@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.broker;
+package com.conveyal.r5.analyst.broker;
 
 /**
  * Describes the status of Job.

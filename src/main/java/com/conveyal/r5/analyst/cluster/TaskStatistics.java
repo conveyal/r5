@@ -1,6 +1,6 @@
-package org.opentripplanner.analyst.cluster;
+package com.conveyal.r5.analyst.cluster;
 
-import org.opentripplanner.common.MavenVersion;
+import com.conveyal.r5.common.MavenVersion;
 
 import java.io.Serializable;
 

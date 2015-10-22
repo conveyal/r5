@@ -1,20 +1,20 @@
-package org.opentripplanner.profile;
+package com.conveyal.r5.profile;
 
 import com.vividsolutions.jts.geom.Coordinate;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.apache.commons.math3.util.FastMath;
-import org.opentripplanner.analyst.PointSet;
-import org.opentripplanner.analyst.ResultSet;
-import org.opentripplanner.analyst.cluster.ResultEnvelope;
-import org.opentripplanner.analyst.core.IsochroneData;
-import org.opentripplanner.analyst.request.SampleGridRenderer.WTWD;
-import org.opentripplanner.analyst.request.SampleGridRenderer.WTWDAccumulativeMetric;
-import org.opentripplanner.common.geometry.AccumulativeGridSampler;
-import org.opentripplanner.common.geometry.DelaunayIsolineBuilder;
-import org.opentripplanner.common.geometry.SparseMatrixZSampleGrid;
-import org.opentripplanner.common.geometry.SphericalDistanceLibrary;
-import org.opentripplanner.routing.graph.Vertex;
+import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.ResultSet;
+import com.conveyal.r5.analyst.cluster.ResultEnvelope;
+import com.conveyal.r5.analyst.core.IsochroneData;
+import com.conveyal.r5.analyst.request.SampleGridRenderer.WTWD;
+import com.conveyal.r5.analyst.request.SampleGridRenderer.WTWDAccumulativeMetric;
+import com.conveyal.r5.common.geometry.AccumulativeGridSampler;
+import com.conveyal.r5.common.geometry.DelaunayIsolineBuilder;
+import com.conveyal.r5.common.geometry.SparseMatrixZSampleGrid;
+import com.conveyal.r5.common.geometry.SphericalDistanceLibrary;
+import com.conveyal.r5.routing.graph.Vertex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

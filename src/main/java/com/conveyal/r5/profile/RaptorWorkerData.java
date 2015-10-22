@@ -1,4 +1,4 @@
-package org.opentripplanner.profile;
+package com.conveyal.r5.profile;
 
 import com.beust.jcommander.internal.Lists;
 import com.google.common.collect.HashMultimap;
@@ -17,30 +17,30 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
 import org.joda.time.LocalDate;
 import org.onebusaway.gtfs.model.Stop;
-import org.opentripplanner.analyst.SampleSet;
-import org.opentripplanner.analyst.cluster.TaskStatistics;
-import org.opentripplanner.analyst.scenario.AddTripPattern;
-import org.opentripplanner.analyst.scenario.ConvertToFrequency;
-import org.opentripplanner.analyst.scenario.Scenario;
-import org.opentripplanner.analyst.scenario.TransferRule;
-import org.opentripplanner.analyst.scenario.TripPatternFilter;
-import org.opentripplanner.common.model.GenericLocation;
-import org.opentripplanner.routing.algorithm.AStar;
-import org.opentripplanner.routing.core.RoutingRequest;
-import org.opentripplanner.routing.core.State;
-import org.opentripplanner.routing.core.TraverseMode;
-import org.opentripplanner.routing.edgetype.SimpleTransfer;
-import org.opentripplanner.routing.edgetype.TripPattern;
-import org.opentripplanner.routing.error.VertexNotFoundException;
-import org.opentripplanner.routing.graph.Graph;
-import org.opentripplanner.routing.graph.Vertex;
-import org.opentripplanner.routing.spt.DominanceFunction;
-import org.opentripplanner.routing.spt.ShortestPathTree;
-import org.opentripplanner.routing.trippattern.FrequencyEntry;
-import org.opentripplanner.routing.trippattern.TripTimes;
-import org.opentripplanner.routing.vertextype.TransitStop;
-import org.opentripplanner.streets.LinkedPointSet;
-import org.opentripplanner.transit.TransitLayer;
+import com.conveyal.r5.analyst.SampleSet;
+import com.conveyal.r5.analyst.cluster.TaskStatistics;
+import com.conveyal.r5.analyst.scenario.AddTripPattern;
+import com.conveyal.r5.analyst.scenario.ConvertToFrequency;
+import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.analyst.scenario.TransferRule;
+import com.conveyal.r5.analyst.scenario.TripPatternFilter;
+import com.conveyal.r5.common.model.GenericLocation;
+import com.conveyal.r5.routing.algorithm.AStar;
+import com.conveyal.r5.routing.core.RoutingRequest;
+import com.conveyal.r5.routing.core.State;
+import com.conveyal.r5.routing.core.TraverseMode;
+import com.conveyal.r5.routing.edgetype.SimpleTransfer;
+import com.conveyal.r5.routing.edgetype.TripPattern;
+import com.conveyal.r5.routing.error.VertexNotFoundException;
+import com.conveyal.r5.routing.graph.Graph;
+import com.conveyal.r5.routing.graph.Vertex;
+import com.conveyal.r5.routing.spt.DominanceFunction;
+import com.conveyal.r5.routing.spt.ShortestPathTree;
+import com.conveyal.r5.routing.trippattern.FrequencyEntry;
+import com.conveyal.r5.routing.trippattern.TripTimes;
+import com.conveyal.r5.routing.vertextype.TransitStop;
+import com.conveyal.r5.streets.LinkedPointSet;
+import com.conveyal.r5.transit.TransitLayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -716,7 +716,7 @@ public class RaptorWorkerData implements Serializable {
 
         // Copy new-style TransportNetwork TripPatterns to RaptorWorkerTimetables
         BitSet servicesActive = transitLayer.getActiveServicesForDate(date);
-        for (org.opentripplanner.transit.TripPattern tripPattern : transitLayer.tripPatterns) {
+        for (com.conveyal.r5.transit.TripPattern tripPattern : transitLayer.tripPatterns) {
             // NOTE this is leaving all patterns with zero active trips in the list.
             // Otherwise we have to re-number all the patterns.
             RaptorWorkerTimetable timetable = tripPattern.toRaptorWorkerTimetable(servicesActive);

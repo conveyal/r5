@@ -1,13 +1,13 @@
-package org.opentripplanner.analyst;
+package com.conveyal.r5.analyst;
 
 import junit.framework.TestCase;
 
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.NoSuchAuthorityCodeException;
-import org.opentripplanner.analyst.EmptyPolygonException;
-import org.opentripplanner.analyst.PointFeature;
-import org.opentripplanner.analyst.PointSet;
-import org.opentripplanner.analyst.UnsupportedGeometryException;
+import com.conveyal.r5.analyst.EmptyPolygonException;
+import com.conveyal.r5.analyst.PointFeature;
+import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.UnsupportedGeometryException;
 
 import java.io.File;
 import java.io.FileOutputStream;

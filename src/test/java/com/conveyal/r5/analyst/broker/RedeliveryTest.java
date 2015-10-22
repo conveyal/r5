@@ -1,7 +1,7 @@
-package org.opentripplanner.analyst.broker;
+package com.conveyal.r5.analyst.broker;
 
-import org.opentripplanner.analyst.cluster.AnalystWorker;
-import org.opentripplanner.analyst.cluster.JobSimulator;
+import com.conveyal.r5.analyst.cluster.AnalystWorker;
+import com.conveyal.r5.analyst.cluster.JobSimulator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

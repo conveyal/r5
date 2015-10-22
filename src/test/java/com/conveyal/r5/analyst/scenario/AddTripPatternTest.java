@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.scenario;
+package com.conveyal.r5.analyst.scenario;
 
 import com.google.common.collect.Lists;
 import com.vividsolutions.jts.geom.LineString;
@@ -8,21 +8,21 @@ import gnu.trove.map.TIntIntMap;
 import junit.framework.TestCase;
 import org.joda.time.LocalDate;
 import org.junit.Test;
-import org.opentripplanner.common.model.GenericLocation;
-import org.opentripplanner.profile.*;
-import org.opentripplanner.routing.algorithm.AStar;
-import org.opentripplanner.routing.core.RoutingRequest;
-import org.opentripplanner.routing.core.TraverseMode;
-import org.opentripplanner.routing.graph.Graph;
-import org.opentripplanner.routing.graph.Vertex;
-import org.opentripplanner.routing.impl.DefaultStreetVertexIndexFactory;
-import org.opentripplanner.routing.spt.ShortestPathTree;
+import com.conveyal.r5.common.model.GenericLocation;
+import com.conveyal.r5.profile.*;
+import com.conveyal.r5.routing.algorithm.AStar;
+import com.conveyal.r5.routing.core.RoutingRequest;
+import com.conveyal.r5.routing.core.TraverseMode;
+import com.conveyal.r5.routing.graph.Graph;
+import com.conveyal.r5.routing.graph.Vertex;
+import com.conveyal.r5.routing.impl.DefaultStreetVertexIndexFactory;
+import com.conveyal.r5.routing.spt.ShortestPathTree;
 
 import java.time.DayOfWeek;
 import java.util.Arrays;
 import java.util.BitSet;
 
-import static org.opentripplanner.graph_builder.module.FakeGraph.*;
+import static com.conveyal.r5.graph_builder.module.FakeGraph.*;
 
 /**
  * Test adding trip patterns.

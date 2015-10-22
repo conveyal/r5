@@ -3,4 +3,4 @@
  * to an underlying baseline graph. It is used for impact analysis: the interactive creation and comparison of the
  * accessibility effects of modifications to a transport network.
  */
-package org.opentripplanner.analyst.scenario;
+package com.conveyal.r5.analyst.scenario;

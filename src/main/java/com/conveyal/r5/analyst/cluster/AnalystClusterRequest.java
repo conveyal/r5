@@ -1,7 +1,7 @@
-package org.opentripplanner.analyst.cluster;
+package com.conveyal.r5.analyst.cluster;
 
-import org.opentripplanner.profile.ProfileRequest;
-import org.opentripplanner.routing.core.RoutingRequest;
+import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.routing.core.RoutingRequest;
 
 import java.io.Serializable;
 

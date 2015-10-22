@@ -1,12 +1,12 @@
-package org.opentripplanner.analyst.cluster;
+package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.S3Object;
 import org.apache.commons.io.IOUtils;
-import org.opentripplanner.graph_builder.GraphBuilder;
-import org.opentripplanner.routing.graph.Graph;
-import org.opentripplanner.routing.impl.DefaultStreetVertexIndexFactory;
-import org.opentripplanner.standalone.CommandLineParameters;
+import com.conveyal.r5.graph_builder.GraphBuilder;
+import com.conveyal.r5.routing.graph.Graph;
+import com.conveyal.r5.routing.impl.DefaultStreetVertexIndexFactory;
+import com.conveyal.r5.standalone.CommandLineParameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

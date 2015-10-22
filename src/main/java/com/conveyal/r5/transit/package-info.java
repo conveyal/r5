@@ -1,4 +1,4 @@
 /**
  * This is a new replacement transit layer implementation.
  */
-package org.opentripplanner.transit;
+package com.conveyal.r5.transit;

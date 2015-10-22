@@ -1,4 +1,4 @@
-package org.opentripplanner.streets;
+package com.conveyal.r5.streets;
 
 import com.conveyal.osmlib.OSM;
 import junit.framework.TestCase;

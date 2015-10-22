@@ -1,6 +1,6 @@
-package org.opentripplanner.transit;
+package com.conveyal.r5.transit;
 
-import org.opentripplanner.profile.RaptorWorkerTimetable;
+import com.conveyal.r5.profile.RaptorWorkerTimetable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

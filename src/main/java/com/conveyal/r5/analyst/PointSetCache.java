@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst;
+package com.conveyal.r5.analyst;
 
 import com.google.common.cache.LoadingCache;
 import org.slf4j.Logger;

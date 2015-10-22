@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.cluster;
+package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.auth.AWSCredentials;
@@ -8,14 +8,14 @@ import com.amazonaws.services.s3.model.S3Object;
 import com.google.common.collect.Maps;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
-import org.opentripplanner.graph_builder.GraphBuilder;
-import org.opentripplanner.routing.graph.Graph;
-import org.opentripplanner.routing.impl.DefaultStreetVertexIndexFactory;
-import org.opentripplanner.routing.services.GraphService;
-import org.opentripplanner.routing.services.GraphSource;
-import org.opentripplanner.routing.services.GraphSource.Factory;
-import org.opentripplanner.standalone.CommandLineParameters;
-import org.opentripplanner.standalone.Router;
+import com.conveyal.r5.graph_builder.GraphBuilder;
+import com.conveyal.r5.routing.graph.Graph;
+import com.conveyal.r5.routing.impl.DefaultStreetVertexIndexFactory;
+import com.conveyal.r5.routing.services.GraphService;
+import com.conveyal.r5.routing.services.GraphSource;
+import com.conveyal.r5.routing.services.GraphSource.Factory;
+import com.conveyal.r5.standalone.CommandLineParameters;
+import com.conveyal.r5.standalone.Router;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

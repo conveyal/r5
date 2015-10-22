@@ -1,22 +1,22 @@
-package org.opentripplanner.profile;
+package com.conveyal.r5.profile;
 
 import junit.framework.TestCase;
 import org.joda.time.LocalDate;
 import org.junit.Test;
-import org.opentripplanner.analyst.scenario.ConvertToFrequency;
-import org.opentripplanner.analyst.scenario.Scenario;
-import org.opentripplanner.api.parameter.QualifiedModeSet;
-import org.opentripplanner.graph_builder.module.FakeGraph;
-import org.opentripplanner.profile.ProfileRequest;
-import org.opentripplanner.profile.RaptorWorkerTimetable;
-import org.opentripplanner.profile.RepeatedRaptorProfileRouter;
-import org.opentripplanner.routing.core.TraverseModeSet;
-import org.opentripplanner.routing.graph.Graph;
-import org.opentripplanner.routing.impl.DefaultStreetVertexIndexFactory;
+import com.conveyal.r5.analyst.scenario.ConvertToFrequency;
+import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.api.parameter.QualifiedModeSet;
+import com.conveyal.r5.graph_builder.module.FakeGraph;
+import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.profile.RaptorWorkerTimetable;
+import com.conveyal.r5.profile.RepeatedRaptorProfileRouter;
+import com.conveyal.r5.routing.core.TraverseModeSet;
+import com.conveyal.r5.routing.graph.Graph;
+import com.conveyal.r5.routing.impl.DefaultStreetVertexIndexFactory;
 
 import java.util.Arrays;
 
-import static org.opentripplanner.graph_builder.module.FakeGraph.*;
+import static com.conveyal.r5.graph_builder.module.FakeGraph.*;
 
 /**
  * Make sure that converting lines to frequency-based representations works.

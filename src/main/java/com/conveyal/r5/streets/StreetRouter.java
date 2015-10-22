@@ -1,4 +1,4 @@
-package org.opentripplanner.streets;
+package com.conveyal.r5.streets;
 
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -6,8 +6,8 @@ import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
-import org.opentripplanner.common.geometry.SphericalDistanceLibrary;
-import org.opentripplanner.common.pqueue.BinHeap;
+import com.conveyal.r5.common.geometry.SphericalDistanceLibrary;
+import com.conveyal.r5.common.pqueue.BinHeap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.scenario;
+package com.conveyal.r5.analyst.scenario;
 
 import junit.framework.TestCase;
 import org.junit.Test;
@@ -8,11 +8,11 @@ import org.onebusaway.gtfs.model.Route;
 import org.onebusaway.gtfs.model.Stop;
 import org.onebusaway.gtfs.model.StopTime;
 import org.onebusaway.gtfs.model.Trip;
-import org.opentripplanner.model.StopPattern;
-import org.opentripplanner.routing.edgetype.TripPattern;
-import org.opentripplanner.routing.trippattern.Deduplicator;
-import org.opentripplanner.routing.trippattern.FrequencyEntry;
-import org.opentripplanner.routing.trippattern.TripTimes;
+import com.conveyal.r5.model.StopPattern;
+import com.conveyal.r5.routing.edgetype.TripPattern;
+import com.conveyal.r5.routing.trippattern.Deduplicator;
+import com.conveyal.r5.routing.trippattern.FrequencyEntry;
+import com.conveyal.r5.routing.trippattern.TripTimes;
 
 import java.util.Arrays;
 import java.util.Collection;

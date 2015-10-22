@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.cluster;
+package com.conveyal.r5.analyst.cluster;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -6,13 +6,13 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
-import org.opentripplanner.api.model.AgencyAndIdSerializer;
-import org.opentripplanner.api.model.JodaLocalDateSerializer;
-import org.opentripplanner.api.model.QualifiedModeSetSerializer;
-import org.opentripplanner.api.model.TraverseModeSetSerializer;
-import org.opentripplanner.profile.ProfileRequest;
-import org.opentripplanner.routing.core.TraverseMode;
-import org.opentripplanner.routing.core.TraverseModeSet;
+import com.conveyal.r5.api.model.AgencyAndIdSerializer;
+import com.conveyal.r5.api.model.JodaLocalDateSerializer;
+import com.conveyal.r5.api.model.QualifiedModeSetSerializer;
+import com.conveyal.r5.api.model.TraverseModeSetSerializer;
+import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.routing.core.TraverseMode;
+import com.conveyal.r5.routing.core.TraverseModeSet;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

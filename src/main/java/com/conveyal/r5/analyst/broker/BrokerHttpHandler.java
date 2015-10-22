@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.broker;
+package com.conveyal.r5.analyst.broker;
 
 import com.conveyal.geojson.GeoJsonModule;
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -11,9 +11,9 @@ import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.grizzly.http.server.Response;
 import org.glassfish.grizzly.http.util.HttpStatus;
-import org.opentripplanner.analyst.cluster.AnalystClusterRequest;
-import org.opentripplanner.api.model.AgencyAndIdSerializer;
-import org.opentripplanner.api.model.JodaLocalDateSerializer;
+import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
+import com.conveyal.r5.api.model.AgencyAndIdSerializer;
+import com.conveyal.r5.api.model.JodaLocalDateSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

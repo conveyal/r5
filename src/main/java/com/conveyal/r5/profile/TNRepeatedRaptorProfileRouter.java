@@ -1,21 +1,21 @@
-package org.opentripplanner.profile;
+package com.conveyal.r5.profile;
 
 import com.google.common.collect.Iterables;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
-import org.opentripplanner.analyst.SampleSet;
-import org.opentripplanner.analyst.cluster.AnalystClusterRequest;
-import org.opentripplanner.analyst.cluster.ResultEnvelope;
-import org.opentripplanner.analyst.cluster.TaskStatistics;
-import org.opentripplanner.analyst.scenario.AddTripPattern;
-import org.opentripplanner.profile.TNPropagatedTimesStore.ConfidenceCalculationMethod;
-import org.opentripplanner.routing.graph.Graph;
-import org.opentripplanner.routing.vertextype.TransitStop;
-import org.opentripplanner.streets.PointSetTimes;
-import org.opentripplanner.streets.StreetRouter;
-import org.opentripplanner.streets.LinkedPointSet;
-import org.opentripplanner.transit.TransportNetwork;
+import com.conveyal.r5.analyst.SampleSet;
+import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
+import com.conveyal.r5.analyst.cluster.ResultEnvelope;
+import com.conveyal.r5.analyst.cluster.TaskStatistics;
+import com.conveyal.r5.analyst.scenario.AddTripPattern;
+import com.conveyal.r5.profile.TNPropagatedTimesStore.ConfidenceCalculationMethod;
+import com.conveyal.r5.routing.graph.Graph;
+import com.conveyal.r5.routing.vertextype.TransitStop;
+import com.conveyal.r5.streets.PointSetTimes;
+import com.conveyal.r5.streets.StreetRouter;
+import com.conveyal.r5.streets.LinkedPointSet;
+import com.conveyal.r5.transit.TransportNetwork;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

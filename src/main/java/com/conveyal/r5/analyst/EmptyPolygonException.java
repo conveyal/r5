@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst;
+package com.conveyal.r5.analyst;
 
 public class EmptyPolygonException extends Exception {
 

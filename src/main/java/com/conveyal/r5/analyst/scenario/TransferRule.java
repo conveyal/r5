@@ -1,6 +1,6 @@
-package org.opentripplanner.analyst.scenario;
+package com.conveyal.r5.analyst.scenario;
 
-import org.opentripplanner.profile.RaptorWorkerTimetable;
+import com.conveyal.r5.profile.RaptorWorkerTimetable;
 
 import java.util.stream.IntStream;
 

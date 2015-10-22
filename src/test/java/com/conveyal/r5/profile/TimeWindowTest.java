@@ -1,4 +1,4 @@
-package org.opentripplanner.profile;
+package com.conveyal.r5.profile;
 
 import junit.framework.TestCase;
 import org.junit.Test;

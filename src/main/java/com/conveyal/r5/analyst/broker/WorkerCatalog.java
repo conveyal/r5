@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.broker;
+package com.conveyal.r5.analyst.broker;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;

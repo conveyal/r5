@@ -1,8 +1,8 @@
-package org.opentripplanner.analyst;
+package com.conveyal.r5.analyst;
 
 import com.fasterxml.jackson.core.JsonGenerationException;
 import com.fasterxml.jackson.core.JsonGenerator;
-import org.opentripplanner.analyst.core.WeightingFunction;
+import com.conveyal.r5.analyst.core.WeightingFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

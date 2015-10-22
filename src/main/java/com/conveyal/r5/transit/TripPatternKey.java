@@ -1,4 +1,4 @@
-package org.opentripplanner.transit;
+package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.model.StopTime;
 import gnu.trove.list.TIntList;

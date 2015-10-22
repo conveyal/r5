@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.scenario;
+package com.conveyal.r5.analyst.scenario;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -9,11 +9,11 @@ import gnu.trove.map.hash.TObjectIntHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.onebusaway.gtfs.model.Stop;
-import org.opentripplanner.profile.RaptorWorkerTimetable;
-import org.opentripplanner.routing.edgetype.TripPattern;
-import org.opentripplanner.routing.graph.Graph;
-import org.opentripplanner.routing.trippattern.FrequencyEntry;
-import org.opentripplanner.routing.trippattern.TripTimes;
+import com.conveyal.r5.profile.RaptorWorkerTimetable;
+import com.conveyal.r5.routing.edgetype.TripPattern;
+import com.conveyal.r5.routing.graph.Graph;
+import com.conveyal.r5.routing.trippattern.FrequencyEntry;
+import com.conveyal.r5.routing.trippattern.TripTimes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

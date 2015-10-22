@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.cluster;
+package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
@@ -26,16 +26,16 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.util.EntityUtils;
-import org.opentripplanner.analyst.PointSet;
-import org.opentripplanner.analyst.SampleSet;
-import org.opentripplanner.api.model.AgencyAndIdSerializer;
-import org.opentripplanner.api.model.JodaLocalDateSerializer;
-import org.opentripplanner.api.model.QualifiedModeSetSerializer;
-import org.opentripplanner.api.model.TraverseModeSetSerializer;
-import org.opentripplanner.common.MavenVersion;
-import org.opentripplanner.profile.RaptorWorkerData;
-import org.opentripplanner.profile.RepeatedRaptorProfileRouter;
-import org.opentripplanner.routing.graph.Graph;
+import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.SampleSet;
+import com.conveyal.r5.api.model.AgencyAndIdSerializer;
+import com.conveyal.r5.api.model.JodaLocalDateSerializer;
+import com.conveyal.r5.api.model.QualifiedModeSetSerializer;
+import com.conveyal.r5.api.model.TraverseModeSetSerializer;
+import com.conveyal.r5.common.MavenVersion;
+import com.conveyal.r5.profile.RaptorWorkerData;
+import com.conveyal.r5.profile.RepeatedRaptorProfileRouter;
+import com.conveyal.r5.routing.graph.Graph;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

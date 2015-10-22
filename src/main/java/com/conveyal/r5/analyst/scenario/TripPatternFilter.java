@@ -1,8 +1,8 @@
-package org.opentripplanner.analyst.scenario;
+package com.conveyal.r5.analyst.scenario;
 
 import com.google.common.collect.Multimap;
-import org.opentripplanner.routing.edgetype.TripPattern;
-import org.opentripplanner.routing.trippattern.TripTimes;
+import com.conveyal.r5.routing.edgetype.TripPattern;
+import com.conveyal.r5.routing.trippattern.TripTimes;
 
 import java.util.Collection;
 

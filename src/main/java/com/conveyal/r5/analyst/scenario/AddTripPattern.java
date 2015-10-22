@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.scenario;
+package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.gtfs.model.Route;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -7,10 +7,10 @@ import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.LineString;
 
 import org.apache.commons.math3.analysis.function.Add;
-import org.opentripplanner.analyst.core.Sample;
-import org.opentripplanner.analyst.request.SampleFactory;
-import org.opentripplanner.model.json_serialization.*;
-import org.opentripplanner.routing.graph.Graph;
+import com.conveyal.r5.analyst.core.Sample;
+import com.conveyal.r5.analyst.request.SampleFactory;
+import com.conveyal.r5.model.json_serialization.*;
+import com.conveyal.r5.routing.graph.Graph;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.cluster;
+package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.handlers.AsyncHandler;
 import com.amazonaws.regions.Region;

@@ -1,9 +1,9 @@
-package org.opentripplanner.streets;
+package com.conveyal.r5.streets;
 
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.iterator.TIntIterator;
 import org.apache.commons.math3.util.FastMath;
-import org.opentripplanner.common.geometry.GeometryUtils;
+import com.conveyal.r5.common.geometry.GeometryUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

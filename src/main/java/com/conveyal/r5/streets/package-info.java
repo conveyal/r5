@@ -1,4 +1,4 @@
 /**
  * This is a new replacement street layer implementation
  */
-package org.opentripplanner.streets;
+package com.conveyal.r5.streets;

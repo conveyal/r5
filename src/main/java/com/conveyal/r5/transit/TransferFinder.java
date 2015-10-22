@@ -1,4 +1,4 @@
-package org.opentripplanner.transit;
+package com.conveyal.r5.transit;
 
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -6,8 +6,8 @@ import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
-import org.opentripplanner.streets.StreetLayer;
-import org.opentripplanner.streets.StreetRouter;
+import com.conveyal.r5.streets.StreetLayer;
+import com.conveyal.r5.streets.StreetRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

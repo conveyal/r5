@@ -1,16 +1,16 @@
-package org.opentripplanner.profile;
+package com.conveyal.r5.profile;
 
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
-import org.opentripplanner.analyst.cluster.TaskStatistics;
-import org.opentripplanner.analyst.scenario.AddTripPattern;
-import org.opentripplanner.analyst.scenario.Scenario;
-import org.opentripplanner.analyst.scenario.TransferRule;
-import org.opentripplanner.analyst.scenario.TripFilter;
-import org.opentripplanner.routing.edgetype.TripPattern;
-import org.opentripplanner.routing.graph.Graph;
-import org.opentripplanner.routing.trippattern.FrequencyEntry;
-import org.opentripplanner.routing.trippattern.TripTimes;
+import com.conveyal.r5.analyst.cluster.TaskStatistics;
+import com.conveyal.r5.analyst.scenario.AddTripPattern;
+import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.analyst.scenario.TransferRule;
+import com.conveyal.r5.analyst.scenario.TripFilter;
+import com.conveyal.r5.routing.edgetype.TripPattern;
+import com.conveyal.r5.routing.graph.Graph;
+import com.conveyal.r5.routing.trippattern.FrequencyEntry;
+import com.conveyal.r5.routing.trippattern.TripTimes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -1,9 +1,9 @@
-package org.opentripplanner.profile;
+package com.conveyal.r5.profile;
 
 import org.joda.time.LocalDate;
-import org.opentripplanner.analyst.scenario.Scenario;
-import org.opentripplanner.api.parameter.QualifiedModeSet;
-import org.opentripplanner.routing.core.TraverseModeSet;
+import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.api.parameter.QualifiedModeSet;
+import com.conveyal.r5.routing.core.TraverseModeSet;
 
 import java.io.Serializable;
 

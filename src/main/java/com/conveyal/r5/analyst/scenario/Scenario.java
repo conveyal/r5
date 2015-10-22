@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.scenario;
+package com.conveyal.r5.analyst.scenario;
 
 import com.beust.jcommander.internal.Lists;
 import com.fasterxml.jackson.annotation.JsonProperty;

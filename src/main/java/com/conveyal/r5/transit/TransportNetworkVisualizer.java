@@ -1,4 +1,4 @@
-package org.opentripplanner.transit;
+package com.conveyal.r5.transit;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -7,15 +7,15 @@ import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.set.TIntSet;
 import org.glassfish.grizzly.http.server.*;
 import org.glassfish.grizzly.http.util.HttpStatus;
-import org.opentripplanner.streets.EdgeStore;
-import org.opentripplanner.streets.VertexStore;
+import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.VertexStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.BindException;
 
-import static org.opentripplanner.streets.VertexStore.floatingDegreesToFixed;
+import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
 
 /**
  * Simple Web-based visualizer for transport networks.
@@ -61,7 +61,7 @@ public class TransportNetworkVisualizer {
         HttpServer server = new HttpServer();
         server.addListener(new NetworkListener("transport_network_visualizer", INTERFACE, PORT));
         server.getServerConfiguration().addHttpHandler(new TransportNetworkHandler(network), "/api/*");
-        server.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(ClassLoader.getSystemClassLoader(), "/org/opentripplanner/transit/TransitNetworkVisualizer/"));
+        server.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(ClassLoader.getSystemClassLoader(), "/com.conveyal.r5/transit/TransitNetworkVisualizer/"));
         try {
             server.start();
             LOG.info("VEX server running.");

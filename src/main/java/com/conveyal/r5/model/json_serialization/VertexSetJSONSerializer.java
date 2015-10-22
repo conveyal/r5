@@ -11,13 +11,13 @@
  You should have received a copy of the GNU General Public License
  along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 
-package org.opentripplanner.model.json_serialization;
+package com.conveyal.r5.model.json_serialization;
 
 import java.io.IOException;
 
 
-import org.opentripplanner.routing.graph.Edge;
-import org.opentripplanner.routing.graph.Graph;
+import com.conveyal.r5.routing.graph.Edge;
+import com.conveyal.r5.routing.graph.Graph;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;

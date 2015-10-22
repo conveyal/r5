@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.broker;
+package com.conveyal.r5.analyst.broker;
 
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.grizzly.http.server.NetworkListener;

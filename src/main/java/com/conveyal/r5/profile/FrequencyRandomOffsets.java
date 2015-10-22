@@ -1,4 +1,4 @@
-package org.opentripplanner.profile;
+package com.conveyal.r5.profile;
 
 import gnu.trove.iterator.TIntObjectIterator;
 import gnu.trove.map.TIntObjectMap;

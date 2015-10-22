@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.cluster;
+package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.auth.AWSCredentials;
@@ -10,8 +10,8 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.io.ByteStreams;
 import org.apache.commons.io.FileUtils;
-import org.opentripplanner.analyst.PointSet;
-import org.opentripplanner.analyst.PointSetCache;
+import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.PointSetCache;
 
 import java.io.File;
 import java.io.FileInputStream;

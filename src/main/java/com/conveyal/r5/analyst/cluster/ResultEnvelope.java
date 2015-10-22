@@ -1,6 +1,6 @@
-package org.opentripplanner.analyst.cluster;
+package com.conveyal.r5.analyst.cluster;
 
-import org.opentripplanner.analyst.ResultSet;
+import com.conveyal.r5.analyst.ResultSet;
 
 import java.io.Serializable;
 import java.util.HashMap;

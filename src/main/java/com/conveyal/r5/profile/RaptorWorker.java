@@ -1,11 +1,11 @@
-package org.opentripplanner.profile;
+package com.conveyal.r5.profile;
 
 import com.google.protobuf.CodedOutputStream;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
-import org.opentripplanner.analyst.cluster.TaskStatistics;
-import org.opentripplanner.routing.graph.Graph;
+import com.conveyal.r5.analyst.cluster.TaskStatistics;
+import com.conveyal.r5.routing.graph.Graph;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

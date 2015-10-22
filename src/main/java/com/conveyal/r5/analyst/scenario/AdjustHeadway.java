@@ -1,9 +1,9 @@
-package org.opentripplanner.analyst.scenario;
+package com.conveyal.r5.analyst.scenario;
 
 import org.onebusaway.gtfs.model.Trip;
-import org.opentripplanner.routing.edgetype.TripPattern;
-import org.opentripplanner.routing.trippattern.FrequencyEntry;
-import org.opentripplanner.routing.trippattern.TripTimes;
+import com.conveyal.r5.routing.edgetype.TripPattern;
+import com.conveyal.r5.routing.trippattern.FrequencyEntry;
+import com.conveyal.r5.routing.trippattern.TripTimes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

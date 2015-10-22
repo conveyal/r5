@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.scenario;
+package com.conveyal.r5.analyst.scenario;
 
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;

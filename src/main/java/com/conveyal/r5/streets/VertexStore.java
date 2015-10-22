@@ -1,4 +1,4 @@
-package org.opentripplanner.streets;
+package com.conveyal.r5.streets;
 
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;

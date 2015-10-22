@@ -1,6 +1,6 @@
-package org.opentripplanner.streets;
+package com.conveyal.r5.streets;
 
-import org.opentripplanner.analyst.PointSet;
+import com.conveyal.r5.analyst.PointSet;
 
 /**
  * The travel time to every point in a PointSet.

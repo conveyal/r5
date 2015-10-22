@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.broker;
+package com.conveyal.r5.analyst.broker;
 
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.ec2.AmazonEC2;
@@ -18,12 +18,12 @@ import gnu.trove.map.hash.TObjectLongHashMap;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.grizzly.http.server.Response;
 import org.glassfish.grizzly.http.util.HttpStatus;
-import org.opentripplanner.analyst.cluster.AnalystClusterRequest;
-import org.opentripplanner.analyst.cluster.AnalystWorker;
-import org.opentripplanner.api.model.AgencyAndIdSerializer;
-import org.opentripplanner.api.model.JodaLocalDateSerializer;
-import org.opentripplanner.api.model.QualifiedModeSetSerializer;
-import org.opentripplanner.api.model.TraverseModeSetSerializer;
+import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
+import com.conveyal.r5.analyst.cluster.AnalystWorker;
+import com.conveyal.r5.api.model.AgencyAndIdSerializer;
+import com.conveyal.r5.api.model.JodaLocalDateSerializer;
+import com.conveyal.r5.api.model.QualifiedModeSetSerializer;
+import com.conveyal.r5.api.model.TraverseModeSetSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

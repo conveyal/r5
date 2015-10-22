@@ -1,12 +1,12 @@
-package org.opentripplanner.transit;
+package com.conveyal.r5.transit;
 
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.S3Object;
 import com.google.common.io.ByteStreams;
 import org.apache.commons.io.IOUtils;
-import org.opentripplanner.common.MavenVersion;
-import org.opentripplanner.standalone.CommandLineParameters;
+import com.conveyal.r5.common.MavenVersion;
+import com.conveyal.r5.standalone.CommandLineParameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

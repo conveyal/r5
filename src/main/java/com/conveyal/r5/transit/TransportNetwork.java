@@ -1,12 +1,12 @@
-package org.opentripplanner.transit;
+package com.conveyal.r5.transit;
 
 import com.conveyal.osmlib.OSM;
 import org.nustaq.serialization.FSTObjectInput;
 import org.nustaq.serialization.FSTObjectOutput;
-import org.opentripplanner.analyst.PointSet;
-import org.opentripplanner.streets.LinkedPointSet;
-import org.opentripplanner.streets.StreetLayer;
-import org.opentripplanner.streets.StreetRouter;
+import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.streets.LinkedPointSet;
+import com.conveyal.r5.streets.StreetLayer;
+import com.conveyal.r5.streets.StreetRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

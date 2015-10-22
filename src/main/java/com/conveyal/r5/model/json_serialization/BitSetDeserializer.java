@@ -1,4 +1,4 @@
-package org.opentripplanner.model.json_serialization;
+package com.conveyal.r5.model.json_serialization;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;

@@ -1,9 +1,9 @@
-package org.opentripplanner.profile;
+package com.conveyal.r5.profile;
 
 import junit.framework.TestCase;
 import org.junit.Test;
-import org.opentripplanner.graph_builder.module.FakeGraph;
-import org.opentripplanner.routing.graph.Graph;
+import com.conveyal.r5.graph_builder.module.FakeGraph;
+import com.conveyal.r5.routing.graph.Graph;
 
 /**
  * Test the propagated times store.

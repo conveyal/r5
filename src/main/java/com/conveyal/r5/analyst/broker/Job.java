@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.broker;
+package com.conveyal.r5.analyst.broker;
 
 import gnu.trove.iterator.TIntLongIterator;
 import gnu.trove.map.TIntLongMap;
@@ -7,7 +7,7 @@ import gnu.trove.map.hash.TIntLongHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
-import org.opentripplanner.analyst.cluster.AnalystClusterRequest;
+import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

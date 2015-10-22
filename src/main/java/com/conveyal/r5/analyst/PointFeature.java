@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst;
+package com.conveyal.r5.analyst;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -6,7 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.geojson.Feature;
-import org.opentripplanner.common.geometry.GeometryUtils;
+import com.conveyal.r5.common.geometry.GeometryUtils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

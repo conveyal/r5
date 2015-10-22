@@ -1,4 +1,4 @@
-package org.opentripplanner.streets;
+package com.conveyal.r5.streets;
 
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.osmlib.Node;
@@ -12,8 +12,8 @@ import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
-import org.opentripplanner.common.geometry.SphericalDistanceLibrary;
-import org.opentripplanner.transit.TransitLayer;
+import com.conveyal.r5.common.geometry.SphericalDistanceLibrary;
+import com.conveyal.r5.transit.TransitLayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

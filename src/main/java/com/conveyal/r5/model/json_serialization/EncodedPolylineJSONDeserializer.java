@@ -1,4 +1,4 @@
-package org.opentripplanner.model.json_serialization;
+package com.conveyal.r5.model.json_serialization;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -6,9 +6,9 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Geometry;
-import org.opentripplanner.common.geometry.GeometryUtils;
-import org.opentripplanner.util.PolylineEncoder;
-import org.opentripplanner.util.model.EncodedPolylineBean;
+import com.conveyal.r5.common.geometry.GeometryUtils;
+import com.conveyal.r5.util.PolylineEncoder;
+import com.conveyal.r5.util.model.EncodedPolylineBean;
 
 import java.io.IOException;
 import java.util.List;

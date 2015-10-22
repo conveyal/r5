@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst.cluster;
+package com.conveyal.r5.analyst.cluster;
 
 /**
  * Store task statistics.

@@ -1,4 +1,4 @@
-package org.opentripplanner.transit;
+package com.conveyal.r5.transit;
 
 import gnu.trove.TIntCollection;
 import gnu.trove.list.TIntList;

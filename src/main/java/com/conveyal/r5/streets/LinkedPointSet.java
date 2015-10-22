@@ -1,11 +1,11 @@
-package org.opentripplanner.streets;
+package com.conveyal.r5.streets;
 
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
-import org.opentripplanner.analyst.PointSet;
-import org.opentripplanner.streets.EdgeStore.Edge;
+import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.streets.EdgeStore.Edge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

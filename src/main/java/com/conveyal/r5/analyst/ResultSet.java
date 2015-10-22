@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst;
+package com.conveyal.r5.analyst;
 
 import com.beust.jcommander.internal.Maps;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -6,11 +6,11 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.geojson.feature.FeatureJSON;
-import org.opentripplanner.analyst.core.IsochroneData;
-import org.opentripplanner.api.resource.LIsochrone;
-import org.opentripplanner.api.resource.SurfaceResource;
-import org.opentripplanner.common.geometry.ZSampleGrid;
-import org.opentripplanner.profile.IsochroneGenerator;
+import com.conveyal.r5.analyst.core.IsochroneData;
+import com.conveyal.r5.api.resource.LIsochrone;
+import com.conveyal.r5.api.resource.SurfaceResource;
+import com.conveyal.r5.common.geometry.ZSampleGrid;
+import com.conveyal.r5.profile.IsochroneGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

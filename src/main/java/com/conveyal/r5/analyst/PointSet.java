@@ -1,4 +1,4 @@
-package org.opentripplanner.analyst;
+package com.conveyal.r5.analyst;
 
 import com.csvreader.CsvReader;
 import com.fasterxml.jackson.core.JsonFactory;
@@ -28,12 +28,12 @@ import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.NoSuchAuthorityCodeException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
-import org.opentripplanner.analyst.pointset.PropertyMetadata;
-import org.opentripplanner.common.geometry.SphericalDistanceLibrary;
-import org.opentripplanner.routing.graph.Graph;
-import org.opentripplanner.routing.services.GraphService;
-import org.opentripplanner.streets.StreetLayer;
-import org.opentripplanner.streets.LinkedPointSet;
+import com.conveyal.r5.analyst.pointset.PropertyMetadata;
+import com.conveyal.r5.common.geometry.SphericalDistanceLibrary;
+import com.conveyal.r5.routing.graph.Graph;
+import com.conveyal.r5.routing.services.GraphService;
+import com.conveyal.r5.streets.StreetLayer;
+import com.conveyal.r5.streets.LinkedPointSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

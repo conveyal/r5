@@ -6,7 +6,6 @@ import com.amazonaws.services.s3.model.S3Object;
 import com.google.common.io.ByteStreams;
 import org.apache.commons.io.IOUtils;
 import com.conveyal.r5.common.MavenVersion;
-import com.conveyal.r5.standalone.CommandLineParameters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,7 +54,7 @@ public class TransportNetworkCache {
         TransportNetwork network = checkCached(networkId);
         if (network == null) {
             LOG.info("Cached transport network for id {} and commit {} was not found. Building it.",
-                    networkId, MavenVersion.VERSION.commit);
+                    networkId, MavenVersion.commit);
             network = buildNetwork(networkId);
         }
 
@@ -68,12 +67,12 @@ public class TransportNetworkCache {
     /** If this transport network is already built and cached, fetch it quick */
     private TransportNetwork checkCached (String networkId) {
         try {
-            String filename = networkId + "_" + MavenVersion.VERSION.commit + ".dat";
-            File cacheLocation = new File(CACHE_DIR, networkId + "_" + MavenVersion.VERSION.commit + ".dat");
+            String filename = networkId + "_" + MavenVersion.commit + ".dat";
+            File cacheLocation = new File(CACHE_DIR, networkId + "_" + MavenVersion.commit + ".dat");
 
             if (cacheLocation.exists())
                 // yippee! we have a cached network
-                LOG.info("Found locally-cached transport network for id {} and commit {}", networkId, MavenVersion.VERSION.commit);
+                LOG.info("Found locally-cached transport network for id {} and commit {}", networkId, MavenVersion.commit);
             else {
                 LOG.info("Checking for cached transport network on S3");
                 // try to download from S3
@@ -145,12 +144,11 @@ public class TransportNetworkCache {
         }
 
         // Now we have a local copy of these graph inputs. Make a graph out of them.
-        CommandLineParameters params = new CommandLineParameters();
         TransportNetwork network = TransportNetwork.fromDirectory(new File(CACHE_DIR, networkId));
 
         // cache the network
-        String filename = networkId + "_" + MavenVersion.VERSION.commit + ".dat";
-        File cacheLocation = new File(CACHE_DIR, networkId + "_" + MavenVersion.VERSION.commit + ".dat");
+        String filename = networkId + "_" + MavenVersion.commit + ".dat";
+        File cacheLocation = new File(CACHE_DIR, networkId + "_" + MavenVersion.commit + ".dat");
         
         try {
             FileOutputStream fos = new FileOutputStream(cacheLocation);

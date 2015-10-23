@@ -35,8 +35,5 @@ public class StreetLayerTest extends TestCase {
         // note: vertices of disconnected subgraphs are not removed
         assertEquals(0, sl.incomingEdges.get(v).size());
         assertEquals(0, sl.outgoingEdges.get(v).size());
-
-        assertTrue(v != sl.edgeStore.getCursor(e0).getToVertex());
-        assertTrue(v != sl.edgeStore.getCursor(e1).getFromVertex());
     }
 }

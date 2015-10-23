@@ -1,6 +1,5 @@
 package com.conveyal.r5.analyst.broker;
 
-import com.conveyal.geojson.GeoJsonModule;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -12,8 +11,6 @@ import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.grizzly.http.server.Response;
 import org.glassfish.grizzly.http.util.HttpStatus;
 import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
-import com.conveyal.r5.api.model.AgencyAndIdSerializer;
-import com.conveyal.r5.api.model.JodaLocalDateSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,9 +42,6 @@ class BrokerHttpHandler extends HttpHandler {
 
     // TODO we should really just make one static mapper somewhere and use it throughout OTP
     private ObjectMapper mapper = new ObjectMapper()
-            .registerModule(AgencyAndIdSerializer.makeModule())
-            .registerModule(JodaLocalDateSerializer.makeModule())
-            .registerModule(new GeoJsonModule())
             .setSerializationInclusion(JsonInclude.Include.NON_NULL);;
 
     private Broker broker;

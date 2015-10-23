@@ -6,13 +6,7 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
-import com.conveyal.r5.api.model.AgencyAndIdSerializer;
-import com.conveyal.r5.api.model.JodaLocalDateSerializer;
-import com.conveyal.r5.api.model.QualifiedModeSetSerializer;
-import com.conveyal.r5.api.model.TraverseModeSetSerializer;
 import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.routing.core.TraverseMode;
-import com.conveyal.r5.routing.core.TraverseModeSet;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -55,10 +49,10 @@ public class JobSimulator {
 
         ObjectMapper mapper = new ObjectMapper();
         mapper.enable(SerializationFeature.INDENT_OUTPUT);
-        mapper.registerModule(AgencyAndIdSerializer.makeModule());
+        /*mapper.registerModule(AgencyAndIdSerializer.makeModule());
         mapper.registerModule(QualifiedModeSetSerializer.makeModule());
         mapper.registerModule(JodaLocalDateSerializer.makeModule());
-        mapper.registerModule(TraverseModeSetSerializer.makeModule());
+        mapper.registerModule(TraverseModeSetSerializer.makeModule());*/
 
         List<AnalystClusterRequest> requests = new ArrayList<>();
 

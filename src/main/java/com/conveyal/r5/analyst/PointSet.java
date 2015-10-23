@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.r5.common.SphericalDistanceLibrary;
 import com.csvreader.CsvReader;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerationException;
@@ -28,10 +29,6 @@ import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.NoSuchAuthorityCodeException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
-import com.conveyal.r5.analyst.pointset.PropertyMetadata;
-import com.conveyal.r5.common.geometry.SphericalDistanceLibrary;
-import com.conveyal.r5.routing.graph.Graph;
-import com.conveyal.r5.routing.services.GraphService;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.LinkedPointSet;
 import org.slf4j.Logger;
@@ -80,12 +77,6 @@ public class PointSet implements Serializable {
     public Map<String, int[]> properties = new ConcurrentHashMap<String, int[]>();
     public int capacity = 0; // The total number of features this PointSet can hold.
 
-    /*
-     * Connects this population to vertices in a given Graph (map of graph ids
-     * to sample sets). Keeping as a graphId->sampleSet map to prevent
-     * duplication of pointset when used across multiple graphs.
-     */
-    private Map<String, SampleSet> samples = new ConcurrentHashMap<String, SampleSet>();
 
     // For TransportNetworks
     Map<StreetLayer, LinkedPointSet> linkageCache = new HashMap<>();
@@ -94,11 +85,6 @@ public class PointSet implements Serializable {
      * Map from string IDs to their array indices. This is a view into PointSet.ids, namely its reverse mapping.
      */
     private transient TObjectIntMap<String> idIndexMap;
-
-    /*
-     * Used to generate SampleSets on an as needed basis. 
-     */
-    protected GraphService graphService;
 
     /*
      * In a detailed Indicator, the time to reach each target, for each origin.
@@ -464,53 +450,6 @@ public class PointSet implements Serializable {
         polygons = new Polygon[capacity];
     }
 
-    /**
-     * Adds a graph service to allow for auto creation of SampleSets for a given
-     * graph
-     */
-    public void setGraphService(GraphService graphService) {
-        this.graphService = graphService;
-    }
-
-    /**
-     * gets a sample set for a given graph id -- requires graphservice to be set
-     * @return sampleset for graph
-     */
-    public SampleSet getSampleSet(String routerId) {
-        if(this.graphService == null) 
-            return null;
-
-        if (this.samples.containsKey(routerId))
-            return this.samples.get(routerId);
-        Graph g = this.graphService.getRouter(routerId).graph;
-
-        return getSampleSet(g);
-    }
-
-    // TODO refactor the other getSampleSet methods in terms of this one.
-    public SampleSet getOrCreateSampleSet(Graph graph) {
-        SampleSet sampleSet = this.samples.get(graph.routerId);
-        if (sampleSet == null) {
-            sampleSet = new SampleSet(this, graph.getSampleFactory());
-            this.samples.put(graph.routerId, sampleSet);
-        }
-        return sampleSet;
-    }
-
-    /** 
-     * gets a sample set for a graph object -- does not require graph service to be set 
-     * @param g a graph objects
-     * @return sampleset for graph
-     */
-
-    public SampleSet getSampleSet(Graph g) {	
-        if (g == null)
-            return null;
-        SampleSet sampleSet = new SampleSet(this, g.getSampleFactory());
-        this.samples.put(g.routerId, sampleSet);
-        return sampleSet;
-    }
-
     public int featureCount() {
         return ids.length;
     }
@@ -856,8 +795,8 @@ public class PointSet implements Serializable {
         // to resurvey the baseline every 24 miles, which explains why one is often driving
         // down a rural road in the midwestern US and comes to a point where the road makes two 90-
         // degree curves in quick succession to reach the new survey baseline.
-        double gridSizeLat = SphericalDistanceLibrary.metersToDegrees(gridSizeMeters);
-        double gridSizeLon = SphericalDistanceLibrary.metersToLonDegrees(gridSizeMeters, (envelope.getMaxY() + envelope.getMinY()) / 2);
+        double gridSizeLat = SphericalDistanceLibrary.metersToDegreesLatitude(gridSizeMeters);
+        double gridSizeLon = SphericalDistanceLibrary.metersToDegreesLongitude(gridSizeMeters, (envelope.getMaxY() + envelope.getMinY()) / 2);
 
         // how large will it be?
         int npts = (int) (envelope.getHeight() / gridSizeLat + 1) * (int) (envelope.getWidth() / gridSizeLon + 1);
@@ -908,6 +847,42 @@ public class PointSet implements Serializable {
 
     public double getLon (int i) {
         return lons[i];
+    }
+
+
+    /**
+     * Contains display and styling information for a single property of features in a PointSet.
+     * @author bmander
+     */
+    public static class PropertyMetadata implements Serializable{
+
+        /** A PointSet-unique property identifier */
+        public String id;
+
+        /** A short description of this property for use in a legend or menu */
+        public String label;
+
+        /** The display style for features having this property (e.g. color) */
+        public Style style;
+
+        public PropertyMetadata(String id){
+            this.style = new Style();
+            this.id = id;
+        }
+
+        public void setLabel(String label) {
+            this.label = label;
+        }
+
+        public void addStyle(String styleAttribute, String styleValue) {
+            this.style.attributes.put(styleAttribute, styleValue);
+        }
+    }
+
+    /** TODO: clarify, does this contain CSS attribute-value pairs or...?
+     * @author bmander */
+    public static class Style implements Serializable{
+        public Map<String, String> attributes = new ConcurrentHashMap<String, String>();
     }
 
 }

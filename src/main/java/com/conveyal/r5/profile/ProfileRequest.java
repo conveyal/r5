@@ -1,9 +1,6 @@
 package com.conveyal.r5.profile;
 
 import org.joda.time.LocalDate;
-import com.conveyal.r5.analyst.scenario.Scenario;
-import com.conveyal.r5.api.parameter.QualifiedModeSet;
-import com.conveyal.r5.routing.core.TraverseModeSet;
 
 import java.io.Serializable;
 
@@ -77,23 +74,21 @@ public class ProfileRequest implements Serializable, Cloneable {
     /** The date of the search */
     public LocalDate date;
     
-    /** The order in which to return multiple options */
-    public Option.SortOrder orderBy;
-    
     /** the maximum number of options presented PER ACCESS MODE */
     public int limit;
     
     /** The modes used to access transit */
-    public QualifiedModeSet accessModes;
+    // TODO replacing mode sets with strings while porting code from otp repository
+    public String accessModes;
     
     /** The modes used to reach the destination after leaving transit */
-    public QualifiedModeSet egressModes;
+    public String egressModes;
     
     /** The modes used to reach the destination without transit */
-    public QualifiedModeSet directModes;
+    public String directModes;
     
     /** The transit modes used */
-    public TraverseModeSet transitModes;
+    public String transitModes;
     
     /** If true, disable all goal direction and propagate results to the street network */
     public boolean analyst = false;
@@ -150,7 +145,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     public int suboptimalMinutes;
 
     /** A non-destructive scenario to apply when executing this request */
-    public Scenario scenario;
+    //public Scenario scenario;
     
     public ProfileRequest clone () throws CloneNotSupportedException {
         return (ProfileRequest) super.clone();

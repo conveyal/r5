@@ -1,7 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.routing.core.RoutingRequest;
 
 import java.io.Serializable;
 

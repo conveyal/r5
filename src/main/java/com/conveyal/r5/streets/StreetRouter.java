@@ -6,12 +6,11 @@ import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
-import com.conveyal.r5.common.geometry.SphericalDistanceLibrary;
-import com.conveyal.r5.common.pqueue.BinHeap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.util.PriorityQueue;
 
 /**
  * This routes over the street layer of a TransitNetwork.
@@ -32,7 +31,7 @@ public class StreetRouter {
 
     TIntObjectMap<State> bestStates = new TIntObjectHashMap<>();
 
-    BinHeap<State> queue = new BinHeap<>();
+    PriorityQueue<State> queue = new PriorityQueue<>((s1, s2) -> s2.weight - s1.weight);
 
     boolean goalDirection = false;
 
@@ -100,7 +99,7 @@ public class StreetRouter {
             return;
         }
         bestStates.clear();
-        queue.reset();
+        queue.clear();
         State startState0 = new State(split.vertex0, -1, null);
         State startState1 = new State(split.vertex1, -1, null);
         // TODO walk speed, assuming 1 m/sec currently.
@@ -108,16 +107,16 @@ public class StreetRouter {
         startState1.weight = split.distance1_mm / 1000;
         bestStates.put(split.vertex0, startState0);
         bestStates.put(split.vertex1, startState1);
-        queue.insert(startState0, startState0.weight);
-        queue.insert(startState1, startState1.weight);
+        queue.add(startState0);
+        queue.add(startState1);
     }
 
     public void setOrigin (int fromVertex) {
         bestStates.clear();
-        queue.reset();
+        queue.clear();
         State startState = new State(fromVertex, -1, null);
         bestStates.put(fromVertex, startState);
-        queue.insert(startState, 0);
+        queue.add(startState);
     }
 
     /**
@@ -151,8 +150,8 @@ public class StreetRouter {
         }
 
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
-        while (!queue.empty()) {
-            State s0 = queue.extract_min();
+        while (!queue.isEmpty()) {
+            State s0 = queue.poll();
             if (bestStates.get(s0.vertex) != s0) {
                 continue; // state was dominated after being enqueued
             }
@@ -176,8 +175,7 @@ public class StreetRouter {
                 if (existingBest == null || existingBest.weight > s1.weight) {
                     bestStates.put(s1.vertex, s1);
                 }
-                int remainingWeight = goalDirection ? heuristic(s1) : 0;
-                queue.insert(s1, s1.weight + remainingWeight);
+                queue.add(s1);
                 return true; // Iteration over edges should continue.
             });
         }
@@ -185,17 +183,6 @@ public class StreetRouter {
             printStream.close();
         }
     }
-
-    /**
-     * Estimate remaining weight to destination. Must be an underestimate.
-     */
-    private int heuristic (State s) {
-        VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor(s.vertex);
-        double lat = vertex.getLat();
-        double lon = vertex.getLon();
-        return (int)SphericalDistanceLibrary.fastDistance(lat, lon, targetLat, targetLon);
-    }
-
     public int getTravelTimeToVertex (int vertexIndex) {
         State state = bestStates.get(vertexIndex);
         if (state == null) {

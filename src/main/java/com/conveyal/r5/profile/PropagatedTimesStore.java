@@ -52,9 +52,9 @@ import static org.apache.commons.math3.util.FastMath.toRadians;
  * When exploring single-point (one-to-many) query results it would be great to have all these stored or produced on
  * demand for visualization.
  */
-public class TNPropagatedTimesStore {
+public class PropagatedTimesStore {
 
-    private static final Logger LOG = LoggerFactory.getLogger(TNPropagatedTimesStore.class);
+    private static final Logger LOG = LoggerFactory.getLogger(PropagatedTimesStore.class);
 
     // Four parallel arrays has worse locality than one big 4|V|-length flat array, but merging per-raptor-call values
     // into this summary statistics storage is not the slow part of the algorithm. Optimization should concentrate on
@@ -67,7 +67,7 @@ public class TNPropagatedTimesStore {
 
     private static final Random random = new Random();
 
-    public TNPropagatedTimesStore(int size) {
+    public PropagatedTimesStore(int size) {
         this.size = size;
         mins = new int[size];
         maxs = new int[size];

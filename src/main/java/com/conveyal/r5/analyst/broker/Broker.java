@@ -4,6 +4,7 @@ import com.amazonaws.regions.Regions;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.*;
+import com.conveyal.r5.common.JsonUtilities;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.HashMultimap;
@@ -77,7 +78,7 @@ public class Broker implements Runnable {
     /** Maximum number of workers allowed */
     private int maxWorkers;
 
-    private static final ObjectMapper mapper = new ObjectMapper();
+    private static final ObjectMapper mapper = JsonUtilities.objectMapper;
 
     private long nextRedeliveryCheckTime = System.currentTimeMillis();
 

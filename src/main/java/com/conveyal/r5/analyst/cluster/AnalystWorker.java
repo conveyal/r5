@@ -4,6 +4,7 @@ import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.conveyal.r5.common.JsonUtilities;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -213,10 +214,7 @@ public class AnalystWorker implements Runnable {
         s3.setRegion(awsRegion);
 
         /* The ObjectMapper (de)serializes JSON. */
-        objectMapper = new ObjectMapper();
-        objectMapper.configure(JsonParser.Feature.ALLOW_COMMENTS, true);
-        objectMapper.configure(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true);
-        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false); // ignore JSON fields that don't match target type
+        objectMapper = JsonUtilities.objectMapper;
 
         instanceType = getInstanceType();
     }

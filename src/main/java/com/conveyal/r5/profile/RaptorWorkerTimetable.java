@@ -1,26 +1,10 @@
 package com.conveyal.r5.profile;
 
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Lists;
-import com.conveyal.r5.analyst.cluster.TaskStatistics;
-import com.conveyal.r5.analyst.scenario.AddTripPattern;
-import com.conveyal.r5.analyst.scenario.Scenario;
-import com.conveyal.r5.analyst.scenario.TransferRule;
-import com.conveyal.r5.analyst.scenario.TripFilter;
-import com.conveyal.r5.routing.edgetype.TripPattern;
-import com.conveyal.r5.routing.graph.Graph;
-import com.conveyal.r5.routing.trippattern.FrequencyEntry;
-import com.conveyal.r5.routing.trippattern.TripTimes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.util.BitSet;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * A RaptorWorkerTimetable is used by a RaptorWorker to perform large numbers of RAPTOR searches very quickly
@@ -245,209 +229,80 @@ public class RaptorWorkerTimetable implements Serializable {
         return this.timesPerTrip != null && this.timesPerTrip.length > 0;
     }
 
-    /**
-     * This is a factory function rather than a constructor to avoid calling the super constructor for rejected patterns.
-     * BannedRoutes is formatted as agencyid_routeid.
-     */
-    public static RaptorWorkerTimetable forPattern (Graph graph, TripPattern pattern, TimeWindow window, Scenario scenario, TaskStatistics ts) {
-
-        // Filter down the trips to only those running during the window
-        // This filtering can reduce number of trips and run time by 80 percent
-        BitSet servicesRunning = window.servicesRunning;
-        List<TripTimes> tripTimes = Lists.newArrayList();
-        TT: for (TripTimes tt : pattern.scheduledTimetable.tripTimes) {
-            if (servicesRunning.get(tt.serviceCode) &&
-                    tt.getArrivalTime(0) < window.to &&
-                    tt.getDepartureTime(tt.getNumStops() - 1) >= window.from) {
-
-                // apply scenario
-                // TODO: need to do this before filtering based on window!
-                if (scenario != null && scenario.modifications != null) {
-                    for (TripFilter filter : Iterables.filter(scenario.modifications, TripFilter.class)) {
-                        tt = filter.apply(tt.trip, pattern, tt);
-
-                        if (tt == null)
-                            continue TT;
-                    }
-                }
-
-                tripTimes.add(tt);
-            }
-        }
-
-        // find frequency trips
-        List<FrequencyEntry> freqs = Lists.newArrayList();
-        FREQUENCIES: for (FrequencyEntry fe : pattern.scheduledTimetable.frequencyEntries) {
-            if (servicesRunning.get(fe.tripTimes.serviceCode) &&
-                    fe.getMinDeparture() < window.to &&
-                    fe.getMaxArrival() > window.from
-                    ) {
-                // this frequency entry has the potential to be used
-
-                if (fe.exactTimes) {
-                    LOG.warn("Exact-times frequency trips not yet supported");
-                    continue;
-                }
-
-                if (scenario != null && scenario.modifications != null) {
-                    for (TripFilter filter : Iterables.filter(scenario.modifications, TripFilter.class)) {
-                        fe = filter.apply(fe.tripTimes.trip, pattern, fe);
-
-                        if (fe == null)
-                            continue FREQUENCIES;
-                    }
-                }
-
-                freqs.add(fe);
-            }
-        }
-
-        if (tripTimes.isEmpty() && freqs.isEmpty()) {
-            return null; // no trips active, don't bother storing a timetable
-        }
-
-
-        // Sort the trip times by their first arrival time
-        Collections.sort(tripTimes, new Comparator<TripTimes>() {
-            @Override
-            public int compare(TripTimes tt1, TripTimes tt2) {
-                return (tt1.getArrivalTime(0) - tt2.getArrivalTime(0));
-            }
-        });
-
-        // Copy the times into the compacted table
-        RaptorWorkerTimetable rwtt = new RaptorWorkerTimetable(tripTimes.size(), pattern.getStops().size());
-        int t = 0;
-        for (TripTimes tt : tripTimes) {
-            int[] times = new int[rwtt.nStops * 2];
-            for (int s = 0; s < pattern.getStops().size(); s++) {
-                int arrival = tt.getArrivalTime(s);
-                int departure = tt.getDepartureTime(s);
-                times[s * 2] = arrival;
-                times[s * 2 + 1] = departure;
-            }
-            rwtt.timesPerTrip[t++] = times;
-        }
-
-        ts.scheduledTripCount += rwtt.timesPerTrip.length;
-
-        // save frequency times
-        rwtt.frequencyTrips = new int[freqs.size()][pattern.getStops().size() * 2];
-        rwtt.endTimes = new int[freqs.size()];
-        rwtt.startTimes = new int[freqs.size()];
-        rwtt.headwaySecs = new int[freqs.size()];
-
-        {
-            int i = 0;
-            for (FrequencyEntry fe : freqs) {
-                rwtt.headwaySecs[i] = fe.headway;
-                rwtt.startTimes[i] = fe.startTime;
-                rwtt.endTimes[i] = fe.endTime;
-
-                ts.frequencyTripCount += fe.numTrips();
-
-                int[] times = rwtt.frequencyTrips[i];
-
-                // It's generally considered good practice to have frequency trips start at midnight, however that is
-                // not always the case, and we need to preserve the original times so that we can update them in
-                // real time.
-                int startTime = fe.tripTimes.getArrivalTime(0);
-
-                for (int s = 0; s < fe.tripTimes.getNumStops(); s++) {
-                    times[s * 2] = fe.tripTimes.getArrivalTime(s) - startTime;
-                    times[s * 2 + 1] = fe.tripTimes.getDepartureTime(s) - startTime;
-                }
-
-                i++;
-            }
-        }
-
-        ts.frequencyEntryCount += rwtt.getFrequencyTripCount();
-
-        rwtt.mode = pattern.route.getType();
-
-        return rwtt;
-    }
-
-    /** Create a raptor worker timetable for an added pattern */
-    public static RaptorWorkerTimetable forAddedPattern(AddTripPattern atp, TimeWindow window, TaskStatistics ts) {
-        if (atp.temporaryStops.length < 2 || atp.timetables.isEmpty())
-            return null;
-
-        // filter down the timetable to only those running
-        Collection<AddTripPattern.PatternTimetable> running = atp.timetables.stream()
-                // getValue yields one-based ISO days of week (monday = 1); convert to 0-based format
-                .filter(t -> t.days.get(window.dayOfWeek.getValue() - 1))
-                .collect(Collectors.toList());
-
-        if (running.isEmpty())
-            return null;
-
-        // TODO: filter with timewindow
-        Collection<AddTripPattern.PatternTimetable> frequencies = running.stream()
-                .filter(t -> t.frequency)
-                .collect(Collectors.toList());
-
-        Collection<AddTripPattern.PatternTimetable> timetables = running.stream()
-                .filter(t -> !t.frequency)
-                .sorted((t1, t2) -> t1.startTime - t2.startTime)
-                .collect(Collectors.toList());
-
-        RaptorWorkerTimetable rwtt = new RaptorWorkerTimetable(timetables.size(), atp.temporaryStops.length);
-
-        // create timetabled trips
-        int t = 0;
-        for (AddTripPattern.PatternTimetable pt : timetables) {
-            rwtt.timesPerTrip[t++] = timesForPatternTimetable(atp, pt);
-        }
-
-        ts.scheduledTripCount += rwtt.timesPerTrip.length;
-
-        // create frequency trips
-        rwtt.frequencyTrips = new int[frequencies.size()][atp.temporaryStops.length * 2];
-        rwtt.endTimes = new int[frequencies.size()];
-        rwtt.startTimes = new int[frequencies.size()];
-        rwtt.headwaySecs = new int[frequencies.size()];
-
-        t = 0;
-        for (AddTripPattern.PatternTimetable pt : frequencies) {
-            rwtt.frequencyTrips[t] = timesForPatternTimetable(atp, pt);
-            rwtt.startTimes[t] = pt.startTime;
-            rwtt.endTimes[t] = pt.endTime;
-            rwtt.headwaySecs[t++] = pt.headwaySecs;
-
-            ts.frequencyTripCount += (pt.endTime - pt.startTime) / pt.headwaySecs;
-        }
-
-        ts.frequencyEntryCount += frequencies.size();
-
-        rwtt.mode = atp.mode;
-        rwtt.routeId = atp.name;
-
-        return rwtt;
-    }
-
-    private static int[] timesForPatternTimetable (AddTripPattern atp, AddTripPattern.PatternTimetable pt) {
-        int[] times = new int[atp.temporaryStops.length * 2];
-        for (int s = 0; s < atp.temporaryStops.length; s++) {
-            // for a timetable route,
-            // arrival time is start time if it's the first stop, or the previous departure time plus the hop time
-            // For a frequency route the first departure is always 0
-            if (s == 0)
-                times[s * 2] = pt.frequency ? 0 : pt.startTime;
-            else
-                times[s * 2] = times[s * 2 - 1] + pt.hopTimes[s - 1];
-
-            times[s * 2 + 1] = times[s * 2] + pt.dwellTimes[s];
-        }
-        return times;
-    }
-
     /** The assumptions made when boarding a frequency vehicle: best case (no wait), worst case (full headway) and half headway (in some sense the average). */
     public static enum BoardingAssumption {
         BEST_CASE, WORST_CASE, HALF_HEADWAY, FIXED, PROPORTION, RANDOM;
 
         public static final long serialVersionUID = 1;
+    }
+
+
+    /**
+     * A transfer rule allows specification, on a per-stop basis, of a different assumption for transfer
+     * boarding times than that used in the graph-wide search.
+     */
+    public static class TransferRule {
+        private static final long serialVersionUID = 1L;
+
+        /** The boarding assumption to use for matched transfers */
+        public RaptorWorkerTimetable.BoardingAssumption assumption;
+
+        /** From GTFS modes; note constants in Route */
+        public int[] fromMode;
+
+        /** To GTFS modes */
+        public int[] toMode;
+
+        /** Stop label; if null will be applied to all stops. */
+        public String stop;
+
+        /**
+         * The transfer time in seconds; only applied if assumption == FIXED.
+         * If specified and assumption == FIXED, this transfer will always take this amount of time,
+         * so this should be the time difference between vehicles. No provision is made for additional
+         * slack for walking, etc., so be sure to allow enough time to be reasonable for transferring
+         * at this stop.
+         */
+        public Integer transferTimeSeconds;
+
+        /**
+         * The proportion of the headway to apply when transferring, when assumption = PROPORTION.
+         *
+         * So, for example, if you set this to 0.33, and the buses run at thirty-minute frequency,
+         * the wait time will be ten minutes.
+         *
+         * There is theoretical justification for setting this below 0.5 when the frequency-based network
+         * under consideration will eventually have a schedule, even if transfers have not been and will
+         * not be explicitly synchronized. Suppose all possible transfer times as a
+         * proportion of headway are drawn from a distribution centered on 0.5. Now consider that there are
+         * likely several competing options for each trip (how many depends on how well-connected the
+         * network is). The trip planner will pick the best one, and the best one is likely to have a
+         * transfer time of less than half headway (because transfer time is correlated with total trip
+         * time, the objective function). Thus the average transfer time in optimal trips is less than
+         * half headway.
+         *
+         * The same is not true of the initial wait, assuming the user gets to their the same way each time
+         * they go there (which is probably true of most people who do not write transportation analytics
+         * software for a living). If you leave your origin at random and do the same thing every day,
+         * you will experience, on average, half headway waits. However, the schedule is fixed (the fact
+         * that you're hitting a slightly different part of it each day notwithstanding), so it is reasonable
+         * to optimize the choice of which sequence of routes to take, just not which to take on a given day.
+         */
+        public Double waitProportion;
+
+        public String getType() {
+            return "transfer-rule";
+        }
+
+        public boolean matches (RaptorWorkerTimetable from, RaptorWorkerTimetable to) {
+            if (fromMode != null && !IntStream.of(fromMode).anyMatch(m -> m == from.mode))
+                return false;
+
+            if (toMode != null && !IntStream.of(toMode).anyMatch(m -> m == to.mode))
+                return false;
+
+            return true;
+        }
     }
 
 }

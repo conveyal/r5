@@ -20,10 +20,6 @@ import org.glassfish.grizzly.http.server.Response;
 import org.glassfish.grizzly.http.util.HttpStatus;
 import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
 import com.conveyal.r5.analyst.cluster.AnalystWorker;
-import com.conveyal.r5.api.model.AgencyAndIdSerializer;
-import com.conveyal.r5.api.model.JodaLocalDateSerializer;
-import com.conveyal.r5.api.model.QualifiedModeSetSerializer;
-import com.conveyal.r5.api.model.TraverseModeSetSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -85,12 +81,12 @@ public class Broker implements Runnable {
 
     private long nextRedeliveryCheckTime = System.currentTimeMillis();
 
-    static {
+    /*static {
         mapper.registerModule(AgencyAndIdSerializer.makeModule());
         mapper.registerModule(QualifiedModeSetSerializer.makeModule());
         mapper.registerModule(JodaLocalDateSerializer.makeModule());
         mapper.registerModule(TraverseModeSetSerializer.makeModule());
-    }
+    }*/
 
     /** broker configuration */
     private final Properties config;

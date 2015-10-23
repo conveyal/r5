@@ -4,7 +4,6 @@ import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
-import com.conveyal.geojson.GeoJsonModule;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -12,6 +11,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.io.ByteStreams;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -27,27 +27,16 @@ import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.util.EntityUtils;
 import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.SampleSet;
-import com.conveyal.r5.api.model.AgencyAndIdSerializer;
-import com.conveyal.r5.api.model.JodaLocalDateSerializer;
-import com.conveyal.r5.api.model.QualifiedModeSetSerializer;
-import com.conveyal.r5.api.model.TraverseModeSetSerializer;
 import com.conveyal.r5.common.MavenVersion;
 import com.conveyal.r5.profile.RaptorWorkerData;
 import com.conveyal.r5.profile.RepeatedRaptorProfileRouter;
-import com.conveyal.r5.routing.graph.Graph;
+import com.conveyal.r5.streets.LinkedPointSet;
+import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TransportNetworkCache;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
+import java.io.*;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.util.List;
@@ -61,7 +50,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPOutputStream;
 
 /**
- *
+ * This is an exact copy of AnalystWorker that's being modified to work with (new) TransitNetworks instead of (old) Graphs.
+ * We can afford the maintainability nightmare of duplicating so much code because this is intended to completely replace
+ * the old class sooner than later.
+ * We don't need to wait for point-to-point routing and detailed walking directions etc. to be available on the new
+ * TransitNetwork code to do analysis work with it.
  */
 public class AnalystWorker implements Runnable {
 
@@ -75,6 +68,8 @@ public class AnalystWorker implements Runnable {
      * WorkerIdDefiner. A side effect is that only one worker can run in a given JVM. It also
      * needs to be defined before the logger is defined, so that it is initialized before the
      * logger is.
+     *
+     * TODO use the per-thread slf4j ID feature
      */
     public static final String machineId = UUID.randomUUID().toString().replaceAll("-", "");
 
@@ -84,6 +79,9 @@ public class AnalystWorker implements Runnable {
 
     public static final int POLL_TIMEOUT = 10 * 1000;
 
+    /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
+    private final TransportNetworkCache transportNetworkCache;
+
     /**
      * If this value is non-negative, the worker will not actually do any work. It will just report all tasks
      * as completed immediately, but will fail to do so on the given percentage of tasks. This is used in testing task
@@ -92,18 +90,20 @@ public class AnalystWorker implements Runnable {
     public int dryRunFailureRate = -1;
 
     /** How long (minimum, in milliseconds) should this worker stay alive after receiving a single point request? */
-    public static final int SINGLE_POINT_KEEPALIVE = 15 * 60 * 1000;
+    public static final int SINGLE_POINT_KEEPALIVE_MSEC = 15 * 60 * 1000;
 
     /** should this worker shut down automatically */
     public final boolean autoShutdown;
 
     public static final Random random = new Random();
 
-    private TaskStatisticsStore statsStore;
+    /** Records extra (meta-)data that is not essential to the calculation, such as speed and other performance info. */
+    private TaskStatisticsStore taskStatisticsStore;
 
     /** is there currently a channel open to the broker to receive single point jobs? */
     private volatile boolean sideChannelOpen = false;
 
+    /** Reads and writes JSON. */
     ObjectMapper objectMapper;
 
     String BROKER_BASE_URL = "http://localhost:9001";
@@ -112,14 +112,14 @@ public class AnalystWorker implements Runnable {
 
     /** Cache RAPTOR data by Job ID */
     private Cache<String, RaptorWorkerData> workerDataCache = CacheBuilder.newBuilder()
-            .maximumSize(200)
+            .maximumSize(10)
             .build();
 
     static {
         PoolingHttpClientConnectionManager mgr = new PoolingHttpClientConnectionManager();
         mgr.setDefaultMaxPerRoute(20);
 
-        int timeout = 10 * 1000;
+        int timeout = 10 * 1000; // TODO should this be a symbolic constant such as POLL_TIMEOUT ?
         SocketConfig cfg = SocketConfig.custom()
                 .setSoTimeout(timeout)
                 .build();
@@ -130,8 +130,8 @@ public class AnalystWorker implements Runnable {
                 .build();
     }
 
-    // Of course this will eventually need to be shared between multiple AnalystWorker threads.
-    ClusterGraphBuilder clusterGraphBuilder;
+    // Builds and caches (old) Graphs
+//    ClusterGraphBuilder clusterGraphBuilder;
 
     // Of course this will eventually need to be shared between multiple AnalystWorker threads.
     PointSetDatastore pointSetDatastore;
@@ -139,52 +139,65 @@ public class AnalystWorker implements Runnable {
     // Clients for communicating with Amazon web services
     AmazonS3 s3;
 
-    String graphId = null;
+    String graphIdAffinity = null;
     long startupTime, nextShutdownCheckTime;
 
     // Region awsRegion = Region.getRegion(Regions.EU_CENTRAL_1);
     Region awsRegion = Region.getRegion(Regions.US_EAST_1);
 
-    /** aws instance type, or null if not running on AWS */
+    /** AWS instance type, or null if not running on AWS. */
     private String instanceType;
 
+    /** TODO what's this number? */
     long lastHighPriorityRequestProcessed = 0;
 
+    /** If true Analyst is running locally, do not use internet connection and hosted servcies. */
+    private boolean workOffline;
+
     /**
-     * Queue for high-priority tasks. Should be plenty long enough to hold all that have come in -
-     * we don't need to block on polling the manager.
+     * Queues for high-priority interactive tasks and low-priority batch tasks.
+     * Should be plenty long enough to hold all that have come in - we don't need to block on polling the manager.
      */
     private ThreadPoolExecutor highPriorityExecutor, batchExecutor;
 
     public AnalystWorker(Properties config) {
-        // parse the configuration
-        // set up the stats store
+
+        // PARSE THE CONFIGURATION
+
+        // First, check whether we are running Analyst offline.
+        workOffline = Boolean.parseBoolean(config.getProperty("work-offline", "false"));
+        if (workOffline) {
+            LOG.info("Working offline. Avoiding internet connections and hosted services.");
+        }
+
+        // Set up the stats store.
         String statsQueue = config.getProperty("statistics-queue");
-        if (statsQueue != null)
-            this.statsStore = new SQSTaskStatisticsStore(statsQueue);
-        else
-            // a stats store that does nothing.
-            this.statsStore = s -> {};
+        if (workOffline || statsQueue == null) {
+            // A stats store that does nothing.
+            this.taskStatisticsStore = s -> { };
+        } else {
+            this.taskStatisticsStore = new SQSTaskStatisticsStore(statsQueue);
+        }
 
         String addr = config.getProperty("broker-address");
         String port = config.getProperty("broker-port");
 
         if (addr != null) {
-            if (port != null)
+            if (port != null) {
                 this.BROKER_BASE_URL = String.format("http://%s:%s", addr, port);
-            else
+            } else {
                 this.BROKER_BASE_URL = String.format("http://%s", addr);
+            }
         }
 
         // set the initial graph affinity of this worker (if it is not in the config file it will be
         // set to null, i.e. no graph affinity)
         // we don't actually build the graph now; this is just a hint to the broker as to what
         // graph this machine was intended to analyze.
-        this.graphId = config.getProperty("initial-graph-id");
+        this.graphIdAffinity = config.getProperty("initial-graph-id");
 
         this.pointSetDatastore = new PointSetDatastore(10, null, false, config.getProperty("pointsets-bucket"));
-        this.clusterGraphBuilder = new ClusterGraphBuilder(config.getProperty("graphs-bucket"));
-
+        this.transportNetworkCache = new TransportNetworkCache(config.getProperty("graphs-bucket"));
         Boolean autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown"));
         this.autoShutdown = autoShutdown == null ? false : autoShutdown;
 
@@ -205,43 +218,34 @@ public class AnalystWorker implements Runnable {
         objectMapper.configure(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true);
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false); // ignore JSON fields that don't match target type
 
-        /* Tell Jackson how to (de)serialize AgencyAndIds, which appear as map keys in routing requests. */
-        objectMapper.registerModule(AgencyAndIdSerializer.makeModule());
-
-        /* serialize/deserialize qualified mode sets */
-        objectMapper.registerModule(QualifiedModeSetSerializer.makeModule());
-
-        /* serialize/deserialize Joda dates */
-        objectMapper.registerModule(JodaLocalDateSerializer.makeModule());
-
-        /* serialize/deserialize traversemodesets */
-        objectMapper.registerModule(TraverseModeSetSerializer.makeModule());
-
-        objectMapper.registerModule(new GeoJsonModule());
-
         instanceType = getInstanceType();
     }
 
     /**
      * This is the main worker event loop which fetches tasks from a broker and schedules them for execution.
-     * It maintains a small local queue on the worker so that it doesn't idle while fetching new tasks.
+     * It maintains a small local queue so the worker doesn't idle while fetching new tasks.
      */
     @Override
     public void run() {
-        // create executors with up to one thread per processor
+
+        // Create executors with up to one thread per processor.
         int nP = Runtime.getRuntime().availableProcessors();
         highPriorityExecutor = new ThreadPoolExecutor(1, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
         highPriorityExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         batchExecutor = new ThreadPoolExecutor(1, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(nP * 2));
         batchExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
 
-        // Build a graph on startup, iff a graph ID was provided.
-        if (graphId != null) {
-            LOG.info("Prebuilding graph {}", graphId);
-            Graph graph = clusterGraphBuilder.getGraph(graphId);
-            // also prebuild the stop tree cache
-            graph.index.getStopTreeCache();
-            LOG.info("Done prebuilding graph {}", graphId);
+        // If an initial graph ID was provided in the config file, build that TransportNetwork on startup.
+        // Prebuilding the graph is necessary because, if the graph is not cached it can take several
+        // minutes to build it. Even if the graph is cached, reconstructing the indices and stop trees
+        // can take up to a minute. The UI times out after 30 seconds, so the broker needs to return
+        // a 503 (Service Not Available) to tell it to try again later. It can't do that after it's
+        // sent a request to a worker, so the worker needs to not come online until it's ready to process
+        // requests.
+        if (graphIdAffinity != null) {
+            LOG.info("Prebuilding graph {}", graphIdAffinity);
+            transportNetworkCache.getNetwork(graphIdAffinity);
+            LOG.info("Done prebuilding graph {}", graphIdAffinity);
         }
 
         // Start filling the work queues.
@@ -250,11 +254,10 @@ public class AnalystWorker implements Runnable {
             long now = System.currentTimeMillis();
             // Consider shutting down if enough time has passed
             if (now > nextShutdownCheckTime && autoShutdown) {
-                if (idle && now > lastHighPriorityRequestProcessed + SINGLE_POINT_KEEPALIVE) {
+                if (idle && now > lastHighPriorityRequestProcessed + SINGLE_POINT_KEEPALIVE_MSEC) {
                     LOG.warn("Machine is idle, shutting down.");
                     try {
-                        Process process = new ProcessBuilder("sudo", "/sbin/shutdown", "-h", "now")
-                                .start();
+                        Process process = new ProcessBuilder("sudo", "/sbin/shutdown", "-h", "now").start();
                         process.waitFor();
                     } catch (Exception ex) {
                         LOG.error("Unable to terminate worker", ex);
@@ -273,18 +276,16 @@ public class AnalystWorker implements Runnable {
                 continue;
             }
 
-            // run through high-priority tasks first to ensure they are enqueued even if the batch
-            // queue blocks.
+            // Enqueue high-priority (interactive) tasks first to ensure they are enqueued
+            // even if the low-priority batch queue blocks.
             tasks.stream().filter(t -> t.outputLocation == null)
                     .forEach(t -> highPriorityExecutor.execute(() -> {
-                        LOG.warn(
-                                "Handling single point request via normal channel, side channel should open shortly.");
+                        LOG.warn("Handling single point request via normal channel, side channel should open shortly.");
                         this.handleOneRequest(t);
                     }));
 
+            // Enqueue low-priority (batch) tasks; note that this may block anywhere in the process
             logQueueStatus();
-
-            // enqueue low-priority tasks; note that this may block anywhere in the process
             tasks.stream().filter(t -> t.outputLocation != null)
                 .forEach(t -> {
                     // attempt to enqueue, waiting if the queue is full
@@ -301,8 +302,8 @@ public class AnalystWorker implements Runnable {
                     }
                 });
 
+            // TODO log info about the high-priority queue as well.
             logQueueStatus();
-
             idle = false;
         }
     }
@@ -336,7 +337,7 @@ public class AnalystWorker implements Runnable {
             // or a job task (where the result is saved to output location on S3).
             boolean isochrone = (clusterRequest.destinationPointsetId == null);
             boolean singlePoint = (clusterRequest.outputLocation == null);
-            boolean transit = (clusterRequest.profileRequest.transitModes != null && clusterRequest.profileRequest.transitModes.isTransit());
+            boolean transit = (clusterRequest.profileRequest.transitModes != null && clusterRequest.profileRequest.transitModes.contains("TRANSIT"));
 
             if (singlePoint) {
                 lastHighPriorityRequestProcessed = startTime;
@@ -357,96 +358,87 @@ public class AnalystWorker implements Runnable {
             // All requests handled together are for the same graph, and this call is synchronized so the graph will
             // only be built once.
             long graphStartTime = System.currentTimeMillis();
-            Graph graph = clusterGraphBuilder.getGraph(clusterRequest.graphId);
-            graphId = clusterRequest.graphId; // Record graphId so we "stick" to this same graph on subsequent polls
+            TransportNetwork transportNetwork = transportNetworkCache.getNetwork(clusterRequest.graphId);
+            // Record graphId so we "stick" to this same graph on subsequent polls.
+            // TODO allow for a list of multiple cached TransitNetworks.
+            graphIdAffinity = clusterRequest.graphId;
             ts.graphBuild = (int) (System.currentTimeMillis() - graphStartTime);
-            ts.graphTripCount = graph.index.patternForTrip.size();
-            ts.graphStopCount = graph.index.stopForId.size();
+            // TODO lazy-initialize all additional indexes on transitLayer
+            // ts.graphTripCount = transportNetwork.transitLayer...
+            ts.graphStopCount = transportNetwork.transitLayer.getStopCount();
             ts.lon = clusterRequest.profileRequest.fromLon;
             ts.lat = clusterRequest.profileRequest.fromLat;
 
-            final SampleSet sampleSet;
 
             // If this one-to-many request is for accessibility information based on travel times to a pointset,
             // fetch the set of points we will use as destinations.
+            final PointSet targets;
+            final LinkedPointSet linkedTargets;
             if (isochrone) {
-                // This is an isochrone request, tell the RepeatedRaptorProfileRouter there are no targets.
-                sampleSet = null;
+                // This is an isochrone request, search to a regular grid of points.
+                targets = transportNetwork.getGridPointSet();
             } else {
-                // This is not an isochrone request. There is necessarily a destination point set supplied.
-                PointSet pointSet = pointSetDatastore.get(clusterRequest.destinationPointsetId);
-                sampleSet = pointSet.getOrCreateSampleSet(graph); // TODO this breaks if graph has been rebuilt
+                // This is a detailed accessibility request. There is necessarily a destination point set supplied.
+                targets = pointSetDatastore.get(clusterRequest.destinationPointsetId);
             }
+            // TODO cache these, they are probably slow to make.
+            // TODO this breaks if transportNetwork has been rebuilt ?
+            linkedTargets = targets.link(transportNetwork.streetLayer);
 
-            // Note that all parameters to create the Raptor worker data are passed in the constructor except ts.
-            // Why not pass in ts as well since this is a throwaway calculator?
             RepeatedRaptorProfileRouter router =
-                    new RepeatedRaptorProfileRouter(graph, clusterRequest.profileRequest, sampleSet);
-            router.ts = ts;
+                    new RepeatedRaptorProfileRouter(transportNetwork, clusterRequest, linkedTargets, ts); // TODO transportNetwork is implied by linkedTargets.
 
             // Produce RAPTOR data tables, going through a cache where relevant.
             // This is only used for multi-point requests. Single-point requests are assumed to be continually
             // changing, so we create throw-away RAPTOR tables for them.
-            // Ideally we'd want this cacheing to happen transparently inside the RepeatedRaptorProfileRouter,
+            // Ideally we'd want this caching to happen invisibly inside the RepeatedRaptorProfileRouter,
             // but the RepeatedRaptorProfileRouter doesn't know the job ID or other information from the cluster request.
             // It would be possible to just supply the cache _key_ as a way of saying that the cache should be used.
             // But then we'd need to pass in both the cache and the key, which is weird.
-            if (transit && !singlePoint) {
-                long dataStart = System.currentTimeMillis();
-                router.raptorWorkerData = workerDataCache.get(clusterRequest.jobId, () -> RepeatedRaptorProfileRouter
-                        .getRaptorWorkerData(clusterRequest.profileRequest, graph, sampleSet, ts));
-                ts.raptorData = (int) (System.currentTimeMillis() - dataStart);
-            } else {
-                // The worker will generate a one-time throw-away table.
-                router.raptorWorkerData = null;
+            long raptorDataStart = System.currentTimeMillis();
+            if (transit) {
+                // We only create stop trees and data tables if transit is in use, otherwise they don't serve any purpose.
+                if (singlePoint) {
+                    // Generate a one-time throw-away table if transit is in use but .
+                    router.raptorWorkerData =
+                            new RaptorWorkerData(transportNetwork.transitLayer, linkedTargets, clusterRequest.profileRequest.date); // FIXME repetitive...
+                } else {
+                    router.raptorWorkerData = workerDataCache.get(clusterRequest.jobId, () ->
+                            new RaptorWorkerData(transportNetwork.transitLayer, linkedTargets, clusterRequest.profileRequest.date));
+                }
             }
+            // TODO include scenario modifications in RaptorWorkerData.
+            ts.raptorData = (int) (System.currentTimeMillis() - raptorDataStart);
 
             // Run the core repeated-raptor analysis.
-            // This result envelope will contain the results of the one-to-many profile or single-departure-time search.
             ResultEnvelope envelope = new ResultEnvelope();
             try {
-                // TODO when router runs, if there are no transit modes defined it should just skip the transit work.
-                router.includeTimes = clusterRequest.includeTimes;
                 envelope = router.route();
-                envelope.id = clusterRequest.id;
                 ts.success = true;
             } catch (Exception ex) {
-                // An error occurred. Leave the envelope empty and TODO include error information.
+                // An error occurred. Keep the empty envelope empty and TODO include error information.
                 LOG.error("Error occurred in profile request", ex);
                 ts.success = false;
             }
 
             // Send the ResultEnvelope back to the user.
-            // The results are either stored on S3 (for multi-origin jobs) or sent back through the broker (for
-            // immediate interactive display of isochrones).
+            // The results are either stored on S3 (for multi-origin jobs) or sent back through the broker
+            // (for immediate interactive display of isochrones).
             envelope.id = clusterRequest.id;
             envelope.jobId = clusterRequest.jobId;
             envelope.destinationPointsetId = clusterRequest.destinationPointsetId;
-            if (clusterRequest.outputLocation != null) {
-                // Convert the result envelope and its contents to JSON and gzip it in this thread.
-                // Transfer the results to Amazon S3 in another thread, piping between the two.
-                String s3key = String.join("/", clusterRequest.jobId, clusterRequest.id + ".json.gz");
-                PipedInputStream inPipe = new PipedInputStream();
-                PipedOutputStream outPipe = new PipedOutputStream(inPipe);
-                new Thread(() -> {
-                    s3.putObject(clusterRequest.outputLocation, s3key, inPipe, null);
-                }).start();
-                OutputStream gzipOutputStream = new GZIPOutputStream(outPipe);
-                // We could do the writeValue() in a thread instead, in which case both the DELETE and S3 options
-                // could consume it in the same way.
-                objectMapper.writeValue(gzipOutputStream, envelope);
-                gzipOutputStream.close();
-                // Tell the broker the task has been handled and should not be re-delivered to another worker.
-                deleteRequest(clusterRequest);
-            } else {
+            if (clusterRequest.outputLocation == null) {
                 // No output location was provided. Instead of saving the result on S3,
                 // return the result immediately via a connection held open by the broker and mark the task completed.
                 finishPriorityTask(clusterRequest, envelope);
+            } else {
+                // Save the result on S3 for retrieval by the UI.
+                saveBatchTaskResults(clusterRequest, envelope);
             }
 
             // Record information about the current task so we can analyze usage and efficiency over time.
             ts.total = (int) (System.currentTimeMillis() - startTime);
-            statsStore.store(ts);
+            taskStatisticsStore.store(ts);
 
         } catch (Exception ex) {
             LOG.error("An error occurred while routing", ex);
@@ -463,7 +455,7 @@ public class AnalystWorker implements Runnable {
         new Thread(() -> {
             sideChannelOpen = true;
             // don't keep single point connections alive forever
-            while (System.currentTimeMillis() < lastHighPriorityRequestProcessed + SINGLE_POINT_KEEPALIVE) {
+            while (System.currentTimeMillis() < lastHighPriorityRequestProcessed + SINGLE_POINT_KEEPALIVE_MSEC) {
                 LOG.info("Awaiting high-priority work");
                 try {
                     List<AnalystClusterRequest> tasks = getSomeWork(WorkType.HIGH_PRIORITY);
@@ -487,9 +479,9 @@ public class AnalystWorker implements Runnable {
         String url;
         if (type == WorkType.HIGH_PRIORITY) {
             // this is a side-channel request for single point work
-            url = BROKER_BASE_URL + "/single/" + graphId;
+            url = BROKER_BASE_URL + "/single/" + graphIdAffinity;
         } else {
-            url = BROKER_BASE_URL + "/dequeue/" + graphId;
+            url = BROKER_BASE_URL + "/dequeue/" + graphIdAffinity;
         }
         HttpPost httpPost = new HttpPost(url);
         httpPost.setHeader(new BasicHeader(WORKER_ID_HEADER, machineId));
@@ -504,12 +496,11 @@ public class AnalystWorker implements Runnable {
                 EntityUtils.consumeQuietly(entity);
                 return null;
             }
-            return objectMapper.readValue(entity.getContent(), new TypeReference<List<AnalystClusterRequest>>() {
-            });
+            return objectMapper.readValue(entity.getContent(), new TypeReference<List<AnalystClusterRequest>>() {});
         } catch (JsonProcessingException e) {
             LOG.error("JSON processing exception while getting work", e);
         } catch (SocketTimeoutException stex) {
-            LOG.error("Socket timeout while waiting to receive work.");
+            LOG.info("Socket timeout while waiting to receive work.");
         } catch (HttpHostConnectException ce) {
             LOG.error("Broker refused connection. Sleeping before retry.");
             try {
@@ -521,6 +512,53 @@ public class AnalystWorker implements Runnable {
         }
         return null;
 
+    }
+
+    /**
+     * Convert the result envelope and its contents to JSON and gzip it in this thread.
+     * Transfer the results to Amazon S3 in another thread, piping between the two.
+     */
+    private void saveBatchTaskResults (AnalystClusterRequest clusterRequest, ResultEnvelope envelope) {
+        String fileName = clusterRequest.id + ".json.gz";
+        PipedInputStream inPipe = new PipedInputStream();
+        Runnable resultSaverRunnable;
+        if (workOffline) {
+            resultSaverRunnable = () -> {
+                // No internet connection or hosted services. Save to local file.
+                try {
+                    // TODO make a FakeS3 class that can be used by other components.
+                    File fakeS3 = new File("S3", clusterRequest.outputLocation);
+                    File jobDirectory = new File(fakeS3, clusterRequest.jobId);
+                    File outputFile = new File(jobDirectory, fileName);
+                    jobDirectory.mkdirs();
+                    OutputStream fileOut = new BufferedOutputStream(new FileOutputStream(outputFile));
+                    ByteStreams.copy(inPipe, fileOut);
+                } catch (Exception e) {
+                    LOG.error("Could not save results locally: {}", e);
+                }
+            };
+        } else {
+            resultSaverRunnable = () -> {
+                // TODO catch the case where the S3 putObject fails. (call deleteRequest based on PutObjectResult in the runnable)
+                // Otherwise the AnalystWorker can freeze piping data to a failed S3 saver thread.
+                String s3key = String.join("/", clusterRequest.jobId, fileName);
+                s3.putObject(clusterRequest.outputLocation, s3key, inPipe, null);
+            };
+        };
+        new Thread(resultSaverRunnable).start();
+        try {
+            PipedOutputStream outPipe = new PipedOutputStream(inPipe);
+            OutputStream gzipOutputStream = new GZIPOutputStream(outPipe);
+            // We could do the writeValue() in a thread instead, in which case both the DELETE and S3 options
+            // could consume it in the same way.
+            objectMapper.writeValue(gzipOutputStream, envelope);
+            gzipOutputStream.close();
+            // Tell the broker the task has been handled and should not be redelivered to another worker.
+            deleteRequest(clusterRequest);
+        } catch (Exception e) {
+            // Do not delete task from broker, it will be retried.
+            LOG.error("Exception while saving routing result to S3: {}", e);
+        }
     }
 
     /**
@@ -615,8 +653,8 @@ public class AnalystWorker implements Runnable {
      * initial-graph-id             The graph ID for this worker to start on
      */
     public static void main(String[] args) {
-        LOG.info("Starting analyst worker");
-        LOG.info("OTP commit is {}", MavenVersion.VERSION.commit);
+        LOG.info("Starting R5 Analyst Worker version {}", MavenVersion.describe);
+        LOG.info("OTP commit is {}", MavenVersion.commit);
 
         Properties config = new Properties();
 
@@ -636,11 +674,7 @@ public class AnalystWorker implements Runnable {
         }
 
         try {
-            // jump over to using TransportNetworks if requested
-            if (Boolean.parseBoolean(config.getProperty("use-transport-networks", "false")))
-                new TNAnalystWorker(config).run();
-            else
-                new AnalystWorker(config).run();
+            new AnalystWorker(config).run();
         } catch (Exception e) {
             LOG.error("Error in analyst worker", e);
             return;

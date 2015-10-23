@@ -4,6 +4,7 @@ import com.conveyal.gtfs.model.Stop;
 import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.osmlib.Way;
+import com.conveyal.r5.common.GeometryUtils;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -12,7 +13,6 @@ import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
-import com.conveyal.r5.common.geometry.SphericalDistanceLibrary;
 import com.conveyal.r5.transit.TransitLayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -147,8 +147,8 @@ public class StreetLayer implements Serializable {
         double lengthMeters = 0;
         Node prevNode = nodes.get(0);
         for (Node node : nodes.subList(1, nodes.size())) {
-            lengthMeters += SphericalDistanceLibrary
-                    .fastDistance(prevNode.getLat(), prevNode.getLon(), node.getLat(), node.getLon());
+            lengthMeters += GeometryUtils
+                    .distance(prevNode.getLat(), prevNode.getLon(), node.getLat(), node.getLon());
             prevNode = node;
         }
         if (lengthMeters * 1000 > Integer.MAX_VALUE) {
@@ -398,9 +398,6 @@ public class StreetLayer implements Serializable {
             }
 
             if (nReached < minSubgraphSize) {
-                LOG.debug("Removing disconnected subgraph of size {} near {}, {}",
-                        nReached, vertexStore.fixedLats.get(vertex) / VertexStore.FIXED_FACTOR,
-                        vertexStore.fixedLons.get(vertex) / VertexStore.FIXED_FACTOR);
                 nSubgraphs++;
                 verticesToRemove.addAll(reachedVertices);
                 reachedVertices.forEach(v -> {
@@ -416,11 +413,6 @@ public class StreetLayer implements Serializable {
                     return true; // iteration should continue
                 });
             }
-
-            if (nSubgraphs > 0)
-                LOG.info("Removed {} disconnected subgraphs", nSubgraphs);
-            else
-                LOG.info("Found no subgraphs to remove, congratulations for having clean OSM data.");
         }
 
         // rebuild the edge store with some edges removed
@@ -428,13 +420,19 @@ public class StreetLayer implements Serializable {
         // TODO remove vertices as well? this is messy because the edges point into them
 
         // don't forget this
-        if (edgeListsBuilt)
+        if (edgeListsBuilt) {
             buildEdgeLists();
+            indexStreets();
+        }
         else {
             incomingEdges = null;
             outgoingEdges = null;
         }
 
+        if (nSubgraphs > 0)
+            LOG.info("Removed {} disconnected subgraphs", nSubgraphs);
+        else
+            LOG.info("Found no subgraphs to remove, congratulations for having clean OSM data.");
         LOG.info("Done removing subgraphs. {} edges remain", edgeStore.nEdges);
     }
 }

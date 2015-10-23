@@ -1,25 +1,15 @@
 package com.conveyal.r5.analyst;
 
-import com.beust.jcommander.internal.Maps;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.geotools.feature.FeatureCollection;
-import org.geotools.geojson.feature.FeatureJSON;
-import com.conveyal.r5.analyst.core.IsochroneData;
-import com.conveyal.r5.api.resource.LIsochrone;
-import com.conveyal.r5.api.resource.SurfaceResource;
-import com.conveyal.r5.common.geometry.ZSampleGrid;
-import com.conveyal.r5.profile.IsochroneGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Serializable;
-import java.io.StringWriter;
-import java.util.Arrays;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -43,59 +33,17 @@ public class ResultSet implements Serializable{
     public String id;
 
     /** One histogram for each category of destination points in the target pointset. */
-    public Map<String,Histogram> histograms = Maps.newHashMap();
+    public Map<String,Histogram> histograms = new HashMap<>();
     // FIXME aren't the histogram.counts identical for all these histograms?
 
     /** Times to reach every feature, may be null */
     public int[] times;
 
-    /** Isochrone geometries around the origin, may be null. */
-    public IsochroneData[] isochrones;
-
     public ResultSet() {
     }
 
-    /** Build a new ResultSet by evaluating the given TimeSurface at all the given sample points, not including times. */
-    public ResultSet(SampleSet samples, TimeSurface surface){
-        this(samples, surface, false, false);
-    }
-    
-    /** Build a new ResultSet by evaluating the given TimeSurface at all the given sample points, optionally including times. */
-    public ResultSet(SampleSet samples, TimeSurface surface, boolean includeTimes, boolean includeIsochrones){
-        id = samples.pset.id + "_" + surface.id;
-
-        PointSet targets = samples.pset;
-        // Evaluate the surface at all points in the pointset
-        int[] times = samples.eval(surface);
-        buildHistograms(times, targets);
-
-        if (includeTimes)
-            this.times = times;
-        
-        if (includeIsochrones)
-            buildIsochrones(surface);
-    }
-    
-    private void buildIsochrones(TimeSurface surface) {
-        List<IsochroneData> id = SurfaceResource.getIsochronesAccumulative(surface, 5, 24);
-        this.isochrones = new IsochroneData[id.size()];
-        id.toArray(this.isochrones);
-    }
-
-    private void buildIsochrones(int[] times, PointSet targets) {
-        ZSampleGrid zs = IsochroneGenerator.makeGrid(targets, times, 1.3);
-        List<IsochroneData> id = IsochroneGenerator.getIsochronesAccumulative(zs, 5, 120, 24);
-
-        this.isochrones = new IsochroneData[id.size()];
-        id.toArray(this.isochrones);
-    }
-
-    /**
-     * Build a new ResultSet that contains only isochrones, built by accumulating the times at all street vertices
-     * into a regular grid without an intermediate pointSet.
-     */
-    public ResultSet (TimeSurface surface) {
-        buildIsochrones(surface);
+    private void buildIsochrones (int[] times, PointSet targets) {
+        throw new UnsupportedOperationException("Isochrones not yet supported");
     }
     
     /** Build a new ResultSet directly from times at point features, optionally including histograms or interpolating isochrones */
@@ -210,21 +158,6 @@ public class ResultSet implements Serializable{
         }
     }
 
-    /** Write the isochrones as GeoJSON */
-    public void writeIsochrones(JsonGenerator jgen) throws IOException {
-        if (this.isochrones == null)
-            return;
-        
-        FeatureJSON fj = new FeatureJSON();
-        FeatureCollection fc = LIsochrone.makeContourFeatures(Arrays.asList(isochrones));
-        
-        StringWriter sw = new StringWriter();
-        fj.writeFeatureCollection(fc, sw);
-        // TODO cludge
-        String json = sw.toString();
-        jgen.writeRaw(json.substring(1, json.length() - 1));
-    }
-    
     /** A set of result sets from profile routing: min, avg, max */;
     public static class RangeSet implements Serializable {
         public static final long serialVersionUID = 1L;

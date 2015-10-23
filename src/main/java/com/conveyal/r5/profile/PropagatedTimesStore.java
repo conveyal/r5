@@ -1,20 +1,10 @@
 package com.conveyal.r5.profile;
 
-import com.vividsolutions.jts.geom.Coordinate;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
-import org.apache.commons.math3.util.FastMath;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.ResultSet;
 import com.conveyal.r5.analyst.cluster.ResultEnvelope;
-import com.conveyal.r5.analyst.core.IsochroneData;
-import com.conveyal.r5.analyst.request.SampleGridRenderer.WTWD;
-import com.conveyal.r5.analyst.request.SampleGridRenderer.WTWDAccumulativeMetric;
-import com.conveyal.r5.common.geometry.AccumulativeGridSampler;
-import com.conveyal.r5.common.geometry.DelaunayIsolineBuilder;
-import com.conveyal.r5.common.geometry.SparseMatrixZSampleGrid;
-import com.conveyal.r5.common.geometry.SphericalDistanceLibrary;
-import com.conveyal.r5.routing.graph.Vertex;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -171,106 +161,6 @@ public class PropagatedTimesStore {
         envelope.avgCase   = new ResultSet(avgs, pointSet, includeTimes, includeHistograms, includeIsochrones);
         envelope.bestCase  = new ResultSet(mins, pointSet, includeTimes, includeHistograms, includeIsochrones);
         return envelope;
-    }
-
-    /**
-     * This bypasses a bunch of conversion and copy steps and just makes the isochrones.
-     * This assumes that the target indexes in this router/propagatedTimesStore are vertex indexes, not pointset indexes.
-     * ^^^^^^^^probably doesn't work currently, can we make an implicit pointset that just wraps the vertices?
-     */
-    public ResultEnvelope makeIsochronesForVertices () {
-        ResultEnvelope envelope = new ResultEnvelope();
-        envelope.worstCase = makeIsochroneForVertices(maxs);
-        envelope.avgCase = makeIsochroneForVertices(avgs);
-        envelope.bestCase = makeIsochroneForVertices(mins);
-        return envelope;
-    }
-
-    /**
-     * This bypasses a bunch of TimeSurface conversion/copy steps we were going though and makes the isochrones directly.
-     * This assumes that the target indexes in this router/propagatedTimesStore are vertex indexes, not pointset indexes.
-     * Called three times on min/avg/max to create the three elements of a ResultEnvelope.
-     */
-    private ResultSet makeIsochroneForVertices (int[] times) {
-
-        final int spacing = 5;
-        final int nMax = 24;
-        final int cutoffMinutes = 120;
-        final int offroadDistanceMeters = 250;
-
-        SparseMatrixZSampleGrid<WTWD> grid = makeSampleGridForVertices(times, offroadDistanceMeters);
-        long t0 = System.currentTimeMillis();
-        DelaunayIsolineBuilder<WTWD> isolineBuilder =
-                new DelaunayIsolineBuilder<>(grid.delaunayTriangulate(), new WTWD.IsolineMetric());
-
-        List<IsochroneData> isoData = new ArrayList<IsochroneData>();
-        for (int minutes = spacing, n = 0; minutes <= cutoffMinutes && n < nMax; minutes += spacing, n++) {
-            int seconds = minutes * 60;
-            WTWD z0 = new WTWD();
-            z0.w = 1.0;
-            z0.wTime = seconds;
-            z0.d = offroadDistanceMeters;
-            IsochroneData isochrone = new IsochroneData(seconds, isolineBuilder.computeIsoline(z0));
-            isoData.add(isochrone);
-        }
-
-        long t1 = System.currentTimeMillis();
-        ResultSet resultSet = new ResultSet();
-        resultSet.isochrones = new IsochroneData[isoData.size()];
-        isoData.toArray(resultSet.isochrones);
-        LOG.debug("Computed {} isochrones in {} msec", isoData.size(), (int) (t1 - t0));
-        return resultSet;
-    }
-
-
-    // FIXME the following function requires a reference to the LinkedPointSet or the TransportNetwork. It should be elsewhere (PointSetTimeRange?)
-    /**
-     * Create a SampleGrid from only the times stored in this PropagatedTimesStore.
-     * This assumes that the target indexes in this router/propagatedTimesStore are vertex indexes, not pointset indexes.
-     * This is not really ideal since it includes only intersection nodes, and no points along the road segments.
-     * FIXME this may be why we're getting hole-punching failures.
-     * TODO: rewrite the isoline code to use only primitive collections and operate on a scalar field.
-     */
-    public SparseMatrixZSampleGrid<WTWD> makeSampleGridForVertices (int[] times, final double gridSizeMeters) {
-        SparseMatrixZSampleGrid<WTWD> grid;
-        long t0 = System.currentTimeMillis();
-        // Off-road max distance MUST be APPROX EQUALS to the grid precision
-        // TODO: Loosen this restriction (by adding more closing sample).
-        // Change the 0.8 magic factor here with caution. Should be roughly grid size.
-        final double offroadWalkDistance = 0.8 * gridSizeMeters;
-        final double offroadWalkSpeed = 1.00; // in m/sec
-        Coordinate coordinateOrigin = null; // FIXME new Coordinate(transitLayer.centerLon, transitLayer.centerLat);
-        final double cosLat = FastMath.cos(toRadians(coordinateOrigin.y));
-        double dY = Math.toDegrees(gridSizeMeters / SphericalDistanceLibrary.RADIUS_OF_EARTH_IN_M);
-        double dX = dY / cosLat;
-        grid = new SparseMatrixZSampleGrid<WTWD>(16, times.length, dX, dY, coordinateOrigin);
-        AccumulativeGridSampler.AccumulativeMetric<WTWD> metric =
-                new WTWDAccumulativeMetric(cosLat, offroadWalkDistance, offroadWalkSpeed, gridSizeMeters);
-        AccumulativeGridSampler<WTWD> sampler =
-                new AccumulativeGridSampler<>(grid, metric);
-        // Iterate over every vertex, adding it to the ZSampleGrid if it was reached.
-        Vertex vertex = null; // FIXME streetLayer.vertexStore.getCursor();
-        for (int v = 0; v < times.length; v++) {
-            int time = times[v];
-            if (time == Integer.MAX_VALUE) {
-                continue; // MAX_VALUE is the "unreached" value
-            }
-            WTWD z = new WTWD();
-            z.w = 1.0;
-            z.d = 0.0;
-            z.wTime = time;
-            z.wBoardings = 0; // unused
-            z.wWalkDist = 0; // unused
-//            vertex.seek(v); FIXME need street layer to get vertex cursor
-//            // FIXME we should propagate along street geometries here
-//            if (vertex != null) {
-//                sampler.addSamplingPoint(vertex.getCoordinate(), z, offroadWalkSpeed);
-//            }
-        }
-        sampler.close();
-        long t1 = System.currentTimeMillis();
-        LOG.info("Made scalar SampleGrid from TimeSurface in {} msec.", (int) (t1 - t0));
-        return grid;
     }
 
     public int countTargetsReached() {

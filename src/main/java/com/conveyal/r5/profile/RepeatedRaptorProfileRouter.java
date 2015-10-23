@@ -1,17 +1,9 @@
 package com.conveyal.r5.profile;
 
-import com.google.common.collect.Iterables;
 import gnu.trove.map.TIntIntMap;
-import gnu.trove.map.TObjectIntMap;
-import gnu.trove.map.hash.TObjectIntHashMap;
-import com.conveyal.r5.analyst.SampleSet;
 import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
 import com.conveyal.r5.analyst.cluster.ResultEnvelope;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
-import com.conveyal.r5.analyst.scenario.AddTripPattern;
-import com.conveyal.r5.profile.TNPropagatedTimesStore.ConfidenceCalculationMethod;
-import com.conveyal.r5.routing.graph.Graph;
-import com.conveyal.r5.routing.vertextype.TransitStop;
 import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -58,13 +50,10 @@ public class RepeatedRaptorProfileRouter {
      */
     public RaptorWorkerData raptorWorkerData;
 
-    /** The number of travel time observations added into the accumulator. The divisor when calculating an average. */
-    TObjectIntMap<TransitStop> counts = new TObjectIntHashMap<TransitStop>();
-
     /** Samples to propagate times to */
     private LinkedPointSet targets;
 
-    private TNPropagatedTimesStore propagatedTimesStore;
+    private PropagatedTimesStore propagatedTimesStore;
 
     // Set this field to an existing taskStatistics before routing if you want to collect performance information.
     public TaskStatistics ts = new TaskStatistics();
@@ -98,7 +87,8 @@ public class RepeatedRaptorProfileRouter {
         LOG.info("Beginning repeated RAPTOR profile request.");
 
         boolean isochrone = (targets == null); // When no sample set is provided, we're making isochrones. TODO explicit switch for this.
-        boolean transit = (request.transitModes != null && request.transitModes.isTransit()); // Does the search involve transit at all?
+        // FIXME real traverse mode set
+        boolean transit = (request.transitModes != null && request.transitModes.contains("TRANSIT")); // Does the search involve transit at all?
 
         // Check that caller has supplied a LinkedPointSet and RaptorWorkerData when needed.
         // These are supplied by the caller because the caller maintains caches, and this router object is throw-away.
@@ -139,16 +129,16 @@ public class RepeatedRaptorProfileRouter {
         ts.walkSearch = (int) (System.currentTimeMillis() - walkSearchStart);
 
         if (transit) {
-            TNRaptorWorker worker = new TNRaptorWorker(raptorWorkerData, request);
+            RaptorWorker worker = new RaptorWorker(raptorWorkerData, request);
             TIntIntMap transitStopAccessTimes = streetRouter.getReachedStops();
             propagatedTimesStore = worker.runRaptor(transitStopAccessTimes, nonTransitTimes, ts);
             ts.initialStopCount = transitStopAccessTimes.size();
         } else {
             // Nontransit case: skip transit routing and make a propagated times store based on only one row.
             // TODO skip the transit search inside the worker and avoid this conditional.
-            propagatedTimesStore = new TNPropagatedTimesStore(nonTransitTimes.size());
+            propagatedTimesStore = new PropagatedTimesStore(nonTransitTimes.size());
             int[][] singleRoundResults = new int[][] {nonTransitTimes.travelTimes};
-            propagatedTimesStore.setFromArray(singleRoundResults, ConfidenceCalculationMethod.MIN_MAX);
+            propagatedTimesStore.setFromArray(singleRoundResults, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX);
         }
         ts.targetsReached = propagatedTimesStore.countTargetsReached();
         ts.compute = (int) (System.currentTimeMillis() - computationStartTime);
@@ -160,7 +150,7 @@ public class RepeatedRaptorProfileRouter {
         if (isochrone) {
             // No destination point set was provided and we're just making isochrones based on travel time to vertices,
             // rather than finding access times to a set of user-specified points.
-            envelope = propagatedTimesStore.makeIsochronesForVertices();
+            envelope = null;//propagatedTimesStore.makeIsochronesForVertices();
         } else {
             // A destination point set was provided. We've found access times to a set of specified points.
             // TODO actually use those boolean params to calculate isochrones on a regular grid pointset
@@ -168,42 +158,5 @@ public class RepeatedRaptorProfileRouter {
         }
         ts.resultSets = (int) (System.currentTimeMillis() - resultSetStart);
         return envelope;
-    }
-
-    // TODO the below function has been replaced, but contains extra steps to set up scenario modifications. Carry those over to its replacement.
-    /** Create RAPTOR worker data from a graph, profile request and sample set (the last of which may be null */
-    public static RaptorWorkerData getRaptorWorkerData (ProfileRequest request, Graph graph, SampleSet sampleSet, TaskStatistics ts) {
-        LOG.info("Make data...");
-        long startData = System.currentTimeMillis();
-
-        // assign indices for added transit stops
-        // note that they only need be unique in the context of this search.
-        // note also that there may be, before this search is over, vertices with higher indices (temp vertices)
-        // but they will not be transit stops.
-        if (request.scenario != null && request.scenario.modifications != null) {
-            for (AddTripPattern atp : Iterables
-                    .filter(request.scenario.modifications, AddTripPattern.class)) {
-                atp.materialize(graph);
-            }
-        }
-
-        // convert from joda to java - ISO day of week with monday == 1
-        DayOfWeek dayOfWeek = DayOfWeek.of(request.date.getDayOfWeek());
-
-        TimeWindow window = new TimeWindow(request.fromTime, request.toTime + RaptorWorker.MAX_DURATION,
-                graph.index.servicesRunning(request.date), dayOfWeek);
-
-        RaptorWorkerData raptorWorkerData;
-        if (sampleSet == null)
-            raptorWorkerData = new RaptorWorkerData(graph, window, request, ts);
-        else
-            raptorWorkerData = new RaptorWorkerData(graph, window, request, sampleSet,
-                    ts);
-
-        ts.raptorData = (int) (System.currentTimeMillis() - startData);
-
-        LOG.info("done");
-
-        return raptorWorkerData;
     }
 }

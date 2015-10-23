@@ -5,8 +5,8 @@ import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.conveyal.r5.common.GeometryUtils;
 import org.geojson.Feature;
-import com.conveyal.r5.common.geometry.GeometryUtils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

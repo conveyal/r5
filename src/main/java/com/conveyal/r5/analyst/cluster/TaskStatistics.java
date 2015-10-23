@@ -116,7 +116,7 @@ public class TaskStatistics implements Serializable{
     public long computeDate;
 
     public TaskStatistics() {
-        otpCommit = MavenVersion.VERSION.commit;
+        otpCommit = MavenVersion.commit;
         computeDate = System.currentTimeMillis();
     }
 }

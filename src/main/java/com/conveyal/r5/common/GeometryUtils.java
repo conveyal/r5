@@ -2,16 +2,20 @@ package com.conveyal.r5.common;
 
 import com.conveyal.r5.analyst.UnsupportedGeometryException;
 import com.vividsolutions.jts.geom.*;
+import org.apache.commons.math3.util.FastMath;
 import org.geojson.GeoJsonObject;
 import org.geojson.LngLatAlt;
 
 import java.util.List;
 
 /**
- * Created by matthewc on 10/22/15.
+ * Reimplementation of OTP GeometryUtils, using copied code where there are not licensing concerns.
  */
 public class GeometryUtils {
     public static final GeometryFactory geometryFactory = new GeometryFactory();
+
+    // average of polar and equatorial, https://en.wikipedia.org/wiki/Earth
+    private static final double RADIUS_OF_EARTH_M = 6367.45;
 
     /**
      * Convert a org.geojson.Xxxx geometry to a JTS geometry. Copied from same-named class in OTP.
@@ -76,5 +80,36 @@ public class GeometryUtils {
             coords[i++] = new Coordinate(p.getLatitude(), p.getLongitude());
         }
         return coords;
+    }
+
+    /**
+     * Haversine formula for distance on the sphere. We used to have a fastDistance function that would estimate this
+     * quickly, but I'm not convinced we actually need it.
+     * @return distance in meters
+     */
+    public static double distance (double lat0, double lon0, double lat1, double lon1) {
+        double theta0 = FastMath.toRadians(lat0);
+        double theta1 = FastMath.toRadians(lat1);
+        double lambda0 = FastMath.toRadians(lon0);
+        double lambda1 = FastMath.toRadians(lon1);
+
+        double thetaAvg = (theta0 + theta1) / 2;
+        double lambdaAvg = (lambda0 + lambda1) / 2;
+        double sin2theta = FastMath.pow(FastMath.sin(thetaAvg), 2);
+        double sin2lambda = FastMath.pow(FastMath.sin(lambdaAvg), 2);
+
+        double underRadical = sin2theta + FastMath.cos(theta0) * FastMath.cos(theta1) * sin2lambda;
+        return 2 * RADIUS_OF_EARTH_M * FastMath.asin(FastMath.sqrt(underRadical));
+    }
+
+    public static double segmentFraction(int fLon0, int fLat0, int fLon1, int fLat1, int fixLon, int fixLat, double cosLat) {
+        // convert to local cartesian system
+        fLon0 /= cosLat;
+        fLon1 /= cosLat;
+        fixLon /= cosLat;
+
+        // TODO can we do this with fixed-point math?
+        LineSegment seg = new LineSegment(fLon0, fLat0, fLon1, fLat1);
+        return seg.segmentFraction(new Coordinate(fixLon, fixLat));
     }
 }

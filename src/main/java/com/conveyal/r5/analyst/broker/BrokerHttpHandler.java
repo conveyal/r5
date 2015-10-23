@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.broker;
 
+import com.conveyal.r5.common.JsonUtilities;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -40,9 +41,7 @@ import java.util.stream.Collectors;
 class BrokerHttpHandler extends HttpHandler {
     private static final Logger LOG = LoggerFactory.getLogger(BrokerHttpHandler.class);
 
-    // TODO we should really just make one static mapper somewhere and use it throughout OTP
-    private ObjectMapper mapper = new ObjectMapper()
-            .setSerializationInclusion(JsonInclude.Include.NON_NULL);;
+    private ObjectMapper mapper = JsonUtilities.objectMapper;
 
     private Broker broker;
 

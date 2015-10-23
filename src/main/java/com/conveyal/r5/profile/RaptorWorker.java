@@ -5,7 +5,8 @@ import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
-import com.conveyal.r5.routing.graph.Graph;
+import com.conveyal.r5.profile.PropagatedTimesStore.ConfidenceCalculationMethod;
+import com.conveyal.r5.streets.PointSetTimes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,6 +19,10 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 /**
+ * This is an exact copy of RaptorWorker that's being modified to work with (new) TransitNetworks
+ * instead of (old) Graphs. We can afford the maintainability nightmare of duplicating so much code because this is
+ * intended to completely replace the old class soon.
+ *
  * A RaptorWorker carries out RAPTOR searches on a pre-filtered, compacted representation of all the trips running
  * during a given time window. It originated as a rewrite of our RAPTOR code that would use "thin workers", allowing
  * computation by a generic function-execution service like AWS Lambda. The gains in efficiency were significant enough
@@ -33,19 +38,6 @@ public class RaptorWorker {
 
     private static final Logger LOG = LoggerFactory.getLogger(RaptorWorker.class);
     public static final int UNREACHED = Integer.MAX_VALUE;
-
-    /**
-     * Destinations with travel time above this threshold are considered unreachable. Note that this will cut off half of the
-     * trips to a particular location if half the time it takes less than the cutoff and half the time more. Use in combination
-     * with the reachability threshold in ProfileRequest to get desired results.
-     *
-     * The fact that there are edge effects here implies a problem with our methodology. We should be taking the approach that
-     * the Accessibility Observatory has taken in which accessibility (rather than travel time) is calculated at each minute.
-     * Alternatively, we could calculate the full OD matrix for each minute and save that to determine whether a particular destination
-     * is reachable in less than x minutes on median for any arbitrary cutoff.
-     *
-     * This should be a number beyond which people would generally consider transit to be completely unreasonable.
-     */
     static final int MAX_DURATION = 120 * 60;
 
     /**
@@ -142,7 +134,7 @@ public class RaptorWorker {
      * @param accessTimes a map from transit stops to the time it takes to reach those stops
      * @param nonTransitTimes the time to reach all targets without transit. Targets can be vertices or points/samples.
      */
-    public PropagatedTimesStore runRaptor (Graph graph, TIntIntMap accessTimes, int[] nonTransitTimes, TaskStatistics ts) {
+    public PropagatedTimesStore runRaptor (TIntIntMap accessTimes, PointSetTimes nonTransitTimes, TaskStatistics ts) {
         long beginCalcTime = System.currentTimeMillis();
         TIntIntMap initialStops = new TIntIntHashMap();
         TIntIntIterator initialIterator = accessTimes.iterator();
@@ -153,7 +145,7 @@ public class RaptorWorker {
             initialStops.put(stopIndex, accessTime);
         }
 
-        PropagatedTimesStore propagatedTimesStore = new PropagatedTimesStore(graph, this.req, data.nTargets);
+        PropagatedTimesStore propagatedTimesStore = new PropagatedTimesStore(data.nTargets);
 
         // optimization: if no schedules, only run Monte Carlo
         int fromTime = req.fromTime;
@@ -196,18 +188,20 @@ public class RaptorWorker {
                 LOG.info("minute {}", n);
             }
 
-            // run the scheduled search
+            // Run the search on scheduled routes.
             this.runRaptorScheduled(initialStops, departureTime);
             this.doPropagation(bestNonTransferTimes, scheduledTimesAtTargets, departureTime);
 
-            // pop in the walk only times; we don't want to force people to ride transit instead of
-            // walking a block
+            // Copy in the pre-transit times; we don't want to force people to ride transit instead of walking a block.
             for (int i = 0; i < scheduledTimesAtTargets.length; i++) {
-                if (nonTransitTimes[i] != UNREACHED && nonTransitTimes[i] + departureTime < scheduledTimesAtTargets[i])
-                    scheduledTimesAtTargets[i] = nonTransitTimes[i] + departureTime;
+                int nonTransitTravelTime = nonTransitTimes.getTravelTimeToPoint(i);
+                int nonTransitClockTime = nonTransitTravelTime + departureTime;
+                if (nonTransitTravelTime != UNREACHED && nonTransitClockTime < scheduledTimesAtTargets[i]) {
+                    scheduledTimesAtTargets[i] = nonTransitClockTime;
+                }
             }
 
-            // run the frequency searches
+            // Run any searches on frequency-based routes.
             if (data.hasFrequencies) {
                 for (int i = 0; i < monteCarloDraws + 2; i++) {
                     // make copies for just this search. We need copies because we can't use dynamic
@@ -274,8 +268,7 @@ public class RaptorWorker {
         //dumpVariableByte(timesAtTargetsEachMinute);
         // we can use min_max here as we've also run it once with best case and worst case board,
         // so the best and worst cases are meaningful.
-        propagatedTimesStore.setFromArray(timesAtTargetsEachIteration,
-                PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX);
+        propagatedTimesStore.setFromArray(timesAtTargetsEachIteration, ConfidenceCalculationMethod.MIN_MAX);
         return propagatedTimesStore;
     }
 
@@ -422,7 +415,6 @@ public class RaptorWorker {
 
             // perform scheduled search
             stopPositionInPattern = -1;
-
             for (int stopIndex : timetable.stopIndices) {
                 stopPositionInPattern += 1;
                 if (onTrip == -1) {
@@ -522,15 +514,14 @@ public class RaptorWorker {
             int baseTimeSeconds = timesAtTransitStops[s];
             if (baseTimeSeconds != UNREACHED) {
                 int[] targets = data.targetsForStop.get(s);
-
-                if (targets == null)
+                if (targets == null) {
                     continue;
-
-                for (int i = 0; i < targets.length; i++) {
-                    int targetIndex = targets[i++]; // increment i after read
-                    // the cache has time in seconds rather than distance, to avoid costly floating-point divides and integer casts here.
-                    int propagated_time = baseTimeSeconds + targets[i];
-
+                }
+                // Targets contains pairs of (targetIndex, time).
+                // The cache has time in seconds rather than distance to avoid costly floating-point divides and integer casts here.
+                for (int i = 0; i < targets.length; ) { // Counter i is incremented in two places below.
+                    int targetIndex = targets[i++]; // Increment i after read
+                    int propagated_time = baseTimeSeconds + targets[i++]; // Increment i after read
                     if (timesAtTargets[targetIndex] > propagated_time) {
                         timesAtTargets[targetIndex] = propagated_time;
                     }

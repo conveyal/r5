@@ -1,0 +1,6 @@
+.idea
+target
+hs_err_pid*
+cache
+*.iml
+src/main/resources/git.properties

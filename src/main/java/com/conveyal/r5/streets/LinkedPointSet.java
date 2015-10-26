@@ -86,10 +86,11 @@ public class LinkedPointSet {
         edges = new int[pointSet.capacity];
         distances0_mm = new int[pointSet.capacity];
         distances1_mm = new int[pointSet.capacity];
+        int unlinked = 0;
         for (int i = 0; i < pointSet.capacity; i++) {
             Split split = streetLayer.findSplit(pointSet.getLat(i), pointSet.getLon(i), 1000);
             if (split == null) {
-                LOG.info("Feature {} left unlinked", i);
+                unlinked++;
                 edges[i] = -1;
             } else {
                 edges[i] = split.edge;
@@ -98,7 +99,7 @@ public class LinkedPointSet {
             }
         }
         this.makeStopTrees();
-        LOG.info("Done linking pointset to street network.");
+        LOG.info("Done linking pointset to street network. {} features unlinked.", unlinked);
     }
 
     public int size () {

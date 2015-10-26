@@ -31,11 +31,7 @@ public class StreetRouter {
 
     TIntObjectMap<State> bestStates = new TIntObjectHashMap<>();
 
-    PriorityQueue<State> queue = new PriorityQueue<>((s1, s2) -> s2.weight - s1.weight);
-
-    boolean goalDirection = false;
-
-    double targetLat, targetLon; // for goal direction heuristic
+    PriorityQueue<State> queue = new PriorityQueue<>((s0, s1) -> s0.weight - s1.weight);
 
     // If you set this to a non-negative number, the search will be directed toward that vertex .
     public int toVertex = ALL_VERTICES;
@@ -105,8 +101,7 @@ public class StreetRouter {
         // TODO walk speed, assuming 1 m/sec currently.
         startState0.weight = split.distance0_mm / 1000;
         startState1.weight = split.distance1_mm / 1000;
-        bestStates.put(split.vertex0, startState0);
-        bestStates.put(split.vertex1, startState1);
+        // NB not adding to bestStates, as it will be added when it comes out of the queue
         queue.add(startState0);
         queue.add(startState1);
     }
@@ -115,7 +110,6 @@ public class StreetRouter {
         bestStates.clear();
         queue.clear();
         State startState = new State(fromVertex, -1, null);
-        bestStates.put(fromVertex, startState);
         queue.add(startState);
     }
 
@@ -124,7 +118,7 @@ public class StreetRouter {
      */
     public void route () {
 
-        if (bestStates.size() == 0 || queue.size() == 0) {
+        if (queue.size() == 0) {
             LOG.warn("Routing without first setting an origin, no search will happen.");
         }
 
@@ -141,42 +135,37 @@ public class StreetRouter {
             printStream.println("lat,lon,weight");
         }
 
-        // Set up goal direction if a to vertex was supplied.
-        if (toVertex > 0) {
-            goalDirection = true;
-            VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor(toVertex);
-            targetLat = vertex.getLat();
-            targetLon = vertex.getLon();
-        }
-
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
         while (!queue.isEmpty()) {
             State s0 = queue.poll();
-            if (bestStates.get(s0.vertex) != s0) {
-                continue; // state was dominated after being enqueued
+
+            if (DEBUG_OUTPUT) {
+                VertexStore.Vertex v = streetLayer.vertexStore.getCursor(s0.vertex);
+                printStream.println(String.format("%.6f,%.6f,%d", v.getLat(), v.getLon(), s0.weight));
             }
-            int v0 = s0.vertex;
-            if (goalDirection && v0 == toVertex) {
-                LOG.debug("Found destination vertex. Tree size is {}.", bestStates.size());
+            if (bestStates.containsKey(s0.vertex))
+                // dominated
+                continue;
+
+            if (toVertex > 0 && toVertex == s0.vertex) {
+                // found destination
                 break;
             }
-            if (DEBUG_OUTPUT) {
-                VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor(v0);
-                printStream.printf("%f,%f,%d\n", vertex.getLat(), vertex.getLon(), s0.weight);
-            }
-            TIntList edgeList = streetLayer.outgoingEdges.get(v0);
-            edgeList.forEach(edgeIndex -> {
-                edge.seek(edgeIndex);
+
+            // non-dominated state coming off the pqueue is by definition the best way to get to that vertex
+            bestStates.put(s0.vertex, s0);
+
+            // explore edges leaving this vertex
+            streetLayer.outgoingEdges.get(s0.vertex).forEach(eidx -> {
+                edge.seek(eidx);
+
                 State s1 = edge.traverse(s0);
-                if (!goalDirection && s1.weight > distanceLimitMeters) {
-                    return true; // Iteration over edges should continue.
+
+                if (s1 != null && s1.weight <= distanceLimitMeters) {
+                    queue.add(s1);
                 }
-                State existingBest = bestStates.get(s1.vertex);
-                if (existingBest == null || existingBest.weight > s1.weight) {
-                    bestStates.put(s1.vertex, s1);
-                }
-                queue.add(s1);
-                return true; // Iteration over edges should continue.
+
+                return true; // iteration over edges should continue
             });
         }
         if (DEBUG_OUTPUT) {

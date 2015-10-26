@@ -15,7 +15,7 @@ public class GeometryUtils {
     public static final GeometryFactory geometryFactory = new GeometryFactory();
 
     // average of polar and equatorial, https://en.wikipedia.org/wiki/Earth
-    private static final double RADIUS_OF_EARTH_M = 6367.45;
+    public static final double RADIUS_OF_EARTH_M = 6_367_450;
 
     /**
      * Convert a org.geojson.Xxxx geometry to a JTS geometry. Copied from same-named class in OTP.
@@ -93,10 +93,10 @@ public class GeometryUtils {
         double lambda0 = FastMath.toRadians(lon0);
         double lambda1 = FastMath.toRadians(lon1);
 
-        double thetaAvg = (theta0 + theta1) / 2;
-        double lambdaAvg = (lambda0 + lambda1) / 2;
-        double sin2theta = FastMath.pow(FastMath.sin(thetaAvg), 2);
-        double sin2lambda = FastMath.pow(FastMath.sin(lambdaAvg), 2);
+        double thetaComb = (theta1 - theta0) / 2;
+        double lambdaComb = (lambda1 - lambda0) / 2;
+        double sin2theta = FastMath.pow(FastMath.sin(thetaComb), 2);
+        double sin2lambda = FastMath.pow(FastMath.sin(lambdaComb), 2);
 
         double underRadical = sin2theta + FastMath.cos(theta0) * FastMath.cos(theta1) * sin2lambda;
         return 2 * RADIUS_OF_EARTH_M * FastMath.asin(FastMath.sqrt(underRadical));

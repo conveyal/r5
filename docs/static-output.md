@@ -102,4 +102,5 @@ and a file named with the y value, and then appropriate file extension. The per-
 #### `non-transit/{x}/{y}.png`
 
 This contains the non-transit access times to each nearby pixel. The center pixel of the image is the pixel specified by x and y in the filename.
-It is a grayscale png with an odd number of rows and columns; the value (0-255) of each pixel is the travel time from the origin to that pixel in _minutes_.
+It is a grayscale png with an odd number of rows and columns; the value (0-254) of each pixel is the travel time from the origin to that pixel in _minutes_, with 255
+indicating unreachable.

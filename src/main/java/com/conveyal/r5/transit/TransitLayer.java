@@ -86,7 +86,11 @@ public class TransitLayer implements Serializable {
      *
      * So loading multiple feeds would be achieved by calling a function on TransitLayer multiple times
      * with multiple GtfsFeed objects. All maps/lists would need to be initialized with empty objects at construction,
-     * and all methods would have to be designed to be called multiple times in successtion.
+     * and all methods would have to be designed to be called multiple times in succession.
+     *
+     * I (MWC) see no reason why this function cannot be called multiple times on the same transit network as-it-is.
+     * I'm going to try that and see how well it works. None of the IDs from the GTFS are used for anything other than reference.
+     * Block chaining is scoped to this function so it won't be affected.
      */
     public void loadFromGtfs (GTFSFeed gtfs) {
 
@@ -243,10 +247,14 @@ public class TransitLayer implements Serializable {
         }
     }
 
-    public static TransitLayer fromGtfs (String file) {
-        GTFSFeed gtfs = GTFSFeed.fromFile(file);
+    public static TransitLayer fromGtfs (List<String> files) {
         TransitLayer transitLayer = new TransitLayer();
-        transitLayer.loadFromGtfs(gtfs);
+
+        for (String file : files) {
+            GTFSFeed gtfs = GTFSFeed.fromFile(file);
+            transitLayer.loadFromGtfs(gtfs);
+        }
+
         return transitLayer;
     }
 

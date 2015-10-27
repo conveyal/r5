@@ -11,6 +11,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Random;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -71,15 +74,21 @@ public class TransportNetwork implements Serializable {
         // transportNetwork.streetLayer.testRouting(true, transitLayer);
     }
 
+    /** Legacy method to load from a single GTFS file */
+    public static TransportNetwork fromFiles (String osmSourceFile, String gtfsSourceFile) {
+        return fromFiles(osmSourceFile, Arrays.asList(gtfsSourceFile));
+    }
+
     /**
      * OSM PBF files are fragments of a single global database with a single namespace. Therefore it is valid to load
      * more than one PBF file into a single OSM storage object. However they might be from different points in time,
      * so it may be cleaner to just map one PBF file to one OSM object.
      *
      * On the other hand, GTFS feeds each have their own namespace. Each GTFS object is for one specific feed, and this
-     * distinction should be maintained for various reasons.
+     * distinction should be maintained for various reasons. However, we use the GTFS IDs only for reference, so it doesn't
+     * really matter, particularly for analytics.
      */
-    public static TransportNetwork fromFiles (String osmSourceFile, String gtfsSourceFile) {
+    public static TransportNetwork fromFiles (String osmSourceFile, List<String> gtfsSourceFiles) {
 
         // Load OSM data into MapDB
         OSM osm = new OSM(null);
@@ -92,7 +101,7 @@ public class TransportNetwork implements Serializable {
         osm.close();
 
         // Load transit data TODO remove need to supply street layer at this stage
-        TransitLayer transitLayer = TransitLayer.fromGtfs(gtfsSourceFile);
+        TransitLayer transitLayer = TransitLayer.fromGtfs(gtfsSourceFiles);
 
         // The street index is needed for associating transit stops with the street network.
         streetLayer.indexStreets();
@@ -115,16 +124,12 @@ public class TransportNetwork implements Serializable {
 
     public static TransportNetwork fromDirectory (File directory) {
         File osmFile = null;
-        File gtfsFile = null;
+        List<String> gtfsFiles = new ArrayList<>();
         for (File file : directory.listFiles()) {
             switch (InputFileType.forFile(file)) {
                 case GTFS:
                     LOG.info("Found GTFS file {}", file);
-                    if (gtfsFile == null) {
-                        gtfsFile = file;
-                    } else {
-                        LOG.warn("Can only load one GTFS file at a time.");
-                    }
+                    gtfsFiles.add(file.getAbsolutePath());
                     break;
                 case OSM:
                     LOG.info("Found OSM file {}", file);
@@ -141,7 +146,7 @@ public class TransportNetwork implements Serializable {
                     LOG.warn("Skipping non-input file '{}'", file);
             }
         }
-        return fromFiles(osmFile.getAbsolutePath(), gtfsFile.getAbsolutePath());
+        return fromFiles(osmFile.getAbsolutePath(), gtfsFiles);
     }
 
     /**

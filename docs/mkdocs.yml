@@ -1,0 +1,6 @@
+site_name: r5
+site_url: r5.readthedocs.org
+repo_url: https://github.com/conveyal/r5
+site_dir: ../target/mkdocs
+docs_dir: ../docs
+theme: readthedocs

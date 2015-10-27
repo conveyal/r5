@@ -104,3 +104,9 @@ and a file named with the y value, and then appropriate file extension. The per-
 This contains the non-transit access times to each nearby pixel. The center pixel of the image is the pixel specified by x and y in the filename.
 It is a grayscale png with an odd number of rows and columns; the value (0-254) of each pixel is the travel time from the origin to that pixel in _minutes_, with 255
 indicating unreachable.
+
+## Calculating accessibility
+
+All of the opportunity categories will be stored in similar flat files. After computing travel times over the entire departure window, accessibility should be calculated
+over the entire window, and then averages should be taken. (It is important to take the averages of the accessibility, rather than taking average travel time and
+using that to compute average accessibility; see [OpenTripPlanner issue 2148](https://github.com/opentripplanner/OpenTripPlanner/issues/2148))

@@ -105,6 +105,8 @@ public class RaptorWorker {
 
     private FrequencyRandomOffsets offsets;
 
+    public PropagatedTimesStore propagatedTimesStore;
+
     public RaptorWorker(RaptorWorkerData data, ProfileRequest req) {
         this.data = data;
         // these should only reflect the results of the (deterministic) scheduled search
@@ -145,7 +147,8 @@ public class RaptorWorker {
             initialStops.put(stopIndex, accessTime);
         }
 
-        PropagatedTimesStore propagatedTimesStore = new PropagatedTimesStore(data.nTargets);
+        if (propagatedTimesStore == null)
+            propagatedTimesStore = new PropagatedTimesStore(data.nTargets);
 
         // optimization: if no schedules, only run Monte Carlo
         int fromTime = req.fromTime;

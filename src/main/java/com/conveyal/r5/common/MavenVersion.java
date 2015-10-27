@@ -23,7 +23,7 @@ public class MavenVersion {
             InputStream is = MavenVersion.class.getClassLoader().getResourceAsStream("git.properties");
             p.load(is);
             is.close();
-        } catch (IOException e) {
+        } catch (IOException | NullPointerException e) {
             LOG.error("Error loading git commit information", e);
         }
 

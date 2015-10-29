@@ -43,13 +43,6 @@ public class RepeatedRaptorProfileRouter {
 
     public TransportNetwork network;
 
-    /**
-     * If this is null we will generate a throw-away raptor data table. If it is set, the provided table will be used
-     * for routing. Ideally we'd handle the cacheing of reusable raptor tables inside this class, but this class is
-     * a throw-away calculator instance and doesn't have access to the job IDs which would be the cache keys.
-     */
-    public RaptorWorkerData raptorWorkerData;
-
     /** Samples to propagate times to */
     private LinkedPointSet targets;
 
@@ -96,11 +89,6 @@ public class RepeatedRaptorProfileRouter {
             throw new IllegalArgumentException("Caller must supply a LinkedPointSet.");
         }
 
-        if (transit && raptorWorkerData == null) {
-            LOG.error("Caller must supply RaptorWorkerData if transit is in use.");
-            transit = false;
-        }
-
         // WHAT WE WANT TO DO HERE:
         // - Make or get a LinkedPointSet (a regular grid if no PointSet is supplied).
         // - Use a streetRouter to explore a circular area around the origin point.
@@ -129,7 +117,7 @@ public class RepeatedRaptorProfileRouter {
         ts.walkSearch = (int) (System.currentTimeMillis() - walkSearchStart);
 
         if (transit) {
-            RaptorWorker worker = new RaptorWorker(raptorWorkerData, request);
+            RaptorWorker worker = new RaptorWorker(network.transitLayer, targets, request);
             TIntIntMap transitStopAccessTimes = streetRouter.getReachedStops();
             ts.initialStopCount = transitStopAccessTimes.size();
             LOG.info("Found {} transit stops near origin", ts.initialStopCount);

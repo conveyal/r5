@@ -5,10 +5,8 @@ import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.conveyal.r5.common.JsonUtilities;
-import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
@@ -29,7 +27,6 @@ import org.apache.http.message.BasicHeader;
 import org.apache.http.util.EntityUtils;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.common.MavenVersion;
-import com.conveyal.r5.profile.RaptorWorkerData;
 import com.conveyal.r5.profile.RepeatedRaptorProfileRouter;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -110,11 +107,6 @@ public class AnalystWorker implements Runnable {
     String BROKER_BASE_URL = "http://localhost:9001";
 
     static final HttpClient httpClient;
-
-    /** Cache RAPTOR data by Job ID */
-    private Cache<String, RaptorWorkerData> workerDataCache = CacheBuilder.newBuilder()
-            .maximumSize(10)
-            .build();
 
     static {
         PoolingHttpClientConnectionManager mgr = new PoolingHttpClientConnectionManager();
@@ -385,28 +377,6 @@ public class AnalystWorker implements Runnable {
 
             RepeatedRaptorProfileRouter router =
                     new RepeatedRaptorProfileRouter(transportNetwork, clusterRequest, linkedTargets, ts); // TODO transportNetwork is implied by linkedTargets.
-
-            // Produce RAPTOR data tables, going through a cache where relevant.
-            // This is only used for multi-point requests. Single-point requests are assumed to be continually
-            // changing, so we create throw-away RAPTOR tables for them.
-            // Ideally we'd want this caching to happen invisibly inside the RepeatedRaptorProfileRouter,
-            // but the RepeatedRaptorProfileRouter doesn't know the job ID or other information from the cluster request.
-            // It would be possible to just supply the cache _key_ as a way of saying that the cache should be used.
-            // But then we'd need to pass in both the cache and the key, which is weird.
-            long raptorDataStart = System.currentTimeMillis();
-            if (transit) {
-                // We only create stop trees and data tables if transit is in use, otherwise they don't serve any purpose.
-                if (singlePoint) {
-                    // Generate a one-time throw-away table if transit is in use but .
-                    router.raptorWorkerData =
-                            new RaptorWorkerData(transportNetwork.transitLayer, linkedTargets, clusterRequest.profileRequest.date); // FIXME repetitive...
-                } else {
-                    router.raptorWorkerData = workerDataCache.get(clusterRequest.jobId, () ->
-                            new RaptorWorkerData(transportNetwork.transitLayer, linkedTargets, clusterRequest.profileRequest.date));
-                }
-            }
-            // TODO include scenario modifications in RaptorWorkerData.
-            ts.raptorData = (int) (System.currentTimeMillis() - raptorDataStart);
 
             // Run the core repeated-raptor analysis.
             ResultEnvelope envelope = new ResultEnvelope();

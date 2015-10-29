@@ -121,8 +121,9 @@ public class ProfileRequest implements Serializable, Cloneable {
      */
     public float reachabilityThreshold = 0.5f;
 
-    /** What assumption should be used when boarding frequency vehicles? */
-    public RaptorWorkerTimetable.BoardingAssumption boardingAssumption = RaptorWorkerTimetable.BoardingAssumption.RANDOM;
+    /** Deprecated: code now always does a monte carlo simulation */
+    @Deprecated
+    public BoardingAssumption boardingAssumption;
 
     /* The relative importance of different factors when biking */
     /** The relative importance of maximizing safety when cycling */

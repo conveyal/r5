@@ -56,19 +56,18 @@ public class StaticSiteTest {
             v.seek(vidx);
             AnalystClusterRequest acr = new AnalystClusterRequest();
 
-            RaptorWorkerData rwd = new RaptorWorkerData(tn.transitLayer, lpset, new LocalDate());
             ProfileRequest req = new ProfileRequest();
             req.fromLat = v.getLat();
             req.fromLon = v.getLon();
             req.fromTime = 7 * 3600;
             req.toTime = 9 * 3600;
 
-            RaptorWorker worker = new RaptorWorker(rwd, req);
+            RaptorWorker worker = new RaptorWorker(tn.transitLayer, lpset, req);
 
             // extract the full travel time matrix
             int[][][] fullTimes = new int[1][][];
 
-            worker.propagatedTimesStore = new PropagatedTimesStore(rwd.nTargets) {
+            worker.propagatedTimesStore = new PropagatedTimesStore(lpset.size()) {
                 @Override
                 public void setFromArray(int[][] times, ConfidenceCalculationMethod confidenceCalculationMethod) {
                     super.setFromArray(times, confidenceCalculationMethod);

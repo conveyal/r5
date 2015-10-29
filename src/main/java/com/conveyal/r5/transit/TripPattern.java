@@ -1,6 +1,5 @@
 package com.conveyal.r5.transit;
 
-import com.conveyal.r5.profile.RaptorWorkerTimetable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,14 +17,20 @@ public class TripPattern implements Serializable {
 
     private static Logger LOG = LoggerFactory.getLogger(TripPattern.class);
 
-    String routeId;
-    int directionId = Integer.MIN_VALUE;
-    int[] stops;
+    public String routeId;
+    public int directionId = Integer.MIN_VALUE;
+    public int[] stops;
     // Could be compacted into 2 bits each or a bunch of flags, but is it even worth it?
-    PickDropType[] pickups;
-    PickDropType[] dropoffs;
-    BitSet wheelchairAccessible; // One bit per stop
-    List<TripSchedule> tripSchedules = new ArrayList<>();
+    public PickDropType[] pickups;
+    public PickDropType[] dropoffs;
+    public BitSet wheelchairAccessible; // One bit per stop
+    public List<TripSchedule> tripSchedules = new ArrayList<>();
+
+    /** does this trip pattern have any frequency trips */
+    public boolean hasFrequencies;
+
+    /** does this trip pattern have any scheduled trips */
+    public boolean hasSchedules;
 
     // This set includes the numeric codes for all services on which at least one trip in this pattern is active.
     BitSet servicesActive = new BitSet();
@@ -46,6 +51,8 @@ public class TripPattern implements Serializable {
 
     public void addTrip (TripSchedule tripSchedule) {
         tripSchedules.add(tripSchedule);
+        hasFrequencies = hasFrequencies || tripSchedule.headwaySeconds != null;
+        hasSchedules = hasSchedules || tripSchedule.headwaySeconds == null;
         servicesActive.set(tripSchedule.serviceCode);
     }
 
@@ -84,45 +91,4 @@ public class TripPattern implements Serializable {
         }
         return bestSchedule;
     }
-
-    /**
-     * Convert a new-style TransitNetwork TripPattern to a RaptorWorkerTimetable as a stopgap measure, to allow
-     * making RaptorWorkerData from the new TransitNetwork.
-     */
-    public RaptorWorkerTimetable toRaptorWorkerTimetable (BitSet servicesActive) {
-        List<TripSchedule> activeSchedules = new ArrayList<>();
-        for (TripSchedule schedule: tripSchedules) {
-            if (servicesActive.get(schedule.serviceCode)) {
-                activeSchedules.add(schedule);
-            }
-        }
-        // The Raptor worker expects trips to be sorted by departure time.
-        Collections.sort(activeSchedules);
-        RaptorWorkerTimetable timetable = new RaptorWorkerTimetable(activeSchedules.size(), stops.length);
-        int trip = 0;
-        for (TripSchedule schedule : activeSchedules) {
-            int nStops = schedule.arrivals.length;
-            // The Raptor worker has arrivals and departures packed into a single array.
-            // This is probably not very beneficial.
-            int[] packed = new int[nStops * 2];
-            for (int s = 0, ps = 0; s < nStops; s++) {
-                packed[ps++] = schedule.arrivals[s];
-                packed[ps++] = schedule.departures[s];
-            }
-            timetable.timesPerTrip[trip++] = packed;
-        }
-
-        timetable.stopIndices = this.stops;
-
-// TODO: more fields in timetable
-//        /** parent raptorworkerdata of this timetable */
-//        public RaptorWorkerData raptorData;
-//        /** Mode of this pattern, see constants in com.conveyal.gtfs.model.Route */
-//        public int mode;
-//        /** Index of this pattern in RaptorData */
-//        public int dataIndex;
-
-        return timetable;
-    }
-
 }

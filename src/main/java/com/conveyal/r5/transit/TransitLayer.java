@@ -60,6 +60,12 @@ public class TransitLayer implements Serializable {
     public double centerLon;
     public double centerLat;
 
+    /** does this TransitLayer have any frequency-based trips? */
+    public boolean hasFrequencies = false;
+
+    /** Does this TransitLayer have any schedules */
+    public boolean hasSchedules = false;
+
     public int nTrips = 0;
 
     /** this is the result of running a search from every stop in the graph, map from stop vertex index to (vertex index, distance) */
@@ -145,6 +151,10 @@ public class TransitLayer implements Serializable {
             int serviceCode = serviceCodeNumber.get(trip.service.service_id);
             TripSchedule tripSchedule = new TripSchedule(trip, arrivals.toArray(), departures.toArray(), serviceCode);
             tripPattern.addTrip(tripSchedule);
+
+            this.hasFrequencies = this.hasFrequencies || tripSchedule.headwaySeconds != null;
+            this.hasSchedules = this.hasSchedules || tripSchedule.headwaySeconds == null;
+
             nTripsAdded += 1;
             // Record which block this trip belongs to, if any.
             if ( ! Strings.isNullOrEmpty(trip.block_id)) {

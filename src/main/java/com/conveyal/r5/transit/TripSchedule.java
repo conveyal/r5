@@ -46,7 +46,7 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule> {
 
         // TODO handle exact times!
 
-        if (trip.frequencies != null && !trip.frequencies.isEmpty() && false) {
+        if (trip.frequencies != null && !trip.frequencies.isEmpty()) {
             // this is a frequency-based trip
             this.headwaySeconds = new int[trip.frequencies.size()];
             this.startTimes = new int[trip.frequencies.size()];

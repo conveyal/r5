@@ -1,5 +1,7 @@
 package com.conveyal.r5.transit;
 
+import gnu.trove.set.TIntSet;
+import gnu.trove.set.hash.TIntHashSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +35,7 @@ public class TripPattern implements Serializable {
     public boolean hasSchedules;
 
     // This set includes the numeric codes for all services on which at least one trip in this pattern is active.
-    BitSet servicesActive = new BitSet();
+    public BitSet servicesActive = new BitSet();
 
     public TripPattern (TripPatternKey tripPatternKey) {
         int nStops = tripPatternKey.stops.size();

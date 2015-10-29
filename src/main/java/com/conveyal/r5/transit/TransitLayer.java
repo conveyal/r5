@@ -176,6 +176,12 @@ public class TransitLayer implements Serializable {
         });
         LOG.info("Done chaining trips together according to blocks.");
 
+        LOG.info("Sorting trips on each pattern");
+        for (TripPattern tripPattern : tripPatternForStopSequence.values()) {
+            Collections.sort(tripPattern.tripSchedules);
+        }
+        LOG.info("done sorting");
+
         LOG.info("Finding the approximate center of the transport network...");
         findCenter(gtfs.stops.values());
 

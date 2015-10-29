@@ -342,11 +342,14 @@ public class RaptorWorker {
         allStopsTouched.clear();
         stopsTouched.clear();
 
-        // we need to mark every reachable stop here, because the network is changing randomly.
-        // It is entirely possible that the first trip in an itinerary does not change, but trips
-        // further down do.
-        IntStream.range(0, bestTimes.length).filter(i -> bestTimes[i] != UNREACHED).forEach(
-                this::markPatternsForStop);
+        // mark only frequency patterns here. Any scheduled patterns that are reached downstream of frequency patterns
+        // will be marked during the search and explored in subsequent rounds.
+        for (int p = 0; p < data.tripPatterns.size(); p++) {
+            TripPattern pat = data.tripPatterns.get(p);
+            if (pat.hasFrequencies && servicesActive.intersects(pat.servicesActive)) {
+                patternsTouched.set(p);
+            }
+        }
 
         // Anytime a round updates some stops, move on to another round
         while (doOneRound(bestTimes, bestNonTransferTimes, previousPatterns, true, boardingAssumption)) {
@@ -507,6 +510,7 @@ public class RaptorWorker {
 
             // perform scheduled search
             TripSchedule onTrip = null;
+            int onTripIdx = -1;
             stopPositionInPattern = -1;
             for (int stopIndex : timetable.stops) {
                 stopPositionInPattern += 1;
@@ -519,7 +523,9 @@ public class RaptorWorker {
 
                     // handle overtaking trips by doing linear search through all trips
                     int bestBoardTimeThisStop = Integer.MAX_VALUE;
+                    int tripIdx = -1;
                     for (TripSchedule trip : timetable.tripSchedules) {
+                        tripIdx++;
                         if (trip.headwaySeconds != null || !servicesActive.get(trip.serviceCode))
                             // frequency trip;
                             continue;
@@ -527,7 +533,9 @@ public class RaptorWorker {
                         int dep = trip.departures[stopPositionInPattern];
                         if (dep > bestTimes[stopIndex] + BOARD_SLACK && dep < bestBoardTimeThisStop) {
                             onTrip = trip;
+                            onTripIdx = tripIdx;
                             bestBoardTimeThisStop = dep;
+                            break; // trips are sorted, we've found the first one
                         }
                     }
 
@@ -553,19 +561,19 @@ public class RaptorWorker {
 
                     }
 
-                    // Check whether we can switch to an earlier trip. This could be due to an overtaking trip (in
-                    // this case we will have set bestTimes above), or (more likely) because there was a faster way to
+                    // Check whether we can switch to an earlier trip, because there was a faster way to
                     // get to a stop further down the line.
-                    for (TripSchedule trip : timetable.tripSchedules) {
+                    int bestTripIdx = onTripIdx;
+                    while (bestTripIdx >= 1 && timetable.tripSchedules.get(bestTripIdx - 1).departures[stopPositionInPattern] > bestTimes[stopIndex] + BOARD_SLACK) {
+                        bestTripIdx--;
+                        TripSchedule trip = timetable.tripSchedules.get(bestTripIdx);
                         if (trip.headwaySeconds != null || !servicesActive.get(trip.serviceCode))
                             // frequency trip or not running today
                             continue;
 
-                        // use bestTime not bestNonTransferTimes to allow transferring to this trip later on down the route
-                        if (trip.departures[stopPositionInPattern] > bestTimes[stopIndex] + BOARD_SLACK &&
-                                trip.departures[stopPositionInPattern] < onTrip.departures[stopPositionInPattern]) {
-                            onTrip = trip;
-                        }
+                        // this is a trip we could potentially take
+                        onTripIdx = bestTripIdx;
+                        onTrip = trip;
                     }
                 }
             }
@@ -657,7 +665,9 @@ public class RaptorWorker {
     private void markPatternsForStop(int stop) {
         TIntList patterns = data.patternsForStop.get(stop);
         for (TIntIterator it = patterns.iterator(); it.hasNext();) {
-            patternsTouched.set(it.next());
+            int p = it.next();
+            if (servicesActive.intersects(data.tripPatterns.get(p).servicesActive))
+            patternsTouched.set(p);
         }
     }
 

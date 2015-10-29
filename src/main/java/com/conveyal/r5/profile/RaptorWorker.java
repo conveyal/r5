@@ -346,7 +346,7 @@ public class RaptorWorker {
         // will be marked during the search and explored in subsequent rounds.
         for (int p = 0; p < data.tripPatterns.size(); p++) {
             TripPattern pat = data.tripPatterns.get(p);
-            if (pat.hasFrequencies && servicesActive.intersects(pat.servicesActive)) {
+            if (pat.hasFrequencies) {
                 patternsTouched.set(p);
             }
         }
@@ -665,9 +665,7 @@ public class RaptorWorker {
     private void markPatternsForStop(int stop) {
         TIntList patterns = data.patternsForStop.get(stop);
         for (TIntIterator it = patterns.iterator(); it.hasNext();) {
-            int p = it.next();
-            if (servicesActive.intersects(data.tripPatterns.get(p).servicesActive))
-            patternsTouched.set(p);
+            patternsTouched.set(it.next());
         }
     }
 

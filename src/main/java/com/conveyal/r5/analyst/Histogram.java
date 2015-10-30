@@ -88,7 +88,7 @@ public class Histogram implements Serializable {
     /** no-arg constructor for serialization/deserialization */
     public Histogram () {}
 
-    public static Map<String, Histogram> buildAll (int[] times, PointSet targets) {
+    public static Map<String, Histogram> buildAll (int[] times, FreeFormPointSet targets) {
         try {
             // bin counts and all properties
             int size = IntStream.of(times).reduce(0, (memo, i) -> i != Integer.MAX_VALUE ? Math.max(i, memo) : memo) + 1;

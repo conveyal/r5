@@ -5,6 +5,7 @@ import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.common.GeometryUtils;
+import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -57,6 +58,9 @@ public class StreetLayer implements Serializable {
     transient List<TIntList> outgoingEdges;
     transient List<TIntList> incomingEdges;
     public transient IntHashGrid spatialIndex = new IntHashGrid();
+
+    /** Envelope of this street layer, in decimal degrees (non-fixed-point) */
+    public Envelope envelope = new Envelope();
 
     TLongIntMap vertexIndexForOsmNode = new TLongIntHashMap(100_000, 0.75f, -1, -1);
     // TIntLongMap osmWayForEdgeIndex;
@@ -175,6 +179,7 @@ public class StreetLayer implements Serializable {
         for (int n = beginIdx; n <= endIdx; n++) {
             long nodeId = way.nodes[n];
             Node node = osm.nodes.get(nodeId);
+            envelope.expandToInclude(node.getLon(), node.getLat());
             nodes.add(node);
         }
 

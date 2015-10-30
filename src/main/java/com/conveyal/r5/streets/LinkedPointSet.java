@@ -1,10 +1,11 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.r5.analyst.PointSet;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
-import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.streets.EdgeStore.Edge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,11 +84,11 @@ public class LinkedPointSet {
         LOG.info("Linking pointset to street network...");
         this.pointSet = pointSet;
         this.streetLayer = streetLayer;
-        edges = new int[pointSet.capacity];
-        distances0_mm = new int[pointSet.capacity];
-        distances1_mm = new int[pointSet.capacity];
+        edges = new int[pointSet.featureCount()];
+        distances0_mm = new int[pointSet.featureCount()];
+        distances1_mm = new int[pointSet.featureCount()];
         int unlinked = 0;
-        for (int i = 0; i < pointSet.capacity; i++) {
+        for (int i = 0; i < pointSet.featureCount(); i++) {
             Split split = streetLayer.findSplit(pointSet.getLat(i), pointSet.getLon(i), 1000);
             if (split == null) {
                 unlinked++;

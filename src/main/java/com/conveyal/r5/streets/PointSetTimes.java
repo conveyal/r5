@@ -1,5 +1,6 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.PointSet;
 
 /**

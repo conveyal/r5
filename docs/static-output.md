@@ -79,18 +79,18 @@ This contains the connection from Web Mercator pixels to transit stops. It is a 
 This file does not obviously have constant offsets. It is assumed that the client will build an index for the file when it is loaded. If this proves
 to be too slow, we can pregenerate an index for the file.
 
-### Per-street-vertex file
+### Per-origin file
 
 #### `{x}/{y}.dat`
 
-There is one file per street vertex, which contains transit travel times in seconds from that street vertex to every transit stop in the network, as well as to all nearby pixels. It is formatted as follows:
+There is one file per origin, which contains transit travel times in seconds from that origin to every transit stop in the network, as well as to all nearby pixels. It is
+named with the x and y position of the pixel origin _relative to the north and west offsets in query.json_ (to avoid enormous numbers). It is formatted as follows.
 
 ```
 (2 bytes) radius of surrounding pixel area (e.g. if this is 20, there is an area 20 pixels above, below, to the right and left of the origin represented here,
 for a 41x41 pixel image centered on the origin)
 	for each pixel, rows first:
 	(2 bytes) travel time to pixel, seconds, delta-coded from previous pixel
-
 
 (4 bytes) number of transit stops
 (2 bytes) number of departure minutes

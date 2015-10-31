@@ -1,0 +1,15 @@
+<configuration>
+  <!-- Maven will only copy this log configuration when doing tests, because it is in src/test/resources  -->
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <!-- print out file and line number in parenthesis, which Eclipse and IDEA will link -->
+      <pattern>%d{HH:mm:ss.SSS} %level \(%F:%L\) %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <root level="info">
+    <appender-ref ref="STDOUT" />
+  </root>
+
+</configuration>
+

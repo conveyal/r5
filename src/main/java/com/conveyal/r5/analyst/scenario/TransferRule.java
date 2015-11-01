@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.scenario;
 
-import org.opentripplanner.profile.RaptorWorkerTimetable;
+import com.conveyal.r5.analyst.BoardingAssumption;
+import com.conveyal.r5.transit.TripPattern;
 
 import java.util.stream.IntStream;
 
@@ -12,7 +13,7 @@ public class TransferRule extends Modification {
     private static final long serialVersionUID = 1L;
 
     /** The boarding assumption to use for matched transfers */
-    public RaptorWorkerTimetable.BoardingAssumption assumption;
+    public BoardingAssumption assumption;
 
     /** From GTFS modes; note constants in Route */
     public int[] fromMode;
@@ -61,7 +62,9 @@ public class TransferRule extends Modification {
         return "transfer-rule";
     }
 
-    public boolean matches (RaptorWorkerTimetable from, RaptorWorkerTimetable to) {
+    public boolean matches (TripPattern from, TripPattern to) {
+
+        /*
         if (fromMode != null && !IntStream.of(fromMode).anyMatch(m -> m == from.mode))
             return false;
 
@@ -69,5 +72,7 @@ public class TransferRule extends Modification {
             return false;
 
         return true;
+        */
+        return false;
     }
 }

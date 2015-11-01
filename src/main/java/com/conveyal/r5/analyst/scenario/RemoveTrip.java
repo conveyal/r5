@@ -1,12 +1,11 @@
 package com.conveyal.r5.analyst.scenario;
 
-import org.onebusaway.gtfs.model.Trip;
-import org.opentripplanner.routing.edgetype.TripPattern;
-import org.opentripplanner.routing.trippattern.FrequencyEntry;
-import org.opentripplanner.routing.trippattern.TripTimes;
+import com.conveyal.r5.transit.TripPattern;
+import com.conveyal.r5.transit.TripSchedule;
 
 /**
- * Remove trips from a scenario
+ * Remove trips from a scenario.
+ * This could remove all trips on a route, since its superclass TimetableFilter provides both route and trip matching.
  */
 public class RemoveTrip extends TripFilter {
     public static final long serialVersionUID = 1L;
@@ -17,12 +16,8 @@ public class RemoveTrip extends TripFilter {
     }
 
     @Override
-    public TripTimes apply(Trip trip, TripPattern tp, TripTimes tt) {
-        return matches(trip) ? null : tt;
+    public TripSchedule apply(TripPattern tp, TripSchedule tt) {
+        return matches(tt.tripId) ? null : tt;
     }
 
-    @Override
-    public FrequencyEntry apply(Trip trip, TripPattern tp, FrequencyEntry fe) {
-        return matches(trip) ? null : fe;
-    }
 }

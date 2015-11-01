@@ -1,9 +1,7 @@
 package com.conveyal.r5.analyst.scenario;
 
-import org.onebusaway.gtfs.model.Trip;
-import org.opentripplanner.routing.edgetype.TripPattern;
-import org.opentripplanner.routing.trippattern.FrequencyEntry;
-import org.opentripplanner.routing.trippattern.TripTimes;
+import com.conveyal.r5.transit.TripPattern;
+import com.conveyal.r5.transit.TripSchedule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,21 +17,11 @@ public class AdjustHeadway extends TripFilter {
     private static final Logger LOG = LoggerFactory.getLogger(AdjustHeadway.class);
 
     @Override
-    public TripTimes apply(Trip trip, TripPattern tp, TripTimes tt) {
-        if (matches(trip))
-            LOG.warn("Not performing requested headway adjustment on timetabled trip {}", trip);
-
+    public TripSchedule apply(TripPattern tp, TripSchedule tt) {
+        if (matches(tt.tripId)) {
+            LOG.warn("Not performing requested headway adjustment on timetabled trip {}", tripId);
+        }
         return tt;
-    }
-
-    @Override
-    public FrequencyEntry apply(Trip trip, TripPattern tp, FrequencyEntry fe) {
-        if (matches(trip)) {
-            return new FrequencyEntry(fe.startTime, fe.endTime, headway, fe.exactTimes, fe.tripTimes);
-        }
-        else {
-            return fe;
-        }
     }
 
     @Override

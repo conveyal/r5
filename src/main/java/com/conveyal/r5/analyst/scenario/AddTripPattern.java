@@ -5,6 +5,9 @@ import com.conveyal.r5.model.json_serialization.BitSetDeserializer;
 import com.conveyal.r5.model.json_serialization.BitSetSerializer;
 import com.conveyal.r5.model.json_serialization.LineStringDeserializer;
 import com.conveyal.r5.model.json_serialization.LineStringSerializer;
+import com.conveyal.r5.streets.Split;
+import com.conveyal.r5.streets.StreetLayer;
+import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.vividsolutions.jts.geom.Coordinate;
@@ -46,14 +49,13 @@ public class AddTripPattern extends Modification {
     public int mode = Route.BUS;
 
     /** Create temporary stops associated with the given graph. Note that a given AddTripPattern can be associated only with a single graph. */
-    public void materialize (Graph graph) {
-        SampleFactory sfac = graph.getSampleFactory();
+    public void materialize (TransportNetwork tnet) {
 
         temporaryStops = new TemporaryStop[stops.cardinality()];
 
         int stop = 0;
         for (int i = stops.nextSetBit(0); i >= 0; i = stops.nextSetBit(i + 1)) {
-            temporaryStops[stop++] = new TemporaryStop(geometry.getCoordinateN(i), sfac);
+            temporaryStops[stop++] = new TemporaryStop(geometry.getCoordinateN(i), tnet.streetLayer);
         }
     }
 
@@ -103,20 +105,20 @@ public class AddTripPattern extends Modification {
         public final double lon;
 
         /** how this vertex is connected to the graph */
-        public final Sample sample;
+        public final Split split;
 
-        public TemporaryStop (Coordinate c, SampleFactory sampleFactory) {
-            this(c.y, c.x, sampleFactory);
+        public TemporaryStop (Coordinate c, StreetLayer streetLayer) {
+            this(c.y, c.x, streetLayer);
         }
 
-        public TemporaryStop (double lat, double lon, SampleFactory sampleFactory) {
+        public TemporaryStop (double lat, double lon, StreetLayer streetLayer) {
             this.lat = lat;
             this.lon = lon;
             this.index = nextId.decrementAndGet();
-            this.sample = sampleFactory.getSample(this.lon, this.lat);
-
-            if (this.sample == null)
+            this.split = streetLayer.findSplit(this.lat, this.lon, 200);
+            if (this.split == null) {
                 LOG.warn("Temporary stop unlinked: {}", this);
+            }
         }
 
         public String toString () {

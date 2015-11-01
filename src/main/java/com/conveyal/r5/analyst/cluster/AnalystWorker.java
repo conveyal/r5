@@ -46,9 +46,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * This is an exact copy of AnalystWorker that's being modified to work with (new) TransitNetworks instead of (old) Graphs.
- * We can afford the maintainability nightmare of duplicating so much code because this is intended to completely replace
- * the old class sooner than later.
+ * This is an exact copy of the AnalystWorker in the OTP repository that's been modified to work with (new)
+ * TransitNetworks instead of (old) OTP Graphs.
+ * We can afford the maintainability nightmare of duplicating so much code because this is intended to completely
+ * replace the old class sooner than later.
  * We don't need to wait for point-to-point routing and detailed walking directions etc. to be available on the new
  * TransitNetwork code to do analysis work with it.
  */

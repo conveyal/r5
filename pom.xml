@@ -352,5 +352,10 @@
       <artifactId>graphql-java</artifactId>
       <version>2015-10-24T09-07-39</version>
     </dependency>
+    <dependency>
+    <groupId>com.sparkjava</groupId>
+    <artifactId>spark-core</artifactId>
+    <version>2.3</version>
+</dependency>
   </dependencies>
 </project>

@@ -4,6 +4,8 @@ import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.vividsolutions.jts.geom.Coordinate;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -12,6 +14,8 @@ import java.util.Map;
  * A linked pointset that represents a web mercator grid laid over the graph.
  */
 public class WebMercatorGridPointSet implements PointSet {
+    public static final Logger LOG = LoggerFactory.getLogger(WebMercatorGridPointSet.class);
+
     public static final int DEFAULT_ZOOM = 10;
 
     /** web mercator zoom level */
@@ -45,6 +49,8 @@ public class WebMercatorGridPointSet implements PointSet {
     }
 
     public WebMercatorGridPointSet(TransportNetwork transportNetwork) {
+        LOG.info("Creating web mercator pointset for transport network with extents {}", transportNetwork.streetLayer.envelope);
+
         this.zoom = DEFAULT_ZOOM;
         long west = lonToPixel(transportNetwork.streetLayer.envelope.getMinX());
         long east = lonToPixel(transportNetwork.streetLayer.envelope.getMaxX());

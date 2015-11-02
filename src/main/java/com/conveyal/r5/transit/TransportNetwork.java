@@ -211,7 +211,7 @@ public class TransportNetwork implements Serializable {
     /**
      * @return an efficient implicit grid PointSet for this TransportNetwork.
      */
-    public PointSet getGridPointSet() {
+    public WebMercatorGridPointSet getGridPointSet() {
         if (this.gridPointSet == null) {
             synchronized (this) {
                 if (this.gridPointSet == null) {

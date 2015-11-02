@@ -1,0 +1,15 @@
+{
+  "name": "static-images",
+  "version": "1.0.0",
+  "description": "",
+  "main": "static-image.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "canvas": "^1.3.0",
+    "request": "^2.65.0"
+  }
+}

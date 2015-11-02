@@ -8,10 +8,11 @@
         </encoder>
     </appender>
 
-    <root level="debug">
+    <root level="info">
         <appender-ref ref="STDOUT" />
     </root>
 
     <logger name="com.conveyal.osmlib" level="INFO" />
     <logger name="com.conveyal.gtfs" level="INFO" />
+
 </configuration>

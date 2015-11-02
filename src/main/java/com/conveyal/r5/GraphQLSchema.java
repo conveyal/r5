@@ -449,7 +449,7 @@ public class GraphQLSchema {
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("egress")
-                .type(new GraphQLNonNull(new GraphQLList(streetSegmentType)))
+                .type(new GraphQLList(streetSegmentType))
                 .description("Part of journey from transit to end")
                 .dataFetcher(environment -> ((ProfileOption) environment.getSource()).egress)
                 .build())
@@ -492,8 +492,8 @@ public class GraphQLSchema {
                 .type(new GraphQLNonNull(Scalars.GraphQLString))
                 .build())
             .argument(GraphQLArgument.newArgument().name("date").defaultValue("today").type(Scalars.GraphQLString).build())
-            .argument(stringTemplate("startTime", "07:30"))
-            .argument(stringTemplate("endTime", "08:30"))
+            .argument(stringTemplate("startTime", "7:30"))
+            .argument(stringTemplate("endTime", "8:30"))
             .dataFetcher(environment -> {
                 return profileResponse;
             })

@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.analyst.scenario.Scenario;
 import org.joda.time.LocalDate;
 
 import java.io.Serializable;
@@ -146,7 +147,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     public int suboptimalMinutes;
 
     /** A non-destructive scenario to apply when executing this request */
-    //public Scenario scenario;
+    public Scenario scenario;
     
     public ProfileRequest clone () throws CloneNotSupportedException {
         return (ProfileRequest) super.clone();

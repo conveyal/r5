@@ -1,0 +1,520 @@
+package com.conveyal.r5;
+
+import com.conveyal.r5.api.ProfileResponse;
+import com.conveyal.r5.api.util.*;
+import graphql.GraphQL;
+import graphql.Scalars;
+import graphql.schema.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Created by mabu on 30.10.2015.
+ */
+public class GraphQLSchema {
+    private static final Logger LOG = LoggerFactory.getLogger(GraphQLSchema.class);
+
+    public static GraphQLEnumType locationTypeEnum = GraphQLEnumType.newEnum()
+        .name("LocationType")
+        .description("Identifies whether this stop represents a stop or station.")
+        .value("STOP", 0, "A location where passengers board or disembark from a transit vehicle.")
+        .value("STATION", 1, "A physical structure or area that contains one or more stop.")
+        .value("ENTRANCE", 2)
+        .build();
+
+    public static GraphQLEnumType wheelchairBoardingEnum = GraphQLEnumType.newEnum()
+        .name("WheelchairBoarding")
+        .value("NO_INFORMATION", 0, "There is no accessibility information for the stop.")
+        .value("POSSIBLE", 1, "At least some vehicles at this stop can be boarded by a rider in a wheelchair.")
+        .value("NOT_POSSIBLE", 2, "Wheelchair boarding is not possible at this stop.")
+        .build();
+
+    public static GraphQLEnumType bikesAllowedEnum = GraphQLEnumType.newEnum()
+        .name("BikesAllowed")
+        .value("NO_INFORMATION", 0, "There is no bike information for the trip.")
+        .value("ALLOWED", 1, "The vehicle being used on this particular trip can accommodate at least one bicycle.")
+        .value("NOT_ALLOWED", 2, "No bicycles are allowed on this trip.")
+        .build();
+
+    public static GraphQLEnumType mode = GraphQLEnumType.newEnum()
+        .name("TransitMode")
+        .value("BUS", 0, "bus")
+        .value("RAIL", 1, "train")
+        .build();
+
+    public static GraphQLEnumType relativeDirectionEnum = GraphQLEnumType.newEnum()
+        .name("RelativeDirection")
+        .description("Represents a turn direction, relative to the current heading.")
+        .value("DEPART", 0)
+        .value("HARD_LEFT", 1)
+        .value("LEFT", 2)
+        .value("SLIGHTLY_LEFT", 3)
+        .value("CONTINUE", 4)
+        .value("SLIGHTLY_RIGHT", 5)
+        .value("RIGHT", 6)
+        .value("HARD_RIGHT", 7)
+        .value("CIRCLE_CLOCKWISE", 8, "traffic circle")
+        .value("CIRCLE_COUNTERCLOCKWISE", 9, "traffic circle")
+        .value("ELEVATOR", 10)
+        .value("UTURN_LEFT", 11)
+        .value("UTURN_RIGHT", 12)
+        .build();
+
+    public static GraphQLEnumType absoluteDirectionEnum = GraphQLEnumType.newEnum()
+        .name("AbsoluteDirection")
+        .description("An absolute cardinal or intermediate direction.")
+        .value("NORTH", 0)
+        .value("NORTHEAST", 1)
+        .value("EAST", 2)
+        .value("SOUTHEAST", 3)
+        .value("SOUTH", 4)
+        .value("SOUTHWEST", 5)
+        .value("WEST", 6)
+        .value("NORTHWEST", 7)
+        .build();
+
+    public static GraphQLEnumType nonTransitModeEnum = GraphQLEnumType.newEnum()
+        .name("NonTransitMode")
+        .description("Modes of transportation that aren't public transit")
+        .value("WALK", 0)
+        .value("BICYCLE", 1)
+        .value("CAR", 2)
+        .build();
+
+    public static GraphQLEnumType legModeEnum = GraphQLEnumType.newEnum()
+        .name("LegMode")
+        .description("Modes of transport on ingress egress legs")
+        .value("WALK", 0)
+        .value("BICYCLE", 1)
+        .value("CAR", 2)
+        .value("BICYCLE_RENT", 3, "Renting a bicycle")
+        .value("CAR_PARK", 4, "Park & Ride")
+        .build();
+
+    public static GraphQLEnumType transitmodeEnum = GraphQLEnumType.newEnum()
+        .name("TransitModes")
+        .description("Types of transit mode transport from GTFS")
+        .value("TRAM", 0, " Tram, Streetcar, Light rail. Any light rail or street level system within a metropolitan area.")
+        .value("SUBWAY", 1, "Subway, Metro. Any underground rail system within a metropolitan area.")
+        .value("RAIL", 2, "Rail. Used for intercity or long-distance travel.")
+        .value("BUS", 3, "Bus. Used for short- and long-distance bus routes.")
+        .value("FERRY", 4, "Ferry. Used for short- and long-distance boat service.")
+        .value("CABLE_CAR", 5, "Cable car. Used for street-level cable cars where the cable runs beneath the car.")
+        .value("GONDOLA", 6, " Gondola, Suspended cable car. Typically used for aerial cable cars where the car is suspended from the cable.")
+        .value("FUNICULAR", 7, "Funicular. Any rail system designed for steep inclines.")
+        .build();
+
+    public GraphQLOutputType profileResponseType = new GraphQLTypeReference("Profile");
+
+    public GraphQLOutputType profileOptionType = new GraphQLTypeReference("ProfileOption");
+
+    public GraphQLOutputType routeType = new GraphQLTypeReference("Route");
+
+    public GraphQLOutputType stopType = new GraphQLTypeReference("Stop");
+
+    public GraphQLOutputType fareType = new GraphQLTypeReference("Fare");
+
+    public GraphQLOutputType statsType = new GraphQLTypeReference("Stats");
+
+    public GraphQLOutputType polylineGeometryType = new GraphQLTypeReference("PolylineGeometry");
+
+    public GraphQLOutputType streetEdgeInfoType = new GraphQLTypeReference("StreetEdgeInfo");
+
+    public GraphQLOutputType streetSegmentType = new GraphQLTypeReference("StreetSegment");
+
+    public GraphQLOutputType transitSegmentType = new GraphQLTypeReference("TransitSegment");
+
+    public GraphQLOutputType segmentPatternType = new GraphQLTypeReference("SegmentPattern");
+
+
+    public GraphQLObjectType queryType;
+
+    public graphql.schema.GraphQLSchema indexSchema;
+
+    private GraphQLArgument stringTemplate(String name, String defaultValue) {
+        GraphQLArgument.Builder argument = GraphQLArgument.newArgument().name(name).type(
+            Scalars.GraphQLString);
+        if (defaultValue != null) {
+            argument.defaultValue(defaultValue);
+        }
+        return argument.build();
+    }
+
+    //TODO: code generation with:
+    // http://sculptorgenerator.org/
+    //https://github.com/square/javapoet
+    //https://github.com/javaparser/javaparser https://github.com/musiKk/plyj
+    //spark
+
+
+    public GraphQLSchema(ProfileResponse profileResponse) {
+
+        fareType = GraphQLObjectType.newObject()
+            .name("Fare")
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("type")
+                .type(new GraphQLNonNull(Scalars.GraphQLString))
+                .dataFetcher(environment -> ((Fare) environment.getSource()).type) //this is not necessary
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("low")
+                .type(new GraphQLNonNull(Scalars.GraphQLFloat))
+                .dataFetcher(environment -> ((Fare) environment.getSource()).low) //this is not necessary
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("transferReduction")
+                .type(Scalars.GraphQLBoolean) //transferReduction is read because isTransferReduction function exists
+                .build())
+            .build();
+
+        statsType = GraphQLObjectType.newObject()
+            .name("Stats")
+            .field(GraphQLFieldDefinition.newFieldDefinition().name("min")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt)).description("Minimal time")
+                .dataFetcher(environment -> ((Stats) environment.getSource()).min).build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("avg")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("Average time")
+                .dataFetcher(environment -> ((Stats) environment.getSource()).avg)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("max")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("Maximal time")
+                .dataFetcher(environment -> ((Stats) environment.getSource()).max)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("num")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("number of options")
+                .dataFetcher(environment -> ((Stats) environment.getSource()).num)
+                .build())
+            .build();
+
+        polylineGeometryType = GraphQLObjectType.newObject()
+            .name("PolylineGeometry")
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("points")
+                .type(new GraphQLNonNull(Scalars.GraphQLString))
+                .description("Polyline encoded geometry")
+                .dataFetcher(environment -> ((PolylineGeometry) environment.getSource()).points)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("length")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("Length of polyline encoded geometry")
+                .dataFetcher(environment -> ((PolylineGeometry) environment.getSource()).length)
+                .build())
+            .build();
+
+        routeType = GraphQLObjectType.newObject()
+            .name("Route")
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("id")
+                .type(new GraphQLNonNull(Scalars.GraphQLString))
+                .description("Route ID")
+                .dataFetcher(environment -> ((RouteShort) environment.getSource()).id)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("shortName")
+                .type(Scalars.GraphQLString)
+                .description("Short name of the route. Usually number or number plus letter")
+                .dataFetcher(environment -> ((RouteShort) environment.getSource()).shortName)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("longName")
+                .type(Scalars.GraphQLString)
+                .description("Full, more descriptive name of the route")
+                .dataFetcher(environment -> ((RouteShort) environment.getSource()).longName)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("mode")
+                .type(Scalars.GraphQLString)
+                .description("Type of transportation used on a route")
+                .dataFetcher(environment -> ((RouteShort) environment.getSource()).mode)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("color")
+                .type(Scalars.GraphQLString)
+                .description("Color that corresponds to a route (it needs to be character hexadecimal number) (00FFFF)")
+                .dataFetcher(environment -> ((RouteShort) environment.getSource()).color)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("agencyName")
+                .type(new GraphQLNonNull(Scalars.GraphQLString))
+                .description("Full name of the transit agency for this route")
+                .dataFetcher(environment -> ((RouteShort) environment.getSource()).agencyName)
+                .build())
+            .build();
+
+        streetEdgeInfoType = GraphQLObjectType.newObject()
+            .name("StreetEdgeInfo")
+            .description("This is a response model class which holds data that will be serialized and returned to the client. It is not used internally in routing. It represents a single street edge in a series of on-street (walking/biking/driving) directions.")
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("edgeId")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("OSM edge ID")
+                .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).edgeId)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("distance")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("Distance of driving on these edge (meters)")
+                .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).distance)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("geometry")
+                .type(polylineGeometryType)
+                .description("TODO: actual encoding and decoding of a geometry")
+                .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).geometry)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("mode")
+                .type(nonTransitModeEnum)
+                .description("Which mode is used for driving (CAR, BICYCLE, WALK)")
+                .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).mode)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("streetName")
+                .type(Scalars.GraphQLString)
+                .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).streetName)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("relativeDirection")
+                .type(relativeDirectionEnum)
+                .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).relativeDirection)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("absoluteDirection")
+                .type(absoluteDirectionEnum)
+                .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).absoluteDirection)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("stayOn")
+                .type(Scalars.GraphQLBoolean)
+                .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).stayOn)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("area")
+                .type(Scalars.GraphQLBoolean)
+                .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).area)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("bogusName")
+                .type(Scalars.GraphQLBoolean)
+                .description("True if name is generated (cycleway, footway, sidewalk, etc)")
+                .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).bogusName)
+                .build())
+            .build();
+
+        streetSegmentType = GraphQLObjectType.newObject()
+            .name("StreetSegment")
+            .description("A response object describing a non-transit part of an Option. This is either an access/egress leg of a transit trip, or a direct path to the destination that does not use transit.")
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("mode")
+                .type(new GraphQLNonNull(legModeEnum))
+                .description("Which mode of transport is used")
+                .dataFetcher(environment -> ((StreetSegment) environment.getSource()).mode)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("time")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("Time in seconds for this part of trip ")
+                .dataFetcher(environment -> ((StreetSegment) environment.getSource()).time)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("streetEdges")
+                .type(new GraphQLList(streetEdgeInfoType))
+                .dataFetcher(environment -> ((StreetSegment) environment.getSource()).streetEdges)
+                .build())
+            .build();
+
+        transitSegmentType = GraphQLObjectType.newObject()
+            .name("TransitSegment")
+            .description("The equivalent of a ride in an API response. Information degenerates to Strings and ints here.")
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("from")
+                .type(Scalars.GraphQLString)
+                .description("Use AgencyAndId instead of String to get both since we are now multi-feed")
+                .dataFetcher(environment -> ((TransitSegment) environment.getSource()).from)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("to")
+                .type(Scalars.GraphQLString)
+                .dataFetcher(environment -> ((TransitSegment) environment.getSource()).to)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("walkTime")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("time in seconds")
+                .dataFetcher(environment -> ((TransitSegment) environment.getSource()).walkTime)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("walkDistance")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("distance of walking in meters")
+                .dataFetcher(environment -> ((TransitSegment) environment.getSource()).walkDistance)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("waitStats")
+                .type(statsType)
+                .dataFetcher(environment -> ((TransitSegment) environment.getSource()).waitStats)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("mode")
+                .type(transitmodeEnum)
+                .description("FIXME: change type to TraverseMode")
+                .dataFetcher(environment -> ((TransitSegment) environment.getSource()).mode)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("fromName")
+                .type(Scalars.GraphQLString)
+                .dataFetcher(environment -> ((TransitSegment) environment.getSource()).fromName)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("toName")
+                .type(Scalars.GraphQLString)
+                .dataFetcher(environment -> ((TransitSegment) environment.getSource()).toName)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("rideStats")
+                .type(statsType)
+                .dataFetcher(environment -> ((TransitSegment) environment.getSource()).rideStats)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("routes")
+                .type(new GraphQLList(routeType))
+                .dataFetcher(environment -> ((TransitSegment) environment.getSource()).routes)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("segmentPatterns")
+                .type(new GraphQLList(segmentPatternType))
+                .dataFetcher(environment -> ((TransitSegment) environment.getSource()).segmentPatterns)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("startTime")
+                .type(Scalars.GraphQLString)
+                .dataFetcher(environment -> ((TransitSegment) environment.getSource()).startTime)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("endTime")
+                .type(Scalars.GraphQLString)
+                .dataFetcher(environment -> ((TransitSegment) environment.getSource()).endTime)
+                .build())
+            .build();
+
+        segmentPatternType = GraphQLObjectType.newObject()
+            .name("SegmentPattern")
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("patternId")
+                .type(new GraphQLNonNull(Scalars.GraphQLString))
+                .description("Trip Pattern id")
+                .dataFetcher(environment -> ((SegmentPattern) environment.getSource()).patternId)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("fromIndex")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("Index of stop where trip was started")
+                .dataFetcher(environment -> ((SegmentPattern) environment.getSource()).fromIndex)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("toIndex")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("Index of stop where trip was stopped")
+                .dataFetcher(environment -> ((SegmentPattern) environment.getSource()).toIndex)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("nTrips")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("Number of trips (on this pattern??)")
+                .dataFetcher(environment -> ((SegmentPattern) environment.getSource()).nTrips)
+                .build())
+            .build();
+
+       profileOptionType = GraphQLObjectType.newObject()
+            .name("ProfileOption")
+            .description("This is a response model class which holds data that will be serialized and returned to the client. It is not used internally in routing.")
+            /*.field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("transit")
+                .type(new GraphQLList(transitSegmentType))
+                .description("Transit leg of a journey")
+                .dataFetcher(environment -> ((ProfileOption) environment.getSource()).transit)
+                .build())*/
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("access")
+                .type(new GraphQLNonNull(new GraphQLList(streetSegmentType)))
+                .description("Part of journey from start to transit (or end)")
+                .dataFetcher(environment -> ((ProfileOption) environment.getSource()).access)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("egress")
+                .type(new GraphQLNonNull(new GraphQLList(streetSegmentType)))
+                .description("Part of journey from transit to end")
+                .dataFetcher(environment -> ((ProfileOption) environment.getSource()).egress)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("stats")
+                .type(new GraphQLNonNull(statsType))
+                .description("Time stats for this part of a journey")
+                .dataFetcher(environment -> ((ProfileOption) environment.getSource()).stats)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("summary")
+                .type(new GraphQLNonNull(Scalars.GraphQLString))
+                .description("Text description of this part of a journey")
+                .dataFetcher(environment -> ((ProfileOption) environment.getSource()).summary)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("fares")
+                .type(new GraphQLList(fareType))
+                .dataFetcher(environment -> ((ProfileOption) environment.getSource()).fares)
+                .build())
+            .build();
+
+        profileResponseType = GraphQLObjectType.newObject()
+            .name("ProfileResponse")
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("options")
+                .type(new GraphQLList(profileOptionType))
+
+                .build())
+            .build();
+
+        GraphQLFieldDefinition profileField = GraphQLFieldDefinition.newFieldDefinition()
+            .name("profile")
+            .description("Gets profile of all paths")
+            .type(profileResponseType)
+            .argument(GraphQLArgument.newArgument().name("from")
+                .type(new GraphQLNonNull(Scalars.GraphQLString)).build())
+            .argument(GraphQLArgument.newArgument()
+                .name("to")
+                .type(new GraphQLNonNull(Scalars.GraphQLString))
+                .build())
+            .argument(GraphQLArgument.newArgument().name("date").defaultValue("today").type(Scalars.GraphQLString).build())
+            .argument(stringTemplate("startTime", "07:30"))
+            .argument(stringTemplate("endTime", "08:30"))
+            .dataFetcher(environment -> {
+                return profileResponse;
+            })
+            .build();
+
+        GraphQLFieldDefinition fareField = GraphQLFieldDefinition.newFieldDefinition()
+            .name("fare")
+            .description("Gets information about fare")
+            .type(fareType)
+            .dataFetcher(environment -> Fare.SampleFare())
+            .build();
+
+
+        this.queryType = GraphQLObjectType.newObject()
+            .name("QueryType")
+            .field(profileField)
+            .field(fareField)
+            .build();
+
+        indexSchema = graphql.schema.GraphQLSchema.newSchema()
+            .query(queryType)
+            .build();
+    }
+}

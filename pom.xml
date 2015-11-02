@@ -219,6 +219,15 @@
       <name>Boundless Maven Repository</name>
       <url>http://repo.boundlessgeo.com/main</url>
     </repository>
+    <!-- Needed  for graphql-java-->
+    <repository>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <id>bintray-andimarek-graphql-java</id>
+      <name>bintray</name>
+      <url>http://dl.bintray.com/andimarek/graphql-java</url>
+    </repository>
   </repositories>
 
   <dependencies>
@@ -337,6 +346,11 @@
       <artifactId>junit</artifactId>
       <version>4.12</version>
       <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.graphql-java</groupId>
+      <artifactId>graphql-java</artifactId>
+      <version>2015-10-24T09-07-39</version>
     </dependency>
   </dependencies>
 </project>

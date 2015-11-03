@@ -376,7 +376,7 @@ public class AnalystWorker implements Runnable {
             // TODO We should link after applying the scenario once we allow street modifications.
             linkedTargets = targets.link(transportNetwork.streetLayer);
 
-
+            LOG.info("Applying scenario...");
             // Get the supplied scenario or create an empty one if no scenario was supplied.
             Scenario scenario = clusterRequest.profileRequest.scenario;
             if (scenario == null) {
@@ -386,7 +386,7 @@ public class AnalystWorker implements Runnable {
             scenario.modifications.add(0, new InactiveTripsFilter());
             // Apply the scenario modifications to the network before use, performing protective copies where necessary.
             TransportNetwork modifiedNetwork = scenario.applyToTransportNetwork(transportNetwork);
-
+            LOG.info("Done aplying scenario.");
 
             // Run the core repeated-raptor analysis.
             RepeatedRaptorProfileRouter router =

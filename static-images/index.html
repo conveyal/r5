@@ -51,9 +51,6 @@
 
         if (x < 0 || x > query.width || y < 0 || y > query.height) return // todo should show blank layer
 
-        x = 270
-        y = 249
-
         Static.getOrigin(baseUrl, x, y, function (origin) {
           console.time('surface')
           var surface = Static.getSurface(query, stopTreeCache, origin, x, y, 'AVERAGE')

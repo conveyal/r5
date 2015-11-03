@@ -4,6 +4,9 @@ import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
+import com.conveyal.r5.analyst.scenario.Modification;
+import com.conveyal.r5.analyst.scenario.Scenario;
+import com.sun.org.apache.xpath.internal.operations.Mod;
 import org.nustaq.serialization.FSTObjectInput;
 import org.nustaq.serialization.FSTObjectOutput;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -25,13 +28,14 @@ import java.util.zip.ZipFile;
  * It uses a lot less object pointers and can be built, read, and written orders of magnitude faster.
  * @author abyrd
  */
-public class TransportNetwork implements Serializable {
+public class TransportNetwork implements Serializable, Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransportNetwork.class);
 
     public StreetLayer streetLayer;
 
     public TransitLayer transitLayer;
+
     private WebMercatorGridPointSet gridPointSet;
 
     public void write (OutputStream stream) throws IOException {
@@ -228,5 +232,14 @@ public class TransportNetwork implements Serializable {
     public LinkedPointSet getLinkedGridPointSet() {
         return getGridPointSet().link(streetLayer);
     }
+
+    public TransportNetwork clone() {
+        try {
+            return (TransportNetwork) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 
 }

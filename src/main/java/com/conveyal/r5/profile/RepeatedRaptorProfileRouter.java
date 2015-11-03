@@ -1,6 +1,8 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
+import com.conveyal.r5.analyst.scenario.InactiveTripsFilter;
+import com.conveyal.r5.analyst.scenario.Scenario;
 import gnu.trove.map.TIntIntMap;
 import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
 import com.conveyal.r5.analyst.cluster.ResultEnvelope;
@@ -11,8 +13,6 @@ import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.time.DayOfWeek;
 
 /**
  * This is an exact copy of RepeatedRaptorProfileRouter that's being modified to work with (new) TransitNetworks
@@ -68,8 +68,8 @@ public class RepeatedRaptorProfileRouter {
         if (network.streetLayer != targets.streetLayer) {
             LOG.error("Transit network and target point set are not linked to the same street layer.");
         }
-        this.clusterRequest = clusterRequest;
         this.network = network;
+        this.clusterRequest = clusterRequest;
         this.targets = targets;
         this.request = clusterRequest.profileRequest;
         this.ts = ts;

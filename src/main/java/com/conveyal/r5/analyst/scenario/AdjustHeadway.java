@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 /**
  * Adjust headways on a route.
  */
-public class AdjustHeadway extends TripFilter {
+public class AdjustHeadway extends TripScheduleModification {
     public static final long serialVersionUID = 1L;
 
     /** The new headway, in seconds */
@@ -17,7 +17,7 @@ public class AdjustHeadway extends TripFilter {
     private static final Logger LOG = LoggerFactory.getLogger(AdjustHeadway.class);
 
     @Override
-    public TripSchedule apply(TripPattern tp, TripSchedule tt) {
+    public TripSchedule applyToTripSchedule(TripPattern tp, TripSchedule tt) {
         if (matches(tt.tripId)) {
             LOG.warn("Not performing requested headway adjustment on timetabled trip {}", tripId);
         }

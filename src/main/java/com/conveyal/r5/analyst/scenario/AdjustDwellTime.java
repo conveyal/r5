@@ -8,7 +8,7 @@ import java.util.Collection;
 /**
  * Adjust the dwell times on matched trips.
  */
-public class AdjustDwellTime extends TripFilter {
+public class AdjustDwellTime extends TripScheduleModification {
     public static final long serialVersionUID = 1L;
 
     /** Stops for which to set the dwell time */
@@ -18,7 +18,7 @@ public class AdjustDwellTime extends TripFilter {
     public int dwellTime;
 
     @Override
-    public TripSchedule apply(TripPattern tp, TripSchedule tt) {
+    public TripSchedule applyToTripSchedule (TripPattern tp, TripSchedule tt) {
         // Do nothing, stub.
         return tt;
     }

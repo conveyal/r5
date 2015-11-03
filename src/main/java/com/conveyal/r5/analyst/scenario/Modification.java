@@ -1,14 +1,19 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.r5.streets.StreetLayer;
+import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import java.io.Serializable;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * A Modification is a single change that can be applied non-destructively to RaptorWorkerData.
+ * A Modification is a single change that can be applied while duplicating a TransportNetwork.
+ * It allows comparing different scenarios without rebuilding entire networks from scratch.
  */
 // we use the property "type" to determine what type of modification it is. The string values are defined here.
 // Each class's getType should return the same value.
@@ -33,4 +38,28 @@ public abstract class Modification implements Serializable {
     }
 
     public final Set<String> warnings = new HashSet<String>();
+
+    /**
+     * Apply this single modification to a TransportNetwork, making copies as necessary.
+     */
+    public TransportNetwork applyToTransportNetwork(TransportNetwork originalNetwork) {
+        // We don't need a base implementation to return the unmodified TransportNetwork.
+        // Any Modification should produce a protective copy at least at level 0.
+        TransportNetwork network = originalNetwork.clone();
+        network.transitLayer = this.applyToTransitLayer(network.transitLayer);
+        network.streetLayer = this.applyToStreetLayer(network.streetLayer);
+        //network.gridPointSet = this.gridPointSet; // apply modification?
+        return network;
+    }
+
+    /**
+     * Apply this Modification to a TransitLayer, making protective copies of the TransitLayer's elements as needed.
+     */
+    protected abstract TransitLayer applyToTransitLayer (TransitLayer originalTransitLayer);
+
+    /**
+     * Apply this Modification to a StreetLayer, making protective copies of the StreetLayer's elements as needed.
+     */
+    protected abstract StreetLayer applyToStreetLayer (StreetLayer originalStreetLayer);
+
 }

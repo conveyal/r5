@@ -18,7 +18,8 @@ import java.util.Collection;
  * Skipped stops are no longer served by the matched trips, and and dwell time at a skipped stop is removed from the schedule.
  * If stops are skipped at the start of a trip, the start of the trip is simply removed; the remaining times are not shifted.
  */
-public class SkipStop extends TripPatternFilter {
+public class SkipStop extends TripPatternModification {
+
     public static final long serialVersionUID = 1L;
 
     private static final Logger LOG = LoggerFactory.getLogger(SkipStop.class);
@@ -32,7 +33,8 @@ public class SkipStop extends TripPatternFilter {
     }
 
     @Override
-    public Collection<TripPattern> apply(TripPattern original) {
-        return Arrays.asList(original);
+    public TripPattern applyToTripPattern(TripPattern originalTripPattern) {
+        return originalTripPattern;
     }
+
 }

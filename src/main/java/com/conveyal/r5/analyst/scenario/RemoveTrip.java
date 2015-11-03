@@ -7,7 +7,8 @@ import com.conveyal.r5.transit.TripSchedule;
  * Remove trips from a scenario.
  * This could remove all trips on a route, since its superclass TimetableFilter provides both route and trip matching.
  */
-public class RemoveTrip extends TripFilter {
+public class RemoveTrip extends TripScheduleModification {
+
     public static final long serialVersionUID = 1L;
 
     @Override
@@ -16,8 +17,8 @@ public class RemoveTrip extends TripFilter {
     }
 
     @Override
-    public TripSchedule apply(TripPattern tp, TripSchedule tt) {
-        return matches(tt.tripId) ? null : tt;
+    public TripSchedule applyToTripSchedule(TripPattern tripPattern, TripSchedule tripSchedule) {
+        return matches(tripSchedule.tripId) ? null : tripSchedule;
     }
 
 }

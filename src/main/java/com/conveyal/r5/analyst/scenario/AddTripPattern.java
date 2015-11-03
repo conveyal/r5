@@ -7,6 +7,7 @@ import com.conveyal.r5.model.json_serialization.LineStringDeserializer;
 import com.conveyal.r5.model.json_serialization.LineStringSerializer;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetLayer;
+import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -22,7 +23,8 @@ import java.util.Collection;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /** Add a trip pattern */
-public class AddTripPattern extends Modification {
+public class AddTripPattern extends TransitLayerModification {
+
     public static final long serialVersionUID = 1L;
     public static final Logger LOG = LoggerFactory.getLogger(AddTripPattern.class);
 
@@ -62,6 +64,12 @@ public class AddTripPattern extends Modification {
     @Override
     public String getType() {
         return "add-trip-pattern";
+    }
+
+    // TODO implement, this is just a stub
+    @Override
+    protected TransitLayer applyToTransitLayer(TransitLayer originalTransitLayer) {
+        return null;
     }
 
     /** a class representing a minimal timetable */

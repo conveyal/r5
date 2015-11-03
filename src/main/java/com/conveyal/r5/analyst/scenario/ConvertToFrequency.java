@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripSchedule;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -18,7 +19,8 @@ import java.util.stream.Stream;
 /**
  * Convert scheduled trips to frequencies. Will partition trips by service day.
  */
-public class ConvertToFrequency extends Modification {
+public class ConvertToFrequency extends TransitLayerModification {
+
     private static final long serialVersionUID = 1L;
 
     private static final Logger LOG = LoggerFactory.getLogger(ConvertToFrequency.class);
@@ -42,6 +44,10 @@ public class ConvertToFrequency extends Modification {
     public ConversionGroup groupBy;
 
     // NO APPLY METHOD, THIS IS A STUB
+    @Override
+    protected TransitLayer applyToTransitLayer(TransitLayer originalTransitLayer) {
+        return null;
+    }
 
     public static enum ConversionGroup {
         ROUTE_DIRECTION, ROUTE, PATTERN;

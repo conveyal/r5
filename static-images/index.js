@@ -38,31 +38,32 @@ export function getSurface (query, stopTreeCache, origin, originX, originY, whic
   // there are a certain number of pixels in each direction aroudn the origin with times in them. read the radius, multiply by two to get diameter,
   // add one because there is a pixel in the center, square to get number of pixels, multipl by two because these are two-byte values,
   // and add two to skip the initial two-byte value specifying radius (phew).
-  let transitOffset = Math.pow(origin.getInt16(0, true) * 2 + 1, 2) * 2 + 2
+  let transitOffset = Math.pow(origin.readInt16LE(0) * 2 + 1, 2) * 2 + 2
 
   // how many departure minutes are there
   // skip number of stops
-  let nMinutes = origin.getInt16(transitOffset + 4, true)
+  let nMinutes = origin.readInt16LE(transitOffset + 4)
+
+  let travelTimes = new Uint8Array(nMinutes)
 
   // x and y refer to pixel coordinates not origins here
   // loop over rows first
   for (let y = 0, pixelIdx = 0, stcOffset = 0; y < query.height; y++) {
     for (let x = 0; x < query.width; x++, pixelIdx++) {
-      let nStops = stopTreeCache.getInt16(stcOffset, true)
+      let nStops = stopTreeCache.readInt16LE(stcOffset)
 
       stcOffset += 2 // skip the bytes with the number of stops
 
-      let travelTimes = new Uint8Array(nMinutes)
       // fill with unreachable
       travelTimes.fill(255)
 
       for (let stopIdx = 0; stopIdx < nStops; stopIdx++) {
         // read the stop ID
-        let stopId = stopTreeCache.getInt32(stcOffset, true)
+        let stopId = stopTreeCache.readInt32LE(stcOffset)
         stcOffset += 4
 
         // read the distance
-        let distance = stopTreeCache.getInt16(stcOffset, true)
+        let distance = stopTreeCache.readInt16LE(stcOffset)
         stcOffset += 2
 
         //console.log(`stop ${stopId} at distance ${distance} (${nStops} stops to consider)`)
@@ -71,7 +72,7 @@ export function getSurface (query, stopTreeCache, origin, originX, originY, whic
         let previous = 0
         for (let minute = 0; minute < nMinutes; minute++) {
           let offset = transitOffset + 6 + stopId * nMinutes * 2 + minute * 2
-          let travelTimeToStop = origin.getInt16(offset, true) + previous
+          let travelTimeToStop = origin.readInt16LE(offset) + previous
           previous = travelTimeToStop
 
           if (travelTimeToStop === -1) continue
@@ -180,7 +181,7 @@ export function getQuery (url, cb) {
 export function getStopTrees (url, cb) {
   fetch(`${url}/stop_trees.dat`).then(res => res.arrayBuffer())
     .then(res => {
-      let buf = new DataView(res)
+      let buf = new Buffer(res)
       console.log(`Stop trees ${Math.round(buf.byteLength / 1000)}kb uncompressed`)
       cb(buf)
     })
@@ -192,7 +193,7 @@ export function getOrigin (url, x, y, cb) {
   y |= 0
   fetch(`${url}/${x}/${y}.dat`).then(res => res.arrayBuffer())
     .then(res => {
-      let buf = new DataView(res)
+      let buf = new Buffer(res)
       console.log(`Origin ${Math.round(buf.byteLength / 1000)}kb uncompressed`)
       cb(buf)
     })

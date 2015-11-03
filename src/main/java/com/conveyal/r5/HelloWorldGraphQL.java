@@ -23,9 +23,7 @@ public class HelloWorldGraphQL {
 
     public static void main(String[] args) throws IOException {
 
-        ObjectMapper mapper = new ObjectMapper();
-        ProfileResponse profileResponse = mapper.readValue(
-            HelloWorldGraphQL.class.getResourceAsStream("/profile.json"), ProfileResponse.class);
+        ProfileResponse profileResponse = new DummyProfile().profileResponse;
 
         String query = "  query IntrospectionQuery {\n"
             + "    __schema {\n"

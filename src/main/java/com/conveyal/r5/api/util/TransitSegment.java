@@ -53,4 +53,12 @@ public class TransitSegment {
             ", endTime='" + endTime + '\'' +
             '}' +"\n\t";
     }
+
+    public String getFromId() {
+        return fromId;
+    }
+
+    public String getToId() {
+        return toId;
+    }
 }

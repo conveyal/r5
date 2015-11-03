@@ -41,8 +41,7 @@ public class GraphQlSpark {
     public static void main(String[] args) throws IOException {
 
         ObjectMapper mapper = new ObjectMapper();
-        ProfileResponse profileResponse = mapper.readValue(
-            GraphQlSpark.class.getResourceAsStream("/profile.json"), ProfileResponse.class);
+        ProfileResponse profileResponse = new DummyProfile().profileResponse;
 
         GraphQL graphQL = new GraphQL(new com.conveyal.r5.GraphQLSchema(profileResponse).indexSchema);
 

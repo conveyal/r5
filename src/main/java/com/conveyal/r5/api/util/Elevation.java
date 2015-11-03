@@ -8,4 +8,9 @@ public class Elevation {
     public float distance;
     //Height in m at this distance @notnull
     public float elevation;
+
+    public Elevation(float distance, float height) {
+        this.distance = distance;
+        this.elevation = height;
+    }
 }

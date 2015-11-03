@@ -62,12 +62,12 @@ public class StaticComputer implements Runnable {
             LittleEndianDataOutputStream out = new LittleEndianDataOutputStream(os);
 
             // first write out the values for nearby pixels
-            out.writeShort(20);
+            out.writeInt(20);
 
-            short previous = 0;
+            int previous = 0;
             for (int time : nonTransitTimes.travelTimes) {
-                out.writeShort((short) time - previous);
-                previous = (short) time;
+                out.writeInt(time - previous);
+                previous = time;
             }
 
             int iterations = pts.times.length;
@@ -76,7 +76,7 @@ public class StaticComputer implements Runnable {
             // number of stops
             out.writeInt(stops);
             // number of iterations
-            out.writeShort((short) iterations);
+            out.writeInt(iterations);
 
             for (int stop = 0; stop < stops; stop++) {
                 short prev = 0;
@@ -84,7 +84,7 @@ public class StaticComputer implements Runnable {
                     int time = pts.times[iter][stop];
                     if (time == Integer.MAX_VALUE) time = -1;
 
-                    out.writeShort(time - prev);
+                    out.writeInt(time - prev);
                     prev = (short) time;
                 }
             }

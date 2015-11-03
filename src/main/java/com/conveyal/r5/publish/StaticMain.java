@@ -42,13 +42,13 @@ public class StaticMain {
         // pre-link so it doesn't get done in every thread
         ps.link(net.streetLayer);
 
-        for (int x = 0; x < ps.width; x++) {
-            for (int y = 0; y < ps.height; y++) {
+        for (int x = 270; x < ps.width; x++) {
+            for (int y = 249; y < ps.height; y++) {
                 requests.add(ssr.getPointRequest(x, y));
             }
         }
 
-        requests.parallelStream().forEach(pr -> {
+        requests.stream().forEach(pr -> {
             new StaticComputer(pr, net, ts -> {}).run();
         });
 

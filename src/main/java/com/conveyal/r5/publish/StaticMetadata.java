@@ -79,14 +79,14 @@ public class StaticMetadata implements Runnable {
 
             for (TIntList tree : stopTrees) {
                 if (tree == null) {
-                    dos.writeShort(0);
+                    dos.writeInt(0);
                 }
                 else {
                     // divide by two because array is jagged, get number of stops
-                    dos.writeShort(tree.size() / 2);
+                    dos.writeInt(tree.size() / 2);
                     for (int i = 0; i < tree.size(); i += 2) {
                         dos.writeInt(tree.get(i));
-                        dos.writeShort(tree.get(i + 1));
+                        dos.writeInt(tree.get(i + 1));
                     }
                 }
             }

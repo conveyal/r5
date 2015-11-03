@@ -17,20 +17,20 @@ public class RouteShort {
 
     /**
      * Short name of the route. Usually number or number plus letter
+     * @notnull
      */
-    @NotNull
     public String shortName;
 
     /**
      * Full, more descriptive name of the route
+     * @notnull
      */
-    @NotNull
     public String longName;
 
     /**
      * Type of transportation used on a route
+     * @notnull
      */
-    @NotNull
     public String mode;
 
     /**

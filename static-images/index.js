@@ -14,14 +14,14 @@ function writeStaticImage (x, y, url, which, stream) {
   console.log('requesting stop tree cache')
   // TODO error handling
   // TODO callback mess
-  request({url: `${url}/query.json`, gzip: true}, (err, res, body) => {
+  request({url: `${url}query.json`, gzip: true}, (err, res, body) => {
     let query = JSON.parse(body)
     console.dir(query)
-    request({url: `${url}/stop_trees.dat`, encoding: null, gzip: true}, (err, res, body) => {
+    request({url: `${url}stop_trees.dat`, encoding: null, gzip: true}, (err, res, body) => {
       let stopTreeCache = body
       console.log(`Stop tree cache retrieved, ${Math.round(stopTreeCache.length / 1000)}kb uncompressed`)
 
-      request({url: `${url}/${x}/${y}.dat`, encoding: null, gzip: true}, (err, res, body) => {
+      request({url: `${url}${x}/${y}.dat`, encoding: null, gzip: true}, (err, res, body) => {
         let origin = body
         console.log(`Origin data retrieved, ${Math.round(origin.length / 1000)}kb uncompressed`)
 
@@ -171,13 +171,13 @@ export function isochroneTile (canvas, tilePoint, zoom, query, surface, cutoffMi
 }
 
 export function getQuery (url, cb) {
-  request({url: `${url}/query.json`, gzip: true}, (err, data, body) => {
+  request({url: `${url}query.json`, gzip: true}, (err, data, body) => {
     cb(JSON.parse(body))
   })
 }
 
 export function getStopTrees (url, cb) {
-  fetch(`${url}/stop_trees.dat`).then(res => res.arrayBuffer())
+  fetch(`${url}stop_trees.dat`).then(res => res.arrayBuffer())
     .then(res => {
       let buf = new Int32Array(res)
       console.log(`Stop trees ${Math.round(buf.byteLength / 1000)}kb uncompressed`)
@@ -189,7 +189,7 @@ export function getStopTrees (url, cb) {
 export function getOrigin (url, x, y, cb) {
   x |= 0 // round off, coerce to integer
   y |= 0
-  fetch(`${url}/${x}/${y}.dat`).then(res => res.arrayBuffer())
+  fetch(`${url}${x}/${y}.dat`).then(res => res.arrayBuffer())
     .then(res => {
       let buf = new Int32Array(res)
       console.log(`Origin ${Math.round(buf.byteLength / 1000)}kb uncompressed`)

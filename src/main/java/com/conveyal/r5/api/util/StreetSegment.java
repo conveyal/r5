@@ -12,6 +12,9 @@ public class StreetSegment {
     //Time in seconds for this part of trip @notnull
     public int time;
     public List<StreetEdgeInfo> streetEdges;
+    //List of elevation elements each elevation has a distance (from start of this segment) and elevation at this point (in meters)
+    public List<Elevation> elevation;
+    public List<Alert> alerts;
 
     @Override public String toString() {
         return "\tStreetSegment{" +

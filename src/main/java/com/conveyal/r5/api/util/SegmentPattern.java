@@ -5,19 +5,19 @@ package com.conveyal.r5.api.util;
  */
 public  class SegmentPattern implements Comparable<SegmentPattern> {
     /**
-     * Trip Pattern id
+     * Trip Pattern id TODO: trippattern?
      * @notnull
      */
     public String patternId;
 
     /**
-     * Index of stop where trip was started
+     * Index of stop in given TripPatern where trip was started
      * @notnull
      */
     public int fromIndex;
 
     /**
-     * Index of stop where trip was stopped
+     * Index of stop in given TripPattern where trip was stopped
      * @notnull
      */
     public int toIndex;

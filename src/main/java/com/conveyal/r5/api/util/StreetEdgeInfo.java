@@ -8,7 +8,7 @@ package com.conveyal.r5.api.util;
  */
 public class StreetEdgeInfo {
     /**
-     * OSM edge ID
+     * OTP internal edge ID
      * @notnull
      */
     public Integer edgeId;
@@ -30,15 +30,15 @@ public class StreetEdgeInfo {
     public AbsoluteDirection absoluteDirection;
     public Boolean stayOn;
     public Boolean area;
+    //Exit name when exiting highway or roundabout
+    public String exit;
 
     /**
      * True if name is generated (cycleway, footway, sidewalk, etc)
      */
     public Boolean bogusName;
 
-    //TODO: missing bikeRentalOn/Off station
+    public BikeRentalStation bikeRentalOnStation;
+    public BikeRentalStation bikeRentalOffStation;
 
-    public Integer getDistance() {
-        return distance;
-    }
 }

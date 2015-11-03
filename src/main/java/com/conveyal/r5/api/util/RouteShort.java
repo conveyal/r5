@@ -2,6 +2,8 @@ package com.conveyal.r5.api.util;
 
 import com.beust.jcommander.internal.Lists;
 import com.conveyal.gtfs.model.Route;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.sun.istack.internal.NotNull;
 
 import java.util.Collection;
@@ -27,17 +29,31 @@ public class RouteShort {
      */
     public String longName;
 
+    public String description;
+
     /**
      * Type of transportation used on a route
      * @notnull
      */
-    public String mode;
+    public TransitModes mode;
 
     /**
      * Color that corresponds to a route (it needs to be character hexadecimal number) (00FFFF)
      * @default: FFFFFF
      */
-    public String color;
+    @JsonProperty("color")
+    public String routeColor;
+
+    /**
+     * Color that is used for text in route (it needs to be character hexadecimal number)
+     * @default: 000000
+     */
+    public String textColor;
+
+    /**
+     * URL with information about route
+     */
+    public String url;
 
     /**
      * Full name of the transit agency for this route
@@ -55,8 +71,8 @@ public class RouteShort {
         longName = route.route_long_name;
         //FIXME: add mode
         //mode = GtfsLibrary.getTraverseMode(route).toString();
-        mode = "UNKNOWN";
-        color = route.route_color;
+        mode = TransitModes.BUS;
+        routeColor = route.route_color;
         agencyName = route.agency.agency_name;
     }
 
@@ -74,7 +90,7 @@ public class RouteShort {
             ", shortName='" + shortName + '\'' +
             ", longName='" + longName + '\'' +
             ", mode='" + mode + '\'' +
-            ", color='" + color + '\'' +
+            ", color='" + routeColor + '\'' +
             ", agencyName='" + agencyName + '\'' +
             '}';
     }

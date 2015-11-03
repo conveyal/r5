@@ -13327,6 +13327,755 @@
                 "area": false,
                 "bogusName": false
             }]
+        }, {
+            "mode": "BICYCLE_RENT",
+            "time": 1753,
+            "streetEdges": [{
+                "edgeId": 64496,
+                "distance": 63,
+                "geometry": {
+                    "points": "}dd{Gg`i~A?Q@aADq@BW@G",
+                    "length": 6
+                },
+                "mode": "WALK",
+                "streetName": "path",
+                "relativeDirection": "DEPART",
+                "absoluteDirection": "EAST",
+                "stayOn": false,
+                "area": false,
+                "bogusName": false
+            }, {
+                "edgeId": 64497,
+                "distance": 97,
+                "geometry": {
+                    "points": "odd{Gmei~A@MAONkAJ}@ReA?C",
+                    "length": 7
+                }
+            }, {
+                "edgeId": 24730,
+                "distance": 54,
+                "geometry": {
+                    "points": "_cd{G_mi~AV}AHg@",
+                    "length": 3
+                }
+            }, {
+                "edgeId": 1109,
+                "distance": 84,
+                "geometry": {
+                    "points": "}ad{Geqi~AnCfA",
+                    "length": 2
+                },
+                "streetName": "Kalohova ulica",
+                "relativeDirection": "RIGHT",
+                "absoluteDirection": "SOUTH",
+                "stayOn": false,
+                "area": false,
+                "bogusName": false
+            }, {
+                "edgeId": 1111,
+                "distance": 8,
+                "geometry": {
+                    "points": "m}c{G}ni~AJH",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 1157,
+                "distance": 74,
+                "geometry": {
+                    "points": "a}c{Gsni~AH]p@qC",
+                    "length": 3
+                },
+                "streetName": "Ulica Janka Mlakarja",
+                "relativeDirection": "LEFT",
+                "absoluteDirection": "SOUTHEAST",
+                "stayOn": false,
+                "area": false,
+                "bogusName": false
+            }, {
+                "edgeId": 1231,
+                "distance": 112,
+                "geometry": {
+                    "points": "e{c{Gcti~AvAgG",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 13346,
+                "distance": 70,
+                "geometry": {
+                    "points": "mxc{Gk|i~Ar@gD",
+                    "length": 2
+                },
+                "streetName": "Hrenova ulica",
+                "relativeDirection": "CONTINUE",
+                "absoluteDirection": "SOUTHEAST",
+                "stayOn": false,
+                "area": false,
+                "bogusName": false
+            }, {
+                "edgeId": 13348,
+                "distance": 76,
+                "geometry": {
+                    "points": "yvc{Gsaj~Az@sD",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 13350,
+                "distance": 77,
+                "geometry": {
+                    "points": "}tc{Gggj~A|@uD",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 13352,
+                "distance": 30,
+                "geometry": {
+                    "points": "_sc{G}lj~AVgA",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 15203,
+                "distance": 12,
+                "geometry": {
+                    "points": "grc{Geoj~ABO@M",
+                    "length": 3
+                },
+                "streetName": "path",
+                "relativeDirection": "CONTINUE",
+                "absoluteDirection": "EAST",
+                "stayOn": false,
+                "area": false,
+                "bogusName": true
+            }, {
+                "edgeId": 44433,
+                "distance": 104,
+                "geometry": {
+                    "points": "arc{Gcpj~AxAp@PFVHNFHFPN",
+                    "length": 7
+                },
+                "streetName": "bike path",
+                "relativeDirection": "RIGHT",
+                "absoluteDirection": "SOUTH",
+                "stayOn": true,
+                "area": false,
+                "bogusName": true
+            }, {
+                "edgeId": 48239,
+                "distance": 7,
+                "geometry": {
+                    "points": "qlc{G_mj~AJI",
+                    "length": 2
+                },
+                "streetName": "bike path",
+                "relativeDirection": "LEFT",
+                "absoluteDirection": "SOUTHEAST",
+                "stayOn": true,
+                "area": false,
+                "bogusName": true
+            }, {
+                "edgeId": 48237,
+                "distance": 4,
+                "geometry": {
+                    "points": "elc{Gimj~ADC",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 48235,
+                "distance": 5,
+                "geometry": {
+                    "points": "_lc{Gmmj~ABM",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 48233,
+                "distance": 11,
+                "geometry": {
+                    "points": "{kc{G{mj~AD]",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 48231,
+                "distance": 9,
+                "geometry": {
+                    "points": "ukc{Gynj~ADU",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 21333,
+                "distance": 14,
+                "geometry": {
+                    "points": "okc{Gooj~AGe@",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 17290,
+                "distance": 48,
+                "geometry": {
+                    "points": "wkc{Gupj~AsAg@",
+                    "length": 2
+                },
+                "streetName": "Preradovičeva ulica",
+                "relativeDirection": "LEFT",
+                "absoluteDirection": "NORTH",
+                "stayOn": false,
+                "area": false,
+                "bogusName": false
+            }, {
+                "edgeId": 66970,
+                "distance": 17,
+                "geometry": {
+                    "points": "knc{G}qj~AJk@",
+                    "length": 2
+                },
+                "streetName": "path",
+                "relativeDirection": "RIGHT",
+                "absoluteDirection": "EAST",
+                "stayOn": false,
+                "area": false,
+                "bogusName": true,
+                "bikeRentalOnStation": {
+                    "id": "-1055",
+                    "name": "Prometna šola Maribor",
+                    "lat": 46.55354351276781,
+                    "lon": 15.62442513395172,
+		    "bikesAvailable": 5,
+		    "spacesAvailable": 2,
+		    "networks" : ["BCikel"]
+                }
+            }, {
+                "edgeId": 66967,
+                "distance": 17,
+                "geometry": {
+                    "points": "_nc{Gisj~AKj@",
+                    "length": 2
+                },
+                "mode": "BICYCLE",
+                "streetName": "path",
+                "relativeDirection": "HARD_LEFT",
+                "absoluteDirection": "WEST",
+                "stayOn": false,
+                "area": false,
+                "bogusName": true
+            }, {
+                "edgeId": 17288,
+                "distance": 53,
+                "geometry": {
+                    "points": "knc{G}qj~A{Ac@",
+                    "length": 2
+                },
+                "streetName": "Preradovičeva ulica",
+                "relativeDirection": "RIGHT",
+                "absoluteDirection": "NORTH",
+                "stayOn": false,
+                "area": false,
+                "bogusName": false
+            }, {
+                "edgeId": 8063,
+                "distance": 4,
+                "geometry": {
+                    "points": "gqc{Gasj~AGA",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 17211,
+                "distance": 15,
+                "geometry": {
+                    "points": "oqc{Gcsj~AIHGFCD",
+                    "length": 4
+                },
+                "streetName": "path",
+                "relativeDirection": "LEFT",
+                "absoluteDirection": "NORTHWEST",
+                "stayOn": false,
+                "area": false,
+                "bogusName": true
+            }, {
+                "edgeId": 48244,
+                "distance": 127,
+                "geometry": {
+                    "points": "erc{Gkrj~AsEoAEK",
+                    "length": 3
+                },
+                "streetName": "bike path",
+                "relativeDirection": "RIGHT",
+                "absoluteDirection": "NORTH",
+                "stayOn": true,
+                "area": false,
+                "bogusName": true
+            }, {
+                "edgeId": 48246,
+                "distance": 6,
+                "geometry": {
+                    "points": "_yc{Gguj~AKB",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 48248,
+                "distance": 15,
+                "geometry": {
+                    "points": "kyc{Gcuj~AM?ME",
+                    "length": 3
+                }
+            }, {
+                "edgeId": 48250,
+                "distance": 3,
+                "geometry": {
+                    "points": "gzc{Giuj~AEA",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 48252,
+                "distance": 60,
+                "geometry": {
+                    "points": "mzc{Gkuj~ASKsAa@",
+                    "length": 3
+                }
+            }, {
+                "edgeId": 48254,
+                "distance": 17,
+                "geometry": {
+                    "points": "u}c{Gyvj~A]I",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 44471,
+                "distance": 75,
+                "geometry": {
+                    "points": "s~c{Gcwj~AKEwBo@",
+                    "length": 3
+                }
+            }, {
+                "edgeId": 44439,
+                "distance": 10,
+                "geometry": {
+                    "points": "wbd{Gyxj~AOM",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 44441,
+                "distance": 40,
+                "geometry": {
+                    "points": "gcd{Ggyj~Ai@YSOC?",
+                    "length": 4
+                }
+            }, {
+                "edgeId": 44443,
+                "distance": 5,
+                "geometry": {
+                    "points": "ied{Gqzj~AIC",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 67426,
+                "distance": 16,
+                "geometry": {
+                    "points": "sed{Guzj~AMAME",
+                    "length": 3
+                }
+            }, {
+                "edgeId": 67427,
+                "distance": 7,
+                "geometry": {
+                    "points": "ofd{G}zj~AGCAG",
+                    "length": 3
+                }
+            }, {
+                "edgeId": 44447,
+                "distance": 3,
+                "geometry": {
+                    "points": "yfd{Gi{j~AAE",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 44449,
+                "distance": 8,
+                "geometry": {
+                    "points": "{fd{Go{j~AMB",
+                    "length": 2
+                },
+                "streetName": "path",
+                "relativeDirection": "LEFT",
+                "absoluteDirection": "NORTH",
+                "stayOn": true,
+                "area": false,
+                "bogusName": true
+            }, {
+                "edgeId": 44451,
+                "distance": 180,
+                "geometry": {
+                    "points": "igd{Gk{j~Aa@C}@QuAUgC}@",
+                    "length": 5
+                }
+            }, {
+                "edgeId": 44453,
+                "distance": 34,
+                "geometry": {
+                    "points": "gqd{Gu~j~Ay@Y",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 14854,
+                "distance": 238,
+                "geometry": {
+                    "points": "asd{Go_k~A}CoAwFuB",
+                    "length": 3
+                }
+            }, {
+                "edgeId": 14706,
+                "distance": 7,
+                "geometry": {
+                    "points": "w_e{Guek~AKG",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 14736,
+                "distance": 53,
+                "geometry": {
+                    "points": "c`e{G}ek~AG[Ku@Qm@",
+                    "length": 4
+                }
+            }, {
+                "edgeId": 15088,
+                "distance": 7,
+                "geometry": {
+                    "points": "iae{G}ik~AIM",
+                    "length": 2
+                },
+                "streetName": "Smetanova ulica",
+                "relativeDirection": "CONTINUE",
+                "absoluteDirection": "NORTHEAST",
+                "stayOn": false,
+                "area": false,
+                "bogusName": false
+            }, {
+                "edgeId": 15090,
+                "distance": 33,
+                "geometry": {
+                    "points": "sae{Gkjk~AA[@YE]",
+                    "length": 4
+                },
+                "streetName": "Smetanova ulica",
+                "relativeDirection": "SLIGHTLY_RIGHT",
+                "absoluteDirection": "EAST",
+                "stayOn": true,
+                "area": false,
+                "bogusName": false
+            }, {
+                "edgeId": 15855,
+                "distance": 40,
+                "geometry": {
+                    "points": "yae{G_mk~AeAe@",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 15082,
+                "distance": 60,
+                "geometry": {
+                    "points": "_de{Genk~Ad@uC",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 15084,
+                "distance": 9,
+                "geometry": {
+                    "points": "ybe{G{rk~ADU",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 28574,
+                "distance": 16,
+                "geometry": {
+                    "points": "sbe{Gqsk~AFQ",
+                    "length": 2
+                },
+                "mode": "WALK",
+                "streetName": "steps",
+                "relativeDirection": "RIGHT",
+                "absoluteDirection": "SOUTHEAST",
+                "stayOn": false,
+                "area": false,
+                "bogusName": true
+            }, {
+                "edgeId": 28489,
+                "distance": 3,
+                "geometry": {
+                    "points": "kbe{Gctk~A@I",
+                    "length": 2
+                },
+                "mode": "BICYCLE",
+                "streetName": "path",
+                "relativeDirection": "CONTINUE",
+                "absoluteDirection": "SOUTHEAST",
+                "stayOn": false,
+                "area": false,
+                "bogusName": true
+            }, {
+                "edgeId": 28658,
+                "distance": 6,
+                "geometry": {
+                    "points": "ibe{Gmtk~ADM",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 5785,
+                "distance": 5,
+                "geometry": {
+                    "points": "cbe{G{tk~AFB",
+                    "length": 2
+                },
+                "streetName": "Turnerjeva ulica",
+                "relativeDirection": "RIGHT",
+                "absoluteDirection": "SOUTH",
+                "stayOn": false,
+                "area": false,
+                "bogusName": false
+            }, {
+                "edgeId": 5779,
+                "distance": 173,
+                "geometry": {
+                    "points": "{ae{Gwtk~A`BmL",
+                    "length": 2
+                },
+                "streetName": "Smetanova ulica",
+                "relativeDirection": "LEFT",
+                "absoluteDirection": "EAST",
+                "stayOn": false,
+                "area": false,
+                "bogusName": false
+            }, {
+                "edgeId": 5777,
+                "distance": 133,
+                "geometry": {
+                    "points": "y~d{Gebl~AnAgI",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 5775,
+                "distance": 173,
+                "geometry": {
+                    "points": "i|d{Gmll~A|AqL",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 5773,
+                "distance": 188,
+                "geometry": {
+                    "points": "kyd{G_zl~AdBuM",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 5771,
+                "distance": 4,
+                "geometry": {
+                    "points": "evd{Guhm~ABI",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 3938,
+                "distance": 4,
+                "geometry": {
+                    "points": "avd{G_im~A@K",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 3936,
+                "distance": 172,
+                "geometry": {
+                    "points": "_vd{Gkim~ApAiKHc@",
+                    "length": 3
+                }
+            }, {
+                "edgeId": 3934,
+                "distance": 16,
+                "geometry": {
+                    "points": "csd{Gyvm~AFg@",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 3932,
+                "distance": 86,
+                "geometry": {
+                    "points": "{rd{Gaxm~An@uE",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 3930,
+                "distance": 9,
+                "geometry": {
+                    "points": "kqd{Gw~m~ABW",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 31301,
+                "distance": 7,
+                "geometry": {
+                    "points": "gqd{Go_n~ABQ",
+                    "length": 2
+                },
+                "streetName": "Orožnova ulica",
+                "relativeDirection": "CONTINUE",
+                "absoluteDirection": "EAST",
+                "stayOn": false,
+                "area": false,
+                "bogusName": false
+            }, {
+                "edgeId": 31303,
+                "distance": 37,
+                "geometry": {
+                    "points": "cqd{Ga`n~AN}A",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 31305,
+                "distance": 8,
+                "geometry": {
+                    "points": "spd{G_cn~A@U",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 64368,
+                "distance": 13,
+                "geometry": {
+                    "points": "qpd{Gucn~AWE",
+                    "length": 2
+                },
+                "streetName": "Gospejna ulica",
+                "relativeDirection": "LEFT",
+                "absoluteDirection": "NORTH",
+                "stayOn": false,
+                "area": false,
+                "bogusName": false
+            }, {
+                "edgeId": 64369,
+                "distance": 48,
+                "geometry": {
+                    "points": "iqd{G{cn~AuAY",
+                    "length": 2
+                },
+                "mode": "WALK",
+                "streetName": "Gospejna ulica",
+                "relativeDirection": "CONTINUE",
+                "absoluteDirection": "NORTH",
+                "stayOn": false,
+                "area": false,
+                "bogusName": false,
+                "bikeRentalOffStation": {
+                    "id": "-2533",
+                    "name": "Univerzitetna knjižnica Maribor",
+                    "lat": 46.55907605699524,
+                    "lon": 15.642549071934214,
+		    "bikesAvailable": 3,
+		    "spacesAvailable": 1,
+		    "networks" : ["BCikel"]
+                }
+            }, {
+                "edgeId": 31087,
+                "distance": 76,
+                "geometry": {
+                    "points": "_td{Gudn~AeCg@",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 31085,
+                "distance": 3,
+                "geometry": {
+                    "points": "exd{G}en~AEA",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 33390,
+                "distance": 11,
+                "geometry": {
+                    "points": "kxd{G_fn~AE\\",
+                    "length": 2
+                },
+                "streetName": "Slovenska ulica",
+                "relativeDirection": "LEFT",
+                "absoluteDirection": "WEST",
+                "stayOn": false,
+                "area": false,
+                "bogusName": false
+            }, {
+                "edgeId": 44069,
+                "distance": 26,
+                "geometry": {
+                    "points": "qxd{Gaen~AOv@AH",
+                    "length": 3
+                }
+            }, {
+                "edgeId": 28559,
+                "distance": 17,
+                "geometry": {
+                    "points": "cyd{G_cn~AICIHI@",
+                    "length": 4
+                },
+                "streetName": "path",
+                "relativeDirection": "RIGHT",
+                "absoluteDirection": "NORTH",
+                "stayOn": false,
+                "area": false,
+                "bogusName": true
+            }, {
+                "edgeId": 48095,
+                "distance": 62,
+                "geometry": {
+                    "points": "azd{Gwbn~A[Ga@Kg@OEA",
+                    "length": 5
+                }
+            }, {
+                "edgeId": 48097,
+                "distance": 8,
+                "geometry": {
+                    "points": "m}d{G}cn~AOE",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 48099,
+                "distance": 10,
+                "geometry": {
+                    "points": "}}d{Gcdn~AQE",
+                    "length": 2
+                }
+            }, {
+                "edgeId": 30774,
+                "distance": 98,
+                "geometry": {
+                    "points": "o~d{Gidn~AEAiCaACWGA",
+                    "length": 5
+                }
+            }, {
+                "edgeId": 30776,
+                "distance": 6,
+                "geometry": {
+                    "points": "kce{Gggn~AKC",
+                    "length": 2
+                },
+                "streetName": "path",
+                "relativeDirection": "SLIGHTLY_LEFT",
+                "absoluteDirection": "NORTH",
+                "stayOn": true,
+                "area": false,
+                "bogusName": true
+            }, {
+                "edgeId": 30778,
+                "distance": 12,
+                "geometry": {
+                    "points": "wce{Gkgn~AGAMF",
+                    "length": 3
+                }
+            }, {
+                "edgeId": 32544,
+                "distance": 8,
+                "geometry": {
+                    "points": "mde{Gegn~AME",
+                    "length": 2
+                },
+                "streetName": "bike path",
+                "relativeDirection": "SLIGHTLY_RIGHT",
+                "absoluteDirection": "NORTH",
+                "stayOn": false,
+                "area": false,
+                "bogusName": false
+            }]
         }],
         "stats": {
             "min": 1195,

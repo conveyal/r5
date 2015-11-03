@@ -1,7 +1,7 @@
 package com.conveyal.r5.api.util;
 
 import com.beust.jcommander.internal.Lists;
-
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 
@@ -13,15 +13,20 @@ public class TransitSegment {
 
 
 
+    //from, to and fromName, toName are actually from stopCluster
     // Use AgencyAndId instead of String to get both since we are now multi-feed
-    public String from;
-    public String to;
+    @JsonProperty("from")
+    private String fromId;
+    @JsonProperty("to")
+    private String toId;
+
+    public StopCluster from;
+    public StopCluster to;
     //time in seconds @notnull
     public int walkTime;
     //distance of walking in meters @notnull
     public int walkDistance;
     public Stats waitStats;
-    //FIXME: change type to TraverseMode
     public TransitModes mode;
     public String fromName;
     public String toName;

@@ -2,6 +2,9 @@ package com.conveyal.r5;
 
 import com.conveyal.r5.api.ProfileResponse;
 import com.conveyal.r5.api.util.*;
+import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.model.json_serialization.PolyUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import graphql.Scalars;
 import graphql.schema.*;
 import org.slf4j.Logger;
@@ -416,10 +419,28 @@ public class GraphQLSchema {
                 .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).distance)
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
-                .name("geometry")
-                .type(polylineGeometryType)
-                //.description("TODO: actual encoding and decoding of a geometry")
-                .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).geometry)
+                .name("geometryPolyline")
+                .type(Scalars.GraphQLString)
+                .dataFetcher(environment -> PolyUtil
+                    .encode(((StreetEdgeInfo) environment.getSource()).geometry.points))
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("geometryWKT").type(Scalars.GraphQLString)
+                .dataFetcher(
+                    environment -> ((StreetEdgeInfo) environment.getSource()).geometry.points
+                        .toString())
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("geometryGeoJSON")
+                .type(Scalars.GraphQLString)
+                .dataFetcher(environment -> {
+                    try {
+                        return JsonUtilities.objectMapper.writeValueAsString(
+                            ((StreetEdgeInfo) environment.getSource()).geometry.points);
+                    } catch (JsonProcessingException e) {
+                        return null;
+                    }
+                })
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("mode")

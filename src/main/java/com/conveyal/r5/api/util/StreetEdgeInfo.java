@@ -18,7 +18,7 @@ public class StreetEdgeInfo {
      * @notnull
      */
     public Integer distance;
-    //TODO: actual encoding and decoding of a geometry
+    /** The geometry of this pattern */
     public PolylineGeometry geometry;
 
     /**

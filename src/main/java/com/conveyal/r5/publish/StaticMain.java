@@ -2,6 +2,7 @@ package com.conveyal.r5.publish;
 
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
 import org.slf4j.Logger;
@@ -40,10 +41,14 @@ public class StaticMain {
         WebMercatorGridPointSet ps = net.getGridPointSet();
 
         // pre-link so it doesn't get done in every thread
-        ps.link(net.streetLayer);
+        LinkedPointSet lps = ps.link(net.streetLayer);
 
         for (int x = 0; x < ps.width; x++) {
             for (int y = 0; y < ps.height; y++) {
+
+                if (lps.edges[y * (int) ps.width + x] == -1)
+                    continue; // don't store unlinked points
+
                 requests.add(ssr.getPointRequest(x, y));
             }
         }

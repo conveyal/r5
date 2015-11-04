@@ -63,13 +63,13 @@ public class LinkedPointSet {
      * For each point, the closest edge in the street layer.
      * This is in fact the even (forward) edge ID of the closest edge pairs.
      */
-    private int[] edges;
+    public int[] edges;
 
     /** For each point, distance from the initial vertex of the edge to the split point. */
-    private int[] distances0_mm;
+    public int[] distances0_mm;
 
     /** For each point, distance from the final vertex of the edge to the split point. */
-    private int[] distances1_mm;
+    public int[] distances1_mm;
 
     // For each transit stop, the distances to nearby streets as packed (vertex, distance) pairs.
     public transient List<int[]> stopTrees;

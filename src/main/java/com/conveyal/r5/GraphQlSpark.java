@@ -73,6 +73,10 @@ public class GraphQlSpark {
                 response.status(500);
                 content.put("errors", ql.getMessage());
                 LOG.error("GraphQL problem:", ql);
+            } catch (Exception e) {
+                response.status(500);
+                content.put("errors", e.getMessage());
+                LOG.error("Unknown error:", e);
             } finally {
                 return dataToJson(content);
             }

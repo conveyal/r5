@@ -20,4 +20,6 @@ public enum TransitModes {
     GONDOLA,
     //Funicular. Any rail system designed for steep inclines.
     FUNICULAR,
+    //All modes
+    TRANSIT
 }

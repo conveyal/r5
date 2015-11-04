@@ -6,11 +6,11 @@ import com.amazonaws.auth.profile.ProfileCredentialsProvider;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.S3Object;
+import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.io.ByteStreams;
 import org.apache.commons.io.FileUtils;
-import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
 
 import java.io.File;
@@ -106,7 +106,7 @@ public class PointSetDatastore extends PointSetCache {
 	/**
 	 * Load pointsets from S3.
 	 */
-	protected static class S3PointSetLoader extends CacheLoader<String, PointSet> {
+	protected static class S3PointSetLoader extends CacheLoader<String, FreeFormPointSet> {
 
 		private Boolean workOffline;
 		private AmazonS3Client s3;
@@ -122,7 +122,7 @@ public class PointSetDatastore extends PointSetCache {
 		}
 
 		@Override
-		public PointSet load (String pointSetId) throws Exception {
+		public FreeFormPointSet load (String pointSetId) throws Exception {
 			
 			File cachedFile;
 			
@@ -151,7 +151,7 @@ public class PointSetDatastore extends PointSetCache {
 			
 			// grab it from the cache
 			
-			return PointSet.fromGeoJson(cachedFile);	
+			return FreeFormPointSet.fromGeoJson(cachedFile);
 		}
 	}
 

@@ -1,5 +1,8 @@
 package com.conveyal.r5.transit;
 
+import com.conveyal.r5.analyst.scenario.Modification;
+import com.conveyal.r5.analyst.scenario.RemoveTrip;
+import com.conveyal.r5.analyst.scenario.Scenario;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.slf4j.Logger;
@@ -10,12 +13,13 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * This is like a transmodel JourneyPattern.
  * All the trips on the same Route that have the same sequence of stops, with the same pickup/dropoff options.
  */
-public class TripPattern implements Serializable {
+public class TripPattern implements Serializable, Cloneable {
 
     private static Logger LOG = LoggerFactory.getLogger(TripPattern.class);
 
@@ -93,4 +97,13 @@ public class TripPattern implements Serializable {
         }
         return bestSchedule;
     }
+
+    public TripPattern clone() {
+        try {
+            return (TripPattern) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 }

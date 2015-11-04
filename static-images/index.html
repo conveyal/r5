@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Static Site Output</title>
+    <script src="static.js"></script>
+    <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.css" />
+    <script src="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.js"></script>
+
+    <style type="text/css">
+      html, body, #map { height: 100%;}
+    </style>
+  </head>
+  <body>
+    <div id="map"></div>
+
+    <script type="text/javascript">
+      var baseUrl = '';
+
+      // retrieve query and stop tree cache
+      var query;
+      Static.getQuery(baseUrl, function (data) {
+        query = data;
+      })
+
+      var stopTreeCache;
+      Static.getStopTrees(baseUrl, function (data) {
+        stopTreeCache = data;
+      })
+
+      var isoLayer = null;
+
+      var map = L.map('map').setView([39.766667, -86.15], 12)
+
+      L.tileLayer('http://{s}.tiles.mapbox.com/v3/conveyal.hml987j0/{z}/{x}/{y}@2x.png', {
+          attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery � <a href="http://mapbox.com">Mapbox</a>',
+          maxZoom: 18,
+          detectRetina: true
+        }).addTo(map);
+
+      map.on('click', function (e) {
+        // get the pixel coordinates
+        var pxpt = map.project(e.latlng)
+        var x = pxpt.x
+        var y = pxpt.y
+        var scale = Math.pow(2, query.zoom - map.getZoom())
+        x *= scale
+        y *= scale
+
+        x -= query.west
+        y -= query.north
+
+        if (x < 0 || x > query.width || y < 0 || y > query.height) return // todo should show blank layer
+
+        Static.getOrigin(baseUrl, x, y, function (origin) {
+          console.time('surface')
+          var surface = Static.getSurface(query, stopTreeCache, origin, x, y, 'AVERAGE')
+          console.timeEnd('surface')
+
+          if (isoLayer != null)
+            map.removeLayer(isoLayer)
+
+          isoLayer = L.tileLayer.canvas()
+          isoLayer.drawTile = function (canvas, tilePoint, zoom) {
+            Static.isochroneTile(canvas, tilePoint, zoom, query, surface, 60)
+          }
+
+          isoLayer.addTo(map)
+        })
+      })
+    </script>
+  </body>
+</html>

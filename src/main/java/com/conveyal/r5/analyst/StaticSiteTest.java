@@ -11,7 +11,6 @@ import com.conveyal.r5.transit.TransportNetwork;
 import com.google.protobuf.CodedOutputStream;
 import gnu.trove.map.TIntIntMap;
 import org.apache.commons.math3.random.MersenneTwister;
-import org.joda.time.LocalDate;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -31,7 +30,7 @@ public class StaticSiteTest {
         int max = tn.transitLayer.streetVertexForStop.size();
 
         // make a pointset for all the dest stops
-        PointSet pset = new PointSet(max);
+        FreeFormPointSet pset = new FreeFormPointSet(max);
         VertexStore.Vertex v = tn.streetLayer.vertexStore.getCursor();
 
         for (int i = 0; i < max; i++) {

@@ -1,9 +1,14 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.osmlib.OSM;
+import com.conveyal.r5.analyst.FreeFormPointSet;
+import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.WebMercatorGridPointSet;
+import com.conveyal.r5.analyst.scenario.Modification;
+import com.conveyal.r5.analyst.scenario.Scenario;
+import com.sun.org.apache.xpath.internal.operations.Mod;
 import org.nustaq.serialization.FSTObjectInput;
 import org.nustaq.serialization.FSTObjectOutput;
-import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
@@ -23,7 +28,7 @@ import java.util.zip.ZipFile;
  * It uses a lot less object pointers and can be built, read, and written orders of magnitude faster.
  * @author abyrd
  */
-public class TransportNetwork implements Serializable {
+public class TransportNetwork implements Serializable, Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransportNetwork.class);
 
@@ -31,10 +36,12 @@ public class TransportNetwork implements Serializable {
 
     public TransitLayer transitLayer;
 
+    private WebMercatorGridPointSet gridPointSet;
+
     public void write (OutputStream stream) throws IOException {
         LOG.info("Writing transport network...");
         FSTObjectOutput out = new FSTObjectOutput(stream);
-        out.writeObject(this, TransportNetwork.class );
+        out.writeObject(this, TransportNetwork.class);
         out.close();
         LOG.info("Done writing.");
     }
@@ -206,20 +213,33 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * TODO cache this grid.
      * @return an efficient implicit grid PointSet for this TransportNetwork.
      */
-    public PointSet getGridPointSet() {
-        LOG.error("Grid pointset not implemeted yet.");
-        return null; // new WebMercatorGridPointSet(this);
+    public WebMercatorGridPointSet getGridPointSet() {
+        if (this.gridPointSet == null) {
+            synchronized (this) {
+                if (this.gridPointSet == null) {
+                    this.gridPointSet = new WebMercatorGridPointSet(this);
+                }
+            }
+        }
+        return this.gridPointSet;
     }
 
     /**
-     * TODO cache this grid.
      * @return an efficient implicit grid PointSet for this TransportNetwork, pre-linked to the street layer.
      */
     public LinkedPointSet getLinkedGridPointSet() {
         return getGridPointSet().link(streetLayer);
     }
+
+    public TransportNetwork clone() {
+        try {
+            return (TransportNetwork) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 
 }

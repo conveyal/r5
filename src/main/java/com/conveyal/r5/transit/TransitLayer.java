@@ -5,8 +5,12 @@ import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
+import com.conveyal.r5.analyst.scenario.Modification;
+import com.conveyal.r5.analyst.scenario.RemoveTrip;
+import com.conveyal.r5.analyst.scenario.Scenario;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -22,12 +26,13 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 /**
  * A key simplifying factor is that we don't handle overnight trips. This is fine for analysis at usual times of day.
  */
-public class TransitLayer implements Serializable {
+public class TransitLayer implements Serializable, Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransitLayer.class);
 
@@ -292,4 +297,15 @@ public class TransitLayer implements Serializable {
     }
 
     // TODO setStreetLayer which automatically links and records the streetLayer ID in a field for use elsewhere?
+
+
+    public TransitLayer clone() {
+        try {
+            return (TransitLayer) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
 }

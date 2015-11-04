@@ -1,5 +1,8 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.analyst.WebMercatorGridPointSet;
+import com.conveyal.r5.analyst.scenario.InactiveTripsFilter;
+import com.conveyal.r5.analyst.scenario.Scenario;
 import gnu.trove.map.TIntIntMap;
 import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
 import com.conveyal.r5.analyst.cluster.ResultEnvelope;
@@ -10,8 +13,6 @@ import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransportNetwork;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.time.DayOfWeek;
 
 /**
  * This is an exact copy of RepeatedRaptorProfileRouter that's being modified to work with (new) TransitNetworks
@@ -67,8 +68,8 @@ public class RepeatedRaptorProfileRouter {
         if (network.streetLayer != targets.streetLayer) {
             LOG.error("Transit network and target point set are not linked to the same street layer.");
         }
-        this.clusterRequest = clusterRequest;
         this.network = network;
+        this.clusterRequest = clusterRequest;
         this.targets = targets;
         this.request = clusterRequest.profileRequest;
         this.ts = ts;
@@ -79,8 +80,7 @@ public class RepeatedRaptorProfileRouter {
         long computationStartTime = System.currentTimeMillis();
         LOG.info("Beginning repeated RAPTOR profile request.");
 
-        boolean isochrone = (targets == null); // When no sample set is provided, we're making isochrones. TODO explicit switch for this.
-        // FIXME real traverse mode set
+        boolean isochrone = targets.pointSet instanceof WebMercatorGridPointSet;
         boolean transit = (request.transitModes != null && request.transitModes.contains("TRANSIT")); // Does the search involve transit at all?
 
         // Check that caller has supplied a LinkedPointSet and RaptorWorkerData when needed.
@@ -90,13 +90,13 @@ public class RepeatedRaptorProfileRouter {
         }
 
         // WHAT WE WANT TO DO HERE:
-        // - Make or get a LinkedPointSet (a regular grid if no PointSet is supplied).
+        // - Make or get a LinkedPointSet (a regular grid if no FreeFormPointSet is supplied).
         // - Use a streetRouter to explore a circular area around the origin point.
         // - Get the travel times to transit stops from the StreetRouter (A).
-        // - Get the travel time to all targets in the PointSet using the StreetRouter's internal tree.
+        // - Get the travel time to all targets in the FreeFormPointSet using the StreetRouter's internal tree.
         // - Make RaptorWorkerData from the TransitLayer.
         // - Use a RepeatedRaptorProfileRouter, intialized with item A, to find travel times to all reachable transit stops.
-        //   - The RepeatedRaptorProfileRouter propagates times out to the targets in the PointSet as it runs.
+        //   - The RepeatedRaptorProfileRouter propagates times out to the targets in the FreeFormPointSet as it runs.
         // - Fetch the propagated results (which will eventually be called a PointSetTimeRange)
         // - Make a result envelope from them.
 
@@ -137,15 +137,11 @@ public class RepeatedRaptorProfileRouter {
         // Turn the results of the search into isochrone geometries or accessibility data as requested.
         long resultSetStart = System.currentTimeMillis();
         ResultEnvelope envelope;
-        if (isochrone) {
-            // No destination point set was provided and we're just making isochrones based on travel time to vertices,
-            // rather than finding access times to a set of user-specified points.
-            envelope = null;//propagatedTimesStore.makeIsochronesForVertices();
-        } else {
-            // A destination point set was provided. We've found access times to a set of specified points.
-            // TODO actually use those boolean params to calculate isochrones on a regular grid pointset
-            envelope = propagatedTimesStore.makeResults(targets.pointSet, clusterRequest.includeTimes, true, false);
-        }
+
+        // A destination point set was provided. We've found access times to a set of specified points.
+        // TODO actually use those boolean params to calculate isochrones on a regular grid pointset
+        envelope = propagatedTimesStore.makeResults(targets.pointSet, clusterRequest.includeTimes, !isochrone, isochrone);
+
         ts.resultSets = (int) (System.currentTimeMillis() - resultSetStart);
         return envelope;
     }

@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.publish.StaticPropagatedTimesStore;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
@@ -166,8 +167,17 @@ public class RaptorWorker {
             initialStops.put(stopIndex, accessTime);
         }
 
-        if (propagatedTimesStore == null)
-            propagatedTimesStore = new PropagatedTimesStore(targets.size());
+        // we don't do propagation when generating a static site
+        boolean doPropagation = targets != null;
+
+        if (propagatedTimesStore == null) {
+            if (doPropagation)
+                propagatedTimesStore = new PropagatedTimesStore(targets.size());
+            else
+                propagatedTimesStore = new StaticPropagatedTimesStore(data.getStopCount());
+        }
+
+        int nTargets = targets != null ? targets.size() : data.getStopCount();
 
         // optimization: if no schedules, only run Monte Carlo
         int fromTime = req.fromTime;
@@ -192,13 +202,13 @@ public class RaptorWorker {
         ts.searchCount = iterations;
 
         // Iterate backward through minutes (range-raptor) taking a snapshot of router state after each call
-        int[][] timesAtTargetsEachIteration = new int[iterations][targets.size()];
+        int[][] timesAtTargetsEachIteration = new int[iterations][nTargets];
 
         // TODO don't hardwire timestep below
         ts.timeStep = 60;
 
         // times at targets from scheduled search
-        int[] scheduledTimesAtTargets = new int[targets.size()];
+        int[] scheduledTimesAtTargets = new int[nTargets];
         Arrays.fill(scheduledTimesAtTargets, UNREACHED);
 
         // current iteration
@@ -212,14 +222,18 @@ public class RaptorWorker {
 
             // Run the search on scheduled routes.
             this.runRaptorScheduled(initialStops, departureTime);
-            this.doPropagation(bestNonTransferTimes, scheduledTimesAtTargets, departureTime);
+            // if we're doing propagation, do it now. If we're not doing propagation but saving per transit stop access
+            // times, we don't need to--we'll just copy them all at once, below.
+            if (doPropagation) {
+                this.doPropagation(bestNonTransferTimes, scheduledTimesAtTargets, departureTime);
 
-            // Copy in the pre-transit times; we don't want to force people to ride transit instead of walking a block.
-            for (int i = 0; i < scheduledTimesAtTargets.length; i++) {
-                int nonTransitTravelTime = nonTransitTimes.getTravelTimeToPoint(i);
-                int nonTransitClockTime = nonTransitTravelTime + departureTime;
-                if (nonTransitTravelTime != UNREACHED && nonTransitClockTime < scheduledTimesAtTargets[i]) {
-                    scheduledTimesAtTargets[i] = nonTransitClockTime;
+                // Copy in the pre-transit times; we don't want to force people to ride transit instead of walking a block.
+                for (int i = 0; i < scheduledTimesAtTargets.length; i++) {
+                    int nonTransitTravelTime = nonTransitTimes.getTravelTimeToPoint(i);
+                    int nonTransitClockTime = nonTransitTravelTime + departureTime;
+                    if (nonTransitTravelTime != UNREACHED && nonTransitClockTime < scheduledTimesAtTargets[i]) {
+                        scheduledTimesAtTargets[i] = nonTransitClockTime;
+                    }
                 }
             }
 
@@ -248,11 +262,15 @@ public class RaptorWorker {
 
                     // do propagation
                     int[] frequencyTimesAtTargets = timesAtTargetsEachIteration[iteration++];
-                    System.arraycopy(scheduledTimesAtTargets, 0, frequencyTimesAtTargets, 0,
-                            scheduledTimesAtTargets.length);
-                    // updates timesAtTargetsEachIteration directly because it has a reference into the array.
-                    this.doPropagation(bestNonTransferTimesCopy, frequencyTimesAtTargets,
-                            departureTime);
+                    if (doPropagation) {
+                        System.arraycopy(scheduledTimesAtTargets, 0, frequencyTimesAtTargets, 0,
+                                scheduledTimesAtTargets.length);
+                        // updates timesAtTargetsEachIteration directly because it has a reference into the array.
+                        this.doPropagation(bestNonTransferTimesCopy, frequencyTimesAtTargets,
+                                departureTime);
+                    } else {
+                        System.arraycopy(bestNonTransferTimesCopy, 0, frequencyTimesAtTargets, 0, bestNonTransferTimesCopy.length);
+                    }
 
                     // convert to elapsed time
                     for (int t = 0; t < frequencyTimesAtTargets.length; t++) {
@@ -262,7 +280,8 @@ public class RaptorWorker {
                 }
             } else {
                 final int dt = departureTime;
-                timesAtTargetsEachIteration[iteration++] = IntStream.of(scheduledTimesAtTargets)
+                // if we're doing propagation, use propagated times, otherwise use times at stops
+                timesAtTargetsEachIteration[iteration++] = IntStream.of(doPropagation ? scheduledTimesAtTargets : bestNonTransferTimes)
                         .map(i -> i != UNREACHED ? i - dt : i)
                         .toArray();
             }

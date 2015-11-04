@@ -4,12 +4,12 @@ import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.conveyal.r5.analyst.scenario.InactiveTripsFilter;
+import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import com.google.common.io.ByteStreams;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -48,9 +48,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * This is an exact copy of AnalystWorker that's being modified to work with (new) TransitNetworks instead of (old) Graphs.
- * We can afford the maintainability nightmare of duplicating so much code because this is intended to completely replace
- * the old class sooner than later.
+ * This is an exact copy of the AnalystWorker in the OTP repository that's been modified to work with (new)
+ * TransitNetworks instead of (old) OTP Graphs.
+ * We can afford the maintainability nightmare of duplicating so much code because this is intended to completely
+ * replace the old class sooner than later.
  * We don't need to wait for point-to-point routing and detailed walking directions etc. to be available on the new
  * TransitNetwork code to do analysis work with it.
  */
@@ -359,7 +360,6 @@ public class AnalystWorker implements Runnable {
             ts.lon = clusterRequest.profileRequest.fromLon;
             ts.lat = clusterRequest.profileRequest.fromLat;
 
-
             // If this one-to-many request is for accessibility information based on travel times to a pointset,
             // fetch the set of points we will use as destinations.
             final PointSet targets;
@@ -373,12 +373,24 @@ public class AnalystWorker implements Runnable {
             }
             // TODO cache these, they are probably slow to make.
             // TODO this breaks if transportNetwork has been rebuilt ?
+            // TODO We should link after applying the scenario once we allow street modifications.
             linkedTargets = targets.link(transportNetwork.streetLayer);
 
-            RepeatedRaptorProfileRouter router =
-                    new RepeatedRaptorProfileRouter(transportNetwork, clusterRequest, linkedTargets, ts); // TODO transportNetwork is implied by linkedTargets.
+            LOG.info("Applying scenario...");
+            // Get the supplied scenario or create an empty one if no scenario was supplied.
+            Scenario scenario = clusterRequest.profileRequest.scenario;
+            if (scenario == null) {
+                scenario = new Scenario(-1);
+            }
+            // Add a filter to remove trips that are not running during the search time window.
+            scenario.modifications.add(0, new InactiveTripsFilter());
+            // Apply the scenario modifications to the network before use, performing protective copies where necessary.
+            TransportNetwork modifiedNetwork = scenario.applyToTransportNetwork(transportNetwork);
+            LOG.info("Done aplying scenario.");
 
             // Run the core repeated-raptor analysis.
+            RepeatedRaptorProfileRouter router =
+                    new RepeatedRaptorProfileRouter(modifiedNetwork, clusterRequest, linkedTargets, ts); // TODO transportNetwork is implied by linkedTargets.
             ResultEnvelope envelope = new ResultEnvelope();
             try {
                 envelope = router.route();

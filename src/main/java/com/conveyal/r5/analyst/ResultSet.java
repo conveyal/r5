@@ -11,6 +11,7 @@ import java.io.OutputStream;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 /**
  * This holds the results of a one-to-many search from a single origin point to a whole set of destination points.
@@ -39,11 +40,20 @@ public class ResultSet implements Serializable{
     /** Times to reach every feature, may be null */
     public int[] times;
 
+    public IsochroneFeature[] isochrones;
+
     public ResultSet() {
     }
 
     private void buildIsochrones (int[] times, PointSet targets) {
-        throw new UnsupportedOperationException("Isochrones not yet supported");
+        if (!WebMercatorGridPointSet.class.isInstance(targets))
+            this.isochrones = null;
+        else {
+            this.isochrones = new IsochroneFeature[24];
+            for (int cutoff = 5 * 60, i = 0; cutoff <= 120 * 60; cutoff += 5 * 60) {
+                this.isochrones[i++] = new IsochroneFeature(cutoff, (WebMercatorGridPointSet) targets, times);
+            }
+        }
     }
     
     /** Build a new ResultSet directly from times at point features, optionally including histograms or interpolating isochrones */
@@ -64,7 +74,10 @@ public class ResultSet implements Serializable{
      * Each new histogram object will be stored as a part of this result set keyed on its property/category.
      */
     protected void buildHistograms(int[] times, PointSet targets) {
-        this.histograms = Histogram.buildAll(times, targets);
+        if (FreeFormPointSet.class.isInstance(targets))
+            this.histograms = Histogram.buildAll(times, (FreeFormPointSet) targets);
+        else
+            this.histograms = null; // gridded pointsets don't have indicator values
     }
 
     /**
@@ -118,7 +131,7 @@ public class ResultSet implements Serializable{
      * properties: a list of the names of all the pointSet properties for which we have histograms.
      * data: for each property, a histogram of arrival times.
      */
-    public void writeJson(OutputStream output, PointSet ps) {
+    public void writeJson(OutputStream output, FreeFormPointSet ps) {
         try {
             JsonFactory jsonFactory = new JsonFactory(); 
 

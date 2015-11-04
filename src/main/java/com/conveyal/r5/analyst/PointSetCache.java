@@ -14,12 +14,12 @@ public abstract class PointSetCache {
 
     private static final Logger LOG = LoggerFactory.getLogger(PointSetCache.class);
     
-    protected LoadingCache<String, PointSet> pointSets;
+    protected LoadingCache<String, FreeFormPointSet> pointSets;
         
     public PointSetCache () {
     }
 
-    public  PointSet get(String pointSetId) {
+    public FreeFormPointSet get(String pointSetId) {
     	return pointSets.getUnchecked(pointSetId);
     };
 	

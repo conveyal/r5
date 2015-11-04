@@ -51,7 +51,7 @@ Finally, to compute accessibility, we overlay these travel time values on opport
 
 ## Data format
 
-The data storage consists of several files that are used to generate isochrone and accessibility results.
+The data storage consists of several files that are used to generate isochrone and accessibility results. All binary files use little endian byte order.
 
 ### Region-wide files
 
@@ -79,31 +79,26 @@ This contains the connection from Web Mercator pixels to transit stops. It is a 
 This file does not obviously have constant offsets. It is assumed that the client will build an index for the file when it is loaded. If this proves
 to be too slow, we can pregenerate an index for the file.
 
-### Per-transit-stop file
+### Per-origin file
 
-There is one file per transit stop, which contains transit travel times in seconds from that transit stop to every other stop in the network. It is formatted
-as follows:
+#### `{x}/{y}.dat`
+
+There is one file per origin, which contains transit travel times in seconds from that origin to every transit stop in the network, as well as to all nearby pixels. It is
+named with the x and y position of the pixel origin _relative to the north and west offsets in query.json_ (to avoid enormous numbers). It is formatted as follows.
 
 ```
+(2 bytes) radius of surrounding pixel area (e.g. if this is 20, there is an area 20 pixels above, below, to the right and left of the origin represented here,
+for a 41x41 pixel image centered on the origin)
+	for each pixel, rows first:
+	(2 bytes) travel time to pixel, seconds, delta-coded from previous pixel
+
 (4 bytes) number of transit stops
 (2 bytes) number of departure minutes
-for each transit stop:
+	for each transit stop:
 	(2 bytes) travel time to stop, seconds, at first departure minute, with value -1 indicating unreachability
 	for each departure minute after first:
 		(2 bytes) delta from previous travel time (in order to reduce entropy and allow gzip to efficiently compress data)
 ```
-
-### Per-origin files
-
-There are other files which are replicated once for each pixel. Each has an x and y pixel value, which is relative to the top-left of the query
-(the top-left pixel being [0, 0]). They are stored in a directory structure similar to the way map tiles are stored, with a directory for each x value,
-and a file named with the y value, and then appropriate file extension. The per-origin files are described below.
-
-#### `non-transit/{x}/{y}.png`
-
-This contains the non-transit access times to each nearby pixel. The center pixel of the image is the pixel specified by x and y in the filename.
-It is a grayscale png with an odd number of rows and columns; the value (0-254) of each pixel is the travel time from the origin to that pixel in _minutes_, with 255
-indicating unreachable.
 
 ## Calculating accessibility
 

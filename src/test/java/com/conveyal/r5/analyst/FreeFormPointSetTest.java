@@ -4,10 +4,6 @@ import junit.framework.TestCase;
 
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.NoSuchAuthorityCodeException;
-import com.conveyal.r5.analyst.EmptyPolygonException;
-import com.conveyal.r5.analyst.PointFeature;
-import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.UnsupportedGeometryException;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -15,10 +11,10 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Map;
 
-public class PointSetTest extends TestCase {
+public class FreeFormPointSetTest extends TestCase {
 
     public void testPointSets() throws IOException {
-        PointSet austin = PointSet.fromCsv(new File("src/test/resources/pointset/austin.csv"));
+        FreeFormPointSet austin = FreeFormPointSet.fromCsv(new File("src/test/resources/pointset/austin.csv"));
         assertNotNull(austin);
         assertEquals(austin.capacity, 15922);
         
@@ -27,12 +23,12 @@ public class PointSetTest extends TestCase {
 
     /** Factory method should return null but not throw an exception on malformed CSV. */
     public void testBogusCSV() throws IOException {
-        PointSet points = PointSet.fromCsv(new File("src/test/resources/pointset/bogus.csv"));
+        FreeFormPointSet points = FreeFormPointSet.fromCsv(new File("src/test/resources/pointset/bogus.csv"));
         assertNull(points);
     }
 
     public void testLoadGeoJson() {
-        PointSet points = PointSet.fromGeoJson(new File("src/test/resources/pointset/population.geo.json"));
+        FreeFormPointSet points = FreeFormPointSet.fromGeoJson(new File("src/test/resources/pointset/population.geo.json"));
         assertNotNull(points);
         assertEquals(points.capacity, 2);
         
@@ -42,7 +38,7 @@ public class PointSetTest extends TestCase {
     }
     
     public void testLoadShapefile() throws NoSuchAuthorityCodeException, IOException, FactoryException, EmptyPolygonException, UnsupportedGeometryException {
-        PointSet points = PointSet.fromShapefile(new File("src/test/resources/pointset/shp/austin.shp"));
+        FreeFormPointSet points = FreeFormPointSet.fromShapefile(new File("src/test/resources/pointset/shp/austin.shp"));
         assertNotNull(points);
         PointFeature ft = points.getFeature(0);
         int pop = ft.getProperty("DEC_10_S_2");
@@ -50,7 +46,7 @@ public class PointSetTest extends TestCase {
     }
     
     public void testGetFeature() {
-        PointSet points = PointSet.fromGeoJson(new File("src/test/resources/pointset/population.geo.json"));
+        FreeFormPointSet points = FreeFormPointSet.fromGeoJson(new File("src/test/resources/pointset/population.geo.json"));
         PointFeature pt = points.getFeature(0);
         
         assertNotNull(pt);
@@ -61,16 +57,16 @@ public class PointSetTest extends TestCase {
     }
     
     public void testSlice() {
-    	PointSet points = PointSet.fromGeoJson(new File("src/test/resources/pointset/population.geo.json"));
+    	FreeFormPointSet points = FreeFormPointSet.fromGeoJson(new File("src/test/resources/pointset/population.geo.json"));
     	
-    	PointSet all = points.slice(0, points.featureCount());
+    	FreeFormPointSet all = points.slice(0, points.featureCount());
     	assertEquals( all.featureCount(), points.featureCount() );
     	
-    	PointSet firstHalf = points.slice(0, 1);
+    	FreeFormPointSet firstHalf = points.slice(0, 1);
     	assertEquals( firstHalf.featureCount(), 1 );
     	assertEquals( firstHalf.getFeature(0).getId(), "XYZ0001" );
     	
-    	PointSet lastHalf = points.slice(1, 2);
+    	FreeFormPointSet lastHalf = points.slice(1, 2);
     	assertEquals( lastHalf.featureCount(), 1 );
     	assertEquals( lastHalf.getFeature(0).getId(), "XYZ0002" );
     }
@@ -80,14 +76,14 @@ public class PointSetTest extends TestCase {
      * that both versions are the same. This should test load and save.
      */
     public void testSaveGeoJson() throws IOException {
-        PointSet points1 = PointSet.fromGeoJson(new File(
+        FreeFormPointSet points1 = FreeFormPointSet.fromGeoJson(new File(
                 "src/test/resources/pointset/population.geo.json"));
         File tempFile = File.createTempFile("population", "geo.json");
         tempFile.deleteOnExit();
         OutputStream out = new FileOutputStream(tempFile);
         points1.writeJson(out);
         out.close();
-        PointSet points2 = PointSet.fromGeoJson(tempFile);
+        FreeFormPointSet points2 = FreeFormPointSet.fromGeoJson(tempFile);
         assertEquals(points1.id, points2.id);
         assertEquals(points1.label, points2.label);
         assertEquals(points1.featureCount(), points2.featureCount());

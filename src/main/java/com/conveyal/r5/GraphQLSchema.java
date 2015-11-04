@@ -133,6 +133,20 @@ public class GraphQLSchema {
 
     public GraphQLOutputType alertType = new GraphQLTypeReference("Alert");
 
+    private final String INPUTCOORDINATENAME = "Coordinate";
+
+    public GraphQLInputObjectType inputCoordinateType = GraphQLInputObjectType.newInputObject()
+            .name(INPUTCOORDINATENAME)
+            .field(GraphQLInputObjectField.newInputObjectField()
+                .name("lat")
+                .type(Scalars.GraphQLFloat)
+                .build())
+            .field(GraphQLInputObjectField.newInputObjectField()
+                .name("lon")
+                .type(Scalars.GraphQLFloat)
+                .build())
+            .build();
+
 
     public GraphQLObjectType queryType;
 
@@ -725,12 +739,14 @@ public class GraphQLSchema {
             .description("Gets profile of all paths")
             .type(profileResponseType)
             .argument(GraphQLArgument.newArgument().name("from")
-                .type(new GraphQLNonNull(Scalars.GraphQLString)).build())
+                .type(new GraphQLNonNull(inputCoordinateType))
+                .build())
             .argument(GraphQLArgument.newArgument()
                 .name("to")
-                .type(new GraphQLNonNull(Scalars.GraphQLString))
+                .type(new GraphQLNonNull(inputCoordinateType))
                 .build())
-            .argument(GraphQLArgument.newArgument().name("date").defaultValue("today").type(Scalars.GraphQLString).build())
+            .argument(GraphQLArgument.newArgument().name("date").defaultValue("today")
+                .type(Scalars.GraphQLString).build())
             .argument(stringTemplate("startTime", "7:30"))
             .argument(stringTemplate("endTime", "8:30"))
             .dataFetcher(environment -> {

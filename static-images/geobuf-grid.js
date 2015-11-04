@@ -1,4 +1,8 @@
-/** Convert a GeoBuf file to a regular grid */
+/**
+ * Convert a GeoBuf file to a regular grid
+ * Usage: geobuf-grid.js [--png] geobuf.pbf output_prefix.
+ * Creates one .grid file for each numeric attribute in the geobuf. If --png is specified, creates log-scaled pngs as well (useful for debugging).
+ */
 
 import grid from './grid'
 import geobuf from 'geobuf'
@@ -74,6 +78,8 @@ function writePng (arrbuf, file) {
 
   for (let i = 0; i < array.length; i++) {
     curr += array[i]
+    // take a log because there are often order-of-magnitude differences in job density across a region, this avoids creating
+    // a black png with a few white spots.
     max = Math.max(Math.log(curr + 1), max)
   }
 
@@ -81,7 +87,8 @@ function writePng (arrbuf, file) {
   curr = 0
   for (let i = 0; i < array.length; i++) {
     curr += array[i]
-    let val = (Math.log(curr + 1) / max * 0xff)
+    // take log and clamp, see comment above
+    let val = (Math.log(curr + 1) / max * 0xff) & 0xff
 
     data.data[i * 4] = val
     data.data[i * 4 + 1] = val

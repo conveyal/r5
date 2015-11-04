@@ -30,6 +30,13 @@ function writeStaticImage (x, y, url, which, stream) {
     })
   })
 }
+
+/**
+ * Get a travel time surface and accessibility results for a particular origin.
+ * Pass in references to the query (the JS object stored in query.json), the stopTreeCache, the origin file, the
+ * x and y coordinates of the origin relative to the query, what parameter you want (BEST_CASE, WORST_CASE or AVERAGE),
+ * and a grid. Returns a travel time/accessibility surface which can be used by isochoroneTile and accessibilityForCutoff
+ */
 export function getSurface (query, stopTreeCache, origin, originX, originY, which, grid) {
   let ret = new Uint8Array(query.width * query.height)
 
@@ -44,6 +51,7 @@ export function getSurface (query, stopTreeCache, origin, originX, originY, whic
   let nMinutes = origin[transitOffset + 1]
 
   let travelTimes = new Uint8Array(nMinutes)
+  // store the accessibility at each departure minute for every possible cutoff 1 - 120
   let accessPerMinute = new Float64Array(nMinutes * 120)
 
   // x and y refer to pixel coordinates not origins here
@@ -145,6 +153,7 @@ export function getSurface (query, stopTreeCache, origin, originX, originY, whic
   }
 }
 
+/** Get the cumulative accessibility number for a cutoff from a travel time surface */
 export function accessibilityForCutoff (surface, cutoff, which) {
   let accessibility = surface.access.slice(cutoff * surface.nMinutes, (cutoff + 1) * surface.nMinutes)
 
@@ -153,6 +162,7 @@ export function accessibilityForCutoff (surface, cutoff, which) {
   else if (which === 'AVERAGE') return (accessibility.reduce((a, b) => a + b) / surface.nMinutes) | 0
 }
 
+/** draw a tile onto the canvas. First three options are same as those used in leaflet TileLayer */
 export function isochroneTile (canvas, tilePoint, zoom, query, surface, cutoffMinutes) {
   // find top-left coords at zoom 10
   let xoff = tilePoint.x * 256

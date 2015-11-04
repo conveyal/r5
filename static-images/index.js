@@ -30,8 +30,7 @@ function writeStaticImage (x, y, url, which, stream) {
     })
   })
 }
-
-export function getSurface (query, stopTreeCache, origin, originX, originY, which) {
+export function getSurface (query, stopTreeCache, origin, originX, originY, which, grid) {
   let ret = new Uint8Array(query.width * query.height)
 
   // where is the transit portion of the origin data
@@ -45,6 +44,7 @@ export function getSurface (query, stopTreeCache, origin, originX, originY, whic
   let nMinutes = origin[transitOffset + 1]
 
   let travelTimes = new Uint8Array(nMinutes)
+  let accessPerMinute = new Float64Array(nMinutes * 120)
 
   // x and y refer to pixel coordinates not origins here
   // loop over rows first
@@ -113,10 +113,44 @@ export function getSurface (query, stopTreeCache, origin, originX, originY, whic
 
       // set pixel value
       ret[pixelIdx] = pixel
+
+      // compute access value
+      // get value of this pixel from grid
+      let gridx = x + query.west - grid.west
+      let gridy = y + query.north - grid.north
+
+      // if condition below fails we're off the grid, value is zero, don't bother with calculations
+      if (gridx >= 0 && gridx < grid.width && gridy >= 0 && gridy < grid.height) {
+        let val = grid.data[gridy * grid.width + gridx]
+
+        for (let minute = 0; minute < nMinutes; minute++) {
+          let travelTime = travelTimes[minute]
+
+          if (travelTime === 255) continue
+
+          // put this in all of the correct cutoff categories for this minute
+          for (let cutoff = 119; cutoff >= travelTime - 1; cutoff--) {
+            // TODO roll off smoothly
+            accessPerMinute[cutoff * nMinutes + minute] += val
+          }
+        }
+      }
     }
   }
 
-  return ret
+  return {
+    surface: ret,
+    access: accessPerMinute,
+    nMinutes: nMinutes
+  }
+}
+
+export function accessibilityForCutoff (surface, cutoff, which) {
+  let accessibility = surface.access.slice(cutoff * surface.nMinutes, (cutoff + 1) * surface.nMinutes)
+
+  if (which === 'BEST_CASE') return accessibility.reduce(Math.max) | 0
+  else if (which === 'WORST_CASE') return accessibility.reduce(Math.min) | 0
+  else if (which === 'AVERAGE') return (accessibility.reduce((a, b) => a + b) / surface.nMinutes) | 0
 }
 
 export function isochroneTile (canvas, tilePoint, zoom, query, surface, cutoffMinutes) {
@@ -151,7 +185,7 @@ export function isochroneTile (canvas, tilePoint, zoom, query, surface, cutoffMi
       if (xpsurf < 0 || xpsurf > query.width || ypsurf < 0 || ypsurf > query.height) {
         val = 255
       } else {
-        val = surface[ypsurf * query.width + xpsurf]
+        val = surface.surface[ypsurf * query.width + xpsurf]
       }
 
       if (val <= cutoffMinutes) {
@@ -196,6 +230,34 @@ export function getOrigin (url, x, y, cb) {
       cb(buf)
     })
 }
+
+/** download a grid */
+export function getGrid (url, category, cb) {
+  fetch(`${url}grids/${category}.grid`).then(res => res.arrayBuffer())
+    .then(res => {
+      console.log(`Grid ${res.length / 1000}kb uncompressed`)
+
+      // de-delta-code
+      // skip header in data
+      let arr = new Float64Array(res, 24)
+
+      for (let i = 0, prev = 0; i < arr.length; i++) {
+        arr[i] = (prev += arr[i])
+      }
+
+      let dv = new DataView(res)
+      cb({
+        // parse header
+        zoom: dv.getInt32(0, true),
+        west: dv.getInt32(4, true),
+        north: dv.getInt32(8, true),
+        width: dv.getInt32(12, true),
+        height: dv.getInt32(16, true),
+        data: arr
+      })
+    })
+}
+
 
 /** main
 let url = process.argv[2]

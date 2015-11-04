@@ -7,11 +7,17 @@
     <script src="http://cdn.leafletjs.com/leaflet/v0.7.7/leaflet.js"></script>
 
     <style type="text/css">
-      html, body, #map { height: 100%;}
+      html, body, #map { height: 100%; font-family: sans-serif; padding: 0px;}
+      #access { position: fixed; top: 25px; right: 25px; z-index: 2000; background: #fff; border: 2px solid #888; width: 250px; height: 100px; padding: 5px;}
+      #access output { display: block; font-size: 20pt; }
     </style>
   </head>
   <body>
     <div id="map"></div>
+    <div id="access">
+      Jobs within 60 minutes
+      <output></output>
+    </div>
 
     <script type="text/javascript">
       var baseUrl = '';
@@ -25,6 +31,11 @@
       var stopTreeCache;
       Static.getStopTrees(baseUrl, function (data) {
         stopTreeCache = data;
+      })
+
+      var grid;
+      Static.getGrid(baseUrl, 'Jobs_total', function (data) {
+        grid = data;
       })
 
       var isoLayer = null;
@@ -53,8 +64,14 @@
 
         Static.getOrigin(baseUrl, x, y, function (origin) {
           console.time('surface')
-          var surface = Static.getSurface(query, stopTreeCache, origin, x, y, 'AVERAGE')
+          var surface = Static.getSurface(query, stopTreeCache, origin, x, y, 'AVERAGE', grid)
           console.timeEnd('surface')
+
+          console.time('accessibility')
+          var access = Static.accessibilityForCutoff(surface, 60, 'AVERAGE')
+          console.timeEnd('accessibility')
+
+          document.querySelector('#access output').value = access;
 
           if (isoLayer != null)
             map.removeLayer(isoLayer)

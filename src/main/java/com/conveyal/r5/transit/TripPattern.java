@@ -87,7 +87,7 @@ public class TripPattern implements Serializable, Cloneable {
         for (TripSchedule schedule : tripSchedules) {
             boolean active = servicesActive.get(schedule.serviceCode);
             // LOG.info("Trip with service {} active: {}.", schedule.serviceCode, active);
-            if (servicesActive.get(schedule.serviceCode)) {
+            if (active) {
                 int departureTime = schedule.departures[stopOffset];
                 if (departureTime > time && departureTime < bestTime) {
                     bestTime = departureTime;

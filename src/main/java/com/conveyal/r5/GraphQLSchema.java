@@ -5,10 +5,16 @@ import com.conveyal.r5.api.util.*;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.model.json_serialization.PolyUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import graphql.GraphQLException;
 import graphql.Scalars;
+import graphql.language.StringValue;
 import graphql.schema.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.text.ParseException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 
 /**
  * Created by mabu on 30.10.2015.
@@ -112,6 +118,48 @@ public class GraphQLSchema {
         .value("DEPART_FROM", SearchType.DEPART_FROM,
             "Search is made for a trip that needs to depart at specific time/date")
         .build();
+
+    public static GraphQLScalarType GraphQLLocalDate = new GraphQLScalarType("LocalDate",
+        "Java 8 LocalDate type YYYY-MM-DD", new Coercing() {
+        @Override
+        public Object coerce(Object input) {
+            LOG.info("Date coerce:{}", input);
+            if (input instanceof String) {
+                try {
+                    if (input.equals("today")) {
+                        return LocalDate.now();
+                    }
+                    return LocalDate
+                        .parse((String) input, DateTimeFormatter.ISO_LOCAL_DATE);
+                } catch (Exception e) {
+                    throw new GraphQLException("Problem parsing date (Expected format is YYYY-MM-DD): " + e.getMessage());
+                }
+            } else  if (input instanceof LocalDate) {
+                return input;
+            } else {
+                throw new GraphQLException("Invalid date input. Expected String or LocalDate");
+            }
+        }
+
+        @Override
+        public Object coerceLiteral(Object input) {
+            //Seems to be used in querying
+            LOG.info("Date coerce literal:{}", input);
+            if (!(input instanceof StringValue)) {
+                return null;
+            }
+            try {
+                String sinput = ((StringValue) input).getValue();
+                if (sinput.equals("today")) {
+                    return LocalDate.now();
+                }
+                return LocalDate
+                    .parse(sinput, DateTimeFormatter.ISO_LOCAL_DATE);
+            } catch (Exception e) {
+                throw new GraphQLException("Problem parsing date (Expected format is YYYY-MM-DD): " + e.getMessage());
+            }
+        }
+    });
 
 
     public GraphQLOutputType profileResponseType = new GraphQLTypeReference("Profile");
@@ -833,7 +881,7 @@ public class GraphQLSchema {
                 .build())
             .argument(GraphQLArgument.newArgument()
                 .name("date")
-                .type(Scalars.GraphQLString)
+                .type(GraphQLLocalDate)
                 .description("The date of the search YYYY-MM-DD")
                 .defaultValue("today")
                 .build())
@@ -986,7 +1034,7 @@ public class GraphQLSchema {
                 .build())
             .argument(GraphQLArgument.newArgument()
                 .name("date")
-                .type(Scalars.GraphQLString)
+                .type(GraphQLLocalDate)
                 .description("The date of the search YYYY-MM-DD")
                 .defaultValue("today")
                 .build())

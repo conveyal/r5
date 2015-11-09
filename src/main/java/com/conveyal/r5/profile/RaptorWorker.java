@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
@@ -66,38 +67,9 @@ public class RaptorWorker {
 
     int max_time = 0;
     int round = 0;
-    List<int[]> timesPerStopPerRound;
-    int[] timesPerStop;
-    int[] bestTimes;
 
-
-    /**
-     * The previous pattern used to get to this stop, parallel to bestTimes. Used to apply transfer rules. This is conceptually
-     * similar to the "parent pointer" used in the RAPTOR paper to allow reconstructing paths. This could
-     * be used to reconstruct a path (although potentially not the one that was used to get to a particular
-     * location, as a later round may have found a faster but more-transfers way to get there). A path
-     * reconstructed this way will tbus be optimal in the earliest-arrival sense but may not have the
-     * fewest transfers; in fact, it will tend not to.
-     *
-     * Consider the case where there is a slower one-seat ride and a quicker route with a transfer
-     * to get to a transit center. At the transit center you board another vehicle. If it turns out
-     * that you still catch that vehicle at the same time regardless of which option you choose,
-     * general utility theory would suggest that you would choose the one seat ride due to a) the
-     * inconvenience of the transfer and b) the fact that most people have a smaller disutility for
-     * in-vehicle time than waiting time, especially if the waiting is exposed to the elements, etc.
-     *
-     * However, this implementation will find the more-transfers trip because it doesn't know where you're
-     * going from the transit center, whereas true RAPTOR would find both. It's not non-optimal in the
-     * earliest arrival sense, but it's also not the only optimal option.
-     *
-     * All of that said, we could reconstruct paths simply by storing one more parallel array with
-     * the index of the stop that you boarded a particular pattern at. Then we can do the typical
-     * reverse-optimization step.
-     */
-    int[] previousPatterns;
-
-    /** The best times for reaching stops via transit rather than via a transfer from another stop */
-    int[] bestNonTransferTimes;
+    /** Single raptor state for scheduled search, as we can use range-raptor on the scheduled search */
+    RaptorState scheduleState;
 
     TransitLayer data;
 
@@ -105,6 +77,7 @@ public class RaptorWorker {
     BitSet stopsTouched;
 
     /** stops touched any round this minute */
+    // TODO do these need to be in RaptorState? I think not as they just track stuff for a single round at a time.
     BitSet allStopsTouched;
 
     BitSet patternsTouched;
@@ -121,25 +94,23 @@ public class RaptorWorker {
 
     public BitSet servicesActive;
 
+    public List<RaptorState> statesEachIteration = new ArrayList<>();
+
     public RaptorWorker(TransitLayer data, LinkedPointSet targets, ProfileRequest req) {
         this.data = data;
         // these should only reflect the results of the (deterministic) scheduled search
         int nStops = data.streetVertexForStop.size();
-        this.bestTimes = new int[nStops];
-        this.bestNonTransferTimes = new int[nStops];
-        this.previousPatterns = new int[nStops];
-        Arrays.fill(previousPatterns, -1);
-        allStopsTouched = new BitSet(nStops);
+
         stopsTouched = new BitSet(nStops);
         patternsTouched = new BitSet(data.tripPatterns.size());
+        allStopsTouched = new BitSet(nStops);
+        this.scheduleState = new RaptorState(nStops);
 
         this.targets = targets;
 
         this.servicesActive = data.getActiveServicesForDate(req.date);
 
-        this.req = req; 
-        Arrays.fill(bestTimes, UNREACHED); // initialize once here and reuse on subsequent iterations.
-        Arrays.fill(bestNonTransferTimes, UNREACHED);
+        this.req = req;
         offsets = new FrequencyRandomOffsets(data);
     }
 
@@ -220,12 +191,14 @@ public class RaptorWorker {
                 LOG.info("minute {}", n);
             }
 
+            scheduleState.departureTime = departureTime;
+
             // Run the search on scheduled routes.
             this.runRaptorScheduled(initialStops, departureTime);
             // if we're doing propagation, do it now. If we're not doing propagation but saving per transit stop access
             // times, we don't need to--we'll just copy them all at once, below.
             if (doPropagation) {
-                this.doPropagation(bestNonTransferTimes, scheduledTimesAtTargets, departureTime);
+                this.doPropagation(scheduleState.bestNonTransferTimes, scheduledTimesAtTargets, departureTime);
 
                 // Copy in the pre-transit times; we don't want to force people to ride transit instead of walking a block.
                 for (int i = 0; i < scheduledTimesAtTargets.length; i++) {
@@ -242,23 +215,16 @@ public class RaptorWorker {
                 for (int i = 0; i < monteCarloDraws + 2; i++) {
                     // make copies for just this search. We need copies because we can't use dynamic
                     // programming/range-raptor with randomized schedules
-                    int[] bestTimesCopy = Arrays.copyOf(bestTimes, bestTimes.length);
-                    int[] bestNonTransferTimesCopy = Arrays
-                            .copyOf(bestNonTransferTimes, bestNonTransferTimes.length);
-                    int[] previousPatternsCopy = Arrays
-                            .copyOf(previousPatterns, previousPatterns.length);
+                    RaptorState stateCopy = scheduleState.copy();
 
                     offsets.randomize();
 
                     if (i == 0)
-                        this.runRaptorFrequency(departureTime, bestTimesCopy, bestNonTransferTimesCopy,
-                            previousPatternsCopy, BoardingAssumption.BEST_CASE);
+                        this.runRaptorFrequency(stateCopy, departureTime, BoardingAssumption.BEST_CASE);
                     else if (i == 1)
-                        this.runRaptorFrequency(departureTime, bestTimesCopy, bestNonTransferTimesCopy,
-                                previousPatternsCopy, BoardingAssumption.WORST_CASE);
+                        this.runRaptorFrequency(stateCopy, departureTime, BoardingAssumption.WORST_CASE);
                     else
-                        this.runRaptorFrequency(departureTime, bestTimesCopy, bestNonTransferTimesCopy,
-                                previousPatternsCopy, BoardingAssumption.RANDOM);
+                        this.runRaptorFrequency(stateCopy, departureTime, BoardingAssumption.RANDOM);
 
                     // do propagation
                     int[] frequencyTimesAtTargets = timesAtTargetsEachIteration[iteration++];
@@ -266,11 +232,13 @@ public class RaptorWorker {
                         System.arraycopy(scheduledTimesAtTargets, 0, frequencyTimesAtTargets, 0,
                                 scheduledTimesAtTargets.length);
                         // updates timesAtTargetsEachIteration directly because it has a reference into the array.
-                        this.doPropagation(bestNonTransferTimesCopy, frequencyTimesAtTargets,
+                        this.doPropagation(stateCopy.bestNonTransferTimes, frequencyTimesAtTargets,
                                 departureTime);
                     } else {
-                        System.arraycopy(bestNonTransferTimesCopy, 0, frequencyTimesAtTargets, 0, bestNonTransferTimesCopy.length);
+                        System.arraycopy(stateCopy.bestNonTransferTimes, 0, frequencyTimesAtTargets, 0, stateCopy.bestNonTransferTimes.length);
                     }
+
+                    statesEachIteration.add(stateCopy);
 
                     // convert to elapsed time
                     for (int t = 0; t < frequencyTimesAtTargets.length; t++) {
@@ -281,9 +249,10 @@ public class RaptorWorker {
             } else {
                 final int dt = departureTime;
                 // if we're doing propagation, use propagated times, otherwise use times at stops
-                timesAtTargetsEachIteration[iteration++] = IntStream.of(doPropagation ? scheduledTimesAtTargets : bestNonTransferTimes)
+                timesAtTargetsEachIteration[iteration++] = IntStream.of(doPropagation ? scheduledTimesAtTargets : scheduleState.bestNonTransferTimes)
                         .map(i -> i != UNREACHED ? i - dt : i)
                         .toArray();
+                statesEachIteration.add(scheduleState.copy());
             }
         }
 
@@ -342,18 +311,18 @@ public class RaptorWorker {
             int stopIndex = iterator.key();
             int time = iterator.value() + departureTime;
             // note not setting bestNonTransferTimes here because the initial walk is effectively a "transfer"
-            bestTimes[stopIndex] = Math.min(time, bestTimes[stopIndex]);
+            scheduleState.bestTimes[stopIndex] = Math.min(time, scheduleState.bestTimes[stopIndex]);
             markPatternsForStop(stopIndex);
         }
 
         // Anytime a round updates some stops, move on to another round
-        while (doOneRound(bestTimes, bestNonTransferTimes, previousPatterns, false, null)) {
+        while (doOneRound(scheduleState, false, null)) {
             advance();
         }
     }
 
     /** Run a RAPTOR search using frequencies */
-    public void runRaptorFrequency (int departureTime, int[] bestTimes, int[] bestNonTransferTimes, int[] previousPatterns, BoardingAssumption boardingAssumption) {
+    public void runRaptorFrequency (RaptorState state, int departureTime, BoardingAssumption boardingAssumption) {
         max_time = departureTime + MAX_DURATION;
         round = 0;
         advance(); // go to first round
@@ -371,13 +340,13 @@ public class RaptorWorker {
         }
 
         // Anytime a round updates some stops, move on to another round
-        while (doOneRound(bestTimes, bestNonTransferTimes, previousPatterns, true, boardingAssumption)) {
+        while (doOneRound(state, true, boardingAssumption)) {
             advance();
         }
     }
 
     /** perform one round, possibly using frequencies with the defined boarding assumption (which is ignored and may be set to null if useFrequencies == false) */
-    public boolean doOneRound (int[] bestTimes, int[] bestNonTransferTimes, int[] previousPatterns, boolean useFrequencies, BoardingAssumption boardingAssumption) {
+    public boolean doOneRound (RaptorState state, boolean useFrequencies, BoardingAssumption boardingAssumption) {
         //LOG.info("round {}", round);
         stopsTouched.clear(); // clear any stops left over from previous round.
         PATTERNS: for (int p = patternsTouched.nextSetBit(0); p >= 0; p = patternsTouched.nextSetBit(p+1)) {
@@ -407,7 +376,7 @@ public class RaptorWorker {
                     }
 
                     // the time at this stop if we board a new vehicle
-                    if (bestTimes[stopIndex] != UNREACHED) {
+                    if (state.bestTimes[stopIndex] != UNREACHED) {
                         for (int tripScheduleIdx = 0; tripScheduleIdx < timetable.tripSchedules.size(); tripScheduleIdx++) {
                             TripSchedule ts = timetable.tripSchedules.get(tripScheduleIdx);
                             if (ts.headwaySeconds == null || !servicesActive.get(ts.serviceCode))
@@ -426,19 +395,19 @@ public class RaptorWorker {
                                 int boardTimeThisEntry;
 
                                 if (boardingAssumption == BoardingAssumption.BEST_CASE) {
-                                    if (bestTimes[stopIndex] + BOARD_SLACK > ts.endTimes[freqEntryIdx] + ts.departures[stopPositionInPattern])
+                                    if (state.bestTimes[stopIndex] + BOARD_SLACK > ts.endTimes[freqEntryIdx] + ts.departures[stopPositionInPattern])
                                         continue FREQUENCY_ENTRIES; // it's too late, can't board.
 
                                     // best case boarding time is now, or when this frequency entry starts, whichever is later
-                                    boardTimeThisEntry = Math.max(bestTimes[stopIndex] + BOARD_SLACK, ts.startTimes[freqEntryIdx] + ts.departures[stopPositionInPattern]);
+                                    boardTimeThisEntry = Math.max(state.bestTimes[stopIndex] + BOARD_SLACK, ts.startTimes[freqEntryIdx] + ts.departures[stopPositionInPattern]);
                                 }
                                 else if (boardingAssumption == BoardingAssumption.WORST_CASE) {
                                     // worst case: cannot board this entry if there is not the full headway remaining before the end of the entry, we
                                     // might miss the vehicle.
-                                    if (bestTimes[stopIndex] + BOARD_SLACK > ts.endTimes[freqEntryIdx] + ts.departures[stopPositionInPattern] - ts.headwaySeconds[freqEntryIdx])
+                                    if (state.bestTimes[stopIndex] + BOARD_SLACK > ts.endTimes[freqEntryIdx] + ts.departures[stopPositionInPattern] - ts.headwaySeconds[freqEntryIdx])
                                         continue FREQUENCY_ENTRIES;
 
-                                    boardTimeThisEntry = Math.max(bestTimes[stopIndex] + BOARD_SLACK + ts.headwaySeconds[freqEntryIdx],
+                                    boardTimeThisEntry = Math.max(state.bestTimes[stopIndex] + BOARD_SLACK + ts.headwaySeconds[freqEntryIdx],
                                             ts.startTimes[freqEntryIdx] + ts.departures[stopPositionInPattern] + ts.headwaySeconds[freqEntryIdx]);
                                 }
                                 else {
@@ -473,7 +442,7 @@ public class RaptorWorker {
 
                                     int latestBoardTime = latestTerminalDeparture + ts.departures[stopPositionInPattern];
 
-                                    while (boardTimeThisEntry < bestTimes[stopIndex] + BOARD_SLACK) {
+                                    while (boardTimeThisEntry < state.bestTimes[stopIndex] + BOARD_SLACK) {
                                         boardTimeThisEntry += ts.headwaySeconds[freqEntryIdx];
 
                                         if (boardTimeThisEntry > latestTerminalDeparture) {
@@ -507,15 +476,16 @@ public class RaptorWorker {
                     // remain on board time must be larger than the arrival time at the stop so will
                     // not be saved; no need for an explicit check.
                     if (remainOnBoardTime != Integer.MAX_VALUE && remainOnBoardTime < max_time) {
-                        if (bestNonTransferTimes[stopIndex] > remainOnBoardTime) {
-                            bestNonTransferTimes[stopIndex] = remainOnBoardTime;
+                        if (state.bestNonTransferTimes[stopIndex] > remainOnBoardTime) {
+                            state.bestNonTransferTimes[stopIndex] = remainOnBoardTime;
+                            state.previousPatterns[stopIndex] = p;
 
                             stopsTouched.set(stopIndex);
                             allStopsTouched.set(stopIndex);
 
-                            if (bestTimes[stopIndex] > remainOnBoardTime) {
-                                bestTimes[stopIndex] = remainOnBoardTime;
-                                previousPatterns[stopIndex] = p;
+                            if (state.bestTimes[stopIndex] > remainOnBoardTime) {
+                                state.bestTimes[stopIndex] = remainOnBoardTime;
+                                state.transferStop[stopIndex] = -1; // not reached via a transfer
                             }
                         }
                     }
@@ -535,7 +505,7 @@ public class RaptorWorker {
                 stopPositionInPattern += 1;
                 if (onTrip == null) {
                     // We haven't boarded yet
-                    if (bestTimes[stopIndex] == UNREACHED) {
+                    if (state.bestTimes[stopIndex] == UNREACHED) {
                         continue; // we've never reached this stop, we can't board.
                     }
                     // Stop has been reached before. Attempt to board here.
@@ -550,7 +520,7 @@ public class RaptorWorker {
                             continue;
 
                         int dep = trip.departures[stopPositionInPattern];
-                        if (dep > bestTimes[stopIndex] + BOARD_SLACK && dep < bestBoardTimeThisStop) {
+                        if (dep > state.bestTimes[stopIndex] + BOARD_SLACK && dep < bestBoardTimeThisStop) {
                             onTrip = trip;
                             onTripIdx = tripIdx;
                             bestBoardTimeThisStop = dep;
@@ -567,23 +537,23 @@ public class RaptorWorker {
                         // cut off the search, don't continue searching this pattern
                         continue PATTERNS;
 
-                    if (arrivalTime < bestNonTransferTimes[stopIndex]) {
-                        bestNonTransferTimes[stopIndex] = arrivalTime;
+                    if (arrivalTime < state.bestNonTransferTimes[stopIndex]) {
+                        state.bestNonTransferTimes[stopIndex] = arrivalTime;
+                        state.previousPatterns[stopIndex] = p;
 
                         stopsTouched.set(stopIndex);
                         allStopsTouched.set(stopIndex);
 
-                        if (arrivalTime < bestTimes[stopIndex]) {
-                            bestTimes[stopIndex] = arrivalTime;
-                            previousPatterns[stopIndex] = p;
+                        if (arrivalTime < state.bestTimes[stopIndex]) {
+                            state.bestTimes[stopIndex] = arrivalTime;
+                            state.transferStop[stopIndex] = -1; // not reached via transfer
                         }
-
                     }
 
                     // Check whether we can switch to an earlier trip, because there was a faster way to
                     // get to a stop further down the line.
                     int bestTripIdx = onTripIdx;
-                    while (bestTripIdx >= 1 && timetable.tripSchedules.get(bestTripIdx - 1).departures[stopPositionInPattern] > bestTimes[stopIndex] + BOARD_SLACK) {
+                    while (bestTripIdx >= 1 && timetable.tripSchedules.get(bestTripIdx - 1).departures[stopPositionInPattern] > state.bestTimes[stopIndex] + BOARD_SLACK) {
                         bestTripIdx--;
                         TripSchedule trip = timetable.tripSchedules.get(bestTripIdx);
                         if (trip.headwaySeconds != null || !servicesActive.get(trip.serviceCode))
@@ -597,7 +567,7 @@ public class RaptorWorker {
                 }
             }
         }
-        doTransfers(bestTimes, bestNonTransferTimes, previousPatterns);
+        doTransfers(state);
         return !patternsTouched.isEmpty();
     }
 
@@ -605,12 +575,12 @@ public class RaptorWorker {
      * Apply transfers.
      * Mark all the patterns passing through these stops and any stops transferred to.
      */
-    private void doTransfers(int[] bestTimes, int[] bestNonTransferTimes, int[] previousPatterns) {
+    private void doTransfers(RaptorState state) {
         patternsTouched.clear();
         for (int stop = stopsTouched.nextSetBit(0); stop >= 0; stop = stopsTouched.nextSetBit(stop + 1)) {
             // TODO this is reboarding every trip at every stop.
             markPatternsForStop(stop);
-            int fromTime = bestNonTransferTimes[stop];
+            int fromTime = state.bestNonTransferTimes[stop];
 
             TIntList transfers = data.transfersForStop.get(stop);
             // transfers stored as jagged array, loop two at a time
@@ -618,9 +588,9 @@ public class RaptorWorker {
                 int toStop = transfers.get(i);
                 int distance = transfers.get(i + 1);
                 int toTime = fromTime + (int) (distance / req.walkSpeed);
-                if (toTime < max_time && toTime < bestTimes[toStop]) {
-                    bestTimes[toStop] = toTime;
-                    previousPatterns[toStop] = previousPatterns[stop];
+                if (toTime < max_time && toTime < state.bestTimes[toStop]) {
+                    state.bestTimes[toStop] = toTime;
+                    state.transferStop[toStop] = stop;
                     markPatternsForStop(toStop);
                 }
             }

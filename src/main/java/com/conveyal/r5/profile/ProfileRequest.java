@@ -1,7 +1,7 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.scenario.Scenario;
-import org.joda.time.LocalDate;
+import java.time.LocalDate;
 
 import java.io.Serializable;
 

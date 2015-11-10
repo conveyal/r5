@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst.core;
 
 import com.conveyal.r5.common.JsonUtilities;
-import org.joda.time.LocalDate;
+import java.time.LocalDate;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

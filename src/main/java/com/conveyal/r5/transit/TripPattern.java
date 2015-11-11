@@ -41,6 +41,9 @@ public class TripPattern implements Serializable, Cloneable {
     // This set includes the numeric codes for all services on which at least one trip in this pattern is active.
     public BitSet servicesActive = new BitSet();
 
+    /** index of this route in TransitLayer data. -1 if detailed route information has not been loaded */
+    public int routeIndex = -1;
+
     public TripPattern (TripPatternKey tripPatternKey) {
         int nStops = tripPatternKey.stops.size();
         stops = new int[nStops];

@@ -81,6 +81,8 @@ public class StaticComputer implements Runnable {
 
         int previous = 0;
         for (int time : nonTransitTimes.travelTimes) {
+            if (time == Integer.MAX_VALUE) time = -1;
+
             out.writeInt(time - previous);
             previous = time;
         }
@@ -144,9 +146,6 @@ public class StaticComputer implements Runnable {
         public int[] patterns;
         public int[] boardStops;
         public int[] alightStops;
-
-        // http://stackoverflow.com/questions/4062919
-        private static Map<Path, Path> pathSet = new WeakHashMap<>();
 
         public Path (RaptorState state, int stop) {
             // trace the path back from this RaptorState

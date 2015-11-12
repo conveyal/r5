@@ -14,6 +14,8 @@ import com.conveyal.r5.transit.TransportNetwork;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.EnumSet;
+
 /**
  * This is an exact copy of RepeatedRaptorProfileRouter that's being modified to work with (new) TransitNetworks
  * instead of (old) Graphs. We can afford the maintainability nightmare of duplicating so much code because this is
@@ -81,7 +83,7 @@ public class RepeatedRaptorProfileRouter {
         LOG.info("Beginning repeated RAPTOR profile request.");
 
         boolean isochrone = targets.pointSet instanceof WebMercatorGridPointSet;
-        boolean transit = (request.transitModes != null && request.transitModes.contains("TRANSIT")); // Does the search involve transit at all?
+        boolean transit = (request.transitModes != null && request.transitModes.contains(Mode.TRANSIT)); // Does the search involve transit at all?
 
         // Check that caller has supplied a LinkedPointSet and RaptorWorkerData when needed.
         // These are supplied by the caller because the caller maintains caches, and this router object is throw-away.
@@ -103,6 +105,19 @@ public class RepeatedRaptorProfileRouter {
         // Get travel times to street vertices near the origin, and to initial stops if we're using transit.
         long initialStopStartTime = System.currentTimeMillis();
         StreetRouter streetRouter = new StreetRouter(network.streetLayer);
+
+        // default to heaviest mode
+        // FIXME what does WALK,CAR even mean in this context
+        EnumSet<Mode> modes = transit ? request.accessModes : request.directModes;
+        if (modes.contains(Mode.CAR))
+            streetRouter.mode = Mode.CAR;
+        else if (modes.contains(Mode.BICYCLE))
+            streetRouter.mode = Mode.BICYCLE;
+        else
+            streetRouter.mode = Mode.WALK;
+
+        streetRouter.profileRequest = request;
+
         // TODO add time and distance limits to routing, not just weight.
         // TODO apply walk and bike speeds and maxBike time.
         streetRouter.distanceLimitMeters = transit ? 2000 : 100_000; // FIXME arbitrary, and account for bike or car access mode

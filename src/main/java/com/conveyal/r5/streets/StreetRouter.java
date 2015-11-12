@@ -1,5 +1,7 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.ProfileRequest;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -10,6 +12,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.PriorityQueue;
 
 /**
@@ -35,6 +39,12 @@ public class StreetRouter {
 
     // If you set this to a non-negative number, the search will be directed toward that vertex .
     public int toVertex = ALL_VERTICES;
+
+    /** Set individual properties here, or an entirely new request */
+    public ProfileRequest profileRequest = new ProfileRequest();
+
+    /** Search mode: we need a single mode, it is up to the caller to disentagle the modes set in the profile request */
+    public Mode mode = Mode.WALK;
 
     /**
      * @return a map from transit stop indexes to their distances from the origin.
@@ -117,7 +127,6 @@ public class StreetRouter {
      * Call one of the setOrigin functions first.
      */
     public void route () {
-
         if (queue.size() == 0) {
             LOG.warn("Routing without first setting an origin, no search will happen.");
         }
@@ -159,7 +168,7 @@ public class StreetRouter {
             streetLayer.outgoingEdges.get(s0.vertex).forEach(eidx -> {
                 edge.seek(eidx);
 
-                State s1 = edge.traverse(s0);
+                State s1 = edge.traverse(s0, mode, profileRequest);
 
                 if (s1 != null && s1.weight <= distanceLimitMeters) {
                     queue.add(s1);

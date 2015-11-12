@@ -81,6 +81,9 @@ public class StaticMetadata implements Runnable {
 
         int stop = 0;
         for (int[] tree : lps.stopTrees) {
+            if (tree == null)
+                continue;
+
             for (int i = 0; i < tree.length; i+= 2) {
                 // tree[i] is the target
                 if (stopTrees[tree[i]] == null) {

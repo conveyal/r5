@@ -26,6 +26,23 @@ public abstract class TraversalPermissionLabeler {
         if (walk(tree, Node.FOOT)) ret.add(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
         if (walk(tree, Node.BICYCLE)) ret.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
         if (walk(tree, Node.CAR)) ret.add(EdgeStore.EdgeFlag.ALLOWS_CAR);
+
+        // check for one-way streets. Note that leaf nodes will always be labeled and there is no unknown,
+        // so we need not traverse the tree
+        EnumMap<Node, OneWay> dir = getDirectionalTree(way);
+        if (back) {
+            // you can traverse back if this is not one way or it is one way reverse
+            if (dir.get(Node.CAR) == OneWay.YES) ret.remove(EdgeStore.EdgeFlag.ALLOWS_CAR);
+            if (dir.get(Node.BICYCLE) == OneWay.YES) ret.remove(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+            if (dir.get(Node.FOOT) == OneWay.YES) ret.remove(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+        }
+        else {
+            // you can always forward traverse unless this is a rare reversed one-way street
+            if (dir.get(Node.CAR) == OneWay.REVERSE) ret.remove(EdgeStore.EdgeFlag.ALLOWS_CAR);
+            if (dir.get(Node.BICYCLE) == OneWay.REVERSE) ret.remove(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+            if (dir.get(Node.FOOT) == OneWay.REVERSE) ret.remove(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+        }
+
         return ret;
     }
 
@@ -52,8 +69,9 @@ public abstract class TraversalPermissionLabeler {
     }
 
     /** apply label hierarchically. This is not explicitly in the spec but we want access=no to override default cycling permissions, for example. */
-    protected void applyLabel(Node node, Label label, EnumMap<Node, Label> tree) {
-        if (label == Label.UNKNOWN) return;
+    protected <T> void applyLabel(Node node, T label, EnumMap<Node, T> tree) {
+        if (label instanceof Label && label.equals(Label.UNKNOWN))
+            return;
 
         tree.put(node, label);
 
@@ -78,6 +96,38 @@ public abstract class TraversalPermissionLabeler {
         for (Node n : Node.values()) {
             tree.put(n, Label.UNKNOWN);
         }
+
+        return tree;
+    }
+
+    /** Get a directional tree (for use when labeling one-way streets) where every node is labeled bidirectional */
+    private EnumMap<Node, OneWay> getDirectionalTree (Way way) {
+        EnumMap<Node, OneWay> tree = new EnumMap<>(Node.class);
+
+        // label all nodes as unknown
+        for (Node n : Node.values()) {
+            tree.put(n, OneWay.NO);
+        }
+
+        // some tags imply oneway = yes unless otherwise noted
+        if (way.hasTag("highway", "motorway") || way.hasTag("junction", "roundabout"))
+            applyLabel(Node.ACCESS, OneWay.YES, tree);
+
+        // read the most generic tags first
+        if (way.hasTag("oneway")) applyLabel(Node.ACCESS, OneWay.fromTag(way.getTag("oneway")), tree);
+        if (way.hasTag("oneway:vehicle")) applyLabel(Node.VEHICLE, OneWay.fromTag(way.getTag("oneway:vehicle")), tree);
+        if (way.hasTag("oneway:motorcar")) applyLabel(Node.CAR, OneWay.fromTag(way.getTag("oneway:motorcar")), tree);
+
+        // one way specification for bicycles can be done in multiple ways
+        if (way.hasTag("cycleway", "opposite") || way.hasTag("cycleway", "opposite_lane") || way.hasTag("cycleway", "opposite_track"))
+            applyLabel(Node.BICYCLE, OneWay.NO, tree);
+
+        if (way.hasTag("oneway:bicycle")) applyLabel(Node.BICYCLE, OneWay.fromTag(way.getTag("oneway:bicycle")), tree);
+
+        // there are in fact one way pedestrian paths, believe it or not, but usually pedestrians don't inherit any oneway
+        // restrictions from more general modes
+        applyLabel(Node.FOOT, OneWay.NO, tree);
+        if (way.hasTag("oneway:foot")) applyLabel(Node.FOOT, OneWay.fromTag(way.getTag("oneway")), tree);
 
         return tree;
     }
@@ -128,6 +178,23 @@ public abstract class TraversalPermissionLabeler {
             // TODO: no-thru-traffic, use_sidepath, customers, etc.
             else return UNKNOWN;
 
+        }
+    }
+
+    /** is a particular node one-way? http://wiki.openstreetmap.org/wiki/Key:oneway */
+    protected enum OneWay {
+        NO, YES, REVERSE;
+
+        public static OneWay fromTag (String tag) {
+            tag = tag.toLowerCase().trim();
+
+            if ("yes".equals(tag) || "true".equals(tag) || "1".equals(tag))
+                return YES;
+
+            if ("-1".equals(tag) || "reverse".equals(tag))
+                return REVERSE;
+
+            return NO;
         }
     }
 }

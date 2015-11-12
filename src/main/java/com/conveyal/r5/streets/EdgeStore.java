@@ -292,9 +292,16 @@ public class EdgeStore implements Serializable {
 
             if (mode == Mode.WALK && getFlag(EdgeFlag.ALLOWS_PEDESTRIAN))
                 s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / req.walkSpeed);
-            else if (mode == Mode.BICYCLE && getFlag(EdgeFlag.ALLOWS_BIKE))
+            else if (mode == Mode.BICYCLE && getFlag(EdgeFlag.ALLOWS_BIKE)) {
+                if (req.bikeTrafficStress > 0 && req.bikeTrafficStress < 4) {
+                    if (getFlag(EdgeFlag.BIKE_LTS_4)) return null;
+                    if (req.bikeTrafficStress < 3 && getFlag(EdgeFlag.BIKE_LTS_3)) return null;
+                    if (req.bikeTrafficStress < 2 && getFlag(EdgeFlag.BIKE_LTS_2)) return null;
+                }
+
                 s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / req.bikeSpeed);
                 // TODO bike walking
+            }
             else if (mode == Mode.CAR && getFlag(EdgeFlag.ALLOWS_CAR))
                 s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / speeds.get(edgeIndex));
             else

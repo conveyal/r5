@@ -5,6 +5,7 @@ import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
 import com.conveyal.r5.labeling.TraversalPermissionLabeler;
 import com.conveyal.r5.labeling.USTraversalPermissionLabeler;
 import com.vividsolutions.jts.geom.Envelope;
@@ -62,6 +63,7 @@ public class StreetLayer implements Serializable {
     public transient IntHashGrid spatialIndex = new IntHashGrid();
 
     private transient TraversalPermissionLabeler permissions = new USTraversalPermissionLabeler(); // TODO don't hardwire to US
+    private transient LevelOfTrafficStressLabeler stressLabeler = new LevelOfTrafficStressLabeler();
 
     /** Envelope of this street layer, in decimal degrees (non-fixed-point) */
     public Envelope envelope = new Envelope();
@@ -197,6 +199,9 @@ public class StreetLayer implements Serializable {
         // Create and store the forward and backward edge
         EnumSet<EdgeStore.EdgeFlag> forwardFlags = permissions.getPermissions(way, false);
         EnumSet<EdgeStore.EdgeFlag> backFlags = permissions.getPermissions(way, true);
+
+        stressLabeler.label(way, forwardFlags, backFlags);
+
         EdgeStore.Edge newForwardEdge = edgeStore.addStreetPair(beginVertexIndex, endVertexIndex, edgeLengthMillimeters, forwardFlags, backFlags);
         newForwardEdge.setGeometry(nodes);
         pointsPerEdgeHistogram.add(nNodes);

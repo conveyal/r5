@@ -39,6 +39,9 @@ public class ProfileRequest implements Serializable, Cloneable {
     
     /** The speed of cycling, in meters per second */
     public float  bikeSpeed = 4f;
+
+    /** maximum level of traffic stress for cycling, 1 - 4 */
+    public int bikeTrafficStress = 1;
     
     /** The speed of driving, in meters per second */
     public float  carSpeed;

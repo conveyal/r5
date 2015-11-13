@@ -40,11 +40,11 @@ public class PointToPointRouterServer {
             }
 
             TransportNetwork transportNetwork = TransportNetwork.fromDirectory(dir);
-            //transportNetwork.makeEnvelope();
             //In memory doesn't save it to disk others do (build, preFlight)
             if (!inMemory) {
                 try {
-                    OutputStream outputStream = new BufferedOutputStream(new FileOutputStream(new File(dir,"network.dat")));
+                    OutputStream outputStream = new BufferedOutputStream(
+                        new FileOutputStream(new File(dir, "network.dat")));
                     transportNetwork.write(outputStream);
                     outputStream.close();
                 } catch (IOException e) {
@@ -52,6 +52,25 @@ public class PointToPointRouterServer {
                     System.exit(-1);
                 }
 
+            }
+        } else if ("--graphs".equals(commandArguments[0])) {
+            File dir = new File(commandArguments[1]);
+
+            if (!dir.isDirectory() && dir.canRead()) {
+                LOG.error("'{}' is not a readable directory.", dir);
+            }
+            try {
+                LOG.info("Loading transit networks from: {}", dir);
+                InputStream inputStream = new BufferedInputStream(new FileInputStream(new File(dir, "network.dat")));
+                TransportNetwork transportNetwork = TransportNetwork.read(inputStream);
+                run(transportNetwork);
+                inputStream.close();
+            } catch (IOException e) {
+                LOG.error("An error occurred during reading of transit networks", e);
+                System.exit(-1);
+            } catch (Exception e) {
+                LOG.error("An error occurred during decoding of transit networks", e);
+                System.exit(-1);
             }
         } else if ("--help".equals(commandArguments[0])
                 || "-h".equals(commandArguments[0])
@@ -62,6 +81,11 @@ public class PointToPointRouterServer {
             LOG.info("Unknown argument: {}", commandArguments[0]);
             System.out.println(USAGE);
         }
+
+    }
+
+    private static void run(TransportNetwork transportNetwork) {
+
 
     }
 }

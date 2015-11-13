@@ -1,14 +1,10 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.analyst.FreeFormPointSet;
-import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
-import com.conveyal.r5.analyst.scenario.Modification;
-import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
-import com.sun.org.apache.xpath.internal.operations.Mod;
+import com.vividsolutions.jts.geom.Envelope;
 import org.nustaq.serialization.FSTObjectInput;
 import org.nustaq.serialization.FSTObjectOutput;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -272,6 +268,12 @@ public class TransportNetwork implements Serializable, Cloneable {
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+
+    //TODO: add transit stops to envelope
+    public Envelope getEnvelope() {
+        return streetLayer.getEnvelope();
     }
 
 

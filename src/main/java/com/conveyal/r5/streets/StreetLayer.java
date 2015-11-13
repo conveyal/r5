@@ -461,4 +461,8 @@ public class StreetLayer implements Serializable {
             LOG.info("Found no subgraphs to remove, congratulations for having clean OSM data.");
         LOG.info("Done removing subgraphs. {} edges remain", edgeStore.nEdges);
     }
+
+    public Envelope getEnvelope() {
+        return envelope;
+    }
 }

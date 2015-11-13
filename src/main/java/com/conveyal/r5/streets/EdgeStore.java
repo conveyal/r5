@@ -48,7 +48,7 @@ public class EdgeStore implements Serializable {
     /** Flags for this edge.  One entry for each forward and each backward edge. */
     protected List<EnumSet<EdgeFlag>> flags;
 
-    /** Speed for this edge.  One entry for each forward and each backward edge. */
+    /** Speed for this edge.  One entry for each forward and each backward edge. Currently m/s * VertexStore.FixedFactor */
     protected TIntList speeds;
 
     /** From vertices. One entry for each edge pair */
@@ -177,7 +177,8 @@ public class EdgeStore implements Serializable {
      * @return a cursor pointing to the forward edge in the pair, which always has an even index.
      */
     public Edge addStreetPair(int beginVertexIndex, int endVertexIndex, int edgeLengthMillimeters,
-                              EnumSet<EdgeFlag> forwardFlags, EnumSet<EdgeFlag> backFlags) {
+        EnumSet<EdgeFlag> forwardFlags, EnumSet<EdgeFlag> backFlags, int forwardSpeed,
+        int backwardSpeed) {
 
         // Store only one length, set of endpoints, and intermediate geometry per pair of edges.
         lengths_mm.add(edgeLengthMillimeters);
@@ -186,7 +187,7 @@ public class EdgeStore implements Serializable {
         geometries.add(EMPTY_INT_ARRAY);
 
         // Forward edge
-        speeds.add(DEFAULT_SPEED_KPH);
+        speeds.add(forwardSpeed);
         flags.add(forwardFlags);
 
         // avoid confusion later on
@@ -194,7 +195,7 @@ public class EdgeStore implements Serializable {
             backFlags = forwardFlags.clone();
 
         // Backward edge
-        speeds.add(DEFAULT_SPEED_KPH);
+        speeds.add(backwardSpeed);
         flags.add(backFlags);
 
         // Increment total number of edges created so far, and return the index of the first new edge.
@@ -264,6 +265,10 @@ public class EdgeStore implements Serializable {
 
         public int getSpeed() {
             return speeds.get(edgeIndex);
+        }
+
+        public float getSpeedkmh() {
+            return (float) ((speeds.get(edgeIndex) / VertexStore.FIXED_FACTOR) * 3.6);
         }
 
         public void setSpeed(int speed) {
@@ -445,8 +450,8 @@ public class EdgeStore implements Serializable {
         @Override
         public String toString() {
             StringBuilder sb = new StringBuilder();
-            sb.append(String.format("Edge from %d to %d. Length %f meters, speed %d kph.",
-                    getFromVertex(), getToVertex(), getLengthMm() / 1000D, getSpeed()));
+            sb.append(String.format("Edge from %d to %d. Length %f meters, speed %f kph.",
+                    getFromVertex(), getToVertex(), getLengthMm() / 1000D, getSpeedkmh()));
             for (EdgeFlag flag : flags.get(edgeIndex)) {
                 sb.append(flag.toString());
             }

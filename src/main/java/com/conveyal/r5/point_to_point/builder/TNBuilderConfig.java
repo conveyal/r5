@@ -92,7 +92,7 @@ public class TNBuilderConfig {
     /**
      * Specifier for way speeds
      */
-    //public final SpeedsFactory speedsFactory;
+    public final SpeedConfig speeds;
 
     /**
      * A custom OSM namer to use.
@@ -130,6 +130,7 @@ public class TNBuilderConfig {
         staticBikeRental = false;
         staticParkAndRide = true;
         staticBikeParkAndRide = false;
+        speeds = SpeedConfig.defaultConfig();
     }
 
     public static TNBuilderConfig defaultConfig() {

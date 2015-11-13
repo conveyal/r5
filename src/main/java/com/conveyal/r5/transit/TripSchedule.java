@@ -107,4 +107,14 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule> {
         }
     }
 
+    /**
+     * @return whether any part of this occurs during the given time range (expressed in seconds after midnight).
+     * TODO frequencies
+     */
+    public boolean overlapsTimeRange (int fromTime, int toTime) {
+        int firstStopTime = departures[0];
+        int lastStopTime = arrivals[arrivals.length - 1];
+        return firstStopTime <= toTime && lastStopTime >= fromTime;
+    }
+
 }

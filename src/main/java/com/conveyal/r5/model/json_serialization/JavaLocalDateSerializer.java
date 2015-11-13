@@ -20,7 +20,7 @@ public class JavaLocalDateSerializer extends JsonSerializer<LocalDate> {
         Version moduleVersion = new Version(1, 0, 0, null, null, null);
         SimpleModule module = new SimpleModule("LocalDate", moduleVersion);
         module.addSerializer(LocalDate.class, new JavaLocalDateSerializer());
-        module.addDeserializer(LocalDate.class, new JodaLocalDateDeserializer());
+        module.addDeserializer(LocalDate.class, new JavaLocalDateDeserializer());
         return module;
     }
 

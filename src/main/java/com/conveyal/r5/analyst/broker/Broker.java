@@ -85,7 +85,7 @@ public class Broker implements Runnable {
     /*static {
         mapper.registerModule(AgencyAndIdSerializer.makeModule());
         mapper.registerModule(QualifiedModeSetSerializer.makeModule());
-        mapper.registerModule(JodaLocalDateSerializer.makeModule());
+        mapper.registerModule(JavaLocalDateSerializer.makeModule());
         mapper.registerModule(TraverseModeSetSerializer.makeModule());
     }*/
 

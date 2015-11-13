@@ -51,7 +51,7 @@ public class JobSimulator {
         mapper.enable(SerializationFeature.INDENT_OUTPUT);
         /*mapper.registerModule(AgencyAndIdSerializer.makeModule());
         mapper.registerModule(QualifiedModeSetSerializer.makeModule());
-        mapper.registerModule(JodaLocalDateSerializer.makeModule());
+        mapper.registerModule(JavaLocalDateSerializer.makeModule());
         mapper.registerModule(TraverseModeSetSerializer.makeModule());*/
 
         List<AnalystClusterRequest> requests = new ArrayList<>();

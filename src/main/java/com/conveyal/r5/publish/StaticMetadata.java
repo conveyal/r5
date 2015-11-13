@@ -81,6 +81,9 @@ public class StaticMetadata implements Runnable {
 
         int stop = 0;
         for (int[] tree : lps.stopTrees) {
+            if (tree == null)
+                continue;
+
             for (int i = 0; i < tree.length; i+= 2) {
                 // tree[i] is the target
                 if (stopTrees[tree[i]] == null) {
@@ -97,6 +100,9 @@ public class StaticMetadata implements Runnable {
         // write the trees
         LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(out);
 
+        int prevStopId = 0;
+        int prevTime = 0;
+
         for (TIntList tree : stopTrees) {
             if (tree == null) {
                 dos.writeInt(0);
@@ -105,8 +111,13 @@ public class StaticMetadata implements Runnable {
                 // divide by two because array is jagged, get number of stops
                 dos.writeInt(tree.size() / 2);
                 for (int i = 0; i < tree.size(); i += 2) {
-                    dos.writeInt(tree.get(i));
-                    dos.writeInt(tree.get(i + 1));
+                    int stopId = tree.get(i);
+                    dos.writeInt(stopId - prevStopId);
+                    prevStopId = stopId;
+
+                    int time = tree.get(i + 1) / 60;
+                    dos.writeInt(time - prevTime);
+                    prevTime = time;
                 }
             }
         }

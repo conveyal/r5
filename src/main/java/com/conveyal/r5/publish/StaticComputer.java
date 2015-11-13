@@ -3,17 +3,23 @@ package com.conveyal.r5.publish;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
 import com.conveyal.r5.analyst.cluster.TaskStatisticsStore;
+import com.conveyal.r5.profile.RaptorState;
 import com.conveyal.r5.profile.RaptorWorker;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.google.common.io.LittleEndianDataOutputStream;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.TObjectIntMap;
+import gnu.trove.map.hash.TObjectIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.*;
 
 /**
  * Compute a static site result for a single origin.
@@ -75,6 +81,8 @@ public class StaticComputer implements Runnable {
 
         int previous = 0;
         for (int time : nonTransitTimes.travelTimes) {
+            if (time == Integer.MAX_VALUE) time = -1;
+
             out.writeInt(time - previous);
             previous = time;
         }
@@ -87,17 +95,105 @@ public class StaticComputer implements Runnable {
         // number of iterations
         out.writeInt(iterations);
 
+        double sum = 0;
+
         for (int stop = 0; stop < stops; stop++) {
-            short prev = 0;
+            int prev = 0;
+            int prevPath = 0;
+            int maxPathIdx = 0;
+
+            TObjectIntMap<Path> paths = new TObjectIntHashMap<>();
+            List<Path> pathList = new ArrayList<>();
+
             for (int iter = 0; iter < iterations; iter++) {
                 int time = pts.times[iter][stop];
                 if (time == Integer.MAX_VALUE) time = -1;
 
                 out.writeInt(time - prev);
-                prev = (short) time;
+                prev = time;
+
+                // write out which path to use, delta coded
+                Path path = new Path(worker.statesEachIteration.get(iter), stop);
+                if (!paths.containsKey(path)) {
+                    paths.put(path, maxPathIdx++);
+                    pathList.add(path);
+                }
+
+                int pathIdx = paths.get(path);
+                out.writeInt(pathIdx - prevPath);
+                prevPath = pathIdx;
+            }
+
+            // write the paths
+            out.writeInt(pathList.size());
+            for (Path path : pathList) {
+                out.writeInt(path.patterns.length);
+
+                for (int i = 0; i < path.patterns.length; i++) {
+                    out.writeInt(path.boardStops[i]);
+                    out.writeInt(path.patterns[i]);
+                    out.writeInt(path.alightStops[i]);
+                }
             }
         }
 
+        LOG.info("Average of {} paths per destination stop", sum / stops);
+
         out.flush();
+    }
+
+    private static class Path {
+        public int[] patterns;
+        public int[] boardStops;
+        public int[] alightStops;
+
+        public Path (RaptorState state, int stop) {
+            // trace the path back from this RaptorState
+            int previousPattern = state.previousPatterns[stop];
+
+            TIntList patterns = new TIntArrayList();
+            TIntList boardStops = new TIntArrayList();
+            TIntList alightStops = new TIntArrayList();
+            TIntList times = new TIntArrayList();
+            TIntList nonTransferTimes = new TIntArrayList();
+
+            while (previousPattern != -1) {
+                patterns.add(previousPattern);
+                alightStops.add(stop);
+                times.add(state.bestTimes[stop]);
+                nonTransferTimes.add(state.bestNonTransferTimes[stop]);
+                stop = state.previousStop[stop];
+                boardStops.add(stop);
+
+                if (state.atOrigin[stop])
+                    break;
+
+                // handle transfers
+                if (state.transferStop[stop] != -1)
+                    stop = state.transferStop[stop];
+
+                previousPattern = state.previousPatterns[stop];
+            }
+
+            patterns.reverse();
+            boardStops.reverse();
+            alightStops.reverse();
+
+            this.patterns = patterns.toArray();
+            this.boardStops = boardStops.toArray();
+            this.alightStops = alightStops.toArray();
+        }
+
+        public int hashCode () {
+            return Arrays.hashCode(patterns) + 2 * Arrays.hashCode(boardStops) + 5 * Arrays.hashCode(alightStops);
+        }
+
+        public boolean equals (Object o) {
+            if (o instanceof Path) {
+                Path p = (Path) o;
+                return this == p || Arrays.equals(patterns, p.patterns) && Arrays.equals(boardStops, p.boardStops) && Arrays.equals(alightStops, p.alightStops);
+            }
+            else return false;
+        }
     }
 }

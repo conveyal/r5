@@ -14,12 +14,12 @@ import java.io.IOException;
 /**
  * Serialize localDates to YYYY-MM-DD
  */
-public class JodaLocalDateSerializer extends JsonSerializer<LocalDate> {
+public class JavaLocalDateSerializer extends JsonSerializer<LocalDate> {
     /** Create a module including the serializer and deserializer for local dates */
     public static SimpleModule makeModule () {
         Version moduleVersion = new Version(1, 0, 0, null, null, null);
         SimpleModule module = new SimpleModule("LocalDate", moduleVersion);
-        module.addSerializer(LocalDate.class, new JodaLocalDateSerializer());
+        module.addSerializer(LocalDate.class, new JavaLocalDateSerializer());
         module.addDeserializer(LocalDate.class, new JodaLocalDateDeserializer());
         return module;
     }

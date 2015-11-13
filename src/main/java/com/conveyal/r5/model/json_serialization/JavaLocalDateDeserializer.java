@@ -10,7 +10,7 @@ import java.time.format.DateTimeFormatter;
 import java.io.IOException;
 
 /** serializer/deserializer for LocalDates to ISO dates, YYYY-MM-DD */
-public class JodaLocalDateDeserializer extends JsonDeserializer<LocalDate> {
+public class JavaLocalDateDeserializer extends JsonDeserializer<LocalDate> {
 
     @Override public LocalDate deserialize(JsonParser jsonParser,
                                            DeserializationContext deserializationContext)

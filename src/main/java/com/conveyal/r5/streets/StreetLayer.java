@@ -5,6 +5,9 @@ import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
+import com.conveyal.r5.labeling.TraversalPermissionLabeler;
+import com.conveyal.r5.labeling.USTraversalPermissionLabeler;
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -58,6 +61,9 @@ public class StreetLayer implements Serializable {
     transient List<TIntList> outgoingEdges;
     transient List<TIntList> incomingEdges;
     public transient IntHashGrid spatialIndex = new IntHashGrid();
+
+    private transient TraversalPermissionLabeler permissions = new USTraversalPermissionLabeler(); // TODO don't hardwire to US
+    private transient LevelOfTrafficStressLabeler stressLabeler = new LevelOfTrafficStressLabeler();
 
     /** Envelope of this street layer, in decimal degrees (non-fixed-point) */
     public Envelope envelope = new Envelope();
@@ -191,7 +197,12 @@ public class StreetLayer implements Serializable {
         }
 
         // Create and store the forward and backward edge
-        EdgeStore.Edge newForwardEdge = edgeStore.addStreetPair(beginVertexIndex, endVertexIndex, edgeLengthMillimeters);
+        EnumSet<EdgeStore.EdgeFlag> forwardFlags = permissions.getPermissions(way, false);
+        EnumSet<EdgeStore.EdgeFlag> backFlags = permissions.getPermissions(way, true);
+
+        stressLabeler.label(way, forwardFlags, backFlags);
+
+        EdgeStore.Edge newForwardEdge = edgeStore.addStreetPair(beginVertexIndex, endVertexIndex, edgeLengthMillimeters, forwardFlags, backFlags);
         newForwardEdge.setGeometry(nodes);
         pointsPerEdgeHistogram.add(nNodes);
 
@@ -305,7 +316,12 @@ public class StreetLayer implements Serializable {
 
         // Make a second, new bidirectional edge pair after the split and add it to the spatial index.
         // New edges will be added to edge lists later (the edge list is a transient index).
-        EdgeStore.Edge newEdge = edgeStore.addStreetPair(newVertexIndex, oldToVertex, split.distance1_mm);
+        // I believe the edge we get passed is always a forward edge
+        EnumSet<EdgeStore.EdgeFlag> forwardFlags = edge.getFlags();
+        edge.advance();
+        EnumSet<EdgeStore.EdgeFlag> backFlags = edge.getFlags();
+
+        EdgeStore.Edge newEdge = edgeStore.addStreetPair(newVertexIndex, oldToVertex, split.distance1_mm, forwardFlags, backFlags);
         spatialIndex.insert(newEdge.getEnvelope(), newEdge.edgeIndex);
         // TODO newEdge.copyFlagsFrom(edge) to match the existing edge...
         return newVertexIndex;

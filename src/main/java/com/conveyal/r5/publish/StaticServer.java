@@ -2,6 +2,7 @@ package com.conveyal.r5.publish;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
+import com.conveyal.r5.transitive.TransitiveNetwork;
 import spark.Request;
 import spark.Response;
 
@@ -16,6 +17,7 @@ import static spark.Spark.*;
 public class StaticServer {
     private static byte[] metadata;
     private static byte[] stopTrees;
+    private static byte[] transitive;
     private static StaticSiteRequest staticSiteRequest;
     private static TransportNetwork network;
 
@@ -38,11 +40,17 @@ public class StaticServer {
         sm.writeStopTrees(sbaos);
         stopTrees = sbaos.toByteArray();
 
+        TransitiveNetwork tn = new TransitiveNetwork(network.transitLayer);
+        ByteArrayOutputStream tnbaos = new ByteArrayOutputStream();
+        JsonUtilities.objectMapper.writeValue(tnbaos, tn);
+        transitive = tnbaos.toByteArray();
+
         // add cors header
         before((req, res) -> res.header("Access-Control-Allow-Origin", "*"));
 
         get("/query.json", StaticServer::getQuery);
         get("/stop_trees.dat", StaticServer::getStopTrees);
+        get("/transitive.json", StaticServer::getTransitiveNetwork);
         get("/:x/:y", StaticServer::getOrigin);
     }
 
@@ -55,6 +63,11 @@ public class StaticServer {
     public static byte[] getStopTrees (Request req, Response res) {
         res.header("Content-Type", "application/octet-stream");
         return stopTrees;
+    }
+
+    public static byte[] getTransitiveNetwork (Request req, Response res) {
+        res.header("Content-Type", "application/json");
+        return transitive;
     }
 
     public static byte[] getOrigin (Request req, Response res) {

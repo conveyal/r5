@@ -11,6 +11,7 @@ import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.LineString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,6 +128,11 @@ public class PointToPointRouterServer {
 
             Float fromLon = request.queryMap("fromLon").floatValue();
             Float toLon = request.queryMap("toLon").floatValue();
+            Boolean simple = request.queryMap("simple").booleanValue();
+
+            if (simple == null) {
+                simple = false;
+            }
 
             //TODO errorchecks
 
@@ -162,24 +168,36 @@ public class PointToPointRouterServer {
                     }
                 }
 
+                //Only uses first and last point of geometry
+                if (simple) {
 
-                //Creates geometry currently only uses first and last point
-                List<Coordinate> coordinateList = new ArrayList<>();
-                for (Integer edgeIdx: edges) {
+                    //Creates geometry currently only uses first and last point
+                    List<Coordinate> coordinateList = new ArrayList<>();
+                    for (Integer edgeIdx : edges) {
 
-                    EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edgeIdx);
-                    VertexStore.Vertex fromVertex = transportNetwork.streetLayer.vertexStore.getCursor(edge.getFromVertex());
-                    coordinateList.add(new Coordinate(fromVertex.getLon(), fromVertex.getLat()));
+                        EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edgeIdx);
+                        VertexStore.Vertex fromVertex = transportNetwork.streetLayer.vertexStore.getCursor(edge.getFromVertex());
+                        coordinateList.add(new Coordinate(fromVertex.getLon(), fromVertex.getLat()));
 
+                    }
+                    //we only save end vertex from the last edge otherwise we have duplicated points since end vertex from each edge is start vertex from the next
+                    EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edges.getLast());
+                    VertexStore.Vertex toVertex = transportNetwork.streetLayer.vertexStore.getCursor(edge.getToVertex());
+                    coordinateList.add(new Coordinate(toVertex.getLon(), toVertex.getLat()));
+
+                    Coordinate[] coordinates = coordinateList.toArray(new Coordinate[coordinateList.size()]);
+                    //TODO: return this as geojson Feature since we can save some information inside properties
+                    content.put("data", GeometryUtils.geometryFactory.createLineString(coordinates));
+                } else {
+                    //TODO: this can be improved since end and start vertices are the same in all the edges.
+                    List<LineString> geometries = new ArrayList<>(edges.size());
+                    for (Integer edgeIdx: edges) {
+                        EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edgeIdx);
+                        geometries.add(edge.getGeometry());
+                    }
+
+                    content.put("data", GeometryUtils.geometryFactory.createMultiLineString(geometries.toArray(new LineString[geometries.size()])));
                 }
-                //we only save end vertex from the last edge otherwise we have duplicated points since end vertex from each edge is start vertex from the next
-                EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edges.getLast());
-                VertexStore.Vertex toVertex = transportNetwork.streetLayer.vertexStore.getCursor(edge.getToVertex());
-                coordinateList.add(new Coordinate(toVertex.getLon(), toVertex.getLat()));
-
-                Coordinate[] coordinates = coordinateList.toArray(new Coordinate[coordinateList.size()]);
-                //TODO: return this as geojson Feature since we can save some information inside properties
-                content.put("data", GeometryUtils.geometryFactory.createLineString(coordinates));
 
             } else {
                 content.put("errors", "Path to end coordinate wasn't found!");

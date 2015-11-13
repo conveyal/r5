@@ -11,13 +11,15 @@
             <option value="WALK">Walking</option>
             <option value="BICYCLE">Cycling</option>
         </select>
+		<label for="simple">Simple geometry</label>
+		<input type="checkbox" name="simple" id="simple" value="true" />
         <button type="submit" value="submit" disabled="true" id="planButton">plan</button>
         <div id="map" style="position: absolute; top: 40px; left: 0; width: 100%; height: 100%;"></div>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
         <script src="//cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
         <script src="./leaflet_context/leaflet.contextmenu.js"></script>
         <script>
-            var hostname = "http://localhost:8099";
+            var hostname = "http://localhost:8080";
             var my_map;
             var MARIBOR_COOR = [46.562483, 15.643975];
             var layer = null;
@@ -113,6 +115,7 @@
                     fromLon: m1.getLatLng().lng,
                     toLat: m2.getLatLng().lat,
                     toLon: m2.getLatLng().lng,
+                    simple: $("#simple").is(":checked"),
                     mode: $("#mode").val()
                 }
                 console.log(params);

@@ -6,6 +6,8 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.scenario.Modification;
 import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.sun.org.apache.xpath.internal.operations.Mod;
 import org.nustaq.serialization.FSTObjectInput;
 import org.nustaq.serialization.FSTObjectOutput;
@@ -37,6 +39,8 @@ public class TransportNetwork implements Serializable, Cloneable {
     public TransitLayer transitLayer;
 
     private WebMercatorGridPointSet gridPointSet;
+
+    static final String BUILDER_CONFIG_FILENAME = "build-config.json";
 
     public void write (OutputStream stream) throws IOException {
         LOG.info("Writing transport network...");
@@ -82,8 +86,8 @@ public class TransportNetwork implements Serializable, Cloneable {
     }
 
     /** Legacy method to load from a single GTFS file */
-    public static TransportNetwork fromFiles (String osmSourceFile, String gtfsSourceFile) {
-        return fromFiles(osmSourceFile, Arrays.asList(gtfsSourceFile));
+    public static TransportNetwork fromFiles (String osmSourceFile, String gtfsSourceFile, TNBuilderConfig tnBuilderConfig) {
+        return fromFiles(osmSourceFile, Arrays.asList(gtfsSourceFile), tnBuilderConfig);
     }
 
     /**
@@ -95,15 +99,17 @@ public class TransportNetwork implements Serializable, Cloneable {
      * distinction should be maintained for various reasons. However, we use the GTFS IDs only for reference, so it doesn't
      * really matter, particularly for analytics.
      */
-    public static TransportNetwork fromFiles (String osmSourceFile, List<String> gtfsSourceFiles) {
+    public static TransportNetwork fromFiles (String osmSourceFile, List<String> gtfsSourceFiles, TNBuilderConfig tnBuilderConfig) {
 
+        System.out.println("Summarizing builder config: " + BUILDER_CONFIG_FILENAME);
+        System.out.println(tnBuilderConfig);
         // Load OSM data into MapDB
         OSM osm = new OSM(null);
         osm.intersectionDetection = true;
         osm.readFromFile(osmSourceFile);
 
         // Make street layer from OSM data in MapDB
-        StreetLayer streetLayer = new StreetLayer();
+        StreetLayer streetLayer = new StreetLayer(tnBuilderConfig);
         streetLayer.loadFromOsm(osm);
         osm.close();
 
@@ -132,6 +138,9 @@ public class TransportNetwork implements Serializable, Cloneable {
     public static TransportNetwork fromDirectory (File directory) {
         File osmFile = null;
         List<String> gtfsFiles = new ArrayList<>();
+        TNBuilderConfig builderConfig = null;
+        //This can exit program if json file has errors.
+        builderConfig = loadJson(new File(directory, BUILDER_CONFIG_FILENAME));
         for (File file : directory.listFiles()) {
             switch (InputFileType.forFile(file)) {
                 case GTFS:
@@ -153,7 +162,31 @@ public class TransportNetwork implements Serializable, Cloneable {
                     LOG.warn("Skipping non-input file '{}'", file);
             }
         }
-        return fromFiles(osmFile.getAbsolutePath(), gtfsFiles);
+        return fromFiles(osmFile.getAbsolutePath(), gtfsFiles, builderConfig);
+    }
+
+    /**
+     * Open and parse the JSON file at the given path into a Jackson JSON tree. Comments and unquoted keys are allowed.
+     * Returns default config if the file does not exist,
+     * Returns null if the file contains syntax errors or cannot be parsed for some other reason.
+     * <p>
+     * We do not require any JSON config files to be present because that would get in the way of the simplest
+     * rapid deployment workflow. Therefore we return default config if file does not exist.
+     */
+    static TNBuilderConfig loadJson(File file) {
+        try (FileInputStream jsonStream = new FileInputStream(file)) {
+            TNBuilderConfig config = JsonUtilities.objectMapper
+                .readValue(jsonStream, TNBuilderConfig.class);
+            LOG.info("Found and loaded JSON configuration file '{}'", file);
+            return config;
+        } catch (FileNotFoundException ex) {
+            LOG.info("File '{}' is not present. Using default configuration.", file);
+            return TNBuilderConfig.defaultConfig();
+        } catch (Exception ex) {
+            LOG.error("Error while parsing JSON config file '{}': {}", file, ex.getMessage());
+            System.exit(42); // probably "should" be done with an exception
+            return null;
+        }
     }
 
     /**

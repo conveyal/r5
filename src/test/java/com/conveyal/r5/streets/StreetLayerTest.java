@@ -1,6 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.osmlib.OSM;
+import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import junit.framework.TestCase;
 import org.junit.Test;
 
@@ -13,7 +14,7 @@ public class StreetLayerTest extends TestCase {
         osm.intersectionDetection = true;
         osm.readFromUrl(StreetLayerTest.class.getResource("subgraph.vex").toString());
 
-        StreetLayer sl = new StreetLayer();
+        StreetLayer sl = new StreetLayer(TNBuilderConfig.defaultConfig());
         // load from OSM and don't remove floating subgraphs
         sl.loadFromOsm(osm, false, true);
 

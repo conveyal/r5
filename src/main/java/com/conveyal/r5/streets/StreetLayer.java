@@ -8,6 +8,7 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
 import com.conveyal.r5.labeling.TraversalPermissionLabeler;
 import com.conveyal.r5.labeling.USTraversalPermissionLabeler;
+import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -84,6 +85,10 @@ public class StreetLayer implements Serializable {
     transient Histogram pointsPerEdgeHistogram = new Histogram("Number of geometry points per edge");
 
     public TransitLayer linkedTransitLayer = null;
+
+    public StreetLayer(TNBuilderConfig tnBuilderConfig) {
+
+    }
 
     /** Load street layer from an OSM-lib OSM DB */
     public void loadFromOsm(OSM osm) {

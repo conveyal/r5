@@ -1,5 +1,6 @@
 package com.conveyal.r5.transit;
 
+import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -43,7 +44,14 @@ public class TransportNetworkVisualizer {
         }
         else if (args.length == 2) {
             LOG.info("Building transport network");
-            network = TransportNetwork.fromFiles(args[0], args[1]);
+            File directory = new File(args[0]).getParentFile();
+            TNBuilderConfig builderConfig;
+            if (directory.isDirectory()) {
+                builderConfig = TransportNetwork.loadJson(new File(directory, TransportNetwork.BUILDER_CONFIG_FILENAME));
+            } else {
+                builderConfig = TNBuilderConfig.defaultConfig();
+            }
+            network = TransportNetwork.fromFiles(args[0], args[1], builderConfig);
             LOG.info("Done building transport network");
         }
         else {

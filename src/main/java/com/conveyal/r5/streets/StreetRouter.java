@@ -12,8 +12,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.util.Arrays;
-import java.util.EnumSet;
 import java.util.PriorityQueue;
 
 /**
@@ -187,6 +185,40 @@ public class StreetRouter {
             return Integer.MAX_VALUE; // Unreachable
         }
         return state.weight; // TODO true walk speed
+    }
+
+    /**
+     * Returns state with smaller weight to vertex0 or vertex1
+     *
+     * If state to only one vertex exists return that vertex.
+     * If state to none of the vertices exists returns null
+     * @param split
+     * @return
+     */
+    public State getState(Split split) {
+        State weight0 = bestStates.get(split.vertex0);
+        State weight1 = bestStates.get(split.vertex1);
+        if (weight0 == null) {
+            if (weight1 == null) {
+                //Both vertices aren't found
+                return null;
+            } else {
+                //vertex1 found vertex 0 not
+                return weight1;
+            }
+        } else {
+            //vertex 0 found vertex 1 not
+            if (weight1 == null) {
+                return weight0;
+            } else {
+                //both found
+                if (weight0.weight < weight1.weight) {
+                    return  weight0;
+                } else {
+                    return weight1;
+                }
+            }
+        }
     }
 
     public static class State implements Cloneable {

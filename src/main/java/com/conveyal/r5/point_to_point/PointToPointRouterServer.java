@@ -25,6 +25,8 @@ public class PointToPointRouterServer {
 
     public static final String BUILDER_CONFIG_FILENAME = "build-config.json";
 
+    private static final String USAGE = "It expects --build [path to directory with GTFS and PBF files] to build the graphs\nor --graphs [path to directory with graph] to start the server with provided graph";
+
     public static void main(String[] commandArguments) {
 
         LOG.info("Arguments: {}", Arrays.toString(commandArguments));
@@ -41,8 +43,14 @@ public class PointToPointRouterServer {
             TNBuilderConfig builderConfig = loadJson(new File(dir, BUILDER_CONFIG_FILENAME));
             System.out.println("Summarizing builder config: " + BUILDER_CONFIG_FILENAME);
             System.out.println(builderConfig);
+        } else if ("--help".equals(commandArguments[0])
+                || "-h".equals(commandArguments[0])
+                || "--usage".equals(commandArguments[0])
+                || "-u".equals(commandArguments[0])) {
+            System.out.println(USAGE);
         } else {
             LOG.info("Unknown argument: {}", commandArguments[0]);
+            System.out.println(USAGE);
         }
 
     }

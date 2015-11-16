@@ -1,5 +1,6 @@
 package com.conveyal.r5.point_to_point;
 
+import com.conveyal.r5.common.GeoJsonFeature;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.RouterInfo;
@@ -11,7 +12,9 @@ import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.LineString;
+import gnu.trove.set.TIntSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,6 +23,7 @@ import java.util.*;
 
 import java.io.File;
 
+import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
 import static spark.Spark.*;
 
 /**
@@ -204,6 +208,57 @@ public class PointToPointRouterServer {
             }
 
             return JsonUtilities.objectMapper.writeValueAsString(content);
+        });
+
+        get("debug/:layer", (request, response) -> {
+            response.header("Content-Type", "application/json");
+            float north = request.queryMap("n").floatValue();
+            float south = request.queryMap("s").floatValue();
+            float east = request.queryMap("e").floatValue();
+            float west = request.queryMap("w").floatValue();
+            boolean detail = request.queryMap("detail").booleanValue();
+
+            String layer = request.params(":layer");
+
+            Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
+                floatingDegreesToFixed(south), floatingDegreesToFixed(north));
+            TIntSet streets = transportNetwork.streetLayer.spatialIndex.query(env);
+
+            if (streets.size() > 10_000) {
+                LOG.warn("Refusing to include more than 10000 edges in result");
+                response.status(401);
+                return "";
+            }
+
+            // write geojson to response
+            Map<String, Object> featureCollection = new HashMap<>(2);
+            featureCollection.put("type", "FeatureCollection");
+            List<GeoJsonFeature> features = new ArrayList<>(streets.size());
+
+            EdgeStore.Edge cursor = transportNetwork.streetLayer.edgeStore.getCursor();
+            VertexStore.Vertex vcursor = transportNetwork.streetLayer.vertexStore.getCursor();
+
+            if ("streetEdges".equals(layer)) {
+                streets.forEach(s -> {
+                    try {
+                        cursor.seek(s);
+
+                        GeoJsonFeature feature = new GeoJsonFeature(cursor.getGeometry());
+                        feature.addProperty("permission", cursor.getPermissionsAsString());
+                        feature.addProperty("edge_id", cursor.getEdgeIndex());
+                        features.add(feature);
+                        return true;
+                    } catch (Exception e) {
+                        response.status(500);
+                        return false;
+                        //throw new RuntimeException(e);
+                    }
+                });
+            }
+
+            featureCollection.put("features", features);
+
+            return JsonUtilities.objectMapper.writeValueAsString(featureCollection);
         });
 
     }

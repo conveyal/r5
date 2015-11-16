@@ -212,6 +212,10 @@ public class PointToPointRouterServer {
 
         get("debug/:layer", (request, response) -> {
             response.header("Content-Type", "application/json");
+            if (request.queryParams().size() < 4) {
+                response.status(400);
+                return "";
+            }
             float north = request.queryMap("n").floatValue();
             float south = request.queryMap("s").floatValue();
             float east = request.queryMap("e").floatValue();

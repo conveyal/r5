@@ -203,8 +203,11 @@ map.on('style.load', function() {
 	});
 });
 
-
 map.on('moveend', function() {
+	//on zooms lower then 13 we are visiting too many spatial index cells on a server and don't get an answer
+	if (map.getZoom() < 13) {
+		return;
+	}
 	var bbox = map.getBounds();
 	var params = {
 		n : bbox.getNorth(),
@@ -213,7 +216,7 @@ map.on('moveend', function() {
 		w : bbox.getWest(),
 		detail: true //adds name, OSMID and speed as properties
 	};
-	console.log(bbox);
+	//console.log(bbox);
 	var full_url = request_url + "?" + EncodeQueryData(params);
 	console.log(full_url);
 	source.setData(full_url);

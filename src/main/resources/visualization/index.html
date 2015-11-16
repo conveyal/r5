@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8' />
+    <title></title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+    <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.11.2/mapbox-gl.js'></script>
+    <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.11.2/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        body { margin:0; padding:0; }
+        #map { position:absolute; top:0; bottom:0; width:100%; }
+    </style>
+</head>
+<body>
+
+<div id='map'></div>
+<script>
+var otp_config = {
+	hostname: "http://localhost:9007",
+	restService: "api",
+	routerId: "default"
+};
+//Those are layers and name of properties in a layer if detail=true
+var layers = {
+	streetEdges:["edge_id", "permission"],
+	permEdges:["name", "edge_id", "label"]
+};
+var current_layer = "streetEdges";
+var url = otp_config.hostname + '/' + otp_config.restService;
+
+
+// Usage:
+//   var data = { 'first name': 'George', 'last name': 'Jetson', 'age': 110 };
+//   var querystring = EncodeQueryData(data);
+// 
+function EncodeQueryData(data)
+{
+   var ret = [];
+   for (var d in data)
+      ret.push(encodeURIComponent(d) + "=" + encodeURIComponent(data[d]));
+   return ret.join("&");
+}
+
+mapboxgl.accessToken = ''; //NOT needed
+var tileset = 'conveyal.hml987j0';
+var map = new mapboxgl.Map({
+    container: 'map', // container id
+    style: {
+        "version": 8,
+        "sources": {
+            "simple-tiles": {
+                "type": "raster",
+				"tiles": [ "http://a.tiles.mapbox.com/v3/conveyal.hml987j0/{z}/{x}/{y}.png",
+					"http://b.tiles.mapbox.com/v3/conveyal.hml987j0/{z}/{x}/{y}.png"
+					],
+            	"maxzoom": 18,
+                "tileSize": 256
+            }
+        },
+        "layers": [{
+            "id": "simple-tiles",
+            "type": "raster",
+            "source": "simple-tiles",
+            "minzoom": 0,
+            "maxzoom": 18
+        }]
+    },
+    center: [15.65, 46.55],
+    zoom: 14
+});
+
+
+var request_url = url+'/' + current_layer;
+var source = new mapboxgl.GeoJSONSource({
+	data: request_url
+})
+
+map.on('style.load', function() {
+	map.addSource('perm', source);
+	/*
+	map.addLayer({
+    "id": "road_major_label",
+    "type": "symbol",
+    "source": "perm",
+    "layout": {
+      "symbol-placement": "line",
+	  "text-field": "@permission",
+      "text-font": "Open Sans Semibold, Arial Unicode MS Bold",
+      "text-transform": "uppercase",
+      "text-letter-spacing": 0.1,
+      "text-max-size": 14
+    },
+    "paint": {
+      "text-color": "#666",
+      "text-halo-color": "rgba(255,255,255,0.75)",
+      "text-halo-width": 2,
+      "text-size": {
+        "base": 1.4,
+        "stops": [[10, 8], [20, 14]]
+      }
+    }
+	});
+	*/
+	map.addLayer({
+		"id": "perm-none",
+		"type": "line",
+		"source": "perm",
+		"paint": {
+			"line-color":"#333333",
+			"line-width":2
+		},
+		"interactive": true,
+		"filter":["==", "permission", "none"]
+	});
+	map.addLayer({
+		"id": "perm-walk",
+		"type": "line",
+		"source": "perm",
+		"paint": {
+			"line-color":"#33b333",
+			"line-width":2
+		},
+		"interactive": true,
+		"filter":["==", "permission", "walk"]
+	});
+	map.addLayer({
+		"id": "perm-bike",
+		"type": "line",
+		"source": "perm",
+		"paint": {
+			"line-color":"#3333b3",
+			"line-width":2
+		},
+		"interactive": true,
+		"filter":["==", "permission", "bike"]
+	});
+	map.addLayer({
+		"id": "perm-walk_bike",
+		"type": "line",
+		"source": "perm",
+		"paint": {
+			"line-color":"#33b3b3",
+			"line-width":2
+		},
+		"interactive": true,
+		"filter":["==", "permission", "walk,bike"]
+	});
+	map.addLayer({
+		"id": "perm-car",
+		"type": "line",
+		"source": "perm",
+		"paint": {
+			"line-color":"#b33333",
+			"line-width":2
+		},
+		"interactive": true,
+		"filter":["==", "permission", "car"]
+	});
+	map.addLayer({
+		"id": "perm-walk_car",
+		"type": "line",
+		"source": "perm",
+		"paint": {
+			"line-color":"#b3b333",
+			"line-width":2
+		},
+		"interactive": true,
+		"filter":["==", "permission", "walk,car"]
+	});
+	map.addLayer({
+		"id": "perm-bike_car",
+		"type": "line",
+		"source": "perm",
+		"paint": {
+			"line-color":"#b333b3",
+			"line-width":2
+		},
+		"interactive": true,
+		"filter":["==", "permission", "bike,car"]
+	});
+	map.addLayer({
+		"id": "perm-walk_bike_car",
+		"type": "line",
+		"source": "perm",
+		"paint": {
+			"line-color":"#b3b3b3",
+			"line-width":2
+		},
+		"interactive": true,
+		"filter":["==", "permission", "walk,bike,car"]
+	});
+
+	map.addLayer({
+		"id": "perm-hover",
+		"type": "line",
+		"source": "perm",
+		"paint": {
+			"line-color":"red",
+			"line-width":2
+		},
+		"filter": ["==", "edge_id", -1]
+	});
+});
+
+
+map.on('moveend', function() {
+	var bbox = map.getBounds();
+	var params = {
+		n : bbox.getNorth(),
+		s : bbox.getSouth(),
+		e : bbox.getEast(),
+		w : bbox.getWest(),
+		detail: true //adds name, OSMID and speed as properties
+	};
+	console.log(bbox);
+	var full_url = request_url + "?" + EncodeQueryData(params);
+	console.log(full_url);
+	source.setData(full_url);
+});
+
+function fillPopup(feature, layer) {
+	if (feature.properties) {
+		var prop = feature.properties;
+		var pop = "<p>";
+		var layer_info = layers[current_layer];
+		for (var i=0; i < layer_info.length; i++) {
+			pop += layer_info[i].toUpperCase();
+			pop +=": ";
+			pop += prop[layer_info[i]];
+			pop +="<br />";
+		}
+		pop +="</p>";
+		return pop;
+	}
+	return null;
+}
+
+map.on('click', function(e) {
+	// query the map for the under the mouse
+   	map.featuresAt(e.point, { radius: 5, includeGeometry: true }, function (err, features) {
+    if (err) throw err;
+    //console.log(e.point, features);
+    var ids = features.map(function (feat) { return feat.properties.edge_id });
+	if (ids.length == 1) {
+		var pop_html = fillPopup(features[0], current_layer);
+		if (pop_html != null) {
+			var tooltip = new mapboxgl.Popup()
+			.setLngLat(e.lngLat)
+			.setHTML(pop_html)
+			.addTo(map);
+		}
+	}
+
+
+    // set the filter on the hover style layer to only select the features
+    // currently under the mouse
+    map.setFilter('perm-hover', [ 'all',
+      [ 'in', 'edge_id' ].concat(ids)
+    ]);
+  });
+});
+
+//disables map rotation
+map.dragRotate.disable();
+</script>
+
+</body>
+</html>

@@ -461,6 +461,32 @@ public class EdgeStore implements Serializable {
         public EnumSet<EdgeFlag> getFlags() {
             return flags.get(edgeIndex);
         }
+
+        /**
+         * Creates text label from permissions
+         *
+         * It looks like walk,bike,car or none.
+         * If any mode of transport is not allowed it is missing in return value.
+         * @return
+         */
+        public String getPermissionsAsString() {
+            StringJoiner sb = new StringJoiner(",");
+            sb.setEmptyValue("none");
+            if (getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) {
+                sb.add("walk");
+            }
+            if (getFlag(EdgeFlag.ALLOWS_BIKE)) {
+                sb.add("bike");
+            }
+            if (getFlag(EdgeFlag.ALLOWS_CAR)) {
+                sb.add("car");
+            }
+            return sb.toString();
+        }
+
+        public int getEdgeIndex() {
+            return edgeIndex;
+        }
     }
 
     public Edge getCursor() {

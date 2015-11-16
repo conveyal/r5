@@ -1,9 +1,8 @@
 package com.conveyal.r5.transit;
 
+import com.conveyal.r5.common.GeoJsonFeature;
+import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.set.TIntSet;
 import org.glassfish.grizzly.http.server.*;
@@ -15,6 +14,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.BindException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
 
@@ -69,7 +72,7 @@ public class TransportNetworkVisualizer {
         HttpServer server = new HttpServer();
         server.addListener(new NetworkListener("transport_network_visualizer", INTERFACE, PORT));
         server.getServerConfiguration().addHttpHandler(new TransportNetworkHandler(network), "/api/*");
-        server.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(ClassLoader.getSystemClassLoader(), "/com.conveyal.r5/transit/TransitNetworkVisualizer/"));
+        server.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(ClassLoader.getSystemClassLoader(), "/visualization/"));
         try {
             server.start();
             LOG.info("VEX server running.");
@@ -115,16 +118,10 @@ public class TransportNetworkVisualizer {
                     }
 
                     // write geojson to response
-                    ObjectMapper mapper = new ObjectMapper();
-                    JsonFactory factory = mapper.getFactory();
-                    OutputStream os = new ByteArrayOutputStream();
-                    JsonGenerator gen = factory.createGenerator(os);
+                    Map<String, Object> featureCollection = new HashMap<>(2);
+                    featureCollection.put("type", "FeatureCollection");
+                    List<GeoJsonFeature> features = new ArrayList<>(streets.size());
 
-                    // geojson header
-                    gen.writeStartObject();
-                    gen.writeStringField("type", "FeatureCollection");
-
-                    gen.writeArrayFieldStart("features");
 
                     EdgeStore.Edge cursor = network.streetLayer.edgeStore.getCursor();
                     VertexStore.Vertex vcursor = network.streetLayer.vertexStore.getCursor();
@@ -133,47 +130,18 @@ public class TransportNetworkVisualizer {
                         try {
                             cursor.seek(s);
 
-                            gen.writeStartObject();
-
-                            gen.writeObjectFieldStart("properties");
-                            gen.writeEndObject();
-
-                            gen.writeStringField("type", "Feature");
-
-                            gen.writeObjectFieldStart("geometry");
-                            gen.writeStringField("type", "LineString");
-                            gen.writeArrayFieldStart("coordinates");
-
-                            gen.writeStartArray();
-                            vcursor.seek(cursor.getFromVertex());
-                            gen.writeNumber(vcursor.getLon());
-                            gen.writeNumber(vcursor.getLat());
-                            gen.writeEndArray();
-
-                            gen.writeStartArray();
-                            vcursor.seek(cursor.getToVertex());
-                            gen.writeNumber(vcursor.getLon());
-                            gen.writeNumber(vcursor.getLat());
-                            gen.writeEndArray();
-
-                            gen.writeEndArray();
-
-                            gen.writeEndObject();
-                            gen.writeEndObject();
+                            GeoJsonFeature feature = new GeoJsonFeature(cursor.getGeometry());
+                            feature.addProperty("permission", cursor.getPermissionsAsString());
+                            feature.addProperty("edge_id", cursor.getEdgeIndex());
+                            features.add(feature);
                             return true;
                         } catch (Exception e) {
                             throw new RuntimeException(e);
                         }
                     });
 
-                    gen.writeEndArray();
-                    gen.writeEndObject();
-
-                    gen.flush();
-                    gen.close();
-                    os.close();
-
-                    String json = os.toString();
+                    featureCollection.put("features", features);
+                    String json = JsonUtilities.objectMapper.writeValueAsString(featureCollection);
 
                     res.setStatus(HttpStatus.OK_200);
                     res.setContentType("application/json");

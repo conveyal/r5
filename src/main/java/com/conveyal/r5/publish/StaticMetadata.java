@@ -79,8 +79,11 @@ public class StaticMetadata implements Runnable {
         // invert the stop trees
         TIntList[] stopTrees = new TIntList[lps.pointSet.featureCount()];
 
-        int stop = 0;
+        // first increment will land at 0
+        int stop = -1;
         for (int[] tree : lps.stopTrees) {
+            // make sure stop always gets incremented
+            stop++;
             if (tree == null)
                 continue;
 
@@ -93,8 +96,6 @@ public class StaticMetadata implements Runnable {
                 // tree[i + 1] is distance
                 stopTrees[tree[i]].add(new int[] { stop, tree[i + 1] });
             }
-
-            stop++;
         }
 
         // write the trees

@@ -379,11 +379,8 @@ public class AnalystWorker implements Runnable {
             LOG.info("Applying scenario...");
             // Get the supplied scenario or create an empty one if no scenario was supplied.
             Scenario scenario = clusterRequest.profileRequest.scenario;
-            if (scenario == null) {
-                scenario = new Scenario(-1);
-            }
-            // Add a filter to remove trips that are not running during the search time window.
-            scenario.modifications.add(0, new InactiveTripsFilter());
+            // Add a pre-filter that removes trips that are not running during the search time window.
+            // scenario.modifications.add(0, new InactiveTripsFilter(transportNetwork, clusterRequest.profileRequest));
             // Apply the scenario modifications to the network before use, performing protective copies where necessary.
             TransportNetwork modifiedNetwork = scenario.applyToTransportNetwork(transportNetwork);
             LOG.info("Done aplying scenario.");

@@ -91,8 +91,8 @@ public class EdgeStore implements Serializable {
 
             prevEdge = edge;
             // flags and speeds have separate entries for forward and backwards edges
+            flags.remove(edge * 2 + 1); // remove the back edge first, before we shift the array around
             flags.remove(edge * 2);
-            flags.remove(edge * 2 + 1);
             // note using 2 int version because it is an offset not a value that we want to remove
             speeds.remove(edge * 2, 2);
 

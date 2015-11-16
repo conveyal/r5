@@ -45,6 +45,11 @@ public class StaticServer {
         JsonUtilities.objectMapper.writeValue(tnbaos, tn);
         transitive = tnbaos.toByteArray();
 
+        // optionally allow specifying port
+        if (args.length == 3) {
+            port(Integer.parseInt(args[2]));
+        }
+
         // add cors header
         before((req, res) -> res.header("Access-Control-Allow-Origin", "*"));
 

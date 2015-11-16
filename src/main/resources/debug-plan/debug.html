@@ -4,8 +4,9 @@
     <meta charset='utf-8' />
     <title></title>
     <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
-    <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.11.2/mapbox-gl.js'></script>
-    <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.11.2/mapbox-gl.css' rel='stylesheet' />
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+    <script src='//api.tiles.mapbox.com/mapbox-gl-js/v0.11.2/mapbox-gl.js'></script>
+    <link href='//api.tiles.mapbox.com/mapbox-gl-js/v0.11.2/mapbox-gl.css' rel='stylesheet' />
     <style>
         body { margin:0; padding:0; }
         #map { position:absolute; top:0; bottom:0; width:100%; }
@@ -262,6 +263,17 @@ map.on('click', function(e) {
 
 //disables map rotation
 map.dragRotate.disable();
+
+//Sets map based on graph data from server
+$.ajax(otp_config.hostname+"/metadata", {
+	dataType: 'JSON',
+	success: function(data) {
+		window.map.fitBounds([
+			[data.envelope.minX, data.envelope.minY],
+			[data.envelope.maxX, data.envelope.maxY]
+		]);
+	}
+});
 </script>
 
 </body>

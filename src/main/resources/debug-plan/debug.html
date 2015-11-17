@@ -285,6 +285,7 @@ function getStyle(type) {
 		return;
 	}
 	style = clone(mapbox_style);
+	style.sources["perm"].data = full_url;
 	if (type == "permissions") {
 		$.each(permission_colors, function(name, color) {
 			var nice_name = name.replace(',', '_');
@@ -352,6 +353,8 @@ function EncodeQueryData(data)
    return ret.join("&");
 }
 
+var full_url = request_url;
+
 var mapbox_style = {
         "version": 8,
         "sources": {
@@ -365,7 +368,7 @@ var mapbox_style = {
             },
 			"perm": {
 				"type": "geojson",
-				"data": request_url
+				"data": full_url
 			}
         },
         "layers": [{
@@ -407,7 +410,7 @@ map.on('moveend', function() {
 		detail: true //adds name, OSMID and speed as properties
 	};
 	//console.log(bbox);
-	var full_url = request_url + "?" + EncodeQueryData(params);
+	full_url = request_url + "?" + EncodeQueryData(params);
 	console.log(full_url);
 	var source = map.getSource("perm");
 	source.setData(full_url);

@@ -252,6 +252,12 @@ public class PointToPointRouterServer {
                         feature.addProperty("edge_id", cursor.getEdgeIndex());
                         feature.addProperty("speed_ms", roundSpeed(cursor.getSpeedMs()));
                         feature.addProperty("speed", roundSpeed(cursor.getSpeedkmh()));
+                        //Needed for filtering flags
+                        for (EdgeStore.EdgeFlag flag: EdgeStore.EdgeFlag.values()) {
+                            if (cursor.getFlag(flag)) {
+                                feature.addProperty(flag.toString(), true);
+                            }
+                        }
                         feature.addProperty("flags", cursor.getFlagsAsString());
                         features.add(feature);
                         return true;

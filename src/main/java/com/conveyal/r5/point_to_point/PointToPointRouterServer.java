@@ -210,7 +210,7 @@ public class PointToPointRouterServer {
             return JsonUtilities.objectMapper.writeValueAsString(content);
         });
 
-        get("debug/:layer", (request, response) -> {
+        get("debug/streetEdges", (request, response) -> {
             response.header("Content-Type", "application/json");
             if (request.queryParams().size() < 4) {
                 response.status(400);
@@ -222,7 +222,7 @@ public class PointToPointRouterServer {
             float west = request.queryMap("w").floatValue();
             boolean detail = request.queryMap("detail").booleanValue();
 
-            String layer = request.params(":layer");
+            String layer = "streetEdges"; // request.params(":layer");
 
             Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
                 floatingDegreesToFixed(south), floatingDegreesToFixed(north));
@@ -272,6 +272,77 @@ public class PointToPointRouterServer {
             featureCollection.put("features", features);
 
             return JsonUtilities.objectMapper.writeValueAsString(featureCollection);
+        });
+
+        //Returns flags usage in requested area
+        get("debug/stats", (request, response) -> {
+            response.header("Content-Type", "application/json");
+            Map<String, Object> content = new HashMap<>(2);
+            EnumMap<EdgeStore.EdgeFlag, Integer> flagUsage = new EnumMap<>(
+                EdgeStore.EdgeFlag.class);
+            if (request.queryParams().size() < 4) {
+
+                EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor();
+                for (int e = 0; e < transportNetwork.streetLayer.edgeStore.getnEdges(); e += 2) {
+                    edge.seek(e);
+
+                    try {
+
+                        for (EdgeStore.EdgeFlag flag : EdgeStore.EdgeFlag.values()) {
+                            if (edge.getFlag(flag)) {
+                                Integer currentValue = flagUsage.getOrDefault(flag, 0);
+                                flagUsage.put(flag, currentValue + 1);
+                            }
+                        }
+                    } catch (Exception ex) {
+                        response.status(500);
+                        content.put("errors", "Problem reading edges:" + ex.getMessage());
+                        LOG.error("Exception:", e);
+                        return JsonUtilities.objectMapper.writeValueAsString(content);
+                    }
+                }
+                content.put("data", flagUsage);
+                return JsonUtilities.objectMapper.writeValueAsString(content);
+            }
+            float north = request.queryMap("n").floatValue();
+            float south = request.queryMap("s").floatValue();
+            float east = request.queryMap("e").floatValue();
+            float west = request.queryMap("w").floatValue();
+            boolean detail = request.queryMap("detail").booleanValue();
+
+            Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
+                floatingDegreesToFixed(south), floatingDegreesToFixed(north));
+            TIntSet streets = transportNetwork.streetLayer.spatialIndex.query(env);
+            //transportNetwork.streetLayer.edgeStore.getCursor()
+
+            if (streets.size() > 10_000) {
+                LOG.warn("Refusing to include more than 10000 edges in result");
+                response.status(401);
+                content.put("errors", "Refusing to include more than 10000 edges in result");
+                return JsonUtilities.objectMapper.writeValueAsString(content);
+            }
+
+            EdgeStore.Edge cursor = transportNetwork.streetLayer.edgeStore.getCursor();
+            VertexStore.Vertex vcursor = transportNetwork.streetLayer.vertexStore.getCursor();
+            streets.forEach(s -> {
+                try {
+                    cursor.seek(s);
+                    for (EdgeStore.EdgeFlag flag : EdgeStore.EdgeFlag.values()) {
+                        if (cursor.getFlag(flag)) {
+                            Integer currentValue = flagUsage.getOrDefault(flag, 0);
+                            flagUsage.put(flag, currentValue + 1);
+                        }
+                    }
+                    return true;
+                } catch (Exception e) {
+                    response.status(500);
+                    content.put("errors", "Problem reading edges:" + e.getMessage());
+                    LOG.error("Exception:", e);
+                    return false;
+                }
+            });
+            content.put("data", flagUsage);
+            return JsonUtilities.objectMapper.writeValueAsString(content);
         });
 
     }

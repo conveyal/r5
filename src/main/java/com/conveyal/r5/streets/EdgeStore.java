@@ -527,5 +527,7 @@ public class EdgeStore implements Serializable {
         }
     }
 
-
+    public int getnEdges() {
+        return nEdges;
+    }
 }

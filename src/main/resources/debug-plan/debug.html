@@ -44,7 +44,7 @@
 		this.color_slope_override = "#f5627b";
 		this.show_transit_link = false;
 		this.color_transit_link = "#8448d3";
-		this.show_allows_pedestrian = false;
+		this.show_allows_pedestrian = true;
 		this.color_allows_pedestrian = "#affe1b";
 		this.show_allows_bike = false;
 		this.color_allows_bike = "#5b82fd";
@@ -280,10 +280,6 @@ function colorChange(name, color) {
 function getStyle(type) {
 	console.info(type);
 	console.log(text);
-	if (current_type == type) {
-		console.log("skipping switching type. Type is the same as prev");
-		return;
-	}
 	style = clone(mapbox_style);
 	style.sources["perm"].data = full_url;
 	if (type == "permissions") {
@@ -470,6 +466,10 @@ $.ajax(otp_config.hostname+"/metadata", {
 			[data.envelope.maxX, data.envelope.maxY]
 		]);
 	}
+});
+
+$(function() {
+	getStyle(current_type);
 });
 </script>
 

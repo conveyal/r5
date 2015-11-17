@@ -267,6 +267,10 @@ public class EdgeStore implements Serializable {
             return speeds.get(edgeIndex);
         }
 
+        public float getSpeedMs() {
+            return (float) ((speeds.get(edgeIndex) / VertexStore.FIXED_FACTOR));
+        }
+
         public float getSpeedkmh() {
             return (float) ((speeds.get(edgeIndex) / VertexStore.FIXED_FACTOR) * 3.6);
         }
@@ -460,6 +464,10 @@ public class EdgeStore implements Serializable {
 
         public EnumSet<EdgeFlag> getFlags() {
             return flags.get(edgeIndex);
+        }
+
+        public String getFlagsAsString() {
+            return getFlags().toString();
         }
 
         /**

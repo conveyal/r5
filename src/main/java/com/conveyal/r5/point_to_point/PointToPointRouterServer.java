@@ -250,12 +250,15 @@ public class PointToPointRouterServer {
                         GeoJsonFeature feature = new GeoJsonFeature(cursor.getGeometry());
                         feature.addProperty("permission", cursor.getPermissionsAsString());
                         feature.addProperty("edge_id", cursor.getEdgeIndex());
+                        feature.addProperty("speed_ms", roundSpeed(cursor.getSpeedMs()));
+                        feature.addProperty("speed", roundSpeed(cursor.getSpeedkmh()));
+                        feature.addProperty("flags", cursor.getFlagsAsString());
                         features.add(feature);
                         return true;
                     } catch (Exception e) {
                         response.status(500);
+                        LOG.error("Exception:", e);
                         return false;
-                        //throw new RuntimeException(e);
                     }
                 });
             }
@@ -265,6 +268,10 @@ public class PointToPointRouterServer {
             return JsonUtilities.objectMapper.writeValueAsString(featureCollection);
         });
 
+    }
+
+    private static float roundSpeed(float speed) {
+        return Math.round(speed * 1000) / 1000;
     }
 
 }

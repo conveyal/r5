@@ -4,6 +4,7 @@ function makeGUI() {
     "use strict";
     var gui = new dat.GUI();
     gui.add(text, 'debug_type', ['permissions', 'flags', 'speeds']).onFinishChange(getStyle);
+    gui.add(text, 'both').name("Show bidirectional")
 
     $.ajax(url + "/stats", {
         dataType: 'JSON',

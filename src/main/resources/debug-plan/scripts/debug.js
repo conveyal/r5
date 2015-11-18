@@ -29,6 +29,10 @@ $(function() {
             w : bbox.getWest(),
             detail: true //adds name, OSMID and speed as properties
         };
+        //Shows lines in both direction only on larger zooms
+        if (map.getZoom() > 14) {
+            params.both= text.both;
+        }
         $.ajax(url +"/stats",{
             dataType: 'JSON',
             data:params,
@@ -40,7 +44,7 @@ $(function() {
         });
         //console.log(bbox);
         full_url = request_url + "?" + $.param(params);
-        console.log(full_url);
+        /*console.log(full_url);*/
         var source = map.getSource("perm");
         source.setData(full_url);
     });

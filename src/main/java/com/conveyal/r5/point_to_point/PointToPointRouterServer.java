@@ -14,6 +14,9 @@ import com.conveyal.r5.transit.TransportNetwork;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.LineString;
+import com.vividsolutions.jts.geom.PrecisionModel;
+import com.vividsolutions.jts.operation.buffer.BufferParameters;
+import com.vividsolutions.jts.operation.buffer.OffsetCurveBuilder;
 import gnu.trove.set.TIntSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -220,7 +223,22 @@ public class PointToPointRouterServer {
             float south = request.queryMap("s").floatValue();
             float east = request.queryMap("e").floatValue();
             float west = request.queryMap("w").floatValue();
-            boolean detail = request.queryMap("detail").booleanValue();
+            Boolean iboth = request.queryMap("both").booleanValue();
+            Boolean idetail = request.queryMap("detail").booleanValue();
+            boolean both, detail;
+
+
+            if (iboth == null) {
+                both = false;
+            } else {
+                both = iboth;
+            }
+
+            if (idetail == null) {
+                detail = false;
+            } else {
+                detail = idetail;
+            }
 
             String layer = "streetEdges"; // request.params(":layer");
 
@@ -242,12 +260,28 @@ public class PointToPointRouterServer {
             EdgeStore.Edge cursor = transportNetwork.streetLayer.edgeStore.getCursor();
             VertexStore.Vertex vcursor = transportNetwork.streetLayer.vertexStore.getCursor();
 
+            BufferParameters bufParams = new BufferParameters();
+            bufParams.setSingleSided(true);
+            bufParams.setJoinStyle(BufferParameters.JOIN_BEVEL);
+            OffsetCurveBuilder offsetBuilder = new OffsetCurveBuilder(new PrecisionModel(),
+                bufParams);
+            float distance = -0.00005f;
+
             if ("streetEdges".equals(layer)) {
                 streets.forEach(s -> {
                     try {
                         cursor.seek(s);
 
-                        GeoJsonFeature feature = new GeoJsonFeature(cursor.getGeometry());
+                        LineString geometry = cursor.getGeometry();
+
+                        if (both) {
+                            Coordinate[] coords = offsetBuilder.getOffsetCurve(geometry.getCoordinates(),
+                                distance);
+                            geometry = GeometryUtils.geometryFactory.createLineString(coords);
+                        }
+
+
+                        GeoJsonFeature feature = new GeoJsonFeature(geometry);
                         feature.addProperty("permission", cursor.getPermissionsAsString());
                         feature.addProperty("edge_id", cursor.getEdgeIndex());
                         feature.addProperty("speed_ms", roundSpeed(cursor.getSpeedMs()));
@@ -260,6 +294,30 @@ public class PointToPointRouterServer {
                         }
                         feature.addProperty("flags", cursor.getFlagsAsString());
                         features.add(feature);
+                        if (both) {
+                            cursor.seek(s+1);
+                            geometry = cursor.getGeometry();
+
+                            Coordinate[] coords = offsetBuilder.getOffsetCurve(geometry.getCoordinates(),
+                                distance);
+                            geometry = GeometryUtils.geometryFactory.createLineString(coords);
+
+
+                            feature = new GeoJsonFeature(geometry);
+                            feature.addProperty("permission", cursor.getPermissionsAsString());
+                            feature.addProperty("edge_id", cursor.getEdgeIndex());
+                            feature.addProperty("speed_ms", roundSpeed(cursor.getSpeedMs()));
+                            feature.addProperty("speed", roundSpeed(cursor.getSpeedkmh()));
+                            //Needed for filtering flags
+                            for (EdgeStore.EdgeFlag flag: EdgeStore.EdgeFlag.values()) {
+                                if (cursor.getFlag(flag)) {
+                                    feature.addProperty(flag.toString(), true);
+                                }
+                            }
+                            feature.addProperty("flags", cursor.getFlagsAsString());
+                            features.add(feature);
+
+                        }
                         return true;
                     } catch (Exception e) {
                         response.status(500);

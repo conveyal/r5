@@ -56,6 +56,7 @@ var mapbox_style = {
 
 var FilterConfig = function() {
     this.debug_type = "permissions";
+    this.both = false;
 
     this.show_unused = false;
     this.color_unused = "#b013b5";

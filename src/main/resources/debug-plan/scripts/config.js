@@ -54,50 +54,55 @@ var mapbox_style = {
     }]
 };
 
+//list of random colors to have some default colors for lines
+var colors = [
+    "#c7f7e8",
+    "#58583b",
+    "#4b4aac",
+    "#e64444",
+    "#e6345c",
+    "#a9114c",
+    "#2c6e7a",
+    "#4ada8e",
+    "#e54f96",
+    "#e35647",
+    "#429647",
+    "#065947",
+    "#b14937",
+    "#7bd891",
+    "#73ee9a",
+    "#07b66e",
+    "#67ba67",
+    "#0f7d14",
+    "#8f62a6",
+    "#1e63e0",
+    "#8de092",
+    "#6b8c38",
+    "#155e54",
+    "#3b54e2",
+    "#b20f03",
+    "#9f8602",
+    "#41c8c9",
+    "#c385c5",
+    "#d1c331",
+    "#952165",
+    "#6c2449",
+    "#1356cb",
+    "#5475b9",
+    "#c3fb47",
+    "#f5b41e",
+    "#23bb24",
+    "#941e96",
+    "#172ab3",
+    "#81943c",
+    "#a24cf7",
+];
+
+
 var FilterConfig = function() {
     this.debug_type = "permissions";
     this.both = false;
 
-    this.show_unused = false;
-    this.color_unused = "#b013b5";
-    this.show_bike_path = false;
-    this.color_bike_path = "#999f7c";
-    this.show_sidewalk = false;
-    this.color_sidewalk = "#367f74";
-    this.show_crossing = false;
-    this.color_crossing = "#682cab";
-    this.show_roundabout = false;
-    this.color_roundabout = "#21c021";
-    this.show_elevator = false;
-    this.color_elevator = "#8c6023";
-    this.show_stairs = false;
-    this.color_stairs = "#0e2e8c";
-    this.show_platform = false;
-    this.color_platform = "#0c5611";
-    this.show_bogus_name = false;
-    this.color_bogus_name = "#cb098f";
-    this.show_no_thru_traffic = false;
-    this.color_no_thru_traffic = "#b56031";
-    this.show_slope_override = false;
-    this.color_slope_override = "#f5627b";
-    this.show_transit_link = false;
-    this.color_transit_link = "#8448d3";
-    this.show_allows_pedestrian = true;
-    this.color_allows_pedestrian = "#affe1b";
-    this.show_allows_bike = false;
-    this.color_allows_bike = "#5b82fd";
-    this.show_allows_car = false;
-    this.color_allows_car = "#006d93";
-    this.show_allows_wheelchair = false;
-    this.color_allows_wheelchair = "#505bc3";
-    this.show_bike_lts_1 = false;
-    this.color_bike_lts_1 = "#fa9de1";
-    this.show_bike_lts_2 = false;
-    this.color_bike_lts_2 = "#d2a18c";
-    this.show_bike_lts_3 = false;
-    this.color_bike_lts_3 = "#f3df6a";
-    this.show_bike_lts_4 = false;
-    this.color_bike_lts_4 = "#a45189";
 };
 
 mapboxgl.accessToken = ''; //NOT needed

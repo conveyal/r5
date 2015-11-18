@@ -10,10 +10,14 @@ function makeGUI() {
         dataType: 'JSON',
         success: function(data) {
             if (data.data) {
+                var next_color = 0;
                 $.each(data.data, function(key, usages) {
                     var split_name = key.replace("_", " ");
                     var nice_name = split_name.toProperCase();
                     var lowercase_name = key.toLowerCase()
+                    text['show_'+lowercase_name] = false;
+                    text['color_'+lowercase_name] = colors[next_color];
+                    next_color++;
                     console.log("key: ", split_name.toProperCase());
                     var tmp = gui.addFolder(nice_name);
                     tmp.add(text, 'show_' + lowercase_name)

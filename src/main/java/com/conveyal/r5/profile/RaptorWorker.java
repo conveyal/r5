@@ -313,8 +313,10 @@ public class RaptorWorker {
             // note not setting bestNonTransferTimes here because the initial walk is effectively a "transfer"
             if (time < scheduleState.bestTimes[stopIndex]) {
                 scheduleState.bestTimes[stopIndex] = time;
-                scheduleState.transferStop[stopIndex] = scheduleState.previousPatterns[stopIndex] = scheduleState.previousStop[stopIndex] = -1;
-                scheduleState.atOrigin[stopIndex] = true;
+                // don't clear previousPatterns/previousStops because we want to avoid egressing from the stop at which
+                // we boarded, allowing one to blow past the walk limit. See #22.
+                scheduleState.transferStop[stopIndex] = -1;
+                scheduleState.atOrigin.set(stopIndex);
                 markPatternsForStop(stopIndex);
             }
         }
@@ -490,6 +492,7 @@ public class RaptorWorker {
                             if (state.bestTimes[stopIndex] > remainOnBoardTime) {
                                 state.bestTimes[stopIndex] = remainOnBoardTime;
                                 state.transferStop[stopIndex] = -1; // not reached via a transfer
+                                state.atOrigin.clear(stopIndex); // not at the origin optimally
                             }
                         }
                     }
@@ -554,6 +557,7 @@ public class RaptorWorker {
                         if (arrivalTime < state.bestTimes[stopIndex]) {
                             state.bestTimes[stopIndex] = arrivalTime;
                             state.transferStop[stopIndex] = -1; // not reached via transfer
+                            state.atOrigin.clear(stopIndex); // not at the origin optimally
                         }
                     }
 
@@ -604,6 +608,7 @@ public class RaptorWorker {
                 if (toTime < max_time && toTime < state.bestTimes[toStop]) {
                     state.bestTimes[toStop] = toTime;
                     state.transferStop[toStop] = stop;
+                    state.atOrigin.clear(toStop); // not at the origin optimally
                     markPatternsForStop(toStop);
                 }
             }

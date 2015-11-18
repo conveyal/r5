@@ -113,13 +113,20 @@ public class StaticComputer implements Runnable {
                 prev = time;
 
                 // write out which path to use, delta coded
-                Path path = new Path(worker.statesEachIteration.get(iter), stop);
-                if (!paths.containsKey(path)) {
-                    paths.put(path, maxPathIdx++);
-                    pathList.add(path);
+                int pathIdx = -1;
+
+                RaptorState state = worker.statesEachIteration.get(iter);
+                // only compute a path if this stop was reached
+                if (state.bestNonTransferTimes[stop] != RaptorWorker.UNREACHED) {
+                    Path path = new Path(state, stop);
+                    if (!paths.containsKey(path)) {
+                        paths.put(path, maxPathIdx++);
+                        pathList.add(path);
+                    }
+
+                    pathIdx = paths.get(path);
                 }
 
-                int pathIdx = paths.get(path);
                 out.writeInt(pathIdx - prevPath);
                 prevPath = pathIdx;
             }
@@ -151,11 +158,16 @@ public class StaticComputer implements Runnable {
             // trace the path back from this RaptorState
             int previousPattern = state.previousPatterns[stop];
 
+            if (previousPattern == -1)
+                LOG.warn("Transit stop reached at egress without riding transit!");
+
             TIntList patterns = new TIntArrayList();
             TIntList boardStops = new TIntArrayList();
             TIntList alightStops = new TIntArrayList();
             TIntList times = new TIntArrayList();
             TIntList nonTransferTimes = new TIntArrayList();
+
+            boolean first = true;
 
             while (previousPattern != -1) {
                 patterns.add(previousPattern);
@@ -165,8 +177,16 @@ public class StaticComputer implements Runnable {
                 stop = state.previousStop[stop];
                 boardStops.add(stop);
 
-                if (state.atOrigin[stop])
+                // even if we're at the origin, if this is the first hop, make sure that
+                // we don't break and leave an empty journey. bestNonTransferTimes always result
+                // from riding transit, even if it would make more sense to walk.
+                // If it would in fact make more sense to walk, that will be taken of by the (separate)
+                // non-transit search.
+                // see r5 issue #22
+                if (state.atOrigin.get(stop) && !first)
                     break;
+
+                first = false;
 
                 // handle transfers
                 if (state.transferStop[stop] != -1)

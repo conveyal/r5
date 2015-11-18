@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile;
 
 import java.util.Arrays;
+import java.util.BitSet;
 
 /**
  * Tracks the state of a RAPTOR search. We have a separate class because we need to clone it when doing Monte Carlo
@@ -51,16 +52,16 @@ public class RaptorState {
     public int[] transferStop;
 
     /** Is the best way to reach this stop to walk from the origin? */
-    public boolean[] atOrigin;
+    public BitSet atOrigin;
 
     public RaptorState (int nStops) {
         this.bestTimes = new int[nStops];
         this.bestNonTransferTimes = new int[nStops];
-        this.atOrigin = new boolean[nStops];
+        this.atOrigin = new BitSet(nStops);
 
         Arrays.fill(bestTimes, RaptorWorker.UNREACHED);
         Arrays.fill(bestNonTransferTimes, RaptorWorker.UNREACHED);
-        Arrays.fill(atOrigin, false);
+        this.atOrigin.clear();
 
         this.previousPatterns = new int[nStops];
         this.previousStop = new int[nStops];
@@ -77,7 +78,8 @@ public class RaptorState {
         this.previousPatterns = Arrays.copyOf(state.previousPatterns, state.previousPatterns.length);
         this.previousStop = Arrays.copyOf(state.previousStop, state.previousStop.length);
         this.transferStop = Arrays.copyOf(state.transferStop, state.transferStop.length);
-        this.atOrigin = Arrays.copyOf(state.atOrigin, state.atOrigin.length);
+        this.atOrigin = new BitSet(this.bestTimes.length);
+        this.atOrigin.or(state.atOrigin);
     }
 
     /** Copy this raptor state, e.g. to apply a frequency search */

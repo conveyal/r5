@@ -11,8 +11,6 @@
             <option value="WALK">Walking</option>
             <option value="BICYCLE">Cycling</option>
         </select>
-		<label for="simple">Simple geometry</label>
-		<input type="checkbox" name="simple" id="simple" value="true" />
         <button type="submit" value="submit" disabled="true" id="planButton">plan</button>
         <div id="map" style="position: absolute; top: 40px; left: 0; width: 100%; height: 100%;"></div>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
@@ -109,13 +107,46 @@
                 my_map.panTo(e.latlng);
             }
 
+            function getModeColor (mode) {
+                if (mode === 'WALK') return '#484'
+                if (mode === 'BICYCLE') return '#0073e5'
+                if (mode === 'SUBWAY') return '#f00'
+                if (mode === 'RAIL') return '#b00'
+                if (mode === 'BUS') return '#080'
+                if (mode === 'TRAM') return '#800'
+                if (mode === 'FERRY') return '#008'
+                if (mode === 'CAR') return '#444'
+                return '#aaa'
+            }; 
+            function styleMode(feature) {
+                return {
+                    color: getModeColor(feature.properties.mode),
+                    //weight:speedWeight(feature.properties.speed_ms),
+                    opacity: 1
+                };
+            }
+
+            function onEachFeature(feature, layer) {
+                if (feature.properties) {
+                    var prop = feature.properties;
+                    var pop = "<p>";
+                    $.each(prop, function(name, value) {
+                        pop += name.toUpperCase();
+                        pop +=": ";
+                        pop += value;
+                        pop +="<br />";
+                    });
+                    pop +="</p>";
+                    layer.bindPopup(pop);
+                }
+            }
+
             function requestPlan() {
                 var params = {
                     fromLat: m1.getLatLng().lat,
                     fromLon: m1.getLatLng().lng,
                     toLat: m2.getLatLng().lat,
                     toLon: m2.getLatLng().lng,
-                    simple: $("#simple").is(":checked"),
                     mode: $("#mode").val()
                 }
                 console.log(params);
@@ -133,13 +164,7 @@
                         if (data.errors) {
                             alert(data.errors);
                         } else {
-
-                            //TODO: styling
-                            if (params.detail == true) {
-                                layer = L.geoJson(data.data, {style: styleMode});
-                            } else {
-                                layer = L.geoJson(data.data);
-                            }
+                            layer = L.geoJson(data.data, {style: styleMode, onEachFeature:onEachFeature});
                             layer.addTo(window.my_map);
                         }
                     }

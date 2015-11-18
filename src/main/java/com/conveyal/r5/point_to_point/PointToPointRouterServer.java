@@ -129,18 +129,13 @@ public class PointToPointRouterServer {
             Mode mode = Mode.valueOf(queryMode);
             if (mode == null) {
                 content.put("errors", "Mode is wrong");
+                return JsonUtilities.objectMapper.writeValueAsString(content);
             }
             Float fromLat = request.queryMap("fromLat").floatValue();
             Float toLat = request.queryMap("toLat").floatValue();
 
             Float fromLon = request.queryMap("fromLon").floatValue();
             Float toLon = request.queryMap("toLon").floatValue();
-            Boolean simple = request.queryMap("simple").booleanValue();
-
-            if (simple == null) {
-                simple = false;
-            }
-
             //TODO errorchecks
 
             ProfileRequest profileRequest = new ProfileRequest();
@@ -160,56 +155,38 @@ public class PointToPointRouterServer {
             //Gets lowest weight state for end coordinate split
             StreetRouter.State lastState = streetRouter.getState(split);
             if (lastState != null) {
+                LinkedList<StreetRouter.State> states = new LinkedList<>();
 
-                LinkedList<Integer> edges = new LinkedList<>();
-
-            /*
-            * Starting from latest (time-wise) state, copy states to the head of a list in reverse
-            * chronological order. List indices will thus increase forward in time, and backEdges will
-            * be chronologically 'back' relative to their state.
-            */
+                /*
+                * Starting from latest (time-wise) state, copy states to the head of a list in reverse
+                * chronological order. List indices will thus increase forward in time, and backEdges will
+                * be chronologically 'back' relative to their state.
+                */
                 for (StreetRouter.State cur = lastState; cur != null; cur = cur.backState) {
-                    //states.addFirst(cur);
-                    if (cur.backEdge != -1 && cur.backState != null) {
-                        edges.addFirst(cur.backEdge);
-                    }
+                    states.addFirst(cur);
                 }
 
-                //Only uses first and last point of geometry
-                if (simple) {
-
-                    //Creates geometry currently only uses first and last point
-                    List<Coordinate> coordinateList = new ArrayList<>();
-                    for (Integer edgeIdx : edges) {
-
-                        EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edgeIdx);
-                        VertexStore.Vertex fromVertex = transportNetwork.streetLayer.vertexStore.getCursor(edge.getFromVertex());
-                        coordinateList.add(new Coordinate(fromVertex.getLon(), fromVertex.getLat()));
-
+                List<GeoJsonFeature> features = new ArrayList<>(states.size());
+                Map<String, Object> featureCollection = new HashMap<>(2);
+                featureCollection.put("type", "FeatureCollection");
+                //TODO: this can be improved since end and start vertices are the same in all the edges.
+                for (StreetRouter.State state : states) {
+                    Integer edgeIdx = state.backEdge;
+                    if (!(edgeIdx == -1 || edgeIdx == null)) {
+                        EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore
+                            .getCursor(edgeIdx);
+                        GeoJsonFeature feature = new GeoJsonFeature(edge.getGeometry());
+                        feature.addProperty("weight", state.weight);
+                        //FIXME: get this from state
+                        feature.addProperty("mode", mode);
+                        features.add(feature);
                     }
-                    //we only save end vertex from the last edge otherwise we have duplicated points since end vertex from each edge is start vertex from the next
-                    EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edges.getLast());
-                    VertexStore.Vertex toVertex = transportNetwork.streetLayer.vertexStore.getCursor(edge.getToVertex());
-                    coordinateList.add(new Coordinate(toVertex.getLon(), toVertex.getLat()));
-
-                    Coordinate[] coordinates = coordinateList.toArray(new Coordinate[coordinateList.size()]);
-                    //TODO: return this as geojson Feature since we can save some information inside properties
-                    content.put("data", GeometryUtils.geometryFactory.createLineString(coordinates));
-                } else {
-                    //TODO: this can be improved since end and start vertices are the same in all the edges.
-                    List<LineString> geometries = new ArrayList<>(edges.size());
-                    for (Integer edgeIdx: edges) {
-                        EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edgeIdx);
-                        geometries.add(edge.getGeometry());
-                    }
-
-                    content.put("data", GeometryUtils.geometryFactory.createMultiLineString(geometries.toArray(new LineString[geometries.size()])));
                 }
-
+                featureCollection.put("features", features);
+                content.put("data", featureCollection);
             } else {
                 content.put("errors", "Path to end coordinate wasn't found!");
             }
-
             return JsonUtilities.objectMapper.writeValueAsString(content);
         });
 

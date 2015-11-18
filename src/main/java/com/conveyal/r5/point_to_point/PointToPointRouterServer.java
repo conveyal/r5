@@ -117,9 +117,9 @@ public class PointToPointRouterServer {
             response.header("Content-Type", "application/json");
             RouterInfo routerInfo = new RouterInfo();
             routerInfo.envelope = transportNetwork.getEnvelope();
-            return JsonUtilities.objectMapper.writeValueAsString(routerInfo);
+            return routerInfo;
 
-        });
+        }, JsonUtilities.objectMapper::writeValueAsString);
 
         get("/plan", (request, response) -> {
             response.header("Content-Type", "application/json");
@@ -129,7 +129,7 @@ public class PointToPointRouterServer {
             Mode mode = Mode.valueOf(queryMode);
             if (mode == null) {
                 content.put("errors", "Mode is wrong");
-                return JsonUtilities.objectMapper.writeValueAsString(content);
+                return content;
             }
             Float fromLat = request.queryMap("fromLat").floatValue();
             Float toLat = request.queryMap("toLat").floatValue();
@@ -187,8 +187,8 @@ public class PointToPointRouterServer {
             } else {
                 content.put("errors", "Path to end coordinate wasn't found!");
             }
-            return JsonUtilities.objectMapper.writeValueAsString(content);
-        });
+            return content;
+        }, JsonUtilities.objectMapper::writeValueAsString);
 
         get("debug/streetEdges", (request, response) -> {
             response.header("Content-Type", "application/json");
@@ -306,8 +306,8 @@ public class PointToPointRouterServer {
 
             featureCollection.put("features", features);
 
-            return JsonUtilities.objectMapper.writeValueAsString(featureCollection);
-        });
+            return featureCollection;
+        }, JsonUtilities.objectMapper::writeValueAsString);
 
         //Returns flags usage in requested area
         get("debug/stats", (request, response) -> {
@@ -333,11 +333,11 @@ public class PointToPointRouterServer {
                         response.status(500);
                         content.put("errors", "Problem reading edges:" + ex.getMessage());
                         LOG.error("Exception:", e);
-                        return JsonUtilities.objectMapper.writeValueAsString(content);
+                        return content;
                     }
                 }
                 content.put("data", flagUsage);
-                return JsonUtilities.objectMapper.writeValueAsString(content);
+                return content;
             }
             float north = request.queryMap("n").floatValue();
             float south = request.queryMap("s").floatValue();
@@ -354,7 +354,7 @@ public class PointToPointRouterServer {
                 LOG.warn("Refusing to include more than 10000 edges in result");
                 response.status(401);
                 content.put("errors", "Refusing to include more than 10000 edges in result");
-                return JsonUtilities.objectMapper.writeValueAsString(content);
+                return content;
             }
 
             EdgeStore.Edge cursor = transportNetwork.streetLayer.edgeStore.getCursor();
@@ -377,8 +377,8 @@ public class PointToPointRouterServer {
                 }
             });
             content.put("data", flagUsage);
-            return JsonUtilities.objectMapper.writeValueAsString(content);
-        });
+            return content;
+        }, JsonUtilities.objectMapper::writeValueAsString);
 
     }
 

@@ -16,6 +16,7 @@ var request_url = url+'/' + current_layer;
 var full_url = request_url;
 var tileset = 'conveyal.hml987j0';
 var map;
+var flag_visible = true;
 
 var permission_colors = {
     "none":"#333333",
@@ -106,5 +107,16 @@ $(function() {
         container: 'map', // container id
         style: mapbox_style,
         zoom: 14
+    });
+    $("#flag_info a").click(function() {
+        if (flag_visible) {
+            $("#flag_info p").hide();
+            flag_visible = false;
+            $("#flag_info a").text("Open");
+        } else {
+            $("#flag_info p").show();
+            flag_visible = true;
+            $("#flag_info a").text("Close");
+        }
     });
 });

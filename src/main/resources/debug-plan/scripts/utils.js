@@ -159,3 +159,17 @@ function fillPopup(feature, layer) {
     }
     return null;
 }
+
+//Shows how many times each flag is used in flag usage div
+function showFlagInfos(data) {
+    var html = "";
+    $.each(data.data, function(flag, usage) {
+        var split_name = flag.replace("_", " ");
+        var nice_name = split_name.toProperCase();
+        html += "<b>" + nice_name +"</b>:";
+        html += usage + "<br />";
+    });
+    if (html !== "") {
+        $(".flags").html(html);
+    }
+}

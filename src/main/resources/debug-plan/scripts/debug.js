@@ -29,6 +29,15 @@ $(function() {
             w : bbox.getWest(),
             detail: true //adds name, OSMID and speed as properties
         };
+        $.ajax(url +"/stats",{
+            dataType: 'JSON',
+            data:params,
+            success: function(data) {
+                if (data.data) {
+                    showFlagInfos(data);
+                }
+            }
+        });
         //console.log(bbox);
         full_url = request_url + "?" + $.param(params);
         console.log(full_url);

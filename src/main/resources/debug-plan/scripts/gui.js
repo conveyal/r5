@@ -11,7 +11,7 @@ function makeGUI() {
             if (data.data) {
                 $.each(data.data, function(key, usages) {
                     var split_name = key.replace("_", " ");
-                    var nice_name = split_name.toProperCase() + " ("+usages+")";
+                    var nice_name = split_name.toProperCase();
                     var lowercase_name = key.toLowerCase()
                     console.log("key: ", split_name.toProperCase());
                     var tmp = gui.addFolder(nice_name);
@@ -22,6 +22,7 @@ function makeGUI() {
 
                 });
 
+                showFlagInfos(data);
             }else {
                 console.error(data.errors);
                 alert("Problem loading flags from server:" + data.errors);

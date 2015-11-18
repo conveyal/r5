@@ -261,7 +261,7 @@ public class PointToPointRouterServer {
                         GeoJsonFeature feature = new GeoJsonFeature(geometry);
                         feature.addProperty("permission", cursor.getPermissionsAsString());
                         feature.addProperty("edge_id", cursor.getEdgeIndex());
-                        feature.addProperty("speed_ms", roundSpeed(cursor.getSpeedMs()));
+                        feature.addProperty("speed_ms", Math.round(cursor.getSpeedMs()*1000));
                         feature.addProperty("speed", roundSpeed(cursor.getSpeedkmh()));
                         //Needed for filtering flags
                         for (EdgeStore.EdgeFlag flag: EdgeStore.EdgeFlag.values()) {
@@ -283,7 +283,7 @@ public class PointToPointRouterServer {
                             feature = new GeoJsonFeature(geometry);
                             feature.addProperty("permission", cursor.getPermissionsAsString());
                             feature.addProperty("edge_id", cursor.getEdgeIndex());
-                            feature.addProperty("speed_ms", roundSpeed(cursor.getSpeedMs()));
+                            feature.addProperty("speed_ms", Math.round(cursor.getSpeedMs()*1000));
                             feature.addProperty("speed", roundSpeed(cursor.getSpeedkmh()));
                             //Needed for filtering flags
                             for (EdgeStore.EdgeFlag flag: EdgeStore.EdgeFlag.values()) {
@@ -380,6 +380,89 @@ public class PointToPointRouterServer {
             return content;
         }, JsonUtilities.objectMapper::writeValueAsString);
 
+        //Returns flags usage in requested area
+        get("debug/speeds", (request, response) -> {
+            response.header("Content-Type", "application/json");
+            Map<String, Object> content = new HashMap<>(2);
+            Map<Integer, Integer> speedUsage = new HashMap<>();
+            MinMax minMax = new MinMax();
+            if (request.queryParams().size() < 4) {
+
+                EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor();
+                for (int e = 0; e < transportNetwork.streetLayer.edgeStore.getnEdges(); e += 2) {
+                    edge.seek(e);
+
+                    try {
+                        updateSpeed(edge, speedUsage, minMax);
+                    } catch (Exception ex) {
+                        response.status(500);
+                        content.put("errors", "Problem reading edges:" + ex.getMessage());
+                        LOG.error("Exception:", e);
+                        return content;
+                    }
+                }
+                content.put("data", speedUsage);
+                content.put("min", minMax.min);
+                content.put("max", minMax.max);
+                return content;
+            }
+            float north = request.queryMap("n").floatValue();
+            float south = request.queryMap("s").floatValue();
+            float east = request.queryMap("e").floatValue();
+            float west = request.queryMap("w").floatValue();
+
+            Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
+                floatingDegreesToFixed(south), floatingDegreesToFixed(north));
+            TIntSet streets = transportNetwork.streetLayer.spatialIndex.query(env);
+
+            if (streets.size() > 10_000) {
+                LOG.warn("Refusing to include more than 10000 edges in result");
+                response.status(401);
+                content.put("errors", "Refusing to include more than 10000 edges in result");
+                return content;
+            }
+
+            EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor();
+            streets.forEach(s -> {
+                try {
+                    edge.seek(s);
+                    updateSpeed(edge, speedUsage, minMax);
+                    return true;
+                } catch (Exception e) {
+                    response.status(500);
+                    content.put("errors", "Problem reading edges:" + e.getMessage());
+                    LOG.error("Exception:", e);
+                    return false;
+                }
+            });
+            content.put("data", speedUsage);
+            content.put("min", minMax.min);
+            content.put("max", minMax.max);
+            return content;
+        }, JsonUtilities.objectMapper::writeValueAsString);
+
+    }
+
+    private static void updateSpeed(EdgeStore.Edge edge, Map<Integer, Integer> speedUsage,
+        MinMax minMax) {
+        Integer currentEdgeSpeed = Math.round(edge.getSpeedMs()*1000);
+        Integer currentValue = speedUsage.getOrDefault(currentEdgeSpeed, 0);
+        speedUsage.put(currentEdgeSpeed, currentValue+1);
+        minMax.updateMin(currentEdgeSpeed);
+        minMax.updateMax(currentEdgeSpeed);
+    }
+
+    private static class MinMax {
+        public int min = Integer.MAX_VALUE;
+        public int max = Integer.MIN_VALUE;
+
+        public void updateMin(Integer currentEdgeSpeed) {
+            min = Math.min(currentEdgeSpeed, min);
+        }
+
+        public void updateMax(Integer currentEdgeSpeed) {
+            max = Math.max(currentEdgeSpeed, max);
+        }
     }
 
     private static float roundSpeed(float speed) {

@@ -18,6 +18,10 @@ var tileset = 'conveyal.hml987j0';
 var map;
 var flag_visible = true;
 
+var speeds = {};
+var speed_min = 0;
+var speed_max = 36111;
+
 var permission_colors = {
     "none":"#333333",
     "walk":"#33b333",
@@ -97,6 +101,20 @@ var colors = [
     "#81943c",
     "#a24cf7",
 ];
+
+$.ajax(url + "/speeds", {
+        dataType: 'JSON',
+        success: function(data) {
+            if (data.data) {
+                speeds = data.data;
+                speed_min = data.min;
+                speed_max = data.max;
+                console.info("Loaded speeds data:", speeds);
+            } else {
+                alert("Problem getting speeds:" + data.errors);
+            }
+        }
+});
 
 
 var FilterConfig = function() {

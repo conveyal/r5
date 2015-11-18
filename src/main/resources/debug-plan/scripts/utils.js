@@ -136,6 +136,38 @@ function getStyle(type) {
             }
 
         });
+    } else if (type == "speeds") {
+        var speed_midle = (speed_max-speed_min)/2;
+        var speedColor = d3.scale.linear()
+        .domain([speed_min, speed_midle, speed_max])
+        .range(["green", "yellow", "red"]);
+
+        $.each(speeds, function(speed, occurence) {
+            var speed_layer = {
+                "id": "speed-"+speed,
+                "type": "line",
+                "source": "perm",
+                "interactive":true,
+                "paint": {
+                    "line-color":speedColor(speed),
+                    "line-width":2
+                },
+                "filter":["==", "speed_ms", parseInt(speed)]
+            };
+            style.layers.push(speed_layer);
+        });
+        var hover_layer = {
+            "id": "perm-hover",
+            "type": "line",
+            "source": "perm",
+            "paint": {
+                "line-color":"black",
+                "line-width":2
+            },
+            "filter": ["==", "edge_id", -1]
+        };
+        style.layers.push(hover_layer);
+
     }
     console.log(style);
     map.setStyle(style);

@@ -73,14 +73,21 @@ function flagChange(flag_name, value) {
 
 //Function changes color of specific flag during changing color in gui
 function colorChange(name, color) {
-    if (current_type != "flags") {
-        return;
-    }
+    if (current_type == "flags") {
     //It is assumed that layer exists since it is enabled
-    if(text["show_"+name] == true) {
-        //console.log("Flag:", name);
-        //console.log("color:", color);
-        map.setPaintProperty("perm-"+name, "line-color", color);
+        if(text["show_"+name] == true) {
+            //console.log("Flag:", name);
+            //console.log("color:", color);
+            map.setPaintProperty("perm-"+name, "line-color", color);
+        }
+    } else if (current_type == "speeds") {
+        var speed_midle = (speed_max-speed_min)/2;
+        var speedColor = d3.scale.linear()
+        .domain([speed_min, speed_midle, speed_max])
+        .range([text.min_speed_color, text.middle_speed_color, text.max_speed_color]);
+        $.each(speeds, function(speed, occurence) {
+            map.setPaintProperty("speed-"+speed,"line-color", speedColor(speed));
+        });
     }
 }
 
@@ -140,7 +147,7 @@ function getStyle(type) {
         var speed_midle = (speed_max-speed_min)/2;
         var speedColor = d3.scale.linear()
         .domain([speed_min, speed_midle, speed_max])
-        .range(["green", "yellow", "red"]);
+        .range([text.min_speed_color, text.middle_speed_color, text.max_speed_color]);
 
         $.each(speeds, function(speed, occurence) {
             var speed_layer = {

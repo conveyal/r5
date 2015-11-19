@@ -5,6 +5,10 @@ function makeGUI() {
     var gui = new dat.GUI();
     gui.add(text, 'debug_type', ['permissions', 'flags', 'speeds']).onFinishChange(getStyle);
     gui.add(text, 'both').name("Show bidirectional")
+    var gui_speed = gui.addFolder("Speeds");
+    gui_speed.addColor(text, 'min_speed_color').onChange(function(color) { colorChange("min", color);});
+    gui_speed.addColor(text, 'middle_speed_color').onChange(function(color) { colorChange("mid", color);});
+    gui_speed.addColor(text, 'max_speed_color').onChange(function(color) { colorChange("max", color);});
 
     $.ajax(url + "/stats", {
         dataType: 'JSON',

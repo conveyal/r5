@@ -121,6 +121,10 @@ var FilterConfig = function() {
     this.debug_type = "permissions";
     this.both = false;
 
+    this.min_speed_color = "#008000";
+    this.middle_speed_color = "#FFFF00";
+    this.max_speed_color = "#FF0000";
+
 };
 
 mapboxgl.accessToken = ''; //NOT needed

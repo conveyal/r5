@@ -11,7 +11,9 @@ $(function() {
             window.map.fitBounds([
                 [data.envelope.minX, data.envelope.minY],
                 [data.envelope.maxX, data.envelope.maxY]
-            ]);
+            ],
+            {speed:100
+            });
         }
     });
     makeGUI();

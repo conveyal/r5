@@ -19,7 +19,7 @@ public class USTraversalPermissionLabeler extends TraversalPermissionLabeler {
             tree.put(Node.FOOT, Label.YES);
             tree.put(Node.CAR, Label.NO);
         }
-        else if ("footway".equals(highway)){
+        else if ("footway".equals(highway) || "steps".equals(highway) || "platform".equals(highway) || "corridor".equals(highway)){
             tree.put(Node.FOOT, Label.YES);
             tree.put(Node.VEHICLE, Label.NO);
         }

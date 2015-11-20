@@ -19,6 +19,11 @@ public abstract class TraversalPermissionLabeler {
         }
 
         EnumMap<Node, Label> tree = getTreeForHighway(way.getTag("highway").toLowerCase().trim());
+        //TODO: move to default permissions
+        if (way.hasTag("railway", "platform") || way.hasTag("public_transport", "platform")) {
+            tree.put(Node.FOOT, Label.YES);
+            tree.put(Node.VEHICLE, Label.NO);
+        }
         applySpecificPermissions(tree, way);
 
         EnumSet<EdgeStore.EdgeFlag> ret = EnumSet.noneOf(EdgeStore.EdgeFlag.class);

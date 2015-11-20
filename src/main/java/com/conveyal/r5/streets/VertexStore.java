@@ -1,5 +1,6 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.r5.common.MmapIntList;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 
@@ -18,8 +19,8 @@ public class VertexStore implements Serializable {
     public TIntList fixedLons;
 
     public VertexStore (int initialSize) {
-        fixedLats = new TIntArrayList(initialSize);
-        fixedLons = new TIntArrayList(initialSize);
+        fixedLats = EdgeStore.MMAP ? new MmapIntList(initialSize): new TIntArrayList(initialSize);
+        fixedLons = EdgeStore.MMAP ? new MmapIntList(initialSize): new TIntArrayList(initialSize);
     }
 
     /**

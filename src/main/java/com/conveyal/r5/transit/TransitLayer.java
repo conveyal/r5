@@ -5,12 +5,12 @@ import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.r5.analyst.scenario.Modification;
-import com.conveyal.r5.analyst.scenario.RemoveTrip;
-import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.common.MmapIntList;
+import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.StreetLayer;
+import com.conveyal.r5.streets.StreetRouter;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -18,15 +18,12 @@ import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
-import com.conveyal.r5.streets.StreetLayer;
-import com.conveyal.r5.streets.StreetRouter;
 import org.joda.time.LocalDate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.*;
-import java.util.stream.Collectors;
 
 
 /**
@@ -46,7 +43,7 @@ public class TransitLayer implements Serializable, Cloneable {
     // TODO both vertex<->stop indexes are in transitLayer, so the linkage between street and transit layers is really one-to-many, not bidirectional. Use this fact to add multiple GTFS.
 
     // Maybe we need a StopStore that has (streetVertexForStop, transfers, flags, etc.)
-    public TIntList streetVertexForStop = new TIntArrayList();
+    public TIntList streetVertexForStop = EdgeStore.MMAP ? new MmapIntList(): new TIntArrayList();
 
     // Inverse map of streetVertexForStop, and reconstructed from that list.
     public transient TIntIntMap stopForStreetVertex;

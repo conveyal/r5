@@ -1,6 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.osmlib.Node;
+import com.conveyal.r5.common.MmapIntList;
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -42,6 +43,8 @@ public class EdgeStore implements Serializable {
 
     int nEdges = 0;
 
+    public static final boolean MMAP = "1".equals(System.getProperty("r5.mmap","0"));
+
     /** Flags for this edge.  One entry for each forward and each backward edge. */
     protected TIntList flags;
 
@@ -63,14 +66,14 @@ public class EdgeStore implements Serializable {
     public EdgeStore (VertexStore vertexStore, int initialSize) {
         this.vertexStore = vertexStore;
         // There is one flags and speeds entry per edge.
-        flags = new TIntArrayList(initialSize);
-        speeds = new TIntArrayList(initialSize);
+        flags = MMAP ? new MmapIntList(initialSize): new TIntArrayList(initialSize);
+        speeds = MMAP ? new MmapIntList(initialSize): new TIntArrayList(initialSize);
         // Vertex indices, geometries, and lengths are shared between pairs of forward and backward edges.
         int initialEdgePairs = initialSize / 2;
-        fromVertices = new TIntArrayList(initialEdgePairs);
-        toVertices = new TIntArrayList(initialEdgePairs);
+        fromVertices = MMAP ? new MmapIntList(initialEdgePairs): new TIntArrayList(initialEdgePairs);
+        toVertices = MMAP ? new MmapIntList(initialEdgePairs): new TIntArrayList(initialEdgePairs);
         geometries = new ArrayList<>(initialEdgePairs);
-        lengths_mm = new TIntArrayList(initialEdgePairs);
+        lengths_mm = MMAP ? new MmapIntList(initialEdgePairs): new TIntArrayList(initialEdgePairs);
     }
 
     /** Remove the specified edges from this edge store */

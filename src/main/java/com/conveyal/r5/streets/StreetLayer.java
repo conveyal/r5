@@ -97,6 +97,73 @@ public class StreetLayer implements Serializable {
         loadFromOsm(osm, true, false);
     }
 
+    /**
+     * Returns true if way can be used for routing
+     *
+     * Routable ways are highways (unless they are raceways or highway rest_area/services since those are similar to landuse tags
+     * Or public_transport platform or railway platform unless its usage tag is tourism
+     *
+     * In both cases roads need to exists in reality aka don't have:
+     * - construction,
+     * - proposed,
+     * - removed,
+     * - abandoned
+     * - unbuilt
+     * tags
+     *
+     * Both construction tagging shemes are supported tag construction=anything and highway/cycleway=construction
+     * same with proposed.
+     * @param way
+     * @return
+     */
+    private static boolean isWayRoutable(Way way) {
+        boolean isRoutable = false;
+
+        String highway = way.getTag("highway");
+
+        if (
+            //Way is routable if it is highway
+            (way.hasTag("highway") && !(
+                //Unless it is raceway or rest area
+                //Those two are areas which are places around highway (similar to landuse tags they aren't routable)
+                highway.equals("services") || highway.equals("rest_area")
+                //highway=conveyor is obsoleted tag for escalator and is actually routable
+                || highway.equals("raceway")))
+                //or it is public transport platform or railway platform
+            || (way.hasTag("public_transport", "platform")
+                || way.hasTag("railway", "platform")
+                //unless it's usage is tourism
+                && !way.hasTag("usage", "tourism"))) {
+
+            isRoutable = actuallyExistsInReality(highway, way);
+
+        }
+
+        if (isRoutable && way.hasTag("cycleway")) {
+            //highway tag is already checked
+            String cycleway = way.getTag("cycleway");
+            isRoutable = actuallyExistsInReality(cycleway, way);
+        }
+
+        return isRoutable;
+    }
+
+    /**
+     * Returns true if road is not in construction, abandoned, removed or proposed
+     * @param highway value of highway or cycleway tag
+     * @param way
+     * @return
+     */
+    private static boolean actuallyExistsInReality(String highway, Way way) {
+        return !("construction".equals(highway)
+            || "abandoned".equals(highway)|| "removed".equals(highway)
+            || "proposed".equals(highway) || "propossed".equals(highway)
+            || "unbuilt".equals(highway)
+            || way.hasTag("construction") || way.hasTag("proposed"));
+    }
+
+
+
     /** Load OSM, optionally removing floating subgraphs (recommended) */
     void loadFromOsm (OSM osm, boolean removeIslands, boolean saveVertexIndex) {
         if (!osm.intersectionDetection)
@@ -106,14 +173,9 @@ public class StreetLayer implements Serializable {
         this.osm = osm;
         for (Map.Entry<Long, Way> entry : osm.ways.entrySet()) {
             Way way = entry.getValue();
-            if ( ! (way.hasTag("highway") || way.hasTag("public_transport", "platform"))) {
+            if (!isWayRoutable(way)) {
                 continue;
             }
-
-            // don't allow users to use proposed infrastructure
-            if (way.hasTag("highway", "proposed"))
-                continue;
-
             int nEdgesCreated = 0;
             int beginIdx = 0;
             // Break each OSM way into topological segments between intersections, and make one edge per segment.

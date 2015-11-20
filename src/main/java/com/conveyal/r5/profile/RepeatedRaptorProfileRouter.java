@@ -128,7 +128,7 @@ public class RepeatedRaptorProfileRouter {
         // Find the travel time to every target without using any transit, based on the results in the StreetRouter.
         long walkSearchStart = System.currentTimeMillis();
         PointSetTimes nonTransitTimes = targets.eval(streetRouter::getTravelTimeToVertex);
-        // According to the Javadoc we do in fact want to record elapsed time for a single eval call.
+        // According to the Javadoc ts.walkSearch does in fact represent the elapsed time for a single eval call.
         ts.walkSearch = (int) (System.currentTimeMillis() - walkSearchStart);
 
         if (transit) {

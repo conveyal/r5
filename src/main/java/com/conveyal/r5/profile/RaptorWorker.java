@@ -130,6 +130,7 @@ public class RaptorWorker {
         long beginCalcTime = System.currentTimeMillis();
         TIntIntMap initialStops = new TIntIntHashMap();
         TIntIntIterator initialIterator = accessTimes.iterator();
+        // TODO Isn't this just copying an int-int map into another one? Why reimplement map copy?
         while (initialIterator.hasNext()) {
             initialIterator.advance();
             int stopIndex = initialIterator.key();
@@ -194,12 +195,14 @@ public class RaptorWorker {
 
             // Run the search on scheduled routes.
             this.runRaptorScheduled(initialStops, departureTime);
-            // if we're doing propagation, do it now. If we're not doing propagation but saving per transit stop access
-            // times, we don't need to--we'll just copy them all at once, below.
+
+            // If we're doing propagation from transit stops out to street vertices, do it now.
+            // If we are instead saving travel times to transit stops (not propagating out to the streets)
+            // we skip this step -- we'll just copy them all at once, below. TODO clarify "all at once"
             if (doPropagation) {
                 this.doPropagation(scheduleState.bestNonTransferTimes, scheduledTimesAtTargets, departureTime);
-
-                // Copy in the pre-transit times; we don't want to force people to ride transit instead of walking a block.
+                // Copy in the pre-transit travel times to street vertices;
+                // we don't want to force people to ride transit instead of walking a block.
                 for (int i = 0; i < scheduledTimesAtTargets.length; i++) {
                     int nonTransitTravelTime = nonTransitTimes.getTravelTimeToPoint(i);
                     int nonTransitClockTime = nonTransitTravelTime + departureTime;
@@ -351,13 +354,21 @@ public class RaptorWorker {
         }
     }
 
-    /** perform one round, possibly using frequencies with the defined boarding assumption (which is ignored and may be set to null if useFrequencies == false) */
+    /**
+     * Perform one round, possibly using frequencies with the defined boarding assumption
+     * (which is ignored and may be set to null if useFrequencies == false)
+     */
     public boolean doOneRound (RaptorState state, boolean useFrequencies, BoardingAssumption boardingAssumption) {
         //LOG.info("round {}", round);
         stopsTouched.clear(); // clear any stops left over from previous round.
         PATTERNS: for (int p = patternsTouched.nextSetBit(0); p >= 0; p = patternsTouched.nextSetBit(p+1)) {
             //LOG.info("pattern {} {}", p, data.patternNames.get(p));
             TripPattern timetable = data.tripPatterns.get(p);
+            // Do not even consider patterns that have no trips on active service IDs.
+            // Anecdotally this can double or triple search speed.
+            if ( ! timetable.servicesActive.intersects(servicesActive)) {
+                continue;
+            }
             int stopPositionInPattern = -1; // first increment will land this at zero
 
             int bestFreqBoardTime = Integer.MAX_VALUE;
@@ -521,8 +532,8 @@ public class RaptorWorker {
                     int tripIdx = -1;
                     for (TripSchedule trip : timetable.tripSchedules) {
                         tripIdx++;
+                        // Do not board frequency trips or trips whose services are not active on the given day
                         if (trip.headwaySeconds != null || !servicesActive.get(trip.serviceCode))
-                            // frequency trip;
                             continue;
 
                         int dep = trip.departures[stopPositionInPattern];
@@ -566,18 +577,19 @@ public class RaptorWorker {
                     int bestTripIdx = onTripIdx;
                     while (--bestTripIdx > 0) {
                         TripSchedule trip = timetable.tripSchedules.get(bestTripIdx);
-                        if (trip.headwaySeconds != null || !servicesActive.get(trip.serviceCode))
-                            // frequency trip or not running today
+                        if (trip.headwaySeconds != null || !servicesActive.get(trip.serviceCode)) {
+                            // This is a frequency trip or it is not running on the day of the search.
                             continue;
-
-                        // this is a trip we could potentially take
+                        }
                         if (trip.departures[stopPositionInPattern] > state.bestTimes[stopIndex] + BOARD_SLACK) {
+                            // This trip is running and departs later than we have arrived at this stop.
                             onTripIdx = bestTripIdx;
                             onTrip = trip;
                             boardStopIndex = stopIndex;
                         }
                         else {
-                            break; // trips are sorted, don't keep looking
+                            // This trip arrives at this stop too early. Trips are sorted by time, don't keep looking.
+                            break;
                         }
                     }
                 }
@@ -585,6 +597,7 @@ public class RaptorWorker {
         }
 
         doTransfers(state);
+        // doTransfers will have marked some patterns if it reached any stops.
         return !patternsTouched.isEmpty();
     }
 
@@ -595,12 +608,15 @@ public class RaptorWorker {
     private void doTransfers(RaptorState state) {
         patternsTouched.clear();
         for (int stop = stopsTouched.nextSetBit(0); stop >= 0; stop = stopsTouched.nextSetBit(stop + 1)) {
+            // First, mark all patterns at this stop (the trivial "stay at the stop where you are" loop transfer).
             // TODO this is reboarding every trip at every stop.
+            // TODO ^^ what does that comment mean?
             markPatternsForStop(stop);
-            int fromTime = state.bestNonTransferTimes[stop];
 
+            // Then follow all transfers out of this stop, marking patterns that pass through those target stops.
+            int fromTime = state.bestNonTransferTimes[stop];
             TIntList transfers = data.transfersForStop.get(stop);
-            // transfers stored as jagged array, loop two at a time
+            // Transfers are stored as a flattened 2D array, advance two elements at a time.
             for (int i = 0; i < transfers.size(); i += 2) {
                 int toStop = transfers.get(i);
                 int distance = transfers.get(i + 1);

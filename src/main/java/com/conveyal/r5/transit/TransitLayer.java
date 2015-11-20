@@ -40,7 +40,7 @@ public class TransitLayer implements Serializable, Cloneable {
 
     public List<TripPattern> tripPatterns = new ArrayList<>();
 
-    // TODO both vertex<->stop indexes are in transitLayer, so the linkage between street and transit layers is really one-to-many, not bidirectional. Use this fact to add multiple GTFS.
+    // TODO bidirectional indexes between vertex and stop are in transitLayer, so the linkage between street and transit layers is really one-to-many, not bidirectional. Use this fact to add multiple GTFS.
 
     // Maybe we need a StopStore that has (streetVertexForStop, transfers, flags, etc.)
     public TIntList streetVertexForStop = new TIntArrayList();

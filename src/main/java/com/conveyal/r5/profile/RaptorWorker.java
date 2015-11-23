@@ -613,24 +613,24 @@ public class RaptorWorker {
                     }
 
                     // Check whether we can switch to an earlier trip, because there was a faster way to
-                    // get to a stop further down the line.
-                    // only makes sense to switch to an earlier trip if there's a way to arrive at this stop earlier
-                    // than now.
+                    // get to this stop than the trip we're currently on.
                     if (inputState.bestTimes[stopIndex] < arrivalTime) {
                         int bestTripIdx = onTripIdx;
-                        while (--bestTripIdx > 0) {
+                        // Step backward toward index 0 (inclusive!)
+                        while (--bestTripIdx >= 0) {
                             TripSchedule trip = timetable.tripSchedules.get(bestTripIdx);
-                            if (trip.headwaySeconds != null || !servicesActive.get(trip.serviceCode))
-                                // frequency trip or not running today
+                            if (trip.headwaySeconds != null || !servicesActive.get(trip.serviceCode)) {
+                                // This is a frequency trip or it is not running on the day of the search.
                                 continue;
-
-                            // this is a trip we could potentially take
+                            }
                             if (trip.departures[stopPositionInPattern] > inputState.bestTimes[stopIndex] + BOARD_SLACK) {
+                                // This trip is running and departs later than we have arrived at this stop.
                                 onTripIdx = bestTripIdx;
                                 onTrip = trip;
                                 boardStopIndex = stopIndex;
                             } else {
-                                break; // trips are sorted, don't keep looking
+                                // This trip arrives at this stop too early. Trips are sorted by time, don't keep looking.
+                                break;
                             }
                         }
                     }

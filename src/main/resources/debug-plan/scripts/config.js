@@ -49,6 +49,7 @@ var mapbox_style = {
             "data": full_url
         }
     },
+    "sprite": "oneway",
     "layers": [{
         "id": "simple-tiles",
         "type": "raster",
@@ -101,6 +102,35 @@ var colors = [
     "#81943c",
     "#a24cf7",
 ];
+
+var oneway_icons_style = {
+    "id": "oneway-icon",
+    "type": "symbol",
+    "source": "perm",
+    "minzoom":15,
+    "maxzoom":22,
+    "layout": {
+        "symbol-placement": "line",
+        "icon-image": {
+            "base": 1,
+            "stops": [
+                [
+                16,
+                "oneway-middle-mix-small"
+            ],
+            [
+                17,
+                "oneway-big-mix-large"
+            ]
+            ]
+        },
+        "icon-ignore-placement": false,
+        "symbol-spacing":250,
+        "icon-allow-overlap":false,
+        "icon-padding":2
+    },
+    "paint": {}
+};
 
 $.ajax(url + "/speeds", {
         dataType: 'JSON',

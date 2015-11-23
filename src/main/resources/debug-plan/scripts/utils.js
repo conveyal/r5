@@ -176,6 +176,10 @@ function getStyle(type) {
         style.layers.push(hover_layer);
 
     }
+    if (text.both) {
+        style.layers.push(oneway_icons_style);
+        /*console.log("Added oneway icons");*/
+    }
     console.log(style);
     map.setStyle(style);
     current_type = type;

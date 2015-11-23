@@ -178,6 +178,7 @@ function getStyle(type) {
     }
     if (text.both) {
         style.layers.push(oneway_icons_style);
+        used_oneway_style = true;
         /*console.log("Added oneway icons");*/
     }
     console.log(style);
@@ -215,4 +216,47 @@ function showFlagInfos(data) {
     if (html !== "") {
         $(".flags").html(html);
     }
+}
+
+function updateMap() {
+    //on zooms lower then 13 we are visiting too many spatial index cells on a server and don't get an answer
+    if (map.getZoom() < 13) {
+        return;
+    }
+    var bbox = map.getBounds();
+    var params = {
+        n : bbox.getNorth(),
+        s : bbox.getSouth(),
+        e : bbox.getEast(),
+        w : bbox.getWest(),
+        detail: true //adds name, OSMID and speed as properties
+    };
+    //Shows lines in both direction only on larger zooms
+    if (map.getZoom() > 14) {
+        params.both= text.both;
+    }
+    //Currently we are showing bidirectional lines but are switching to
+    //monodirectional
+    if (used_oneway_style && !params.both) {
+        used_oneway_style = false;
+        map.removeLayer("oneway-icons");
+    //Switching to bidireactional
+    }else if (!used_oneway_style && params.both) {
+        used_oneway_style = true;
+        map.addLayer(oneway_icons_style);
+    }
+    $.ajax(url +"/stats",{
+        dataType: 'JSON',
+        data:params,
+        success: function(data) {
+            if (data.data) {
+                showFlagInfos(data);
+            }
+        }
+    });
+    //console.log(bbox);
+    full_url = request_url + "?" + $.param(params);
+    /*console.log(full_url);*/
+    var source = map.getSource("perm");
+    source.setData(full_url);
 }

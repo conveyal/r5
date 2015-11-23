@@ -19,36 +19,7 @@ $(function() {
     makeGUI();
     //request new geojson on map move
     map.on('moveend', function() {
-        //on zooms lower then 13 we are visiting too many spatial index cells on a server and don't get an answer
-        if (map.getZoom() < 13) {
-            return;
-        }
-        var bbox = map.getBounds();
-        var params = {
-            n : bbox.getNorth(),
-            s : bbox.getSouth(),
-            e : bbox.getEast(),
-            w : bbox.getWest(),
-            detail: true //adds name, OSMID and speed as properties
-        };
-        //Shows lines in both direction only on larger zooms
-        if (map.getZoom() > 14) {
-            params.both= text.both;
-        }
-        $.ajax(url +"/stats",{
-            dataType: 'JSON',
-            data:params,
-            success: function(data) {
-                if (data.data) {
-                    showFlagInfos(data);
-                }
-            }
-        });
-        //console.log(bbox);
-        full_url = request_url + "?" + $.param(params);
-        /*console.log(full_url);*/
-        var source = map.getSource("perm");
-        source.setData(full_url);
+        updateMap();
     });
 
     //shows hower tag on map and shows a popup

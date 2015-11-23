@@ -17,6 +17,8 @@ var full_url = request_url;
 var tileset = 'conveyal.hml987j0';
 var map;
 var flag_visible = true;
+//True if bidirectional edges are shown AKA direction arrows
+var used_oneway_style = false;
 
 var speeds = {};
 var speed_min = 0;
@@ -104,7 +106,7 @@ var colors = [
 ];
 
 var oneway_icons_style = {
-    "id": "oneway-icon",
+    "id": "oneway-icons",
     "type": "symbol",
     "source": "perm",
     "minzoom":15,

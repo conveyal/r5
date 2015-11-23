@@ -280,7 +280,7 @@ public class TransitLayer implements Serializable, Cloneable {
 
             stopTree[stop] = r.getReachedVertices();
         }
-        LOG.info("Done duilding stop trees.");
+        LOG.info("Done building stop trees.");
     }
 
     public static TransitLayer fromGtfs (List<String> files) {

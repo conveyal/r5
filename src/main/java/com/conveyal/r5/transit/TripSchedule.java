@@ -10,7 +10,7 @@ import java.io.Serializable;
 /**
  *
  */
-public class TripSchedule implements Serializable, Comparable<TripSchedule> {
+public class TripSchedule implements Serializable, Comparable<TripSchedule>, Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(TripSchedule.class);
 
@@ -94,6 +94,14 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule> {
         return this.departures[0] - other.departures[0];
     }
 
+    @Override
+    public TripSchedule clone() {
+        try {
+            return (TripSchedule) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     /** @return whether it makes sense for the supplied trip to be served by the same vehicle as this trip. */
     public void chainTo (TripSchedule that) {

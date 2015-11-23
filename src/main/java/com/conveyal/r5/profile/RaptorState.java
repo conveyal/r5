@@ -10,6 +10,9 @@ import java.util.BitSet;
  * @author mattwigway
  */
 public class RaptorState {
+    /** Previous state (one less transfer) */
+    public RaptorState previous;
+
     /** departure time for this state */
     public int departureTime;
 
@@ -51,17 +54,12 @@ public class RaptorState {
     /** If this stop is optimally reached via a transfer, the stop we transferred from */
     public int[] transferStop;
 
-    /** Is the best way to reach this stop to walk from the origin? */
-    public BitSet atOrigin;
-
     public RaptorState (int nStops) {
         this.bestTimes = new int[nStops];
         this.bestNonTransferTimes = new int[nStops];
-        this.atOrigin = new BitSet(nStops);
 
         Arrays.fill(bestTimes, RaptorWorker.UNREACHED);
         Arrays.fill(bestNonTransferTimes, RaptorWorker.UNREACHED);
-        this.atOrigin.clear();
 
         this.previousPatterns = new int[nStops];
         this.previousStop = new int[nStops];
@@ -71,19 +69,45 @@ public class RaptorState {
         Arrays.fill(transferStop, -1);
     }
 
-    /** copy constructor */
+    /**
+     * copy constructor, use only when progressing from one round to the next to maintain consistent reachedThisRound data
+     */
     private RaptorState(RaptorState state) {
         this.bestTimes = Arrays.copyOf(state.bestTimes, state.bestTimes.length);
         this.bestNonTransferTimes = Arrays.copyOf(state.bestNonTransferTimes, state.bestNonTransferTimes.length);
         this.previousPatterns = Arrays.copyOf(state.previousPatterns, state.previousPatterns.length);
         this.previousStop = Arrays.copyOf(state.previousStop, state.previousStop.length);
         this.transferStop = Arrays.copyOf(state.transferStop, state.transferStop.length);
-        this.atOrigin = new BitSet(this.bestTimes.length);
-        this.atOrigin.or(state.atOrigin);
+        this.departureTime = state.departureTime;
+        this.previous = state;
     }
 
-    /** Copy this raptor state, e.g. to apply a frequency search */
+    /** Copy this raptor state to progress to the next round. Clears reachedThisRound so should be used only to progress to the next round. */
     public RaptorState copy () {
         return new RaptorState(this);
+    }
+
+    /**
+     * Set this state to the min values found in this state or the other passed in (used in Range RAPTOR).
+     * if updateStopsTouched is true, will copy reachedThisRound information from the other query where that
+     * query has the optimal time. Otherwise it will not. updateStopsTouched should thus be set to true when
+     * you are combining two RaptorStates from the same round (e.g. during a frequency search), and false when
+     * you are advancing to the next round.
+     */
+    public void min (RaptorState other) {
+        int nStops = this.bestTimes.length;
+        for (int stop = 0; stop < nStops; stop++) {
+            // prefer times from other when breaking tie as other is earlier in RAPTOR search and thus has fewer transfers
+            if (other.bestTimes[stop] <= this.bestTimes[stop]) {
+                this.bestTimes[stop] = other.bestTimes[stop];
+                this.transferStop[stop] = other.transferStop[stop];
+            }
+
+            if (other.bestNonTransferTimes[stop] <= this.bestNonTransferTimes[stop]) {
+                this.bestNonTransferTimes[stop] = other.bestNonTransferTimes[stop];
+                this.previousPatterns[stop] = other.previousPatterns[stop];
+                this.previousStop[stop] = other.previousStop[stop];
+            }
+        }
     }
 }

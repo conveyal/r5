@@ -156,11 +156,7 @@ public class StaticComputer implements Runnable {
 
         public Path (RaptorState state, int stop) {
             // trace the path back from this RaptorState
-            int previousPattern = state.previousPatterns[stop];
-
-            if (previousPattern == -1)
-                LOG.warn("Transit stop reached at egress without riding transit!");
-
+            int previousPattern;
             TIntList patterns = new TIntArrayList();
             TIntList boardStops = new TIntArrayList();
             TIntList alightStops = new TIntArrayList();
@@ -169,7 +165,15 @@ public class StaticComputer implements Runnable {
 
             boolean first = true;
 
-            while (previousPattern != -1) {
+            while (state.previous != null)  {
+                // find the fewest-transfers trip that is still optimal in terms of travel time
+                if (state.previous.bestNonTransferTimes[stop] == state.bestNonTransferTimes[stop]) {
+                    state = state.previous;
+                    continue;
+                }
+
+                previousPattern = state.previousPatterns[stop];
+
                 patterns.add(previousPattern);
                 alightStops.add(stop);
                 times.add(state.bestTimes[stop]);
@@ -177,22 +181,14 @@ public class StaticComputer implements Runnable {
                 stop = state.previousStop[stop];
                 boardStops.add(stop);
 
-                // even if we're at the origin, if this is the first hop, make sure that
-                // we don't break and leave an empty journey. bestNonTransferTimes always result
-                // from riding transit, even if it would make more sense to walk.
-                // If it would in fact make more sense to walk, that will be taken of by the (separate)
-                // non-transit search.
-                // see r5 issue #22
-                if (state.atOrigin.get(stop) && !first)
-                    break;
-
                 first = false;
+
+                // go to previous state before handling transfers as transfers are done at the end of a round
+                state = state.previous;
 
                 // handle transfers
                 if (state.transferStop[stop] != -1)
                     stop = state.transferStop[stop];
-
-                previousPattern = state.previousPatterns[stop];
             }
 
             patterns.reverse();
@@ -202,6 +198,9 @@ public class StaticComputer implements Runnable {
             this.patterns = patterns.toArray();
             this.boardStops = boardStops.toArray();
             this.alightStops = alightStops.toArray();
+
+            if (this.patterns.length == 0)
+                LOG.error("Transit path computed without a transit segment!");
         }
 
         public int hashCode () {

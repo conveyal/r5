@@ -12,11 +12,14 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.io.ByteStreams;
 import org.apache.commons.io.FileUtils;
 import com.conveyal.r5.analyst.PointSetCache;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.AbstractMap;
 import java.util.List;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
@@ -26,6 +29,7 @@ import java.util.zip.GZIPOutputStream;
  */
 public class PointSetDatastore extends PointSetCache {
 
+	private static final Logger LOG = LoggerFactory.getLogger(PointSetDatastore.class);
 	static private File POINT_DIR = new File("cache", "pointsets");
 	private String pointsetBucket;
 	
@@ -127,30 +131,34 @@ public class PointSetDatastore extends PointSetCache {
 			File cachedFile;
 			
 			if(!workOffline) {
-				// get pointset metadata from S3
+				// Get pointset metadata from S3.
 				cachedFile = new File(POINT_DIR, pointSetId + ".json");
+				LOG.info("Fetching PointSet with id {} from local cache or S3.", pointSetId);
 				if(!cachedFile.exists()){
+					LOG.info("PointSet is not in local cache, downloading it from s3.");
 					POINT_DIR.mkdirs();
-					
-					S3Object obj = s3.getObject(pointsetBucket, pointSetId + ".json.gz");
-					ObjectMetadata objMet = obj.getObjectMetadata();
-					FileOutputStream fos = new FileOutputStream(cachedFile);
-					GZIPInputStream gis = new GZIPInputStream(obj.getObjectContent());
+					GZIPInputStream gis = null;
+					FileOutputStream fos = null;
 					try {
+						S3Object obj;
+						obj = s3.getObject(pointsetBucket, pointSetId + ".json.gz");
+						ObjectMetadata objMet = obj.getObjectMetadata();
+						gis = new GZIPInputStream(obj.getObjectContent());
+						fos = new FileOutputStream(cachedFile);
 						ByteStreams.copy(gis, fos);
+					} catch (AmazonServiceException ex) {
+						LOG.error("The specified PointSet {} could not be retrieved from S3. Cause: {}", pointSetId, ex.getErrorMessage());
 					} finally {
-						fos.close();
-						gis.close();
+						if (gis != null) gis.close();
+						if (fos != null) fos.close();
 					}
 				}
 			}
-			else 
+			else {
 				cachedFile = new File(POINT_DIR, pointSetId + ".json");
-			
-			
-			
-			// grab it from the cache
-			
+			}
+			// Pointset file was already in the cache, or it has now been downloaded into the cache. Grab it.
+			LOG.info("Loading PointSet into cache from local file {}", cachedFile);
 			return FreeFormPointSet.fromGeoJson(cachedFile);
 		}
 	}

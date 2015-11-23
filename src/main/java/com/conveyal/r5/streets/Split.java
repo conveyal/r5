@@ -125,7 +125,10 @@ public class Split {
         }
 
         if (best.distance0_mm > edge.getLengthMm()) {
-            LOG.error("Length of first street segment was greater than the whole edge ({} > {}).",
+            // This mistake happens because the linear distance calculation we're using comes out longer than the
+            // spherical distance. The graph remains coherent because we force the two split edge lengths to add up
+            // to the original edge length.
+            LOG.debug("Length of first street segment was greater than the whole edge ({} > {}).",
                     best.distance0_mm, edge.getLengthMm());
             best.distance0_mm = edge.getLengthMm();
         }

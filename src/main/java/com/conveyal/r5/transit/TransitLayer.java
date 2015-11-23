@@ -253,9 +253,13 @@ public class TransitLayer implements Serializable, Cloneable {
     }
 
     public void buildStopTree () {
-        if (linkedStreetLayer == null)
-            throw new IllegalStateException("Attempt to build stop trees on unlinked transit layer");
 
+        LOG.info("Building stop trees (cached distances between transit stops and street intersections).");
+        if (linkedStreetLayer == null) {
+            throw new IllegalStateException("Attempt to build stop trees on a transit layer that is not linked to a street layer.");
+        }
+
+        // For each transit stop, an int->int map giving the distance of every reached street intersection from the origin stop.
         stopTree = new TIntIntMap[getStopCount()];
 
         StreetRouter r = new StreetRouter(linkedStreetLayer);
@@ -265,9 +269,8 @@ public class TransitLayer implements Serializable, Cloneable {
             int originVertex = streetVertexForStop.get(stop);
 
             if (originVertex == -1) {
-                // stop is unlinked
-                LOG.info("Stop {} is unlinked", stop);
-
+                // -1 indicates that this stop is not linked to the street network.
+                LOG.info("Stop {} has not been linked to the street netowork.", stop);
                 stopTree[stop] = null;
                 continue;
             }
@@ -277,6 +280,7 @@ public class TransitLayer implements Serializable, Cloneable {
 
             stopTree[stop] = r.getReachedVertices();
         }
+        LOG.info("Done duilding stop trees.");
     }
 
     public static TransitLayer fromGtfs (List<String> files) {

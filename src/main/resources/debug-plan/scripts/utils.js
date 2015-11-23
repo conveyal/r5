@@ -125,6 +125,7 @@ function getStyle(type) {
         };
         style.layers.push(hover_layer);
     } else if (type == "flags") {
+        flag_filters = ["any"];
         $.each(text, function(name, value) {
             console.log(name);
             if (name.startsWith("show_") && value == true) {
@@ -139,6 +140,7 @@ function getStyle(type) {
                     },
                     "filter":["==", flag_name.toUpperCase(), true]
                 };
+                flag_filters.push(["==", flag_name.toUpperCase(), true]);
                 style.layers.push(flag_layer);
             }
 
@@ -175,6 +177,13 @@ function getStyle(type) {
         };
         style.layers.push(hover_layer);
 
+    }
+    //Updates oneway icons style since we can enable/disable it with show
+    //bidirectional checkbox
+    if (type === "flags") {
+        oneway_icons_style.filter=flag_filters;
+    } else {
+        delete oneway_icons_style.filter;
     }
     if (text.both) {
         style.layers.push(oneway_icons_style);

@@ -19,6 +19,7 @@ var map;
 var flag_visible = true;
 //True if bidirectional edges are shown AKA direction arrows
 var used_oneway_style = false;
+var flag_filters = ["any"];
 
 var speeds = {};
 var speed_min = 0;

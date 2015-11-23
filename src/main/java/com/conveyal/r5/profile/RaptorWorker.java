@@ -145,6 +145,9 @@ public class RaptorWorker {
             initialIterator.advance();
             int stopIndex = initialIterator.key();
             int accessTime = initialIterator.value();
+            if (accessTime <= 0) {
+                LOG.error("access time to stop {} is {}", stopIndex, accessTime);
+            }
             initialStops.put(stopIndex, accessTime);
         }
 

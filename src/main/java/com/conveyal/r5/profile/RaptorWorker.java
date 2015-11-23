@@ -203,13 +203,9 @@ public class RaptorWorker {
             if (n % 15 == 0) {
                 LOG.info("minute {}", n);
             }
-<<<<<<< HEAD
 
             final int departureTimeFinal = departureTime;
             scheduleState.stream().forEach(rs -> rs.departureTime = departureTimeFinal);
-=======
-            scheduleState.departureTime = departureTime;
->>>>>>> 7525414... more logging of potentially slow operations #18
 
             // Run the search on scheduled routes.
             this.runRaptorScheduled(initialStops, departureTime);

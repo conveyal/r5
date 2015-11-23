@@ -258,11 +258,11 @@ public class AnalystWorker implements Runnable {
                 }
                 nextShutdownCheckTime += 60 * 60 * 1000;
             }
-            LOG.info("Long-polling for work ({} second timeout).", POLL_TIMEOUT / 1000.0);
+            LOG.debug("Long-polling for work ({} second timeout).", POLL_TIMEOUT / 1000.0);
             // Long-poll (wait a few seconds for messages to become available)
             List<AnalystClusterRequest> tasks = getSomeWork(WorkType.BATCH);
             if (tasks == null) {
-                LOG.info("Didn't get any work. Retrying.");
+                LOG.debug("Didn't get any work. Retrying.");
                 idle = true;
                 continue;
             }
@@ -439,7 +439,7 @@ public class AnalystWorker implements Runnable {
             sideChannelOpen = true;
             // don't keep single point connections alive forever
             while (System.currentTimeMillis() < lastHighPriorityRequestProcessed + SINGLE_POINT_KEEPALIVE_MSEC) {
-                LOG.info("Awaiting high-priority work");
+                LOG.debug("Awaiting high-priority work");
                 try {
                     List<AnalystClusterRequest> tasks = getSomeWork(WorkType.HIGH_PRIORITY);
 
@@ -483,7 +483,7 @@ public class AnalystWorker implements Runnable {
         } catch (JsonProcessingException e) {
             LOG.error("JSON processing exception while getting work", e);
         } catch (SocketTimeoutException stex) {
-            LOG.info("Socket timeout while waiting to receive work.");
+            LOG.debug("Socket timeout while waiting to receive work.");
         } catch (HttpHostConnectException ce) {
             LOG.error("Broker refused connection. Sleeping before retry.");
             try {
@@ -620,7 +620,7 @@ public class AnalystWorker implements Runnable {
 
     /** log queue status */
     private void logQueueStatus() {
-        LOG.info("Waiting tasks: high priority: {}, batch: {}", highPriorityExecutor.getQueue().size(), batchExecutor.getQueue().size());
+        LOG.debug("Waiting tasks: high priority: {}, batch: {}", highPriorityExecutor.getQueue().size(), batchExecutor.getQueue().size());
     }
 
     /**

@@ -136,7 +136,6 @@ public class RepeatedRaptorProfileRouter {
             TIntIntMap transitStopAccessTimes = streetRouter.getReachedStops();
             ts.initialStopCount = transitStopAccessTimes.size();
             LOG.info("Found {} transit stops near origin", ts.initialStopCount);
-
             propagatedTimesStore = worker.runRaptor(transitStopAccessTimes, nonTransitTimes, ts);
         } else {
             // Nontransit case: skip transit routing and make a propagated times store based on only one row.

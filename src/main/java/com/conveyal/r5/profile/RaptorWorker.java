@@ -203,9 +203,13 @@ public class RaptorWorker {
             if (n % 15 == 0) {
                 LOG.info("minute {}", n);
             }
+<<<<<<< HEAD
 
             final int departureTimeFinal = departureTime;
             scheduleState.stream().forEach(rs -> rs.departureTime = departureTimeFinal);
+=======
+            scheduleState.departureTime = departureTime;
+>>>>>>> 7525414... more logging of potentially slow operations #18
 
             // Run the search on scheduled routes.
             this.runRaptorScheduled(initialStops, departureTime);
@@ -580,17 +584,18 @@ public class RaptorWorker {
                             onTrip = trip;
                             onTripIdx = tripIdx;
                             boardStopIndex = stopIndex;
-                            break; // trips are sorted, we've found the first one
+                            break; // trips are sorted, we've found the earliest usable one
                         }
                     }
 
                     continue; // boarded or not, we move on to the next stop in the sequence
                 } else {
-                    // We're on board a trip.
+                    // We're on board a trip. At this particular stop on this trip, update best arrival time
+                    // if we've improved on the existing one.
                     int arrivalTime = onTrip.arrivals[stopPositionInPattern];
 
                     if (arrivalTime > max_time)
-                        // cut off the search, don't continue searching this pattern
+                        // Cut off the search, don't continue searching this pattern
                         continue PATTERNS;
 
                     if (arrivalTime < outputState.bestNonTransferTimes[stopIndex]) {

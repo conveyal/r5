@@ -270,7 +270,7 @@ public class TransitLayer implements Serializable, Cloneable {
 
             if (originVertex == -1) {
                 // -1 indicates that this stop is not linked to the street network.
-                LOG.info("Stop {} has not been linked to the street netowork.", stop);
+                LOG.info("Stop {} has not been linked to the street network.", stop);
                 stopTree[stop] = null;
                 continue;
             }

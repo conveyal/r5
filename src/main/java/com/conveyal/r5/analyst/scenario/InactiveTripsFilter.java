@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.gtfs.model.Trip;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -43,7 +44,7 @@ public class InactiveTripsFilter extends TripScheduleModification {
     }
 
     /**
-     * For each trip pattern, if that trip pattern is used on any of the service scehedules that are active on
+     * For each trip pattern, if that trip pattern is used on any of the service schedules that are active on
      * the date in question, apply the filter to each trip schedule individually. Otherwise reject the entire pattern,
      * it will not be used in the search.
      */

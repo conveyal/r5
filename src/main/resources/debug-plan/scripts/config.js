@@ -21,6 +21,7 @@ var flag_visible = true;
 var used_oneway_style = false;
 var flag_filters = ["any"];
 
+//Map of speed as m/s * 1000 as string to number of occurences
 var speeds = {};
 var speed_min = 0;
 var speed_max = 36111;
@@ -28,6 +29,7 @@ var speed_max = 36111;
 //line-dasharray from MapGL first number is length of line second length of gap
 var flag_dash = [1.25, 3];
 
+//which color has which permission
 var permission_colors = {
     "none":"#333333",
     "walk":"#33b333",
@@ -65,7 +67,7 @@ var mapbox_style = {
     }]
 };
 
-//list of random colors to have some default colors for lines
+//list of random colors to have some default colors for flags
 var colors = [
     "#c7f7e8",
     "#58583b",
@@ -109,6 +111,8 @@ var colors = [
     "#a24cf7",
 ];
 
+//There are also different colored icons ["blue", "black", "green", "mix"]
+//and different sizes ["thin", "middle", "big"]
 var oneway_icons_style = {
     "id": "oneway-icons",
     "type": "symbol",

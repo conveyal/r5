@@ -23,7 +23,7 @@ function makeGUI() {
                     text['color_'+lowercase_name] = colors[next_color];
                     text['dash_'+lowercase_name] = false;
                     next_color++;
-                    console.log("key: ", split_name.toProperCase());
+                    /*console.log("key: ", split_name.toProperCase());*/
                     var tmp = gui.addFolder(nice_name);
                     tmp.add(text, 'show_' + lowercase_name)
                     .onFinishChange(function(value) {flagChange(lowercase_name, value)});

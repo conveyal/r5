@@ -263,6 +263,10 @@ public class EdgeStore implements Serializable {
             flags.get(edgeIndex).add(flag);
         }
 
+        public void clearFlag(EdgeFlag flag) {
+            flags.get(edgeIndex).remove(flag);
+        }
+
         public int getSpeed() {
             return speeds.get(edgeIndex);
         }

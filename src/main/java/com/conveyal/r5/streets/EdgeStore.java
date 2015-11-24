@@ -326,7 +326,7 @@ public class EdgeStore implements Serializable {
                 // TODO bike walking
             }
             else if (mode == Mode.CAR && getFlag(EdgeFlag.ALLOWS_CAR))
-                s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / speeds.get(edgeIndex));
+                s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / getSpeedMs());
             else
                 return null; // this mode cannot traverse this edge
 

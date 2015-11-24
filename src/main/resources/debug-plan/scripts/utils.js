@@ -345,3 +345,37 @@ function updateMap() {
     var source = map.getSource("perm");
     source.setData(full_url);
 }
+
+//Requests a server for envelope for wanted edge_id
+//- moves map to this envelope,
+//- enables bidirectional edges
+//- highlights requested edge
+function query_edge_id(edge_id) {
+    console.info("Edge_ID:", edge_id);
+    var params = {
+        'edgeID': text.edge_id
+    };
+    //Enabling bidirectional edges since wanted edge can be reverse edge
+    text.both = true;
+    $.ajax(otp_config.hostname + "/query", {
+            dataType: 'JSON',
+            data: params,
+            success: function(data) {
+                if (data.data) {
+                    console.info("Loaded speeds data:", data.data);
+                    window.map.fitBounds([
+                        [data.data.minX, data.data.minY],
+                        [data.data.maxX, data.data.maxY]
+                    ]);
+                    ids = [parseInt(text.edge_id)];
+                    // set the filter on the hover style layer to only select the features
+                    // currently under the mouse
+                    map.setFilter('perm-hover', [ 'all',
+                                [ 'in', 'edge_id' ].concat(ids)
+                    ]);
+                } else {
+                    alert("Problem getting edge id:\n" + data.errors);
+                }
+            }
+    });
+}

@@ -161,6 +161,7 @@ var FilterConfig = function() {
     this.debug_type = "permissions";
     this.unit = "kmh";
     this.both = false;
+    this.edge_id = "";
 
     this.min_speed_color = "#008000";
     this.middle_speed_color = "#FFFF00";

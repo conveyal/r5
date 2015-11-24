@@ -439,6 +439,37 @@ public class PointToPointRouterServer {
             return content;
         }, JsonUtilities.objectMapper::writeValueAsString);
 
+
+        //queries edge store for edgeID and returns envelope of this edge ID
+        get("/query", (request, response) -> {
+            response.header("Content-Type", "application/json");
+            Map<String, Object> content = new HashMap<>(2);
+            try {
+
+            Integer edgeID = request.queryMap("edgeID").integerValue();
+
+            if (edgeID == null) {
+                content.put("errors", "edgeID is empty!");
+            } else {
+                EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor();
+                try {
+                    edge.seek(edgeID);
+                    content.put("data", edge.getGeometry().getEnvelopeInternal());
+                } catch (Exception ex) {
+                    content.put("errors", ex.getMessage());
+                    LOG.error("Error getting edge:{}", ex);
+                }
+
+            }
+            } catch (Exception ex) {
+                content.put("errors", "Problem converting edgeID to integer:"+ ex.getMessage());
+                LOG.error("Error converting edgeID to integer:{}", ex.getMessage());
+            }
+
+            return content;
+
+        }, JsonUtilities.objectMapper::writeValueAsString);
+
     }
 
     private static void updateSpeed(EdgeStore.Edge edge, Map<Integer, Integer> speedUsage,

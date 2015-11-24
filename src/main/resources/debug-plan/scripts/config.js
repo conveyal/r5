@@ -17,6 +17,7 @@ var full_url = request_url;
 var tileset = 'conveyal.hml987j0';
 var map;
 var flag_visible = true;
+var speed_visible = true;
 //True if bidirectional edges are shown AKA direction arrows
 var used_oneway_style = false;
 var flag_filters = ["any"];
@@ -149,7 +150,7 @@ $.ajax(url + "/speeds", {
                 speeds = data.data;
                 speed_min = data.min;
                 speed_max = data.max;
-                console.info("Loaded speeds data:", speeds);
+                /*console.info("Loaded speeds data:", speeds);*/
             } else {
                 alert("Problem getting speeds:" + data.errors);
             }
@@ -187,6 +188,17 @@ $(function() {
             $("#flag_info p").show();
             flag_visible = true;
             $("#flag_info a").text("Close");
+        }
+    });
+    $("#speed_info a").click(function() {
+        if (speed_visible) {
+            $("#speed_info p").hide();
+            speed_visible = false;
+            $("#speed_info a").text("Open");
+        } else {
+            $("#speed_info p").show();
+            speed_visible = true;
+            $("#speed_info a").text("Close");
         }
     });
 });

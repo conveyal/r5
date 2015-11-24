@@ -37,6 +37,7 @@ function makeGUI() {
                 });
 
                 showFlagInfos(data);
+                showSpeedInfos(speeds);
             }else {
                 console.error(data.errors);
                 alert("Problem loading flags from server:" + data.errors);

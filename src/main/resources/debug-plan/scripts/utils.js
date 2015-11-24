@@ -303,6 +303,20 @@ function showFlagInfos(data) {
     }
 }
 
+//Shows how many times each speed is used in speed usage div
+function showSpeedInfos(data) {
+    console.info(data);
+    var html = "";
+    $.each(data, function(speed, usage) {
+        var speed = showSpeed(speed);
+        html += "<b>" + speed +"</b>:";
+        html += usage + "<br />";
+    });
+    if (html !== "") {
+        $(".speeds").html(html);
+    }
+}
+
 function updateMap() {
     //on zooms lower then 13 we are visiting too many spatial index cells on a server and don't get an answer
     if (map.getZoom() < 13) {
@@ -330,12 +344,22 @@ function updateMap() {
         used_oneway_style = true;
         map.addLayer(oneway_icons_style);
     }
+    //Shows flag and speed stats
     $.ajax(url +"/stats",{
         dataType: 'JSON',
         data:params,
         success: function(data) {
             if (data.data) {
                 showFlagInfos(data);
+            }
+        }
+    });
+    $.ajax(url +"/speeds",{
+        dataType: 'JSON',
+        data:params,
+        success: function(data) {
+            if (data.data) {
+                showSpeedInfos(data.data);
             }
         }
     });

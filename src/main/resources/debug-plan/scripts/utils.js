@@ -55,7 +55,28 @@ function flagChange(flag_name, value) {
     //console.log("Flag:", flag_name);
     //console.log("Info:", value);
     if (value == false) {
+        var location=-1;
+        //We check which index has current filter we want to disable
+        //We start at 1 since at 0 is always "any"
+        for (var idx = 1; idx < flag_filters.length; idx++) {
+            if (flag_filters[idx][1]==flag_name.toUpperCase()){
+                location = idx;
+                break;
+            }
+        }
+        /*console.log("Removing flag: ", flag_name);*/
+        /*console.log("Location:", location);*/
+        /*console.log(flag_filters.map(function(item){return item[1];}));*/
         map.removeLayer("perm-"+flag_name);
+        if (location > 0) {
+            //removes current flag filter from list
+            flag_filters.splice(location, 1);
+            /*console.log(flag_filters.map(function(item){return item[1];}));*/
+            oneway_icons_style.filter=flag_filters;
+            if (text.both) {
+                map.setFilter("oneway-icons", flag_filters);
+            }
+        }
     } else {
         var flag_layer = {
             "id": "perm-"+flag_name,
@@ -67,7 +88,20 @@ function flagChange(flag_name, value) {
             },
             "filter":["==", flag_name.toUpperCase(), true]
         };
-        map.addLayer(flag_layer);
+        /*console.log("Adding flag: ", flag_name);*/
+        //Updates filter with new flag
+        flag_filters.push(["==", flag_name.toUpperCase(), true]);
+        /*console.log(flag_filters.map(function(item){return item[1];}));*/
+        oneway_icons_style.filter=flag_filters;
+        //We remove and readd oneway icons, because it needs to be the last
+        //filter to be drawn on top
+        if (text.both) {
+            map.removeLayer("oneway-icons");
+            map.addLayer(flag_layer);
+            map.addLayer(oneway_icons_style);
+        } else {
+            map.addLayer(flag_layer);
+        }
     }
 }
 
@@ -97,6 +131,7 @@ function getStyle(type) {
     console.log(text);
     style = clone(mapbox_style);
     style.sources["perm"].data = full_url;
+    flag_filters = ["any"];
     if (type == "permissions") {
         $.each(permission_colors, function(name, color) {
             var nice_name = name.replace(',', '_');
@@ -125,7 +160,6 @@ function getStyle(type) {
         };
         style.layers.push(hover_layer);
     } else if (type == "flags") {
-        flag_filters = ["any"];
         $.each(text, function(name, value) {
             console.log(name);
             if (name.startsWith("show_") && value == true) {

@@ -46,6 +46,30 @@ function clone(obj) {
 }
 
 /**
+ * Creates flag layer and updates flag filters
+ *
+ * It uses color, and dash from gui config
+ */
+function makeFlagLayer(flag_name) {
+    var flag_layer = {
+        "id": "perm-"+flag_name,
+        "type": "line",
+        "source": "perm",
+        "paint": {
+            "line-color":text["color_"+flag_name],
+            "line-width":2
+        },
+        "filter":["==", flag_name.toUpperCase(), true]
+    };
+    if (text["dash_"+flag_name]) {
+        flag_layer.paint["line-dasharray"] = flag_dash;
+        flag_layer.paint["line-width"] = 3;
+    }
+    flag_filters.push(["==", flag_name.toUpperCase(), true]);
+    return flag_layer;
+}
+
+/**
 Function enables or disables layer depending on true or false gui value
 **/
 function flagChange(flag_name, value) {
@@ -78,19 +102,8 @@ function flagChange(flag_name, value) {
             }
         }
     } else {
-        var flag_layer = {
-            "id": "perm-"+flag_name,
-            "type": "line",
-            "source": "perm",
-            "paint": {
-                "line-color":text["color_"+flag_name],
-                "line-width":2
-            },
-            "filter":["==", flag_name.toUpperCase(), true]
-        };
+        var flag_layer = makeFlagLayer(flag_name);
         /*console.log("Adding flag: ", flag_name);*/
-        //Updates filter with new flag
-        flag_filters.push(["==", flag_name.toUpperCase(), true]);
         /*console.log(flag_filters.map(function(item){return item[1];}));*/
         oneway_icons_style.filter=flag_filters;
         //We remove and readd oneway icons, because it needs to be the last
@@ -122,6 +135,26 @@ function colorChange(name, color) {
         $.each(speeds, function(speed, occurence) {
             map.setPaintProperty("speed-"+speed,"line-color", speedColor(speed));
         });
+    }
+}
+
+//Function that enables/disables flag dash array
+function dashChange(name, enabled) {
+    if (current_type != "flags") {
+        return;
+    }
+
+    if (text["show_"+name] == true) {
+
+        if (enabled==true) {
+            map.setPaintProperty("perm-"+name, "line-width", 3);
+            map.setPaintProperty("perm-"+name, "line-dasharray", flag_dash);
+        } else {
+            map.setPaintProperty("perm-"+name, "line-width", 2);
+            //TODO: change this to null when unsetting paint properties is
+            //supported
+            map.setPaintProperty("perm-"+name, "line-dasharray", [100,0]);
+        }
     }
 }
 
@@ -164,17 +197,7 @@ function getStyle(type) {
             console.log(name);
             if (name.startsWith("show_") && value == true) {
                 var flag_name = name.replace("show_", "");
-                var flag_layer = {
-                    "id": "perm-"+flag_name,
-                    "type": "line",
-                    "source": "perm",
-                    "paint": {
-                        "line-color":text["color_"+flag_name],
-                        "line-width":2
-                    },
-                    "filter":["==", flag_name.toUpperCase(), true]
-                };
-                flag_filters.push(["==", flag_name.toUpperCase(), true]);
+                var flag_layer = makeFlagLayer(flag_name);
                 style.layers.push(flag_layer);
             }
 

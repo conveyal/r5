@@ -25,6 +25,9 @@ var speeds = {};
 var speed_min = 0;
 var speed_max = 36111;
 
+//line-dasharray from MapGL first number is length of line second length of gap
+var flag_dash = [1.25, 3];
+
 var permission_colors = {
     "none":"#333333",
     "walk":"#33b333",

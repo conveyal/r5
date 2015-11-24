@@ -3,6 +3,7 @@ var text = new FilterConfig();
 function makeGUI() {
     "use strict";
     var gui = new dat.GUI();
+    gui.remember(text);
     gui.add(text, 'debug_type', ['permissions', 'flags', 'speeds']).onFinishChange(getStyle);
     gui.add(text, "unit", ['kmh', 'mph']);
     gui.add(text, 'both').listen().name("Show bidirectional").onChange(function(value) { updateMap(); });

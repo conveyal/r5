@@ -249,47 +249,14 @@ public class PointToPointRouterServer {
                     try {
                         cursor.seek(s);
 
-                        LineString geometry = cursor.getGeometry();
-
-                        if (both) {
-                            Coordinate[] coords = offsetBuilder.getOffsetCurve(geometry.getCoordinates(),
-                                distance);
-                            geometry = GeometryUtils.geometryFactory.createLineString(coords);
-                        }
-
-
-                        GeoJsonFeature feature = new GeoJsonFeature(geometry);
-                        feature.addProperty("permission", cursor.getPermissionsAsString());
-                        feature.addProperty("edge_id", cursor.getEdgeIndex());
-                        feature.addProperty("speed_ms", Math.round(cursor.getSpeedMs()*1000));
-                        //Needed for filtering flags
-                        for (EdgeStore.EdgeFlag flag: EdgeStore.EdgeFlag.values()) {
-                            if (cursor.getFlag(flag)) {
-                                feature.addProperty(flag.toString(), true);
-                            }
-                        }
-                        feature.addProperty("flags", cursor.getFlagsAsString());
+                        GeoJsonFeature feature = getEdgeFeature(both, cursor, offsetBuilder,
+                            distance);
                         features.add(feature);
                         if (both) {
+                            //backward edge
                             cursor.seek(s+1);
-                            geometry = cursor.getGeometry();
-
-                            Coordinate[] coords = offsetBuilder.getOffsetCurve(geometry.getCoordinates(),
+                            feature = getEdgeFeature(both, cursor, offsetBuilder,
                                 distance);
-                            geometry = GeometryUtils.geometryFactory.createLineString(coords);
-
-
-                            feature = new GeoJsonFeature(geometry);
-                            feature.addProperty("permission", cursor.getPermissionsAsString());
-                            feature.addProperty("edge_id", cursor.getEdgeIndex());
-                            feature.addProperty("speed_ms", Math.round(cursor.getSpeedMs()*1000));
-                            //Needed for filtering flags
-                            for (EdgeStore.EdgeFlag flag: EdgeStore.EdgeFlag.values()) {
-                                if (cursor.getFlag(flag)) {
-                                    feature.addProperty(flag.toString(), true);
-                                }
-                            }
-                            feature.addProperty("flags", cursor.getFlagsAsString());
                             features.add(feature);
 
                         }
@@ -470,6 +437,38 @@ public class PointToPointRouterServer {
 
         }, JsonUtilities.objectMapper::writeValueAsString);
 
+    }
+
+    /**
+     * Gets feature from edge in EdgeStore
+     * @param both true if we are showing edges in both directions AKA it needs to be offset
+     * @param cursor cursor to current forward or reversed edge
+     * @param offsetBuilder builder which creates edge offset if needed
+     * @param distance for which edge is offset if both is true
+     * @return
+     */
+    private static GeoJsonFeature getEdgeFeature(boolean both, EdgeStore.Edge cursor,
+        OffsetCurveBuilder offsetBuilder, float distance) {
+        LineString geometry = cursor.getGeometry();
+
+        if (both) {
+            Coordinate[] coords = offsetBuilder.getOffsetCurve(geometry.getCoordinates(),
+                distance);
+            geometry = GeometryUtils.geometryFactory.createLineString(coords);
+        }
+
+        GeoJsonFeature feature = new GeoJsonFeature(geometry);
+        feature.addProperty("permission", cursor.getPermissionsAsString());
+        feature.addProperty("edge_id", cursor.getEdgeIndex());
+        feature.addProperty("speed_ms", Math.round(cursor.getSpeedMs()*1000));
+        //Needed for filtering flags
+        for (EdgeStore.EdgeFlag flag: EdgeStore.EdgeFlag.values()) {
+            if (cursor.getFlag(flag)) {
+                feature.addProperty(flag.toString(), true);
+            }
+        }
+        feature.addProperty("flags", cursor.getFlagsAsString());
+        return feature;
     }
 
     private static void updateSpeed(EdgeStore.Edge edge, Map<Integer, Integer> speedUsage,

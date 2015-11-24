@@ -361,7 +361,7 @@ public class PointToPointRouterServer {
         get("debug/speeds", (request, response) -> {
             response.header("Content-Type", "application/json");
             Map<String, Object> content = new HashMap<>(2);
-            Map<Integer, Integer> speedUsage = new HashMap<>();
+            Map<Short, Integer> speedUsage = new HashMap<>();
             MinMax minMax = new MinMax();
             if (request.queryParams().size() < 4) {
 
@@ -472,7 +472,7 @@ public class PointToPointRouterServer {
         GeoJsonFeature feature = new GeoJsonFeature(geometry);
         feature.addProperty("permission", cursor.getPermissionsAsString());
         feature.addProperty("edge_id", cursor.getEdgeIndex());
-        feature.addProperty("speed_ms", Math.round(cursor.getSpeedMs()*1000));
+        feature.addProperty("speed_ms", cursor.getSpeed());
         //Needed for filtering flags
         for (EdgeStore.EdgeFlag flag: EdgeStore.EdgeFlag.values()) {
             if (cursor.getFlag(flag)) {
@@ -483,9 +483,9 @@ public class PointToPointRouterServer {
         return feature;
     }
 
-    private static void updateSpeed(EdgeStore.Edge edge, Map<Integer, Integer> speedUsage,
+    private static void updateSpeed(EdgeStore.Edge edge, Map<Short, Integer> speedUsage,
         MinMax minMax) {
-        Integer currentEdgeSpeed = Math.round(edge.getSpeedMs()*1000);
+        Short currentEdgeSpeed = edge.getSpeed();
         Integer currentValue = speedUsage.getOrDefault(currentEdgeSpeed, 0);
         speedUsage.put(currentEdgeSpeed, currentValue+1);
         minMax.updateMin(currentEdgeSpeed);
@@ -493,15 +493,15 @@ public class PointToPointRouterServer {
     }
 
     private static class MinMax {
-        public int min = Integer.MAX_VALUE;
-        public int max = Integer.MIN_VALUE;
+        public short min = Short.MAX_VALUE;
+        public short max = Short.MIN_VALUE;
 
-        public void updateMin(Integer currentEdgeSpeed) {
-            min = Math.min(currentEdgeSpeed, min);
+        public void updateMin(Short currentEdgeSpeed) {
+            min = (short) Math.min(currentEdgeSpeed, min);
         }
 
-        public void updateMax(Integer currentEdgeSpeed) {
-            max = Math.max(currentEdgeSpeed, max);
+        public void updateMax(Short currentEdgeSpeed) {
+            max = (short) Math.max(currentEdgeSpeed, max);
         }
     }
 

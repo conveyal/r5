@@ -8,7 +8,9 @@ import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.LineString;
 import gnu.trove.list.TIntList;
+import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.list.array.TShortArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,8 +50,14 @@ public class EdgeStore implements Serializable {
     /** Flags for this edge.  One entry for each forward and each backward edge. */
     protected List<EnumSet<EdgeFlag>> flags;
 
-    /** Speed for this edge.  One entry for each forward and each backward edge. Currently m/s * VertexStore.FixedFactor */
-    protected TIntList speeds;
+    /** Speed for this edge.
+     * One entry for each forward and each backward edge.
+     * rounded (m/s * 100) (2 decimal places)
+     * Saved speed is mostly the same as speed saved as m/s * 1000 it differs in second decimal place and is 0.024% smaller
+     *
+     * This way of saving speeds is 3.5% smaller then previous (saving 7 decimal places)
+     */
+    protected TShortList speeds;
 
     /** From vertices. One entry for each edge pair */
     protected TIntList fromVertices;
@@ -70,7 +78,7 @@ public class EdgeStore implements Serializable {
         this.vertexStore = vertexStore;
         // There is one flags and speeds entry per edge.
         flags = new ArrayList<>(initialSize);
-        speeds = new TIntArrayList(initialSize);
+        speeds = new TShortArrayList(initialSize);
         // Vertex indices, geometries, and lengths are shared between pairs of forward and backward edges.
         int initialEdgePairs = initialSize / 2;
         fromVertices = new TIntArrayList(initialEdgePairs);
@@ -180,8 +188,8 @@ public class EdgeStore implements Serializable {
      * @return a cursor pointing to the forward edge in the pair, which always has an even index.
      */
     public Edge addStreetPair(int beginVertexIndex, int endVertexIndex, int edgeLengthMillimeters,
-        EnumSet<EdgeFlag> forwardFlags, EnumSet<EdgeFlag> backFlags, int forwardSpeed,
-        int backwardSpeed) {
+        EnumSet<EdgeFlag> forwardFlags, EnumSet<EdgeFlag> backFlags, short forwardSpeed,
+        short backwardSpeed) {
 
         // Store only one length, set of endpoints, and intermediate geometry per pair of edges.
         lengths_mm.add(edgeLengthMillimeters);
@@ -266,19 +274,19 @@ public class EdgeStore implements Serializable {
             flags.get(edgeIndex).add(flag);
         }
 
-        public int getSpeed() {
+        public short getSpeed() {
             return speeds.get(edgeIndex);
         }
 
         public float getSpeedMs() {
-            return (float) ((speeds.get(edgeIndex) / VertexStore.FIXED_FACTOR));
+            return (float) ((speeds.get(edgeIndex) / 100.));
         }
 
         public float getSpeedkmh() {
-            return (float) ((speeds.get(edgeIndex) / VertexStore.FIXED_FACTOR) * 3.6);
+            return (float) ((speeds.get(edgeIndex) / 100.) * 3.6);
         }
 
-        public void setSpeed(int speed) {
+        public void setSpeed(short speed) {
             speeds.set(edgeIndex, speed);
         }
 

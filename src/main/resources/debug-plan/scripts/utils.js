@@ -257,7 +257,7 @@ function getStyle(type) {
 // And returnes it rounded to 2 decimal places
 //and wanted unit
 function showSpeed(speedms) {
-    var speed_ms = speedms/1000;
+    var speed_ms = speedms/100;
     var speed;
     if (text.unit == "kmh") {
         speed = speed_ms*3.6;

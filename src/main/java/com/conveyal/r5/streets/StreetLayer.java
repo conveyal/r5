@@ -236,9 +236,8 @@ public class StreetLayer implements Serializable {
         return (int)(lengthMeters * 1000);
     }
 
-    private static int speedToInt(Float speed) {
-        //TODO: lower number of decimals check if we can store speed in short/byte since max speed is probably 200 km/h ~ 55 m/s
-        return (int) (speed * VertexStore.FIXED_FACTOR);
+    private static short speedToShort(Float speed) {
+        return (short) Math.round(speed * 100);
     }
 
     /**
@@ -270,8 +269,8 @@ public class StreetLayer implements Serializable {
             return;
         }
 
-        int forwardSpeed = speedToInt(speedConfigurator.getSpeedMS(way, false));
-        int backwardSpeed = speedToInt(speedConfigurator.getSpeedMS(way, true));
+        short forwardSpeed = speedToShort(speedConfigurator.getSpeedMS(way, false));
+        short backwardSpeed = speedToShort(speedConfigurator.getSpeedMS(way, true));
 
         // Create and store the forward and backward edge
         EnumSet<EdgeStore.EdgeFlag> forwardFlags = permissions.getPermissions(way, false);
@@ -395,10 +394,10 @@ public class StreetLayer implements Serializable {
         // New edges will be added to edge lists later (the edge list is a transient index).
         // I believe the edge we get passed is always a forward edge
         EnumSet<EdgeStore.EdgeFlag> forwardFlags = edge.getFlags();
-        int forwardSpeed = edge.getSpeed();
+        short forwardSpeed = edge.getSpeed();
         edge.advance();
         EnumSet<EdgeStore.EdgeFlag> backFlags = edge.getFlags();
-        int backwardSpeed = edge.getSpeed();
+        short backwardSpeed = edge.getSpeed();
 
         EdgeStore.Edge newEdge = edgeStore.addStreetPair(newVertexIndex, oldToVertex, split.distance1_mm, forwardFlags, backFlags,
             forwardSpeed, backwardSpeed);

@@ -251,6 +251,18 @@ public class PointToPointRouterServer {
 
                         GeoJsonFeature feature = getEdgeFeature(both, cursor, offsetBuilder,
                             distance);
+
+                        if (!both) {
+                            //Adds fake flag oneway which is added to forward edge if permission flags on forward and backward edge differ.
+                            EnumSet<EdgeStore.EdgeFlag> forwardPermissions = cursor.getPermissionFlags();
+                            EdgeStore.Edge backwardCursor = transportNetwork.streetLayer.edgeStore.getCursor(s+1);
+
+                            EnumSet<EdgeStore.EdgeFlag> backwardPermissions = backwardCursor.getPermissionFlags();
+
+                            if (!forwardPermissions.equals(backwardPermissions)) {
+                                feature.addProperty("ONEWAY", true);
+                            }
+                        }
                         features.add(feature);
                         if (both) {
                             //backward edge

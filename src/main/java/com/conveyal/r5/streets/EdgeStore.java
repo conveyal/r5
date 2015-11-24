@@ -63,6 +63,9 @@ public class EdgeStore implements Serializable {
     /** Geometries. One entry for each edge pair */
     protected List<int[]> geometries; // intermediate points along the edge, other than the intersection endpoints
 
+    public static final transient EnumSet<EdgeFlag> PERMISSION_FLAGS = EnumSet
+        .of(EdgeFlag.ALLOWS_PEDESTRIAN, EdgeFlag.ALLOWS_BIKE, EdgeFlag.ALLOWS_CAR);
+
     public EdgeStore (VertexStore vertexStore, int initialSize) {
         this.vertexStore = vertexStore;
         // There is one flags and speeds entry per edge.
@@ -490,6 +493,20 @@ public class EdgeStore implements Serializable {
                 sb.add("car");
             }
             return sb.toString();
+        }
+
+        /**
+         * Returns only enumSet of permission flags (CAR, BICYCLE, WALKING)
+         * @return
+         */
+        public EnumSet<EdgeFlag> getPermissionFlags() {
+            EnumSet<EdgeFlag> edgePermissionFlags = EnumSet.noneOf(EdgeFlag.class);
+            for (EdgeFlag permissionFlag: PERMISSION_FLAGS) {
+                if (getFlag(permissionFlag)) {
+                    edgePermissionFlags.add(permissionFlag);
+                }
+            }
+            return edgePermissionFlags;
         }
 
         public int getEdgeIndex() {

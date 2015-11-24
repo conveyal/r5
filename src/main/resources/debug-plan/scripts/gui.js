@@ -17,6 +17,8 @@ function makeGUI() {
         dataType: 'JSON',
         success: function(data) {
             if (data.data) {
+                //Adds fake oneway flag
+                data.data["ONEWAY"] = "1";
                 var next_color = 0;
                 $.each(data.data, function(key, usages) {
                     var split_name = key.replace("_", " ");

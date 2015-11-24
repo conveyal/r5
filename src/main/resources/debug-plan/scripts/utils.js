@@ -252,6 +252,21 @@ function getStyle(type) {
     current_type = type;
 }
 
+//Converts speed from m/s to kmh/mph
+// based on GUI settings
+// And returnes it rounded to 2 decimal places
+//and wanted unit
+function showSpeed(speedms) {
+    var speed_ms = speedms/1000;
+    var speed;
+    if (text.unit == "kmh") {
+        speed = speed_ms*3.6;
+    } else {
+        speed = speed_ms*2.23693629;
+    }
+    return Math.round(speed*100)/100 + " "+text.unit;
+}
+
 //Shows all the features from current layer in popup
 function fillPopup(feature, layer) {
     if (feature.properties) {
@@ -261,7 +276,11 @@ function fillPopup(feature, layer) {
         for (var i=0; i < layer_info.length; i++) {
             pop += layer_info[i].toUpperCase();
             pop +=": ";
-            pop += prop[layer_info[i]];
+            if (layer_info[i] == "speed_ms") {
+                pop += showSpeed(prop[layer_info[i]]);
+            } else {
+                pop += prop[layer_info[i]];
+            }
             pop +="<br />";
         }
         pop +="</p>";

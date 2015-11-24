@@ -5,7 +5,7 @@ var otp_config = {
 };
 //Those are layers and name of properties in a layer if detail=true
 var layers = {
-    streetEdges:["edge_id", "permission", "speed", "flags"],
+    streetEdges:["edge_id", "permission", "speed_ms", "flags"],
     permEdges:["name", "edge_id", "label"]
 };
 var current_layer = "streetEdges";
@@ -159,6 +159,7 @@ $.ajax(url + "/speeds", {
 
 var FilterConfig = function() {
     this.debug_type = "permissions";
+    this.unit = "kmh";
     this.both = false;
 
     this.min_speed_color = "#008000";

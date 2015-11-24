@@ -262,7 +262,6 @@ public class PointToPointRouterServer {
                         feature.addProperty("permission", cursor.getPermissionsAsString());
                         feature.addProperty("edge_id", cursor.getEdgeIndex());
                         feature.addProperty("speed_ms", Math.round(cursor.getSpeedMs()*1000));
-                        feature.addProperty("speed", roundSpeed(cursor.getSpeedkmh()));
                         //Needed for filtering flags
                         for (EdgeStore.EdgeFlag flag: EdgeStore.EdgeFlag.values()) {
                             if (cursor.getFlag(flag)) {
@@ -284,7 +283,6 @@ public class PointToPointRouterServer {
                             feature.addProperty("permission", cursor.getPermissionsAsString());
                             feature.addProperty("edge_id", cursor.getEdgeIndex());
                             feature.addProperty("speed_ms", Math.round(cursor.getSpeedMs()*1000));
-                            feature.addProperty("speed", roundSpeed(cursor.getSpeedkmh()));
                             //Needed for filtering flags
                             for (EdgeStore.EdgeFlag flag: EdgeStore.EdgeFlag.values()) {
                                 if (cursor.getFlag(flag)) {

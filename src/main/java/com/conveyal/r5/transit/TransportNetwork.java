@@ -1,10 +1,13 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.osmlib.OSM;
+import com.conveyal.r5.MyEnumSetListSerializer;
+import com.conveyal.r5.MyEnumSetSerializer;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.vividsolutions.jts.geom.Envelope;
+import org.nustaq.serialization.FSTConfiguration;
 import org.nustaq.serialization.FSTObjectInput;
 import org.nustaq.serialization.FSTObjectOutput;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -14,10 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -37,20 +37,26 @@ public class TransportNetwork implements Serializable, Cloneable {
     private WebMercatorGridPointSet gridPointSet;
 
     static final String BUILDER_CONFIG_FILENAME = "build-config.json";
+    static final FSTConfiguration conf;
+
+    static {
+        conf = FSTConfiguration.createDefaultConfiguration();
+        //conf.registerSerializer(EnumSet.class, new MyEnumSetSerializer(), true);
+        conf.registerSerializer(ArrayList.class, new MyEnumSetListSerializer(), false);
+    }
 
     public void write (OutputStream stream) throws IOException {
         LOG.info("Writing transport network...");
-        FSTObjectOutput out = new FSTObjectOutput(stream);
+        FSTObjectOutput out = conf.getObjectOutput(stream);
         out.writeObject(this, TransportNetwork.class);
-        out.close();
+        out.flush();
         LOG.info("Done writing.");
     }
 
     public static TransportNetwork read (InputStream stream) throws Exception {
         LOG.info("Reading transport network...");
-        FSTObjectInput in = new FSTObjectInput(stream);
+        FSTObjectInput in = conf.getObjectInput(stream);
         TransportNetwork result = (TransportNetwork) in.readObject(TransportNetwork.class);
-        in.close();
         result.streetLayer.buildEdgeLists();
         result.streetLayer.indexStreets();
         result.transitLayer.rebuildTransientIndexes();

@@ -8,8 +8,12 @@ import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.EnumSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Label streets with a best-guess at their Level of Traffic Stress, as defined in
@@ -19,6 +23,11 @@ import java.util.EnumSet;
  * lane widths, etc.
  */
 public class LevelOfTrafficStressLabeler {
+    private static final Logger LOG = LoggerFactory.getLogger(LevelOfTrafficStressLabeler.class);
+
+    /** match OSM speeds, from http://wiki.openstreetmap.org/wiki/Key:maxspeed */
+    private static final Pattern speedPattern = Pattern.compile("^([0-9][\\.0-9]*?) ?(km/h|kmh|kph|mph|knots)?$");
+
     /** Set the LTS for this way in the provided flags (not taking into account any intersection LTS at the moment) */
     public void label (Way way, EnumSet<EdgeStore.EdgeFlag> forwardFlags, EnumSet<EdgeStore.EdgeFlag> backFlags) {
         // the general idea behind this function is that we progress from low-stress to higher-stress, bailing out as we go.
@@ -63,30 +72,63 @@ public class LevelOfTrafficStressLabeler {
             hasForwardLane = true;
         }
 
+        // extract max speed and lane info
+        double maxSpeed = Double.NaN;
+        if (way.hasTag("maxspeed")) {
+            // parse the max speed tag
+            maxSpeed = getSpeedKmh(way.getTag("maxspeed"));
+            if (Double.isNaN(maxSpeed)) {
+                LOG.warn("Unable to parse maxspeed tag {}", way.getTag("maxspeed"));
+            }
+        }
+
+        int lanes = Integer.MAX_VALUE;
+        if (way.hasTag("lanes")) {
+            try {
+                lanes = Integer.parseInt(way.getTag("lanes"));
+            } catch (NumberFormatException e) {
+                LOG.warn("Unable to parse lane specification {}", way.getTag("lanes"));
+            }
+        }
+
+        EdgeStore.EdgeFlag defaultLts = EdgeStore.EdgeFlag.BIKE_LTS_3;
+
+        // if it's small and slow, LTS 2
+        if (lanes <= 3 && maxSpeed <= 25 * 1.61) defaultLts = EdgeStore.EdgeFlag.BIKE_LTS_2;
+
+        // assume that there aren't too many lanes if it's not specified
+        if (lanes == Integer.MAX_VALUE && maxSpeed <= 25 * 1.61) defaultLts = EdgeStore.EdgeFlag.BIKE_LTS_2;
+
         // TODO arbitrary. Roads up to tertiary with bike lanes are considered LTS 2, roads above tertiary, LTS 3.
         // LTS 3 has defined space, but on fast roads
         if (way.hasTag("highway", "unclassified") || way.hasTag("highway", "tertiary") || way.hasTag("highway", "tertiary_link")) {
+            // assume that it's not too fast if it's not specified, but only for these smaller roads
+            // TODO questionable. Tertiary roads probably tend to be faster than 25 MPH.
+            if (lanes <= 3 && Double.isNaN(maxSpeed)) defaultLts = EdgeStore.EdgeFlag.BIKE_LTS_2;
+
             if (hasForwardLane) {
                 forwardFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_2);
             }
             else {
-                forwardFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_3); // moderate speed single lane street
+                forwardFlags.add(defaultLts); // moderate speed single lane street
             }
 
             if (hasBackwardLane) {
                 backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_2);
             }
             else {
-                backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_3);
+                backFlags.add(defaultLts);
             }
         }
-        else {
+        else { // NB includes trunk
+            // NB this will be LTS 3 unless this street has a low number of lanes and speed limit, or a low speed limit
+            // and unknown number of lanes
             if (hasForwardLane) {
-                forwardFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_3);
+                forwardFlags.add(defaultLts);
             }
 
             if (hasBackwardLane) {
-                backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_3);
+                backFlags.add(defaultLts);
             }
         }
 
@@ -199,5 +241,30 @@ public class LevelOfTrafficStressLabeler {
         else if (lts == 2) return EdgeStore.EdgeFlag.BIKE_LTS_2;
         else if (lts == 3) return EdgeStore.EdgeFlag.BIKE_LTS_3;
         else return EdgeStore.EdgeFlag.BIKE_LTS_4;
+    }
+
+    /** parse an OSM speed tag */
+    public static double getSpeedKmh (String maxSpeed) {
+        try {
+            Matcher m = speedPattern.matcher(maxSpeed);
+
+            // do match op here
+            if (!m.matches())
+                return Double.NaN;
+
+            double ret = Double.parseDouble(m.group(1));
+
+            // check for non-metric units
+            if (m.groupCount() > 1) {
+                if ("mph".equals(m.group(2))) ret *= 1.609;
+                // seriously? knots?
+                else if ("knots".equals(m.group(2))) ret *= 1.852;
+                // all other units are assumed to be km/h
+            }
+
+            return ret;
+        } catch (Exception e) {
+            return Double.NaN;
+        }
     }
 }

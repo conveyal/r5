@@ -46,22 +46,22 @@ public class EdgeStore implements Serializable {
     int nEdges = 0;
 
     /** Flags for this edge.  One entry for each forward and each backward edge. */
-    protected List<EnumSet<EdgeFlag>> flags;
+    public List<EnumSet<EdgeFlag>> flags;
 
     /** Speed for this edge.  One entry for each forward and each backward edge. Currently m/s * VertexStore.FixedFactor */
-    protected TIntList speeds;
+    public TIntList speeds;
 
     /** From vertices. One entry for each edge pair */
-    protected TIntList fromVertices;
+    public TIntList fromVertices;
 
     /** To vertices. One entry for each edge pair */
-    protected TIntList toVertices;
+    public TIntList toVertices;
 
     /** Length (millimeters). One entry for each edge pair */
-    protected TIntList lengths_mm;
+    public TIntList lengths_mm;
 
     /** Geometries. One entry for each edge pair */
-    protected List<int[]> geometries; // intermediate points along the edge, other than the intersection endpoints
+    public List<int[]> geometries; // intermediate points along the edge, other than the intersection endpoints
 
     public EdgeStore (VertexStore vertexStore, int initialSize) {
         this.vertexStore = vertexStore;
@@ -221,6 +221,14 @@ public class EdgeStore implements Serializable {
             pairIndex = edgeIndex / 2;
             isBackward = !isBackward;
             return edgeIndex < nEdges;
+        }
+
+        /** move the cursor back one edge */
+        public boolean retreat () {
+            edgeIndex--;
+            pairIndex = edgeIndex / 2;
+            isBackward = !isBackward;
+            return edgeIndex >= 0;
         }
 
         /** Jump to a specific edge number. */

@@ -1,8 +1,12 @@
 package com.conveyal.r5.point_to_point;
 
+import com.conveyal.r5.IenumSet;
 import com.conveyal.r5.common.GeoJsonFeature;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.EnumFlagsFST;
+import com.conveyal.r5.IntFlagsFST;
+import com.conveyal.r5.LongFlagsFST;
 import com.conveyal.r5.point_to_point.builder.RouterInfo;
 import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.ProfileRequest;
@@ -25,6 +29,7 @@ import java.io.*;
 import java.util.*;
 
 import java.io.File;
+import java.util.stream.Collectors;
 
 import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
 import static spark.Spark.*;
@@ -88,6 +93,96 @@ public class PointToPointRouterServer {
                 TransportNetwork transportNetwork = TransportNetwork.read(inputStream);
                 run(transportNetwork);
                 inputStream.close();
+            } catch (IOException e) {
+                LOG.error("An error occurred during reading of transit networks", e);
+                System.exit(-1);
+            } catch (Exception e) {
+                LOG.error("An error occurred during decoding of transit networks", e);
+                System.exit(-1);
+            }
+        } else if ("--test".equals(commandArguments[0])) {
+            File dir = new File(commandArguments[1]);
+            if (!dir.isDirectory() && dir.canRead()) {
+                LOG.error("'{}' is not a readable directory.", dir);
+            }
+            try {
+                LOG.info("Loading transit networks from: {}", dir);
+                InputStream inputStream = new BufferedInputStream(
+                    new FileInputStream(new File(dir, "network.dat")));
+                TransportNetwork transportNetwork = TransportNetwork.read(inputStream);
+                inputStream.close();
+                //run(transportNetwork);
+                OutputStream outputStream = new BufferedOutputStream(
+                    new FileOutputStream(new File(dir, "enumSetFST.dat")));
+                ObjectOutputStream objectOutputStream = new ObjectOutputStream(
+                    new BufferedOutputStream(
+                        new FileOutputStream(new File(dir, "enumSetSer.dat"))
+                    )
+                );
+
+                List<EnumSet<EdgeStore.EdgeFlag>> flags =transportNetwork.streetLayer.edgeStore.flags;
+
+                    /*new ArrayList<>(10);
+                flags.addAll(transportNetwork.streetLayer.edgeStore.flags
+                .stream()
+                .limit(10)
+                .collect(Collectors.toList()));*/
+
+
+                List<EnumSet<EdgeStore.EdgeFlag>> ourFlags;
+
+                IenumSet enumSet = new EnumFlagsFST(flags);
+                LOG.info("Compare enumSetFlags:{}",flags.equals(enumSet.toList()));
+                enumSet.serialize(outputStream);
+                enumSet.serialize(objectOutputStream);
+                objectOutputStream.close();
+
+                InputStream inputStream1 = new BufferedInputStream(new FileInputStream(new File(dir, "enumSetFST.dat")));
+
+                ourFlags = enumSet.deserialize(inputStream1);
+                LOG.info("Compare des enumSetFlags:{}", flags.equals(ourFlags));
+
+
+                outputStream = new BufferedOutputStream(
+                    new FileOutputStream(new File(dir, "intFlagsFST.dat")));
+                objectOutputStream = new ObjectOutputStream(new BufferedOutputStream(
+                    new FileOutputStream(new File(dir, "intFlagsSer.dat"))
+                ));
+                enumSet = new IntFlagsFST(flags);
+                LOG.info("Compare intFlags:{}",flags.equals(enumSet.toList()));
+                enumSet.serialize(outputStream);
+                enumSet.serialize(objectOutputStream);
+                objectOutputStream.close();
+
+                inputStream1 = new BufferedInputStream(new FileInputStream(new File(dir, "intFlagsFST.dat")));
+
+                ourFlags = enumSet.deserialize(inputStream1);
+                LOG.info("Compare des intSetFlags:{}", flags.equals(ourFlags));
+
+
+                outputStream = new BufferedOutputStream(
+                    new FileOutputStream(new File(dir, "longFlagsFST.dat")));
+                objectOutputStream = new ObjectOutputStream(new BufferedOutputStream(
+                    new FileOutputStream(new File(dir, "longFlagsSer.dat"))
+                ));
+                enumSet = new LongFlagsFST(flags);
+                List<EnumSet<EdgeStore.EdgeFlag>> longFlags = enumSet.toList();
+                /*for (int i = 0; i < 5; i++) {
+                    LOG.info("Flags:{} long:{}", flags.get(i), longFlags.get(i));
+                }*/
+                LOG.info("Compare longFlags:{}",flags.equals(longFlags));
+                enumSet.serialize(outputStream);
+                enumSet.serialize(objectOutputStream);
+                objectOutputStream.close();
+
+                inputStream1 = new BufferedInputStream(new FileInputStream(new File(dir, "longFlagsFST.dat")));
+
+                ourFlags = enumSet.deserialize(inputStream1);
+                LOG.info("Compare des longSetFlags:{}", flags.equals(ourFlags));
+
+
+
+
             } catch (IOException e) {
                 LOG.error("An error occurred during reading of transit networks", e);
                 System.exit(-1);

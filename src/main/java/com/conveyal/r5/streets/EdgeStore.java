@@ -48,7 +48,7 @@ public class EdgeStore implements Serializable {
     int nEdges = 0;
 
     /** Flags for this edge.  One entry for each forward and each backward edge. */
-    protected List<EnumSet<EdgeFlag>> flags;
+    public List<EnumSet<EdgeFlag>> flags;
 
     /** Speed for this edge.
      * One entry for each forward and each backward edge.

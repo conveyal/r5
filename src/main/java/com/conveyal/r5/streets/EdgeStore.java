@@ -316,15 +316,26 @@ public class EdgeStore implements Serializable {
 
             if (mode == Mode.WALK && getFlag(EdgeFlag.ALLOWS_PEDESTRIAN))
                 s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / req.walkSpeed);
-            else if (mode == Mode.BICYCLE && getFlag(EdgeFlag.ALLOWS_BIKE)) {
+            else if (mode == Mode.BICYCLE) {
+                // walk a bike if biking is not allowed on this edge, or if the traffic stress is too high
+                boolean walking = !getFlag(EdgeFlag.ALLOWS_BIKE);
+
                 if (req.bikeTrafficStress > 0 && req.bikeTrafficStress < 4) {
-                    if (getFlag(EdgeFlag.BIKE_LTS_4)) return null;
-                    if (req.bikeTrafficStress < 3 && getFlag(EdgeFlag.BIKE_LTS_3)) return null;
-                    if (req.bikeTrafficStress < 2 && getFlag(EdgeFlag.BIKE_LTS_2)) return null;
+                    if (getFlag(EdgeFlag.BIKE_LTS_4)) walking = true;
+                    if (req.bikeTrafficStress < 3 && getFlag(EdgeFlag.BIKE_LTS_3)) walking = true;
+                    if (req.bikeTrafficStress < 2 && getFlag(EdgeFlag.BIKE_LTS_2)) walking = true;
                 }
 
-                s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / req.bikeSpeed);
-                // TODO bike walking
+                // only walk if you're allowed to
+                if (walking && !getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) return null;
+
+                if (!walking)
+                    s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / req.bikeSpeed);
+                else
+                    // * 1.5 to account for time to get off bike and slower walk speed once off
+                    // this will tend to prefer to bike a slightly longer route than walk a long way,
+                    // but will allow walking to cross a busy street, etc.
+                    s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / req.walkSpeed * 1.5);
             }
             else if (mode == Mode.CAR && getFlag(EdgeFlag.ALLOWS_CAR))
                 s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / speeds.get(edgeIndex));

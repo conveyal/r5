@@ -178,7 +178,7 @@ public abstract class TraversalPermissionLabeler {
             if ("no".equals(tag) || "private".equals(tag) || "agricultural".equals(tag) || "delivery".equals(tag) ||
                     "dismount".equals(tag) || "forestry".equals(tag) || "customers".equals(tag))
                 return NO;
-            else if ("yes".equals("tag") || "permissive".equals(tag) || "designated".equals(tag))
+            else if ("yes".equals(tag) || "permissive".equals(tag) || "designated".equals(tag))
                 return YES;
             // TODO: no-thru-traffic, use_sidepath, customers, etc.
             else return UNKNOWN;

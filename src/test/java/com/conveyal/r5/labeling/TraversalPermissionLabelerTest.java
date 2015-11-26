@@ -33,6 +33,8 @@ public class TraversalPermissionLabelerTest {
 
     public static final EnumSet<EdgeStore.EdgeFlag> BICYCLE = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_BIKE);
 
+    private static final EnumSet<EdgeStore.EdgeFlag> CAR = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_CAR);
+
     @BeforeClass
     public static void setUpClass() {
         traversalPermissionLabeler = new USTraversalPermissionLabeler();
@@ -146,6 +148,34 @@ public class TraversalPermissionLabelerTest {
 
         assertEquals(PEDESTRIAN, forwardFiltered);
         assertEquals(PEDESTRIAN, backwardFiltered);
+    }
+
+    @Test
+    public void testSidepath() throws Exception {
+        Way osmWay = makeOSMWayFromTags("highway=tertiary;bicycle=use_sidepath");
+
+        EnumSet<EdgeStore.EdgeFlag> forwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, false);
+        EnumSet<EdgeStore.EdgeFlag> backwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, true);
+
+        Set<EdgeStore.EdgeFlag> forwardFiltered = filterFlags(forwardPermissions);
+        Set<EdgeStore.EdgeFlag> backwardFiltered = filterFlags(backwardPermissions);
+
+        assertEquals(PEDESTRIAN_AND_CAR, forwardFiltered);
+        assertEquals(PEDESTRIAN_AND_CAR, backwardFiltered);
+    }
+
+    @Test
+    public void testSpecificPermission() throws Exception {
+        Way osmWay = makeOSMWayFromTags("highway=primary;bicycle=use_sidepath;foot=no;junction=roundabout");
+
+        EnumSet<EdgeStore.EdgeFlag> forwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, false);
+        EnumSet<EdgeStore.EdgeFlag> backwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, true);
+
+        Set<EdgeStore.EdgeFlag> forwardFiltered = filterFlags(forwardPermissions);
+        Set<EdgeStore.EdgeFlag> backwardFiltered = filterFlags(backwardPermissions);
+
+        assertEquals(CAR, forwardFiltered);
+        assertEquals(NONE, backwardFiltered);
     }
 
     /**

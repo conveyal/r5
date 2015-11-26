@@ -88,8 +88,10 @@ public abstract class TraversalPermissionLabeler {
     /** returns whether this node is permitted traversal anywhere in the hierarchy */
     private boolean walk (EnumMap<Node, Label> tree, Node node) {
         do {
-            if (tree.get(node) == Label.YES)
-                return true;
+            //We need to return first labeled node not first yes node
+            //Otherwise access=yes bicycle=no returns true for bicycle
+            if (tree.get(node) != Label.UNKNOWN)
+                return tree.get(node) == Label.YES;
         } while ((node = node.getParent()) != null);
 
         return false;

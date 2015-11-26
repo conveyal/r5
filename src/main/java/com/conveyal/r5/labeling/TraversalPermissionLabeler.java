@@ -2,9 +2,10 @@ package com.conveyal.r5.labeling;
 
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.streets.EdgeStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.EnumMap;
-import java.util.EnumSet;
+import java.util.*;
 
 /**
  * Label edges with their traversal permissions, see https://wiki.openstreetmap.org/wiki/Computing_access_restrictions#Algorithm
@@ -12,18 +13,51 @@ import java.util.EnumSet;
  * Note that there are country-specific classes that contain defaults for particular countries, see https://wiki.openstreetmap.org/wiki/OSM_tags_for_routing/Access-Restrictions
  */
 public abstract class TraversalPermissionLabeler {
-    public EnumSet<EdgeStore.EdgeFlag> getPermissions(Way way, boolean back) {
-        if (!way.hasTag("highway")) {
-            // no permissions
-            return EnumSet.noneOf(EdgeStore.EdgeFlag.class);
-        }
 
-        EnumMap<Node, Label> tree = getTreeForHighway(way.getTag("highway").toLowerCase().trim());
-        //TODO: move to default permissions
-        if (way.hasTag("railway", "platform") || way.hasTag("public_transport", "platform")) {
-            tree.put(Node.FOOT, Label.YES);
-            tree.put(Node.VEHICLE, Label.NO);
-        }
+    private static final Logger LOG = LoggerFactory.getLogger(TraversalPermissionLabeler.class);
+
+    static Map<String, EnumMap<Node, Label>> defaultPermissions = new HashMap<>(30);
+
+    //This is immutable map of highway tag and boolean which is true if this tag has same road with _link
+    static final Map<String, Boolean> validHighwayTags;
+
+    static {
+
+        Map<String, Boolean> validHighwayTagsConst;
+        validHighwayTagsConst = new HashMap<>(16);
+        validHighwayTagsConst.put("motorway", true);
+        validHighwayTagsConst.put("trunk", true);
+        validHighwayTagsConst.put("primary", true);
+        validHighwayTagsConst.put("secondary", true);
+        validHighwayTagsConst.put("tertiary", true);
+        validHighwayTagsConst.put("unclassified", false);
+        validHighwayTagsConst.put("residential", false);
+        validHighwayTagsConst.put("living_street", false);
+        validHighwayTagsConst.put("road", false);
+        validHighwayTagsConst.put("service", false);
+        validHighwayTagsConst.put("track", false);
+        validHighwayTagsConst.put("pedestrian", false);
+        validHighwayTagsConst.put("path", false);
+        validHighwayTagsConst.put("bridleway", false);
+        validHighwayTagsConst.put("cycleway", false);
+        validHighwayTagsConst.put("footway", false);
+        validHighwayTagsConst.put("steps", false);
+        validHighwayTagsConst.put("platform", false);
+        validHighwayTagsConst.put("corridor", false); //Apparently indoor hallway
+        validHighwayTags = Collections.unmodifiableMap(validHighwayTagsConst);
+
+        addPermissions("motorway", "access=yes;bicycle=no;foot=no");
+        addPermissions("trunk|primary|secondary|tertiary|unclassified|residential|living_street|road|service|track", "access=yes");
+        addPermissions("pedestrian", "access=no;foot=yes");
+        addPermissions("path", "access=no;foot=yes;bicycle=yes");
+        addPermissions("bridleway", "access=no"); //horse=yes but we don't support horse
+        addPermissions("cycleway", "access=no;bicycle=yes");
+        addPermissions("footway|steps|platform|public_transport=platform|railway=platform|corridor", "access=no;foot=yes");
+    }
+
+    public EnumSet<EdgeStore.EdgeFlag> getPermissions(Way way, boolean back) {
+        EnumMap<Node, Label> tree = getTreeForWay(way);
+
         applySpecificPermissions(tree, way);
 
         EnumSet<EdgeStore.EdgeFlag> ret = EnumSet.noneOf(EdgeStore.EdgeFlag.class);
@@ -90,7 +124,93 @@ public abstract class TraversalPermissionLabeler {
     }
 
     /** Label a tree with the defaults for a highway tag for a particular country */
-    protected abstract EnumMap<Node, Label> getTreeForHighway (String highway);
+    protected EnumMap<Node, Label> getTreeForWay (Way way) {
+        String highway = way.getTag("highway");
+        EnumMap<Node, Label> tree = getDefaultTree();
+        if (highway != null) {
+            highway = highway.toLowerCase().trim();
+            EnumMap<Node, Label> defaultTree = defaultPermissions.getOrDefault("highway="+highway, defaultPermissions.get("highway=road"));
+            tree.putAll(defaultTree);
+            return tree;
+        } else if (way.hasTag("railway", "platform")) {
+            EnumMap<Node, Label> defaultTree = defaultPermissions.getOrDefault("railway=platform", defaultPermissions.get("highway=road"));
+            tree.putAll(defaultTree);
+            return tree;
+        } else if(way.hasTag("public_transport", "platform")) {
+            EnumMap<Node, Label> defaultTree = defaultPermissions
+                .getOrDefault("public_transport=platform", defaultPermissions.get("highway=road"));
+            tree.putAll(defaultTree);
+            return tree;
+        }
+
+        return defaultPermissions.get("highway=road");
+    }
+
+    /**
+     * For adding permissions for multiple tags.
+     *
+     * It splits tags on | and for each tag calls {@link #addPermission(String, String)}
+     *
+     * @param tags Tags are separated with | they can be specified with tag=value or just value where it is assumed that tag is highway.
+     * @param traversalPermissions are separated with ; they are specified as tag=value
+     */
+    protected static void addPermissions(String tags, String traversalPermissions) {
+        if (tags.contains("|")) {
+            for (String specifier: tags.split("\\|")) {
+               addPermission(specifier, traversalPermissions);
+            }
+        } else {
+            addPermission(tags, traversalPermissions);
+        }
+    }
+
+    /**
+     * For adding permissions for one tag.
+     *
+     * It calls {@link #addTree(String, String)} once if highway doesn't have link counterpart.
+     * Or twice if it has. AKA once for highway=motorway and once for highway=motorway_link.
+     *
+     * @param tag is specified as value where tag is assumed to be highway or tag=value
+     * @param traversalPermissions are separated with ; they are specified as tag=value
+     */
+    private static void addPermission(String tag, String traversalPermissions) {
+        if (tag.contains("\\|")) {
+            throw new RuntimeException("Specifier shouldn't contain | please call addPermissions");
+        }
+        if (tag.contains("=")) {
+            addTree(tag, traversalPermissions);
+            return;
+        }
+        if (validHighwayTags.containsKey(tag)) {
+            addTree("highway=" +tag, traversalPermissions);
+            if (validHighwayTags.get(tag)) {
+                addTree("highway=" +tag+"_link", traversalPermissions);
+            }
+        } else {
+            LOG.warn("Tag \"{}\" is not valid highway tag!", tag);
+        }
+    }
+
+    /**
+     * Updates defaultPermissions with additional traversalPermissions
+     *
+     * @param tag is specified as tag=value
+     * @param traversalPermissions are separated with ; they are specified as tag=value
+     */
+    private static void addTree(String tag, String traversalPermissions) {
+        EnumMap<Node, Label> currentTree = defaultPermissions.getOrDefault(tag,new EnumMap<>(Node.class));
+        String[] permissions = traversalPermissions.split(";");
+        for (String permission : permissions) {
+            String[] nodeLabel = permission.split("=");
+            Node currentNode = Node.valueOf(nodeLabel[0].toUpperCase());
+            Label currentLabel = Label.fromTag(nodeLabel[1]);
+            if (currentLabel == Label.UNKNOWN) {
+                throw new RuntimeException("permissions:" + permission + " invalid label for " + tag);
+            }
+            currentTree.put(currentNode, currentLabel);
+        }
+        defaultPermissions.put(tag, currentTree);
+    }
 
     /** Get a tree where every node is labeled unknown */
     protected EnumMap<Node, Label> getDefaultTree () {

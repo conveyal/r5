@@ -290,19 +290,42 @@ public abstract class TraversalPermissionLabeler {
 
     /** What is the label of a particular node? */
     protected enum Label {
-        YES, NO, UNKNOWN;
+        YES, NO, NO_THRU_TRAFFIC, UNKNOWN;
+
+        private static boolean isTagTrue(String tagValue) {
+            return ("yes".equals(tagValue) || "1".equals(tagValue) || "true".equals(tagValue));
+        }
+
+        private static boolean isTagFalse(String tagValue) {
+            return ("no".equals(tagValue) || "0".equals(tagValue) || "false".equals(tagValue));
+        }
+
+        private static boolean isNoThruTraffic(String access) {
+            return  "destination".equals(access)
+                || "customers".equals(access) || "delivery".equals(access)
+                || "forestry".equals(access)  || "agricultural".equals(access)
+                || "residents".equals(access) || "resident".equals(access)
+                || "customer".equals(access)
+                || "private".equals(access) ;
+        }
 
         public static Label fromTag (String tag) {
             tag = tag.toLowerCase().trim();
-            // TODO customers, delivery should just be treated as no-thru-traffic
-            if ("no".equals(tag) || "private".equals(tag) || "agricultural".equals(tag) || "delivery".equals(tag) ||
-                    "dismount".equals(tag) || "forestry".equals(tag) || "customers".equals(tag))
-                return NO;
-            else if ("yes".equals(tag) || "permissive".equals(tag) || "designated".equals(tag))
+            if (isTagTrue(tag) || "official".equals(tag)
+                || "unknown".equals(tag) || "public".equals(tag)
+                || "permissive".equals(tag) || "designated".equals(tag)) {
                 return YES;
-            // TODO: no-thru-traffic, use_sidepath, customers, etc.
-            else return UNKNOWN;
-
+            } else if (isTagFalse(tag) || tag.equals("license")
+                || tag.equals("restricted") || tag.equals("prohibited")
+                || tag.equals("emergency")
+                || "use_sidepath".equals(tag) || "dismount".equals(tag)) {
+                return NO;
+            } else if (isNoThruTraffic(tag)) {
+                return YES; //FIXME: Temporary
+            } else {
+                LOG.info("Unknown access tag:{}", tag);
+                return UNKNOWN;
+            }
         }
     }
 

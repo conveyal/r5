@@ -310,6 +310,10 @@ public abstract class TraversalPermissionLabeler {
         }
 
         public static Label fromTag (String tag) {
+            //Some access tags are like designated;yes no idea why
+            if (tag.contains(";")) {
+                tag = tag.split(";")[0];
+            }
             tag = tag.toLowerCase().trim();
             if (isTagTrue(tag) || "official".equals(tag)
                 || "unknown".equals(tag) || "public".equals(tag)

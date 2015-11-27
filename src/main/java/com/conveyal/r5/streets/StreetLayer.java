@@ -88,6 +88,12 @@ public class StreetLayer implements Serializable {
 
     public TransitLayer linkedTransitLayer = null;
 
+    public static final EnumSet<EdgeStore.EdgeFlag> ALL_PERMISSIONS = EnumSet
+        .of(EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR,
+            EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC,
+            EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_BIKE, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_PEDESTRIAN,
+            EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
+
     public StreetLayer(TNBuilderConfig tnBuilderConfig) {
             speedConfigurator = new SpeedConfigurator(tnBuilderConfig.speeds);
     }
@@ -275,6 +281,12 @@ public class StreetLayer implements Serializable {
         // Create and store the forward and backward edge
         EnumSet<EdgeStore.EdgeFlag> forwardFlags = permissions.getPermissions(way, false);
         EnumSet<EdgeStore.EdgeFlag> backFlags = permissions.getPermissions(way, true);
+
+        //Doesn't insert edges which don't have any permissions forward and backward
+        if (Collections.disjoint(forwardFlags, ALL_PERMISSIONS) && Collections.disjoint(backFlags, ALL_PERMISSIONS)) {
+            LOG.info("Way has no permissions skipping!");
+            return;
+        }
 
         stressLabeler.label(way, forwardFlags, backFlags);
 

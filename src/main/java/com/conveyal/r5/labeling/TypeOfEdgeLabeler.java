@@ -85,6 +85,11 @@ public class TypeOfEdgeLabeler {
             backFlags.add(EdgeStore.EdgeFlag.CROSSING);
         }
 
+        if (way.hasTag("junction", "roundabout")) {
+            forwardFlags.add(EdgeStore.EdgeFlag.ROUNDABOUT);
+            backFlags.add(EdgeStore.EdgeFlag.ROUNDABOUT);
+        }
+
 
     }
 }

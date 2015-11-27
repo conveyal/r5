@@ -5,10 +5,7 @@ import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.common.GeometryUtils;
-import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
-import com.conveyal.r5.labeling.SpeedConfigurator;
-import com.conveyal.r5.labeling.TraversalPermissionLabeler;
-import com.conveyal.r5.labeling.USTraversalPermissionLabeler;
+import com.conveyal.r5.labeling.*;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
@@ -66,6 +63,7 @@ public class StreetLayer implements Serializable {
 
     private transient TraversalPermissionLabeler permissions = new USTraversalPermissionLabeler(); // TODO don't hardwire to US
     private transient LevelOfTrafficStressLabeler stressLabeler = new LevelOfTrafficStressLabeler();
+    private transient TypeOfEdgeLabeler typeOfEdgeLabeler = new TypeOfEdgeLabeler();
     private transient SpeedConfigurator speedConfigurator;
 
     /** Envelope of this street layer, in decimal degrees (non-fixed-point) */
@@ -289,6 +287,8 @@ public class StreetLayer implements Serializable {
         }
 
         stressLabeler.label(way, forwardFlags, backFlags);
+
+        typeOfEdgeLabeler.label(way, forwardFlags, backFlags);
 
         EdgeStore.Edge newForwardEdge = edgeStore.addStreetPair(beginVertexIndex, endVertexIndex, edgeLengthMillimeters, forwardFlags, backFlags, forwardSpeed, backwardSpeed);
         newForwardEdge.setGeometry(nodes);

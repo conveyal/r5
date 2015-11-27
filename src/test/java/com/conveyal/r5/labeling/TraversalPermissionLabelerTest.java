@@ -206,7 +206,7 @@ public class TraversalPermissionLabelerTest {
      * @param tags with tags separated with ; and tag and value separated with =
      * @return
      */
-    private static Way makeOSMWayFromTags(String tags) {
+    protected static Way makeOSMWayFromTags(String tags) {
         Way osmWay = new Way();
         String[] pairs = tags.split(";");
         for (String pair : pairs) {

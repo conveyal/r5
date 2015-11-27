@@ -14,6 +14,9 @@ import static org.junit.Assert.*;
  */
 public class TypeOfEdgeLabelerTest {
 
+    public static final EnumSet<EdgeStore.EdgeFlag> PLATFORM = EnumSet
+        .of(EdgeStore.EdgeFlag.PLATFORM);
+
     static TypeOfEdgeLabeler typeOfEdgeLabeler;
     static TraversalPermissionLabeler traversalPermissionLabeler;
 
@@ -42,4 +45,33 @@ public class TypeOfEdgeLabelerTest {
         assertEquals(expectedPermissionsBackward, backwardFlags);
 
     }
+
+    @Test
+    public void testPlatform() throws Exception {
+        Way osmWay = TraversalPermissionLabelerTest.makeOSMWayFromTags("highway=platform");
+
+        EnumSet<EdgeStore.EdgeFlag> flag = EnumSet.noneOf(EdgeStore.EdgeFlag.class);
+
+        typeOfEdgeLabeler.label(osmWay, flag, flag);
+
+        assertEquals("highway=platform", PLATFORM, flag);
+
+
+        osmWay = TraversalPermissionLabelerTest.makeOSMWayFromTags("public_transport=platform");
+
+        flag = EnumSet.noneOf(EdgeStore.EdgeFlag.class);
+
+        typeOfEdgeLabeler.label(osmWay, flag, flag);
+
+        assertEquals("public_transport=platform", PLATFORM, flag);
+
+        osmWay = TraversalPermissionLabelerTest.makeOSMWayFromTags("railway=platform");
+
+        flag = EnumSet.noneOf(EdgeStore.EdgeFlag.class);
+
+        typeOfEdgeLabeler.label(osmWay, flag, flag);
+
+        assertEquals("railway=platform", PLATFORM, flag);
+    }
+
 }

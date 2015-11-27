@@ -90,6 +90,13 @@ public class TypeOfEdgeLabeler {
             backFlags.add(EdgeStore.EdgeFlag.ROUNDABOUT);
         }
 
+        if (way.hasTag("highway", "platform")
+            || way.hasTag("public_transport", "platform")
+            || way.hasTag("railway", "platform")) {
+            forwardFlags.add(EdgeStore.EdgeFlag.PLATFORM);
+            backFlags.add(EdgeStore.EdgeFlag.PLATFORM);
+        }
+
 
     }
 }

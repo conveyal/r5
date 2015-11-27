@@ -132,6 +132,9 @@ public class EdgeStore implements Serializable {
         PLATFORM,
         BOGUS_NAME,
         NO_THRU_TRAFFIC,
+        NO_THRU_TRAFFIC_PEDESTRIAN,
+        NO_THRU_TRAFFIC_BIKE,
+        NO_THRU_TRAFFIC_CAR,
         SLOPE_OVERRIDE,
         TRANSIT_LINK, // This edge is a one-way connection from a street to a transit stop. Target is a transit stop index, not an intersection index.
 

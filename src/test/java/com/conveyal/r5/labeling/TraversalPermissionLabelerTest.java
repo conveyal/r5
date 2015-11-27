@@ -21,6 +21,11 @@ public class TraversalPermissionLabelerTest {
     public static final EnumSet<EdgeStore.EdgeFlag> ALL = EnumSet
         .of(EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR,
             EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+    public static final EnumSet<EdgeStore.EdgeFlag> ALLPERMISSIONS = EnumSet
+        .of(EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR,
+            EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC,
+            EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_BIKE, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_PEDESTRIAN,
+            EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
     public static final EnumSet<EdgeStore.EdgeFlag> PEDESTRIAN_AND_BICYCLE = EnumSet.of(
         EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_BIKE);
     public static final EnumSet<EdgeStore.EdgeFlag> PEDESTRIAN_AND_CAR = EnumSet.of(
@@ -62,8 +67,10 @@ public class TraversalPermissionLabelerTest {
         backwardFiltered = filterFlags(backwardPermissions);
 
         //CAR is destination
-        assertEquals(ALL, forwardFiltered);
-        assertEquals(ALL, backwardFiltered);
+        assertEquals(EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_BIKE,
+            EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR), forwardFiltered);
+        assertEquals(EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_BIKE,
+            EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR), backwardFiltered);
 
     }
 
@@ -94,8 +101,10 @@ public class TraversalPermissionLabelerTest {
         Set<EdgeStore.EdgeFlag> forwardFiltered = filterFlags(forwardPermissions);
         Set<EdgeStore.EdgeFlag> backwardFiltered = filterFlags(backwardPermissions);
 
-        assertEquals(NONE, forwardFiltered);
-        assertEquals(NONE, backwardFiltered);
+        EnumSet<EdgeStore.EdgeFlag> expectedPermissions = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_BIKE,
+            EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
+        assertEquals(expectedPermissions, forwardFiltered);
+        assertEquals(expectedPermissions, backwardFiltered);
     }
 
     @Test
@@ -185,7 +194,7 @@ public class TraversalPermissionLabelerTest {
      */
     private static Set<EdgeStore.EdgeFlag> filterFlags(EnumSet<EdgeStore.EdgeFlag> permissions) {
         return permissions.stream()
-            .filter(ALL::contains)
+            .filter(ALLPERMISSIONS::contains)
             .collect(Collectors.toSet());
     }
 

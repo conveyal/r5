@@ -62,9 +62,24 @@ public abstract class TraversalPermissionLabeler {
 
         EnumSet<EdgeStore.EdgeFlag> ret = EnumSet.noneOf(EdgeStore.EdgeFlag.class);
 
-        if (walk(tree, Node.FOOT)) ret.add(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-        if (walk(tree, Node.BICYCLE)) ret.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
-        if (walk(tree, Node.CAR)) ret.add(EdgeStore.EdgeFlag.ALLOWS_CAR);
+        Label walk = walk(tree, Node.FOOT);
+        Label bicycle = walk(tree, Node.BICYCLE);
+        Label car = walk(tree, Node.CAR);
+        if (walk == Label.YES) {
+            ret.add(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+        } else if (walk == Label.NO_THRU_TRAFFIC) {
+            ret.add(EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_PEDESTRIAN);
+        }
+        if (bicycle == Label.YES) {
+            ret.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+        } else if (bicycle == Label.NO_THRU_TRAFFIC) {
+            ret.add(EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_BIKE);
+        }
+        if (car == Label.YES) {
+            ret.add(EdgeStore.EdgeFlag.ALLOWS_CAR);
+        } else if (car == Label.NO_THRU_TRAFFIC) {
+            ret.add(EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
+        }
 
         // check for one-way streets. Note that leaf nodes will always be labeled and there is no unknown,
         // so we need not traverse the tree
@@ -86,15 +101,17 @@ public abstract class TraversalPermissionLabeler {
     }
 
     /** returns whether this node is permitted traversal anywhere in the hierarchy */
-    private boolean walk (EnumMap<Node, Label> tree, Node node) {
+    private Label walk (EnumMap<Node, Label> tree, Node node) {
         do {
             //We need to return first labeled node not first yes node
             //Otherwise access=yes bicycle=no returns true for bicycle
             if (tree.get(node) != Label.UNKNOWN)
-                return tree.get(node) == Label.YES;
+                return tree.get(node);
         } while ((node = node.getParent()) != null);
 
-        return false;
+        LOG.warn("Node label is unknown!!");
+        //TODO: check this
+        return Label.UNKNOWN;
     }
 
     /** apply any specific permissions that may exist */
@@ -109,18 +126,23 @@ public abstract class TraversalPermissionLabeler {
         if (way.hasTag("motorcar")) applyLabel(Node.CAR, Label.fromTag(way.getTag("motorcar")), tree);
     }
 
-    /** apply label hierarchically. This is not explicitly in the spec but we want access=no to override default cycling permissions, for example. */
+    /**  we want access=no to not override default cycling permissions, for example. */
     protected <T> void applyLabel(Node node, T label, EnumMap<Node, T> tree) {
         if (label instanceof Label && label.equals(Label.UNKNOWN))
             return;
 
         tree.put(node, label);
+    }
+
+    /** apply oneway hierarchically.  */
+    private void applyOnewayHierarchically(Node node, OneWay oneWay, EnumMap<Node, OneWay> tree) {
+        tree.put(node, oneWay);
 
         Node[] children = node.getChildren();
 
         if (children != null) {
             for (Node child : children) {
-                applyLabel(child, label, tree);
+                applyOnewayHierarchically(child, oneWay, tree);
             }
         }
     }
@@ -238,26 +260,28 @@ public abstract class TraversalPermissionLabeler {
 
         // some tags imply oneway = yes unless otherwise noted
         if (way.hasTag("highway", "motorway") || way.hasTag("junction", "roundabout"))
-            applyLabel(Node.ACCESS, OneWay.YES, tree);
+            applyOnewayHierarchically(Node.ACCESS, OneWay.YES, tree);
 
         // read the most generic tags first
-        if (way.hasTag("oneway")) applyLabel(Node.ACCESS, OneWay.fromTag(way.getTag("oneway")), tree);
-        if (way.hasTag("oneway:vehicle")) applyLabel(Node.VEHICLE, OneWay.fromTag(way.getTag("oneway:vehicle")), tree);
-        if (way.hasTag("oneway:motorcar")) applyLabel(Node.CAR, OneWay.fromTag(way.getTag("oneway:motorcar")), tree);
+        if (way.hasTag("oneway")) applyOnewayHierarchically(Node.ACCESS, OneWay.fromTag(way.getTag("oneway")), tree);
+        if (way.hasTag("oneway:vehicle")) applyOnewayHierarchically(Node.VEHICLE, OneWay.fromTag(way.getTag("oneway:vehicle")), tree);
+        if (way.hasTag("oneway:motorcar")) applyOnewayHierarchically(Node.CAR, OneWay.fromTag(way.getTag("oneway:motorcar")), tree);
 
         // one way specification for bicycles can be done in multiple ways
         if (way.hasTag("cycleway", "opposite") || way.hasTag("cycleway", "opposite_lane") || way.hasTag("cycleway", "opposite_track"))
-            applyLabel(Node.BICYCLE, OneWay.NO, tree);
+            applyOnewayHierarchically(Node.BICYCLE, OneWay.NO, tree);
 
-        if (way.hasTag("oneway:bicycle")) applyLabel(Node.BICYCLE, OneWay.fromTag(way.getTag("oneway:bicycle")), tree);
+        if (way.hasTag("oneway:bicycle")) applyOnewayHierarchically(Node.BICYCLE, OneWay.fromTag(way.getTag("oneway:bicycle")), tree);
 
         // there are in fact one way pedestrian paths, believe it or not, but usually pedestrians don't inherit any oneway
         // restrictions from more general modes
-        applyLabel(Node.FOOT, OneWay.NO, tree);
-        if (way.hasTag("oneway:foot")) applyLabel(Node.FOOT, OneWay.fromTag(way.getTag("oneway")), tree);
+        applyOnewayHierarchically(Node.FOOT, OneWay.NO, tree);
+        if (way.hasTag("oneway:foot")) applyOnewayHierarchically(Node.FOOT, OneWay.fromTag(way.getTag("oneway")), tree);
 
         return tree;
     }
+
+
 
     /** We are using such a small subset of the tree that we can just code it up manually here */
     protected enum Node {
@@ -327,7 +351,7 @@ public abstract class TraversalPermissionLabeler {
                 || "use_sidepath".equals(tag) || "dismount".equals(tag)) {
                 return NO;
             } else if (isNoThruTraffic(tag)) {
-                return YES; //FIXME: Temporary
+                return NO_THRU_TRAFFIC;
             } else {
                 LOG.info("Unknown access tag:{}", tag);
                 return UNKNOWN;

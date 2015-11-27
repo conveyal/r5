@@ -121,6 +121,8 @@ public abstract class TraversalPermissionLabeler {
         if (way.hasTag("foot")) applyLabel(Node.FOOT, Label.fromTag(way.getTag("foot")), tree);
         if (way.hasTag("vehicle")) applyLabel(Node.VEHICLE, Label.fromTag(way.getTag("vehicle")), tree);
         if (way.hasTag("bicycle")) applyLabel(Node.BICYCLE, Label.fromTag(way.getTag("bicycle")), tree);
+        if (way.hasTag("cycleway")) applyLabel(Node.BICYCLE, Label.fromTag(way.getTag("cycleway")), tree);
+        if (way.hasTag("cycleway:both")) applyLabel(Node.BICYCLE, Label.fromTag(way.getTag("cycleway:both")), tree);
         if (way.hasTag("motor_vehicle")) applyLabel(Node.CAR, Label.fromTag(way.getTag("motor_vehicle")), tree);
         // motorcar takes precedence over motor_vehicle
         if (way.hasTag("motorcar")) applyLabel(Node.CAR, Label.fromTag(way.getTag("motorcar")), tree);
@@ -253,6 +255,7 @@ public abstract class TraversalPermissionLabeler {
     private EnumMap<Node, OneWay> getDirectionalTree (Way way) {
         EnumMap<Node, OneWay> tree = new EnumMap<>(Node.class);
 
+        //TODO: cycleway:left :right
         // label all nodes as unknown
         for (Node n : Node.values()) {
             tree.put(n, OneWay.NO);
@@ -343,7 +346,18 @@ public abstract class TraversalPermissionLabeler {
             tag = tag.toLowerCase().trim();
             if (isTagTrue(tag) || "official".equals(tag)
                 || "unknown".equals(tag) || "public".equals(tag)
-                || "permissive".equals(tag) || "designated".equals(tag)) {
+                || "permissive".equals(tag) || "designated".equals(tag)
+                //cycleway lane on the street
+                || "lane".equals(tag)
+                //cycleway track next to the street
+                || "track".equals(tag)
+                //sharrow
+                || "shared_lane".equals(tag)
+                //special lane reserved for public transport on which cycling is allowed
+                || "share_busway".equals(tag)
+                //cycleway=crossing it should already have bicycle=yes from highway=cycleway or bicycle=yes
+                || "crossing".equals(tag)
+                ) {
                 return YES;
             } else if (isTagFalse(tag) || tag.equals("license")
                 || tag.equals("restricted") || tag.equals("prohibited")

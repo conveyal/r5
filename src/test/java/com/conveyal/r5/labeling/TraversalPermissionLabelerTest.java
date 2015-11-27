@@ -1,12 +1,15 @@
 package com.conveyal.r5.labeling;
 
+import com.conveyal.osmlib.OSMEntity;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.streets.EdgeStore;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.EnumSet;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.*;
@@ -42,7 +45,7 @@ public class TraversalPermissionLabelerTest {
 
     @BeforeClass
     public static void setUpClass() {
-        traversalPermissionLabeler = new USTraversalPermissionLabeler();
+        traversalPermissionLabeler = new TestPermissionsLabeler();
     }
 
     @Test
@@ -121,6 +124,7 @@ public class TraversalPermissionLabelerTest {
         assertEquals(PEDESTRIAN, backwardFiltered);
     }
 
+    @Ignore("specific tagging isn't supported yet in specific permissions")
     @Test
     public void testSidewalk() throws Exception {
         Way osmWay = new Way();
@@ -134,6 +138,7 @@ public class TraversalPermissionLabelerTest {
         assertEquals(PEDESTRIAN_AND_BICYCLE, forwardFiltered);
         assertEquals(PEDESTRIAN_AND_BICYCLE, backwardFiltered);
 
+        //TODO: this had special permissions in OTP
         osmWay = makeOSMWayFromTags("footway=sidewalk;highway=footway");
 
         forwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, false);
@@ -144,6 +149,100 @@ public class TraversalPermissionLabelerTest {
 
         assertEquals(PEDESTRIAN, forwardFiltered);
         assertEquals(PEDESTRIAN, backwardFiltered);
+    }
+
+    //TODO: is sidewalk:right onedirectional or bidirectional
+    @Ignore("Sidewalks aren't supported yet")
+    @Test
+    public void testRoadWithSidewalk() {
+
+        Way osmWay = makeOSMWayFromTags("highway=nobikenoped");
+
+        roadFlagComparision(osmWay, CAR, CAR);
+
+        roadFlagComparision(osmWay, "sidewalk", "right", PEDESTRIAN_AND_CAR, CAR);
+        roadFlagComparision(osmWay, "sidewalk", "left", CAR, PEDESTRIAN_AND_CAR);
+        roadFlagComparision(osmWay, "sidewalk", "both", PEDESTRIAN_AND_CAR, PEDESTRIAN_AND_CAR);
+    }
+
+
+    @Test
+    public void testRoadWithBidirectionalCycleway() {
+
+        Way osmWay = makeOSMWayFromTags("highway=nobikenoped");
+
+        roadFlagComparision(osmWay, CAR, CAR);
+
+        roadFlagComparision(osmWay, "cycleway", "lane", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
+
+        roadFlagComparision(osmWay, "cycleway", "track", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
+
+        roadFlagComparision(osmWay, "cycleway:both", "lane", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
+
+        roadFlagComparision(osmWay, "cycleway:both", "track", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
+
+        roadFlagComparision(osmWay, "cycleway", "share_busway", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
+
+        roadFlagComparision(osmWay, "cycleway", "shared_lane", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
+    }
+
+    @Ignore(":left :right tags aren't supported yet")
+    @Test
+    public void testRoadWithMonodirectionalCycleway() {
+        Way osmWay = makeOSMWayFromTags("highway=nobikenoped");
+
+        roadFlagComparision(osmWay, "cycleway:right", "lane", BICYCLE_AND_CAR, CAR);
+
+        roadFlagComparision(osmWay, "cycleway:right", "track", BICYCLE_AND_CAR, CAR);
+
+        roadFlagComparision(osmWay, "cycleway:left", "lane", CAR, BICYCLE_AND_CAR);
+
+        roadFlagComparision(osmWay, "cycleway:left", "track", CAR, BICYCLE_AND_CAR);
+    }
+
+    private void roadFlagComparision(Way osmWay, EnumSet<EdgeStore.EdgeFlag> forwardExpected,
+        EnumSet<EdgeStore.EdgeFlag> backwardExpected) {
+        roadFlagComparision(osmWay, null, null, forwardExpected, backwardExpected);
+    }
+
+    /**
+     * Makes comparision of way with osmWay tags and newTag with newValue and compares forward and backward permissions with expected permissions
+     *
+     * Copy of osmWay is made since otherwise tags would be changed
+     *
+     * @param iosmWay
+     * @param newTag
+     * @param newValue
+     * @param forwardExpected
+     * @param backwardExpected
+     */
+    private static void roadFlagComparision(Way iosmWay, String newTag, String newValue, EnumSet<EdgeStore.EdgeFlag> forwardExpected, EnumSet<EdgeStore.EdgeFlag> backwardExpected) {
+        Way osmWay = new Way();
+
+        StringJoiner stringJoiner = new StringJoiner(";");
+
+        for (OSMEntity.Tag tag: iosmWay.tags) {
+            osmWay.addTag(tag.key, tag.value);
+            stringJoiner.add(tag.key+"="+tag.value);
+        }
+        if (newTag != null && newValue != null) {
+            osmWay.addTag(newTag, newValue);
+            stringJoiner.add(newTag+"="+newValue);
+        }
+        EnumSet<EdgeStore.EdgeFlag> forwardPermissions;
+        EnumSet<EdgeStore.EdgeFlag> backwardPermissions;
+        Set<EdgeStore.EdgeFlag> forwardFiltered;
+        Set<EdgeStore.EdgeFlag> backwardFiltered;
+        forwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, false);
+        backwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, true);
+
+        forwardFiltered = filterFlags(forwardPermissions);
+        backwardFiltered = filterFlags(backwardPermissions);
+
+        String tags = "Tags: " + stringJoiner.toString();
+
+        assertEquals(tags, forwardExpected, forwardFiltered);
+        assertEquals(tags, backwardExpected, backwardFiltered);
     }
 
     @Test

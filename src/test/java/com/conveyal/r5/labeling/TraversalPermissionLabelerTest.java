@@ -41,7 +41,7 @@ public class TraversalPermissionLabelerTest {
 
     public static final EnumSet<EdgeStore.EdgeFlag> BICYCLE = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_BIKE);
 
-    private static final EnumSet<EdgeStore.EdgeFlag> CAR = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_CAR);
+    public static final EnumSet<EdgeStore.EdgeFlag> CAR = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_CAR);
 
     @BeforeClass
     public static void setUpClass() {

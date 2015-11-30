@@ -11,11 +11,38 @@ import java.util.EnumSet;
 public class TypeOfEdgeLabeler {
 
 
-    private boolean isCycleway (Way way) {
-        return way.hasTag("highway", "cycleway") ||
+    private boolean isCycleway (Way way, boolean back) {
+        boolean bidirectionalCycleway = way.hasTag("highway", "cycleway") ||
             (way.hasTag("highway", "path") && way.hasTag("bicycle", "designated") && way.hasTag("foot", "designated")) ||
-        (way.hasTag("highway", "track")) ;
-        //todo left:right forward:backward
+            way.hasTag("cycleway", "lane") ||
+            way.hasTag("cycleway", "track");
+        if (bidirectionalCycleway) {
+            if (way.hasTag("oneway")) {
+                if (TraversalPermissionLabeler.Label.fromTag(way.getTag("oneway")) == TraversalPermissionLabeler.Label.YES) {
+                    if (!back) {
+                        return true;
+                    } else {
+                        return false;
+                    }
+                }
+            } else {
+                return true;
+            }
+        }
+
+        //TODO: opposite_track and opposite_lane
+        if (back) {
+            String cycleway_left = way.getTag("cycleway:left");
+            if (cycleway_left != null && TraversalPermissionLabeler.Label.fromTag(cycleway_left) == TraversalPermissionLabeler.Label.YES) {
+                return true;
+            }
+        } else {
+            String cycleway_right = way.getTag("cycleway:right");
+            if (cycleway_right != null && TraversalPermissionLabeler.Label.fromTag(cycleway_right) == TraversalPermissionLabeler.Label.YES) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isSidewalk(Way way, boolean back) {
@@ -48,7 +75,7 @@ public class TypeOfEdgeLabeler {
             (way.hasTag("highway", "path") && way.hasTag("bicycle", "designated") && way.hasTag("foot", "designated"))){
             return true;
             //implicit sidewalks with cycleways next to street
-        } else if (way.hasTag("highway", "track") && way.hasTag("segregated", "yes")) {
+        } else if (way.hasTag("cycleway", "track") && way.hasTag("segregated", "yes")) {
             return true;
         }
         return false;
@@ -64,13 +91,12 @@ public class TypeOfEdgeLabeler {
         if (way.hasTag("highway", "steps")) {
             forwardFlags.add(EdgeStore.EdgeFlag.STAIRS);
             backFlags.add(EdgeStore.EdgeFlag.STAIRS);
-        } else if (isCycleway(way)) {
-            if (forwardFlags.contains(EdgeStore.EdgeFlag.ALLOWS_BIKE)) {
-                forwardFlags.add(EdgeStore.EdgeFlag.BIKE_PATH);
-            }
-            if (backFlags.contains(EdgeStore.EdgeFlag.ALLOWS_BIKE)) {
-                backFlags.add(EdgeStore.EdgeFlag.BIKE_PATH);
-            }
+        }
+        if (forwardFlags.contains(EdgeStore.EdgeFlag.ALLOWS_BIKE) && isCycleway(way , false)) {
+            forwardFlags.add(EdgeStore.EdgeFlag.BIKE_PATH);
+        }
+        if (backFlags.contains(EdgeStore.EdgeFlag.ALLOWS_BIKE) && isCycleway(way, true)) {
+            backFlags.add(EdgeStore.EdgeFlag.BIKE_PATH);
         }
 
         if (isSidewalk(way, false)) {

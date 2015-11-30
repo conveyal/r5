@@ -1,5 +1,6 @@
 package com.conveyal.r5.labeling;
 
+import com.conveyal.osmlib.OSMEntity;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.streets.EdgeStore;
 import org.junit.BeforeClass;
@@ -10,6 +11,7 @@ import org.junit.runners.Parameterized;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.EnumSet;
+import java.util.StringJoiner;
 
 import static org.junit.Assert.*;
 
@@ -28,7 +30,7 @@ public class TypeOfEdgeLabelerTest {
     @BeforeClass
     public static void setUpClass() {
         typeOfEdgeLabeler = new TypeOfEdgeLabeler();
-        traversalPermissionLabeler = new USTraversalPermissionLabeler();
+        traversalPermissionLabeler = new TestPermissionsLabeler();
     }
 
     //name of current test
@@ -49,6 +51,10 @@ public class TypeOfEdgeLabelerTest {
 
     @Parameterized.Parameters(name="{0} with tags:{1}")
     public static Collection<Object[]> data() {
+        EnumSet<EdgeStore.EdgeFlag> CAR_CYCLEWAY = EnumSet.copyOf(TraversalPermissionLabelerTest.BICYCLE_AND_CAR);
+        CAR_CYCLEWAY.add(EdgeStore.EdgeFlag.BIKE_PATH);
+        EnumSet<EdgeStore.EdgeFlag> PEDESTRIAN_BIKE_CYCLEWAY = EnumSet.copyOf(TraversalPermissionLabelerTest.PEDESTRIAN_AND_BICYCLE);
+        PEDESTRIAN_BIKE_CYCLEWAY.add(EdgeStore.EdgeFlag.BIKE_PATH);
         return Arrays.asList(new Object[][] {
             {"sidewalk", "highway=cycleway;foot=designated;oneway=yes", EnumSet.of(EdgeStore.EdgeFlag.SIDEWALK,
                 EdgeStore.EdgeFlag.BIKE_PATH, EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN),
@@ -60,6 +66,14 @@ public class TypeOfEdgeLabelerTest {
             {"platform", "highway=platform", PLATFORM, PLATFORM},
             {"platform", "public_transport=platform", PLATFORM, PLATFORM},
             {"platform", "railway=platform", PLATFORM, PLATFORM},
+            {"monodirectional cycleway", "highway=nobikenoped;cycleway=lane", CAR_CYCLEWAY, CAR_CYCLEWAY},
+            {"monodirectional cycleway", "highway=nobikenoped;cycleway=track", CAR_CYCLEWAY, CAR_CYCLEWAY},
+            {"directional cycleway", "highway=nobikenoped;cycleway:right=track", CAR_CYCLEWAY, TraversalPermissionLabelerTest.CAR},
+            {"directional cycleway", "highway=nobikenoped;cycleway:left=track", TraversalPermissionLabelerTest.CAR, CAR_CYCLEWAY},
+            {"directional cycleway", "highway=nobikenoped;cycleway:right=lane", CAR_CYCLEWAY, TraversalPermissionLabelerTest.CAR},
+            {"directional cycleway", "highway=nobikenoped;cycleway:left=lane", TraversalPermissionLabelerTest.CAR, CAR_CYCLEWAY},
+            {"directional cycleway", "highway=cycleway;oneway=true", PEDESTRIAN_BIKE_CYCLEWAY, TraversalPermissionLabelerTest.PEDESTRIAN},
+            {"directional cycleway", "highway=cycleway", PEDESTRIAN_BIKE_CYCLEWAY, PEDESTRIAN_BIKE_CYCLEWAY},
         } );
 
 
@@ -68,14 +82,15 @@ public class TypeOfEdgeLabelerTest {
     @Test
     public void testParam() throws Exception {
         Way osmWay = TraversalPermissionLabelerTest.makeOSMWayFromTags(tags);
+
         RoadPermission roadPermission = traversalPermissionLabeler.getPermissions(osmWay);
 
 
         typeOfEdgeLabeler.label(osmWay, roadPermission.forward, roadPermission.backward);
 
 
-        assertEquals(expectedForwardFlags, roadPermission.forward);
-        assertEquals(expectedBackwardFlags, roadPermission.backward);
+        assertEquals("Tags: " + tags, expectedForwardFlags, roadPermission.forward);
+        assertEquals("Tags: " + tags, expectedBackwardFlags, roadPermission.backward);
 
     }
 

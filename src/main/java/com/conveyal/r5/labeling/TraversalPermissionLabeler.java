@@ -81,12 +81,15 @@ public abstract class TraversalPermissionLabeler {
             ret.add(EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
         }
 
-        // check for one-way streets. Note that leaf nodes will always be labeled and there is no unknown,
-        // so we need not traverse the tree
-        EnumMap<Node, OneWay> dir = getDirectionalTree(way);
 
         EnumSet<EdgeStore.EdgeFlag> forward = EnumSet.copyOf(ret);
         EnumSet<EdgeStore.EdgeFlag> backward = EnumSet.copyOf(ret);
+
+        applyDirectionalPermissions(way, forward, backward);
+
+        // check for one-way streets. Note that leaf nodes will always be labeled and there is no unknown,
+        // so we need not traverse the tree
+        EnumMap<Node, OneWay> dir = getDirectionalTree(way);
 
         //Backward edge
         // you can traverse back if this is not one way or it is one way reverse
@@ -100,8 +103,76 @@ public abstract class TraversalPermissionLabeler {
         if (dir.get(Node.BICYCLE) == OneWay.REVERSE) forward.remove(EdgeStore.EdgeFlag.ALLOWS_BIKE);
         if (dir.get(Node.FOOT) == OneWay.REVERSE) forward.remove(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
 
+        //This needs to be called after permissions were removed in directionalTree
+        //it is moved from directional tree since we can only remove permissions there
+        //but they need to be added also for example highway=residential;bicycle=no;oneway=yes;bicycle:left=opposite_lane
+
+        //If oneway is reversed (oneway=-1) opposite bicycle permission also need to be since they are opposite rest of traffic
+        if (dir.get(Node.CAR) == OneWay.REVERSE){
+            applyOppositeBicyclePermissions(way, forward);
+        } else {
+            applyOppositeBicyclePermissions(way, backward);
+        }
+
 
         return new RoadPermission(forward, backward);
+    }
+
+    /**
+     *  Adds Allows bike to backward direction if one of those is true:
+     *  - cycleway=opposite
+     *  - cycleway:left starts with opposite (can be opposite_track or opposite_lane)
+     *  - cycleway:right starts with opposite (can be opposite_track or opposite_lane)
+     * @param way
+     * @param backward
+     */
+    private void applyOppositeBicyclePermissions(Way way, EnumSet<EdgeStore.EdgeFlag> backward) {
+        String cyclewayLeftTagValue = way.getTag("cycleway:left");
+        String cyclewayRightTagValue = way.getTag("cycleway:right");
+        boolean addedBikePermissions = false;
+        if (way.hasTag("cycleway", "opposite")) {
+            backward.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+            addedBikePermissions = true;
+        } else if (cyclewayRightTagValue != null) {
+            if (cyclewayRightTagValue.startsWith("opposite")){
+                backward.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+                addedBikePermissions = true;
+            }
+        }
+        if (!addedBikePermissions && cyclewayLeftTagValue != null) {
+            if (cyclewayLeftTagValue.startsWith("opposite")) {
+                backward.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+            }
+        }
+
+    }
+
+    /**
+     * Adds cycleway permission of forward or backward edge if cycleway:left/:right has YES label
+     *
+     * AKA lane, track, shared_line
+     * @param way
+     * @param forward
+     * @param backward
+     */
+    private void applyDirectionalPermissions(Way way, EnumSet<EdgeStore.EdgeFlag> forward,
+        EnumSet<EdgeStore.EdgeFlag> backward) {
+        String cyclewayLeftTagValue = way.getTag("cycleway:left");
+        String cyclewayRightTagValue = way.getTag("cycleway:right");
+
+        if (cyclewayRightTagValue != null) {
+            Label cyclewayRight = Label.fromTag(cyclewayRightTagValue);
+            if (cyclewayRight == Label.YES) {
+                forward.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+            }
+        }
+
+        if (cyclewayLeftTagValue != null) {
+            Label cyclewayLeft = Label.fromTag(cyclewayLeftTagValue);
+            if (cyclewayLeft == Label.YES) {
+                backward.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+            }
+        }
     }
 
     @Deprecated
@@ -269,7 +340,6 @@ public abstract class TraversalPermissionLabeler {
     private EnumMap<Node, OneWay> getDirectionalTree (Way way) {
         EnumMap<Node, OneWay> tree = new EnumMap<>(Node.class);
 
-        //TODO: cycleway:left :right
         // label all nodes as unknown
         for (Node n : Node.values()) {
             tree.put(n, OneWay.NO);
@@ -284,11 +354,29 @@ public abstract class TraversalPermissionLabeler {
         if (way.hasTag("oneway:vehicle")) applyOnewayHierarchically(Node.VEHICLE, OneWay.fromTag(way.getTag("oneway:vehicle")), tree);
         if (way.hasTag("oneway:motorcar")) applyOnewayHierarchically(Node.CAR, OneWay.fromTag(way.getTag("oneway:motorcar")), tree);
 
-        // one way specification for bicycles can be done in multiple ways
-        if (way.hasTag("cycleway", "opposite") || way.hasTag("cycleway", "opposite_lane") || way.hasTag("cycleway", "opposite_track"))
-            applyOnewayHierarchically(Node.BICYCLE, OneWay.NO, tree);
-
         if (way.hasTag("oneway:bicycle")) applyOnewayHierarchically(Node.BICYCLE, OneWay.fromTag(way.getTag("oneway:bicycle")), tree);
+        OneWay sidepath = OneWay.NO;
+        if (way.hasTag("bicycle:forward")) {
+            //Dismount, use_sidepath, no etc means only cycling in reverse direction
+            if (Label.fromTag(way.getTag("bicycle:forward")) == Label.NO) {
+                sidepath = OneWay.REVERSE;
+            }
+        }
+        if (way.hasTag("bicycle:backward")) {
+            //we can't cycle in backward direction same as if oneway:bicycle=yes
+            //Label.NO is also if tag is use_sidepath or dismount
+            if (Label.fromTag(way.getTag("bicycle:backward")) == Label.NO) {
+                if (sidepath == OneWay.REVERSE) {
+                    //Seems it is sidepath in both direction meaning cycling is completely disallowed
+                    LOG.error(
+                        "Way has tags bicycle:forward=use_sidepath and bicycle:backward=use_sidepath please use bicycle=use_sidepath");
+                }
+                sidepath = OneWay.YES;
+            }
+        }
+        if (sidepath != OneWay.NO) {
+            applyOnewayHierarchically(Node.BICYCLE, sidepath, tree);
+        }
 
         // there are in fact one way pedestrian paths, believe it or not, but usually pedestrians don't inherit any oneway
         // restrictions from more general modes
@@ -380,6 +468,9 @@ public abstract class TraversalPermissionLabeler {
                 return NO;
             } else if (isNoThruTraffic(tag)) {
                 return NO_THRU_TRAFFIC;
+                //Used in setting opposite cycling permissions
+            } else if (tag.startsWith("opposite")) {
+                return UNKNOWN;
             } else {
                 LOG.info("Unknown access tag:{}", tag);
                 return UNKNOWN;

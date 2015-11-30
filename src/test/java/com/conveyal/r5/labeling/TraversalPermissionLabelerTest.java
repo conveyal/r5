@@ -186,7 +186,6 @@ public class TraversalPermissionLabelerTest {
         roadFlagComparision(osmWay, "cycleway", "shared_lane", BICYCLE_AND_CAR, BICYCLE_AND_CAR);
     }
 
-    @Ignore(":left :right tags aren't supported yet")
     @Test
     public void testRoadWithMonodirectionalCycleway() {
         Way osmWay = makeOSMWayFromTags("highway=nobikenoped");
@@ -199,9 +198,34 @@ public class TraversalPermissionLabelerTest {
 
         roadFlagComparision(osmWay, "cycleway:left", "track", CAR, BICYCLE_AND_CAR);
 
+        osmWay = makeOSMWayFromTags("highway=residential;foot=no");
+
         roadFlagComparision(osmWay, "bicycle:forward", "use_sidepath", CAR, BICYCLE_AND_CAR);
 
+        roadFlagComparision(osmWay, "bicycle:forward", "no", CAR, BICYCLE_AND_CAR);
+
+        roadFlagComparision(osmWay, "bicycle:forward", "dismount", CAR, BICYCLE_AND_CAR);
+
         roadFlagComparision(osmWay, "bicycle:backward", "use_sidepath", BICYCLE_AND_CAR, CAR);
+
+        roadFlagComparision(osmWay, "bicycle:backward", "no", BICYCLE_AND_CAR, CAR);
+
+        roadFlagComparision(osmWay, "bicycle:backward", "dismount", BICYCLE_AND_CAR, CAR);
+
+        osmWay = makeOSMWayFromTags("cycleway:right=lane;highway=residential;cycleway:left=opposite_lane;oneway=yes");
+
+        roadFlagComparision(osmWay, ALL, PEDESTRIAN_AND_BICYCLE);
+
+        roadFlagComparision(osmWay, "oneway:bicycle", "no", ALL, PEDESTRIAN_AND_BICYCLE);
+
+        osmWay = makeOSMWayFromTags("highway=tertiary;cycleway:left=lane;bicycle:forward=use_sidepath");
+        roadFlagComparision(osmWay, PEDESTRIAN_AND_CAR, ALL);
+
+        osmWay = makeOSMWayFromTags("highway=nobikenoped;cycleway:left=lane;bicycle:forward=use_sidepath");
+        roadFlagComparision(osmWay, CAR, BICYCLE_AND_CAR);
+
+        osmWay = makeOSMWayFromTags("highway=nobikenoped;foot=yes;oneway=-1;cycleway:left=opposite_lane");
+        roadFlagComparision(osmWay, PEDESTRIAN_AND_BICYCLE, PEDESTRIAN_AND_CAR);
     }
 
     private void roadFlagComparision(Way osmWay, EnumSet<EdgeStore.EdgeFlag> forwardExpected,

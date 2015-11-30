@@ -198,6 +198,10 @@ public class TraversalPermissionLabelerTest {
         roadFlagComparision(osmWay, "cycleway:left", "lane", CAR, BICYCLE_AND_CAR);
 
         roadFlagComparision(osmWay, "cycleway:left", "track", CAR, BICYCLE_AND_CAR);
+
+        roadFlagComparision(osmWay, "bicycle:forward", "use_sidepath", CAR, BICYCLE_AND_CAR);
+
+        roadFlagComparision(osmWay, "bicycle:backward", "use_sidepath", BICYCLE_AND_CAR, CAR);
     }
 
     private void roadFlagComparision(Way osmWay, EnumSet<EdgeStore.EdgeFlag> forwardExpected,

@@ -28,7 +28,7 @@ import java.util.stream.IntStream;
 public class LTSRelabeler {
     private static final Logger LOG = LoggerFactory.getLogger(LTSRelabeler.class);
 
-    public static final int RELABEL_ITERATIONS = 5_000;
+    public static final int RELABEL_ITERATIONS = 2_000;
     public static final int SEARCHES_PER_ITERATION = 1_000;
 
     public TransportNetwork network;
@@ -112,6 +112,7 @@ public class LTSRelabeler {
         MersenneTwister mt = new MersenneTwister();
 
         for (int relabel = 0; relabel < RELABEL_ITERATIONS; relabel++) {
+            long start = System.currentTimeMillis();
             if (relabel % 100 == 0)
                 LOG.info("{} / {} relabels", relabel, RELABEL_ITERATIONS);
 
@@ -159,6 +160,8 @@ public class LTSRelabeler {
             for (int search = 0; search < SEARCHES_PER_ITERATION; search++) {
                 writer.write(relabel + "," + origins[search] + "," + v.getLat() + "," + v.getLon() + "," + relabeledEdges + "," + before[search] + "," + after[search] + "\n");
             }
+
+            LOG.info("Relabel {}, {}ms", relabel, System.currentTimeMillis() - start);
         }
     }
 }

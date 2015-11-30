@@ -276,9 +276,11 @@ public class StreetLayer implements Serializable {
         short forwardSpeed = speedToShort(speedConfigurator.getSpeedMS(way, false));
         short backwardSpeed = speedToShort(speedConfigurator.getSpeedMS(way, true));
 
+        RoadPermission roadPermission = permissions.getPermissions(way);
+
         // Create and store the forward and backward edge
-        EnumSet<EdgeStore.EdgeFlag> forwardFlags = permissions.getPermissions(way, false);
-        EnumSet<EdgeStore.EdgeFlag> backFlags = permissions.getPermissions(way, true);
+        EnumSet<EdgeStore.EdgeFlag> forwardFlags = roadPermission.forward;
+        EnumSet<EdgeStore.EdgeFlag> backFlags = roadPermission.backward;
 
         //Doesn't insert edges which don't have any permissions forward and backward
         if (Collections.disjoint(forwardFlags, ALL_PERMISSIONS) && Collections.disjoint(backFlags, ALL_PERMISSIONS)) {

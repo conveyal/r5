@@ -55,7 +55,7 @@ public abstract class TraversalPermissionLabeler {
         addPermissions("footway|steps|platform|public_transport=platform|railway=platform|corridor", "access=no;foot=yes");
     }
 
-    public EnumSet<EdgeStore.EdgeFlag> getPermissions(Way way, boolean back) {
+    public RoadPermission getPermissions(Way way) {
         EnumMap<Node, Label> tree = getTreeForWay(way);
 
         applySpecificPermissions(tree, way);
@@ -84,20 +84,34 @@ public abstract class TraversalPermissionLabeler {
         // check for one-way streets. Note that leaf nodes will always be labeled and there is no unknown,
         // so we need not traverse the tree
         EnumMap<Node, OneWay> dir = getDirectionalTree(way);
-        if (back) {
-            // you can traverse back if this is not one way or it is one way reverse
-            if (dir.get(Node.CAR) == OneWay.YES) ret.remove(EdgeStore.EdgeFlag.ALLOWS_CAR);
-            if (dir.get(Node.BICYCLE) == OneWay.YES) ret.remove(EdgeStore.EdgeFlag.ALLOWS_BIKE);
-            if (dir.get(Node.FOOT) == OneWay.YES) ret.remove(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-        }
-        else {
-            // you can always forward traverse unless this is a rare reversed one-way street
-            if (dir.get(Node.CAR) == OneWay.REVERSE) ret.remove(EdgeStore.EdgeFlag.ALLOWS_CAR);
-            if (dir.get(Node.BICYCLE) == OneWay.REVERSE) ret.remove(EdgeStore.EdgeFlag.ALLOWS_BIKE);
-            if (dir.get(Node.FOOT) == OneWay.REVERSE) ret.remove(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-        }
 
-        return ret;
+        EnumSet<EdgeStore.EdgeFlag> forward = EnumSet.copyOf(ret);
+        EnumSet<EdgeStore.EdgeFlag> backward = EnumSet.copyOf(ret);
+
+        //Backward edge
+        // you can traverse back if this is not one way or it is one way reverse
+        if (dir.get(Node.CAR) == OneWay.YES) backward.remove(EdgeStore.EdgeFlag.ALLOWS_CAR);
+        if (dir.get(Node.BICYCLE) == OneWay.YES) backward.remove(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+        if (dir.get(Node.FOOT) == OneWay.YES) backward.remove(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+
+        //Forward edge
+        // you can always forward traverse unless this is a rare reversed one-way street
+        if (dir.get(Node.CAR) == OneWay.REVERSE) forward.remove(EdgeStore.EdgeFlag.ALLOWS_CAR);
+        if (dir.get(Node.BICYCLE) == OneWay.REVERSE) forward.remove(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+        if (dir.get(Node.FOOT) == OneWay.REVERSE) forward.remove(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+
+
+        return new RoadPermission(forward, backward);
+    }
+
+    @Deprecated
+    public EnumSet<EdgeStore.EdgeFlag> getPermissions(Way way, boolean back) {
+        RoadPermission roadPermission = getPermissions(way);
+        if (back) {
+            return roadPermission.backward;
+        } else {
+            return roadPermission.forward;
+        }
     }
 
     /** returns whether this node is permitted traversal anywhere in the hierarchy */

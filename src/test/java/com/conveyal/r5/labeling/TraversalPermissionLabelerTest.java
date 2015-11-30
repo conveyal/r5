@@ -233,15 +233,13 @@ public class TraversalPermissionLabelerTest {
             osmWay.addTag(newTag, newValue);
             stringJoiner.add(newTag+"="+newValue);
         }
-        EnumSet<EdgeStore.EdgeFlag> forwardPermissions;
-        EnumSet<EdgeStore.EdgeFlag> backwardPermissions;
         Set<EdgeStore.EdgeFlag> forwardFiltered;
         Set<EdgeStore.EdgeFlag> backwardFiltered;
-        forwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, false);
-        backwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, true);
 
-        forwardFiltered = filterFlags(forwardPermissions);
-        backwardFiltered = filterFlags(backwardPermissions);
+        RoadPermission roadPermission = traversalPermissionLabeler.getPermissions(osmWay);
+
+        forwardFiltered = filterFlags(roadPermission.forward);
+        backwardFiltered = filterFlags(roadPermission.backward);
 
         String tags = "Tags: " + stringJoiner.toString();
 

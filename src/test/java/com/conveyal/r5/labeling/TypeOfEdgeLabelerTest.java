@@ -68,14 +68,14 @@ public class TypeOfEdgeLabelerTest {
     @Test
     public void testParam() throws Exception {
         Way osmWay = TraversalPermissionLabelerTest.makeOSMWayFromTags(tags);
-        EnumSet<EdgeStore.EdgeFlag> forwardFlags = traversalPermissionLabeler.getPermissions(osmWay, false);
-        EnumSet<EdgeStore.EdgeFlag> backwardFlags = traversalPermissionLabeler.getPermissions(osmWay, true);
-
-        typeOfEdgeLabeler.label(osmWay, forwardFlags, backwardFlags);
+        RoadPermission roadPermission = traversalPermissionLabeler.getPermissions(osmWay);
 
 
-        assertEquals(expectedForwardFlags, forwardFlags);
-        assertEquals(expectedBackwardFlags, backwardFlags);
+        typeOfEdgeLabeler.label(osmWay, roadPermission.forward, roadPermission.backward);
+
+
+        assertEquals(expectedForwardFlags, roadPermission.forward);
+        assertEquals(expectedBackwardFlags, roadPermission.backward);
 
     }
 

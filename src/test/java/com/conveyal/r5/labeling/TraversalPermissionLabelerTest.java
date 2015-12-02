@@ -3,10 +3,12 @@ package com.conveyal.r5.labeling;
 import com.conveyal.osmlib.OSMEntity;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.streets.EdgeStore;
+import junit.framework.Assert;
 import org.junit.BeforeClass;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.StringJoiner;
@@ -187,6 +189,22 @@ public class TraversalPermissionLabelerTest {
     }
 
     @Test
+    public void testSkippingRoadsWithNoPermissions() throws Exception {
+        Way osmWay = makeOSMWayFromTags("bicycle=no;foot=no;highway=primary;lanes=2;maxspeed=70;oneway=yes;ref=1");
+        RoadPermission roadPermission = roadFlagComparision(osmWay, CAR, NONE);
+
+        //Doesn't insert edges which don't have any permissions forward and backward
+        Assert.assertFalse(
+            Collections.disjoint(roadPermission.forward, ALLPERMISSIONS) && Collections
+                .disjoint(roadPermission.backward, ALLPERMISSIONS));
+
+        Assert.assertTrue(
+            Collections.disjoint(NONE, ALLPERMISSIONS) && Collections
+                .disjoint(NONE, ALLPERMISSIONS));
+
+    }
+
+    @Test
     public void testRoadWithMonodirectionalCycleway() {
         Way osmWay = makeOSMWayFromTags("highway=nobikenoped");
 
@@ -228,23 +246,22 @@ public class TraversalPermissionLabelerTest {
         roadFlagComparision(osmWay, PEDESTRIAN_AND_BICYCLE, PEDESTRIAN_AND_CAR);
     }
 
-    private void roadFlagComparision(Way osmWay, EnumSet<EdgeStore.EdgeFlag> forwardExpected,
+    private RoadPermission roadFlagComparision(Way osmWay, EnumSet<EdgeStore.EdgeFlag> forwardExpected,
         EnumSet<EdgeStore.EdgeFlag> backwardExpected) {
-        roadFlagComparision(osmWay, null, null, forwardExpected, backwardExpected);
+        return roadFlagComparision(osmWay, null, null, forwardExpected, backwardExpected);
     }
 
     /**
      * Makes comparision of way with osmWay tags and newTag with newValue and compares forward and backward permissions with expected permissions
      *
      * Copy of osmWay is made since otherwise tags would be changed
-     *
-     * @param iosmWay
+     *  @param iosmWay
      * @param newTag
      * @param newValue
      * @param forwardExpected
      * @param backwardExpected
      */
-    private static void roadFlagComparision(Way iosmWay, String newTag, String newValue, EnumSet<EdgeStore.EdgeFlag> forwardExpected, EnumSet<EdgeStore.EdgeFlag> backwardExpected) {
+    private static RoadPermission roadFlagComparision(Way iosmWay, String newTag, String newValue, EnumSet<EdgeStore.EdgeFlag> forwardExpected, EnumSet<EdgeStore.EdgeFlag> backwardExpected) {
         Way osmWay = new Way();
 
         StringJoiner stringJoiner = new StringJoiner(";");
@@ -269,6 +286,7 @@ public class TraversalPermissionLabelerTest {
 
         assertEquals(tags, forwardExpected, forwardFiltered);
         assertEquals(tags, backwardExpected, backwardFiltered);
+        return roadPermission;
     }
 
     @Test

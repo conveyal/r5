@@ -298,6 +298,13 @@ public class EdgeStore implements Serializable {
         }
 
         /**
+         * @return length of edge in meters
+         */
+        public double getLengthM() {
+            return getLengthMm() / 1000.0;
+        }
+
+        /**
          * Set the length for the current edge pair (always the same in both directions).
          */
         public void setLengthMm (int millimeters) {
@@ -317,7 +324,7 @@ public class EdgeStore implements Serializable {
             s1.nextState = null;
 
             if (mode == Mode.WALK && getFlag(EdgeFlag.ALLOWS_PEDESTRIAN))
-                s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / req.walkSpeed);
+                s1.weight = (int) Math.round(s0.weight + getLengthM() / req.walkSpeed);
             else if (mode == Mode.BICYCLE && getFlag(EdgeFlag.ALLOWS_BIKE)) {
                 if (req.bikeTrafficStress > 0 && req.bikeTrafficStress < 4) {
                     if (getFlag(EdgeFlag.BIKE_LTS_4)) return null;
@@ -325,11 +332,11 @@ public class EdgeStore implements Serializable {
                     if (req.bikeTrafficStress < 2 && getFlag(EdgeFlag.BIKE_LTS_2)) return null;
                 }
 
-                s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / req.bikeSpeed);
+                s1.weight = (int) Math.round(s0.weight + getLengthM() / req.bikeSpeed);
                 // TODO bike walking
             }
             else if (mode == Mode.CAR && getFlag(EdgeFlag.ALLOWS_CAR))
-                s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / getSpeedMs());
+                s1.weight = (int) Math.round(s0.weight + getLengthM() / getSpeedMs());
             else
                 return null; // this mode cannot traverse this edge
 

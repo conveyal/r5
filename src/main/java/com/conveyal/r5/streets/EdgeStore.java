@@ -319,27 +319,75 @@ public class EdgeStore implements Serializable {
             return !isBackward;
         }
 
-        public StreetRouter.State traverse (StreetRouter.State s0, Mode mode, ProfileRequest req) {
-            StreetRouter.State s1 = new StreetRouter.State(getToVertex(), edgeIndex, s0);
-            s1.nextState = null;
+        /**
+         * Calculate the speed appropriately given the ProfileRequest and traverseMode and the current wall clock time.
+         * Note: this is not strictly symmetrical, because in a forward search we get the speed based on the
+         * time we enter this edge, whereas in a reverse search we get the speed based on the time we exit
+         * the edge.
+         *
+         * If driving speed is based on max edge speed. (or from traffic if traffic is supported)
+         *
+         * Otherwise speed is based on wanted walking, cycling speed provided in ProfileRequest.
+         */
+        private float calculateSpeed(ProfileRequest options, Mode traverseMode,
+            long time) {
+            if (traverseMode == null) {
+                return Float.NaN;
+            } else if (traverseMode == Mode.CAR) {
+                /*if (options.useTraffic) {
+                    //TODO: speed based on traffic information
+                }*/
+                return getSpeedMs();
+            }
+            return options.getSpeed(traverseMode);
+        }
 
-            if (mode == Mode.WALK && getFlag(EdgeFlag.ALLOWS_PEDESTRIAN))
-                s1.weight = (int) Math.round(s0.weight + getLengthM() / req.walkSpeed);
-            else if (mode == Mode.BICYCLE && getFlag(EdgeFlag.ALLOWS_BIKE)) {
+        public StreetRouter.State traverse (StreetRouter.State s0, Mode mode, ProfileRequest req) {
+            StreetRouter.State s1 = new StreetRouter.State(getToVertex(), edgeIndex,
+                s0.getTime(), s0);
+            s1.nextState = null;
+            s1.weight = s0.weight;
+            float speedms = calculateSpeed(req, mode, s0.getTime());
+            float time = (float) (getLengthM() / speedms);
+            float weight = 0;
+
+            //Currently weigh is basically the same as weight. It differs only on stairs and when walking.
+
+
+
+            if (mode == Mode.WALK && getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) {
+                weight = time;
+                //elevation which changes weight
+            } else if (mode == Mode.BICYCLE && getFlag(EdgeFlag.ALLOWS_BIKE)) {
                 if (req.bikeTrafficStress > 0 && req.bikeTrafficStress < 4) {
                     if (getFlag(EdgeFlag.BIKE_LTS_4)) return null;
                     if (req.bikeTrafficStress < 3 && getFlag(EdgeFlag.BIKE_LTS_3)) return null;
                     if (req.bikeTrafficStress < 2 && getFlag(EdgeFlag.BIKE_LTS_2)) return null;
                 }
 
-                s1.weight = (int) Math.round(s0.weight + getLengthM() / req.bikeSpeed);
-                // TODO bike walking
+                //elevation costs
+                //Triangle (bikesafety, flat, quick)
+                weight = time;
+                // TODO bike walking costs when switching bikes
             }
-            else if (mode == Mode.CAR && getFlag(EdgeFlag.ALLOWS_CAR))
-                s1.weight = (int) Math.round(s0.weight + getLengthM() / getSpeedMs());
-            else
+            else if (mode == Mode.CAR && getFlag(EdgeFlag.ALLOWS_CAR)) {
+                weight = time;
+            } else
                 return null; // this mode cannot traverse this edge
 
+
+            if(getFlag(EdgeFlag.STAIRS)) {
+                weight*=3.0; //stair reluctance
+            } else if (mode == Mode.WALK) {
+                weight*=2.0; //walk reluctance
+            }
+
+            //TODO: turn costs
+
+
+            int roundedTime = (int) Math.ceil(time);
+            s1.incrementTimeInSeconds(roundedTime);
+            s1.incrementWeight(weight);
             return s1;
         }
 

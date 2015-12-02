@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.time.Instant;
 import java.util.PriorityQueue;
 
 /**
@@ -104,8 +105,8 @@ public class StreetRouter {
         }
         bestStates.clear();
         queue.clear();
-        State startState0 = new State(split.vertex0, -1, null);
-        State startState1 = new State(split.vertex1, -1, null);
+        State startState0 = new State(split.vertex0, -1, profileRequest.getFromTimeDate(), null);
+        State startState1 = new State(split.vertex1, -1, profileRequest.getFromTimeDate(), null);
         // TODO walk speed, assuming 1 m/sec currently.
         startState0.weight = split.distance0_mm / 1000;
         startState1.weight = split.distance1_mm / 1000;
@@ -117,7 +118,7 @@ public class StreetRouter {
     public void setOrigin (int fromVertex) {
         bestStates.clear();
         queue.clear();
-        State startState = new State(fromVertex, -1, null);
+        State startState = new State(fromVertex, -1, profileRequest.getFromTimeDate(), null);
         queue.add(startState);
     }
 
@@ -225,12 +226,39 @@ public class StreetRouter {
         public int vertex;
         public int weight;
         public int backEdge;
+        // the current time at this state, in milliseconds UNIX time
+        protected Instant time;
         public State backState; // previous state in the path chain
         public State nextState; // next state at the same location (for turn restrictions and other cases with co-dominant states)
-        public State (int atVertex, int viaEdge, State backState) {
+        public State(int atVertex, int viaEdge, long fromTimeDate, State backState) {
             this.vertex = atVertex;
             this.backEdge = viaEdge;
             this.backState = backState;
+            this.time = Instant.ofEpochMilli(fromTimeDate);
+
+        }
+
+
+        public void incrementTimeInSeconds(long seconds) {
+            if (seconds < 0) {
+                LOG.warn("A state's time is being incremented by a negative amount while traversing edge "
+                    );
+                //defectiveTraversal = true;
+                return;
+            }
+            if (false) {
+                time = time.minusSeconds(seconds);
+            } else {
+                time = time.plusSeconds(seconds);
+            }
+        }
+
+        public long getTime() {
+            return time.toEpochMilli();
+        }
+
+        public void incrementWeight(float weight) {
+            this.weight+=(int)weight;
         }
     }
 

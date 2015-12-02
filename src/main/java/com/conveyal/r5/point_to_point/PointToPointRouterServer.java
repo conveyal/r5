@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.time.Instant;
 import java.util.*;
 
 import java.io.File;
@@ -145,6 +146,7 @@ public class PointToPointRouterServer {
             profileRequest.toLon = toLon;
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
 
+            streetRouter.profileRequest = profileRequest;
             streetRouter.mode = mode;
             //Split for end coordinate
             Split split = transportNetwork.streetLayer.findSplit(profileRequest.toLat, profileRequest.toLon,
@@ -180,6 +182,7 @@ public class PointToPointRouterServer {
                         //FIXME: get this from state
                         feature.addProperty("mode", mode);
                         features.add(feature);
+                        feature.addProperty("time", Instant.ofEpochMilli(state.getTime()).toString());
                     }
                 }
                 featureCollection.put("features", features);

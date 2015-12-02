@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.joda.time.LocalDate;
 
 import java.io.Serializable;
+import java.time.ZoneOffset;
 import java.util.EnumSet;
 
 /**
@@ -166,5 +167,36 @@ public class ProfileRequest implements Serializable, Cloneable {
     
     public ProfileRequest clone () throws CloneNotSupportedException {
         return (ProfileRequest) super.clone();
+    }
+
+    /**
+     * Returns number of milliseconds UNIX time made with date and fromTime
+     *
+     * FIXME: Very broken because of timezones problems. (I have no idea which timezone date is supposed to be)
+     */
+    public long getFromTimeDate() {
+        long currentDateTime;
+
+        if (date == null) {
+            currentDateTime = java.time.LocalDate.now().atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli();
+        } else {
+            currentDateTime = date.toDate().getTime();
+        }
+
+        return  currentDateTime + (fromTime*1000);
+    }
+
+    public float getSpeed(Mode mode) {
+        switch (mode) {
+        case WALK:
+            return walkSpeed;
+        case BICYCLE:
+            return bikeSpeed;
+        case CAR:
+            return carSpeed;
+        default:
+            break;
+        }
+        throw new IllegalArgumentException("getSpeed(): Invalid mode " + mode);
     }
 }

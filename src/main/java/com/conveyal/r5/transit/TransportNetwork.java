@@ -14,10 +14,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
+import java.time.ZoneId;
+import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -274,6 +272,27 @@ public class TransportNetwork implements Serializable, Cloneable {
     //TODO: add transit stops to envelope
     public Envelope getEnvelope() {
         return streetLayer.getEnvelope();
+    }
+
+    /**
+     * Gets timezone of this transportNetwork
+     *
+     * If transitLayer exists returns transitLayer timezone otherwise GMT
+     *
+     * It is never null
+     * @return TransportNetwork timezone
+     */
+    public ZoneId getTimeZone() {
+        if (transitLayer == null) {
+            LOG.warn("TransportNetwork transit layer isn't loaded; API request times will be interpreted as GMT.");
+            return ZoneId.of("GMT");
+        } else if (transitLayer.timeZone == null) {
+            LOG.error(
+                "TransportNetwork transit layer is loaded but timezone is unknown; API request times will be interpreted as GMT.");
+            return ZoneId.of("GMT");
+        } else {
+            return transitLayer.timeZone;
+        }
     }
 
 

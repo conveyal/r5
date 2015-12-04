@@ -22,6 +22,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.time.DateTimeException;
+import java.time.ZoneId;
+import java.time.zone.ZoneRulesException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -32,6 +35,9 @@ import java.util.stream.Collectors;
 public class TransitLayer implements Serializable, Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransitLayer.class);
+
+    //TransportNetwork timezone. It is read from GTFS agency. If it is invalid it is GMT
+    protected ZoneId timeZone;
 
     // Do we really need to store this? It does serve as a key into the GTFS MapDB.
     public List<String> stopIdForIndex = new ArrayList<>();
@@ -200,6 +206,49 @@ public class TransitLayer implements Serializable, Cloneable {
 
         LOG.info("Finding the approximate center of the transport network...");
         findCenter(gtfs.stops.values());
+
+        //Set transportNetwork timezone
+        //If there are no agencies (which is strange) it is GMT
+        //Otherwise it is set to first valid agency timezone and warning is shown if agencies have different timezones
+        if (gtfs.agency.size() == 0) {
+            timeZone = ZoneId.of("GMT");
+            LOG.warn("graph contains no agencies; API request times will be interpreted as GMT.");
+        } else {
+            for (Agency agency : gtfs.agency.values()) {
+                if (agency.agency_timezone == null) {
+                    LOG.warn("Agency {} is without timezone", agency.agency_name);
+                    continue;
+                }
+                ZoneId tz;
+                try {
+                    tz = ZoneId.of(agency.agency_timezone);
+                } catch (ZoneRulesException z) {
+                    LOG.error("Agency {} in GTFS with timezone '{}' wasn't found in timezone database reason: {}", agency.agency_name, agency.agency_timezone, z.getMessage());
+                    //timezone will be set to GMT if it is still empty after for loop
+                    continue;
+                } catch (DateTimeException dt) {
+                    LOG.error("Agency {} in GTFS has timezone in wrong format:'{}'. Expected format: area/city ", agency.agency_name, agency.agency_timezone);
+                    //timezone will be set to GMT if it is still empty after for loop
+                    continue;
+                }
+                //First time setting timezone
+                if (timeZone == null) {
+                    LOG.info("TransportNetwork time zone set to {} from agency '{}' and agency_timezone:{}", tz,
+                        agency.agency_name, agency.agency_timezone);
+                    timeZone = tz;
+                } else if (!timeZone.equals(tz)) {
+                    LOG.error("agency time zone {} differs from TransportNetwork time zone: {}. This will be problematic.", tz,
+                        timeZone);
+                }
+            }
+
+            //This can only happen if all agencies have empty timezones
+            if (timeZone == null) {
+                timeZone = ZoneId.of("GMT");
+                LOG.warn(
+                    "No agency in graph had valid timezone; API request times will be interpreted as GMT.");
+            }
+        }
 
         // Will be useful in naming patterns.
 //        LOG.info("Finding topology of each route/direction...");

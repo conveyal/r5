@@ -299,7 +299,7 @@ public class TransitLayer implements Serializable, Cloneable {
         BitSet activeServices = new BitSet();
         int s = 0;
         for (Service service : services) {
-            if (service.activeOn(new org.joda.time.LocalDate(date.getYear(), date.getMonthValue(), date.getDayOfMonth()))) {
+            if (service.activeOn(date)) {
                 activeServices.set(s);
             }
             s++;

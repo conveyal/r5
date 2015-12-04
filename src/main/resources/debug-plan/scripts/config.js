@@ -55,7 +55,8 @@ var mapbox_style = {
         },
         "perm": {
             "type": "geojson",
-            "data": full_url
+            "data": full_url,
+            "maxzoom":22
         }
     },
     "sprite": "oneway",
@@ -131,11 +132,11 @@ var oneway_icons_style = {
             ],
             [
                 17,
-                "oneway-big-mix-large"
+                "oneway-big-mix-small"
             ]
             ]
         },
-        "icon-ignore-placement": false,
+        "icon-ignore-placement": true,
         "symbol-spacing":250,
         "icon-allow-overlap":false,
         "icon-padding":2

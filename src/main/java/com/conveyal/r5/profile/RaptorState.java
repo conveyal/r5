@@ -89,10 +89,6 @@ public class RaptorState {
 
     /**
      * Set this state to the min values found in this state or the other passed in (used in Range RAPTOR).
-     * if updateStopsTouched is true, will copy reachedThisRound information from the other query where that
-     * query has the optimal time. Otherwise it will not. updateStopsTouched should thus be set to true when
-     * you are combining two RaptorStates from the same round (e.g. during a frequency search), and false when
-     * you are advancing to the next round.
      */
     public void min (RaptorState other) {
         int nStops = this.bestTimes.length;
@@ -109,5 +105,21 @@ public class RaptorState {
                 this.previousStop[stop] = other.previousStop[stop];
             }
         }
+    }
+
+    /** Do a deep copy of this RaptorState and all parent raptor states. */
+    public RaptorState deepCopy() {
+        RaptorState state = this;
+        RaptorState ret = this.copy();
+        RaptorState copy = ret;
+
+        while (state.previous != null) {
+            copy.previous = state.previous.copy();
+            copy.previous.previous = null;
+            state = state.previous;
+            copy = copy.previous;
+        }
+
+        return ret;
     }
 }

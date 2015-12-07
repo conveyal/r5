@@ -252,7 +252,7 @@ public class RaptorWorker {
                         System.arraycopy(stateCopy.bestNonTransferTimes, 0, frequencyTimesAtTargets, 0, stateCopy.bestNonTransferTimes.length);
                     }
 
-                    statesEachIteration.add(stateCopy);
+                    statesEachIteration.add(stateCopy.deepCopy());
 
                     // convert to elapsed time
                     for (int t = 0; t < frequencyTimesAtTargets.length; t++) {
@@ -267,7 +267,7 @@ public class RaptorWorker {
                 timesAtTargetsEachIteration[iteration++] = IntStream.of(doPropagation ? scheduledTimesAtTargets : state.bestNonTransferTimes)
                         .map(i -> i != UNREACHED ? i - dt : i)
                         .toArray();
-                statesEachIteration.add(state.copy());
+                statesEachIteration.add(state.deepCopy());
             }
         }
 
@@ -341,6 +341,12 @@ public class RaptorWorker {
         // Anytime a round updates some stops, move on to another round
         while (doOneRound(scheduleState.get(round - 1), scheduleState.get(round), false, null)) {
             advance();
+        }
+
+        // make sure new times are propagated all the way to the end even if we did fewer rounds on a future search
+        while (round < scheduleState.size() - 1) {
+            scheduleState.get(round + 1).min(scheduleState.get(round));
+            round++;
         }
     }
 
@@ -728,5 +734,4 @@ public class RaptorWorker {
             patternsTouched.set(it.next());
         }
     }
-
 }

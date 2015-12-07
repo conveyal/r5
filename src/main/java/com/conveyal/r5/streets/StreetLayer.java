@@ -379,7 +379,7 @@ public class StreetLayer implements Serializable {
      * algorithm, see http://stackoverflow.com/questions/1348783.
      */
     public void removeDisconnectedSubgraphs(int minSubgraphSize) {
-        LOG.info("Removing subgraphs with fewer than {} vertices");
+        LOG.info("Removing subgraphs with fewer than {} vertices", minSubgraphSize);
         boolean edgeListsBuilt = incomingEdges != null;
 
         int nSubgraphs = 0;

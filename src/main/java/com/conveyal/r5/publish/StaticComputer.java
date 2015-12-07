@@ -172,6 +172,10 @@ public class StaticComputer implements Runnable {
                     continue;
                 }
 
+                if (state.previous.bestNonTransferTimes[stop] < state.bestNonTransferTimes[stop]) {
+                    LOG.error("Previous round has lower weight at stop {}, this implies a bug!", stop);
+                }
+
                 previousPattern = state.previousPatterns[stop];
 
                 patterns.add(previousPattern);

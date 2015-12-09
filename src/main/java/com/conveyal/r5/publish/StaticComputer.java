@@ -3,6 +3,7 @@ package com.conveyal.r5.publish;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
 import com.conveyal.r5.analyst.cluster.TaskStatisticsStore;
+import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.RaptorState;
 import com.conveyal.r5.profile.RaptorWorker;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -10,8 +11,6 @@ import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.google.common.io.LittleEndianDataOutputStream;
-import gnu.trove.list.TIntList;
-import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
 import org.slf4j.Logger;
@@ -56,6 +55,7 @@ public class StaticComputer implements Runnable {
         TaskStatistics ts = new TaskStatistics();
 
         LinkedPointSet lps = points.link(network.streetLayer);
+
 
         // perform street search to find transit stops and non-transit times
         StreetRouter sr = new StreetRouter(network.streetLayer);
@@ -149,74 +149,4 @@ public class StaticComputer implements Runnable {
         out.flush();
     }
 
-    private static class Path {
-        public int[] patterns;
-        public int[] boardStops;
-        public int[] alightStops;
-
-        public Path (RaptorState state, int stop) {
-            // trace the path back from this RaptorState
-            int previousPattern;
-            TIntList patterns = new TIntArrayList();
-            TIntList boardStops = new TIntArrayList();
-            TIntList alightStops = new TIntArrayList();
-            TIntList times = new TIntArrayList();
-            TIntList nonTransferTimes = new TIntArrayList();
-
-            boolean first = true;
-
-            while (state.previous != null)  {
-                // find the fewest-transfers trip that is still optimal in terms of travel time
-                if (state.previous.bestNonTransferTimes[stop] == state.bestNonTransferTimes[stop]) {
-                    state = state.previous;
-                    continue;
-                }
-
-                if (state.previous.bestNonTransferTimes[stop] < state.bestNonTransferTimes[stop]) {
-                    LOG.error("Previous round has lower weight at stop {}, this implies a bug!", stop);
-                }
-
-                previousPattern = state.previousPatterns[stop];
-
-                patterns.add(previousPattern);
-                alightStops.add(stop);
-                times.add(state.bestTimes[stop]);
-                nonTransferTimes.add(state.bestNonTransferTimes[stop]);
-                stop = state.previousStop[stop];
-                boardStops.add(stop);
-
-                first = false;
-
-                // go to previous state before handling transfers as transfers are done at the end of a round
-                state = state.previous;
-
-                // handle transfers
-                if (state.transferStop[stop] != -1)
-                    stop = state.transferStop[stop];
-            }
-
-            patterns.reverse();
-            boardStops.reverse();
-            alightStops.reverse();
-
-            this.patterns = patterns.toArray();
-            this.boardStops = boardStops.toArray();
-            this.alightStops = alightStops.toArray();
-
-            if (this.patterns.length == 0)
-                LOG.error("Transit path computed without a transit segment!");
-        }
-
-        public int hashCode () {
-            return Arrays.hashCode(patterns) + 2 * Arrays.hashCode(boardStops) + 5 * Arrays.hashCode(alightStops);
-        }
-
-        public boolean equals (Object o) {
-            if (o instanceof Path) {
-                Path p = (Path) o;
-                return this == p || Arrays.equals(patterns, p.patterns) && Arrays.equals(boardStops, p.boardStops) && Arrays.equals(alightStops, p.alightStops);
-            }
-            else return false;
-        }
-    }
 }

@@ -140,6 +140,7 @@ public class PointToPointRouterServer {
             //TODO errorchecks
 
             ProfileRequest profileRequest = new ProfileRequest();
+            profileRequest.setZoneId(transportNetwork.getTimeZone());
             profileRequest.fromLat = fromLat;
             profileRequest.fromLon = fromLon;
             profileRequest.toLat = toLat;

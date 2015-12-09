@@ -8,7 +8,10 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.joda.time.LocalDate;
 
 import java.io.Serializable;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
 
 /**
@@ -164,7 +167,17 @@ public class ProfileRequest implements Serializable, Cloneable {
 
     /** A non-destructive scenario to apply when executing this request */
     public Scenario scenario;
-    
+
+    private ZoneId zoneId = ZoneOffset.UTC;
+
+    public ZoneId getZoneId() {
+        return zoneId;
+    }
+
+    public void setZoneId(ZoneId zoneId) {
+        this.zoneId = zoneId;
+    }
+
     public ProfileRequest clone () throws CloneNotSupportedException {
         return (ProfileRequest) super.clone();
     }
@@ -172,17 +185,22 @@ public class ProfileRequest implements Serializable, Cloneable {
     /**
      * Returns number of milliseconds UNIX time made with date and fromTime
      *
-     * FIXME: Very broken because of timezones problems. (I have no idea which timezone date is supposed to be)
+     * It reads date as date in transportNetwork timezone when it is converted to UNIX time it is in UTC
+     *
+     * It needs to be decided how to do this correctly: #37
+     *
+     * If date isn't set current date is used. Time is empty (one hour before midnight in UTC if +1 timezone is used)
      */
     public long getFromTimeDate() {
         long currentDateTime;
 
         if (date == null) {
-            currentDateTime = java.time.LocalDate.now().atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli();
+            currentDateTime = ZonedDateTime.now(zoneId).truncatedTo(ChronoUnit.DAYS).toInstant().toEpochMilli();
         } else {
-            currentDateTime = date.toDate().getTime();
+            currentDateTime = ZonedDateTime.of(date.getYear(), date.getMonthOfYear(), date.getDayOfMonth(), 0,0,0,0,zoneId).toInstant().toEpochMilli();
         }
 
+        //fromTime is in seconds and there are 1000 ms in a second
         return  currentDateTime + (fromTime*1000);
     }
 

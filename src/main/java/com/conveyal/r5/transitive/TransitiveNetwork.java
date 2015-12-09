@@ -8,6 +8,7 @@ import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
+import org.apache.commons.codec.binary.Hex;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,6 +28,8 @@ public class TransitiveNetwork {
     public List<TransitivePattern> patterns = new ArrayList<>();
     // places, journeys not currently supported - these are added by the client.
 
+    private static Hex hex = new Hex();
+
     public TransitiveNetwork (TransitLayer layer) {
         // first write patterns, accumulating routes along the way
         TIntObjectMap<TransitiveRoute> routes = new TIntObjectHashMap<>();
@@ -44,7 +47,13 @@ public class TransitiveNetwork {
                 route.route_long_name = ri.route_long_name;
                 route.route_id = patt.routeIndex + "";
                 route.route_type = ri.route_type;
-                route.color = ri.color;
+                route.route_color = Hex.encodeHexString(new byte[] { (byte) (pattIdx & 0xff), (byte) (pattIdx * 2 & 0xff), (byte) (pattIdx * 4 & 0xff) });
+
+                // Transitive always expects route short name to be defined, and the GTFS spec requires use of the empty
+                // string when the field is empty. GTFS lib converts that to null, convert it back.
+                if (route.route_long_name == null) route.route_long_name = "Route";
+                if (route.route_short_name == null) route.route_short_name = route.route_long_name.split("[^A-Za-z0-9]")[0];
+
                 routes.put(patt.routeIndex, route);
             }
 

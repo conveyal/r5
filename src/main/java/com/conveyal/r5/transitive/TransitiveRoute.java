@@ -9,5 +9,5 @@ public class TransitiveRoute {
     public String route_short_name;
     public String route_long_name;
     public int route_type;
-    public String color;
+    public String route_color;
 }

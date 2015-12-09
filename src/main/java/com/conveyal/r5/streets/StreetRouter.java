@@ -96,12 +96,13 @@ public class StreetRouter {
     /**
      * @param lat Latitude in floating point (not fixed int) degrees.
      * @param lon Longitude in flating point (not fixed int) degrees.
+     * @return true if edge was found near wanted coordinate
      */
-    public void setOrigin (double lat, double lon) {
+    public boolean setOrigin (double lat, double lon) {
         Split split = streetLayer.findSplit(lat, lon, 300);
         if (split == null) {
             LOG.info("No street was found near the specified origin point of {}, {}.", lat, lon);
-            return;
+            return false;
         }
         bestStates.clear();
         queue.clear();
@@ -113,6 +114,7 @@ public class StreetRouter {
         // NB not adding to bestStates, as it will be added when it comes out of the queue
         queue.add(startState0);
         queue.add(startState1);
+        return true;
     }
 
     public void setOrigin (int fromVertex) {

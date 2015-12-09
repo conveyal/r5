@@ -152,7 +152,14 @@ public class PointToPointRouterServer {
             //Split for end coordinate
             Split split = transportNetwork.streetLayer.findSplit(profileRequest.toLat, profileRequest.toLon,
                 RADIUS_METERS);
-            streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon);
+            if (split == null) {
+                content.put("errors", "Edge near the end coordinate wasn't found. Routing didn't start!");
+                return content;
+            }
+            if (!streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
+                content.put("errors", "Edge near the origin coordinate wasn't found. Routing didn't start!");
+                return content;
+            }
             streetRouter.route();
 
             //Gets lowest weight state for end coordinate split

@@ -550,6 +550,15 @@ public class RaptorWorker {
                                 outputState.bestTimes[stopIndex] = remainOnBoardTime;
                                 outputState.transferStop[stopIndex] = -1; // not reached via a transfer
                             }
+
+                            if (outputState.bestNonTransferTimes[stopIndex] > inputState.bestNonTransferTimes[stopIndex] ||
+                                    outputState.bestTimes[stopIndex] > inputState.bestTimes[stopIndex]) {
+                                LOG.error("Relaxing stop increased travel time at stop {}, can't happen", stopIndex);
+                            }
+
+                            if (remainOnBoardTime < outputState.departureTime) {
+                                LOG.error("Negative speed travel, path dump follows:\n{}", outputState.dump(stopIndex));
+                            }
                         }
                     }
                 }

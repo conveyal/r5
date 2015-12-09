@@ -107,6 +107,19 @@ public class RaptorState {
         }
     }
 
+    /** dump this as a string */
+    public String dump (int stop) {
+        Path p = new Path(this, stop);
+
+        StringBuilder sb = new StringBuilder();
+
+        for (int i = 0; i < p.length; i++) {
+            sb.append(String.format("Stop %5d at %5d, reached by pattern %5d from stop %5d\n", p.alightStops[i], p.alightTimes[i], p.patterns[i], p.boardStops[i]));
+        }
+
+        return sb.toString();
+    }
+
     /** Do a deep copy of this RaptorState and all parent raptor states. */
     public RaptorState deepCopy() {
         RaptorState state = this;

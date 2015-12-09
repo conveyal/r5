@@ -375,18 +375,17 @@ public class RaptorWorker {
         // no need to make a copy here as this is not updated in the search
         RaptorState previousRound = scheduleState.get(round - 1);
         RaptorState currentRound = scheduleState.get(round).copy();
+        currentRound.previous = previousRound;
 
         // Anytime a round updates some stops, move on to another round
         while (doOneRound(previousRound, currentRound, true, boardingAssumption)) {
-            advance();
+             advance();
             previousRound = currentRound;
             currentRound = previousRound.copy();
             // copy in scheduled times
             currentRound.min(scheduleState.get(round));
-            // copy frequency times over
-            currentRound.min(previousRound);
         }
-
+        
         return currentRound;
     }
 

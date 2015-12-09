@@ -165,7 +165,12 @@ public class TransitLayer implements Serializable, Cloneable {
             }
             tripPattern.setOrVerifyDirection(trip.direction_id);
             int serviceCode = serviceCodeNumber.get(trip.service.service_id);
-            TripSchedule tripSchedule = new TripSchedule(trip, arrivals.toArray(), departures.toArray(), serviceCode);
+
+            // TODO there's no reason why we can't just filter trips like this, correct?
+            // TODO this means that invalid trips still have empty patterns created
+            TripSchedule tripSchedule = TripSchedule.create(trip, arrivals.toArray(), departures.toArray(), serviceCode);
+            if (tripSchedule == null) continue;
+
             tripPattern.addTrip(tripSchedule);
 
             this.hasFrequencies = this.hasFrequencies || tripSchedule.headwaySeconds != null;

@@ -1,5 +1,6 @@
 package com.conveyal.r5.common;
 
+import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Geometry;
 
 import java.util.HashMap;
@@ -23,6 +24,10 @@ public class GeoJsonFeature {
     public GeoJsonFeature(Geometry geometry) {
         this.geometry = geometry;
         this.properties = new HashMap<>(5);
+    }
+
+    public GeoJsonFeature(double lon, double lat) {
+        this(GeometryUtils.geometryFactory.createPoint(new Coordinate(lon, lat)));
     }
 
     public String getType() {

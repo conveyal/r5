@@ -47,8 +47,19 @@ public class StreetRouter {
 
     private RoutingVisitor routingVisitor;
 
+    private Split originSplit;
+
     public void setRoutingVisitor(RoutingVisitor routingVisitor) {
         this.routingVisitor = routingVisitor;
+    }
+
+    /** Currently used for debugging snapping to vertices
+     * TODO: API should probably be nicer
+     * setOrigin on split or setOrigin that would return split
+     * @return
+     */
+    public Split getOriginSplit() {
+        return originSplit;
     }
 
     /**
@@ -110,6 +121,7 @@ public class StreetRouter {
             LOG.info("No street was found near the specified origin point of {}, {}.", lat, lon);
             return false;
         }
+        originSplit = split;
         bestStates.clear();
         queue.clear();
         State startState0 = new State(split.vertex0, -1, profileRequest.getFromTimeDate(), null);

@@ -168,7 +168,8 @@
                         }
                         if (data.errors) {
                             alert(data.errors);
-                        } else {
+                        }
+                        if (data.data) {
                             layer = L.geoJson(data.data, {style: styleMode, onEachFeature:onEachFeature});
                             layer.addTo(window.my_map);
                         }

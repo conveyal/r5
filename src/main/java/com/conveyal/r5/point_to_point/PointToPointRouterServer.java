@@ -8,10 +8,7 @@ import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.streets.*;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.Envelope;
-import com.vividsolutions.jts.geom.LineString;
-import com.vividsolutions.jts.geom.PrecisionModel;
+import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.operation.buffer.BufferParameters;
 import com.vividsolutions.jts.operation.buffer.OffsetCurveBuilder;
 import gnu.trove.set.TIntSet;
@@ -24,6 +21,7 @@ import java.util.*;
 
 import java.io.File;
 
+import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
 import static spark.Spark.*;
 
@@ -191,6 +189,62 @@ public class PointToPointRouterServer {
                 featureCollection.put("features", features);
                 content.put("data", featureCollection);
             } else {
+                Split originSplit = streetRouter.getOriginSplit();
+                //FIXME: why are coordinates of vertex0 and vertex1 the same
+                //but distance to vertex and vertex idx differ
+
+                /*Path wasn't found we return 3 points:
+                 * - Point on start of edge that we started the search
+                 * - Point on end of edge that started the search
+                 * - Closest point on edge to start coordinate
+                 *
+                 * We also return outgoing edges from start and end points of edge that started the search
+                 */
+                Map<String, Object> featureCollection = new HashMap<>(2);
+                featureCollection.put("type", "FeatureCollection");
+                List<GeoJsonFeature> features = new ArrayList<>(10);
+                GeoJsonFeature feature = new GeoJsonFeature(
+                    fixedDegreesToFloating(originSplit.fLon), fixedDegreesToFloating(originSplit.fLat));
+                feature.addProperty("type", "Point on edge");
+
+                features.add(feature);
+
+                VertexStore.Vertex vertex = transportNetwork.streetLayer.vertexStore.getCursor(originSplit.vertex0);
+                feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
+                feature.addProperty("type", "Edge start point");
+                feature.addProperty("vertex_idx", originSplit.vertex0);
+                feature.addProperty("distance_to_vertex", originSplit.distance0_mm/1000);
+                features.add(feature);
+                transportNetwork.streetLayer.getOutgoingEdges().get(originSplit.vertex0)
+                    .forEach(edge_idx -> {
+                        EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edge_idx);
+                        GeoJsonFeature edge_feature = new GeoJsonFeature(edge.getGeometry());
+                        edge_feature.addProperty("idx", edge_idx);
+                        edge_feature.addProperty("permissions", edge.getPermissionsAsString());
+                        edge_feature.addProperty("from", "vertex0");
+                        features.add(edge_feature);
+                        return true;
+                    });
+
+                transportNetwork.streetLayer.vertexStore.getCursor(originSplit.vertex1);
+                feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
+                feature.addProperty("type", "Edge end point");
+                feature.addProperty("vertex_idx", originSplit.vertex1);
+                feature.addProperty("distance_to_vertex", originSplit.distance1_mm/1000);
+                features.add(feature);
+                transportNetwork.streetLayer.getOutgoingEdges().get(originSplit.vertex1)
+                    .forEach(edge_idx -> {
+                        EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edge_idx);
+                        GeoJsonFeature edge_feature = new GeoJsonFeature(edge.getGeometry());
+                        edge_feature.addProperty("idx", edge_idx);
+                        edge_feature.addProperty("permissions", edge.getPermissionsAsString());
+                        edge_feature.addProperty("from", "vertex1");
+                        features.add(edge_feature);
+                        return true;
+                    });
+
+                featureCollection.put("features", features);
+                content.put("data", featureCollection);
                 content.put("errors", "Path to end coordinate wasn't found!");
             }
             return content;

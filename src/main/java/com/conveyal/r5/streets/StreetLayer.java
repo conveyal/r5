@@ -553,4 +553,8 @@ public class StreetLayer implements Serializable {
     public Envelope getEnvelope() {
         return envelope;
     }
+
+    public List<TIntList> getOutgoingEdges() {
+        return outgoingEdges;
+    }
 }

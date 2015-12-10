@@ -111,4 +111,10 @@ public class VertexStore implements Serializable {
         return fixed / FIXED_FACTOR;
     }
 
+    //Used when converting fixed latitude and longitude to floating from Split
+    //It is in double type even though it is fixed
+    public static double fixedDegreesToFloating(double fixed) {
+        return fixed / FIXED_FACTOR;
+    }
+
 }

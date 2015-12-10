@@ -6,10 +6,7 @@ import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.RouterInfo;
 import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.streets.EdgeStore;
-import com.conveyal.r5.streets.Split;
-import com.conveyal.r5.streets.StreetRouter;
-import com.conveyal.r5.streets.VertexStore;
+import com.conveyal.r5.streets.*;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
@@ -139,6 +136,13 @@ public class PointToPointRouterServer {
             Float toLon = request.queryMap("toLon").floatValue();
             //TODO errorchecks
 
+            Boolean fullStateList = request.queryMap("full").booleanValue();
+            RoutingVisitor routingVisitor = new RoutingVisitor(transportNetwork.streetLayer.edgeStore, mode);
+
+            if (fullStateList == null) {
+                fullStateList = false;
+            }
+
             ProfileRequest profileRequest = new ProfileRequest();
             profileRequest.setZoneId(transportNetwork.getTimeZone());
             profileRequest.fromLat = fromLat;
@@ -160,39 +164,30 @@ public class PointToPointRouterServer {
                 content.put("errors", "Edge near the origin coordinate wasn't found. Routing didn't start!");
                 return content;
             }
+            if (fullStateList) {
+                streetRouter.setRoutingVisitor(routingVisitor);
+            }
             streetRouter.route();
+
+            if (fullStateList) {
+                Map<String, Object> featureCollection = new HashMap<>(2);
+                featureCollection.put("type", "FeatureCollection");
+                List<GeoJsonFeature> features = routingVisitor.getFeatures();
+
+                LOG.info("Num features:{}", features.size());
+                featureCollection.put("features", features);
+                content.put("data", featureCollection);
+                return content;
+            }
 
             //Gets lowest weight state for end coordinate split
             StreetRouter.State lastState = streetRouter.getState(split);
             if (lastState != null) {
-                LinkedList<StreetRouter.State> states = new LinkedList<>();
-
-                /*
-                * Starting from latest (time-wise) state, copy states to the head of a list in reverse
-                * chronological order. List indices will thus increase forward in time, and backEdges will
-                * be chronologically 'back' relative to their state.
-                */
-                for (StreetRouter.State cur = lastState; cur != null; cur = cur.backState) {
-                    states.addFirst(cur);
-                }
-
-                List<GeoJsonFeature> features = new ArrayList<>(states.size());
                 Map<String, Object> featureCollection = new HashMap<>(2);
                 featureCollection.put("type", "FeatureCollection");
-                //TODO: this can be improved since end and start vertices are the same in all the edges.
-                for (StreetRouter.State state : states) {
-                    Integer edgeIdx = state.backEdge;
-                    if (!(edgeIdx == -1 || edgeIdx == null)) {
-                        EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore
-                            .getCursor(edgeIdx);
-                        GeoJsonFeature feature = new GeoJsonFeature(edge.getGeometry());
-                        feature.addProperty("weight", state.weight);
-                        //FIXME: get this from state
-                        feature.addProperty("mode", mode);
-                        features.add(feature);
-                        feature.addProperty("time", Instant.ofEpochMilli(state.getTime()).toString());
-                    }
-                }
+                List<GeoJsonFeature> features = new ArrayList<>();
+
+                fillFeature(transportNetwork, mode, lastState, features);
                 featureCollection.put("features", features);
                 content.put("data", featureCollection);
             } else {
@@ -460,6 +455,35 @@ public class PointToPointRouterServer {
 
         }, JsonUtilities.objectMapper::writeValueAsString);
 
+    }
+
+    private static void fillFeature(TransportNetwork transportNetwork, Mode mode,
+        StreetRouter.State lastState, List<GeoJsonFeature> features) {
+        LinkedList<StreetRouter.State> states = new LinkedList<>();
+
+                /*
+                * Starting from latest (time-wise) state, copy states to the head of a list in reverse
+                * chronological order. List indices will thus increase forward in time, and backEdges will
+                * be chronologically 'back' relative to their state.
+                */
+        for (StreetRouter.State cur = lastState; cur != null; cur = cur.backState) {
+            states.addFirst(cur);
+        }
+
+        //TODO: this can be improved since end and start vertices are the same in all the edges.
+        for (StreetRouter.State state : states) {
+            Integer edgeIdx = state.backEdge;
+            if (!(edgeIdx == -1 || edgeIdx == null)) {
+                EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore
+                    .getCursor(edgeIdx);
+                GeoJsonFeature feature = new GeoJsonFeature(edge.getGeometry());
+                feature.addProperty("weight", state.weight);
+                //FIXME: get this from state
+                feature.addProperty("mode", mode);
+                features.add(feature);
+                feature.addProperty("time", Instant.ofEpochMilli(state.getTime()).toString());
+            }
+        }
     }
 
     /**

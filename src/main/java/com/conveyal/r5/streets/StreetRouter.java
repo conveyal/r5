@@ -45,6 +45,12 @@ public class StreetRouter {
     /** Search mode: we need a single mode, it is up to the caller to disentagle the modes set in the profile request */
     public Mode mode = Mode.WALK;
 
+    private RoutingVisitor routingVisitor;
+
+    public void setRoutingVisitor(RoutingVisitor routingVisitor) {
+        this.routingVisitor = routingVisitor;
+    }
+
     /**
      * @return a map from transit stop indexes to their distances from the origin.
      * Note that the TransitLayer contains all the information about which street vertices are transit stops.
@@ -164,6 +170,10 @@ public class StreetRouter {
 
             // non-dominated state coming off the pqueue is by definition the best way to get to that vertex
             bestStates.put(s0.vertex, s0);
+
+            if (routingVisitor != null) {
+                routingVisitor.visitVertex(s0);
+            }
 
             // explore edges leaving this vertex
             streetLayer.outgoingEdges.get(s0.vertex).forEach(eidx -> {

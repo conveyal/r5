@@ -11,6 +11,9 @@
             <option value="WALK">Walking</option>
             <option value="BICYCLE">Cycling</option>
         </select>
+        <label for="full">
+            <input type="checkbox" value="full_load" id="full" name="full">Load all states
+        </label>
         <button type="submit" value="submit" disabled="true" id="planButton">plan</button>
         <div id="map" style="position: absolute; top: 40px; left: 0; width: 100%; height: 100%;"></div>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
@@ -148,7 +151,8 @@
                     fromLon: m1.getLatLng().lng,
                     toLat: m2.getLatLng().lat,
                     toLon: m2.getLatLng().lng,
-                    mode: $("#mode").val()
+                    mode: $("#mode").val(),
+                    full: $("#full").is(':checked')
                 }
                 console.log(params);
 
@@ -204,6 +208,7 @@
 
             $(document).ready(function() {
                 $("#planButton").click(requestPlan);
+                $("#full").change(requestPlan);
             });
 
 

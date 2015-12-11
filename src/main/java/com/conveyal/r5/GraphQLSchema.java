@@ -792,6 +792,10 @@ public class GraphQLSchema {
                 .type(new GraphQLList(profileOptionType))
 
                 .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("patterns")
+                .type(new GraphQLList(segmentPatternType))
+                .build())
             .build();
 
         GraphQLFieldDefinition profileField = GraphQLFieldDefinition.newFieldDefinition()

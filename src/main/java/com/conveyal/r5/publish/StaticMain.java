@@ -57,21 +57,29 @@ public class StaticMain {
             }
         }
 
-        HttpClient httpClient = HttpClients.createDefault();
-        HttpPost request = new HttpPost(args[2] + "/enqueue/jobs");
-        request.setHeader("Content-Type", "application/json");
-        request.setEntity(new StringEntity(JsonUtilities.objectMapper.writeValueAsString(requests)));
-        HttpResponse res = httpClient.execute(request);
+        int nRequests = requests.size();
 
-        if (res.getStatusLine().getStatusCode() != 200 && res.getStatusLine().getStatusCode() != 202) {
-            InputStream is = res.getEntity().getContent();
-            String responseText = new String(ByteStreams.toByteArray(is));
-            is.close();
-            LOG.error("Request was unsuccessful: {}\n{}", res.getStatusLine().toString(), responseText);
+        // enqueue 50000 requests at a time so Jackson doesn't run out of memory
+        for (int offset = 0; offset < nRequests; offset += 50000) {
+            HttpClient httpClient = HttpClients.createDefault();
+            HttpPost request = new HttpPost(args[2] + "/enqueue/jobs");
+            request.setHeader("Content-Type", "application/json");
+            List<StaticSiteRequest.PointRequest> subRequests = requests.subList(offset, offset + 50000);
+            request.setEntity(new StringEntity(JsonUtilities.objectMapper.writeValueAsString(subRequests)));
+            HttpResponse res = httpClient.execute(request);
+
+            if (res.getStatusLine().getStatusCode() != 200 && res.getStatusLine().getStatusCode() != 202) {
+                InputStream is = res.getEntity().getContent();
+                String responseText = new String(ByteStreams.toByteArray(is));
+                is.close();
+                LOG.error("Request was unsuccessful, retrying after 5s delay: {}\n{}", res.getStatusLine().toString(), responseText);
+
+                Thread.sleep(5000);
+                offset -= 50000; // will be incremented back to where it was at top of loop
+            }
         }
-        else {
-            LOG.info("{} requests enqueued successfully", requests.size());
-        }
+
+        LOG.info("{} requests enqueued successfully", requests.size());
 
         LOG.info("done");
     }

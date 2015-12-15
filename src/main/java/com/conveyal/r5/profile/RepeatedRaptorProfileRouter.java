@@ -1,10 +1,9 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
-import com.conveyal.r5.analyst.scenario.InactiveTripsFilter;
-import com.conveyal.r5.analyst.scenario.Scenario;
-import gnu.trove.map.TIntIntMap;
 import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
+import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
+import gnu.trove.map.TIntIntMap;
 import com.conveyal.r5.analyst.cluster.ResultEnvelope;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
 import com.conveyal.r5.streets.PointSetTimes;

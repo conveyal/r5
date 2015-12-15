@@ -27,13 +27,13 @@ public class StaticComputer implements Runnable {
     private static final Logger LOG = LoggerFactory.getLogger(StaticComputer.class);
     private StaticSiteRequest.PointRequest req;
     private TransportNetwork network;
-    private TaskStatisticsStore taskStatisticsStore;
+    private TaskStatistics taskStatistics;
 
     /** Compute the origin specified by x and y (relative to the request origin) */
-    public StaticComputer (StaticSiteRequest.PointRequest req, TransportNetwork network, TaskStatisticsStore tss) {
+    public StaticComputer (StaticSiteRequest.PointRequest req, TransportNetwork network, TaskStatistics ts) {
         this.req = req;
         this.network = network;
-        this.taskStatisticsStore = tss;
+        this.taskStatistics = ts;
     }
 
     public void run () {

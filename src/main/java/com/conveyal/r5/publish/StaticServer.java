@@ -1,4 +1,5 @@
 package com.conveyal.r5.publish;
+import com.conveyal.r5.analyst.cluster.TaskStatistics;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
@@ -81,7 +82,7 @@ public class StaticServer {
         int x = Integer.parseInt(req.params("x"));
         int y = Integer.parseInt(req.params("y").replaceFirst("\\.dat$", ""));
         StaticSiteRequest.PointRequest pr = staticSiteRequest.getPointRequest(x, y);
-        StaticComputer computer = new StaticComputer(pr, network, ts -> {});
+        StaticComputer computer = new StaticComputer(pr, network, new TaskStatistics());
         try {
             computer.write(baos);
             return baos.toByteArray();

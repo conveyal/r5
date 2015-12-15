@@ -5,19 +5,23 @@ import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
+import com.google.common.io.ByteStreams;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.methods.HttpPost;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.HttpClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
-import java.io.FileInputStream;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ThreadPoolExecutor;
 
 /**
  * Main class to compute a static site based on configuration JSON.
  *
- * Usage: ... request.json graph-bucket
+ * Usage: ... request.json graph-bucket broker-url
  */
 public class StaticMain {
     private static final Logger LOG = LoggerFactory.getLogger(StaticMain.class);
@@ -35,7 +39,7 @@ public class StaticMain {
         metadata.run();
 
 
-        LOG.info("Performing requests");
+        LOG.info("Enqueueing requests");
         List<StaticSiteRequest.PointRequest> requests = new ArrayList<>();
 
         WebMercatorGridPointSet ps = net.getGridPointSet();
@@ -53,9 +57,21 @@ public class StaticMain {
             }
         }
 
-        requests.parallelStream().forEach(pr -> {
-            new StaticComputer(pr, net, ts -> {}).run();
-        });
+        HttpClient httpClient = HttpClients.createDefault();
+        HttpPost request = new HttpPost(args[2] + "/enqueue/jobs");
+        request.setHeader("Content-Type", "application/json");
+        request.setEntity(new StringEntity(JsonUtilities.objectMapper.writeValueAsString(requests)));
+        HttpResponse res = httpClient.execute(request);
+
+        if (res.getStatusLine().getStatusCode() != 200 && res.getStatusLine().getStatusCode() != 202) {
+            InputStream is = res.getEntity().getContent();
+            String responseText = new String(ByteStreams.toByteArray(is));
+            is.close();
+            LOG.error("Request was unsuccessful: {}\n{}", res.getStatusLine().toString(), responseText);
+        }
+        else {
+            LOG.info("{} requests enqueued successfully", requests.size());
+        }
 
         LOG.info("done");
     }

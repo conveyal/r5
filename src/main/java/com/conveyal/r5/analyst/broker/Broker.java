@@ -4,6 +4,7 @@ import com.amazonaws.regions.Regions;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.*;
+import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import com.conveyal.r5.common.JsonUtilities;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
@@ -19,7 +20,6 @@ import gnu.trove.map.hash.TObjectLongHashMap;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.grizzly.http.server.Response;
 import org.glassfish.grizzly.http.util.HttpStatus;
-import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
 import com.conveyal.r5.analyst.cluster.AnalystWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,7 +106,7 @@ public class Broker implements Runnable {
      * the side channels. If that doesn't work, we put them here to be picked up the next time a worker
      * is available via normal task distribution channels.
      */
-    private ArrayListMultimap<String, AnalystClusterRequest> stalledHighPriorityTasks = ArrayListMultimap.create();
+    private ArrayListMultimap<String, GenericClusterRequest> stalledHighPriorityTasks = ArrayListMultimap.create();
 
     /**
      * High priority requests that have just come and are about to be sent down a single point channel.
@@ -115,7 +115,7 @@ public class Broker implements Runnable {
      * two different workers because the second came in in between closing the side channel and the worker
      * reopening it.
      */
-    private Multimap<String, AnalystClusterRequest> newHighPriorityTasks = ArrayListMultimap.create();
+    private Multimap<String, GenericClusterRequest> newHighPriorityTasks = ArrayListMultimap.create();
 
     /** Priority requests that have already been farmed out to workers, and are awaiting a response. */
     private TIntObjectMap<Response> highPriorityResponses = new TIntObjectHashMap<>();
@@ -199,7 +199,7 @@ public class Broker implements Runnable {
      * Enqueue a task for execution ASAP, planning to return the response over the same HTTP connection.
      * Low-reliability, no re-delivery.
      */
-    public synchronized void enqueuePriorityTask (AnalystClusterRequest task, Response response) {
+    public synchronized void enqueuePriorityTask (GenericClusterRequest task, Response response) {
         boolean workersAvailable = workersAvailableForGraph(task.graphId);
 
         if (!workersAvailable) {
@@ -236,7 +236,7 @@ public class Broker implements Runnable {
 
     /** attempt to deliver high priority tasks via side channels, or move them into normal channels if need be */
     public synchronized void deliverHighPriorityTasks (String graphId) {
-        Collection<AnalystClusterRequest> tasks = newHighPriorityTasks.get(graphId);
+        Collection<GenericClusterRequest> tasks = newHighPriorityTasks.get(graphId);
 
         if (tasks.isEmpty())
             // someone got here first
@@ -280,13 +280,13 @@ public class Broker implements Runnable {
     }
 
     /** Enqueue some tasks for queued execution possibly much later. Results will be saved to S3. */
-    public synchronized void enqueueTasks (List<AnalystClusterRequest> tasks) {
+    public synchronized void enqueueTasks (List<GenericClusterRequest> tasks) {
         Job job = findJob(tasks.get(0)); // creates one if it doesn't exist
 
         if (!workersAvailableForGraph(job.graphId))
             createWorkersForGraph(job.graphId);
 
-        for (AnalystClusterRequest task : tasks) {
+        for (GenericClusterRequest task : tasks) {
             task.taskId = nextTaskId++;
             job.addTask(task);
             nUndeliveredTasks += 1;
@@ -490,11 +490,11 @@ public class Broker implements Runnable {
         // workers on their graph.
 
         // start with high-priority tasks
-        HIGHPRIORITY: for (Map.Entry<String, Collection<AnalystClusterRequest>> e : stalledHighPriorityTasks
+        HIGHPRIORITY: for (Map.Entry<String, Collection<GenericClusterRequest>> e : stalledHighPriorityTasks
                 .asMap().entrySet()) {
             // the collection is an arraylist with the most recently added at the end
             String graphId = e.getKey();
-            Collection<AnalystClusterRequest> tasks = e.getValue();
+            Collection<GenericClusterRequest> tasks = e.getValue();
 
             // see if there are any consumers for this
             // don't respect graph affinity when working offline; we can't arbitrarily start more workers
@@ -512,7 +512,7 @@ public class Broker implements Runnable {
                 continue HIGHPRIORITY;
             }
 
-            Iterator<AnalystClusterRequest> taskIt = tasks.iterator();
+            Iterator<GenericClusterRequest> taskIt = tasks.iterator();
             while (taskIt.hasNext() && !consumers.isEmpty()) {
                 Response consumer = consumers.pop();
 
@@ -601,7 +601,7 @@ public class Broker implements Runnable {
         }
 
         // Get up to N tasks from the tasksAwaitingDelivery deque
-        List<AnalystClusterRequest> tasks = new ArrayList<>();
+        List<GenericClusterRequest> tasks = new ArrayList<>();
         while (tasks.size() < MAX_TASKS_PER_WORKER && !job.tasksAwaitingDelivery.isEmpty()) {
             tasks.add(job.tasksAwaitingDelivery.poll());
         }
@@ -673,7 +673,7 @@ public class Broker implements Runnable {
     }
 
     /** find the job for a task, creating it if it does not exist */
-    public Job findJob (AnalystClusterRequest task) {
+    public Job findJob (GenericClusterRequest task) {
         Job job = findJob(task.jobId);
 
         if (job != null)

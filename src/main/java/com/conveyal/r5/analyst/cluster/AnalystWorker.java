@@ -4,9 +4,10 @@ import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
-import com.conveyal.r5.analyst.scenario.InactiveTripsFilter;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.publish.StaticComputer;
+import com.conveyal.r5.publish.StaticSiteRequest;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,10 +38,7 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.net.SocketTimeoutException;
 import java.net.URI;
-import java.util.List;
-import java.util.Properties;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -260,7 +258,7 @@ public class AnalystWorker implements Runnable {
             }
             LOG.debug("Long-polling for work ({} second timeout).", POLL_TIMEOUT / 1000.0);
             // Long-poll (wait a few seconds for messages to become available)
-            List<AnalystClusterRequest> tasks = getSomeWork(WorkType.BATCH);
+            List<GenericClusterRequest> tasks = getSomeWork(WorkType.BATCH);
             if (tasks == null) {
                 LOG.debug("Didn't get any work. Retrying.");
                 idle = true;
@@ -269,7 +267,7 @@ public class AnalystWorker implements Runnable {
 
             // Enqueue high-priority (interactive) tasks first to ensure they are enqueued
             // even if the low-priority batch queue blocks.
-            tasks.stream().filter(t -> t.outputLocation == null)
+            tasks.stream().filter(t -> t instanceof AnalystClusterRequest && ((AnalystClusterRequest) t).outputLocation == null)
                     .forEach(t -> highPriorityExecutor.execute(() -> {
                         LOG.warn("Handling single point request via normal channel, side channel should open shortly.");
                         this.handleOneRequest(t);
@@ -277,7 +275,7 @@ public class AnalystWorker implements Runnable {
 
             // Enqueue low-priority (batch) tasks; note that this may block anywhere in the process
             logQueueStatus();
-            tasks.stream().filter(t -> t.outputLocation != null)
+            tasks.stream().filter(t -> !(t instanceof AnalystClusterRequest) || ((AnalystClusterRequest) t).outputLocation != null)
                 .forEach(t -> {
                     // attempt to enqueue, waiting if the queue is full
                     while (true) {
@@ -303,7 +301,7 @@ public class AnalystWorker implements Runnable {
      * This is the callback that processes a single task and returns the results upon completion.
      * It may be called several times simultaneously on different executor threads.
      */
-    private void handleOneRequest(AnalystClusterRequest clusterRequest) {
+    private void handleOneRequest(GenericClusterRequest clusterRequest) {
 
         if (dryRunFailureRate >= 0) {
             // This worker is running in test mode.
@@ -322,28 +320,11 @@ public class AnalystWorker implements Runnable {
             long startTime = System.currentTimeMillis();
             LOG.info("Handling message {}", clusterRequest.toString());
 
-            // We need to distinguish between and handle four different types of requests here:
-            // Either vector isochrones or accessibility to a pointset,
-            // as either a single-origin priority request (where the result is returned immediately)
-            // or a job task (where the result is saved to output location on S3).
-            boolean isochrone = (clusterRequest.destinationPointsetId == null);
-            boolean singlePoint = (clusterRequest.outputLocation == null);
-            boolean transit = (clusterRequest.profileRequest.transitModes != null && clusterRequest.profileRequest.transitModes.contains("TRANSIT"));
-
-            if (singlePoint) {
-                lastHighPriorityRequestProcessed = startTime;
-                if (!sideChannelOpen) {
-                    openSideChannel();
-                }
-            }
-
             TaskStatistics ts = new TaskStatistics();
-            ts.pointsetId = clusterRequest.destinationPointsetId;
             ts.graphId = clusterRequest.graphId;
             ts.awsInstanceType = instanceType;
             ts.jobId = clusterRequest.jobId;
             ts.workerId = machineId;
-            ts.single = singlePoint;
 
             // Get the graph object for the ID given in the request, fetching inputs and building as needed.
             // All requests handled together are for the same graph, and this call is synchronized so the graph will
@@ -357,76 +338,110 @@ public class AnalystWorker implements Runnable {
             // TODO lazy-initialize all additional indexes on transitLayer
             // ts.graphTripCount = transportNetwork.transitLayer...
             ts.graphStopCount = transportNetwork.transitLayer.getStopCount();
-            ts.lon = clusterRequest.profileRequest.fromLon;
-            ts.lat = clusterRequest.profileRequest.fromLat;
 
-            // If this one-to-many request is for accessibility information based on travel times to a pointset,
-            // fetch the set of points we will use as destinations.
-            final PointSet targets;
-            final LinkedPointSet linkedTargets;
-            if (isochrone) {
-                // This is an isochrone request, search to a regular grid of points.
-                targets = transportNetwork.getGridPointSet();
-            } else {
-                // This is a detailed accessibility request. There is necessarily a destination point set supplied.
-                targets = pointSetDatastore.get(clusterRequest.destinationPointsetId);
-            }
-            // TODO cache these, they are probably slow to make.
-            // TODO this breaks if transportNetwork has been rebuilt ?
-            // TODO We should link after applying the scenario once we allow street modifications.
-            linkedTargets = targets.link(transportNetwork.streetLayer);
+            if (clusterRequest instanceof AnalystClusterRequest)
+                this.handleAnalystRequest((AnalystClusterRequest) clusterRequest, transportNetwork, ts);
+            else if (clusterRequest instanceof StaticSiteRequest.PointRequest)
+                this.handleStaticSiteRequest((StaticSiteRequest.PointRequest) clusterRequest, transportNetwork, ts);
+            else
+                LOG.error("Unrecognized request type {}", clusterRequest.getClass());
 
-            LOG.info("Applying scenario...");
-            // Get the supplied scenario or create an empty one if no scenario was supplied.
-            Scenario scenario = clusterRequest.profileRequest.scenario;
-            if (scenario == null) {
-                scenario = new Scenario(-1);
+            // Record information about the current task so we can analyze usage and efficiency over time.
+            ts.total = (int) (System.currentTimeMillis() - startTime);
+            taskStatisticsStore.store(ts);
+        } catch (Exception ex) {
+            LOG.error("An error occurred while routing", ex);
+        }
+
+    }
+
+    /** handle a fancy new-fangled static site request */
+    private void handleStaticSiteRequest (StaticSiteRequest.PointRequest request, TransportNetwork transportNetwork, TaskStatistics ts) {
+        new StaticComputer(request, transportNetwork, ts).run();
+    }
+
+    /** Handle a stock Analyst request */
+    private void handleAnalystRequest (AnalystClusterRequest clusterRequest, TransportNetwork transportNetwork, TaskStatistics ts) {
+        long startTime = System.currentTimeMillis();
+
+        // We need to distinguish between and handle four different types of requests here:
+        // Either vector isochrones or accessibility to a pointset,
+        // as either a single-origin priority request (where the result is returned immediately)
+        // or a job task (where the result is saved to output location on S3).
+        boolean isochrone = (clusterRequest.destinationPointsetId == null);
+        boolean singlePoint = (clusterRequest.outputLocation == null);
+        boolean transit = (clusterRequest.profileRequest.transitModes != null && clusterRequest.profileRequest.transitModes.contains("TRANSIT"));
+
+        if (singlePoint) {
+            lastHighPriorityRequestProcessed = startTime;
+            if (!sideChannelOpen) {
+                openSideChannel();
             }
+        }
+
+        ts.lon = clusterRequest.profileRequest.fromLon;
+        ts.lat = clusterRequest.profileRequest.fromLat;
+        ts.pointsetId = clusterRequest.destinationPointsetId;
+        ts.single = singlePoint;
+
+        // If this one-to-many request is for accessibility information based on travel times to a pointset,
+        // fetch the set of points we will use as destinations.
+        final PointSet targets;
+        final LinkedPointSet linkedTargets;
+        if (isochrone) {
+            // This is an isochrone request, search to a regular grid of points.
+            targets = transportNetwork.getGridPointSet();
+        } else {
+            // This is a detailed accessibility request. There is necessarily a destination point set supplied.
+            targets = pointSetDatastore.get(clusterRequest.destinationPointsetId);
+        }
+        // TODO cache these, they are probably slow to make.
+        // TODO this breaks if transportNetwork has been rebuilt ?
+        // TODO We should link after applying the scenario once we allow street modifications.
+        linkedTargets = targets.link(transportNetwork.streetLayer);
+
+        LOG.info("Applying scenario...");
+        // Get the supplied scenario or create an empty one if no scenario was supplied.
+        Scenario scenario = clusterRequest.profileRequest.scenario;
+        if (scenario == null) {
+            scenario = new Scenario(-1);
+        }
 //            if (!scenario.modifications.isEmpty()) {
 //                scenario.modifications.clear();
 //                // Add a pre-filter that removes trips that are not running during the search time window.
 //                scenario.modifications.add(0, new InactiveTripsFilter(transportNetwork, clusterRequest.profileRequest));
 //            }
-            // Apply the scenario modifications to the network before use, performing protective copies where necessary.
-            TransportNetwork modifiedNetwork = scenario.applyToTransportNetwork(transportNetwork);
-            LOG.info("Done applying scenario.");
+        // Apply the scenario modifications to the network before use, performing protective copies where necessary.
+        TransportNetwork modifiedNetwork = scenario.applyToTransportNetwork(transportNetwork);
+        LOG.info("Done applying scenario.");
 
-            // Run the core repeated-raptor analysis.
-            RepeatedRaptorProfileRouter router =
-                    new RepeatedRaptorProfileRouter(modifiedNetwork, clusterRequest, linkedTargets, ts); // TODO transportNetwork is implied by linkedTargets.
-            ResultEnvelope envelope = new ResultEnvelope();
-            try {
-                envelope = router.route();
-                ts.success = true;
-            } catch (Exception ex) {
-                // An error occurred. Keep the empty envelope empty and TODO include error information.
-                LOG.error("Error occurred in profile request", ex);
-                ts.success = false;
-            }
-
-            // Send the ResultEnvelope back to the user.
-            // The results are either stored on S3 (for multi-origin jobs) or sent back through the broker
-            // (for immediate interactive display of isochrones).
-            envelope.id = clusterRequest.id;
-            envelope.jobId = clusterRequest.jobId;
-            envelope.destinationPointsetId = clusterRequest.destinationPointsetId;
-            if (clusterRequest.outputLocation == null) {
-                // No output location was provided. Instead of saving the result on S3,
-                // return the result immediately via a connection held open by the broker and mark the task completed.
-                finishPriorityTask(clusterRequest, envelope);
-            } else {
-                // Save the result on S3 for retrieval by the UI.
-                saveBatchTaskResults(clusterRequest, envelope);
-            }
-
-            // Record information about the current task so we can analyze usage and efficiency over time.
-            ts.total = (int) (System.currentTimeMillis() - startTime);
-            taskStatisticsStore.store(ts);
-
+        // Run the core repeated-raptor analysis.
+        RepeatedRaptorProfileRouter router =
+                new RepeatedRaptorProfileRouter(modifiedNetwork, clusterRequest, linkedTargets, ts); // TODO transportNetwork is implied by linkedTargets.
+        ResultEnvelope envelope = new ResultEnvelope();
+        try {
+            envelope = router.route();
+            ts.success = true;
         } catch (Exception ex) {
-            LOG.error("An error occurred while routing", ex);
+            // An error occurred. Keep the empty envelope empty and TODO include error information.
+            LOG.error("Error occurred in profile request", ex);
+            ts.success = false;
         }
 
+        // Send the ResultEnvelope back to the user.
+        // The results are either stored on S3 (for multi-origin jobs) or sent back through the broker
+        // (for immediate interactive display of isochrones).
+        envelope.id = clusterRequest.id;
+        envelope.jobId = clusterRequest.jobId;
+        envelope.destinationPointsetId = clusterRequest.destinationPointsetId;
+        if (clusterRequest.outputLocation == null) {
+            // No output location was provided. Instead of saving the result on S3,
+            // return the result immediately via a connection held open by the broker and mark the task completed.
+            finishPriorityTask(clusterRequest, envelope);
+        } else {
+            // Save the result on S3 for retrieval by the UI.
+            saveBatchTaskResults(clusterRequest, envelope);
+        }
     }
 
     /** Open a single point channel to the broker to receive high-priority requests immediately */
@@ -441,7 +456,7 @@ public class AnalystWorker implements Runnable {
             while (System.currentTimeMillis() < lastHighPriorityRequestProcessed + SINGLE_POINT_KEEPALIVE_MSEC) {
                 LOG.debug("Awaiting high-priority work");
                 try {
-                    List<AnalystClusterRequest> tasks = getSomeWork(WorkType.HIGH_PRIORITY);
+                    List<GenericClusterRequest> tasks = getSomeWork(WorkType.HIGH_PRIORITY);
 
                     if (tasks != null)
                         tasks.stream().forEach(t -> highPriorityExecutor.execute(
@@ -456,7 +471,7 @@ public class AnalystWorker implements Runnable {
         }).start();
     }
 
-    public List<AnalystClusterRequest> getSomeWork(WorkType type) {
+    public List<GenericClusterRequest> getSomeWork(WorkType type) {
 
         // Run a POST request (long-polling for work) indicating which graph this worker prefers to work on
         String url;
@@ -479,7 +494,7 @@ public class AnalystWorker implements Runnable {
                 EntityUtils.consumeQuietly(entity);
                 return null;
             }
-            return objectMapper.readValue(entity.getContent(), new TypeReference<List<AnalystClusterRequest>>() {});
+            return objectMapper.readValue(entity.getContent(), new TypeReference<List<GenericClusterRequest>>() {});
         } catch (JsonProcessingException e) {
             LOG.error("JSON processing exception while getting work", e);
         } catch (SocketTimeoutException stex) {
@@ -547,7 +562,7 @@ public class AnalystWorker implements Runnable {
     /**
      * Signal the broker that the given high-priority task is completed, providing a result.
      */
-    public void finishPriorityTask(AnalystClusterRequest clusterRequest, Object result) {
+    public void finishPriorityTask(GenericClusterRequest clusterRequest, Object result) {
         String url = BROKER_BASE_URL + String.format("/complete/priority/%s", clusterRequest.taskId);
         HttpPost httpPost = new HttpPost(url);
         try {
@@ -574,7 +589,7 @@ public class AnalystWorker implements Runnable {
     /**
      * Tell the broker that the given message has been successfully processed by a worker (HTTP DELETE).
      */
-    public void deleteRequest(AnalystClusterRequest clusterRequest) {
+    public void deleteRequest(GenericClusterRequest clusterRequest) {
         String url = BROKER_BASE_URL + String.format("/tasks/%s", clusterRequest.taskId);
         HttpDelete httpDelete = new HttpDelete(url);
         try {

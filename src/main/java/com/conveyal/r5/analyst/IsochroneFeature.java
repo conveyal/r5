@@ -117,11 +117,6 @@ public class IsochroneFeature implements Serializable {
 
                     found[x][y] = true;
 
-                    // TODO isolines don't pass through the centers of cells
-                    if (idx != prevIdx)
-                        // not continuing in same direction
-                        ring.add(new Coordinate(points.pixelToLon(x + points.west), points.pixelToLat(y + points.north)));
-
                     // follow line, keeping unfilled area to the left, which determines a direction
                     // this also means that we'll be able to figure out if something is a hole by
                     // the winding direction.
@@ -199,6 +194,42 @@ public class IsochroneFeature implements Serializable {
                             LOG.error("Ran off inside of ring");
                             break CELLS;
                     }
+
+                    // figure out from whence we came
+                    int topLeftTime = times[(int) points.width * y + x];
+                    int botLeftTime = times[(int) points.width * (y + 1) + x];
+                    int topRightTime = times[(int) points.width * y + x + 1];
+                    int botRightTime = times[(int) points.width * (y + 1) + x + 1];
+
+                    double lat, lon;
+
+                    if (startx < x) {
+                        // came from left
+                        // will always be positive, if numerator is negative denominator will be as well.
+                        double frac = (cutoffSec - topLeftTime) / (double) (botLeftTime - topLeftTime);
+                        lat = points.pixelToLat(points.north + y + frac);
+                        lon = points.pixelToLon(points.west + x);
+                    }
+                    else if (startx > x) {
+                        // came from right
+                        double frac = (cutoffSec - topRightTime) / (double) (botRightTime - topRightTime);
+                        lat = points.pixelToLat(points.north + y + frac);
+                        lon = points.pixelToLon(points.west + x + 1);
+                    }
+                    else if (starty < y) {
+                        // came from top
+                        double frac = (cutoffSec - topLeftTime) / (double) (topRightTime - topLeftTime);
+                        lat = points.pixelToLat(points.north + y);
+                        lon = points.pixelToLon(points.west + x + frac);
+                    }
+                    else {
+                        // came from bottom
+                        double frac = (cutoffSec - botLeftTime) / (botRightTime - botLeftTime);
+                        lat = points.pixelToLat(points.north + y + 1);
+                        lon = points.pixelToLon(points.west + x + frac);
+                    }
+
+                    ring.add(new Coordinate(lon, lat));
 
                     // this shouldn't happen
                     if (x == startx && y == starty) {

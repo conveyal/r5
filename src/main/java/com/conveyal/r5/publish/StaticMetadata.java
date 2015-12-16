@@ -74,7 +74,8 @@ public class StaticMetadata implements Runnable {
     public void writeStopTrees (OutputStream out) throws IOException {
         // build the stop trees
         LinkedPointSet lps = network.getLinkedGridPointSet();
-        lps.makeStopTrees();
+        if (lps.stopTrees == null)
+            lps.makeStopTrees();
 
         // invert the stop trees
         TIntList[] stopTrees = new TIntList[lps.pointSet.featureCount()];

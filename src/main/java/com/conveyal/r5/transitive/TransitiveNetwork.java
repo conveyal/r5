@@ -72,11 +72,23 @@ public class TransitiveNetwork {
 
         // write stops
         for (int sidx = 0; sidx < layer.getStopCount(); sidx++) {
-            v.seek(layer.streetVertexForStop.get(sidx));
             TransitiveStop ts = new TransitiveStop();
+            int vidx = layer.streetVertexForStop.get(sidx);
+
             ts.stop_id = sidx + "";
-            ts.stop_lat = v.getLat();
-            ts.stop_lon = v.getLon();
+
+            if (vidx != -1) {
+                v.seek(vidx);
+                ts.stop_lat = v.getLat();
+                ts.stop_lon = v.getLon();
+            } else {
+                // TODO this should actually know where unlinked stop are
+                // see issue 33
+                // at least put the stop in the map somewhere
+                v.seek(0);
+                ts.stop_lat = v.getLat();
+                ts.stop_lon = v.getLon();
+            }
             ts.stop_name = layer.stopNames.get(sidx);
             stops.add(ts);
         }

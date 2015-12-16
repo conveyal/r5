@@ -16,7 +16,7 @@ import java.util.Map;
 public class WebMercatorGridPointSet implements PointSet {
     public static final Logger LOG = LoggerFactory.getLogger(WebMercatorGridPointSet.class);
 
-    public static final int DEFAULT_ZOOM = 10;
+    public static final int DEFAULT_ZOOM = 9;
 
     /** web mercator zoom level */
     public final int zoom;

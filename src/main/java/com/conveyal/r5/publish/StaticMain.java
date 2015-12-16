@@ -61,19 +61,25 @@ public class StaticMain {
 
         // enqueue 50000 requests at a time so Jackson doesn't run out of memory
         for (int offset = 0; offset < nRequests; offset += 50000) {
-            HttpClient httpClient = HttpClients.createDefault();
-            HttpPost request = new HttpPost(args[2] + "/enqueue/jobs");
-            request.setHeader("Content-Type", "application/json");
-            List<StaticSiteRequest.PointRequest> subRequests = requests.subList(offset, offset + 50000);
-            request.setEntity(new StringEntity(JsonUtilities.objectMapper.writeValueAsString(subRequests)));
-            HttpResponse res = httpClient.execute(request);
+            try {
+                HttpClient httpClient = HttpClients.createDefault();
+                HttpPost request = new HttpPost(args[2] + "/enqueue/jobs");
+                request.setHeader("Content-Type", "application/json");
+                List<StaticSiteRequest.PointRequest> subRequests = requests.subList(offset, offset + 50000);
+                request.setEntity(new StringEntity(JsonUtilities.objectMapper.writeValueAsString(subRequests)));
+                HttpResponse res = httpClient.execute(request);
 
-            if (res.getStatusLine().getStatusCode() != 200 && res.getStatusLine().getStatusCode() != 202) {
-                InputStream is = res.getEntity().getContent();
-                String responseText = new String(ByteStreams.toByteArray(is));
-                is.close();
-                LOG.error("Request was unsuccessful, retrying after 5s delay: {}\n{}", res.getStatusLine().toString(), responseText);
+                if (res.getStatusLine().getStatusCode() != 200 && res.getStatusLine().getStatusCode() != 202) {
+                    InputStream is = res.getEntity().getContent();
+                    String responseText = new String(ByteStreams.toByteArray(is));
+                    is.close();
+                    LOG.error("Request was unsuccessful, retrying after 5s delay: {}\n{}", res.getStatusLine().toString(), responseText);
 
+                    Thread.sleep(5000);
+                    offset -= 50000; // will be incremented back to where it was at top of loop
+                }
+            } catch (Exception e) {
+                LOG.error("Exception enqueueing, retrying", e);
                 Thread.sleep(5000);
                 offset -= 50000; // will be incremented back to where it was at top of loop
             }

@@ -9,6 +9,8 @@ import com.vividsolutions.jts.operation.union.UnaryUnionOp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.FileWriter;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,8 +29,9 @@ public class IsochroneFeature implements Serializable {
     // maximum number of vertices in a ring
     public static final int MAX_RING_SIZE = 25000;
 
-    // scale factor for the grid
-    public static final int SCALE_FACTOR = 1;
+    // scale factor for the grid. Making this a factor of 2 will theoretically make the algorithm fast as the averaging
+    // is just a bit shift (but who knows what the JVM will decide to optimize)
+    public static final int SCALE_FACTOR = 4;
 
     public Geometry geometry;
     public int cutoffSec;
@@ -40,16 +43,28 @@ public class IsochroneFeature implements Serializable {
      * https://en.wikipedia.org/wiki/Marching_squares
      */
     public IsochroneFeature (int cutoffSec, WebMercatorGridPointSet points, int[] times) {
+        /*try {
+            FileWriter w = new FileWriter(new File("times" + cutoffSec + ".txt"));
+            for (int y = 0, pixel = 0; y < points.height; y++) {
+                for (int x = 0; x < points.width; x++, pixel++) {
+                    w.write(times[pixel] < cutoffSec ? "XX" : "  ");
+                }
+                w.write("\n");
+            }
+        } catch (Exception e) {
+            LOG.error("could not dump times", e);
+        }*/
+
         LOG.debug("Making isochrone for {}sec", cutoffSec);
         this.cutoffSec = cutoffSec;
         // make contouring grid
-        byte[][] contour = new byte[(int) points.width / SCALE_FACTOR - 1][(int) points.height / SCALE_FACTOR - 1];
-        for (int y = 0; y < points.height / SCALE_FACTOR - 1; y++) {
-            for (int x = 0; x < points.width / SCALE_FACTOR - 1; x++) {
-                boolean topLeft = times[(int) (points.width * y + x) * SCALE_FACTOR] < cutoffSec;
-                boolean topRight = times[(int) (points.width * y + x + 1) * SCALE_FACTOR] < cutoffSec;
-                boolean botLeft = times[(int) (points.width * (y + 1) + x) * SCALE_FACTOR] < cutoffSec;
-                boolean botRight = times[(int) (points.width * (y + 1) + x + 1) * SCALE_FACTOR] < cutoffSec;
+        byte[][] contour = new byte[(int) points.width - 1][(int) points.height - 1];
+        for (int y = 0; y < points.height - 1; y++) {
+            for (int x = 0; x < points.width - 1; x++) {
+                boolean topLeft = times[(int) (points.width * y + x)] < cutoffSec;
+                boolean topRight = times[(int) (points.width * y + x + 1)] < cutoffSec;
+                boolean botLeft = times[(int) (points.width * (y + 1) + x)] < cutoffSec;
+                boolean botRight = times[(int) (points.width * (y + 1) + x + 1)] < cutoffSec;
 
                 byte idx = 0;
 
@@ -64,20 +79,22 @@ public class IsochroneFeature implements Serializable {
             }
         }
 
-        LOG.debug("Contour grid built");
+        /*try {
+            dumpContourGrid(contour, "contour" + cutoffSec + ".txt");
+        } catch (Exception e) {
+            LOG.error("Could not dump contour grid", e);
+        }*/
 
         // create a geometry. For now not doing linear interpolation. Find a cell a line crosses through and
         // follow that line.
         List<Polygon> rings = new ArrayList<>();
         boolean[][] found = new boolean[(int) points.width - 1][(int) points.height - 1];
 
-        for (int y = 0; y < points.height / SCALE_FACTOR - 1; y++) {
-            for (int x = 0; x < points.width / SCALE_FACTOR - 1; x++) {
+        for (int y = 0; y < points.height - 1; y++) {
+            for (int x = 0; x < points.width - 1; x++) {
                 if (found[x][y]) continue;
 
                 byte idx = contour[x][y];
-
-                found[x][y] = true;
 
                 // can't start at a saddle we don't know which way it goes
                 if (idx == 0 || idx == 5 || idx == 10 || idx == 15) continue;
@@ -92,21 +109,34 @@ public class IsochroneFeature implements Serializable {
                 CELLS:
                 while (true) {
                     idx = contour[x][y];
+
+                    if (found[x][y] && idx != 5 && idx != 10) {
+                        LOG.error("Ring crosses another ring (possibly itself). This cell has index {}, the previous cell has index {}.", idx, prevIdx);
+                        break CELLS;
+                    }
+
                     found[x][y] = true;
 
                     // TODO isolines don't pass through the centers of cells
                     if (idx != prevIdx)
                         // not continuing in same direction
-                        ring.add(new Coordinate(points.pixelToLon(x * SCALE_FACTOR + points.west), points.pixelToLat(y * SCALE_FACTOR + points.north)));
+                        ring.add(new Coordinate(points.pixelToLon(x + points.west), points.pixelToLat(y + points.north)));
 
                     // follow line, keeping unfilled area to the left, which determines a direction
                     // this also means that we'll be able to figure out if something is a hole by
                     // the winding direction.
-                    boolean end = ring.size() >= MAX_RING_SIZE;
+                    if (ring.size() >= MAX_RING_SIZE) {
+                        LOG.error("Ring is too large, bailing");
+                        break CELLS;
+                    }
+
+                    // save x values here, the next iteration may need to know what they were before we messed with them
+                    int startx = x;
+                    int starty = y;
                     switch (idx) {
                         case 0:
-                            end = true;
-                            break;
+                            LOG.error("Ran off outside of ring");
+                            break CELLS;
                         case 1:
                             x--;
                             break;
@@ -124,15 +154,11 @@ public class IsochroneFeature implements Serializable {
                             if (prevy > y)
                                 // came from bottom
                                 x++;
-                            else if (prevx < x)
-                                // came from left
-                                y--;
                             else if (prevy < y)
                                 // came from top
                                 x--;
                             else
-                                // came from right
-                                y++;
+                                LOG.error("Entered case 5 saddle point from wrong direction!");
                             break;
                         case 6:
                             y++;
@@ -147,18 +173,15 @@ public class IsochroneFeature implements Serializable {
                             y--;
                             break;
                         case 10:
-                            if (prevy > y)
-                                // came from bottom
-                                x--;
-                            else if (prevx < x)
+                            if (prevx < x)
                                 // came from left
                                 y++;
-                            else if (prevy < y)
-                                // came from top
-                                x++;
-                            else
+                            else if (prevx > x)
                                 // came from right
                                 y--;
+                            else {
+                                LOG.error("Entered case 10 saddle point from wrong direction.");
+                            }
                             break;
                         case 11:
                             y--;
@@ -173,22 +196,22 @@ public class IsochroneFeature implements Serializable {
                             y++;
                             break;
                         case 15:
-                            end = true;
-                            break;
+                            LOG.error("Ran off inside of ring");
+                            break CELLS;
                     }
 
                     // this shouldn't happen
-                    if (x == prevx && y == prevy)
-                        end = true;
+                    if (x == startx && y == starty) {
+                        LOG.error("Ring position did not update");
+                        break CELLS;
+                    }
 
+                    // pass previous values to next iteration
                     prevIdx = idx;
-                    prevx = x;
-                    prevy = y;
+                    prevx = startx;
+                    prevy = starty;
 
-                    if (x == origx && y == origy || end) {
-                        if (end)
-                            LOG.warn("Ring ended unexpectedly");
-
+                    if (x == origx && y == origy) {
                         ring.add(ring.get(0));
                         if (ring.size() != 2 && ring.size() != 3)
                             rings.add(GeometryUtils.geometryFactory.createPolygon(ring.toArray(new Coordinate[ring.size()])));
@@ -220,5 +243,57 @@ public class IsochroneFeature implements Serializable {
         this.geometry = largestRing;
 
         LOG.debug("Done.");
+    }
+
+    public void dumpContourGrid (byte[][] contour, String out) throws Exception {
+        FileWriter sb = new FileWriter(new File(out));
+        for (int y = 0; y < contour[0].length; y++) {
+            for (int x = 0; x < contour.length; x++) {
+                switch(contour[x][y]) {
+                    case 0:
+                        sb.append("  ");
+                        break;
+                    case 15:
+                        sb.append("XX");
+                        break;
+                    case 1:
+                    case 14:
+                        sb.append("\\ ");
+                        break;
+                    case 2:
+                    case 13:
+                        sb.append(" /");
+                        break;
+                    case 3:
+                    case 12:
+                        sb.append("--");
+                        break;
+                    case 4:
+                    case 11:
+                        sb.append(" \\");
+                        break;
+                    case 5:
+                        sb.append("//");
+                        break;
+                    case 10:
+                        sb.append("\\\\");
+                        break;
+                    case 6:
+                    case 9:
+                        sb.append("| ");
+                        break;
+                    case 7:
+                    case 8:
+                        sb.append("/ ");
+                        break;
+                    default:
+                        sb.append("**");
+
+                }
+            }
+            sb.append("\n");
+        }
+
+        sb.close();
     }
 }

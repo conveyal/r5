@@ -1,10 +1,10 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.common.GeometryUtils;
-import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.LinearRing;
-import com.vividsolutions.jts.geom.Polygon;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
+import com.vividsolutions.jts.geom.*;
+import com.vividsolutions.jts.geom.impl.PackedCoordinateSequence;
 import com.vividsolutions.jts.operation.union.UnaryUnionOp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,7 +13,10 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * This is similar to the IsochroneData class in OTP, and in fact for compatibility can be serialized to JSON and
@@ -87,11 +90,15 @@ public class IsochroneFeature implements Serializable {
 
         // create a geometry. For now not doing linear interpolation. Find a cell a line crosses through and
         // follow that line.
-        List<Polygon> rings = new ArrayList<>();
+        List<LinearRing> outerRings = new ArrayList<>();
+        List<LinearRing> innerRings = new ArrayList<>();
         boolean[][] found = new boolean[(int) points.width - 1][(int) points.height - 1];
 
-        for (int y = 0; y < points.height - 1; y++) {
-            for (int x = 0; x < points.width - 1; x++) {
+        for (int origy = 0; origy < points.height - 1; origy++) {
+            for (int origx = 0; origx < points.width - 1; origx++) {
+                int x = origx;
+                int y = origy;
+
                 if (found[x][y]) continue;
 
                 byte idx = contour[x][y];
@@ -99,17 +106,20 @@ public class IsochroneFeature implements Serializable {
                 // can't start at a saddle we don't know which way it goes
                 if (idx == 0 || idx == 5 || idx == 10 || idx == 15) continue;
 
-                int origx = x, origy = y;
-
                 byte prevIdx = -1;
 
                 List<Coordinate> ring = new ArrayList<>();
+
+                // keep track of clockwise/counterclockwise orientation, see http://stackoverflow.com/questions/1165647
+                int direction = 0;
                 // skip empty cells
                 int prevy = 0, prevx = 0;
+                Coordinate prevCoord = null;
                 CELLS:
                 while (true) {
                     idx = contour[x][y];
 
+                    // check for intersecting rings, but know that saddles are supposed to self-intersect.
                     if (found[x][y] && idx != 5 && idx != 10) {
                         LOG.error("Ring crosses another ring (possibly itself). This cell has index {}, the previous cell has index {}.", idx, prevIdx);
                         break CELLS;
@@ -126,6 +136,8 @@ public class IsochroneFeature implements Serializable {
                     }
 
                     // save x values here, the next iteration may need to know what they were before we messed with them
+                    // NB no bounds checking is performed below, but the next iteration of the loop will try to access contour[x][y] which
+                    // will serve as a bounds check.
                     int startx = x;
                     int starty = y;
                     switch (idx) {
@@ -229,7 +241,12 @@ public class IsochroneFeature implements Serializable {
                         lon = points.pixelToLon(points.west + x + frac);
                     }
 
-                    ring.add(new Coordinate(lon, lat));
+                    // keep track of winding direction
+                    // http://stackoverflow.com/questions/1165647
+                    direction += (x - startx) * (y + starty);
+
+                    prevCoord = new Coordinate(lon, lat);
+                    ring.add(prevCoord);
 
                     // this shouldn't happen
                     if (x == startx && y == starty) {
@@ -243,9 +260,15 @@ public class IsochroneFeature implements Serializable {
                     prevy = starty;
 
                     if (x == origx && y == origy) {
-                        ring.add(ring.get(0));
-                        if (ring.size() != 2 && ring.size() != 3)
-                            rings.add(GeometryUtils.geometryFactory.createPolygon(ring.toArray(new Coordinate[ring.size()])));
+                        Coordinate end = ring.get(0);
+                        ring.add(end);
+
+                        if (ring.size() != 2 && ring.size() != 3) {
+                            LinearRing lr = GeometryUtils.geometryFactory.createLinearRing(ring.toArray(new Coordinate[ring.size()]));
+                            // direction less than 0 means clockwise (NB the y-axis is backwards), since value is to left it is an outer ring
+                            if (direction > 0) outerRings.add(lr);
+                            else innerRings.add(lr);
+                        }
                         else
                             LOG.warn("Ring with two points, this should not happen");
 
@@ -255,23 +278,44 @@ public class IsochroneFeature implements Serializable {
             }
         }
 
-        LOG.debug("{} components", rings.size());
+        LOG.debug("{} components", outerRings.size());
 
         // find the largest ring, more or less (ignoring lon scale distortion)
         // FIXME this won't work
         double maxArea = 0;
         Geometry largestRing = EMPTY_POLYGON;
 
-        for (Polygon ring : rings) {
-            double area = ring.getArea();
-            if (maxArea < area) {
-                maxArea = area;
-                largestRing = ring;
+        Multimap<LinearRing, LinearRing> holesForRing = HashMultimap.create();
+
+        // create polygons so we can test containment
+        Map<LinearRing, Polygon> polygonsForOuterRing = outerRings.stream().collect(Collectors.toMap(
+                r -> r,
+                r -> GeometryUtils.geometryFactory.createPolygon(r)
+        ));
+
+        Map<LinearRing, Polygon> polygonsForInnerRing = innerRings.stream().collect(Collectors.toMap(
+                r -> r,
+                r -> GeometryUtils.geometryFactory.createPolygon(r)
+        ));
+
+        HOLES: for (Map.Entry<LinearRing, Polygon> hole : polygonsForInnerRing.entrySet()) {
+            for (Map.Entry<LinearRing, Polygon> outer : polygonsForOuterRing.entrySet()) {
+                if (outer.getValue().contains(hole.getValue())) {
+                    holesForRing.put(outer.getKey(), hole.getKey());
+                    continue HOLES;
+                }
             }
+
+            LOG.warn("Found no fitting shell for an isochrone hole, dropping this hole.");
         }
 
+        Polygon[] polygons = outerRings.stream().map(shell -> {
+            Collection<LinearRing> holes = holesForRing.get(shell);
+            return GeometryUtils.geometryFactory.createPolygon(shell, holes.toArray(new LinearRing[holes.size()]));
+        }).toArray(s -> new Polygon[s]);
+
         // first geometry has to be an outer ring, but there may be multiple outer rings
-        this.geometry = largestRing;
+        this.geometry = GeometryUtils.geometryFactory.createMultiPolygon(polygons);
 
         LOG.debug("Done.");
     }

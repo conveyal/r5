@@ -5,6 +5,7 @@ import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.geom.impl.PackedCoordinateSequence;
+import com.vividsolutions.jts.io.WKTWriter;
 import com.vividsolutions.jts.operation.union.UnaryUnionOp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,10 +13,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -57,6 +55,21 @@ public class IsochroneFeature implements Serializable {
         } catch (Exception e) {
             LOG.error("could not dump times", e);
         }*/
+
+        // slightly hacky, but simple: set all of the times around the edges of the pointset to MAX_VALUE so that
+        // the isochrone never runs off the edge of the display.
+        // first, protective copy
+        times = Arrays.copyOf(times, times.length);
+
+        for (int x = 0; x < points.width; x++) {
+            times[x] = Integer.MAX_VALUE;
+            times[(int) ((points.height - 1) * points.width) + x] = Integer.MAX_VALUE;
+        }
+
+        for (int y = 0; y < points.height; y++) {
+            times[(int) points.width * y] = Integer.MAX_VALUE;
+            times[(int) points.width * (y + 1) - 1] = Integer.MAX_VALUE;
+        }
 
         LOG.debug("Making isochrone for {}sec", cutoffSec);
         this.cutoffSec = cutoffSec;

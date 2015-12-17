@@ -311,7 +311,18 @@ public class IsochroneFeature implements Serializable {
                 r -> GeometryUtils.geometryFactory.createPolygon(r)
         ));
 
+        // get rid of tiny shells
+        for (Iterator<Polygon> it = polygonsForOuterRing.values().iterator(); it.hasNext();) {
+            if (it.next().getArea() < 1e-6) it.remove();
+        }
+
+        int holeIdx = -1;
         HOLES: for (Map.Entry<LinearRing, Polygon> hole : polygonsForInnerRing.entrySet()) {
+            holeIdx++;
+
+            // get rid of tiny holes
+            if (hole.getValue().getArea() < 1e-6) continue;
+
             for (Map.Entry<LinearRing, Polygon> outer : polygonsForOuterRing.entrySet()) {
                 if (outer.getValue().contains(hole.getValue())) {
                     holesForRing.put(outer.getKey(), hole.getKey());

@@ -306,8 +306,36 @@ public class IsochroneFeature implements Serializable {
                 }
             }
 
-            LOG.warn("Found no fitting shell for an isochrone hole, dropping this hole.");
+            LOG.warn("Found no fitting shell for isochrone hole {} at cutoff {}, dropping this hole.", holeIdx, cutoffSec);
         }
+
+        /*
+        try {
+            FileWriter w = new FileWriter("debug" + cutoffSec + ".tsv");
+            w.write("outer\tidx\twkt\n");
+
+            WKTWriter wkt = new WKTWriter();
+
+            for (Polygon ring : polygonsForOuterRing.values()) {
+                w.write("true\t-1\t");
+                w.write(wkt.write(ring));
+                w.write("\n");
+            }
+
+            int hidx = 0;
+            for (Polygon ring : polygonsForInnerRing.values()) {
+                w.write("false\t");
+                w.write(hidx++ + "\t");
+                w.write(wkt.write(ring));
+                w.write("\n");
+            }
+
+            w.close();
+        } catch (Exception e) {
+            LOG.error("error saving debug geometry", e);
+        }
+        */
+
 
         Polygon[] polygons = outerRings.stream().map(shell -> {
             Collection<LinearRing> holes = holesForRing.get(shell);

@@ -144,6 +144,20 @@ var oneway_icons_style = {
     "paint": {}
 };
 
+var traffic_lights_layer = {
+    'id': "perm-traffic_lights",
+    'type': "circle",
+    "source": "perm",
+    "minzoom":15,
+    "maxzoom":22,
+    "paint":{
+        "circle-color":"#C00000",
+        "circle-blur":0.8
+    },
+    "layout": {},
+    "filter": ["==", "flags", "TRAFFIC_SIGNAL"]
+};
+
 $.ajax(url + "/speeds", {
         dataType: 'JSON',
         success: function(data) {

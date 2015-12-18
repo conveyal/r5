@@ -247,6 +247,8 @@ function getStyle(type) {
         used_oneway_style = true;
         /*console.log("Added oneway icons");*/
     }
+    //Traffic lights layer
+    style.layers.push(traffic_lights_layer);
     console.log(style);
     map.setStyle(style);
     current_type = type;

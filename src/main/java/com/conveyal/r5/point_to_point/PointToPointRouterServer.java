@@ -304,6 +304,8 @@ public class PointToPointRouterServer {
                 bufParams);
             float distance = -0.00005f;
 
+            Set<Integer> seenVertices = new HashSet<>(streets.size());
+
             if ("streetEdges".equals(layer)) {
                 streets.forEach(s -> {
                     try {
@@ -324,6 +326,8 @@ public class PointToPointRouterServer {
                             }
                         }
                         features.add(feature);
+
+                        getVertexFeatures(cursor, vcursor, seenVertices, features);
                         if (both) {
                             //backward edge
                             cursor.seek(s+1);
@@ -509,6 +513,61 @@ public class PointToPointRouterServer {
 
         }, JsonUtilities.objectMapper::writeValueAsString);
 
+    }
+
+    /**
+     * Creates features from from and to vertices of provided edge
+     * if they weren't alreade created and they have TRAFFIC_SIGNAL flag
+     * 
+     * @param cursor
+     * @param vcursor
+     * @param seenVertices
+     * @param features
+     */
+    private static void getVertexFeatures(EdgeStore.Edge cursor, VertexStore.Vertex vcursor,
+        Set<Integer> seenVertices, List<GeoJsonFeature> features) {
+
+        int fromVertex = cursor.getFromVertex();
+        if (!seenVertices.contains(fromVertex)) {
+            vcursor.seek(fromVertex);
+            GeoJsonFeature feature = getVertexFeature(vcursor);
+            //It can be null since we only insert vertices with flags
+            if (feature != null) {
+                features.add(feature);
+            }
+            seenVertices.add(fromVertex);
+        }
+        int toVertex = cursor.getToVertex();
+        if (!seenVertices.contains(toVertex)) {
+            vcursor.seek(toVertex);
+            GeoJsonFeature feature = getVertexFeature(vcursor);
+            //It can be null since we only insert vertices with flags
+            if (feature != null) {
+                features.add(feature);
+            }
+            seenVertices.add(toVertex);
+        }
+    }
+
+    /**
+     * Creates geojson feature from specified vertex
+     *
+     * Currently it only does that if vertex have TRAFFIC_SIGNAL flag.
+     * Properties in GeoJSON are:
+     * - vertex_id
+     * - flags: TRAFFIC_SIGNAL
+     * @param vertex
+     * @return
+     */
+    private static GeoJsonFeature getVertexFeature(VertexStore.Vertex vertex) {
+        if (vertex.getFlag(VertexStore.VertexFlag.TRAFFIC_SIGNAL)) {
+            GeoJsonFeature feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
+            feature.addProperty("vertex_id", vertex.index);
+            //TODO: add all flags (when there is more)
+            feature.addProperty("flags", VertexStore.VertexFlag.TRAFFIC_SIGNAL.toString());
+            return feature;
+        }
+        return null;
     }
 
     private static void fillFeature(TransportNetwork transportNetwork, Mode mode,

@@ -48,7 +48,7 @@ public class EdgeStore implements Serializable {
     int nEdges = 0;
 
     /** Flags for this edge.  One entry for each forward and each backward edge. */
-    protected List<EnumSet<EdgeFlag>> flags;
+    public List<EnumSet<EdgeFlag>> flags;
 
     /** Speed for this edge.
      * One entry for each forward and each backward edge.
@@ -57,19 +57,19 @@ public class EdgeStore implements Serializable {
      *
      * This way of saving speeds is 3.5% smaller then previous (saving 7 decimal places)
      */
-    protected TShortList speeds;
+    public TShortList speeds;
 
     /** From vertices. One entry for each edge pair */
-    protected TIntList fromVertices;
+    public TIntList fromVertices;
 
     /** To vertices. One entry for each edge pair */
-    protected TIntList toVertices;
+    public TIntList toVertices;
 
     /** Length (millimeters). One entry for each edge pair */
-    protected TIntList lengths_mm;
+    public TIntList lengths_mm;
 
     /** Geometries. One entry for each edge pair */
-    protected List<int[]> geometries; // intermediate points along the edge, other than the intersection endpoints
+    public List<int[]> geometries; // intermediate points along the edge, other than the intersection endpoints
 
     public static final transient EnumSet<EdgeFlag> PERMISSION_FLAGS = EnumSet
         .of(EdgeFlag.ALLOWS_PEDESTRIAN, EdgeFlag.ALLOWS_BIKE, EdgeFlag.ALLOWS_CAR);
@@ -237,6 +237,14 @@ public class EdgeStore implements Serializable {
             return edgeIndex < nEdges;
         }
 
+        /** move the cursor back one edge */
+        public boolean retreat () {
+            edgeIndex--;
+            pairIndex = edgeIndex / 2;
+            isBackward = !isBackward;
+            return edgeIndex >= 0;
+        }
+
         /** Jump to a specific edge number. */
         public void seek(int pos) {
             if (pos < 0)
@@ -275,6 +283,10 @@ public class EdgeStore implements Serializable {
 
         public void setFlag(EdgeFlag flag) {
             flags.get(edgeIndex).add(flag);
+        }
+
+        public void clearFlag(EdgeFlag flag) {
+            flags.get(edgeIndex).remove(flag);
         }
 
         public short getSpeed() {
@@ -353,24 +365,36 @@ public class EdgeStore implements Serializable {
 
             //Currently weigh is basically the same as weight. It differs only on stairs and when walking.
 
-
-
             if (mode == Mode.WALK && getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) {
                 weight = time;
                 //elevation which changes weight
-            } else if (mode == Mode.BICYCLE && getFlag(EdgeFlag.ALLOWS_BIKE)) {
+            } else if (mode == Mode.BICYCLE) {
+                // walk a bike if biking is not allowed on this edge, or if the traffic stress is too high
+                boolean walking = !getFlag(EdgeFlag.ALLOWS_BIKE);
+
                 if (req.bikeTrafficStress > 0 && req.bikeTrafficStress < 4) {
-                    if (getFlag(EdgeFlag.BIKE_LTS_4)) return null;
-                    if (req.bikeTrafficStress < 3 && getFlag(EdgeFlag.BIKE_LTS_3)) return null;
-                    if (req.bikeTrafficStress < 2 && getFlag(EdgeFlag.BIKE_LTS_2)) return null;
+                    if (getFlag(EdgeFlag.BIKE_LTS_4)) walking = true;
+                    if (req.bikeTrafficStress < 3 && getFlag(EdgeFlag.BIKE_LTS_3)) walking = true;
+                    if (req.bikeTrafficStress < 2 && getFlag(EdgeFlag.BIKE_LTS_2)) walking = true;
                 }
 
                 //elevation costs
                 //Triangle (bikesafety, flat, quick)
                 weight = time;
                 // TODO bike walking costs when switching bikes
-            }
-            else if (mode == Mode.CAR && getFlag(EdgeFlag.ALLOWS_CAR)) {
+
+                // only walk if you're allowed to
+                if (walking && !getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) return null;
+
+
+                if (walking) {
+                    // * 1.5 to account for time to get off bike and slower walk speed once off
+                    // this will tend to prefer to bike a slightly longer route than walk a long way,
+                    // but will allow walking to cross a busy street, etc.
+                    weight *=1.5;
+                }
+
+            } else if (mode == Mode.CAR && getFlag(EdgeFlag.ALLOWS_CAR)) {
                 weight = time;
             } else
                 return null; // this mode cannot traverse this edge

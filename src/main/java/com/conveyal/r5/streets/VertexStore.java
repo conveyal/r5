@@ -4,6 +4,9 @@ import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
 
 /**
  *
@@ -16,10 +19,12 @@ public class VertexStore implements Serializable {
     public static final double FIXED_FACTOR = 1e7; // we could just reuse the constant from osm-lib Node.
     public TIntList fixedLats;
     public TIntList fixedLons;
+    public List<EnumSet<VertexFlag>> vertexFlags;
 
     public VertexStore (int initialSize) {
         fixedLats = new TIntArrayList(initialSize);
         fixedLons = new TIntArrayList(initialSize);
+        vertexFlags = new ArrayList<>(initialSize);
     }
 
     /**
@@ -38,6 +43,7 @@ public class VertexStore implements Serializable {
         int vertexIndex = nVertices++;
         fixedLats.add(fixedLat);
         fixedLons.add(fixedLon);
+        vertexFlags.add(EnumSet.noneOf(VertexFlag.class));
         return vertexIndex;
     }
 
@@ -77,6 +83,18 @@ public class VertexStore implements Serializable {
             setLon(lon);
         }
 
+        public boolean getFlag (VertexFlag flag) {
+            return vertexFlags.get(index).contains(flag);
+        }
+
+        public void setFlag (VertexFlag flag) {
+            vertexFlags.get(index).add(flag);
+        }
+
+        public void clearFlag (VertexFlag flag) {
+            vertexFlags.get(index).remove(flag);
+        }
+
         public double getLat() {
             return fixedLats.get(index) / FIXED_FACTOR;
         }
@@ -111,10 +129,17 @@ public class VertexStore implements Serializable {
         return fixed / FIXED_FACTOR;
     }
 
+
     //Used when converting fixed latitude and longitude to floating from Split
     //It is in double type even though it is fixed
     public static double fixedDegreesToFloating(double fixed) {
         return fixed / FIXED_FACTOR;
+    }
+
+
+    public enum VertexFlag {
+        /** this intersection has a traffic signal */
+        TRAFFIC_SIGNAL
     }
 
 }

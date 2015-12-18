@@ -57,8 +57,8 @@ public class StreetLayer implements Serializable {
     private static final int SNAP_RADIUS_MM = 5 * 1000;
 
     // Edge lists should be constructed after the fact from edges. This minimizes serialized size too.
-    transient List<TIntList> outgoingEdges;
-    transient List<TIntList> incomingEdges;
+    public transient List<TIntList> outgoingEdges;
+    public transient List<TIntList> incomingEdges;
     public transient IntHashGrid spatialIndex = new IntHashGrid();
 
     private transient TraversalPermissionLabeler permissions = new USTraversalPermissionLabeler(); // TODO don't hardwire to US
@@ -195,11 +195,15 @@ public class StreetLayer implements Serializable {
         LOG.info("Done making street edges.");
         LOG.info("Made {} vertices and {} edges.", vertexStore.nVertices, edgeStore.nEdges);
 
+        // need edge lists to apply intersection costs
+        buildEdgeLists();
+        stressLabeler.applyIntersectionCosts(this);
+
         if (removeIslands)
             removeDisconnectedSubgraphs(MIN_SUBGRAPH_SIZE);
 
-        edgesPerWayHistogram.display();
-        pointsPerEdgeHistogram.display();
+        //edgesPerWayHistogram.display();
+        //pointsPerEdgeHistogram.display();
         // Clear unneeded indexes, allow them to be gc'ed
         if (!saveVertexIndex)
             vertexIndexForOsmNode = null;
@@ -217,6 +221,11 @@ public class StreetLayer implements Serializable {
             // Store node coordinates for this new street vertex
             Node node = osm.nodes.get(osmNodeId);
             vertexIndex = vertexStore.addVertex(node.getLat(), node.getLon());
+
+            VertexStore.Vertex v = vertexStore.getCursor(vertexIndex);
+            if (node.hasTag("highway", "traffic_signals"))
+                v.setFlag(VertexStore.VertexFlag.TRAFFIC_SIGNAL);
+
             vertexIndexForOsmNode.put(osmNodeId, vertexIndex);
         }
         return vertexIndex;

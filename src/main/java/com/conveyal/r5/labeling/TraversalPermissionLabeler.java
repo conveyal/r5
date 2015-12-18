@@ -472,7 +472,7 @@ public abstract class TraversalPermissionLabeler {
             } else if (tag.startsWith("opposite")) {
                 return UNKNOWN;
             } else {
-                LOG.info("Unknown access tag:{}", tag);
+                LOG.debug("Unknown access tag:{}", tag);
                 return UNKNOWN;
             }
         }

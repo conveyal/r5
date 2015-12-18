@@ -293,7 +293,7 @@ public class StreetLayer implements Serializable {
 
         //Doesn't insert edges which don't have any permissions forward and backward
         if (Collections.disjoint(forwardFlags, ALL_PERMISSIONS) && Collections.disjoint(backFlags, ALL_PERMISSIONS)) {
-            LOG.info("Way has no permissions skipping!");
+            LOG.debug("Way has no permissions skipping!");
             return;
         }
 

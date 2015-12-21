@@ -505,7 +505,7 @@ public class StreetLayer implements Serializable {
             StreetRouter r = new StreetRouter(this);
             r.setOrigin(vertex);
             // walk to the end of the graph
-            r.distanceLimitMeters = 100000;
+            r.distanceLimitMeters = Integer.MAX_VALUE;
             r.route();
 
             TIntList reachedVertices = new TIntArrayList();

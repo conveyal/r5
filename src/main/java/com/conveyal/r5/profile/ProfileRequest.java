@@ -1,11 +1,12 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.scenario.Scenario;
+import java.time.LocalDate;
+
 import com.conveyal.r5.model.json_serialization.ModeSetDeserializer;
 import com.conveyal.r5.model.json_serialization.ModeSetSerializer;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import org.joda.time.LocalDate;
 
 import java.io.Serializable;
 import java.util.EnumSet;

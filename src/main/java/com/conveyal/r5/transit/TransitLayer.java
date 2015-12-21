@@ -17,7 +17,7 @@ import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
-import org.joda.time.LocalDate;
+import java.time.LocalDate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -308,7 +308,7 @@ public class TransitLayer implements Serializable, Cloneable {
         BitSet activeServices = new BitSet();
         int s = 0;
         for (Service service : services) {
-            if (service.activeOn(date)) {
+            if (service.activeOn(new org.joda.time.LocalDate(date.getYear(), date.getMonthValue(), date.getDayOfMonth()))) {
                 activeServices.set(s);
             }
             s++;

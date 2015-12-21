@@ -44,7 +44,7 @@ public class TransportNetworkCache {
      */
     public synchronized TransportNetwork getNetwork (String networkId) {
 
-        LOG.info("Finding or building a TransportNetwork for ID {}", networkId);
+        LOG.info("Finding or building a TransportNetwork for ID {} and R5 commit {}", networkId, MavenVersion.commit);
 
         if (networkId.equals(currentNetworkId)) {
             LOG.info("Network ID has not changed. Reusing the last one that was built.");
@@ -53,7 +53,7 @@ public class TransportNetworkCache {
 
         TransportNetwork network = checkCached(networkId);
         if (network == null) {
-            LOG.info("Cached transport network for id {} and commit {} was not found. Building it.",
+            LOG.info("Cached transport network for id {} and commit {} was not found. Building the network from scratch.",
                     networkId, MavenVersion.commit);
             network = buildNetwork(networkId);
         }
@@ -72,21 +72,20 @@ public class TransportNetworkCache {
 
             if (cacheLocation.exists())
                 // yippee! we have a cached network
-                LOG.info("Found locally-cached transport network for id {} and commit {}", networkId, MavenVersion.commit);
+                LOG.info("Found locally-cached TransportNetwork at {}", cacheLocation);
             else {
-                LOG.info("Checking for cached transport network on S3");
-                // try to download from S3
+                LOG.info("No locally cached transport network at {}.", cacheLocation);
+                LOG.info("Checking for cached transport network on S3.");
                 S3Object tn;
                 try {
                     tn = s3.getObject(sourceBucket, filename);
                 } catch (AmazonServiceException ex) {
-                    LOG.info("No cached transport network was found in S3");
+                    LOG.info("No cached transport network was found in S3. It will be built from scratch.");
                     return null;
                 }
-
                 CACHE_DIR.mkdirs();
-
-                // get it on the disk to save it for later
+                // Copy the network from S3 to our local disk for later use.
+                LOG.info("Copying pre-built transport network from S3 to local file {}", cacheLocation);
                 FileOutputStream fos = new FileOutputStream(cacheLocation);
                 InputStream is = tn.getObjectContent();
                 try {
@@ -96,7 +95,7 @@ public class TransportNetworkCache {
                     fos.close();
                 }
             }
-
+            LOG.info("Loading cached transport network at {}", cacheLocation);
             FileInputStream fis = new FileInputStream(cacheLocation);
             try {
                 return TransportNetwork.read(fis);
@@ -151,6 +150,8 @@ public class TransportNetworkCache {
         File cacheLocation = new File(CACHE_DIR, networkId + "_" + MavenVersion.commit + ".dat");
         
         try {
+
+            // Serialize TransportNetwork to local cache on this worker
             FileOutputStream fos = new FileOutputStream(cacheLocation);
             try {
                 network.write(fos);
@@ -158,10 +159,13 @@ public class TransportNetworkCache {
                 fos.close();
             }
 
-            // upload to S3
+            // Upload the serialized TransportNetwork to S3
+            LOG.info("Uploading the serialized TransportNetwork to S3 for use by other workers.");
             s3.putObject(sourceBucket, filename, cacheLocation);
+            LOG.info("Done uploading the serialized TransportNetwork to S3.");
+
         } catch (Exception e) {
-            // don't break here as we do have a network to return, we just couldn't cache it.
+            // Don't break here as we do have a network to return, we just couldn't cache it.
             LOG.error("Error saving cached network", e);
             cacheLocation.delete();
         }

@@ -30,6 +30,8 @@ public class StaticDataStore {
 
 
         PutObjectRequest por = new PutObjectRequest(req.bucket, req.prefix + "/" + filename, pipeIn, md);
+        // buffer files up to 100MB
+        por.getRequestClientOptions().setReadLimit(100 * 1024 * 1024 + 1);
 
         // run s3 put in background thread so pipedinputstream does not block.
         // TODO gzip in background as well?

@@ -1,6 +1,8 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.osmlib.Node;
+import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.ProfileRequest;
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -8,9 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 /**
  * Column store is better than struct simulation because 1. it is less fancy, 2. it is auto-resizing (not fixed size),
@@ -43,7 +43,7 @@ public class EdgeStore implements Serializable {
     int nEdges = 0;
 
     /** Flags for this edge.  One entry for each forward and each backward edge. */
-    protected TIntList flags;
+    protected List<EnumSet<EdgeFlag>> flags;
 
     /** Speed for this edge.  One entry for each forward and each backward edge. */
     protected TIntList speeds;
@@ -63,7 +63,7 @@ public class EdgeStore implements Serializable {
     public EdgeStore (VertexStore vertexStore, int initialSize) {
         this.vertexStore = vertexStore;
         // There is one flags and speeds entry per edge.
-        flags = new TIntArrayList(initialSize);
+        flags = new ArrayList<>(initialSize);
         speeds = new TIntArrayList(initialSize);
         // Vertex indices, geometries, and lengths are shared between pairs of forward and backward edges.
         int initialEdgePairs = initialSize / 2;
@@ -87,9 +87,10 @@ public class EdgeStore implements Serializable {
                 continue; // ignore duplicates
 
             prevEdge = edge;
-            // note using 2 int version because it is an offset not a value that we want to remove
             // flags and speeds have separate entries for forward and backwards edges
-            flags.remove(edge * 2, 2);
+            flags.remove(edge * 2 + 1); // remove the back edge first, before we shift the array around
+            flags.remove(edge * 2);
+            // note using 2 int version because it is an offset not a value that we want to remove
             speeds.remove(edge * 2, 2);
 
             // everything else has a single entry for forward and backward edges
@@ -106,28 +107,64 @@ public class EdgeStore implements Serializable {
     // Maybe we should have trunk, secondary, tertiary, residential etc. as types 0...6
     // SIDEWALK(1),     CROSSING(2),     ROUNDABOUT(3),     ELEVATOR(4),     STAIRS(5),     PLATFORM(6),
 
-    public static enum Flag {
-        UNUSED(0),
-        BIKE_PATH(1),
-        SIDEWALK(2),
-        CROSSING(3),
-        ROUNDABOUT(4),
-        ELEVATOR(5),
-        STAIRS(6),
-        PLATFORM(7),
-        BOGUS_NAME(8),
-        NO_THRU_TRAFFIC(9),
-        SLOPE_OVERRIDE(10),
-        TRANSIT_LINK(11), // This edge is a one-way connection from a street to a transit stop. Target is a transit stop index, not an intersection index.
+    public enum EdgeFlag {
+        UNUSED,
+        BIKE_PATH,
+        SIDEWALK,
+        CROSSING,
+        ROUNDABOUT,
+        ELEVATOR,
+        STAIRS,
+        PLATFORM,
+        BOGUS_NAME,
+        NO_THRU_TRAFFIC,
+        SLOPE_OVERRIDE,
+        TRANSIT_LINK, // This edge is a one-way connection from a street to a transit stop. Target is a transit stop index, not an intersection index.
+
         // Permissions
-        ALLOWS_PEDESTRIAN(16),
-        ALLOWS_BIKE(17),
-        ALLOWS_CAR(18),
-        ALLOWS_WHEELCHAIR(19);
-        public final int flag;
-        private Flag (int bitNumber) {
-            flag = 1 << bitNumber;
-        }
+        ALLOWS_PEDESTRIAN,
+        ALLOWS_BIKE,
+        ALLOWS_CAR,
+        ALLOWS_WHEELCHAIR,
+
+        // Bicycle level of traffic stress: http://transweb.sjsu.edu/PDFs/research/1005-low-stress-bicycling-network-connectivity.pdf
+        // comments below pasted from document.
+
+        /**
+         * Presenting little traffic stress and demanding little attention from cyclists, and attractive enough for a
+         * relaxing bike ride. Suitable for almost all cyclists, including children trained to safely cross intersections.
+         * On links, cyclists are either physically separated from traffic, or are in an exclusive bicycling zone next to
+         * a slow traffic stream with no more than one lane per direction, or are on a shared road where they interact
+         * with only occasional motor vehicles (as opposed to a stream of traffic) with a low speed differential. Where
+         * cyclists ride alongside a parking lane, they have ample operating space outside the zone into which car
+         * doors are opened. Intersections are easy to approach and cross.
+         */
+        BIKE_LTS_1,
+
+        /**
+         * Presenting little traffic stress and therefore suitable to most adult cyclists but demanding more attention
+         * than might be expected from children. On links, cyclists are either physically separated from traffic, or are
+         * in an exclusive bicycling zone next to a well-confined traffic stream with adequate clearance from a parking
+         * lane, or are on a shared road where they interact with only occasional motor vehicles (as opposed to a
+         * stream of traffic) with a low speed differential. Where a bike lane lies between a through lane and a rightturn
+         * lane, it is configured to give cyclists unambiguous priority where cars cross the bike lane and to keep
+         * car speed in the right-turn lane comparable to bicycling speeds. Crossings are not difficult for most adults.
+         */
+        BIKE_LTS_2,
+
+        /**
+         * More traffic stress than LTS 2, yet markedly less than the stress of integrating with multilane traffic, and
+         * therefore welcome to many people currently riding bikes in American cities. Offering cyclists either an
+         * exclusive riding zone (lane) next to moderate-speed traffic or shared lanes on streets that are not multilane
+         * and have moderately low speed. Crossings may be longer or across higher-speed roads than allowed by
+         * LTS 2, but are still considered acceptably safe to most adult pedestrians.
+         */
+        BIKE_LTS_3,
+
+        /**
+         * A level of stress beyond LTS3. (this is in fact the official definition. -Ed.)
+         */
+        BIKE_LTS_4 // also known as FLORIDA_AVENUE
     }
 
     /**
@@ -136,7 +173,8 @@ public class EdgeStore implements Serializable {
      * This avoids having a tangle of different edge creator functions for different circumstances.
      * @return a cursor pointing to the forward edge in the pair, which always has an even index.
      */
-    public Edge addStreetPair(int beginVertexIndex, int endVertexIndex, int edgeLengthMillimeters) {
+    public Edge addStreetPair(int beginVertexIndex, int endVertexIndex, int edgeLengthMillimeters,
+                              EnumSet<EdgeFlag> forwardFlags, EnumSet<EdgeFlag> backFlags) {
 
         // Store only one length, set of endpoints, and intermediate geometry per pair of edges.
         lengths_mm.add(edgeLengthMillimeters);
@@ -146,11 +184,15 @@ public class EdgeStore implements Serializable {
 
         // Forward edge
         speeds.add(DEFAULT_SPEED_KPH);
-        flags.add(0);
+        flags.add(forwardFlags);
+
+        // avoid confusion later on
+        if (backFlags == forwardFlags)
+            backFlags = forwardFlags.clone();
 
         // Backward edge
         speeds.add(DEFAULT_SPEED_KPH);
-        flags.add(0);
+        flags.add(backFlags);
 
         // Increment total number of edges created so far, and return the index of the first new edge.
         int forwardEdgeIndex = nEdges;
@@ -209,12 +251,12 @@ public class EdgeStore implements Serializable {
             }
         }
 
-        public boolean getFlag(Flag flag) {
-            return (flags.get(edgeIndex) & flag.flag) != 0;
+        public boolean getFlag(EdgeFlag flag) {
+            return flags.get(edgeIndex).contains(flag);
         }
 
-        public void setFlag(Flag flag) {
-            flags.set(edgeIndex, flags.get(edgeIndex) | flag.flag);
+        public void setFlag(EdgeFlag flag) {
+            flags.get(edgeIndex).add(flag);
         }
 
         public int getSpeed() {
@@ -244,10 +286,27 @@ public class EdgeStore implements Serializable {
             return !isBackward;
         }
 
-        public StreetRouter.State traverse (StreetRouter.State s0) {
+        public StreetRouter.State traverse (StreetRouter.State s0, Mode mode, ProfileRequest req) {
             StreetRouter.State s1 = new StreetRouter.State(getToVertex(), edgeIndex, s0);
             s1.nextState = null;
-            s1.weight = s0.weight + getLengthMm() / 1000;
+
+            if (mode == Mode.WALK && getFlag(EdgeFlag.ALLOWS_PEDESTRIAN))
+                s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / req.walkSpeed);
+            else if (mode == Mode.BICYCLE && getFlag(EdgeFlag.ALLOWS_BIKE)) {
+                if (req.bikeTrafficStress > 0 && req.bikeTrafficStress < 4) {
+                    if (getFlag(EdgeFlag.BIKE_LTS_4)) return null;
+                    if (req.bikeTrafficStress < 3 && getFlag(EdgeFlag.BIKE_LTS_3)) return null;
+                    if (req.bikeTrafficStress < 2 && getFlag(EdgeFlag.BIKE_LTS_2)) return null;
+                }
+
+                s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / req.bikeSpeed);
+                // TODO bike walking
+            }
+            else if (mode == Mode.CAR && getFlag(EdgeFlag.ALLOWS_CAR))
+                s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / speeds.get(edgeIndex));
+            else
+                return null; // this mode cannot traverse this edge
+
             return s1;
         }
 
@@ -341,13 +400,14 @@ public class EdgeStore implements Serializable {
             StringBuilder sb = new StringBuilder();
             sb.append(String.format("Edge from %d to %d. Length %f meters, speed %d kph.",
                     getFromVertex(), getToVertex(), getLengthMm() / 1000D, getSpeed()));
-            for (Flag flag : Flag.values()) {
-                if (getFlag(flag)) {
-                    sb.append(" ");
-                    sb.append(flag.toString());
-                }
+            for (EdgeFlag flag : flags.get(edgeIndex)) {
+                sb.append(flag.toString());
             }
             return sb.toString();
+        }
+
+        public EnumSet<EdgeFlag> getFlags() {
+            return flags.get(edgeIndex);
         }
     }
 

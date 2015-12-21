@@ -171,6 +171,10 @@ public class ResultSet implements Serializable{
         }
     }
 
+    public void writeIsochrones (JsonGenerator jgen) throws IOException {
+        throw new UnsupportedOperationException("Isochrone generation not supported in R5");
+    }
+
     /** A set of result sets from profile routing: min, avg, max */;
     public static class RangeSet implements Serializable {
         public static final long serialVersionUID = 1L;

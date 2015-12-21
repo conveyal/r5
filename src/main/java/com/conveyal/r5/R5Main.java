@@ -3,6 +3,8 @@ package com.conveyal.r5;
 import com.conveyal.r5.analyst.broker.BrokerMain;
 import com.conveyal.r5.analyst.cluster.AnalystWorker;
 import com.conveyal.r5.publish.StaticMain;
+import com.conveyal.r5.publish.StaticServer;
+import com.conveyal.r5.publish.StaticSiteRequest;
 
 import java.util.Arrays;
 
@@ -23,6 +25,10 @@ public class R5Main {
             AnalystWorker.main(commandArguments);
         } else if ("static".equals(command)) {
             StaticMain.main(commandArguments);
+        } else if ("static-server".equals(command)) {
+            StaticServer.main(commandArguments);
+        } else {
+            System.err.println("Unknown command " + command);
         }
     }
 }

@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst.broker;
 
+import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import com.conveyal.r5.common.JsonUtilities;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,7 +11,6 @@ import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.grizzly.http.server.Response;
 import org.glassfish.grizzly.http.util.HttpStatus;
-import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,8 +108,8 @@ class BrokerHttpHandler extends HttpHandler {
                     String context = pathComponents[2];
                     if ("priority".equals(context)) {
                         // Enqueue a single priority task
-                        AnalystClusterRequest task = mapper.readValue(request.getInputStream(),
-                                AnalystClusterRequest.class);
+                        GenericClusterRequest task = mapper.readValue(request.getInputStream(),
+                                GenericClusterRequest.class);
                         broker.enqueuePriorityTask(task, response);
                         // Enqueueing the priority task has set its internal taskId.
                         // TODO move all removal listener registration into the broker functions.
@@ -123,13 +122,13 @@ class BrokerHttpHandler extends HttpHandler {
 
                     } else if ("jobs".equals(context)) {
                         // Enqueue a list of tasks that belong to jobs
-                        List<AnalystClusterRequest> tasks = mapper
+                        List<GenericClusterRequest> tasks = mapper
                                 .readValue(request.getInputStream(),
-                                        new TypeReference<List<AnalystClusterRequest>>() {
+                                        new TypeReference<List<GenericClusterRequest>>() {
                                         });
                         // Pre-validate tasks checking that they are all on the same job
-                        AnalystClusterRequest exemplar = tasks.get(0);
-                        for (AnalystClusterRequest task : tasks) {
+                        GenericClusterRequest exemplar = tasks.get(0);
+                        for (GenericClusterRequest task : tasks) {
                             if (task.jobId != exemplar.jobId || task.graphId != exemplar.graphId) {
                                 response.setStatus(HttpStatus.BAD_REQUEST_400);
                                 response.setDetailMessage(

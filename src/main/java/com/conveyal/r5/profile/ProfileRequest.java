@@ -1,9 +1,14 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.model.json_serialization.ModeSetDeserializer;
+import com.conveyal.r5.model.json_serialization.ModeSetSerializer;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.joda.time.LocalDate;
 
 import java.io.Serializable;
+import java.util.EnumSet;
 
 /**
  * All the modifiable parameters for profile routing.
@@ -30,10 +35,13 @@ public class ProfileRequest implements Serializable, Cloneable {
     public int    toTime;
 
     /** The speed of walking, in meters per second */
-    public float  walkSpeed;
+    public float  walkSpeed = 1.3f;
     
     /** The speed of cycling, in meters per second */
-    public float  bikeSpeed;
+    public float  bikeSpeed = 4f;
+
+    /** maximum level of traffic stress for cycling, 1 - 4 */
+    public int bikeTrafficStress = 4;
     
     /** The speed of driving, in meters per second */
     public float  carSpeed;
@@ -79,17 +87,24 @@ public class ProfileRequest implements Serializable, Cloneable {
     public int limit;
     
     /** The modes used to access transit */
-    // TODO replacing mode sets with strings while porting code from otp repository
-    public String accessModes;
+    @JsonSerialize(using = ModeSetSerializer.class)
+    @JsonDeserialize(using = ModeSetDeserializer.class)
+    public EnumSet<Mode> accessModes;
     
     /** The modes used to reach the destination after leaving transit */
-    public String egressModes;
+    @JsonSerialize(using = ModeSetSerializer.class)
+    @JsonDeserialize(using = ModeSetDeserializer.class)
+    public EnumSet<Mode> egressModes;
     
     /** The modes used to reach the destination without transit */
-    public String directModes;
+    @JsonSerialize(using = ModeSetSerializer.class)
+    @JsonDeserialize(using = ModeSetDeserializer.class)
+    public EnumSet<Mode> directModes;
     
     /** The transit modes used */
-    public String transitModes;
+    @JsonSerialize(using = ModeSetSerializer.class)
+    @JsonDeserialize(using = ModeSetDeserializer.class)
+    public EnumSet<Mode> transitModes;
     
     /** If true, disable all goal direction and propagate results to the street network */
     public boolean analyst = false;

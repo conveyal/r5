@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
+import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
 import com.conveyal.r5.profile.*;
 import com.conveyal.r5.streets.LinkedPointSet;

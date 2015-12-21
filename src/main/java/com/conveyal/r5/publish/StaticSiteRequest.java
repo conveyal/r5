@@ -1,6 +1,9 @@
 package com.conveyal.r5.publish;
 
+import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import com.conveyal.r5.profile.ProfileRequest;
+
+import java.util.UUID;
 
 /**
  * Configuration object for a static site, deserialized from JSON.
@@ -18,25 +21,35 @@ public class StaticSiteRequest {
     /** Prefix for result output */
     public String prefix;
 
+    public final String jobId = UUID.randomUUID().toString().replace("-", "");
+
     public PointRequest getPointRequest (int x, int y) {
         return new PointRequest(this, x, y);
     }
 
     /** Represents a single point of a static site request */
-    public static class PointRequest {
+    public static class PointRequest extends GenericClusterRequest {
+        public final String type = "static";
+
         private PointRequest (StaticSiteRequest request, int x, int y) {
             this.request = request;
             this.x = x;
             this.y = y;
+            this.graphId = request.transportNetworkId;
+            this.jobId = request.jobId;
+            this.id = x + "_" + y;
         }
 
+        /** no-arg constructor for deserialization */
+        public PointRequest () { /* do nothing */ }
+
         /** x pixel, relative to west side of transport network */
-        public final int x;
+        public int x;
 
         /** y pixel, relative to north edge of transport network */
-        public final int y;
+        public int y;
 
         /** StaticSiteRequest this is associated with */
-        public final StaticSiteRequest request;
+        public StaticSiteRequest request;
     }
 }

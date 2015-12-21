@@ -7,7 +7,7 @@ import gnu.trove.map.hash.TIntLongHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
-import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
+import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,10 +34,10 @@ public class Job {
 
     /* Tasks in this job that have yet to be delivered, or that will be re-delivered due to completion timeout. */
     // maybe this should only be a list of IDs.
-    Queue<AnalystClusterRequest> tasksAwaitingDelivery = new ArrayDeque<>();
+    Queue<GenericClusterRequest> tasksAwaitingDelivery = new ArrayDeque<>();
 
     /* The tasks in this job keyed on their task ID. */
-    TIntObjectMap<AnalystClusterRequest> tasksById = new TIntObjectHashMap<>();
+    TIntObjectMap<GenericClusterRequest> tasksById = new TIntObjectHashMap<>();
 
     /*
      * Completion timeouts for tasks that have been delivered.
@@ -54,15 +54,15 @@ public class Job {
     }
 
     /** Adds a task to this Job, assigning it a task ID number. */
-    public void addTask (AnalystClusterRequest task) {
+    public void addTask (GenericClusterRequest task) {
         tasksById.put(task.taskId, task);
         tasksAwaitingDelivery.add(task);
     }
 
-    public void markTasksDelivered(List<AnalystClusterRequest> tasks) {
+    public void markTasksDelivered(List<GenericClusterRequest> tasks) {
         long deliveryTime = System.currentTimeMillis();
         long visibleAt = deliveryTime + INVISIBLE_DURATION_SEC * 1000;
-        for (AnalystClusterRequest task : tasks) {
+        for (GenericClusterRequest task : tasks) {
             invisibleUntil.put(task.taskId, visibleAt);
         }
     }
@@ -121,7 +121,7 @@ public class Job {
     }
 
     public boolean containsTask (int taskId) {
-        AnalystClusterRequest req = tasksById.get(taskId);
+        GenericClusterRequest req = tasksById.get(taskId);
         if (req != null) {
             if (!req.jobId.equals(this.jobId)) {
                 LOG.error("Task {} has a job ID that does not match the job in which it was discovered.");

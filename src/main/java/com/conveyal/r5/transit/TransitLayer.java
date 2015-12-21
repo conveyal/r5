@@ -1,10 +1,7 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.gtfs.model.Service;
-import com.conveyal.gtfs.model.Stop;
-import com.conveyal.gtfs.model.StopTime;
-import com.conveyal.gtfs.model.Trip;
+import com.conveyal.gtfs.model.*;
 import com.conveyal.r5.analyst.scenario.Modification;
 import com.conveyal.r5.analyst.scenario.RemoveTrip;
 import com.conveyal.r5.analyst.scenario.Scenario;
@@ -43,7 +40,7 @@ public class TransitLayer implements Serializable, Cloneable {
 
     public List<TripPattern> tripPatterns = new ArrayList<>();
 
-    // TODO both vertex<->stop indexes are in transitLayer, so the linkage between street and transit layers is really one-to-many, not bidirectional. Use this fact to add multiple GTFS.
+    // TODO bidirectional indexes between vertex and stop are in transitLayer, so the linkage between street and transit layers is really one-to-many, not bidirectional. Use this fact to add multiple GTFS.
 
     // Maybe we need a StopStore that has (streetVertexForStop, transfers, flags, etc.)
     public TIntList streetVertexForStop = new TIntArrayList();
@@ -53,6 +50,12 @@ public class TransitLayer implements Serializable, Cloneable {
 
     // For each stop, a packed list of transfers to other stops
     public List<TIntList> transfersForStop;
+
+    /** Information about a route */
+    public List<RouteInfo> routes = new ArrayList<>();
+
+    /** The names of the stops */
+    public List<String> stopNames = new ArrayList<>();
 
     public List<TIntList> patternsForStop;
 
@@ -84,26 +87,15 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     public StreetLayer linkedStreetLayer = null;
 
-    /**
-     * Seems kind of hackish to pass the street layer in.
-     * Maybe there should not even be separate street and transit layer classes.
-     * Should we have separate stop objects in the transit layer and stop vertices in the street layer?
-     *
-     * It should be possible to load multiple GTFS feeds into the same transit layer.
-     * This might be achieved by loading more than one feed into a MapDB, but it's probably better to keep the
-     * one MapDB == one feed equivalence. That way when individual GTFS feeds are updated, we only need to reload
-     * one MapDB, there are no identifier collision problems within one MapDB, and we don't need to store which feed
-     * each entity belongs to in the MapDB.
-     *
-     * So loading multiple feeds would be achieved by calling a function on TransitLayer multiple times
-     * with multiple GtfsFeed objects. All maps/lists would need to be initialized with empty objects at construction,
-     * and all methods would have to be designed to be called multiple times in succession.
-     *
-     * I (MWC) see no reason why this function cannot be called multiple times on the same transit network as-it-is.
-     * I'm going to try that and see how well it works. None of the IDs from the GTFS are used for anything other than reference.
-     * Block chaining is scoped to this function so it won't be affected.
-     */
+    /** Load a GTFS feed with full load level */
     public void loadFromGtfs (GTFSFeed gtfs) {
+        loadFromGtfs(gtfs, LoadLevel.FULL);
+    }
+
+    /**
+     * Load data from a GTFS feed. Call multiple times to load multiple feeds.
+     */
+    public void loadFromGtfs (GTFSFeed gtfs, LoadLevel level) {
 
         // Load stops.
         // ID is the GTFS string ID, stopIndex is the zero-based index, stopVertexIndex is the index in the street layer.
@@ -113,6 +105,10 @@ public class TransitLayer implements Serializable, Cloneable {
             indexForStopId.put(stop.stop_id, stopIndex);
             stopIdForIndex.add(stop.stop_id);
             stopForIndex.add(stop);
+
+            if (level == LoadLevel.FULL) {
+                stopNames.add(stop.stop_name);
+            }
         }
 
         // Load service periods, assigning integer codes which will be referenced by trips and patterns.
@@ -132,6 +128,7 @@ public class TransitLayer implements Serializable, Cloneable {
         // These are temporary maps used only for grouping purposes.
         Map<TripPatternKey, TripPattern> tripPatternForStopSequence = new HashMap<>();
         Multimap<String, TripSchedule> tripsForBlock = HashMultimap.create();
+        TObjectIntMap<Route> routeIndexForRoute = new TObjectIntHashMap<>();
         int nTripsAdded = 0;
         for (String tripId : gtfs.trips.keySet()) {
             Trip trip = gtfs.trips.get(tripId);
@@ -149,12 +146,31 @@ public class TransitLayer implements Serializable, Cloneable {
             TripPattern tripPattern = tripPatternForStopSequence.get(tripPatternKey);
             if (tripPattern == null) {
                 tripPattern = new TripPattern(tripPatternKey);
+
+                // if we haven't seen the route yet _from this feed_ (as IDs are only feed-unique)
+                // create it.
+                if (level == LoadLevel.FULL) {
+                    if (!routeIndexForRoute.containsKey(trip.route)) {
+                        int routeIndex = routes.size();
+                        RouteInfo ri = new RouteInfo(trip.route);
+                        routes.add(ri);
+                        routeIndexForRoute.put(trip.route, routeIndex);
+                    }
+
+                    tripPattern.routeIndex = routeIndexForRoute.get(trip.route);
+                }
+
                 tripPatternForStopSequence.put(tripPatternKey, tripPattern);
                 tripPatterns.add(tripPattern);
             }
             tripPattern.setOrVerifyDirection(trip.direction_id);
             int serviceCode = serviceCodeNumber.get(trip.service.service_id);
-            TripSchedule tripSchedule = new TripSchedule(trip, arrivals.toArray(), departures.toArray(), serviceCode);
+
+            // TODO there's no reason why we can't just filter trips like this, correct?
+            // TODO this means that invalid trips still have empty patterns created
+            TripSchedule tripSchedule = TripSchedule.create(trip, arrivals.toArray(), departures.toArray(), serviceCode);
+            if (tripSchedule == null) continue;
+
             tripPattern.addTrip(tripSchedule);
 
             this.hasFrequencies = this.hasFrequencies || tripSchedule.headwaySeconds != null;
@@ -242,9 +258,13 @@ public class TransitLayer implements Serializable, Cloneable {
     }
 
     public void buildStopTree () {
-        if (linkedStreetLayer == null)
-            throw new IllegalStateException("Attempt to build stop trees on unlinked transit layer");
 
+        LOG.info("Building stop trees (cached distances between transit stops and street intersections).");
+        if (linkedStreetLayer == null) {
+            throw new IllegalStateException("Attempt to build stop trees on a transit layer that is not linked to a street layer.");
+        }
+
+        // For each transit stop, an int->int map giving the distance of every reached street intersection from the origin stop.
         stopTree = new TIntIntMap[getStopCount()];
 
         StreetRouter r = new StreetRouter(linkedStreetLayer);
@@ -254,9 +274,8 @@ public class TransitLayer implements Serializable, Cloneable {
             int originVertex = streetVertexForStop.get(stop);
 
             if (originVertex == -1) {
-                // stop is unlinked
-                LOG.info("Stop {} is unlinked", stop);
-
+                // -1 indicates that this stop is not linked to the street network.
+                LOG.info("Stop {} has not been linked to the street network.", stop);
                 stopTree[stop] = null;
                 continue;
             }
@@ -266,6 +285,7 @@ public class TransitLayer implements Serializable, Cloneable {
 
             stopTree[stop] = r.getReachedVertices();
         }
+        LOG.info("Done building stop trees.");
     }
 
     public static TransitLayer fromGtfs (List<String> files) {
@@ -307,5 +327,11 @@ public class TransitLayer implements Serializable, Cloneable {
         }
     }
 
-
+    /** How much information should we load/save? */
+    public enum LoadLevel {
+        /** Load only information required for analytics, leaving out route names, etc. */
+        BASIC,
+        /** Load enough information for customer facing trip planning */
+        FULL
+    }
 }

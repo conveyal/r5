@@ -54,7 +54,7 @@ public class JobSimulator {
         mapper.registerModule(JodaLocalDateSerializer.makeModule());
         mapper.registerModule(TraverseModeSetSerializer.makeModule());*/
 
-        List<AnalystClusterRequest> requests = new ArrayList<>();
+        List<GenericClusterRequest> requests = new ArrayList<>();
 
         IntStream.range(0, nOrigins).forEach(i -> {
             // Enqueue one fake origin

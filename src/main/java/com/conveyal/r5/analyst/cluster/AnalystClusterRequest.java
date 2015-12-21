@@ -5,73 +5,61 @@ import com.conveyal.r5.profile.ProfileRequest;
 import java.io.Serializable;
 
 /**
- * A request sent to an Analyst cluster worker.
- * It has two separate fields for RoutingReqeust or ProfileReqeust to facilitate binding from JSON.
- * Only one of them should be set in a given instance, with the ProfileRequest taking precedence if both are set.
+ * A class for vanilla Analyst requests with a pointset and a transportnetwork.
  */
-public class AnalystClusterRequest implements Serializable {
+public class AnalystClusterRequest extends GenericClusterRequest implements Serializable {
+    public static final long serialVersionUID = 1L;
 
-	/** The ID of the destinations pointset */
-	public String destinationPointsetId;
+    public final String type = "analyst";
 
-	/** The Analyst Cluster user that created this request */
-	public String userId;
+    /** The ID of the destinations pointset */
+    public String destinationPointsetId;
 
-	/** The ID of the graph against which to calculate this request */
-	public String graphId;
+    /** The Analyst Cluster user that created this request */
+    public String userId;
 
-	/** The job ID this is associated with */
-	public String jobId;
+    /** To where should the result be POSTed */
+    @Deprecated
+    public String directOutputUrl;
 
-	/** The id of this particular origin */
-	public String id;
+    /**
+     * Where should the job be saved?
+     */
+    public String outputLocation;
 
-	/** To where should the result be POSTed */
-	@Deprecated
-	public String directOutputUrl;
+    /**
+     * The routing parameters to use for a one-to-many profile request.
+     * Non-profile one-to-many requests are represented by simply setting the time window to zero width, i.e.
+     * in profileRequest fromTime == toTime.
+     * Non-transit one-to-many requests are represented by setting profileRequest.transitModes to null or empty.
+     * In that case only the directModes will be used to reach the destinations on the street.
+     */
+    public ProfileRequest profileRequest;
 
-	/** A unique identifier for this request assigned by the queue/broker system. */
-	public int taskId;
+    /** Should times be included in the results (i.e. ResultSetWithTimes rather than ResultSet) */
+    public boolean includeTimes = false;
 
-	/**
-	 * Where should the job be saved?
-	 */
-	public String outputLocation;
+    private AnalystClusterRequest (String destinationPointsetId, String graphId) {
+        this.destinationPointsetId = destinationPointsetId;
+        this.graphId = graphId;
+    }
 
-	/**
-	 * The routing parameters to use for a one-to-many profile request.
-	 * Non-profile one-to-many requests are represented by simply setting the time window to zero width, i.e.
-	 * in profileRequest fromTime == toTime.
-	 * Non-transit one-to-many requests are represented by setting profileRequest.transitModes to null or empty.
-	 * In that case only the directModes will be used to reach the destinations on the street.
-	 */
-	public ProfileRequest profileRequest;
+    /**
+     * We're now using ProfileRequests for everything (no RoutingRequests for non-transit searches).
+     * An GenericClusterRequest is a wrapper around a ProfileRequest with some additional settings and context.
+     */
+    public AnalystClusterRequest (String destinationPointsetId, String graphId, ProfileRequest req) {
+        this(destinationPointsetId, graphId);
+        try {
+            profileRequest = req.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new AssertionError();
+        }
+        profileRequest.analyst = true;
+        profileRequest.toLat = profileRequest.fromLat;
+        profileRequest.toLon = profileRequest.fromLon;
+    }
 
-	/** Should times be included in the results (i.e. ResultSetWithTimes rather than ResultSet) */
-	public boolean includeTimes = false;
-	
-	private AnalystClusterRequest(String destinationPointsetId, String graphId) {
-		this.destinationPointsetId = destinationPointsetId;
-		this.graphId = graphId;
-	}
-
-	/**
-	 * We're now using ProfileRequests for everything (no RoutingRequests for non-transit searches).
-	 * An AnalystClusterRequest is a wrapper around a ProfileRequest with some additional settings and context.
-	 */
-	 public AnalystClusterRequest(String destinationPointsetId, String graphId, ProfileRequest req) {
-		this(destinationPointsetId, graphId);
-		try {
-			profileRequest = req.clone();
-		} catch (CloneNotSupportedException e) {
-			throw new AssertionError();
-		}
-		profileRequest.analyst = true;
-		profileRequest.toLat = profileRequest.fromLat;
-		profileRequest.toLon = profileRequest.fromLon;
-	}
-
-	/** Used for deserialization from JSON */
-	public AnalystClusterRequest () { /* do nothing */ }
-
+    /** Used for deserialization from JSON */
+    public AnalystClusterRequest () { /* do nothing */ }
 }

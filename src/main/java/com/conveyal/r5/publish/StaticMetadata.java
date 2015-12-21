@@ -1,5 +1,6 @@
 package com.conveyal.r5.publish;
 
+import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.ProfileRequest;
@@ -11,6 +12,7 @@ import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Serializable;
 
@@ -31,6 +33,30 @@ public class StaticMetadata implements Runnable {
     @Override
     public void run () {
         // first generate and write out metadata
+
+        try {
+            OutputStream os = StaticDataStore.getOutputStream(request, "query.json", "application/json");
+            writeMetadata(os);
+            os.close();
+        } catch (Exception e) {
+            LOG.error("Exception saving static output", e);
+            return;
+        }
+
+        // write the stop tree
+        try {
+            OutputStream os = StaticDataStore.getOutputStream(request, "stop_trees.dat", "application/octet-stream");
+            writeStopTrees(os);
+            os.close();
+        } catch (Exception e) {
+            LOG.error("Exception writing stop trees", e);
+            return;
+        }
+
+    }
+
+    /** Write metadata for this query */
+    public void writeMetadata (OutputStream out) throws IOException {
         Metadata metadata = new Metadata();
         WebMercatorGridPointSet ps = network.getGridPointSet();
         metadata.zoom = ps.zoom;
@@ -41,24 +67,27 @@ public class StaticMetadata implements Runnable {
         metadata.transportNetwork = request.transportNetworkId;
         metadata.request = request.request;
 
-        try {
-            OutputStream os = StaticDataStore.getOutputStream(request, "query.json", "application/json");
-            JsonUtilities.objectMapper.writeValue(os, metadata);
-            os.close();
-        } catch (Exception e) {
-            LOG.error("Exception saving static output", e);
-            return;
-        }
+        JsonUtilities.objectMapper.writeValue(out, metadata);
+    }
 
+    /** Write stop trees for this query */
+    public void writeStopTrees (OutputStream out) throws IOException {
         // build the stop trees
-        LinkedPointSet lps = new LinkedPointSet(ps, network.streetLayer);
-        lps.makeStopTrees();
+        LinkedPointSet lps = network.getLinkedGridPointSet();
+        if (lps.stopTrees == null)
+            lps.makeStopTrees();
 
         // invert the stop trees
-        TIntList[] stopTrees = new TIntList[ps.featureCount()];
+        TIntList[] stopTrees = new TIntList[lps.pointSet.featureCount()];
 
-        int stop = 0;
+        // first increment will land at 0
+        int stop = -1;
         for (int[] tree : lps.stopTrees) {
+            // make sure stop always gets incremented
+            stop++;
+            if (tree == null)
+                continue;
+
             for (int i = 0; i < tree.length; i+= 2) {
                 // tree[i] is the target
                 if (stopTrees[tree[i]] == null) {
@@ -68,36 +97,34 @@ public class StaticMetadata implements Runnable {
                 // tree[i + 1] is distance
                 stopTrees[tree[i]].add(new int[] { stop, tree[i + 1] });
             }
-
-            stop++;
         }
 
-        // write the stop tree
-        try {
-            OutputStream os = StaticDataStore.getOutputStream(request, "stop_trees.dat", "application/octet-stream");
-            LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(os);
+        // write the trees
+        LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(out);
 
-            for (TIntList tree : stopTrees) {
-                if (tree == null) {
-                    dos.writeInt(0);
-                }
-                else {
-                    // divide by two because array is jagged, get number of stops
-                    dos.writeInt(tree.size() / 2);
-                    for (int i = 0; i < tree.size(); i += 2) {
-                        dos.writeInt(tree.get(i));
-                        dos.writeInt(tree.get(i + 1));
-                    }
+        int prevStopId = 0;
+        int prevTime = 0;
+
+        for (TIntList tree : stopTrees) {
+            if (tree == null) {
+                dos.writeInt(0);
+            }
+            else {
+                // divide by two because array is jagged, get number of stops
+                dos.writeInt(tree.size() / 2);
+                for (int i = 0; i < tree.size(); i += 2) {
+                    int stopId = tree.get(i);
+                    dos.writeInt(stopId - prevStopId);
+                    prevStopId = stopId;
+
+                    int time = tree.get(i + 1) / 60;
+                    dos.writeInt(time - prevTime);
+                    prevTime = time;
                 }
             }
-
-            dos.flush();
-            dos.close();
-        } catch (Exception e) {
-            LOG.error("Exception writing stop trees", e);
-            return;
         }
 
+        dos.flush();
     }
 
     public static class Metadata implements Serializable {

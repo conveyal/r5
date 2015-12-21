@@ -198,7 +198,7 @@ public class ProfileRequest implements Serializable, Cloneable {
         if (date == null) {
             currentDateTime = ZonedDateTime.now(zoneId).truncatedTo(ChronoUnit.DAYS).toInstant().toEpochMilli();
         } else {
-            currentDateTime = ZonedDateTime.of(date.getYear(), date.getMonthOfYear(), date.getDayOfMonth(), 0,0,0,0,zoneId).toInstant().toEpochMilli();
+            currentDateTime = ZonedDateTime.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth(), 0,0,0,0,zoneId).toInstant().toEpochMilli();
         }
 
         //fromTime is in seconds and there are 1000 ms in a second

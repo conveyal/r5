@@ -6,7 +6,8 @@ import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
-import org.joda.time.LocalDate;
+import java.time.LocalDate;
+import java.time.Month;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,7 +110,7 @@ public class TransitRouter {
         LOG.debug("Begin raptor routing. Initial state: {}", currentRound);
 
         // Determine which services are active to avoid exploring those that are not running on this day.
-        LocalDate searchDate = new LocalDate(2015, 8, 6);
+        LocalDate searchDate = LocalDate.of(2015, Month.AUGUST, 6);
         servicesActive = transitLayer.getActiveServicesForDate(searchDate);
         final int latestAcceptableTime = departureTime + maxTravelTimeSeconds;
 

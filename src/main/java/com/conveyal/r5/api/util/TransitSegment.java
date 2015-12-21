@@ -13,6 +13,7 @@ public class TransitSegment {
 
 
 
+    //TODO: this is stopCluster in Profile and Stop in point to point
     //from, to and fromName, toName are actually from stopCluster
     // Use AgencyAndId instead of String to get both since we are now multi-feed
     @JsonProperty("from")
@@ -22,10 +23,9 @@ public class TransitSegment {
 
     public StopCluster from;
     public StopCluster to;
-    //time in seconds @notnull
-    public int walkTime;
-    //distance of walking in meters @notnull
-    public int walkDistance;
+
+    //this is index of non transit part of a journey in middle between this transit part and the next
+    public  int middle_id;
     public Stats waitStats;
     public TransitModes mode;
     public String fromName;
@@ -33,15 +33,11 @@ public class TransitSegment {
     public Stats rideStats;
     public List<RouteShort> routes;
     public List<SegmentPattern> segmentPatterns = Lists.newArrayList();
-    public String startTime;
-    public String endTime;
 
     @Override public String toString() {
         return "TransitSegment{" +
             "from='" + from + '\'' +
             ", to='" + to + '\'' +
-            ", walkTime=" + walkTime +
-            ", walkDistance=" + walkDistance +
             ", waitStats=" + waitStats +
             ", mode='" + mode + '\'' +
             ", fromName='" + fromName + '\'' +
@@ -49,8 +45,6 @@ public class TransitSegment {
             ", rideStats=" + rideStats +
             ",\n\t routes=" + routes +
             ",\n\t segmentPatterns=" + segmentPatterns +
-            ",\n\t startTime='" + startTime + '\'' +
-            ", endTime='" + endTime + '\'' +
             '}' +"\n\t";
     }
 

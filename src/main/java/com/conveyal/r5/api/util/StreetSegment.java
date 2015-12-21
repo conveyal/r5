@@ -1,5 +1,7 @@
 package com.conveyal.r5.api.util;
 
+import com.vividsolutions.jts.geom.Geometry;
+
 import java.util.List;
 
 /**
@@ -10,7 +12,12 @@ public class StreetSegment {
     //Which mode of transport is used @notnull
     public LegMode mode;
     //Time in seconds for this part of trip @notnull
-    public int time;
+    public int duration;
+    //Distance in meters for this part of a trip @notnull
+    public int distance;
+    //TODO: geometry needs to be split when there is mode switch. Probably best to use indexes in geometry
+    //Geometry of all the edges
+    public Geometry geometry;
     public List<StreetEdgeInfo> streetEdges;
     //List of elevation elements each elevation has a distance (from start of this segment) and elevation at this point (in meters)
     public List<Elevation> elevation;
@@ -19,7 +26,7 @@ public class StreetSegment {
     @Override public String toString() {
         return "\tStreetSegment{" +
             "mode='" + mode + '\'' +
-            ", time=" + time +
+            ", time=" + duration +
             ", streetEdges=" + streetEdges.size() +
             '}' + "\n";
     }

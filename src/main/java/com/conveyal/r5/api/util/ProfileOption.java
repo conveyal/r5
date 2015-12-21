@@ -11,8 +11,12 @@ public class ProfileOption {
     public List<TransitSegment> transit;
     //Part of journey from start to transit (or end) @notnull
     public List<StreetSegment> access;
+    //Part of a journey between transit stops (transfers)
+    public List<StreetSegment> middle;
     //Part of journey from transit to end @notnull
     public List<StreetSegment> egress;
+    //Connects all the trip part to a trip at specific time with specific modes of transportation
+    public List<Itinerary> itinerary;
     //Time stats for this part of a journey @notnull
     public Stats stats = new Stats();
     //Text description of this part of a journey @notnull

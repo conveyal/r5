@@ -17,8 +17,8 @@ public class StreetEdgeInfo {
      * Distance of driving on these edge (meters)
      * @notnull
      */
-    public Integer distance;
-    /** The geometry of this pattern */
+    public int distance;
+    /** The geometry of this edge */
     public PolylineGeometry geometry;
 
     /**
@@ -40,5 +40,6 @@ public class StreetEdgeInfo {
 
     public BikeRentalStation bikeRentalOnStation;
     public BikeRentalStation bikeRentalOffStation;
+    //TODO: P+R
 
 }

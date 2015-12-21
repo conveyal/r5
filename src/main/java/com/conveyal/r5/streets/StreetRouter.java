@@ -12,8 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.util.Arrays;
-import java.util.EnumSet;
+import java.time.Instant;
 import java.util.PriorityQueue;
 
 /**
@@ -45,6 +44,23 @@ public class StreetRouter {
 
     /** Search mode: we need a single mode, it is up to the caller to disentagle the modes set in the profile request */
     public Mode mode = Mode.WALK;
+
+    private RoutingVisitor routingVisitor;
+
+    private Split originSplit;
+
+    public void setRoutingVisitor(RoutingVisitor routingVisitor) {
+        this.routingVisitor = routingVisitor;
+    }
+
+    /** Currently used for debugging snapping to vertices
+     * TODO: API should probably be nicer
+     * setOrigin on split or setOrigin that would return split
+     * @return
+     */
+    public Split getOriginSplit() {
+        return originSplit;
+    }
 
     /**
      * @return a map from transit stop indexes to their distances from the origin.
@@ -97,29 +113,32 @@ public class StreetRouter {
     /**
      * @param lat Latitude in floating point (not fixed int) degrees.
      * @param lon Longitude in flating point (not fixed int) degrees.
+     * @return true if edge was found near wanted coordinate
      */
-    public void setOrigin (double lat, double lon) {
+    public boolean setOrigin (double lat, double lon) {
         Split split = streetLayer.findSplit(lat, lon, 300);
         if (split == null) {
             LOG.info("No street was found near the specified origin point of {}, {}.", lat, lon);
-            return;
+            return false;
         }
+        originSplit = split;
         bestStates.clear();
         queue.clear();
-        State startState0 = new State(split.vertex0, -1, null);
-        State startState1 = new State(split.vertex1, -1, null);
+        State startState0 = new State(split.vertex0, -1, profileRequest.getFromTimeDate(), null);
+        State startState1 = new State(split.vertex1, -1, profileRequest.getFromTimeDate(), null);
         // TODO walk speed, assuming 1 m/sec currently.
         startState0.weight = split.distance0_mm / 1000;
         startState1.weight = split.distance1_mm / 1000;
         // NB not adding to bestStates, as it will be added when it comes out of the queue
         queue.add(startState0);
         queue.add(startState1);
+        return true;
     }
 
     public void setOrigin (int fromVertex) {
         bestStates.clear();
         queue.clear();
-        State startState = new State(fromVertex, -1, null);
+        State startState = new State(fromVertex, -1, profileRequest.getFromTimeDate(), null);
         queue.add(startState);
     }
 
@@ -164,6 +183,10 @@ public class StreetRouter {
             // non-dominated state coming off the pqueue is by definition the best way to get to that vertex
             bestStates.put(s0.vertex, s0);
 
+            if (routingVisitor != null) {
+                routingVisitor.visitVertex(s0);
+            }
+
             // explore edges leaving this vertex
             streetLayer.outgoingEdges.get(s0.vertex).forEach(eidx -> {
                 edge.seek(eidx);
@@ -189,16 +212,77 @@ public class StreetRouter {
         return state.weight; // TODO true walk speed
     }
 
+    /**
+     * Returns state with smaller weight to vertex0 or vertex1
+     *
+     * If state to only one vertex exists return that vertex.
+     * If state to none of the vertices exists returns null
+     * @param split
+     * @return
+     */
+    public State getState(Split split) {
+        State weight0 = bestStates.get(split.vertex0);
+        State weight1 = bestStates.get(split.vertex1);
+        if (weight0 == null) {
+            if (weight1 == null) {
+                //Both vertices aren't found
+                return null;
+            } else {
+                //vertex1 found vertex 0 not
+                return weight1;
+            }
+        } else {
+            //vertex 0 found vertex 1 not
+            if (weight1 == null) {
+                return weight0;
+            } else {
+                //both found
+                if (weight0.weight < weight1.weight) {
+                    return  weight0;
+                } else {
+                    return weight1;
+                }
+            }
+        }
+    }
+
     public static class State implements Cloneable {
         public int vertex;
         public int weight;
         public int backEdge;
+        // the current time at this state, in milliseconds UNIX time
+        protected Instant time;
         public State backState; // previous state in the path chain
         public State nextState; // next state at the same location (for turn restrictions and other cases with co-dominant states)
-        public State (int atVertex, int viaEdge, State backState) {
+        public State(int atVertex, int viaEdge, long fromTimeDate, State backState) {
             this.vertex = atVertex;
             this.backEdge = viaEdge;
             this.backState = backState;
+            this.time = Instant.ofEpochMilli(fromTimeDate);
+
+        }
+
+
+        public void incrementTimeInSeconds(long seconds) {
+            if (seconds < 0) {
+                LOG.warn("A state's time is being incremented by a negative amount while traversing edge "
+                    );
+                //defectiveTraversal = true;
+                return;
+            }
+            if (false) {
+                time = time.minusSeconds(seconds);
+            } else {
+                time = time.plusSeconds(seconds);
+            }
+        }
+
+        public long getTime() {
+            return time.toEpochMilli();
+        }
+
+        public void incrementWeight(float weight) {
+            this.weight+=(int)weight;
         }
     }
 

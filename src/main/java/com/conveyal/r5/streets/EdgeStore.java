@@ -1,11 +1,16 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.osmlib.Node;
+import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
+import com.vividsolutions.jts.geom.LineString;
 import gnu.trove.list.TIntList;
+import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.list.array.TShortArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,28 +48,37 @@ public class EdgeStore implements Serializable {
     int nEdges = 0;
 
     /** Flags for this edge.  One entry for each forward and each backward edge. */
-    protected List<EnumSet<EdgeFlag>> flags;
+    public List<EnumSet<EdgeFlag>> flags;
 
-    /** Speed for this edge.  One entry for each forward and each backward edge. */
-    protected TIntList speeds;
+    /** Speed for this edge.
+     * One entry for each forward and each backward edge.
+     * rounded (m/s * 100) (2 decimal places)
+     * Saved speed is mostly the same as speed saved as m/s * 1000 it differs in second decimal place and is 0.024% smaller
+     *
+     * This way of saving speeds is 3.5% smaller then previous (saving 7 decimal places)
+     */
+    public TShortList speeds;
 
     /** From vertices. One entry for each edge pair */
-    protected TIntList fromVertices;
+    public TIntList fromVertices;
 
     /** To vertices. One entry for each edge pair */
-    protected TIntList toVertices;
+    public TIntList toVertices;
 
     /** Length (millimeters). One entry for each edge pair */
-    protected TIntList lengths_mm;
+    public TIntList lengths_mm;
 
     /** Geometries. One entry for each edge pair */
-    protected List<int[]> geometries; // intermediate points along the edge, other than the intersection endpoints
+    public List<int[]> geometries; // intermediate points along the edge, other than the intersection endpoints
+
+    public static final transient EnumSet<EdgeFlag> PERMISSION_FLAGS = EnumSet
+        .of(EdgeFlag.ALLOWS_PEDESTRIAN, EdgeFlag.ALLOWS_BIKE, EdgeFlag.ALLOWS_CAR);
 
     public EdgeStore (VertexStore vertexStore, int initialSize) {
         this.vertexStore = vertexStore;
         // There is one flags and speeds entry per edge.
         flags = new ArrayList<>(initialSize);
-        speeds = new TIntArrayList(initialSize);
+        speeds = new TShortArrayList(initialSize);
         // Vertex indices, geometries, and lengths are shared between pairs of forward and backward edges.
         int initialEdgePairs = initialSize / 2;
         fromVertices = new TIntArrayList(initialEdgePairs);
@@ -118,6 +132,9 @@ public class EdgeStore implements Serializable {
         PLATFORM,
         BOGUS_NAME,
         NO_THRU_TRAFFIC,
+        NO_THRU_TRAFFIC_PEDESTRIAN,
+        NO_THRU_TRAFFIC_BIKE,
+        NO_THRU_TRAFFIC_CAR,
         SLOPE_OVERRIDE,
         TRANSIT_LINK, // This edge is a one-way connection from a street to a transit stop. Target is a transit stop index, not an intersection index.
 
@@ -174,7 +191,8 @@ public class EdgeStore implements Serializable {
      * @return a cursor pointing to the forward edge in the pair, which always has an even index.
      */
     public Edge addStreetPair(int beginVertexIndex, int endVertexIndex, int edgeLengthMillimeters,
-                              EnumSet<EdgeFlag> forwardFlags, EnumSet<EdgeFlag> backFlags) {
+        EnumSet<EdgeFlag> forwardFlags, EnumSet<EdgeFlag> backFlags, short forwardSpeed,
+        short backwardSpeed) {
 
         // Store only one length, set of endpoints, and intermediate geometry per pair of edges.
         lengths_mm.add(edgeLengthMillimeters);
@@ -183,7 +201,7 @@ public class EdgeStore implements Serializable {
         geometries.add(EMPTY_INT_ARRAY);
 
         // Forward edge
-        speeds.add(DEFAULT_SPEED_KPH);
+        speeds.add(forwardSpeed);
         flags.add(forwardFlags);
 
         // avoid confusion later on
@@ -191,7 +209,7 @@ public class EdgeStore implements Serializable {
             backFlags = forwardFlags.clone();
 
         // Backward edge
-        speeds.add(DEFAULT_SPEED_KPH);
+        speeds.add(backwardSpeed);
         flags.add(backFlags);
 
         // Increment total number of edges created so far, and return the index of the first new edge.
@@ -217,6 +235,14 @@ public class EdgeStore implements Serializable {
             pairIndex = edgeIndex / 2;
             isBackward = !isBackward;
             return edgeIndex < nEdges;
+        }
+
+        /** move the cursor back one edge */
+        public boolean retreat () {
+            edgeIndex--;
+            pairIndex = edgeIndex / 2;
+            isBackward = !isBackward;
+            return edgeIndex >= 0;
         }
 
         /** Jump to a specific edge number. */
@@ -259,16 +285,35 @@ public class EdgeStore implements Serializable {
             flags.get(edgeIndex).add(flag);
         }
 
-        public int getSpeed() {
+        public void clearFlag(EdgeFlag flag) {
+            flags.get(edgeIndex).remove(flag);
+        }
+
+        public short getSpeed() {
             return speeds.get(edgeIndex);
         }
 
-        public void setSpeed(int speed) {
+        public float getSpeedMs() {
+            return (float) ((speeds.get(edgeIndex) / 100.));
+        }
+
+        public float getSpeedkmh() {
+            return (float) ((speeds.get(edgeIndex) / 100.) * 3.6);
+        }
+
+        public void setSpeed(short speed) {
             speeds.set(edgeIndex, speed);
         }
 
         public int getLengthMm () {
             return lengths_mm.get(pairIndex);
+        }
+
+        /**
+         * @return length of edge in meters
+         */
+        public double getLengthM() {
+            return getLengthMm() / 1000.0;
         }
 
         /**
@@ -286,27 +331,87 @@ public class EdgeStore implements Serializable {
             return !isBackward;
         }
 
-        public StreetRouter.State traverse (StreetRouter.State s0, Mode mode, ProfileRequest req) {
-            StreetRouter.State s1 = new StreetRouter.State(getToVertex(), edgeIndex, s0);
-            s1.nextState = null;
+        /**
+         * Calculate the speed appropriately given the ProfileRequest and traverseMode and the current wall clock time.
+         * Note: this is not strictly symmetrical, because in a forward search we get the speed based on the
+         * time we enter this edge, whereas in a reverse search we get the speed based on the time we exit
+         * the edge.
+         *
+         * If driving speed is based on max edge speed. (or from traffic if traffic is supported)
+         *
+         * Otherwise speed is based on wanted walking, cycling speed provided in ProfileRequest.
+         */
+        private float calculateSpeed(ProfileRequest options, Mode traverseMode,
+            long time) {
+            if (traverseMode == null) {
+                return Float.NaN;
+            } else if (traverseMode == Mode.CAR) {
+                /*if (options.useTraffic) {
+                    //TODO: speed based on traffic information
+                }*/
+                return getSpeedMs();
+            }
+            return options.getSpeed(traverseMode);
+        }
 
-            if (mode == Mode.WALK && getFlag(EdgeFlag.ALLOWS_PEDESTRIAN))
-                s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / req.walkSpeed);
-            else if (mode == Mode.BICYCLE && getFlag(EdgeFlag.ALLOWS_BIKE)) {
+        public StreetRouter.State traverse (StreetRouter.State s0, Mode mode, ProfileRequest req) {
+            StreetRouter.State s1 = new StreetRouter.State(getToVertex(), edgeIndex,
+                s0.getTime(), s0);
+            s1.nextState = null;
+            s1.weight = s0.weight;
+            float speedms = calculateSpeed(req, mode, s0.getTime());
+            float time = (float) (getLengthM() / speedms);
+            float weight = 0;
+
+            //Currently weigh is basically the same as weight. It differs only on stairs and when walking.
+
+            if (mode == Mode.WALK && getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) {
+                weight = time;
+                //elevation which changes weight
+            } else if (mode == Mode.BICYCLE) {
+                // walk a bike if biking is not allowed on this edge, or if the traffic stress is too high
+                boolean walking = !getFlag(EdgeFlag.ALLOWS_BIKE);
+
                 if (req.bikeTrafficStress > 0 && req.bikeTrafficStress < 4) {
-                    if (getFlag(EdgeFlag.BIKE_LTS_4)) return null;
-                    if (req.bikeTrafficStress < 3 && getFlag(EdgeFlag.BIKE_LTS_3)) return null;
-                    if (req.bikeTrafficStress < 2 && getFlag(EdgeFlag.BIKE_LTS_2)) return null;
+                    if (getFlag(EdgeFlag.BIKE_LTS_4)) walking = true;
+                    if (req.bikeTrafficStress < 3 && getFlag(EdgeFlag.BIKE_LTS_3)) walking = true;
+                    if (req.bikeTrafficStress < 2 && getFlag(EdgeFlag.BIKE_LTS_2)) walking = true;
                 }
 
-                s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / req.bikeSpeed);
-                // TODO bike walking
-            }
-            else if (mode == Mode.CAR && getFlag(EdgeFlag.ALLOWS_CAR))
-                s1.weight = (int) Math.round(s0.weight + getLengthMm() / 1000.0 / speeds.get(edgeIndex));
-            else
+                //elevation costs
+                //Triangle (bikesafety, flat, quick)
+                weight = time;
+                // TODO bike walking costs when switching bikes
+
+                // only walk if you're allowed to
+                if (walking && !getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) return null;
+
+
+                if (walking) {
+                    // * 1.5 to account for time to get off bike and slower walk speed once off
+                    // this will tend to prefer to bike a slightly longer route than walk a long way,
+                    // but will allow walking to cross a busy street, etc.
+                    weight *=1.5;
+                }
+
+            } else if (mode == Mode.CAR && getFlag(EdgeFlag.ALLOWS_CAR)) {
+                weight = time;
+            } else
                 return null; // this mode cannot traverse this edge
 
+
+            if(getFlag(EdgeFlag.STAIRS)) {
+                weight*=3.0; //stair reluctance
+            } else if (mode == Mode.WALK) {
+                weight*=2.0; //walk reluctance
+            }
+
+            //TODO: turn costs
+
+
+            int roundedTime = (int) Math.ceil(time);
+            s1.incrementTimeInSeconds(roundedTime);
+            s1.incrementWeight(weight);
             return s1;
         }
 
@@ -329,6 +434,50 @@ public class EdgeStore implements Serializable {
                 intermediateCoords[i++] = node.fixedLon;
             }
             geometries.set(pairIndex, intermediateCoords);
+        }
+
+        /**
+         * Returns LineString geometry of edge
+         * Uses from/to vertices for first/last node and nodes from geometries for middle nodes
+         *
+         * TODO: it might be better idea to return just list of coordinates
+         * @return
+         */
+        public LineString getGeometry() {
+            int[] coords = geometries.get(pairIndex);
+            //Size is 2 (from and to vertex) if there are no intermediate vertices
+            int size = coords == EMPTY_INT_ARRAY ? 2 :
+                //division with two since coordinates are in same array saved as lat, lon,lat etc.
+                (coords.length / 2) + 2;
+            Coordinate[] c = new Coordinate[size];
+
+            VertexStore.Vertex fromVertex = vertexStore.getCursor(getFromVertex());
+            VertexStore.Vertex toVertex = vertexStore.getCursor(getToVertex());
+
+            double fromVertexLon = fromVertex.getLon();
+            double fromVertexLat = fromVertex.getLat();
+            double toVertexLon = toVertex.getLon();
+            double toVertexLat = toVertex.getLat();
+
+            boolean reverse = isBackward();
+
+            double firstCoorLon = reverse ? toVertexLon : fromVertexLon;
+            double firstCoorLat = reverse ? toVertexLat : fromVertexLat;
+            double lastCoorLon = reverse ? fromVertexLon : toVertexLon;
+            double lastCoorLat = reverse ? fromVertexLat : toVertexLat;
+            c[0] = new Coordinate(firstCoorLon, firstCoorLat);
+            if (coords != null) {
+                for (int i = 1; i < c.length - 1; i++) {
+                    int ilat = coords[(i - 1) * 2];
+                    int ilon = coords[(i - 1) * 2 + 1];
+                    c[i] = new Coordinate(ilon / VertexStore.FIXED_FACTOR, ilat /  VertexStore.FIXED_FACTOR);
+                }
+            }
+            c[c.length - 1] = new Coordinate(lastCoorLon, lastCoorLat);
+            LineString out = GeometryUtils.geometryFactory.createLineString(c);
+            if (reverse)
+                out = (LineString) out.reverse();
+            return out;
         }
 
         /**
@@ -398,8 +547,8 @@ public class EdgeStore implements Serializable {
         @Override
         public String toString() {
             StringBuilder sb = new StringBuilder();
-            sb.append(String.format("Edge from %d to %d. Length %f meters, speed %d kph.",
-                    getFromVertex(), getToVertex(), getLengthMm() / 1000D, getSpeed()));
+            sb.append(String.format("Edge from %d to %d. Length %f meters, speed %f kph.",
+                    getFromVertex(), getToVertex(), getLengthMm() / 1000D, getSpeedkmh()));
             for (EdgeFlag flag : flags.get(edgeIndex)) {
                 sb.append(flag.toString());
             }
@@ -408,6 +557,50 @@ public class EdgeStore implements Serializable {
 
         public EnumSet<EdgeFlag> getFlags() {
             return flags.get(edgeIndex);
+        }
+
+        public String getFlagsAsString() {
+            return getFlags().toString();
+        }
+
+        /**
+         * Creates text label from permissions
+         *
+         * It looks like walk,bike,car or none.
+         * If any mode of transport is not allowed it is missing in return value.
+         * @return
+         */
+        public String getPermissionsAsString() {
+            StringJoiner sb = new StringJoiner(",");
+            sb.setEmptyValue("none");
+            if (getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) {
+                sb.add("walk");
+            }
+            if (getFlag(EdgeFlag.ALLOWS_BIKE)) {
+                sb.add("bike");
+            }
+            if (getFlag(EdgeFlag.ALLOWS_CAR)) {
+                sb.add("car");
+            }
+            return sb.toString();
+        }
+
+        /**
+         * Returns only enumSet of permission flags (CAR, BICYCLE, WALKING)
+         * @return
+         */
+        public EnumSet<EdgeFlag> getPermissionFlags() {
+            EnumSet<EdgeFlag> edgePermissionFlags = EnumSet.noneOf(EdgeFlag.class);
+            for (EdgeFlag permissionFlag: PERMISSION_FLAGS) {
+                if (getFlag(permissionFlag)) {
+                    edgePermissionFlags.add(permissionFlag);
+                }
+            }
+            return edgePermissionFlags;
+        }
+
+        public int getEdgeIndex() {
+            return edgeIndex;
         }
     }
 
@@ -441,5 +634,7 @@ public class EdgeStore implements Serializable {
         }
     }
 
-
+    public int getnEdges() {
+        return nEdges;
+    }
 }

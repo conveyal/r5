@@ -4,6 +4,7 @@ import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.conveyal.r5.analyst.scenario.InactiveTripsFilter;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.publish.StaticComputer;
@@ -403,16 +404,12 @@ public class AnalystWorker implements Runnable {
         LOG.info("Applying scenario...");
         // Get the supplied scenario or create an empty one if no scenario was supplied.
         Scenario scenario = clusterRequest.profileRequest.scenario;
-        if (scenario == null) {
-            scenario = new Scenario(-1);
+        if (scenario != null) {
+            // Prepend a pre-filter that removes trips that are not running during the search time window.
+            scenario.modifications.add(0, new InactiveTripsFilter(transportNetwork, clusterRequest.profileRequest));
         }
-//            if (!scenario.modifications.isEmpty()) {
-//                scenario.modifications.clear();
-//                // Add a pre-filter that removes trips that are not running during the search time window.
-//                scenario.modifications.add(0, new InactiveTripsFilter(transportNetwork, clusterRequest.profileRequest));
-//            }
-        // Apply the scenario modifications to the network before use, performing protective copies where necessary.
-        TransportNetwork modifiedNetwork = scenario.applyToTransportNetwork(transportNetwork);
+        // Apply any scenario modifications to the network before use, performing protective copies where necessary.
+        TransportNetwork modifiedNetwork = transportNetwork.applyScenario(scenario);
         LOG.info("Done applying scenario.");
 
         // Run the core repeated-raptor analysis.

@@ -2,6 +2,7 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
+import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.vividsolutions.jts.geom.Envelope;
@@ -295,5 +296,15 @@ public class TransportNetwork implements Serializable, Cloneable {
         }
     }
 
+    /**
+     * Apply the given scenario to this TransportNetwork, copying any elements that are modified to leave the original
+     * unscathed. The scenario may be null or empty, in which case this method is a no-op.
+     */
+    public TransportNetwork applyScenario (Scenario scenario) {
+        if (scenario == null || scenario.modifications.isEmpty()) {
+            return this;
+        }
+        return scenario.applyToTransportNetwork(this);
+    }
 
 }

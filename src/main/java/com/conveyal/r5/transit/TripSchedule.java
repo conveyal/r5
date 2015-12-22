@@ -159,8 +159,10 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
     }
 
     /**
+     * I can't think of any reason we need to use the first arrivals and last departure,
+     * rather than the first departure and last arrival.
      * @return whether any part of this occurs during the given time range (expressed in seconds after midnight).
-     * TODO frequencies
+     * TODO --> frequencies <--
      */
     public boolean overlapsTimeRange (int fromTime, int toTime) {
         int firstStopTime = departures[0];

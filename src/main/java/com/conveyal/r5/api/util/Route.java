@@ -1,15 +1,12 @@
 package com.conveyal.r5.api.util;
 
 import com.beust.jcommander.internal.Lists;
-import com.conveyal.gtfs.model.Route;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import com.sun.istack.internal.NotNull;
 
 import java.util.Collection;
 import java.util.List;
 
-public class RouteShort {
+public class Route {
 
     /**
      * Route ID
@@ -61,11 +58,11 @@ public class RouteShort {
      */
     public String agencyName;
 
-    public RouteShort() {
+    public Route() {
 
     }
 
-    public RouteShort (Route route) {
+    public Route(com.conveyal.gtfs.model.Route route) {
         id = route.route_id;
         shortName = route.route_short_name;
         longName = route.route_long_name;
@@ -76,9 +73,9 @@ public class RouteShort {
         agencyName = route.agency.agency_name;
     }
 
-    public static List<RouteShort> list (Collection<Route> in) {
-        List<RouteShort> out = Lists.newArrayList();
-        for (Route route : in) out.add(new RouteShort(route));
+    public static List<Route> list (Collection<com.conveyal.gtfs.model.Route> in) {
+        List<Route> out = Lists.newArrayList();
+        for (com.conveyal.gtfs.model.Route route : in) out.add(new Route(route));
         return out;
     }
 

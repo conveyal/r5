@@ -31,7 +31,7 @@ public class TransitSegment {
     public String fromName;
     public String toName;
     public Stats rideStats;
-    public List<RouteShort> routes;
+    public List<Route> routes;
     public List<SegmentPattern> segmentPatterns = Lists.newArrayList();
 
     @Override public String toString() {

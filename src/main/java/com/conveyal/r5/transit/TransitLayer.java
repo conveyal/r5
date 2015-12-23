@@ -343,6 +343,8 @@ public class TransitLayer implements Serializable, Cloneable {
         for (String file : files) {
             GTFSFeed gtfs = GTFSFeed.fromFile(file);
             transitLayer.loadFromGtfs(gtfs);
+            //Makes sure that temporary mapdb files are deleted after they aren't needed
+            gtfs.close();
         }
 
         return transitLayer;

@@ -7,6 +7,7 @@ import com.conveyal.r5.model.json_serialization.ModeSetDeserializer;
 import com.conveyal.r5.model.json_serialization.ModeSetSerializer;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import graphql.schema.DataFetchingEnvironment;
 
 import java.io.Serializable;
 import java.time.ZoneId;
@@ -14,6 +15,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.EnumSet;
+import java.util.HashMap;
 
 /**
  * All the modifiable parameters for profile routing.
@@ -217,5 +219,25 @@ public class ProfileRequest implements Serializable, Cloneable {
             break;
         }
         throw new IllegalArgumentException("getSpeed(): Invalid mode " + mode);
+    }
+
+    /**
+     * Sets profile request with parameters from GraphQL request
+     * @param environment
+     * @return
+     */
+    public static ProfileRequest fromEnvironment(DataFetchingEnvironment environment) {
+        ProfileRequest profileRequest = new ProfileRequest();
+
+
+        profileRequest.fromLon = environment.getArgument("from").get("lon");
+        profileRequest.fromLat = environment.getArgument("from").get("lat");
+
+        profileRequest.toLat = environment.getArgument("to").get("lat");
+        profileRequest.toLon = environment.getArgument("to").get("lon");
+
+        //Doesn't work currently since Mode != LegMode
+        //profileRequest.directModes.addAll(environment.getArgument("directModes"));
+        return profileRequest;
     }
 }

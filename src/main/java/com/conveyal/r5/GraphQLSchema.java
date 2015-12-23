@@ -4,6 +4,8 @@ import com.conveyal.r5.api.ProfileResponse;
 import com.conveyal.r5.api.util.*;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.model.json_serialization.PolyUtil;
+import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
+import com.conveyal.r5.profile.ProfileRequest;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import graphql.GraphQLException;
 import graphql.Scalars;
@@ -228,7 +230,7 @@ public class GraphQLSchema {
     //spark
 
 
-    public GraphQLSchema(ProfileResponse profileResponse) {
+    public GraphQLSchema(PointToPointQuery profileResponse) {
 
         fareType = GraphQLObjectType.newObject()
             .name("Fare")
@@ -1080,7 +1082,7 @@ public class GraphQLSchema {
                 .type(Scalars.GraphQLInt)
                 .build())
             .dataFetcher(environment -> {
-                return profileResponse;
+                 return profileResponse.getPlan(ProfileRequest.fromEnvironment(environment));
             })
             .build();
 

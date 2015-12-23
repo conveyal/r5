@@ -1,17 +1,24 @@
 package com.conveyal.r5.point_to_point;
 
+import com.conveyal.r5.api.GraphQlRequest;
 import com.conveyal.r5.common.GeoJsonFeature;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.point_to_point.builder.RouterInfo;
 import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.streets.*;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.operation.buffer.BufferParameters;
 import com.vividsolutions.jts.operation.buffer.OffsetCurveBuilder;
 import gnu.trove.set.TIntSet;
+import graphql.ExecutionResult;
+import graphql.GraphQL;
+import graphql.GraphQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -105,9 +112,31 @@ public class PointToPointRouterServer {
 
     private static void run(TransportNetwork transportNetwork) {
         port(DEFAULT_PORT);
+        ObjectMapper mapper = new ObjectMapper();
         staticFileLocation("debug-plan");
+        PointToPointQuery pointToPointQuery = new PointToPointQuery(transportNetwork);
+
+        //TODO: executor strategies
+        GraphQL graphQL = new GraphQL(new com.conveyal.r5.GraphQLSchema(pointToPointQuery).indexSchema);
         // add cors header
         before((req, res) -> res.header("Access-Control-Allow-Origin", "*"));
+
+        options("/*", (request, response) -> {
+
+            String accessControlRequestHeaders = request
+                .headers("Access-Control-Request-Headers");
+            if (accessControlRequestHeaders != null) {
+                response.header("Access-Control-Allow-Headers", accessControlRequestHeaders);
+            }
+
+            String accessControlRequestMethod = request
+                .headers("Access-Control-Request-Method");
+            if (accessControlRequestMethod != null) {
+                response.header("Access-Control-Allow-Methods", accessControlRequestMethod);
+            }
+
+            return "OK";
+        });
 
         get("/metadata", (request, response) -> {
             response.header("Content-Type", "application/json");
@@ -512,6 +541,42 @@ public class PointToPointRouterServer {
             return content;
 
         }, JsonUtilities.objectMapper::writeValueAsString);
+
+        post("/otp/routers/default/index/graphql", ((request, response) -> {
+            response.type("application/json");
+
+            HashMap<String, Object> content = new HashMap<>();
+            try {
+                //TODO: use ObjectReader
+                GraphQlRequest graphQlRequest = mapper
+                    .readValue(request.body(), GraphQlRequest.class);
+
+                Map<String, Object> variables = new HashMap<>();
+                ExecutionResult executionResult = graphQL.execute(graphQlRequest.query, null, null, variables);
+                response.status(200);
+
+                if (!executionResult.getErrors().isEmpty()) {
+                    response.status(500);
+                    content.put("errors", executionResult.getErrors());
+                }
+                if (executionResult.getData() != null) {
+                    content.put("data", executionResult.getData());
+                }
+            } catch (JsonParseException jpe) {
+                response.status(400);
+                content.put("errors", "Problem parsing query: " + jpe.getMessage());
+            } catch (GraphQLException ql) {
+                response.status(500);
+                content.put("errors", ql.getMessage());
+                LOG.error("GraphQL problem:", ql);
+            } catch (Exception e) {
+                response.status(500);
+                content.put("errors", e.getMessage());
+                LOG.error("Unknown error:", e);
+            }
+            return content;
+
+        }), JsonUtilities.objectMapper::writeValueAsString);
 
     }
 

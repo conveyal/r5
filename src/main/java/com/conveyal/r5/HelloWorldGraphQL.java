@@ -104,13 +104,13 @@ public class HelloWorldGraphQL {
         query = "{profile (from: \"A\",  to: \"B\"){options {summary}}}";
         //query = "{ fare { type, low transferReduction} }";
         //GraphQL graphQL = new GraphQL(new com.conveyal.r5.GraphQLSchema(profileResponse).indexSchema), Executors.newC
-        ExecutionResult result = new GraphQL(new com.conveyal.r5.GraphQLSchema(profileResponse).indexSchema)
+        /*ExecutionResult result = new GraphQL(new com.conveyal.r5.GraphQLSchema(profileResponse).indexSchema)
             .execute(query);
         if (!result.getErrors().isEmpty()) {
             LOG.error("Errors:{}", result.getErrors());
         } else {
             LOG.info("{}", result.getData());
-        }
+        }*/
 
     }
 }

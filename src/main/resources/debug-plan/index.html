@@ -1,0 +1,218 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Leaflet Context Menu</title>
+        <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css"/>
+        <link rel="stylesheet" href="/leaflet_context/leaflet.contextmenu.css"/>
+    </head>
+    <body>
+        <select id="mode">
+            <option value="CAR">Car</option>
+            <option value="WALK">Walking</option>
+            <option value="BICYCLE">Cycling</option>
+        </select>
+        <label for="full">
+            <input type="checkbox" value="full_load" id="full" name="full">Load all states
+        </label>
+        <button type="submit" value="submit" disabled="true" id="planButton">plan</button>
+        <div id="map" style="position: absolute; top: 40px; left: 0; width: 100%; height: 100%;"></div>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+        <script src="//cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
+        <script src="./leaflet_context/leaflet.contextmenu.js"></script>
+        <script>
+            var hostname = "http://localhost:8080";
+            var my_map;
+            var MARIBOR_COOR = [46.562483, 15.643975];
+            var layer = null;
+
+            var m1, m2;
+
+            var icon_start = L.icon({
+                iconUrl: 'images/marker-flag-start-shadowed.png',
+                shadowUrl: null,
+                iconSize: new L.Point(48, 49),
+                iconAnchor: new L.Point(46, 42),
+                popupAnchor: new L.Point(0, -16)
+            });
+            var icon_end = L.icon({
+                iconUrl: 'images/marker-flag-end-shadowed.png',
+                shadowUrl: null,
+                iconSize: new L.Point(48, 49),
+                iconAnchor: new L.Point(46, 42),
+                popupAnchor: new L.Point(0, -16)
+            });
+
+            my_map  = L.map('map', {
+                contextmenu: true,
+                contextmenuWidth: 140,
+                contextmenuItems: [
+                    {
+                    text: "Start Here",
+                    callback: addFirst
+                }, {
+                    text: "End Here",
+                    callback: addLast
+                }, {
+                    separator: true
+                }, {
+                    text: "Center Map",
+                    callback: centerMap
+                }, {
+                    text: "Zoom in",
+                    callback: zoomIn
+                }, {
+                    text: "Zoom Out",
+                    callback: zoomOut
+                }]
+            }).setView(L.latLng(MARIBOR_COOR[0], MARIBOR_COOR[1]), 13);
+
+            function enable_button() {
+                if (m1 != undefined && m2 != undefined) {
+                    $("#planButton").prop('disabled', false);
+                }
+            }
+
+            function addFirst(e) {
+                if (typeof (m1) != 'undefined') {
+                    my_map.removeLayer(m1);
+                }
+                m1 = L.marker(e.latlng, {
+                    draggable: true,
+                    icon: icon_start
+                });
+                enable_button()
+
+                m1.addTo(my_map);
+            }
+
+            function addLast(e) {
+                if (typeof (m2) != 'undefined') {
+                    my_map.removeLayer(m2);
+                }
+                m2 = L.marker(e.latlng, {
+                    draggable: true,
+                    icon: icon_end
+                });
+                enable_button()
+
+                m2.addTo(my_map);
+            }
+
+            function zoomIn() {
+                my_map.zoomIn();
+            }
+
+            function zoomOut() {
+                my_map.zoomOut();
+            }
+
+            function centerMap(e) {
+                my_map.panTo(e.latlng);
+            }
+
+            function getModeColor (mode) {
+                if (mode === 'WALK') return '#484'
+                if (mode === 'BICYCLE') return '#0073e5'
+                if (mode === 'SUBWAY') return '#f00'
+                if (mode === 'RAIL') return '#b00'
+                if (mode === 'BUS') return '#080'
+                if (mode === 'TRAM') return '#800'
+                if (mode === 'FERRY') return '#008'
+                if (mode === 'CAR') return '#444'
+                return '#aaa'
+            }; 
+            function styleMode(feature) {
+                return {
+                    color: getModeColor(feature.properties.mode),
+                    //weight:speedWeight(feature.properties.speed_ms),
+                    //weight:feature.properties.weight/10,
+                    opacity: 0.8
+                };
+            }
+
+            function onEachFeature(feature, layer) {
+                if (feature.properties) {
+                    var prop = feature.properties;
+                    var pop = "<p>";
+                    $.each(prop, function(name, value) {
+                        pop += name.toUpperCase();
+                        pop +=": ";
+                        pop += value;
+                        pop +="<br />";
+                    });
+                    pop +="</p>";
+                    layer.bindPopup(pop);
+                }
+            }
+
+            function requestPlan() {
+                var params = {
+                    fromLat: m1.getLatLng().lat,
+                    fromLon: m1.getLatLng().lng,
+                    toLat: m2.getLatLng().lat,
+                    toLon: m2.getLatLng().lng,
+                    mode: $("#mode").val(),
+                    full: $("#full").is(':checked')
+                }
+                console.log(params);
+
+                //make a request
+                $.ajax({
+                    data: params,
+                    url: hostname + "/plan",
+                    success: function (data) {
+                        console.log(data);
+                        //Removes line from previous request
+                        if (layer != null) {
+                            layer.clearLayers();
+                        }
+                        if (data.errors) {
+                            alert(data.errors);
+                        }
+                        if (data.data) {
+                            layer = L.geoJson(data.data, {style: styleMode, onEachFeature:onEachFeature});
+                            layer.addTo(window.my_map);
+                        }
+                    }
+                });
+            }
+
+            var osmLayer = L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+            });
+
+            var osmConveyalLayer = L.tileLayer('http://{s}.tiles.mapbox.com/v3/conveyal.hml987j0/{z}/{x}/{y}.png',{
+                attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+            });
+
+            var mapquestLayer = L.tileLayer('http://{s}.mqcdn.com/tiles/1.0.0/osm/{z}/{x}/{y}.png', {
+                attribution: 'Data, imagery and map information provided by <a href="http://open.mapquest.co.uk" target="_blank">MapQuest</a>, <a href="http://www.openstreetmap.org/" target="_blank">OpenStreetMap</a> and contributors.',
+                subdomains: ['otile1', 'otile2', 'otile3', 'otile4']
+            });
+            my_map.addLayer(osmConveyalLayer);
+            my_map.addControl(new L.Control.Layers({
+                'OSM': osmLayer,
+                'OSM Conveyal': osmConveyalLayer,
+                'MapQuest': mapquestLayer
+            }));
+
+            //Sets map based on graph data from server
+            $.ajax(hostname+"/metadata", {
+                dataType: 'JSON',
+                success: function(data) {
+                    window.my_map.fitBounds([
+                        [data.envelope.minY, data.envelope.minX],
+                        [data.envelope.maxY, data.envelope.maxX]
+                    ]);
+                }
+            });
+
+            $(document).ready(function() {
+                $("#planButton").click(requestPlan);
+                $("#full").change(requestPlan);
+            });
+
+
+        </script>
+    </body>
+</html>

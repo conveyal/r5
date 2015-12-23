@@ -2,8 +2,18 @@ package com.conveyal.r5.labeling;
 
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.StreetLayer;
+import com.conveyal.r5.streets.VertexStore;
+import gnu.trove.iterator.TIntIntIterator;
+import gnu.trove.iterator.TIntIterator;
+import gnu.trove.map.TIntIntMap;
+import gnu.trove.map.hash.TIntIntHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.EnumSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Label streets with a best-guess at their Level of Traffic Stress, as defined in
@@ -13,6 +23,11 @@ import java.util.EnumSet;
  * lane widths, etc.
  */
 public class LevelOfTrafficStressLabeler {
+    private static final Logger LOG = LoggerFactory.getLogger(LevelOfTrafficStressLabeler.class);
+
+    /** match OSM speeds, from http://wiki.openstreetmap.org/wiki/Key:maxspeed */
+    private static final Pattern speedPattern = Pattern.compile("^([0-9][\\.0-9]*?) ?(km/h|kmh|kph|mph|knots)?$");
+
     /** Set the LTS for this way in the provided flags (not taking into account any intersection LTS at the moment) */
     public void label (Way way, EnumSet<EdgeStore.EdgeFlag> forwardFlags, EnumSet<EdgeStore.EdgeFlag> backFlags) {
         // the general idea behind this function is that we progress from low-stress to higher-stress, bailing out as we go.
@@ -24,6 +39,11 @@ public class LevelOfTrafficStressLabeler {
             backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_1);
             return;
         }
+
+        // leave some unlabeled because we don't really know. Also alleys and parking aisles shouldn't "bleed" high LTS
+        // into the streets that connect to them
+        if (way.hasTag("highway", "service"))
+            return;
 
         // is this a small, low-stress road?
         if (way.hasTag("highway", "residential") || way.hasTag("highway", "living_street")) {
@@ -52,30 +72,63 @@ public class LevelOfTrafficStressLabeler {
             hasForwardLane = true;
         }
 
+        // extract max speed and lane info
+        double maxSpeed = Double.NaN;
+        if (way.hasTag("maxspeed")) {
+            // parse the max speed tag
+            maxSpeed = getSpeedKmh(way.getTag("maxspeed"));
+            if (Double.isNaN(maxSpeed)) {
+                LOG.warn("Unable to parse maxspeed tag {}", way.getTag("maxspeed"));
+            }
+        }
+
+        int lanes = Integer.MAX_VALUE;
+        if (way.hasTag("lanes")) {
+            try {
+                lanes = Integer.parseInt(way.getTag("lanes"));
+            } catch (NumberFormatException e) {
+                LOG.warn("Unable to parse lane specification {}", way.getTag("lanes"));
+            }
+        }
+
+        EdgeStore.EdgeFlag defaultLts = EdgeStore.EdgeFlag.BIKE_LTS_3;
+
+        // if it's small and slow, LTS 2
+        if (lanes <= 3 && maxSpeed <= 25 * 1.61) defaultLts = EdgeStore.EdgeFlag.BIKE_LTS_2;
+
+        // assume that there aren't too many lanes if it's not specified
+        if (lanes == Integer.MAX_VALUE && maxSpeed <= 25 * 1.61) defaultLts = EdgeStore.EdgeFlag.BIKE_LTS_2;
+
         // TODO arbitrary. Roads up to tertiary with bike lanes are considered LTS 2, roads above tertiary, LTS 3.
         // LTS 3 has defined space, but on fast roads
         if (way.hasTag("highway", "unclassified") || way.hasTag("highway", "tertiary") || way.hasTag("highway", "tertiary_link")) {
+            // assume that it's not too fast if it's not specified, but only for these smaller roads
+            // TODO questionable. Tertiary roads probably tend to be faster than 25 MPH.
+            if (lanes <= 3 && Double.isNaN(maxSpeed)) defaultLts = EdgeStore.EdgeFlag.BIKE_LTS_2;
+
             if (hasForwardLane) {
                 forwardFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_2);
             }
             else {
-                forwardFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_3); // moderate speed single lane street
+                forwardFlags.add(defaultLts); // moderate speed single lane street
             }
 
             if (hasBackwardLane) {
                 backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_2);
             }
             else {
-                backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_3);
+                backFlags.add(defaultLts);
             }
         }
-        else {
+        else { // NB includes trunk
+            // NB this will be LTS 3 unless this street has a low number of lanes and speed limit, or a low speed limit
+            // and unknown number of lanes
             if (hasForwardLane) {
-                forwardFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_3);
+                forwardFlags.add(defaultLts);
             }
 
             if (hasBackwardLane) {
-                backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_3);
+                backFlags.add(defaultLts);
             }
         }
 
@@ -88,4 +141,130 @@ public class LevelOfTrafficStressLabeler {
                 !backFlags.contains(EdgeStore.EdgeFlag.BIKE_LTS_3) && !backFlags.contains(EdgeStore.EdgeFlag.BIKE_LTS_4))
             backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_4);
      }
+
+    /**
+     * The way the LTS of intersections is incorporated into the model is to give approaches to intersections
+     * the highest LTS of any of the streets entering the intersection, unless there is a traffic signal at the intersection.
+     */
+    public void applyIntersectionCosts(StreetLayer streetLayer) {
+        VertexStore.Vertex v = streetLayer.vertexStore.getCursor(0);
+        EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
+
+        // we can't re-label until after we've scanned every vertex, because otherwise some edges would
+        // get relabeled before we had scanned other vertices, and high-LTS streets would bleed into nearby
+        // low-LTS neighborhoods.
+        TIntIntMap vertexStresses = new TIntIntHashMap();
+
+        do {
+            // signalized intersections are not considered by LTS methodology
+            if (v.getFlag(VertexStore.VertexFlag.TRAFFIC_SIGNAL)) continue;
+
+            // otherwise find the max lts
+            int maxLts = 1;
+
+            for (TIntIterator it = streetLayer.incomingEdges.get(v.index).iterator(); it.hasNext();) {
+                e.seek(it.next());
+                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_2)) maxLts = Math.max(2, maxLts);
+                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_3)) maxLts = Math.max(3, maxLts);
+                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_4)) maxLts = Math.max(4, maxLts);
+            }
+
+            for (TIntIterator it = streetLayer.outgoingEdges.get(v.index).iterator(); it.hasNext();) {
+                e.seek(it.next());
+                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_2)) maxLts = Math.max(2, maxLts);
+                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_3)) maxLts = Math.max(3, maxLts);
+                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_4)) maxLts = Math.max(4, maxLts);
+            }
+
+            vertexStresses.put(v.index, maxLts);
+
+        } while (v.advance());
+
+        for (TIntIntIterator it = vertexStresses.iterator(); it.hasNext();) {
+            it.advance();
+
+            v.seek(it.key());
+
+            for (TIntIterator eit = streetLayer.incomingEdges.get(v.index).iterator(); eit.hasNext();) {
+                e.seek(eit.next());
+
+                // we do need to check and preserve LTS on this edge, because it can be higher than the intersection
+                // LTS if the other end of it is connected to a higher-stress intersection.
+                int lts = it.value();
+                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_2)) lts = Math.max(2, lts);
+                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_3)) lts = Math.max(3, lts);
+                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_4)) lts = Math.max(4, lts);
+
+                // clear existing markings
+                e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_1);
+                e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_2);
+                e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_3);
+                e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_4);
+
+                e.setFlag(intToLts(lts));
+            }
+
+            // need to set on both incoming and outgoing b/c it is possible to start or end a search at a high-stress intersection
+            for (TIntIterator eit = streetLayer.outgoingEdges.get(v.index).iterator(); eit.hasNext();) {
+                e.seek(eit.next());
+
+                // we do need to check and preserve LTS on this edge, because it can be higher than the intersection
+                // LTS if the other end of it is connected to a higher-stress intersection.
+                int lts = it.value();
+                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_2)) lts = Math.max(2, lts);
+                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_3)) lts = Math.max(3, lts);
+                if (e.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_4)) lts = Math.max(4, lts);
+
+                // clear existing markings
+                e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_1);
+                e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_2);
+                e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_3);
+                e.clearFlag(EdgeStore.EdgeFlag.BIKE_LTS_4);
+
+                e.setFlag(intToLts(lts));
+            }
+        }
+    }
+
+    public static Integer ltsToInt (EdgeStore.EdgeFlag flag) {
+        switch (flag) {
+            case BIKE_LTS_1: return 1;
+            case BIKE_LTS_2: return 2;
+            case BIKE_LTS_3: return 3;
+            case BIKE_LTS_4: return 4;
+            default: return null;
+        }
+    }
+
+    public static EdgeStore.EdgeFlag intToLts (int lts) {
+        if (lts < 2) return EdgeStore.EdgeFlag.BIKE_LTS_1;
+        else if (lts == 2) return EdgeStore.EdgeFlag.BIKE_LTS_2;
+        else if (lts == 3) return EdgeStore.EdgeFlag.BIKE_LTS_3;
+        else return EdgeStore.EdgeFlag.BIKE_LTS_4;
+    }
+
+    /** parse an OSM speed tag */
+    public static double getSpeedKmh (String maxSpeed) {
+        try {
+            Matcher m = speedPattern.matcher(maxSpeed);
+
+            // do match op here
+            if (!m.matches())
+                return Double.NaN;
+
+            double ret = Double.parseDouble(m.group(1));
+
+            // check for non-metric units
+            if (m.groupCount() > 1) {
+                if ("mph".equals(m.group(2))) ret *= 1.609;
+                // seriously? knots?
+                else if ("knots".equals(m.group(2))) ret *= 1.852;
+                // all other units are assumed to be km/h
+            }
+
+            return ret;
+        } catch (Exception e) {
+            return Double.NaN;
+        }
+    }
 }

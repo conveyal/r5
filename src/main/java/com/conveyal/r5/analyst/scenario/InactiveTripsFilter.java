@@ -6,7 +6,6 @@ import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
-import org.joda.time.LocalDate;
 
 import java.util.BitSet;
 

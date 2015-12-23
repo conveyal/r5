@@ -5,9 +5,8 @@ import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.common.GeometryUtils;
-import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
-import com.conveyal.r5.labeling.TraversalPermissionLabeler;
-import com.conveyal.r5.labeling.USTraversalPermissionLabeler;
+import com.conveyal.r5.labeling.*;
+import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -58,12 +57,14 @@ public class StreetLayer implements Serializable {
     private static final int SNAP_RADIUS_MM = 5 * 1000;
 
     // Edge lists should be constructed after the fact from edges. This minimizes serialized size too.
-    transient List<TIntList> outgoingEdges;
-    transient List<TIntList> incomingEdges;
+    public transient List<TIntList> outgoingEdges;
+    public transient List<TIntList> incomingEdges;
     public transient IntHashGrid spatialIndex = new IntHashGrid();
 
     private transient TraversalPermissionLabeler permissions = new USTraversalPermissionLabeler(); // TODO don't hardwire to US
     private transient LevelOfTrafficStressLabeler stressLabeler = new LevelOfTrafficStressLabeler();
+    private transient TypeOfEdgeLabeler typeOfEdgeLabeler = new TypeOfEdgeLabeler();
+    private transient SpeedConfigurator speedConfigurator;
 
     /** Envelope of this street layer, in decimal degrees (non-fixed-point) */
     public Envelope envelope = new Envelope();
@@ -85,10 +86,87 @@ public class StreetLayer implements Serializable {
 
     public TransitLayer linkedTransitLayer = null;
 
+    public static final EnumSet<EdgeStore.EdgeFlag> ALL_PERMISSIONS = EnumSet
+        .of(EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR,
+            EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC,
+            EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_BIKE, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_PEDESTRIAN,
+            EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
+
+    public StreetLayer(TNBuilderConfig tnBuilderConfig) {
+            speedConfigurator = new SpeedConfigurator(tnBuilderConfig.speeds);
+    }
+
     /** Load street layer from an OSM-lib OSM DB */
     public void loadFromOsm(OSM osm) {
         loadFromOsm(osm, true, false);
     }
+
+    /**
+     * Returns true if way can be used for routing
+     *
+     * Routable ways are highways (unless they are raceways or highway rest_area/services since those are similar to landuse tags
+     * Or public_transport platform or railway platform unless its usage tag is tourism
+     *
+     * In both cases roads need to exists in reality aka don't have:
+     * - construction,
+     * - proposed,
+     * - removed,
+     * - abandoned
+     * - unbuilt
+     * tags
+     *
+     * Both construction tagging shemes are supported tag construction=anything and highway/cycleway=construction
+     * same with proposed.
+     * @param way
+     * @return
+     */
+    private static boolean isWayRoutable(Way way) {
+        boolean isRoutable = false;
+
+        String highway = way.getTag("highway");
+
+        if (
+            //Way is routable if it is highway
+            (way.hasTag("highway") && !(
+                //Unless it is raceway or rest area
+                //Those two are areas which are places around highway (similar to landuse tags they aren't routable)
+                highway.equals("services") || highway.equals("rest_area")
+                //highway=conveyor is obsoleted tag for escalator and is actually routable
+                || highway.equals("raceway")))
+                //or it is public transport platform or railway platform
+            || (way.hasTag("public_transport", "platform")
+                || way.hasTag("railway", "platform")
+                //unless it's usage is tourism
+                && !way.hasTag("usage", "tourism"))) {
+
+            isRoutable = actuallyExistsInReality(highway, way);
+
+        }
+
+        if (isRoutable && way.hasTag("cycleway")) {
+            //highway tag is already checked
+            String cycleway = way.getTag("cycleway");
+            isRoutable = actuallyExistsInReality(cycleway, way);
+        }
+
+        return isRoutable;
+    }
+
+    /**
+     * Returns true if road is not in construction, abandoned, removed or proposed
+     * @param highway value of highway or cycleway tag
+     * @param way
+     * @return
+     */
+    private static boolean actuallyExistsInReality(String highway, Way way) {
+        return !("construction".equals(highway)
+            || "abandoned".equals(highway)|| "removed".equals(highway)
+            || "proposed".equals(highway) || "propossed".equals(highway)
+            || "unbuilt".equals(highway)
+            || way.hasTag("construction") || way.hasTag("proposed"));
+    }
+
+
 
     /** Load OSM, optionally removing floating subgraphs (recommended) */
     void loadFromOsm (OSM osm, boolean removeIslands, boolean saveVertexIndex) {
@@ -99,14 +177,9 @@ public class StreetLayer implements Serializable {
         this.osm = osm;
         for (Map.Entry<Long, Way> entry : osm.ways.entrySet()) {
             Way way = entry.getValue();
-            if ( ! (way.hasTag("highway") || way.hasTag("public_transport", "platform"))) {
+            if (!isWayRoutable(way)) {
                 continue;
             }
-
-            // don't allow users to use proposed infrastructure
-            if (way.hasTag("highway", "proposed"))
-                continue;
-
             int nEdgesCreated = 0;
             int beginIdx = 0;
             // Break each OSM way into topological segments between intersections, and make one edge per segment.
@@ -122,11 +195,15 @@ public class StreetLayer implements Serializable {
         LOG.info("Done making street edges.");
         LOG.info("Made {} vertices and {} edges.", vertexStore.nVertices, edgeStore.nEdges);
 
+        // need edge lists to apply intersection costs
+        buildEdgeLists();
+        stressLabeler.applyIntersectionCosts(this);
+
         if (removeIslands)
             removeDisconnectedSubgraphs(MIN_SUBGRAPH_SIZE);
 
-        edgesPerWayHistogram.display();
-        pointsPerEdgeHistogram.display();
+        //edgesPerWayHistogram.display();
+        //pointsPerEdgeHistogram.display();
         // Clear unneeded indexes, allow them to be gc'ed
         if (!saveVertexIndex)
             vertexIndexForOsmNode = null;
@@ -144,6 +221,11 @@ public class StreetLayer implements Serializable {
             // Store node coordinates for this new street vertex
             Node node = osm.nodes.get(osmNodeId);
             vertexIndex = vertexStore.addVertex(node.getLat(), node.getLon());
+
+            VertexStore.Vertex v = vertexStore.getCursor(vertexIndex);
+            if (node.hasTag("highway", "traffic_signals"))
+                v.setFlag(VertexStore.VertexFlag.TRAFFIC_SIGNAL);
+
             vertexIndexForOsmNode.put(osmNodeId, vertexIndex);
         }
         return vertexIndex;
@@ -165,6 +247,10 @@ public class StreetLayer implements Serializable {
             return -1;
         }
         return (int)(lengthMeters * 1000);
+    }
+
+    private static short speedToShort(Float speed) {
+        return (short) Math.round(speed * 100);
     }
 
     /**
@@ -196,13 +282,26 @@ public class StreetLayer implements Serializable {
             return;
         }
 
+        short forwardSpeed = speedToShort(speedConfigurator.getSpeedMS(way, false));
+        short backwardSpeed = speedToShort(speedConfigurator.getSpeedMS(way, true));
+
+        RoadPermission roadPermission = permissions.getPermissions(way);
+
         // Create and store the forward and backward edge
-        EnumSet<EdgeStore.EdgeFlag> forwardFlags = permissions.getPermissions(way, false);
-        EnumSet<EdgeStore.EdgeFlag> backFlags = permissions.getPermissions(way, true);
+        EnumSet<EdgeStore.EdgeFlag> forwardFlags = roadPermission.forward;
+        EnumSet<EdgeStore.EdgeFlag> backFlags = roadPermission.backward;
+
+        //Doesn't insert edges which don't have any permissions forward and backward
+        if (Collections.disjoint(forwardFlags, ALL_PERMISSIONS) && Collections.disjoint(backFlags, ALL_PERMISSIONS)) {
+            LOG.debug("Way has no permissions skipping!");
+            return;
+        }
 
         stressLabeler.label(way, forwardFlags, backFlags);
 
-        EdgeStore.Edge newForwardEdge = edgeStore.addStreetPair(beginVertexIndex, endVertexIndex, edgeLengthMillimeters, forwardFlags, backFlags);
+        typeOfEdgeLabeler.label(way, forwardFlags, backFlags);
+
+        EdgeStore.Edge newForwardEdge = edgeStore.addStreetPair(beginVertexIndex, endVertexIndex, edgeLengthMillimeters, forwardFlags, backFlags, forwardSpeed, backwardSpeed);
         newForwardEdge.setGeometry(nodes);
         pointsPerEdgeHistogram.add(nNodes);
 
@@ -318,10 +417,13 @@ public class StreetLayer implements Serializable {
         // New edges will be added to edge lists later (the edge list is a transient index).
         // I believe the edge we get passed is always a forward edge
         EnumSet<EdgeStore.EdgeFlag> forwardFlags = edge.getFlags();
+        short forwardSpeed = edge.getSpeed();
         edge.advance();
         EnumSet<EdgeStore.EdgeFlag> backFlags = edge.getFlags();
+        short backwardSpeed = edge.getSpeed();
 
-        EdgeStore.Edge newEdge = edgeStore.addStreetPair(newVertexIndex, oldToVertex, split.distance1_mm, forwardFlags, backFlags);
+        EdgeStore.Edge newEdge = edgeStore.addStreetPair(newVertexIndex, oldToVertex, split.distance1_mm, forwardFlags, backFlags,
+            forwardSpeed, backwardSpeed);
         spatialIndex.insert(newEdge.getEnvelope(), newEdge.edgeIndex);
         // TODO newEdge.copyFlagsFrom(edge) to match the existing edge...
         return newVertexIndex;
@@ -403,7 +505,7 @@ public class StreetLayer implements Serializable {
             StreetRouter r = new StreetRouter(this);
             r.setOrigin(vertex);
             // walk to the end of the graph
-            r.distanceLimitMeters = 100000;
+            r.distanceLimitMeters = Integer.MAX_VALUE;
             r.route();
 
             TIntList reachedVertices = new TIntArrayList();
@@ -455,5 +557,13 @@ public class StreetLayer implements Serializable {
         else
             LOG.info("Found no subgraphs to remove, congratulations for having clean OSM data.");
         LOG.info("Done removing subgraphs. {} edges remain", edgeStore.nEdges);
+    }
+
+    public Envelope getEnvelope() {
+        return envelope;
+    }
+
+    public List<TIntList> getOutgoingEdges() {
+        return outgoingEdges;
     }
 }

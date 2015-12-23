@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8' />
+    <title></title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
+    <script src='//api.tiles.mapbox.com/mapbox-gl-js/v0.12.0/mapbox-gl.js'></script>
+    <script src='//cdnjs.cloudflare.com/ajax/libs/dat-gui/0.5.1/dat.gui.min.js'></script>
+    <script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
+    <script src='./scripts/config.js'></script>
+    <script src='./scripts/utils.js'></script>
+    <script src='./scripts/gui.js'></script>
+    <script src='./scripts/debug.js'></script>
+    <link href='//api.tiles.mapbox.com/mapbox-gl-js/v0.12.0/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        body { margin:0; padding:0; }
+        #map { position:absolute; top:0; bottom:0; width:100%; }
+        #flag_info { position:absolute; top:0; left:10px; width:200px; background-color:white; opacity:0.7;}
+        #speed_info { position:absolute; top:0; left:260px; width:200px; background-color:white; opacity:0.7;}
+    </style>
+</head>
+<body>
+
+<div id='map'></div>
+<div id='flag_info'><p>Flag usages:<br /><span class="flags"/></p><a href="#">Close</a></div>
+<div id='speed_info'><p>Speed usages:<br /><span class="speeds"/></p><a href="#">Close</a></div>
+
+</body>
+</html>

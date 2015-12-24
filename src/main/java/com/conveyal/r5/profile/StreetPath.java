@@ -57,9 +57,9 @@ public class StreetPath {
         return (int) Math.abs(lastState.getTime()-firstState.getTime())/1000;
     }
 
+    //Gets distance in mm
     public int getDistance() {
-        //FIXME: implement distance in state
-        return 0;
+        return lastState.distance;
     }
 
     public EdgeStore.Edge getEdge(Integer edgeIdx) {

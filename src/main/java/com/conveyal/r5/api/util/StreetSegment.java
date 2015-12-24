@@ -18,7 +18,7 @@ public class StreetSegment {
     public LegMode mode;
     //Time in seconds for this part of trip @notnull
     public int duration;
-    //Distance in meters for this part of a trip @notnull
+    //Distance in mm for this part of a trip @notnull
     public int distance;
     //TODO: geometry needs to be split when there is mode switch. Probably best to use indexes in geometry
     //Geometry of all the edges

@@ -14,7 +14,7 @@ public class Itinerary {
     //Time when walking in seconds
     public int walkTime;
 
-    //Distance in meters of all non-transit parts of this itinerary @notnull
+    //Distance in mm of all non-transit parts of this itinerary @notnull
     public int distance;
 
     //TODO: walking, cycling, driving distance/time?
@@ -51,6 +51,7 @@ public class Itinerary {
         transfers = 0;
         waitingTime = 0;
         walkTime = duration = streetSegment.duration;
+        distance = streetSegment.distance;
         transitTime = 0;
         startTime = fromTimeDateZD;
         endTime = fromTimeDateZD.plusSeconds(streetSegment.duration);

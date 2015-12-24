@@ -412,6 +412,7 @@ public class EdgeStore implements Serializable {
             int roundedTime = (int) Math.ceil(time);
             s1.incrementTimeInSeconds(roundedTime);
             s1.incrementWeight(weight);
+            s1.distance += getLengthMm();
             return s1;
         }
 

@@ -59,7 +59,11 @@ public class PointToPointQuery {
                     StreetPath streetPath = new StreetPath(lastState, transportNetwork);
                     StreetSegment streetSegment = new StreetSegment(streetPath);
                     //TODO: this needs to be different if transit is requested
-                    option.addDirect(streetSegment, request.getFromTimeDateZD());
+                    if (transit) {
+                        //addAccess
+                    } else {
+                        option.addDirect(streetSegment, request.getFromTimeDateZD());
+                    }
 
                 }
             } else {
@@ -68,6 +72,11 @@ public class PointToPointQuery {
         });
         option.summary = option.generateSummary();
         profileResponse.addOption(option);
+        /**
+         * TODO: search for transit from all stops accesed in stop trees in access search.
+         * add them to options and generate itinerary for each time option
+         * add egress part
+         */
 
 
         return profileResponse;

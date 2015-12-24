@@ -193,18 +193,33 @@ public class ProfileRequest implements Serializable, Cloneable {
      * It needs to be decided how to do this correctly: #37
      *
      * If date isn't set current date is used. Time is empty (one hour before midnight in UTC if +1 timezone is used)
+     *
+     * uses {@link this#getFromTimeDateZD()}
      */
     public long getFromTimeDate() {
-        long currentDateTime;
+        return getFromTimeDateZD().toInstant().toEpochMilli();
+    }
+
+    /**
+     * Returns ZonedDateTime made with date and fromTime fields
+     *
+     * It reads date as date in transportNetwork timezone when it is converted to UNIX time it is in UTC
+     *
+     * It needs to be decided how to do this correctly: #37
+     *
+     * If date isn't set current date is used. Time is empty (one hour before midnight in UTC if +1 timezone is used)
+     */
+    public ZonedDateTime getFromTimeDateZD() {
+        ZonedDateTime currentDateTime;
 
         if (date == null) {
-            currentDateTime = ZonedDateTime.now(zoneId).truncatedTo(ChronoUnit.DAYS).toInstant().toEpochMilli();
+            currentDateTime = ZonedDateTime.now(zoneId).truncatedTo(ChronoUnit.DAYS);
         } else {
-            currentDateTime = ZonedDateTime.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth(), 0,0,0,0,zoneId).toInstant().toEpochMilli();
+            currentDateTime = ZonedDateTime.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth(), 0,0,0,0,zoneId);
         }
 
         //fromTime is in seconds and there are 1000 ms in a second
-        return  currentDateTime + (fromTime*1000);
+        return  currentDateTime.plusSeconds(fromTime);
     }
 
     public float getSpeed(Mode mode) {

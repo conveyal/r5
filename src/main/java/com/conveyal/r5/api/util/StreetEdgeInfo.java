@@ -1,5 +1,7 @@
 package com.conveyal.r5.api.util;
 
+import com.vividsolutions.jts.geom.LineString;
+
 /**
  * This is a response model class which holds data that will be serialized and returned to the client.
  * It is not used internally in routing.
@@ -19,7 +21,7 @@ public class StreetEdgeInfo {
      */
     public int distance;
     /** The geometry of this edge */
-    public PolylineGeometry geometry;
+    public LineString geometry;
 
     /**
      * Which mode is used for driving (CAR, BICYCLE, WALK)

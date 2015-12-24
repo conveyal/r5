@@ -498,13 +498,12 @@ public class GraphQLSchema {
                 .name("geometryPolyline")
                 .type(Scalars.GraphQLString)
                 .dataFetcher(environment -> PolyUtil
-                    .encode(((StreetEdgeInfo) environment.getSource()).geometry.points))
+                    .encode(((StreetEdgeInfo) environment.getSource()).geometry))
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("geometryWKT").type(Scalars.GraphQLString)
                 .dataFetcher(
-                    environment -> ((StreetEdgeInfo) environment.getSource()).geometry.points
-                        .toString())
+                    environment -> ((StreetEdgeInfo) environment.getSource()).geometry.toString())
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("geometryGeoJSON")
@@ -512,7 +511,7 @@ public class GraphQLSchema {
                 .dataFetcher(environment -> {
                     try {
                         return JsonUtilities.objectMapper.writeValueAsString(
-                            ((StreetEdgeInfo) environment.getSource()).geometry.points);
+                            ((StreetEdgeInfo) environment.getSource()).geometry);
                     } catch (JsonProcessingException e) {
                         return null;
                     }
@@ -638,6 +637,29 @@ public class GraphQLSchema {
                 .type(new GraphQLNonNull(Scalars.GraphQLInt))
                 .description("Time in seconds for this part of trip")
                 .dataFetcher(environment -> ((StreetSegment) environment.getSource()).duration)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("geometryPolyline")
+                .type(Scalars.GraphQLString)
+                .dataFetcher(environment -> PolyUtil
+                    .encode(((StreetSegment) environment.getSource()).geometry))
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("geometryWKT").type(Scalars.GraphQLString)
+                .dataFetcher(
+                    environment -> ((StreetSegment) environment.getSource()).geometry.toString())
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("geometryGeoJSON")
+                .type(Scalars.GraphQLString)
+                .dataFetcher(environment -> {
+                    try {
+                        return JsonUtilities.objectMapper.writeValueAsString(
+                            ((StreetSegment) environment.getSource()).geometry);
+                    } catch (JsonProcessingException e) {
+                        return null;
+                    }
+                })
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("streetEdges")

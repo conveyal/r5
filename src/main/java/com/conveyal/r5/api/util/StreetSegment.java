@@ -1,6 +1,6 @@
 package com.conveyal.r5.api.util;
 
-import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.LineString;
 
 import java.util.List;
 
@@ -17,7 +17,7 @@ public class StreetSegment {
     public int distance;
     //TODO: geometry needs to be split when there is mode switch. Probably best to use indexes in geometry
     //Geometry of all the edges
-    public Geometry geometry;
+    public LineString geometry;
     public List<StreetEdgeInfo> streetEdges;
     //List of elevation elements each elevation has a distance (from start of this segment) and elevation at this point (in meters)
     public List<Elevation> elevation;

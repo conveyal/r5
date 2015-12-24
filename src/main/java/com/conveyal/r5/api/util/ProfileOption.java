@@ -1,5 +1,11 @@
 package com.conveyal.r5.api.util;
 
+import com.conveyal.r5.profile.StreetPath;
+import com.google.common.base.Joiner;
+import com.google.common.collect.Lists;
+
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -13,7 +19,7 @@ public class ProfileOption {
     public List<StreetSegment> access;
     //Part of a journey between transit stops (transfers)
     public List<StreetSegment> middle;
-    //Part of journey from transit to end @notnull
+    //Part of journey from transit to end
     public List<StreetSegment> egress;
     //Connects all the trip part to a trip at specific time with specific modes of transportation
     public List<Itinerary> itinerary;
@@ -34,4 +40,61 @@ public class ProfileOption {
             '}' + "\n";
     }
 
+    /**
+     * Initializes access and itinerary since those are non null.
+     *
+     * Other fields are initialized as needed
+     */
+    public ProfileOption() {
+        access = new ArrayList<>();
+        itinerary = new ArrayList<>();
+    }
+
+    /** Make a human readable text summary of this option.
+     * There are basically four options:
+     * - Direct non-transit routes which are named "Non-transit options"
+     * - Transit without transfers only on one route which are named "routes [route num]"
+     * - Transit without transfers with multiple route options which are named "routes [route num]/[route num]..."
+     * - Transit with transfers which are named "routes "[route nun]/[route num], [route num]/[route num] via [STATION NAME]"
+     *
+     * "/" in name designates OR and "," AND station name is a station where transfer is needed
+     * */
+    public String generateSummary() {
+        if (transit == null || transit.isEmpty()) {
+            return "Non-transit options";
+        }
+        List<String> vias = Lists.newArrayList();
+        List<String> routes = Lists.newArrayList();
+        for (TransitSegment segment : transit) {
+            List<String> routeShortNames = Lists.newArrayList();
+            for (Route rs : segment.routes) {
+                String routeName = rs.shortName == null ? rs.longName : rs.shortName;
+                routeShortNames.add(routeName);
+            }
+            routes.add(Joiner.on("/").join(routeShortNames));
+            vias.add(segment.toName);
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("routes ");
+        sb.append(Joiner.on(", ").join(routes));
+        if (!vias.isEmpty()) vias.remove(vias.size() - 1);
+        if (!vias.isEmpty()) {
+            sb.append(" via ");
+            sb.append(Joiner.on(", ").join(vias));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Adds direct routing without transit at provided fromTimeDate
+     *
+     * This also creates itinerary and adds streetSegment to access list
+     * @param streetSegment
+     * @param fromTimeDateZD
+     */
+    public void addDirect(StreetSegment streetSegment, ZonedDateTime fromTimeDateZD) {
+        access.add(streetSegment);
+        Itinerary itinerary = new Itinerary(streetSegment, fromTimeDateZD);
+        this.itinerary.add(itinerary);
+    }
 }

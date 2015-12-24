@@ -1,8 +1,13 @@
 package com.conveyal.r5.api.util;
 
 import com.vividsolutions.jts.geom.LineString;
+import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.profile.StreetPath;
+import com.conveyal.r5.streets.EdgeStore;
+import com.conveyal.r5.streets.StreetRouter;
+import com.vividsolutions.jts.geom.Coordinate;
 
-import java.util.List;
+import java.util.*;
 
 /**
  * A response object describing a non-transit part of an Option. This is either an access/egress leg of a transit
@@ -29,5 +34,49 @@ public class StreetSegment {
             ", time=" + duration +
             ", streetEdges=" + streetEdges.size() +
             '}' + "\n";
+    }
+
+    /**
+     * creates StreetSegment from path
+     *
+     * It fills geometry fields and duration for now.
+     * //TODO: get mode from state
+     * @param path
+     */
+    public StreetSegment(StreetPath path) {
+        duration = path.getDuration();
+        distance = path.getDistance();
+        streetEdges = new LinkedList<>();
+        List<com.vividsolutions.jts.geom.Coordinate> coordinates = new LinkedList<>();
+
+        for (Integer edgeIdx : path.getEdges()) {
+            EdgeStore.Edge edge = path.getEdge(edgeIdx);
+            LineString geometry = edge.getGeometry();
+
+            if (geometry != null) {
+                if (coordinates.size() == 0) {
+                    Collections.addAll(coordinates, geometry.getCoordinates());
+                } else {
+                    coordinates.addAll(Arrays.asList(geometry.getCoordinates()).subList(1, geometry.getNumPoints())); // Avoid duplications
+                }
+            }
+        }
+        for (StreetRouter.State state: path.getStates()) {
+            int edgeIdx = state.backEdge;
+            if (edgeIdx != -1) {
+                EdgeStore.Edge edge = path.getEdge(edgeIdx);
+                StreetEdgeInfo streetEdgeInfo = new StreetEdgeInfo();
+                streetEdgeInfo.edgeId = edgeIdx;
+                streetEdgeInfo.geometry = edge.getGeometry();
+                streetEdges.add(streetEdgeInfo);
+            }
+        }
+        Coordinate[] coordinatesArray = new Coordinate[coordinates.size()];
+        //FIXME: copy from list to array
+        coordinatesArray = coordinates.toArray(coordinatesArray);
+        //FIXME: copy from array to coordinates sequence
+        this.geometry = GeometryUtils.geometryFactory.createLineString(coordinatesArray);
+        //TODO: read this from state
+        this.mode = LegMode.WALK;
     }
 }

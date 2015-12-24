@@ -10,7 +10,7 @@ import java.util.*;
  * Created by mabu on 30.10.2015.
  */
 public class ProfileResponse {
-    public List<ProfileOption> options;
+    public List<ProfileOption> options = new ArrayList<>();
 
     @Override public String toString() {
         return "ProfileResponse{" +
@@ -39,5 +39,9 @@ public class ProfileResponse {
 
         //TODO: return as a map since I think it will be more usefull but GraphQL doesn't support map
         return new ArrayList<>(patterns.values());
+    }
+
+    public void addOption(ProfileOption option) {
+        options.add(option);
     }
 }

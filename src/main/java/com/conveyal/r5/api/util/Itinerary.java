@@ -1,6 +1,8 @@
 package com.conveyal.r5.api.util;
 
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by mabu on 21.12.2015.
@@ -26,9 +28,33 @@ public class Itinerary {
     //How much time did we spend on transit in seconds
     public int transitTime;
 
+    public List<PointToPointConnection> connection;
+
     //ISO 8061 date time when this journey started
     public ZonedDateTime startTime;
 
     //ISO 8061 date time when this journey was over
     public ZonedDateTime endTime;
+
+    /**
+     * Creates itinerary from streetSegment
+     *
+     * It assumes it is a direct path
+     * startTime is set fromTimeDataZD
+     * endTime is set from startTime plus duration of streetSegment
+     * @param streetSegment
+     * @param fromTimeDateZD
+     */
+    public Itinerary(StreetSegment streetSegment, ZonedDateTime fromTimeDateZD) {
+        connection = new ArrayList<>();
+        transfers = 0;
+        waitingTime = 0;
+        walkTime = duration = streetSegment.duration;
+        transitTime = 0;
+        startTime = fromTimeDateZD;
+        endTime = fromTimeDateZD.plusSeconds(streetSegment.duration);
+        PointToPointConnection pointToPointConnection = new PointToPointConnection();
+        pointToPointConnection.access = 0;
+        connection.add(pointToPointConnection);
+    }
 }

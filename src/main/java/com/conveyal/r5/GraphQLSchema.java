@@ -201,11 +201,11 @@ public class GraphQLSchema {
             .name(INPUTCOORDINATENAME)
             .field(GraphQLInputObjectField.newInputObjectField()
                 .name("lat")
-                .type(Scalars.GraphQLFloat)
+                .type(new GraphQLNonNull(Scalars.GraphQLFloat))
                 .build())
             .field(GraphQLInputObjectField.newInputObjectField()
                 .name("lon")
-                .type(Scalars.GraphQLFloat)
+                .type(new GraphQLNonNull(Scalars.GraphQLFloat))
                 .build())
             .build();
 

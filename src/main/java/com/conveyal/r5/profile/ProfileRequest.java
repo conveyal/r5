@@ -237,6 +237,14 @@ public class ProfileRequest implements Serializable, Cloneable {
     }
 
     /**
+     *
+     * @return true if there is any transitMode in transitModes (Safe to call if transitModes is null)
+     */
+    public boolean useTransit() {
+        return this.transitModes != null && !this.transitModes.isEmpty();
+    }
+
+    /**
      * Sets profile request with parameters from GraphQL request
      * @param environment
      * @return
@@ -244,12 +252,20 @@ public class ProfileRequest implements Serializable, Cloneable {
     public static ProfileRequest fromEnvironment(DataFetchingEnvironment environment) {
         ProfileRequest profileRequest = new ProfileRequest();
 
+        //This is always set otherwise GraphQL validation fails
+        HashMap<String, Float> fromCoordinate = environment.getArgument("from");
+        HashMap<String, Float> toCoordinate = environment.getArgument("to");
 
-        profileRequest.fromLon = environment.getArgument("from").get("lon");
-        profileRequest.fromLat = environment.getArgument("from").get("lat");
 
-        profileRequest.toLat = environment.getArgument("to").get("lat");
-        profileRequest.toLon = environment.getArgument("to").get("lon");
+        profileRequest.fromLon = fromCoordinate.get("lon");
+        profileRequest.fromLat = fromCoordinate.get("lat");
+
+        profileRequest.toLat = toCoordinate.get("lat");
+        profileRequest.toLon = toCoordinate.get("lon");
+
+        profileRequest.directModes = EnumSet.of(Mode.WALK);
+        //TODO: get mode from request
+        //profileRequest.directModes.add(Mode.WALK);
 
         //Doesn't work currently since Mode != LegMode
         //profileRequest.directModes.addAll(environment.getArgument("directModes"));

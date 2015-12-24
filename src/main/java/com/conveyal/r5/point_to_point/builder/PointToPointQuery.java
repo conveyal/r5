@@ -29,20 +29,9 @@ public class PointToPointQuery {
 
     //Does point to point routing with data from request
     public ProfileResponse getPlan(ProfileRequest request) {
+        request.setZoneId(transportNetwork.getTimeZone());
         //Do the query and return result
         ProfileResponse profileResponse = new ProfileResponse();
-
-        boolean transit = request.useTransit();
-        StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
-        EnumSet<Mode> modes = transit ? request.accessModes : request.directModes;
-        if (modes.contains(Mode.CAR))
-            streetRouter.mode = Mode.CAR;
-        else if (modes.contains(Mode.BICYCLE))
-            streetRouter.mode = Mode.BICYCLE;
-        else
-            streetRouter.mode = Mode.WALK;
-
-        streetRouter.profileRequest = request;
 
         //Split for end coordinate
         Split split = transportNetwork.streetLayer.findSplit(request.toLat, request.toLon,
@@ -50,27 +39,36 @@ public class PointToPointQuery {
         if (split == null) {
             throw new RuntimeException("Edge near the end coordinate wasn't found. Routing didn't start!");
         }
-        // TODO add time and distance limits to routing, not just weight.
-        // TODO apply walk and bike speeds and maxBike time.
-        streetRouter.distanceLimitMeters = transit ? 2000 : 100_000; // FIXME arbitrary, and account for bike or car access mode
-        if(!streetRouter.setOrigin(request.fromLat, request.fromLon)) {
-            throw  new RuntimeException("Edge near the origin coordinate wasn't found. Routing didn't start!");
-        }
-        streetRouter.route();
-        if (transit) {
-            LOG.warn("Transit routing doesn't work yet");
-        } else {
-            StreetRouter.State lastState = streetRouter.getState(split);
-            if (lastState != null) {
-                StreetPath streetPath = new StreetPath(lastState, transportNetwork);
-                StreetSegment streetSegment = new StreetSegment(streetPath);
-                ProfileOption option = new ProfileOption();
-                option.addDirect(streetSegment, request.getFromTimeDateZD());
-                option.summary = option.generateSummary();
-                profileResponse.addOption(option);
 
+        boolean transit = request.useTransit();
+
+        EnumSet<Mode> modes = transit ? request.accessModes : request.directModes;
+        ProfileOption option = new ProfileOption();
+        //Routes all direct/access modes
+        modes.forEach(mode -> {
+            StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+            streetRouter.mode = mode;
+            streetRouter.profileRequest = request;
+            // TODO add time and distance limits to routing, not just weight.
+            // TODO apply walk and bike speeds and maxBike time.
+            streetRouter.distanceLimitMeters = transit ? 2000 : 100_000; // FIXME arbitrary, and account for bike or car access mode
+            if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
+                streetRouter.route();
+                StreetRouter.State lastState = streetRouter.getState(split);
+                if (lastState != null) {
+                    StreetPath streetPath = new StreetPath(lastState, transportNetwork);
+                    StreetSegment streetSegment = new StreetSegment(streetPath);
+                    //TODO: this needs to be different if transit is requested
+                    option.addDirect(streetSegment, request.getFromTimeDateZD());
+
+                }
+            } else {
+                LOG.warn("MODE:{}, Edge near the origin coordinate wasn't found. Routing didn't start!", mode);
             }
-        }
+        });
+        option.summary = option.generateSummary();
+        profileResponse.addOption(option);
+
 
         return profileResponse;
     }

@@ -42,6 +42,9 @@ public class ProfileResponse {
     }
 
     public void addOption(ProfileOption option) {
-        options.add(option);
+        //Adds only non-empty profile options to response
+        if (option.access != null && !option.access.isEmpty()) {
+            options.add(option);
+        }
     }
 }

@@ -263,7 +263,7 @@ public class ProfileRequest implements Serializable, Cloneable {
         profileRequest.toLat = toCoordinate.get("lat");
         profileRequest.toLon = toCoordinate.get("lon");
 
-        profileRequest.directModes = EnumSet.of(Mode.WALK);
+        profileRequest.directModes = EnumSet.of(Mode.WALK, Mode.BICYCLE, Mode.CAR);
         //TODO: get mode from request
         //profileRequest.directModes.add(Mode.WALK);
 

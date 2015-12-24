@@ -93,8 +93,8 @@ public class ProfileOption {
      * @param fromTimeDateZD
      */
     public void addDirect(StreetSegment streetSegment, ZonedDateTime fromTimeDateZD) {
+        Itinerary itinerary = new Itinerary(streetSegment, access.size(), fromTimeDateZD);
         access.add(streetSegment);
-        Itinerary itinerary = new Itinerary(streetSegment, fromTimeDateZD);
         this.itinerary.add(itinerary);
     }
 }

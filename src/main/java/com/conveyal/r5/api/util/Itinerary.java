@@ -39,13 +39,14 @@ public class Itinerary {
     /**
      * Creates itinerary from streetSegment
      *
-     * It assumes it is a direct path
+     * It assumes it is a direct path (without transit)
      * startTime is set fromTimeDataZD
      * endTime is set from startTime plus duration of streetSegment
      * @param streetSegment
+     * @param accessIndex with which accessIndex is this itinerary made
      * @param fromTimeDateZD
      */
-    public Itinerary(StreetSegment streetSegment, ZonedDateTime fromTimeDateZD) {
+    public Itinerary(StreetSegment streetSegment, int accessIndex, ZonedDateTime fromTimeDateZD) {
         connection = new ArrayList<>();
         transfers = 0;
         waitingTime = 0;
@@ -54,7 +55,7 @@ public class Itinerary {
         startTime = fromTimeDateZD;
         endTime = fromTimeDateZD.plusSeconds(streetSegment.duration);
         PointToPointConnection pointToPointConnection = new PointToPointConnection();
-        pointToPointConnection.access = 0;
+        pointToPointConnection.access = accessIndex;
         connection.add(pointToPointConnection);
     }
 }

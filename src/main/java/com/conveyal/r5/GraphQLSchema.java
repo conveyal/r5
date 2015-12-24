@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 
 import java.text.ParseException;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
 /**
@@ -163,6 +164,46 @@ public class GraphQLSchema {
         }
     });
 
+    //FIXME: ISO8601 parsing and outputting in java is little broken it doesn't support timezone as +HH+MM
+    //https://stackoverflow.com/questions/32079459/java-time-zoneddatetime-parse-and-iso8601
+    public static GraphQLScalarType GraphQLZonedDateTime = new GraphQLScalarType("ZonedDateTime",
+        "Java 8 ZonedDateTime type ISO 8601 YYYY-MM-DDTHH:MM:SS+HH:MM", new Coercing() {
+        @Override
+        public Object coerce(Object input) {
+            //LOG.info("TDate coerce:{}", input);
+            if (input instanceof String) {
+                try {
+
+                    return ZonedDateTime
+                        .parse((String) input, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+                } catch (Exception e) {
+                    throw new GraphQLException("Problem parsing date (Expected format is ISO 8061 YYYY-MM-DDTHH:MM:SS+HH:MM): " + e.getMessage());
+                }
+            } else  if (input instanceof ZonedDateTime) {
+                return ((ZonedDateTime) input).format(DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+            } else {
+                throw new GraphQLException("Invalid date input. Expected String or LocalDate");
+            }
+        }
+
+        @Override
+        public Object coerceLiteral(Object input) {
+            //Seems to be used in querying
+            //LOG.info("TDate coerce literal:{}", input);
+            if (!(input instanceof StringValue)) {
+                return null;
+            }
+            try {
+                String sinput = ((StringValue) input).getValue();
+
+                return ZonedDateTime
+                    .parse(sinput, DateTimeFormatter.ISO_OFFSET_DATE_TIME);
+            } catch (Exception e) {
+                throw new GraphQLException("Problem parsing date (Expected format is ISO 8061 YYYY-MM-DDTHH:MM:SS+HH:MM): " + e.getMessage());
+            }
+        }
+    });
+
 
     public GraphQLOutputType profileResponseType = new GraphQLTypeReference("Profile");
 
@@ -193,6 +234,12 @@ public class GraphQLSchema {
     public GraphQLOutputType elevationType = new GraphQLTypeReference("Elevation");
 
     public GraphQLOutputType alertType = new GraphQLTypeReference("Alert");
+
+    public GraphQLOutputType transitJourneyIDType = new GraphQLTypeReference("TransitJourneyID");
+
+    public GraphQLOutputType pointToPointConnectionType = new GraphQLTypeReference("PointToPointConnection");
+
+    public GraphQLOutputType itineraryType = new GraphQLTypeReference("Itinerary");
 
     private final String INPUTCOORDINATENAME = "Coordinate";
 
@@ -639,6 +686,12 @@ public class GraphQLSchema {
                 .dataFetcher(environment -> ((StreetSegment) environment.getSource()).duration)
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("distance")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("Distance in meters for this part of a trip")
+                .dataFetcher(environment -> ((StreetSegment) environment.getSource()).distance)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("geometryPolyline")
                 .type(Scalars.GraphQLString)
                 .dataFetcher(environment -> PolyUtil
@@ -747,6 +800,104 @@ public class GraphQLSchema {
                 .build())
             .build();
 
+        transitJourneyIDType = GraphQLObjectType.newObject()
+            .name("TransitJourneyID")
+            .description("Tells which pattern and time in pattern to use for this specific transit")
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("pattern")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("Index of segment pattern")
+                .dataFetcher(environment -> ((TransitJourneyID) environment.getSource()).pattern)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("time")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("Index of time in chosen pattern")
+                .dataFetcher(environment -> ((TransitJourneyID) environment.getSource()).time)
+                .build())
+            .build();
+
+        pointToPointConnectionType = GraphQLObjectType.newObject()
+            .name("PointToPointConnection")
+            .description("Object which pulls together specific access, transit and egress part of an option")
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("access")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("Index of access part of this trip")
+                .dataFetcher(environment -> ((PointToPointConnection) environment.getSource()).access)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("egress")
+                .type(Scalars.GraphQLInt)
+                .description("Index of egress part of this trip")
+                .dataFetcher(environment -> ((PointToPointConnection) environment.getSource()).egress)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("transit")
+                .type(new GraphQLList(transitJourneyIDType))
+                .description("chooses which specific trip should be used Index in transit list specifies transit with same index Each TransitJourneyID has pattern in chosen index an time index in chosen pattern This can uniquly identify specific trip with transit")
+                .dataFetcher(environment -> ((PointToPointConnection) environment.getSource()).transit)
+                .build())
+            .build();
+
+        itineraryType = GraphQLObjectType.newObject()
+            .name("Itinerary")
+            .description("Object represents specific trip at a specific point in time with specific access, transit and egress parts")
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("waitingTime")
+                .type(Scalars.GraphQLInt)
+                .description("Waiting time between transfers in seconds")
+                .dataFetcher(environment -> ((Itinerary) environment.getSource()).waitingTime)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("walkTime")
+                .type(Scalars.GraphQLInt)
+                .description("Time when walking in seconds")
+                .dataFetcher(environment -> ((Itinerary) environment.getSource()).walkTime)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("distance")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("Distance in meters of all non-transit parts of this itinerary")
+                .dataFetcher(environment -> ((Itinerary) environment.getSource()).distance)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("transfers")
+                .type(Scalars.GraphQLInt)
+                .description("Number of transfers between different transit vehicles")
+                .dataFetcher(environment -> ((Itinerary) environment.getSource()).transfers)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("duration")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("How much time did whole trip took in seconds")
+                .dataFetcher(environment -> ((Itinerary) environment.getSource()).duration)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("transitTime")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("How much time did we spend on transit in seconds")
+                .dataFetcher(environment -> ((Itinerary) environment.getSource()).transitTime)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("connection")
+                .type(new GraphQLList(pointToPointConnectionType))
+                .dataFetcher(environment -> ((Itinerary) environment.getSource()).connection)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("startTime")
+                .type(new GraphQLNonNull(GraphQLZonedDateTime))
+                .description("ISO 8061 date time when this journey started")
+                .dataFetcher(environment -> ((Itinerary) environment.getSource()).startTime)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("endTime")
+                .type(new GraphQLNonNull(GraphQLZonedDateTime))
+                .description("ISO 8061 date time when this journey was over")
+                .dataFetcher(environment -> ((Itinerary) environment.getSource()).endTime)
+                .build())
+            .build();
+
         profileOptionType = GraphQLObjectType.newObject()
             .name("ProfileOption")
             .description("This is a response model class which holds data that will be serialized and returned to the client. It is not used internally in routing.")
@@ -763,10 +914,22 @@ public class GraphQLSchema {
                 .dataFetcher(environment -> ((ProfileOption) environment.getSource()).access)
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("middle")
+                .type(new GraphQLList(streetSegmentType))
+                .description("Part of a journey between transit stops (transfers)")
+                .dataFetcher(environment -> ((ProfileOption) environment.getSource()).middle)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("egress")
                 .type(new GraphQLList(streetSegmentType))
                 .description("Part of journey from transit to end")
                 .dataFetcher(environment -> ((ProfileOption) environment.getSource()).egress)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("itinerary")
+                .type(new GraphQLList(itineraryType))
+                .description("Connects all the trip part to a trip at specific time with specific modes of transportation")
+                .dataFetcher(environment -> ((ProfileOption) environment.getSource()).itinerary)
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("stats")

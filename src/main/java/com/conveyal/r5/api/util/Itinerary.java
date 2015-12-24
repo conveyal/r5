@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Created by mabu on 21.12.2015.
+ * Object represents specific trip at a specific point in time with specific access, transit and egress parts
  */
 public class Itinerary {
     //Waiting time between transfers in seconds
@@ -14,7 +14,7 @@ public class Itinerary {
     //Time when walking in seconds
     public int walkTime;
 
-    //Distance in meters of all non-transit parts of this itinerary
+    //Distance in meters of all non-transit parts of this itinerary @notnull
     public int distance;
 
     //TODO: walking, cycling, driving distance/time?
@@ -22,18 +22,18 @@ public class Itinerary {
     //Number of transfers between different transit vehicles
     public int transfers;
 
-    //How much time did whole trip took in seconds
+    //How much time did whole trip took in seconds @notnull
     public int duration;
 
-    //How much time did we spend on transit in seconds
+    //How much time did we spend on transit in seconds @notnull
     public int transitTime;
 
     public List<PointToPointConnection> connection;
 
-    //ISO 8061 date time when this journey started
+    //ISO 8061 date time when this journey started @notnull
     public ZonedDateTime startTime;
 
-    //ISO 8061 date time when this journey was over
+    //ISO 8061 date time when this journey was over @notnull
     public ZonedDateTime endTime;
 
     /**

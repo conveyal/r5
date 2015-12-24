@@ -3,10 +3,10 @@ package com.conveyal.r5.api.util;
 import java.util.List;
 
 /**
- * Created by mabu on 21.12.2015.
+ * Object which pulls together specific access, transit and egress part of an option
  */
 public class PointToPointConnection {
-    //Index of access part of this trip
+    //Index of access part of this trip @notnull
     public int access;
     //Index of egress part of this trip
     public int egress;

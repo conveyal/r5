@@ -30,7 +30,7 @@ public class SpeedConfigurator {
     // regex courtesy http://wiki.openstreetmap.org/wiki/Key:maxspeed
     // and edited
     private static final Pattern maxSpeedPattern = Pattern.compile("^([0-9][\\.0-9]+?)(?:[ ]?(kmh|km/h|kmph|kph|mph|knots))?$");
-    private static Map<String, Float> highwaySpeedMap;
+    private static Map<String, Float> highwaySpeedMap; // FIXME is this really supposed to be static?
     private Float defaultSpeed;
 
     public SpeedConfigurator(SpeedConfig speedConfig) {

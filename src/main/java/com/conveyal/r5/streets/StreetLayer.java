@@ -115,7 +115,7 @@ public class StreetLayer implements Serializable {
      * - unbuilt
      * tags
      *
-     * Both construction tagging shemes are supported tag construction=anything and highway/cycleway=construction
+     * Both construction tagging schemes are supported tag construction=anything and highway/cycleway=construction
      * same with proposed.
      * @param way
      * @return
@@ -165,7 +165,6 @@ public class StreetLayer implements Serializable {
             || "unbuilt".equals(highway)
             || way.hasTag("construction") || way.hasTag("proposed"));
     }
-
 
 
     /** Load OSM, optionally removing floating subgraphs (recommended) */
@@ -282,16 +281,18 @@ public class StreetLayer implements Serializable {
             return;
         }
 
+        // FIXME this encoded speed should probably never be exposed outside the edge object
         short forwardSpeed = speedToShort(speedConfigurator.getSpeedMS(way, false));
         short backwardSpeed = speedToShort(speedConfigurator.getSpeedMS(way, true));
 
         RoadPermission roadPermission = permissions.getPermissions(way);
 
         // Create and store the forward and backward edge
+        // FIXME these sets of flags should probably not leak outside the permissions/stress/etc. labeler methods
         EnumSet<EdgeStore.EdgeFlag> forwardFlags = roadPermission.forward;
         EnumSet<EdgeStore.EdgeFlag> backFlags = roadPermission.backward;
 
-        //Doesn't insert edges which don't have any permissions forward and backward
+        // Doesn't insert edges which don't have any permissions forward and backward
         if (Collections.disjoint(forwardFlags, ALL_PERMISSIONS) && Collections.disjoint(backFlags, ALL_PERMISSIONS)) {
             LOG.debug("Way has no permissions skipping!");
             return;
@@ -301,10 +302,18 @@ public class StreetLayer implements Serializable {
 
         typeOfEdgeLabeler.label(way, forwardFlags, backFlags);
 
-        EdgeStore.Edge newForwardEdge = edgeStore.addStreetPair(beginVertexIndex, endVertexIndex, edgeLengthMillimeters, forwardFlags, backFlags, forwardSpeed, backwardSpeed);
-        newForwardEdge.setGeometry(nodes);
-        pointsPerEdgeHistogram.add(nNodes);
+        EdgeStore.Edge newEdge = edgeStore.addStreetPair(beginVertexIndex, endVertexIndex, edgeLengthMillimeters);
+        // newEdge is first pointing to the forward edge in the pair.
+        // Geometries apply to both edges in a pair.
+        newEdge.setGeometry(nodes);
+        newEdge.setFlags(forwardFlags);
+        newEdge.setSpeed(forwardSpeed);
+        // Step ahead to the backward edge in the same pair.
+        newEdge.advance();
+        newEdge.setFlags(backFlags);
+        newEdge.setSpeed(backwardSpeed);
 
+        pointsPerEdgeHistogram.add(nNodes);
     }
 
     public void indexStreets () {
@@ -411,25 +420,18 @@ public class StreetLayer implements Serializable {
         int oldToVertex = edge.getToVertex();
         edge.setLengthMm(split.distance0_mm);
         edge.setToVertex(newVertexIndex);
-        edge.setGeometry(Collections.EMPTY_LIST); // Turn it into a straight line for now.
+        edge.setGeometry(Collections.EMPTY_LIST); // Turn it into a straight line for now. FIXME split edges should have geometries
 
         // Make a second, new bidirectional edge pair after the split and add it to the spatial index.
         // New edges will be added to edge lists later (the edge list is a transient index).
-        // I believe the edge we get passed is always a forward edge
-        EnumSet<EdgeStore.EdgeFlag> forwardFlags = edge.getFlags();
-        short forwardSpeed = edge.getSpeed();
-        edge.advance();
-        EnumSet<EdgeStore.EdgeFlag> backFlags = edge.getFlags();
-        short backwardSpeed = edge.getSpeed();
-
-        EdgeStore.Edge newEdge = edgeStore.addStreetPair(newVertexIndex, oldToVertex, split.distance1_mm, forwardFlags, backFlags,
-            forwardSpeed, backwardSpeed);
+        EdgeStore.Edge newEdge = edgeStore.addStreetPair(newVertexIndex, oldToVertex, split.distance1_mm);
         spatialIndex.insert(newEdge.getEnvelope(), newEdge.edgeIndex);
-        // TODO newEdge.copyFlagsFrom(edge) to match the existing edge...
+
+        // Copy the flags and speeds for both directions, making the new edge like the existing one.
+        newEdge.copyPairFlagsAndSpeeds(edge);
+
         return newVertexIndex;
-
         // TODO store street-to-stop distance in a table in TransitLayer. This also allows adjusting for subway entrances etc.
-
     }
 
     /**

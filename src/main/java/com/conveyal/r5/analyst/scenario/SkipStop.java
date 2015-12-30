@@ -35,7 +35,7 @@ public class SkipStop extends TripPatternModification {
     public Collection<String> stopId;
 
     // integer IDs. TODO resolve method that attaches a Modification to a specific TransportNetwork.
-    public transient TIntSet stopsToRemove;
+    private transient TIntSet stopsToRemove;
 
     @Override
     public String getType() {
@@ -49,7 +49,7 @@ public class SkipStop extends TripPatternModification {
             int intStopId = network.transitLayer.indexForStopId.get(stringStopId);
             stopsToRemove.add(intStopId);
         }
-        LOG.info("Resolved stop IDs. Strings {} resolved to integers {}.", stopId, stopsToRemove);
+        LOG.info("Resolved stop IDs for removal. Strings {} resolved to integers {}.", stopId, stopsToRemove);
     }
 
     @Override
@@ -58,6 +58,7 @@ public class SkipStop extends TripPatternModification {
         if (nToRemove == 0) {
             return originalTripPattern;
         }
+        LOG.info("Modifying {}", originalTripPattern);
         // Make a protective copy that we can destructively modify.
         TripPattern pattern = originalTripPattern.clone();
         int oldLength = originalTripPattern.stops.length;
@@ -71,13 +72,13 @@ public class SkipStop extends TripPatternModification {
         for (int i = 0, j = 0; i < oldLength; i++) {
             if (stopsToRemove.contains(originalTripPattern.stops[i])) {
                 removeStop[i] = true;
+            } else {
+                removeStop[i] = false;
                 pattern.stops[j] = originalTripPattern.stops[i];
                 pattern.pickups[j] = originalTripPattern.pickups[i];
                 pattern.dropoffs[j] = originalTripPattern.dropoffs[i];
                 pattern.wheelchairAccessible.set(j, originalTripPattern.wheelchairAccessible.get(i));
                 j++;
-            } else {
-                removeStop[i] = false;
             }
         }
         // Next, remove the same stops from every trip on this pattern.
@@ -105,23 +106,25 @@ public class SkipStop extends TripPatternModification {
         int newLength = removeStop.length - Booleans.countTrue(removeStop);
         schedule.arrivals = new int[newLength];
         schedule.departures = new int[newLength];
-        int prevDeparture = 0;
         int accumulatedRideTime = 0;
-        for (int i = 0, j = 0; i < schedule.arrivals.length; i++) {
-            int rideTime = originalSchedule.arrivals[i] - prevDeparture;
+        int prevInputDeparture = 0;
+        int prevOutputDeparture = 0;
+        for (int i = 0, j = 0; i < removeStop.length; i++) {
+            int rideTime = originalSchedule.arrivals[i] - prevInputDeparture;
             int dwellTime = originalSchedule.departures[i] - originalSchedule.arrivals[i];
-            prevDeparture = originalSchedule.departures[i];
+            prevInputDeparture = originalSchedule.departures[i];
             if (removeStop[i]) {
                 // The current stop will not be included in the output. Record the travel time.
                 accumulatedRideTime += rideTime;
                 if (j == 0) {
-                    // Only accumulate dwell time at the beginning of the trip, to preserve the time offset of
+                    // Only accumulate dwell time at the beginning of the output trip, to preserve the time offset of
                     // the first arrival in the output. After that, dwells are not retained for skipped stops.
                     accumulatedRideTime += dwellTime;
                 }
             } else {
-                schedule.arrivals[j] = prevDeparture + rideTime + accumulatedRideTime;
+                schedule.arrivals[j] = prevOutputDeparture + accumulatedRideTime + rideTime;
                 schedule.departures[j] = schedule.arrivals[j] + dwellTime;
+                prevOutputDeparture = schedule.departures[j];
                 accumulatedRideTime = 0;
                 j++;
             }

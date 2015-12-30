@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.analyst.BoardingAssumption;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import java.time.LocalDate;
 

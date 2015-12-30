@@ -47,6 +47,8 @@ public abstract class Modification implements Serializable {
         // We don't need a base implementation to return the unmodified TransportNetwork.
         // Any Modification should produce a protective copy at least at level 0.
         TransportNetwork network = originalNetwork.clone();
+        // The following is not threadsafe! TODO confirm whether this is going to be a problem.
+        this.resolve(network);
         network.transitLayer = this.applyToTransitLayer(network.transitLayer);
         network.streetLayer = this.applyToStreetLayer(network.streetLayer);
         //network.gridPointSet = this.gridPointSet; // apply modification?

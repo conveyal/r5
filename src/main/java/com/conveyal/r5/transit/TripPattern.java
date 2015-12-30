@@ -109,4 +109,13 @@ public class TripPattern implements Serializable, Cloneable {
         }
     }
 
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("TripPattern on route ");
+        sb.append(routeId);
+        sb.append(" with stops ");
+        sb.append(stops);
+        return sb.toString();
+    }
 }

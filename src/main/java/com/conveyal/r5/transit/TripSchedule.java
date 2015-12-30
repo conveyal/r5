@@ -10,7 +10,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- *
+ * This represents the arrival and departure times of a single GTFS trip within a TripPattern.
+ * If this is a frequency trip, it also records the different headways throughout the day, and when those headways
+ * begin and end.
  */
 public class TripSchedule implements Serializable, Comparable<TripSchedule>, Cloneable {
 
@@ -168,6 +170,10 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
         int firstStopTime = departures[0];
         int lastStopTime = arrivals[arrivals.length - 1];
         return firstStopTime <= toTime && lastStopTime >= fromTime;
+    }
+
+    public int getNStops() {
+        return arrivals.length;
     }
 
 }

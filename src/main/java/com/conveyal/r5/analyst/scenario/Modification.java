@@ -14,6 +14,9 @@ import java.util.stream.Collectors;
 /**
  * A Modification is a single change that can be applied while duplicating a TransportNetwork.
  * It allows comparing different scenarios without rebuilding entire networks from scratch.
+ *
+ * TODO make it clear that Modifications are throw-away objects that should be applied only once to a single TransportNetwork
+ * That will also allow them to accumulate stats on how many patterns, trips, routes etc. they affected.
  */
 // we use the property "type" to determine what type of modification it is. The string values are defined here.
 // Each class's getType should return the same value.

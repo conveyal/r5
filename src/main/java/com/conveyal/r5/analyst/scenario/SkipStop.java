@@ -58,7 +58,7 @@ public class SkipStop extends TripPatternModification {
         if (nToRemove == 0) {
             return originalTripPattern;
         }
-        LOG.info("Modifying {}", originalTripPattern);
+        LOG.debug("Modifying {}", originalTripPattern);
         // Make a protective copy that we can destructively modify.
         TripPattern pattern = originalTripPattern.clone();
         int oldLength = originalTripPattern.stops.length;

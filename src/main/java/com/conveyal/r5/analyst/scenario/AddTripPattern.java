@@ -1,6 +1,9 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.StopTime;
+import com.conveyal.gtfs.model.Trip;
 import com.conveyal.r5.model.json_serialization.BitSetDeserializer;
 import com.conveyal.r5.model.json_serialization.BitSetSerializer;
 import com.conveyal.r5.model.json_serialization.LineStringDeserializer;
@@ -9,17 +12,25 @@ import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TripPattern;
+import com.conveyal.r5.transit.TripPatternKey;
+import com.conveyal.r5.transit.TripSchedule;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.google.common.collect.Lists;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.LineString;
 
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /** Add a trip pattern */
@@ -40,6 +51,8 @@ public class AddTripPattern extends TransitLayerModification {
     @JsonDeserialize(using = BitSetDeserializer.class)
     @JsonSerialize(using = BitSetSerializer.class)
     public BitSet stops;
+
+    public List<String> stopIds;
 
     /** The timetables for this trip pattern */
     public Collection<PatternTimetable> timetables;
@@ -66,10 +79,31 @@ public class AddTripPattern extends TransitLayerModification {
         return "add-trip-pattern";
     }
 
-    // TODO implement, this is just a stub
     @Override
     protected TransitLayer applyToTransitLayer(TransitLayer originalTransitLayer) {
-        return null;
+        // Convert the supplied stop IDs into internal integer indexes for this TransportNetwork.
+        TripPatternKey key = new TripPatternKey("SCENARIO_MODIFICATION");
+        StopTime stopTime = new StopTime();
+        for (String stopId : stopIds) {
+            // Pickup and drop off type default to 0, which means "scheduled".
+            // FIXME handle missing value, report unmatched stops
+            stopTime.stop_id = stopId;
+            key.addStopTime(stopTime, originalTransitLayer.indexForStopId);
+        }
+        TripPattern pattern = new TripPattern(key);
+        for (PatternTimetable timetable : timetables) {
+            TripSchedule schedule = createSchedule(timetable);
+            if (schedule != null) {
+                pattern.addTrip(schedule);
+            } else {
+                LOG.error("could not create a trip");
+                return originalTransitLayer;
+            }
+        }
+        TransitLayer transitLayer = originalTransitLayer.clone();
+        transitLayer.tripPatterns = new ArrayList<>(transitLayer.tripPatterns);
+        transitLayer.tripPatterns.add(pattern);
+        return transitLayer;
     }
 
     /** a class representing a minimal timetable */
@@ -131,6 +165,42 @@ public class AddTripPattern extends TransitLayerModification {
 
         public String toString () {
             return "Temporary stop at " + this.lat + ", " + this.lon;
+        }
+    }
+
+    /**
+     * Creates an internal R5 TripSchedule object from a PatternTimetable object that was deserialized from JSON.
+     * This represents either a single trip, or a frequency-based family of trips.
+     */
+    public TripSchedule createSchedule (PatternTimetable timetable) {
+        // Create a dummy GTFS Trip object so we can use the standard TripSchedule factory method.
+        Trip trip = new Trip();
+        // Convert the supplied hop and dwell times (which are relative to adjacent entries) to arrival and departure
+        // times (which are relative to the beginning of the trip or the beginning of the service day).
+        int nStops = stopIds.size();
+        int t = 0;
+        int[] arrivals = new int[nStops];
+        int[] departures = new int[nStops];
+        for (int s = 0; s < nStops; s++) {
+            arrivals[s] = t;
+            if (s < timetable.dwellTimes.length) {
+                t += timetable.dwellTimes[s];
+            }
+            departures[s] = t;
+            if (s < timetable.hopTimes.length) {
+                t += timetable.hopTimes[s];
+            }
+        }
+        if (timetable.frequency) {
+            Frequency freq = new Frequency();
+            freq.start_time = timetable.startTime;
+            freq.end_time = timetable.endTime;
+            freq.headway_secs = timetable.headwaySecs;
+            trip.frequencies = Lists.newArrayList(freq);
+            TripSchedule schedule = TripSchedule.create(trip, arrivals, departures, 01234);
+            return schedule;
+        } else {
+            throw new UnsupportedOperationException();
         }
     }
 }

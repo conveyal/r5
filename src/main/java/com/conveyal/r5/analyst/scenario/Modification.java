@@ -25,7 +25,8 @@ import java.util.stream.Collectors;
         @JsonSubTypes.Type(name = "skip-stop", value = SkipStop.class),
         @JsonSubTypes.Type(name = "add-trip-pattern", value = AddTripPattern.class),
         @JsonSubTypes.Type(name = "convert-to-frequency", value = ConvertToFrequency.class),
-        @JsonSubTypes.Type(name = "transfer-rule", value = TransferRule.class)
+        @JsonSubTypes.Type(name = "transfer-rule", value = TransferRule.class),
+        @JsonSubTypes.Type(name = "scale-speed", value = ScaleSpeed.class)
 })
 public abstract class Modification implements Serializable {
 
@@ -61,5 +62,14 @@ public abstract class Modification implements Serializable {
      * Apply this Modification to a StreetLayer, making protective copies of the StreetLayer's elements as needed.
      */
     protected abstract StreetLayer applyToStreetLayer (StreetLayer originalStreetLayer);
+
+    /**
+     * Resolve any GTFS IDs contained in this Modification to integer IDs in the given TransportNetwork.
+     * I'm not sure this is really a good way to operate. Do we ever need to apply the same Modification to two
+     * different TransportNetworks?
+     */
+    public void resolve (TransportNetwork network) {
+        // Default implementation: do nothing.
+    }
 
 }

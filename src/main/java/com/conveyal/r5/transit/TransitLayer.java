@@ -31,6 +31,9 @@ import java.util.stream.Collectors;
 
 /**
  * A key simplifying factor is that we don't handle overnight trips. This is fine for analysis at usual times of day.
+ *
+ * The bidirectional indexes between street vertex and transit stop are in transitLayer, so the linkage between
+ * street and transit layers is really one-to-many, not one-to-one. This fact allows multiple GTFS in a single network.
  */
 public class TransitLayer implements Serializable, Cloneable {
 
@@ -40,13 +43,16 @@ public class TransitLayer implements Serializable, Cloneable {
     protected ZoneId timeZone;
 
     // Do we really need to store this? It does serve as a key into the GTFS MapDB.
+    // It contains information that is temporarily also held in stopForIndex.
     public List<String> stopIdForIndex = new ArrayList<>();
 
+    // Inverse map of stopIdForIndex, reconstructed from that list (not serialized).
+    public transient TObjectIntMap<String> indexForStopId;
+
+    // This is used as an initial size estimate for many lists.
     public static final int TYPICAL_NUMBER_OF_STOPS_PER_TRIP = 30;
 
     public List<TripPattern> tripPatterns = new ArrayList<>();
-
-    // TODO bidirectional indexes between vertex and stop are in transitLayer, so the linkage between street and transit layers is really one-to-many, not bidirectional. Use this fact to add multiple GTFS.
 
     // Maybe we need a StopStore that has (streetVertexForStop, transfers, flags, etc.)
     public TIntList streetVertexForStop = new TIntArrayList();
@@ -82,7 +88,11 @@ public class TransitLayer implements Serializable, Cloneable {
 
     public int nTrips = 0;
 
-    /** this is the result of running a search from every stop in the graph, map from stop vertex index to (vertex index, distance) */
+    /**
+     * This is the result of running a search from every stop in the graph.
+     * It is an array of maps (one for each of these origin stops). Each array entry is a map from all reachable
+     * destination street vertex indexes to their distances.
+     */
     public transient TIntIntMap[] stopTree;
 
     /**
@@ -303,6 +313,12 @@ public class TransitLayer implements Serializable, Cloneable {
         stopForStreetVertex = new TIntIntHashMap(streetVertexForStop.size(), 0.5f, -1, -1);
         for (int s = 0; s < streetVertexForStop.size(); s++) {
             stopForStreetVertex.put(streetVertexForStop.get(s), s);
+        }
+
+        // 3. What is the integer index for each GTFS stop ID?
+        indexForStopId = new TObjectIntHashMap<>();
+        for (int s = 0; s < stopIdForIndex.size(); s++) {
+            indexForStopId.put(stopIdForIndex.get(s), s);
         }
     }
 

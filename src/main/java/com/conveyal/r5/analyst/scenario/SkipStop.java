@@ -52,6 +52,7 @@ public class SkipStop extends TripPatternModification {
         LOG.info("Resolved stop IDs for removal. Strings {} resolved to integers {}.", stopId, stopsToRemove);
     }
 
+    // TODO filter by route and trip IDs
     @Override
     public TripPattern applyToTripPattern(TripPattern originalTripPattern) {
         int nToRemove = (int) Arrays.stream(originalTripPattern.stops).filter(stopsToRemove::contains).count();

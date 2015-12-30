@@ -1,7 +1,9 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.gtfs.model.Calendar;
 import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.Service;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.r5.model.json_serialization.BitSetDeserializer;
@@ -52,6 +54,7 @@ public class AddTripPattern extends TransitLayerModification {
     @JsonSerialize(using = BitSetSerializer.class)
     public BitSet stops;
 
+    /** New way of using this modification: just supply existing stop IDs. */
     public List<String> stopIds;
 
     /** The timetables for this trip pattern */
@@ -91,18 +94,27 @@ public class AddTripPattern extends TransitLayerModification {
             key.addStopTime(stopTime, originalTransitLayer.indexForStopId);
         }
         TripPattern pattern = new TripPattern(key);
+        LOG.info("Converted stop ID sequence {} to trip pattern {}.", stopIds, pattern);
+        // Protective copy of original transit layer so we can make non-destructive modifications.
+        TransitLayer transitLayer = originalTransitLayer.clone();
+        // We will be creating a service for each supplied timetable, make a protective copy.
+        List<Service> augmentedServices = new ArrayList<>(originalTransitLayer.services);
         for (PatternTimetable timetable : timetables) {
-            TripSchedule schedule = createSchedule(timetable);
-            if (schedule != null) {
+            for (TripSchedule schedule : createSchedules(timetable, augmentedServices)) {
+                if (schedule == null) {
+                    LOG.error("Failed to create a trip.");
+                    continue;
+                }
                 pattern.addTrip(schedule);
-            } else {
-                LOG.error("could not create a trip");
-                return originalTransitLayer;
+                transitLayer.hasFrequencies |= timetable.frequency;
+                transitLayer.hasSchedules |= !timetable.frequency;
             }
         }
-        TransitLayer transitLayer = originalTransitLayer.clone();
-        transitLayer.tripPatterns = new ArrayList<>(transitLayer.tripPatterns);
+        transitLayer.tripPatterns = new ArrayList<>(originalTransitLayer.tripPatterns);
         transitLayer.tripPatterns.add(pattern);
+        transitLayer.services = augmentedServices;
+        // FIXME shouldn't rebuilding indexes happen automatically higher up?
+        transitLayer.rebuildTransientIndexes();
         return transitLayer;
     }
 
@@ -170,18 +182,49 @@ public class AddTripPattern extends TransitLayerModification {
 
     /**
      * Creates an internal R5 TripSchedule object from a PatternTimetable object that was deserialized from JSON.
-     * This represents either a single trip, or a frequency-based family of trips.
+     * This represents either a single trip, or a frequency-based family of trips. The supplied list of services will
+     * be extended with a new service, whose code will be saved int the new TripSchedule. Make sure the supplied list is
+     * a protective copy of the one from the original TransportNetwork!
      */
-    public TripSchedule createSchedule (PatternTimetable timetable) {
+    public List<TripSchedule> createSchedules (PatternTimetable timetable, List<Service> services) {
+        // Create a calendar entry and service ID for this new trip pattern.
+        // If no day information is supplied, make the pattern active every day of the week.
+        BitSet days = timetable.days;
+        if (days == null) {
+            days = new BitSet();
+            days.set(0, 7, true);
+        }
+        Calendar calendar = new Calendar();
+        // TODO move this logic to a function on Calendar in gtfs-lib
+        calendar.monday    = days.get(0) ? 1 : 0;
+        calendar.tuesday   = days.get(1) ? 1 : 0;
+        calendar.wednesday = days.get(2) ? 1 : 0;
+        calendar.thursday  = days.get(3) ? 1 : 0;
+        calendar.friday    = days.get(4) ? 1 : 0;
+        calendar.saturday  = days.get(5) ? 1 : 0;
+        calendar.sunday    = days.get(6) ? 1 : 0;
+        StringBuilder nameBuilder = new StringBuilder("MOD-");
+        for (int i = 0; i < 7; i++) {
+            boolean active = days.get(i);
+            nameBuilder.append(active ? 1 : 0);
+        }
+        // Very long date range from the year 1850 to 2200 should be sufficient.
+        calendar.start_date = 18500101;
+        calendar.end_date = 22000101;
+        Service service = new Service(nameBuilder.toString());
+        service.calendar = calendar;
+        int serviceCode = services.size();
+        services.add(service);
+
         // Create a dummy GTFS Trip object so we can use the standard TripSchedule factory method.
         Trip trip = new Trip();
+        trip.direction_id = 0;
         // Convert the supplied hop and dwell times (which are relative to adjacent entries) to arrival and departure
         // times (which are relative to the beginning of the trip or the beginning of the service day).
         int nStops = stopIds.size();
-        int t = 0;
         int[] arrivals = new int[nStops];
         int[] departures = new int[nStops];
-        for (int s = 0; s < nStops; s++) {
+        for (int s = 0, t = 0; s < nStops; s++) {
             arrivals[s] = t;
             if (s < timetable.dwellTimes.length) {
                 t += timetable.dwellTimes[s];
@@ -191,16 +234,25 @@ public class AddTripPattern extends TransitLayerModification {
                 t += timetable.hopTimes[s];
             }
         }
+        List<TripSchedule> schedules = new ArrayList<>();
         if (timetable.frequency) {
             Frequency freq = new Frequency();
             freq.start_time = timetable.startTime;
             freq.end_time = timetable.endTime;
             freq.headway_secs = timetable.headwaySecs;
             trip.frequencies = Lists.newArrayList(freq);
-            TripSchedule schedule = TripSchedule.create(trip, arrivals, departures, 01234);
-            return schedule;
+            schedules.add(TripSchedule.create(trip, arrivals, departures, serviceCode));
         } else {
-            throw new UnsupportedOperationException();
+            for (int t = timetable.startTime; t < timetable.endTime; t += timetable.headwaySecs) {
+                int[] shiftedArrivals = new int[arrivals.length];
+                int[] shiftedDepartures = new int[departures.length];
+                for (int i = 0; i < nStops; i++) {
+                    shiftedArrivals[i] = arrivals[i] + t;
+                    shiftedDepartures[i] = departures[i] + t;
+                }
+                schedules.add(TripSchedule.create(trip, shiftedArrivals, shiftedDepartures, serviceCode));
+            }
         }
+        return schedules;
     }
 }

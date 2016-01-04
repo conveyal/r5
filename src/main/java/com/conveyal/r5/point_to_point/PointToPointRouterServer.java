@@ -33,7 +33,7 @@ import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
 import static spark.Spark.*;
 
 /**
- * This will represent point to point searche server.
+ * This will represent point to point search server.
  *
  * It can build point to point TransportNetwork and start a server with API for point to point searches
  *
@@ -171,7 +171,7 @@ public class PointToPointRouterServer {
             }
 
             ProfileRequest profileRequest = new ProfileRequest();
-            profileRequest.setZoneId(transportNetwork.getTimeZone());
+            profileRequest.zoneId = transportNetwork.getTimeZone();
             profileRequest.fromLat = fromLat;
             profileRequest.fromLon = fromLon;
             profileRequest.toLat = toLat;

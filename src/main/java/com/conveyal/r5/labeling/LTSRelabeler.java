@@ -32,7 +32,7 @@ public class LTSRelabeler {
     public static final int SEARCHES_PER_ITERATION = 1_000;
 
     public TransportNetwork network;
-    private List<EnumSet<EdgeStore.EdgeFlag>> originalFlags;
+    private TIntList originalFlags;
 
     public LTSRelabeler(TransportNetwork network) {
         this.network = network;
@@ -41,7 +41,7 @@ public class LTSRelabeler {
 
     public int relabel (int vertex) {
         // make a fresh copy of the street layer's flags since we modify them below
-        network.streetLayer.edgeStore.flags = new ArrayList<>(originalFlags);
+        network.streetLayer.edgeStore.flags = new TIntArrayList(originalFlags);
         int relabeledEdges = 0;
 
         // walk, relabeling all contiguous edges from LTS 3 to LTS 2

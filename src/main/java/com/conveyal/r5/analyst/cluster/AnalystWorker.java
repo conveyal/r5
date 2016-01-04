@@ -39,6 +39,8 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.net.SocketTimeoutException;
 import java.net.URI;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
@@ -154,6 +156,8 @@ public class AnalystWorker implements Runnable {
     private ThreadPoolExecutor highPriorityExecutor, batchExecutor;
 
     public AnalystWorker(Properties config) {
+        // print out date on startup so that CloudWatch logs has a unique fingerprint
+        LOG.info("Analyst worker starting at {}", LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
 
         // PARSE THE CONFIGURATION
 

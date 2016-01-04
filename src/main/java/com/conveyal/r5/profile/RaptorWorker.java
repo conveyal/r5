@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.analyst.BoardingAssumption;
 import com.conveyal.r5.publish.StaticPropagatedTimesStore;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransitLayer;

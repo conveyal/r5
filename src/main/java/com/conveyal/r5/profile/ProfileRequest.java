@@ -1,10 +1,15 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.analyst.BoardingAssumption;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import java.time.LocalDate;
 
 import com.conveyal.r5.model.json_serialization.ModeSetDeserializer;
 import com.conveyal.r5.model.json_serialization.ModeSetSerializer;
+import com.conveyal.r5.model.json_serialization.ZoneIdDeserializer;
+import com.conveyal.r5.model.json_serialization.ZoneIdSerializer;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import graphql.schema.DataFetchingEnvironment;
@@ -171,15 +176,9 @@ public class ProfileRequest implements Serializable, Cloneable {
     /** A non-destructive scenario to apply when executing this request */
     public Scenario scenario;
 
-    private ZoneId zoneId = ZoneOffset.UTC;
-
-    public ZoneId getZoneId() {
-        return zoneId;
-    }
-
-    public void setZoneId(ZoneId zoneId) {
-        this.zoneId = zoneId;
-    }
+    @JsonSerialize(using=ZoneIdSerializer.class)
+    @JsonDeserialize(using=ZoneIdDeserializer.class)
+    public ZoneId zoneId = ZoneOffset.UTC;
 
     public ProfileRequest clone () throws CloneNotSupportedException {
         return (ProfileRequest) super.clone();

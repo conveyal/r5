@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.List;
@@ -109,4 +110,13 @@ public class TripPattern implements Serializable, Cloneable {
         }
     }
 
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("TripPattern on route ");
+        sb.append(routeId);
+        sb.append(" with stops ");
+        sb.append(Arrays.toString(stops));
+        return sb.toString();
+    }
 }

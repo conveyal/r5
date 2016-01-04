@@ -27,7 +27,7 @@ public class ModeSetDeserializer extends JsonDeserializer<EnumSet<Mode>> {
             try {
                 mode = Mode.valueOf(m.toUpperCase().trim());
             } catch (IllegalArgumentException e) {
-                LOG.info("Mode {} not found, ignoring (if this is an obscure transit mode, this message is safe to ignore)");
+                LOG.info("Mode {} not found, ignoring (if this is an obscure transit mode, this message is safe to ignore)", m);
                 return;
             }
 

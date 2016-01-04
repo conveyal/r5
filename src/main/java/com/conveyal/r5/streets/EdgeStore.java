@@ -39,7 +39,7 @@ import java.util.*;
 public class EdgeStore implements Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(EdgeStore.class);
-    private static final int DEFAULT_SPEED_KPH = 50;
+    private static final short DEFAULT_SPEED_KPH = 50;
     private static final int[] EMPTY_INT_ARRAY = new int[0];
 
     // The vertices that are referred to in these edges
@@ -48,13 +48,12 @@ public class EdgeStore implements Serializable {
     int nEdges = 0;
 
     /** Flags for this edge.  One entry for each forward and each backward edge. */
-    public List<EnumSet<EdgeFlag>> flags;
+    public TIntList flags;
 
-    /** Speed for this edge.
-     * One entry for each forward and each backward edge.
+    /**
+     * One speed for each edge. Separate entries for forward and backward edges.
      * rounded (m/s * 100) (2 decimal places)
      * Saved speed is mostly the same as speed saved as m/s * 1000 it differs in second decimal place and is 0.024% smaller
-     *
      * This way of saving speeds is 3.5% smaller then previous (saving 7 decimal places)
      */
     public TShortList speeds;
@@ -77,7 +76,7 @@ public class EdgeStore implements Serializable {
     public EdgeStore (VertexStore vertexStore, int initialSize) {
         this.vertexStore = vertexStore;
         // There is one flags and speeds entry per edge.
-        flags = new ArrayList<>(initialSize);
+        flags = new TIntArrayList(initialSize);
         speeds = new TShortArrayList(initialSize);
         // Vertex indices, geometries, and lengths are shared between pairs of forward and backward edges.
         int initialEdgePairs = initialSize / 2;
@@ -89,63 +88,68 @@ public class EdgeStore implements Serializable {
 
     /** Remove the specified edges from this edge store */
     public void remove (int[] edgesToOmit) {
-        // be clever: sort the list descending, because removing an edge only affects the indices of
-        // edges that appear later in the graph.
+        // Sort the list and traverse it backward. Removing an element only affects the array indices of elements later
+        // in the list, so backward traversal ensures that all edge indexes remain valid during a bulk remove operation.
         Arrays.sort(edgesToOmit);
-
         int prevEdge = -1;
         for (int cursor = edgesToOmit.length - 1; cursor >= 0; cursor--) {
             int edge = edgesToOmit[cursor] / 2;
-
-            if (edge == prevEdge)
-                continue; // ignore duplicates
-
+            if (edge == prevEdge) {
+                // Ignore duplicate edge indexes, which would cause two different edges to be removed.
+                continue;
+            }
             prevEdge = edge;
-            // flags and speeds have separate entries for forward and backwards edges
-            flags.remove(edge * 2 + 1); // remove the back edge first, before we shift the array around
-            flags.remove(edge * 2);
-            // note using 2 int version because it is an offset not a value that we want to remove
+            // Flags and speeds arrays have separate elements for the forward and backward edges within a pair.
+            // Use TIntList function to remove these two elements at once.
+            // Note that the 1-arg remove function will remove a certain value from the list, not an element at an index.
+            flags.remove(edge * 2, 2);
             speeds.remove(edge * 2, 2);
-
-            // everything else has a single entry for forward and backward edges
+            // All other arrays have a single element describing both the forward and backward edges in an edge pair.
             fromVertices.remove(edge, 1);
             toVertices.remove(edge, 1);
             lengths_mm.remove(edge, 1);
-            // this is not a TIntList
+            // This is not a TIntList, so use the 1-arg remove function to remove by index.
             geometries.remove(edge);
             nEdges -= 2;
         }
     }
 
-    // Maybe reserve the first 4-5 bits (or a whole byte, and 16 bits for flags) for mutually exclusive edge types.
-    // Maybe we should have trunk, secondary, tertiary, residential etc. as types 0...6
-    // SIDEWALK(1),     CROSSING(2),     ROUNDABOUT(3),     ELEVATOR(4),     STAIRS(5),     PLATFORM(6),
-
+    /**
+     * Edge flags are various boolean values (requiring a single bit of information) that can be attached to each
+     * edge in the street graph. They are each assigned a bit number from 0...31 so they can all be packed into a
+     * single integer field for space and speed reasons.
+     */
     public enum EdgeFlag {
-        UNUSED,
-        BIKE_PATH,
-        SIDEWALK,
-        CROSSING,
-        ROUNDABOUT,
-        ELEVATOR,
-        STAIRS,
-        PLATFORM,
-        BOGUS_NAME,
-        NO_THRU_TRAFFIC,
-        NO_THRU_TRAFFIC_PEDESTRIAN,
-        NO_THRU_TRAFFIC_BIKE,
-        NO_THRU_TRAFFIC_CAR,
-        SLOPE_OVERRIDE,
-        TRANSIT_LINK, // This edge is a one-way connection from a street to a transit stop. Target is a transit stop index, not an intersection index.
+
+        // Street categories.
+        // FIXME some street categories are mutually exclusive and should not be flags, just narrow numbers.
+        // Maybe reserve the first 4-5 bits (or a whole byte, and 16 bits for flags) for mutually exclusive edge types.
+        UNUSED (0),
+        BIKE_PATH (1),
+        SIDEWALK (2),
+        CROSSING (3),
+        ROUNDABOUT (4),
+        ELEVATOR (5),
+        STAIRS (6),
+        PLATFORM (7),
+        BOGUS_NAME (8),
+        NO_THRU_TRAFFIC (9),
+        NO_THRU_TRAFFIC_PEDESTRIAN (10),
+        NO_THRU_TRAFFIC_BIKE (11),
+        NO_THRU_TRAFFIC_CAR (12),
+        SLOPE_OVERRIDE (13),
+        TRANSIT_LINK (14), // This edge is a one-way connection from a street to a transit stop. Target is a transit stop index, not an intersection index.
 
         // Permissions
-        ALLOWS_PEDESTRIAN,
-        ALLOWS_BIKE,
-        ALLOWS_CAR,
-        ALLOWS_WHEELCHAIR,
+        ALLOWS_PEDESTRIAN (15),
+        ALLOWS_BIKE (16),
+        ALLOWS_CAR (17),
+        ALLOWS_WHEELCHAIR (18),
 
-        // Bicycle level of traffic stress: http://transweb.sjsu.edu/PDFs/research/1005-low-stress-bicycling-network-connectivity.pdf
-        // comments below pasted from document.
+        // Bicycle level of traffic stress for this street.
+        // See http://transweb.sjsu.edu/PDFs/research/1005-low-stress-bicycling-network-connectivity.pdf
+        // Comments below pasted from that document.
+        // FIXME bicycle LTS should not really be flags, the categories are mutually exclusive and can be stored in 2 bits.
 
         /**
          * Presenting little traffic stress and demanding little attention from cyclists, and attractive enough for a
@@ -156,7 +160,7 @@ public class EdgeStore implements Serializable {
          * cyclists ride alongside a parking lane, they have ample operating space outside the zone into which car
          * doors are opened. Intersections are easy to approach and cross.
          */
-        BIKE_LTS_1,
+        BIKE_LTS_1 (28),
 
         /**
          * Presenting little traffic stress and therefore suitable to most adult cyclists but demanding more attention
@@ -167,7 +171,7 @@ public class EdgeStore implements Serializable {
          * lane, it is configured to give cyclists unambiguous priority where cars cross the bike lane and to keep
          * car speed in the right-turn lane comparable to bicycling speeds. Crossings are not difficult for most adults.
          */
-        BIKE_LTS_2,
+        BIKE_LTS_2 (29),
 
         /**
          * More traffic stress than LTS 2, yet markedly less than the stress of integrating with multilane traffic, and
@@ -176,23 +180,31 @@ public class EdgeStore implements Serializable {
          * and have moderately low speed. Crossings may be longer or across higher-speed roads than allowed by
          * LTS 2, but are still considered acceptably safe to most adult pedestrians.
          */
-        BIKE_LTS_3,
+        BIKE_LTS_3 (30),
 
         /**
          * A level of stress beyond LTS3. (this is in fact the official definition. -Ed.)
+         * Also known as FLORIDA_AVENUE.
          */
-        BIKE_LTS_4 // also known as FLORIDA_AVENUE
+        BIKE_LTS_4 (31);
+
+        /** In each enum value this field should contain an integer with only a single bit switched on. */
+        public final int flag;
+
+        /** Conveniently create a unique integer flag pattern for each of the enum values. */
+        private EdgeFlag (int bitNumber) {
+            flag = 1 << bitNumber;
+        }
+
     }
 
     /**
      * This creates the bare topological edge pair with a length.
-     * Flags, detailed geometry, etc. must be set using an edge cursor.
+     * Flags, detailed geometry, etc. must be set subsequently using an edge cursor.
      * This avoids having a tangle of different edge creator functions for different circumstances.
      * @return a cursor pointing to the forward edge in the pair, which always has an even index.
      */
-    public Edge addStreetPair(int beginVertexIndex, int endVertexIndex, int edgeLengthMillimeters,
-        EnumSet<EdgeFlag> forwardFlags, EnumSet<EdgeFlag> backFlags, short forwardSpeed,
-        short backwardSpeed) {
+    public Edge addStreetPair(int beginVertexIndex, int endVertexIndex, int edgeLengthMillimeters) {
 
         // Store only one length, set of endpoints, and intermediate geometry per pair of edges.
         lengths_mm.add(edgeLengthMillimeters);
@@ -200,17 +212,15 @@ public class EdgeStore implements Serializable {
         toVertices.add(endVertexIndex);
         geometries.add(EMPTY_INT_ARRAY);
 
-        // Forward edge
-        speeds.add(forwardSpeed);
-        flags.add(forwardFlags);
+        // Forward edge.
+        // No speed or flags are set, they must be set afterward using the edge cursor.
+        speeds.add(DEFAULT_SPEED_KPH);
+        flags.add(0);
 
-        // avoid confusion later on
-        if (backFlags == forwardFlags)
-            backFlags = forwardFlags.clone();
-
-        // Backward edge
-        speeds.add(backwardSpeed);
-        flags.add(backFlags);
+        // Backward edge.
+        // No speed or flags are set, they must be set afterward using the edge cursor.
+        speeds.add(DEFAULT_SPEED_KPH);
+        flags.add(0);
 
         // Increment total number of edges created so far, and return the index of the first new edge.
         int forwardEdgeIndex = nEdges;
@@ -219,7 +229,10 @@ public class EdgeStore implements Serializable {
 
     }
 
-    /** Inner class that serves as a cursor: points to a single edge in this store, and can be moved to other indexes. */
+    /**
+     * Inner class that serves as a cursor: points to a single edge in this store, and can be moved to other indexes.
+     * TODO make this a separate class so the outer class reference is explicit (useful in copy functions)
+     */
     public class Edge {
 
         int edgeIndex = -1;
@@ -278,15 +291,42 @@ public class EdgeStore implements Serializable {
         }
 
         public boolean getFlag(EdgeFlag flag) {
-            return flags.get(edgeIndex).contains(flag);
+            return (flags.get(edgeIndex) & flag.flag) != 0;
         }
 
         public void setFlag(EdgeFlag flag) {
-            flags.get(edgeIndex).add(flag);
+            flags.set(edgeIndex, flags.get(edgeIndex) | flag.flag);
         }
 
         public void clearFlag(EdgeFlag flag) {
-            flags.get(edgeIndex).remove(flag);
+            flags.set(edgeIndex, flags.get(edgeIndex) & ~(flag.flag)); // TODO verify logic
+        }
+
+        /**
+         * This function should not exist. This is a hack until we stop using an inner class and it's possible to
+         * access the outer EdgeStore field from Edge functions.
+         */
+        public EdgeStore getEdgeStore() {
+            return EdgeStore.this;
+        }
+
+        /**
+         * This is inefficient, it's just a stopgap until we refactor to eliminate the need for Sets of EdgeFlag
+         */
+        public EnumSet<EdgeFlag> getFlags() {
+            EnumSet<EdgeFlag> ret = EnumSet.noneOf(EdgeFlag.class);
+            for (EdgeFlag flag : EdgeFlag.values()) {
+                if (getFlag(flag)) {
+                    ret.add(flag);
+                }
+            }
+            return ret;
+        }
+
+        public void setFlags(Set<EdgeFlag> flagSet) {
+            for (EdgeFlag flag : flagSet) {
+                setFlag(flag);
+            }
         }
 
         public short getSpeed() {
@@ -307,6 +347,21 @@ public class EdgeStore implements Serializable {
 
         public int getLengthMm () {
             return lengths_mm.get(pairIndex);
+        }
+
+        /**
+         * Copy the flags and speeds from the supplied Edge cursor into this one.
+         * This is a hack and should be done some other way.
+         */
+        public void copyPairFlagsAndSpeeds(Edge other) {
+            int foreEdge = pairIndex * 2;
+            int backEdge = foreEdge + 1;
+            int otherForeEdge = other.pairIndex * 2;
+            int otherBackEdge = otherForeEdge + 1;
+            flags.set(foreEdge, other.getEdgeStore().flags.get(otherForeEdge));
+            flags.set(backEdge, other.getEdgeStore().flags.get(otherBackEdge));
+            speeds.set(foreEdge, other.getEdgeStore().speeds.get(otherForeEdge));
+            speeds.set(backEdge, other.getEdgeStore().speeds.get(otherBackEdge));
         }
 
         /**
@@ -482,7 +537,7 @@ public class EdgeStore implements Serializable {
         }
 
         /**
-         * Call a function on every segment in this edges's geometry.
+         * Call a function on every segment in this edge's geometry.
          * Always iterates forward over the geometry, whether we are on a forward or backward edge.
          */
         public void forEachSegment (SegmentConsumer segmentConsumer) {
@@ -547,21 +602,20 @@ public class EdgeStore implements Serializable {
 
         @Override
         public String toString() {
+            String base = String.format("Edge from %d to %d. Length %f meters, speed %f kph.",
+                        getFromVertex(), getToVertex(), getLengthMm() / 1000D, getSpeedkmh());
+            return base + getFlagsAsString();
+        }
+
+        public String getFlagsAsString () {
             StringBuilder sb = new StringBuilder();
-            sb.append(String.format("Edge from %d to %d. Length %f meters, speed %f kph.",
-                    getFromVertex(), getToVertex(), getLengthMm() / 1000D, getSpeedkmh()));
-            for (EdgeFlag flag : flags.get(edgeIndex)) {
-                sb.append(flag.toString());
+            for (EdgeFlag flag : EdgeFlag.values()) {
+                if (getFlag(flag)) {
+                    sb.append(" ");
+                    sb.append(flag.toString());
+                }
             }
             return sb.toString();
-        }
-
-        public EnumSet<EdgeFlag> getFlags() {
-            return flags.get(edgeIndex);
-        }
-
-        public String getFlagsAsString() {
-            return getFlags().toString();
         }
 
         /**

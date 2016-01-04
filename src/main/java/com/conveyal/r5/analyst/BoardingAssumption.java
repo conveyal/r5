@@ -5,6 +5,22 @@ package com.conveyal.r5.analyst;
  * and half headway (in some sense the average).
  */
 public enum BoardingAssumption {
-    BEST_CASE, WORST_CASE, HALF_HEADWAY, FIXED, PROPORTION, RANDOM;
+
+    /** be optimistic: assume that frequency-based services are always coming when you get to a stop */
+    BEST_CASE,
+
+    /** be pessimistic: assume that frequency-based services have always just left when you get to a stop */
+    WORST_CASE,
+
+    /** in some sense the average: assume that you always wait half of the time between vehicles */
+    HALF_HEADWAY,
+
+    FIXED,
+
+    PROPORTION,
+
+    /** Use a Monte Carlo simulation where a bunch of different random schedules are generated. */
+    RANDOM;
+
     public static final long serialVersionUID = 1;
 }

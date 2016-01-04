@@ -14,6 +14,9 @@ import java.util.stream.Collectors;
 /**
  * A Modification is a single change that can be applied while duplicating a TransportNetwork.
  * It allows comparing different scenarios without rebuilding entire networks from scratch.
+ *
+ * TODO make it clear that Modifications are throw-away objects that should be applied only once to a single TransportNetwork
+ * That will also allow them to accumulate stats on how many patterns, trips, routes etc. they affected.
  */
 // we use the property "type" to determine what type of modification it is. The string values are defined here.
 // Each class's getType should return the same value.
@@ -25,7 +28,8 @@ import java.util.stream.Collectors;
         @JsonSubTypes.Type(name = "skip-stop", value = SkipStop.class),
         @JsonSubTypes.Type(name = "add-trip-pattern", value = AddTripPattern.class),
         @JsonSubTypes.Type(name = "convert-to-frequency", value = ConvertToFrequency.class),
-        @JsonSubTypes.Type(name = "transfer-rule", value = TransferRule.class)
+        @JsonSubTypes.Type(name = "transfer-rule", value = TransferRule.class),
+        @JsonSubTypes.Type(name = "scale-speed", value = ScaleSpeed.class)
 })
 public abstract class Modification implements Serializable {
 
@@ -46,6 +50,8 @@ public abstract class Modification implements Serializable {
         // We don't need a base implementation to return the unmodified TransportNetwork.
         // Any Modification should produce a protective copy at least at level 0.
         TransportNetwork network = originalNetwork.clone();
+        // The following is not threadsafe! TODO confirm whether this is going to be a problem.
+        this.resolve(network);
         network.transitLayer = this.applyToTransitLayer(network.transitLayer);
         network.streetLayer = this.applyToStreetLayer(network.streetLayer);
         //network.gridPointSet = this.gridPointSet; // apply modification?
@@ -61,5 +67,14 @@ public abstract class Modification implements Serializable {
      * Apply this Modification to a StreetLayer, making protective copies of the StreetLayer's elements as needed.
      */
     protected abstract StreetLayer applyToStreetLayer (StreetLayer originalStreetLayer);
+
+    /**
+     * Resolve any GTFS IDs contained in this Modification to integer IDs in the given TransportNetwork.
+     * I'm not sure this is really a good way to operate. Do we ever need to apply the same Modification to two
+     * different TransportNetworks?
+     */
+    public void resolve (TransportNetwork network) {
+        // Default implementation: do nothing.
+    }
 
 }

@@ -214,7 +214,7 @@ public class PointToPointRouterServer {
                 featureCollection.put("type", "FeatureCollection");
                 List<GeoJsonFeature> features = new ArrayList<>();
 
-                fillFeature(transportNetwork, mode, lastState, features);
+                fillFeature(transportNetwork, lastState, features);
                 featureCollection.put("features", features);
                 content.put("data", featureCollection);
             } else {
@@ -635,8 +635,8 @@ public class PointToPointRouterServer {
         return null;
     }
 
-    private static void fillFeature(TransportNetwork transportNetwork, Mode mode,
-        StreetRouter.State lastState, List<GeoJsonFeature> features) {
+    private static void fillFeature(TransportNetwork transportNetwork, StreetRouter.State lastState,
+        List<GeoJsonFeature> features) {
         LinkedList<StreetRouter.State> states = new LinkedList<>();
 
                 /*
@@ -656,8 +656,7 @@ public class PointToPointRouterServer {
                     .getCursor(edgeIdx);
                 GeoJsonFeature feature = new GeoJsonFeature(edge.getGeometry());
                 feature.addProperty("weight", state.weight);
-                //FIXME: get this from state
-                feature.addProperty("mode", mode);
+                feature.addProperty("mode", state.mode);
                 features.add(feature);
                 feature.addProperty("time", Instant.ofEpochMilli(state.getTime()).toString());
             }

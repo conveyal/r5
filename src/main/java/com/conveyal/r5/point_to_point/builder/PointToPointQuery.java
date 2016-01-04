@@ -57,7 +57,7 @@ public class PointToPointQuery {
                 StreetRouter.State lastState = streetRouter.getState(split);
                 if (lastState != null) {
                     StreetPath streetPath = new StreetPath(lastState, transportNetwork);
-                    StreetSegment streetSegment = new StreetSegment(streetPath);
+                    StreetSegment streetSegment = new StreetSegment(streetPath, mode);
                     //TODO: this needs to be different if transit is requested
                     if (transit) {
                         //addAccess

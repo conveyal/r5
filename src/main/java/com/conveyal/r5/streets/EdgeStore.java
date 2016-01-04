@@ -420,6 +420,7 @@ public class EdgeStore implements Serializable {
 
             //Currently weigh is basically the same as weight. It differs only on stairs and when walking.
 
+            s1.mode = mode;
             if (mode == Mode.WALK && getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) {
                 weight = time;
                 //elevation which changes weight
@@ -443,6 +444,8 @@ public class EdgeStore implements Serializable {
 
 
                 if (walking) {
+                    //TODO: set bike walking in state
+                    s1.mode = Mode.WALK;
                     // * 1.5 to account for time to get off bike and slower walk speed once off
                     // this will tend to prefer to bike a slightly longer route than walk a long way,
                     // but will allow walking to cross a busy street, etc.

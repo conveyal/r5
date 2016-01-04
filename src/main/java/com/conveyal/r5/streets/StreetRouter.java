@@ -124,8 +124,8 @@ public class StreetRouter {
         originSplit = split;
         bestStates.clear();
         queue.clear();
-        State startState0 = new State(split.vertex0, -1, profileRequest.getFromTimeDate());
-        State startState1 = new State(split.vertex1, -1, profileRequest.getFromTimeDate());
+        State startState0 = new State(split.vertex0, -1, profileRequest.getFromTimeDate(), mode);
+        State startState1 = new State(split.vertex1, -1, profileRequest.getFromTimeDate(), mode);
         // TODO walk speed, assuming 1 m/sec currently.
         startState0.weight = split.distance0_mm / 1000;
         startState1.weight = split.distance1_mm / 1000;
@@ -138,7 +138,7 @@ public class StreetRouter {
     public void setOrigin (int fromVertex) {
         bestStates.clear();
         queue.clear();
-        State startState = new State(fromVertex, -1, profileRequest.getFromTimeDate());
+        State startState = new State(fromVertex, -1, profileRequest.getFromTimeDate(), mode);
         queue.add(startState);
     }
 
@@ -254,6 +254,7 @@ public class StreetRouter {
         protected Instant time;
         //Distance in mm
         public int distance;
+        public Mode mode;
         public State backState; // previous state in the path chain
         public State nextState; // next state at the same location (for turn restrictions and other cases with co-dominant states)
         public State(int atVertex, int viaEdge, long fromTimeDate, State backState) {
@@ -264,12 +265,13 @@ public class StreetRouter {
             this.distance = backState.distance;
         }
 
-        public State(int atVertex, int viaEdge, long fromTimeDate) {
+        public State(int atVertex, int viaEdge, long fromTimeDate, Mode mode) {
             this.vertex = atVertex;
             this.backEdge = viaEdge;
             this.backState = null;
             this.time = Instant.ofEpochMilli(fromTimeDate);
             this.distance = 0;
+            this.mode = mode;
         }
 
 

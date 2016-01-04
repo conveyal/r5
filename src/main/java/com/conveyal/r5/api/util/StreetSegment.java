@@ -1,5 +1,6 @@
 package com.conveyal.r5.api.util;
 
+import com.conveyal.r5.profile.Mode;
 import com.vividsolutions.jts.geom.LineString;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetPath;
@@ -40,10 +41,10 @@ public class StreetSegment {
      * creates StreetSegment from path
      *
      * It fills geometry fields and duration for now.
-     * //TODO: get mode from state
      * @param path
+     * @param mode requested mode for this path
      */
-    public StreetSegment(StreetPath path) {
+    public StreetSegment(StreetPath path, Mode mode) {
         duration = path.getDuration();
         distance = path.getDistance();
         streetEdges = new LinkedList<>();
@@ -68,6 +69,8 @@ public class StreetSegment {
                 StreetEdgeInfo streetEdgeInfo = new StreetEdgeInfo();
                 streetEdgeInfo.edgeId = edgeIdx;
                 streetEdgeInfo.geometry = edge.getGeometry();
+                //TODO: decide between NonTransitMode and mode
+                streetEdgeInfo.mode = NonTransitMode.valueOf(state.mode.toString());
                 streetEdges.add(streetEdgeInfo);
             }
         }
@@ -76,7 +79,9 @@ public class StreetSegment {
         coordinatesArray = coordinates.toArray(coordinatesArray);
         //FIXME: copy from array to coordinates sequence
         this.geometry = GeometryUtils.geometryFactory.createLineString(coordinatesArray);
-        //TODO: read this from state
-        this.mode = LegMode.WALK;
+        //TODO: decide between LegMode or Mode
+        //This is not read from state because this is requested mode which is not always the same as state mode
+        //For example bicycle plan can consist of bicycle and walk modes if walking the bike is required
+        this.mode = LegMode.valueOf(mode.toString());
     }
 }

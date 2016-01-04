@@ -29,7 +29,7 @@ public class PointToPointQuery {
 
     //Does point to point routing with data from request
     public ProfileResponse getPlan(ProfileRequest request) {
-        request.setZoneId(transportNetwork.getTimeZone());
+        request.zoneId = transportNetwork.getTimeZone();
         //Do the query and return result
         ProfileResponse profileResponse = new ProfileResponse();
 

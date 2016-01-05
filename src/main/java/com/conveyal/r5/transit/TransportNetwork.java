@@ -201,7 +201,7 @@ public class TransportNetwork implements Serializable, Cloneable {
                     if (stopTimesEntry != null) return GTFS;
                 } catch (Exception e) { /* fall through */ }
             }
-            if (name.endsWith(".pbf")) return OSM;
+            if (name.endsWith(".pbf") || name.endsWith(".vex")) return OSM;
             if (name.endsWith(".tif") || name.endsWith(".tiff")) return DEM; // Digital elevation model (elevation raster)
             if (name.endsWith("network.dat")) return OUTPUT;
             return OTHER;

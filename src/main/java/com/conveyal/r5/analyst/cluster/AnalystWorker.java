@@ -146,7 +146,7 @@ public class AnalystWorker implements Runnable {
     /** TODO what's this number? */
     long lastHighPriorityRequestProcessed = 0;
 
-    /** If true Analyst is running locally, do not use internet connection and hosted servcies. */
+    /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
     private boolean workOffline;
 
     /**
@@ -556,7 +556,7 @@ public class AnalystWorker implements Runnable {
             deleteRequest(clusterRequest);
         } catch (Exception e) {
             // Do not delete task from broker, it will be retried.
-            LOG.error("Exception while saving routing result to S3: {}", e);
+            LOG.error("Exception while saving routing result to S3: {}", e.getMessage());
         }
     }
 

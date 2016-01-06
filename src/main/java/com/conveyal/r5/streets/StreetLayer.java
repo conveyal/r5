@@ -323,10 +323,7 @@ public class StreetLayer implements Serializable {
         EdgeStore.Edge edge = edgeStore.getCursor();
         for (int e = 0; e < edgeStore.nEdges; e += 2) {
             edge.seek(e);
-            // FIXME for now we are skipping edges over 1km because they can have huge envelopes. TODO Rasterize them.
-            //if (edge.getLengthMm() < 1 * 1000 * 1000) {
-            spatialIndex.insert(edge.getEnvelope(), e);
-            //}
+            spatialIndex.insert(edge.getGeometry(), e);
         }
         LOG.info("Done indexing streets.");
     }

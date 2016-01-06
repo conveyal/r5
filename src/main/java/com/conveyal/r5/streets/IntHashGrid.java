@@ -16,6 +16,7 @@ package com.conveyal.r5.streets;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.LineString;
+import com.vividsolutions.jts.triangulate.quadedge.Vertex;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TLongObjectMap;
@@ -99,13 +100,35 @@ public class IntHashGrid {
         Coordinate[] coord = geom.getCoordinates();
         final TLongSet keys = new TLongHashSet(coord.length * 8);
         for (int i = 0; i < coord.length - 1; i++) {
-            // TODO Cut the segment if longer than bin size
-            // to reduce the number of wrong bins
-            Envelope env = new Envelope(coord[i], coord[i + 1]);
-            visit(env, true, (bin, mapKey) -> {
-                keys.add(mapKey);
-                return false;
-            });
+            // Cut the segment if longer than bin size to reduce the number of wrong bins
+            double dX = coord[i].x - coord[i + 1].x;
+            double dY = coord[i].y - coord[i + 1].y;
+            int segments = (int) Math.max(Math.abs(dX)  / xBinSize, Math.abs(dY) / yBinSize);
+
+            if (segments > 1000 || segments < 0)
+                LOG.warn("Huge number of segments ({}) for edge, or possible int overflow)", segments);
+
+            segments = Math.max(segments, 1);
+            double segFrac = 1D / segments;
+
+            for (int s = 0; s < segments; s++) {
+                // interpolate the coordinates
+                Coordinate c0 = new Coordinate(
+                        VertexStore.floatingDegreesToFixed(coord[i].x + dX * segFrac * s),
+                        VertexStore.floatingDegreesToFixed(coord[i].y + dY * segFrac * s)
+                );
+
+                Coordinate c1 = new Coordinate(
+                        VertexStore.floatingDegreesToFixed(coord[i].x + dX * segFrac * (s + 1)),
+                        VertexStore.floatingDegreesToFixed(coord[i].y + dY * segFrac * (s + 1))
+                );
+
+                Envelope env = new Envelope(c0, c1);
+                visit(env, true, (bin, mapKey) -> {
+                    keys.add(mapKey);
+                    return false;
+                });
+            }
         }
         keys.forEach(key -> {
             // Note: bins have been initialized in the previous visit

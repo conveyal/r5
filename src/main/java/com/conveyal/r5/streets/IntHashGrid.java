@@ -95,7 +95,10 @@ public class IntHashGrid {
         nObjects++;
     }
 
-    // FIXME we should really be using this method. Long roads can have very big envelopes. Really the edges should be rasterized into the grid.
+    /**
+     * Insert a linestring into the index. NB: the line string uses real-world float coordinates, not fixed coordinates.
+     * This keeps long and angular line strings from winding in many unnecessary cells.
+     */
     public final void insert(LineString geom, final int item) {
         Coordinate[] coord = geom.getCoordinates();
         final TLongSet keys = new TLongHashSet(coord.length * 8);
@@ -103,7 +106,7 @@ public class IntHashGrid {
             // Cut the segment if longer than bin size to reduce the number of wrong bins
             double dX = coord[i].x - coord[i + 1].x;
             double dY = coord[i].y - coord[i + 1].y;
-            int segments = (int) Math.max(Math.abs(dX)  / xBinSize, Math.abs(dY) / yBinSize);
+            int segments = (int) Math.max(Math.abs(dX) / xBinSize, Math.abs(dY) / yBinSize);
 
             if (segments > 1000 || segments < 0)
                 LOG.warn("Huge number of segments ({}) for edge, or possible int overflow)", segments);

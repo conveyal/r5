@@ -86,30 +86,35 @@ public class EdgeStore implements Serializable {
         lengths_mm = new TIntArrayList(initialEdgePairs);
     }
 
-    /** Remove the specified edges from this edge store */
+    /**
+     * Remove the specified edges from this edge store.
+     * Removing edges causes their indexes to change, but the only place these indexes are used is in the incoming
+     * and outgoing edge lists of vertices. Those are transient data structures derived from the edges themselves,
+     * so fortunately we don't need to update them when the edges are shifted around, we just rebuild them.
+     */
     public void remove (int[] edgesToOmit) {
         // Sort the list and traverse it backward. Removing an element only affects the array indices of elements later
         // in the list, so backward traversal ensures that all edge indexes remain valid during a bulk remove operation.
         Arrays.sort(edgesToOmit);
-        int prevEdge = -1;
+        int prevPair = -1;
         for (int cursor = edgesToOmit.length - 1; cursor >= 0; cursor--) {
-            int edge = edgesToOmit[cursor] / 2;
-            if (edge == prevEdge) {
+            int edgePair = edgesToOmit[cursor] / 2;
+            if (edgePair == prevPair) {
                 // Ignore duplicate edge indexes, which would cause two different edges to be removed.
                 continue;
             }
-            prevEdge = edge;
+            prevPair = edgePair;
             // Flags and speeds arrays have separate elements for the forward and backward edges within a pair.
             // Use TIntList function to remove these two elements at once.
             // Note that the 1-arg remove function will remove a certain value from the list, not an element at an index.
-            flags.remove(edge * 2, 2);
-            speeds.remove(edge * 2, 2);
+            flags.remove(edgePair * 2, 2);
+            speeds.remove(edgePair * 2, 2);
             // All other arrays have a single element describing both the forward and backward edges in an edge pair.
-            fromVertices.remove(edge, 1);
-            toVertices.remove(edge, 1);
-            lengths_mm.remove(edge, 1);
+            fromVertices.remove(edgePair, 1);
+            toVertices.remove(edgePair, 1);
+            lengths_mm.remove(edgePair, 1);
             // This is not a TIntList, so use the 1-arg remove function to remove by index.
-            geometries.remove(edge);
+            geometries.remove(edgePair);
             nEdges -= 2;
         }
     }

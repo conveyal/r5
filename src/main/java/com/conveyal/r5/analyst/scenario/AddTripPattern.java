@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.collect.Lists;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.LineString;
-
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
@@ -32,6 +31,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -66,16 +66,10 @@ public class AddTripPattern extends TransitLayerModification {
     /** GTFS mode (route_type), see constants in com.conveyal.gtfs.model.Route */
     public int mode = Route.BUS;
 
-    /** Create temporary stops associated with the given graph. Note that a given AddTripPattern can be associated only with a single graph. */
-    public void materialize (TransportNetwork tnet) {
+    /** If set to true, create both the forward pattern and a derived backward pattern as a matching set. */
+    public boolean generateReversePattern = true;
 
-        temporaryStops = new TemporaryStop[stops.cardinality()];
-
-        int stop = 0;
-        for (int i = stops.nextSetBit(0); i >= 0; i = stops.nextSetBit(i + 1)) {
-            temporaryStops[stop++] = new TemporaryStop(geometry.getCoordinateN(i), tnet.streetLayer);
-        }
-    }
+    private TripPatternKey tripPatternKey;
 
     @Override
     public String getType() {
@@ -83,24 +77,81 @@ public class AddTripPattern extends TransitLayerModification {
     }
 
     @Override
-    protected TransitLayer applyToTransitLayer(TransitLayer originalTransitLayer) {
-        // Convert the supplied stop IDs into internal integer indexes for this TransportNetwork.
-        TripPatternKey key = new TripPatternKey("SCENARIO_MODIFICATION");
-        StopTime stopTime = new StopTime();
-        for (String stopId : stopIds) {
-            // Pickup and drop off type default to 0, which means "scheduled".
-            // FIXME handle missing value, report unmatched stops
-            stopTime.stop_id = stopId;
-            key.addStopTime(stopTime, originalTransitLayer.indexForStopId);
+    public boolean resolve (TransportNetwork network) {
+        boolean foundErrors = false;
+        for (PatternTimetable pt : timetables) {
+            if (pt.endTime <= pt.startTime) {
+                warnings.add("End time is not later than start time.");
+                foundErrors = true;
+            }
+            if (pt.headwaySecs <= 0) {
+                warnings.add("Headway is not greater than zero.");
+                foundErrors = true;
+            }
         }
-        TripPattern pattern = new TripPattern(key);
-        LOG.info("Converted stop ID sequence {} to trip pattern {}.", stopIds, pattern);
+        for (String stopId : stopIds) {
+            // FIXME handle missing value (which is currently 0, a real stop index, rather than -1).
+            int stopIndex = network.transitLayer.indexForStopId.get(stopId);
+            if (stopIndex == 0) {
+                warnings.add("Could not find a stop for GTFS ID " + stopId);
+                foundErrors = true;
+            }
+        }
+        return foundErrors;
+    }
+
+    @Override
+    protected TransitLayer applyToTransitLayer(TransitLayer originalTransitLayer) {
         // Protective copy of original transit layer so we can make non-destructive modifications.
         TransitLayer transitLayer = originalTransitLayer.clone();
-        // We will be creating a service for each supplied timetable, make a protective copy.
-        List<Service> augmentedServices = new ArrayList<>(originalTransitLayer.services);
+        // We will be extending the list of TripPatterns, so make a protective copy of it.
+        transitLayer.tripPatterns = new ArrayList<>(originalTransitLayer.tripPatterns);
+        // We will be creating a service for each supplied timetable, make a protective copy of the list of services.
+        transitLayer.services = new ArrayList<>(originalTransitLayer.services);
+        generatePattern(transitLayer);
+        if (generateReversePattern) {
+            // Reverse the stopIds in place. Not sure how wise this is but it works.
+            // Guava Lists.reverse would return a view / copy.
+            Collections.reverse(stopIds);
+            for (PatternTimetable ptt : timetables) {
+                // Reverse all the pattern timetables in place. Not sure how wise this is but it works.
+                // Amazingly, there is no Arrays.reverse() or Ints.reverse().
+                TIntList hopList = new TIntArrayList();
+                hopList.add(ptt.hopTimes);
+                hopList.reverse();
+                ptt.hopTimes = hopList.toArray();
+                TIntList dwellList = new TIntArrayList();
+                dwellList.add(ptt.dwellTimes);
+                dwellList.reverse();
+                ptt.dwellTimes = dwellList.toArray();
+            }
+            // TODO the transitlayer wouldn't really need to be passed around, it could be in a field.
+            generatePattern(transitLayer);
+        }
+        // FIXME shouldn't rebuilding indexes happen automatically higher up?
+        transitLayer.rebuildTransientIndexes();
+        return transitLayer;
+    }
+
+    /**
+     * This has been pulled out into a separate function so it can be called twice: once to generate the forward
+     * pattern and once to generate the reverse pattern.
+     * @param transitLayer a protective copy of a transit layer whose existing tripPatterns list will be extended.
+     */
+    private void generatePattern (TransitLayer transitLayer) {
+        // Convert the supplied stop IDs into internal integer indexes for this TransportNetwork.
+        // Pickup and drop off type default to 0, which means "scheduled".
+        StopTime stopTime = new StopTime();
+        tripPatternKey = new TripPatternKey("SCENARIO_MODIFICATION");
+        for (String stopId : stopIds) {
+            stopTime.stop_id = stopId;
+            tripPatternKey.addStopTime(stopTime, transitLayer.indexForStopId);
+        }
+        TripPattern pattern = new TripPattern(tripPatternKey);
+        LOG.info("Converted stop ID sequence {} to trip pattern {}.", stopIds, pattern);
         for (PatternTimetable timetable : timetables) {
-            for (TripSchedule schedule : createSchedules(timetable, augmentedServices)) {
+            // CreateSchedules may create more than one if we're in non-frequency ("exact-times") mode.
+            for (TripSchedule schedule : createSchedules(timetable, transitLayer.services)) {
                 if (schedule == null) {
                     LOG.error("Failed to create a trip.");
                     continue;
@@ -110,12 +161,7 @@ public class AddTripPattern extends TransitLayerModification {
                 transitLayer.hasSchedules |= !timetable.frequency;
             }
         }
-        transitLayer.tripPatterns = new ArrayList<>(originalTransitLayer.tripPatterns);
         transitLayer.tripPatterns.add(pattern);
-        transitLayer.services = augmentedServices;
-        // FIXME shouldn't rebuilding indexes happen automatically higher up?
-        transitLayer.rebuildTransientIndexes();
-        return transitLayer;
     }
 
     /** a class representing a minimal timetable */
@@ -181,10 +227,11 @@ public class AddTripPattern extends TransitLayerModification {
     }
 
     /**
-     * Creates an internal R5 TripSchedule object from a PatternTimetable object that was deserialized from JSON.
-     * This represents either a single trip, or a frequency-based family of trips. The supplied list of services will
-     * be extended with a new service, whose code will be saved int the new TripSchedule. Make sure the supplied list is
-     * a protective copy of the one from the original TransportNetwork!
+     * Creates one or more R5 TripSchedule objects from a PatternTimetable object that was deserialized from JSON.
+     * These represent either independent trips, or a frequency-based family of trips.
+     * The supplied list of services will be extended with a new service,
+     * whose code will be saved int the new TripSchedule.
+     * Make sure the supplied list is a protective copy, not the one from the original TransportNetwork!
      */
     public List<TripSchedule> createSchedules (PatternTimetable timetable, List<Service> services) {
         // Create a calendar entry and service ID for this new trip pattern.

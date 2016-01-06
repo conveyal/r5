@@ -34,6 +34,16 @@ public class ScaleSpeed extends TripPatternModification {
     // public int referenceStop = 0;
 
     @Override
+    public boolean resolve (TransportNetwork network) {
+        boolean foundErrors = false;
+        if (scaleFactor <= 0) {
+            warnings.add("Scaling factor must be a positive number.");
+            foundErrors = true;
+        }
+        return foundErrors;
+    }
+
+    @Override
     public String getType() {
         return "scale-speed";
     }
@@ -50,7 +60,7 @@ public class ScaleSpeed extends TripPatternModification {
         pattern.tripSchedules = pattern.tripSchedules.stream()
                 .map(ts -> this.applyToTripSchedule(ts))
                 .collect(Collectors.toList());
-        LOG.info("Scaled travel times (factor {}) for all trips on {}.", scaleFactor, originalTripPattern);
+        LOG.debug("Scaled travel times (factor {}) for all trips on {}.", scaleFactor, originalTripPattern);
         return pattern;
     }
 
@@ -68,9 +78,13 @@ public class ScaleSpeed extends TripPatternModification {
         }
         int originalTravelTime = originalSchedule.departures[nStops - 1] - originalSchedule.arrivals[0];
         int updatedTravelTime = schedule.departures[nStops - 1] - schedule.arrivals[0];
-        LOG.info("Total travel time on trip {} changed from {} to {} seconds.",
+        LOG.debug("Total travel time on trip {} changed from {} to {} seconds.",
                 schedule.tripId, originalTravelTime, updatedTravelTime);
         return schedule;
+    }
+
+    private static void postSanityCheck (TripSchedule schedule) {
+
     }
 
 }

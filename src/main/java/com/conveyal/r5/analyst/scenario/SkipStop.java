@@ -18,6 +18,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Skip stops and associated dwell times.
@@ -43,18 +45,37 @@ public class SkipStop extends TripPatternModification {
     }
 
     @Override
-    public void resolve (TransportNetwork network) {
+    public boolean resolve (TransportNetwork network) {
+        boolean foundErrors = false;
         stopsToRemove = new TIntHashSet();
         for (String stringStopId : stopId) {
             int intStopId = network.transitLayer.indexForStopId.get(stringStopId);
-            stopsToRemove.add(intStopId);
+            if (intStopId == 0) { // FIXME should be -1 not 0
+                warnings.add("Could not find a stop with GTFS ID " + stringStopId);
+                foundErrors = true;
+            } else {
+                stopsToRemove.add(intStopId);
+            }
         }
-        LOG.info("Resolved stop IDs for removal. Strings {} resolved to integers {}.", stopId, stopsToRemove);
+        LOG.debug("Resolved stop IDs for removal. Strings {} resolved to integers {}.", stopId, stopsToRemove);
+        // For debugging.
+//        Set<String> names = new HashSet<>();
+//        stopsToRemove.forEach(intStopId -> {
+//            names.add(network.transitLayer.stopNames.get(intStopId));
+//            return true; // Continue iteration.
+//        });
+//        names.stream().forEach(name -> {
+//            LOG.info("Stop selected for removal: {}", name);
+//        });
+        return foundErrors;
     }
 
-    // TODO filter by route and trip IDs
     @Override
     public TripPattern applyToTripPattern(TripPattern originalTripPattern) {
+        // TODO filter by trip IDs too
+        if (!routeId.contains(originalTripPattern.routeId)) {
+            return originalTripPattern;
+        }
         int nToRemove = (int) Arrays.stream(originalTripPattern.stops).filter(stopsToRemove::contains).count();
         if (nToRemove == 0) {
             return originalTripPattern;

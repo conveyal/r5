@@ -31,7 +31,8 @@ public class InactiveTripsFilter extends TripScheduleModification {
 
     @Override
     public String getType() {
-        return null; // This is used internally and should never be serialized
+        // This modification type is used internally and should never be serialized.
+        return "inactive-trips";
     }
 
     @Override

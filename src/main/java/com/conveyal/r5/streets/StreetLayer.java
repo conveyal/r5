@@ -501,7 +501,7 @@ public class StreetLayer implements Serializable {
         LOG.info("Removing subgraphs with fewer than {} vertices", minSubgraphSize);
         boolean edgeListsBuilt = incomingEdges != null;
 
-        int nSubgraphs = 0;
+        int nSmallSubgraphs = 0;
 
         if (!edgeListsBuilt)
             buildEdgeLists();
@@ -525,7 +525,9 @@ public class StreetLayer implements Serializable {
             r.distanceLimitMeters = Integer.MAX_VALUE;
             r.route();
             nOrigins++;
-            LOG.info ("Searched from vertex {}, {} total origins, {} islands", vertex, nOrigins, nSubgraphs);
+            if (nOrigins % 100 == 0) {
+                LOG.info("Searched from vertex number {}, {} total searches performed, {} islands slated for removal.", vertex, nOrigins, nSmallSubgraphs);
+            }
 
             TIntList reachedVertices = new TIntArrayList();
             int nReached = 0;
@@ -539,7 +541,7 @@ public class StreetLayer implements Serializable {
             }
 
             if (nReached < minSubgraphSize) {
-                nSubgraphs++;
+                nSmallSubgraphs++;
                 verticesToRemove.addAll(reachedVertices);
                 reachedVertices.forEach(v -> {
                     // can't use method reference here because we always have to return true
@@ -570,8 +572,8 @@ public class StreetLayer implements Serializable {
             outgoingEdges = null;
         }
 
-        if (nSubgraphs > 0)
-            LOG.info("Removed {} disconnected subgraphs", nSubgraphs);
+        if (nSmallSubgraphs > 0)
+            LOG.info("Removed {} disconnected subgraphs", nSmallSubgraphs);
         else
             LOG.info("Found no subgraphs to remove, congratulations for having clean OSM data.");
         LOG.info("Done removing subgraphs. {} edges remain", edgeStore.nEdges);

@@ -16,9 +16,6 @@ import java.util.Random;
  * NOTE that most methods will not behave as expected, as they will affect or see only the augmented part of the list,
  * not the base list. The only method that will access the base list and account for its indexes is get(). The only
  * method that should be used to modify this list is add().
- *
- * We should not resize edges when splitting edges to link stops, because this doesn't work when temporarily adding
- * stops.
  */
 public class TIntAugmentedList extends TIntArrayList {
 

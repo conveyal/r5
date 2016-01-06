@@ -97,7 +97,11 @@ public class IntHashGrid {
 
     /**
      * Insert a linestring into the index. NB: the line string uses real-world float coordinates, not fixed coordinates.
-     * This keeps long and angular line strings from winding in many unnecessary cells.
+     * This function keeps long and angular line strings from winding up in many unnecessary cells by inserting each segment
+     * individually and splitting long segments into pieces.
+     *
+     * We could use a rasterization algorithm, but just splitting the line segments up into manageable pieces works as
+     * well and is easier to follow, at the expense of slower insert performance (which so far doesn't seem to be a problem).
      */
     public final void insert(LineString geom, final int item) {
         Coordinate[] coord = geom.getCoordinates();

@@ -164,7 +164,7 @@ public class IntHashGrid {
         // Check sanity before iterating
         long dx = (maxXKey - minXKey);
         long dy = (maxYKey - minYKey);
-        if (dx * dy > 1000) {
+        if (dx * dy > 10000) {
             LOG.error("Visiting too many spatial index cells.");
             return;
         }

@@ -283,8 +283,8 @@ public class PointToPointRouterServer {
                 floatingDegreesToFixed(south), floatingDegreesToFixed(north));
             TIntSet streets = transportNetwork.streetLayer.spatialIndex.query(env);
 
-            if (streets.size() > 10_000) {
-                LOG.warn("Refusing to include more than 10000 edges in result");
+            if (streets.size() > 100_000) {
+                LOG.warn("Refusing to include more than 100,000 edges in result");
                 response.status(401);
                 return "";
             }
@@ -391,10 +391,10 @@ public class PointToPointRouterServer {
             TIntSet streets = transportNetwork.streetLayer.spatialIndex.query(env);
             //transportNetwork.streetLayer.edgeStore.getCursor()
 
-            if (streets.size() > 10_000) {
-                LOG.warn("Refusing to include more than 10000 edges in result");
+            if (streets.size() > 100_000) {
+                LOG.warn("Refusing to include more than 100,000 edges in result");
                 response.status(401);
-                content.put("errors", "Refusing to include more than 10000 edges in result");
+                content.put("errors", "Refusing to include more than 100,000 edges in result");
                 return content;
             }
 
@@ -456,10 +456,10 @@ public class PointToPointRouterServer {
                 floatingDegreesToFixed(south), floatingDegreesToFixed(north));
             TIntSet streets = transportNetwork.streetLayer.spatialIndex.query(env);
 
-            if (streets.size() > 10_000) {
-                LOG.warn("Refusing to include more than 10000 edges in result");
+            if (streets.size() > 100_000) {
+                LOG.warn("Refusing to include more than 100,000 edges in result");
                 response.status(401);
-                content.put("errors", "Refusing to include more than 10000 edges in result");
+                content.put("errors", "Refusing to include more than 100,000 edges in result");
                 return content;
             }
 

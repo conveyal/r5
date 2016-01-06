@@ -37,6 +37,9 @@ public class TransportNetworkCache {
         this.sourceBucket = sourceBucket;
     }
 
+    /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
+    private boolean workOffline;
+
     /**
      * Return the graph for the given unique identifier for graph builder inputs on S3.
      * If this is the same as the last graph built, just return the pre-built graph.
@@ -69,9 +72,7 @@ public class TransportNetworkCache {
         try {
             String filename = networkId + "_" + MavenVersion.commit + ".dat";
             File cacheLocation = new File(CACHE_DIR, networkId + "_" + MavenVersion.commit + ".dat");
-
             if (cacheLocation.exists())
-                // yippee! we have a cached network
                 LOG.info("Found locally-cached TransportNetwork at {}", cacheLocation);
             else {
                 LOG.info("No locally cached transport network at {}.", cacheLocation);
@@ -161,8 +162,9 @@ public class TransportNetworkCache {
 
             // Upload the serialized TransportNetwork to S3
             LOG.info("Uploading the serialized TransportNetwork to S3 for use by other workers.");
-            s3.putObject(sourceBucket, filename, cacheLocation);
-            LOG.info("Done uploading the serialized TransportNetwork to S3.");
+            LOG.warn("SKIPPING"); // TODO use offline mode
+            // s3.putObject(sourceBucket, filename, cacheLocation);
+            // LOG.info("Done uploading the serialized TransportNetwork to S3.");
 
         } catch (Exception e) {
             // Don't break here as we do have a network to return, we just couldn't cache it.

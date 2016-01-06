@@ -1,5 +1,6 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.r5.trove.TIntAugmentedList;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 
@@ -13,13 +14,13 @@ import java.util.List;
  */
 public class VertexStore implements Serializable {
 
+    public static final double FIXED_FACTOR = 1e7; // we could just reuse the constant from osm-lib Node.
     // TODO direct mm_per_fixed_degree conversion, work entirely in mm and fixed degrees.
 
     public int nVertices = 0;
-    public static final double FIXED_FACTOR = 1e7; // we could just reuse the constant from osm-lib Node.
     public TIntList fixedLats;
     public TIntList fixedLons;
-    public List<EnumSet<VertexFlag>> vertexFlags;
+    public List<EnumSet<VertexFlag>> vertexFlags; // TODO change this to use one big int array of bit flags.
 
     public VertexStore (int initialSize) {
         fixedLats = new TIntArrayList(initialSize);
@@ -140,6 +141,19 @@ public class VertexStore implements Serializable {
     public enum VertexFlag {
         /** this intersection has a traffic signal */
         TRAFFIC_SIGNAL
+    }
+
+    /**
+     * Makes a copy of this VertexStore that can have vertices added to it, but cannot otherwise be modified.
+     * This is done efficiently by wrapping the existing lists holding the various vertex characteristics.
+     */
+    public VertexStore extendOnlyCopy() {
+        VertexStore copy = new VertexStore(100);
+        copy.nVertices = 0;
+        copy.fixedLats = new TIntAugmentedList(this.fixedLats);
+        copy.fixedLons = new TIntAugmentedList(this.fixedLons);
+        copy.vertexFlags = null; // TODO change this to use one big int array of bit flags.
+        return copy;
     }
 
 }

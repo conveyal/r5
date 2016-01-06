@@ -82,7 +82,7 @@ public class StreetLayerTest extends TestCase {
 
         //This inserts vertex around the middle of the way.
         //Vertices are A->B->C B is new vertex
-        int vertexId = streetLayer.getOrCreateVertexNear(lat, lon, 500);
+        int vertexId = streetLayer.getOrCreateVertexNear(lat, lon, 500, true);
         //Edge from A to B
         EdgeStore.Edge oldForwardEdge = streetLayer.edgeStore.getCursor(0);
         //This should always work since in existing edges only length and toVertex changes

@@ -5,6 +5,7 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+import com.conveyal.r5.streets.Split;
 import com.vividsolutions.jts.geom.Envelope;
 import org.nustaq.serialization.FSTObjectInput;
 import org.nustaq.serialization.FSTObjectOutput;
@@ -305,6 +306,22 @@ public class TransportNetwork implements Serializable, Cloneable {
             return this;
         }
         return scenario.applyToTransportNetwork(this);
+    }
+
+    /**
+     * Currently this is intended for use by Modifications but not when building the network initially.
+     * If this is being used in a non-destructive Modification, the caller must already have made protective copies of
+     * all fields that will be modified.
+     * Really we should use the same function for modifications and when initially creating the TransportNetwork. This
+     * function would need to create the stop, link it to the street network, and make a stop tree for that stop.
+     */
+    public int addStop (String id, double lat, double lon, double radiusMeters) {
+        int newStopIndex = transitLayer.getStopCount();
+        int newStreetVertexIndex = streetLayer.getOrCreateVertexNear(lat, lon, radiusMeters, false);
+        transitLayer.stopIdForIndex.add(id); // TODO check for uniqueness
+        transitLayer.streetVertexForStop.add(newStreetVertexIndex);
+        // TODO stop tree, any other stop-indexed arrays or lists
+        return newStopIndex;
     }
 
 }

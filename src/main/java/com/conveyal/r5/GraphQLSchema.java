@@ -1205,7 +1205,7 @@ public class GraphQLSchema {
                 .name("date")
                 .type(GraphQLLocalDate)
                 .description("The date of the search YYYY-MM-DD")
-                .defaultValue("today")
+                .defaultValue(LocalDate.now()) //TODO: when is defaultValue evaluated?
                 .build())
             .argument(GraphQLArgument.newArgument()
                 .name("limit")

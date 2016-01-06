@@ -255,6 +255,9 @@ public class ProfileRequest implements Serializable, Cloneable {
         HashMap<String, Float> fromCoordinate = environment.getArgument("from");
         HashMap<String, Float> toCoordinate = environment.getArgument("to");
 
+        profileRequest.fromTime = environment.getArgument("time");
+        profileRequest.date = environment.getArgument("date");
+
 
         profileRequest.fromLon = fromCoordinate.get("lon");
         profileRequest.fromLat = fromCoordinate.get("lat");

@@ -83,8 +83,8 @@ public class StreetRouter {
     /** Return a map where the keys are all the reached vertices, and the values are their distances from the origin. */
     public TIntIntMap getReachedVertices () {
         TIntIntMap result = new TIntIntHashMap();
-        bestStates.forEachEntry((vidx, state) -> {
-            result.put(vidx, state.weight);
+        bestStates.forEachEntry((vertexIndex, state) -> {
+            result.put(vertexIndex, state.weight);
             return true; // continue iteration
         });
         return result;

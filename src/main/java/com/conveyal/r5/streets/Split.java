@@ -27,7 +27,6 @@ public class Split {
     // The following fields require more calculations and are only set once a best edge is found.
     public int distance0_mm = 0; // the accumulated distance along the edge geometry up to the split point
     public int distance1_mm = 0; // the accumulated distance along the edge geometry after the split point
-    public int distance_mm = 0; // the distance from the search point to the split point on the street
     public int vertex0; // the vertex at the beginning of the chosen edge
     public int vertex1; // the vertex at the end of the chosen edge
 

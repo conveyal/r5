@@ -233,6 +233,7 @@ public class StreetLayer implements Serializable {
     /**
      * Calculate length from a list of nodes. This is done in advance of creating an edge pair because we need to catch
      * potential length overflows before we ever reserve space for the edges.
+     * @return the length of the edge in millimeters, or -1 if that length will overflow a 32 bit int
      */
     private int getEdgeLengthMillimeters (List<Node> nodes) {
         double lengthMeters = 0;
@@ -465,11 +466,12 @@ public class StreetLayer implements Serializable {
 
     /**
      * Non-destructively find a location on an existing street near the given point.
-     * PARAMETERS ARE FLOATING POINT GEOGRAPHIC (not fixed point ints)
      * TODO favor platforms and pedestrian paths when requested
+     * @param lat latitude in floating point geographic coordinates (not fixed point int coordinates)
+     * @param lon longitude in floating point geographic coordinates (not fixed point int coordinates)
      * @return a Split object representing a point along a sub-segment of a specific edge, or null if there are no streets nearby.
      */
-    public Split findSplit (double lat, double lon, double radiusMeters) {
+    public Split findSplit(double lat, double lon, double radiusMeters) {
         return Split.find (lat, lon, radiusMeters, this);
     }
 

@@ -18,8 +18,8 @@ import java.io.Serializable;
 import java.util.*;
 
 /**
- * Column store is better than struct simulation because 1. it is less fancy, 2. it is auto-resizing (not fixed size),
- * 3. I've tried both and they're the same speed.
+ * A column store with parallel arrays is better than a struct simulation because:
+ * 1. it is less fancy, 2. it is auto-resizing (not fixed size), 3. I've tried both and they're the same speed.
  *
  * Edges come in pairs that have the same origin and destination vertices and the same geometries, but reversed.
  * Therefore many of the arrays are only half as big as the number of edges. All even numbered edges are forward, all
@@ -47,7 +47,7 @@ public class EdgeStore implements Serializable {
 
     int nEdges = 0;
 
-    /** Flags for this edge.  One entry for each forward and each backward edge. */
+    /** Boolean flags for every edge. Separate entries for forward and backward edges. */
     public TIntList flags;
 
     /**
@@ -58,16 +58,16 @@ public class EdgeStore implements Serializable {
      */
     public TShortList speeds;
 
-    /** From vertices. One entry for each edge pair */
+    /** The index of the origin vertex of each edge pair in the forward direction. One entry for each edge pair. */
     public TIntList fromVertices;
 
-    /** To vertices. One entry for each edge pair */
+    /** The index of the destination vertex of each edge pair in the forward direction. One entry for each edge pair. */
     public TIntList toVertices;
 
-    /** Length (millimeters). One entry for each edge pair */
+    /** Length of the edge along its geometry (millimeters). One entry for each edge pair. */
     public TIntList lengths_mm;
 
-    /** Geometries. One entry for each edge pair */
+    /** Geometries. One entry for each edge pair. */
     public List<int[]> geometries; // intermediate points along the edge, other than the intersection endpoints
 
     public static final transient EnumSet<EdgeFlag> PERMISSION_FLAGS = EnumSet
@@ -75,7 +75,7 @@ public class EdgeStore implements Serializable {
 
     public EdgeStore (VertexStore vertexStore, int initialSize) {
         this.vertexStore = vertexStore;
-        // There is one flags and speeds entry per edge.
+        // There are separate flags and speeds entries for the forward and backward edges in each pair.
         flags = new TIntArrayList(initialSize);
         speeds = new TShortArrayList(initialSize);
         // Vertex indices, geometries, and lengths are shared between pairs of forward and backward edges.

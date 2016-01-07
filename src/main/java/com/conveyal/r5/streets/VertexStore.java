@@ -10,7 +10,14 @@ import java.util.EnumSet;
 import java.util.List;
 
 /**
- *
+ * Store a large number of vertices in parallel arrays, providing some abstraction to view them as Vertex objects.
+ * This class is a workaround for Java's lack of compound value types.
+ * It is the equivalent of an array of Vertex structs, but transposed to be a column store.
+ * Not because the work we're doing operates frequently on entire columns,
+ * just because the quirks of Java make parallel arrays more memory efficient than lists of objects.
+ * It would be nice if this kind of functionality was built into the language but it's not too terrible to hand-roll it.
+ * It does also have the advantage of allowing a field to be dropped entirely (its array field is null) which is
+ * more space-efficient than a struct array when a field may be missing/null in every element.
  */
 public class VertexStore implements Serializable {
 
@@ -30,6 +37,8 @@ public class VertexStore implements Serializable {
 
     /**
      * Add a vertex, specifying its coordinates in double-precision floating point degrees.
+     * @lat latitude in floating point degrees
+     * @lon longitude in floating point degrees
      * @return the index of the new vertex.
      */
     public int addVertex (double lat, double lon) {

@@ -109,7 +109,7 @@ public class TransportNetwork implements Serializable, Cloneable {
         streetLayer.loadFromOsm(osm);
         osm.close();
 
-        // Load transit data TODO remove need to supply street layer at this stage
+        // Load transit data
         TransitLayer transitLayer = TransitLayer.fromGtfs(gtfsSourceFiles);
 
         // The street index is needed for associating transit stops with the street network.

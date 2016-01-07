@@ -51,6 +51,7 @@ public class Scenario implements Serializable {
                 useVariant, filteredModifications.size(), modifications.size());
         TransportNetwork network = originalNetwork.clone();
         LOG.info("Resolving modifications against TransportNetwork and sanity checking.");
+        // FIXME actually we don't want to check all the parameters before applying any modifications. Some parameters may become valid/invalid because of previous modifications.
         boolean errorsInScenario = false;
         for (Modification modification : filteredModifications) {
             boolean errorsInModification = modification.resolve(originalNetwork);

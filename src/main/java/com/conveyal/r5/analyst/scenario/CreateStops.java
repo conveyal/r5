@@ -33,6 +33,12 @@ public class CreateStops extends Modification {
     }
 
     @Override
+    public boolean resolve (TransportNetwork network) {
+        // Check for duplicate stop IDs.
+        return false;
+    }
+
+    @Override
     protected TransitLayer applyToTransitLayer(TransitLayer originalTransitLayer) {
         // This should be called before applyToStreetLayer.
         TransitLayer transitLayer = originalTransitLayer.clone();

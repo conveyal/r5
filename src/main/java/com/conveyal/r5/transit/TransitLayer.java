@@ -31,9 +31,6 @@ import java.util.stream.Collectors;
 
 /**
  * A key simplifying factor is that we don't handle overnight trips. This is fine for analysis at usual times of day.
- *
- * The bidirectional indexes between street vertex and transit stop are in transitLayer, so the linkage between
- * street and transit layers is really one-to-many, not one-to-one. This fact allows multiple GTFS in a single network.
  */
 public class TransitLayer implements Serializable, Cloneable {
 

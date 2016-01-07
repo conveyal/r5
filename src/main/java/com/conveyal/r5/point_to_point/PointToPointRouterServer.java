@@ -359,7 +359,7 @@ public class PointToPointRouterServer {
             if (request.queryParams().size() < 4) {
 
                 EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor();
-                for (int e = 0; e < transportNetwork.streetLayer.edgeStore.getnEdges(); e += 2) {
+                for (int e = 0; e < transportNetwork.streetLayer.edgeStore.nEdges(); e += 2) {
                     edge.seek(e);
 
                     try {
@@ -430,7 +430,7 @@ public class PointToPointRouterServer {
             if (request.queryParams().size() < 4) {
 
                 EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor();
-                for (int e = 0; e < transportNetwork.streetLayer.edgeStore.getnEdges(); e += 2) {
+                for (int e = 0; e < transportNetwork.streetLayer.edgeStore.nEdges(); e += 2) {
                     edge.seek(e);
 
                     try {

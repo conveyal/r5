@@ -45,8 +45,6 @@ public class EdgeStore implements Serializable {
     // The vertices that are referred to in these edges
     private VertexStore vertexStore;
 
-    int nEdges = 0;
-
     /** Boolean flags for every edge. Separate entries for forward and backward edges. */
     public TIntList flags;
 
@@ -116,7 +114,6 @@ public class EdgeStore implements Serializable {
             lengths_mm.remove(edgePair, 1);
             // This is not a TIntList, so use the 1-arg remove function to remove by index.
             geometries.remove(edgePair);
-            nEdges -= 2;
         }
     }
 
@@ -229,8 +226,7 @@ public class EdgeStore implements Serializable {
         flags.add(0);
 
         // Increment total number of edges created so far, and return the index of the first new edge.
-        int forwardEdgeIndex = nEdges;
-        nEdges += 2;
+        int forwardEdgeIndex = nEdges();
         return getCursor(forwardEdgeIndex);
 
     }
@@ -253,7 +249,7 @@ public class EdgeStore implements Serializable {
             edgeIndex += 1;
             pairIndex = edgeIndex / 2;
             isBackward = !isBackward;
-            return edgeIndex < nEdges;
+            return edgeIndex < nEdges();
         }
 
         /** move the cursor back one edge */
@@ -268,7 +264,7 @@ public class EdgeStore implements Serializable {
         public void seek(int pos) {
             if (pos < 0)
                 throw new ArrayIndexOutOfBoundsException("Attempt to seek to negative edge number");
-            if (pos >= nEdges)
+            if (pos >= nEdges())
                 throw new ArrayIndexOutOfBoundsException("Attempt to seek beyond end of edge store");
 
             edgeIndex = pos;
@@ -688,13 +684,18 @@ public class EdgeStore implements Serializable {
 
     public void dump () {
         Edge edge = getCursor();
-        for (int e = 0; e < nEdges; e++) {
+        for (int e = 0; e < nEdges(); e++) {
             edge.seek(e);
             System.out.println(edge);
         }
     }
 
-    public int getnEdges() {
-        return nEdges;
+    public int nEdges() {
+        return flags.size();
     }
+
+    public int nEdgePairs() {
+        return fromVertices.size();
+    }
+
 }

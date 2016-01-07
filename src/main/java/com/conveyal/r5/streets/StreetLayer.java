@@ -192,7 +192,7 @@ public class StreetLayer implements Serializable {
             edgesPerWayHistogram.add(nEdgesCreated);
         }
         LOG.info("Done making street edges.");
-        LOG.info("Made {} vertices and {} edges.", vertexStore.getVertexCount(), edgeStore.nEdges);
+        LOG.info("Made {} vertices and {} edges.", vertexStore.getVertexCount(), edgeStore.nEdges());
 
         // need edge lists to apply intersection costs
         buildEdgeLists();
@@ -322,7 +322,7 @@ public class StreetLayer implements Serializable {
         spatialIndex = new IntHashGrid();
         // Skip by twos, we only need to index forward (even) edges. Their odd companions have the same geometry.
         EdgeStore.Edge edge = edgeStore.getCursor();
-        for (int e = 0; e < edgeStore.nEdges; e += 2) {
+        for (int e = 0; e < edgeStore.nEdges(); e += 2) {
             edge.seek(e);
             spatialIndex.insert(edge.getGeometry(), e);
         }
@@ -578,7 +578,7 @@ public class StreetLayer implements Serializable {
             LOG.info("Removed {} disconnected subgraphs", nSmallSubgraphs);
         else
             LOG.info("Found no subgraphs to remove, congratulations for having clean OSM data.");
-        LOG.info("Done removing subgraphs. {} edges remain", edgeStore.nEdges);
+        LOG.info("Done removing subgraphs. {} edges remain", edgeStore.nEdges());
     }
 
     public Envelope getEnvelope() {

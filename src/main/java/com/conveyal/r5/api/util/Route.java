@@ -1,6 +1,7 @@
 package com.conveyal.r5.api.util;
 
 import com.beust.jcommander.internal.Lists;
+import com.conveyal.r5.transit.RouteInfo;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.Collection;
@@ -92,5 +93,19 @@ public class Route {
             '}';
     }
 
+    //TODO: we need to decide if we would use Route or RouteInfo since copying RouteInfo data to Route is just stupid
+    public static Route from(RouteInfo routeInfo) {
+        Route route = new Route();
 
+        route.shortName = routeInfo.route_short_name;
+        route.longName = routeInfo.route_long_name;
+        route.id = routeInfo.route_id;
+        route.routeColor = routeInfo.color;
+        //TODO: get mode
+        route.mode = TransitModes.BUS;
+        //FIXME: get from GTFS
+        route.agencyName = "MARPROM";
+
+        return route;
+    }
 }

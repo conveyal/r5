@@ -256,6 +256,7 @@ public class ProfileRequest implements Serializable, Cloneable {
         HashMap<String, Float> toCoordinate = environment.getArgument("to");
 
         profileRequest.fromTime = environment.getArgument("time");
+        profileRequest.toTime = profileRequest.fromTime + 3*3600;
         profileRequest.date = environment.getArgument("date");
 
 
@@ -265,7 +266,10 @@ public class ProfileRequest implements Serializable, Cloneable {
         profileRequest.toLat = toCoordinate.get("lat");
         profileRequest.toLon = toCoordinate.get("lon");
 
-        profileRequest.directModes = EnumSet.of(Mode.WALK, Mode.BICYCLE, Mode.CAR);
+        //profileRequest.directModes = EnumSet.of(Mode.WALK, Mode.BICYCLE, Mode.CAR);
+        profileRequest.transitModes = EnumSet.of(Mode.TRANSIT);
+        profileRequest.accessModes = EnumSet.of(Mode.WALK);
+        profileRequest.egressModes = profileRequest.accessModes;
         //TODO: get mode from request
         //profileRequest.directModes.add(Mode.WALK);
 

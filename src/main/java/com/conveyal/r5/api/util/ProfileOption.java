@@ -97,4 +97,9 @@ public class ProfileOption {
         access.add(streetSegment);
         this.itinerary.add(itinerary);
     }
+
+    public void addTransit(TransitSegment transitSegment) {
+        transit = new ArrayList<>(5);
+        transit.add(transitSegment);
+    }
 }

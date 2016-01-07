@@ -1,8 +1,15 @@
 package com.conveyal.r5.api.util;
 
 import com.beust.jcommander.internal.Lists;
+import com.conveyal.gtfs.model.Agency;
+import com.conveyal.r5.streets.StreetLayer;
+import com.conveyal.r5.streets.VertexStore;
+import com.conveyal.r5.transit.RouteInfo;
+import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TripPattern;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -33,6 +40,30 @@ public class TransitSegment {
     public Stats rideStats;
     public List<Route> routes;
     public List<SegmentPattern> segmentPatterns = Lists.newArrayList();
+    private transient TransitLayer transitLayer;
+
+    public TransitSegment(TransitLayer transitLayer, int boardStopIdx, int alightStopIdx,
+        int patternIdx) {
+        this.transitLayer = transitLayer;
+        StreetLayer streetLayer = transitLayer.linkedStreetLayer;
+        routes = new ArrayList<>(5);
+        TripPattern pattern = transitLayer.tripPatterns.get(patternIdx);
+        if (pattern.routeIndex >= 0) {
+            RouteInfo routeInfo = transitLayer.routes.get(pattern.routeIndex);
+            //TODO: this needs to be Stop instead of StopCluster in point to point routing
+            from = new StopCluster(transitLayer.stopIdForIndex.get(boardStopIdx), transitLayer.stopNames.get(boardStopIdx));
+            to = new StopCluster(transitLayer.stopIdForIndex.get(alightStopIdx), transitLayer.stopNames.get(alightStopIdx));
+            VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor();
+            vertex.seek(transitLayer.streetVertexForStop.get(boardStopIdx));
+            from.lat = (float) vertex.getLat();
+            from.lon = (float) vertex.getLon();
+
+            vertex.seek(transitLayer.streetVertexForStop.get(alightStopIdx));
+            to.lat = (float) vertex.getLat();
+            to.lon = (float) vertex.getLon();
+            routes.add(Route.from(routeInfo));
+        }
+    }
 
     @Override public String toString() {
         return "TransitSegment{" +

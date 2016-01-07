@@ -114,7 +114,7 @@ public class TransportNetwork implements Serializable, Cloneable {
 
         // The street index is needed for associating transit stops with the street network.
         streetLayer.indexStreets();
-        streetLayer.associateStops(transitLayer, 500);
+        streetLayer.associateStops(transitLayer);
         // Edge lists must be built after all inter-layer linking has occurred.
         streetLayer.buildEdgeLists();
         transitLayer.rebuildTransientIndexes();
@@ -315,9 +315,9 @@ public class TransportNetwork implements Serializable, Cloneable {
      * Really we should use the same function for modifications and when initially creating the TransportNetwork. This
      * function would need to create the stop, link it to the street network, and make a stop tree for that stop.
      */
-    public int addStop (String id, double lat, double lon, double radiusMeters) {
+    public int addStop (String id, double lat, double lon) {
         int newStopIndex = transitLayer.getStopCount();
-        int newStreetVertexIndex = streetLayer.getOrCreateVertexNear(lat, lon, radiusMeters, false);
+        int newStreetVertexIndex = streetLayer.getOrCreateVertexNear(lat, lon, false);
         transitLayer.stopIdForIndex.add(id); // TODO check for uniqueness
         transitLayer.streetVertexForStop.add(newStreetVertexIndex);
         // TODO stop tree, any other stop-indexed arrays or lists

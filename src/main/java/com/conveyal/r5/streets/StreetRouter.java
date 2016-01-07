@@ -116,7 +116,7 @@ public class StreetRouter {
      * @return true if edge was found near wanted coordinate
      */
     public boolean setOrigin (double lat, double lon) {
-        Split split = streetLayer.findSplit(lat, lon, 300);
+        Split split = streetLayer.findSplit(lat, lon, 500);
         if (split == null) {
             LOG.info("No street was found near the specified origin point of {}, {}.", lat, lon);
             return false;

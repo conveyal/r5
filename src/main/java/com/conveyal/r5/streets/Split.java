@@ -42,7 +42,7 @@ public class Split {
     /**
      * @return a new Split object, or null if no edge was found in range.
      */
-    public static Split find (double lat, double lon, double radiusMeters, StreetLayer streetLayer) {
+    public static Split find (double lat, double lon, double searchRadiusMeters, StreetLayer streetLayer) {
         // NOTE THIS ENTIRE GEOMETRIC CALCULATION IS HAPPENING IN FIXED PRECISION INT DEGREES
         int fixLat = VertexStore.floatingDegreesToFixed(lat);
         int fixLon = VertexStore.floatingDegreesToFixed(lon);
@@ -52,7 +52,7 @@ public class Split {
 
         final double metersPerDegreeLat = 111111.111;
         double cosLat = FastMath.cos(FastMath.toRadians(lat)); // The projection factor, Earth is a "sphere"
-        double radiusFixedLat = VertexStore.floatingDegreesToFixed(radiusMeters / metersPerDegreeLat);
+        double radiusFixedLat = VertexStore.floatingDegreesToFixed(searchRadiusMeters / metersPerDegreeLat);
         double radiusFixedLon = radiusFixedLat / cosLat; // Expand the X search space, don't shrink it.
         Envelope envelope = new Envelope(fixLon, fixLon, fixLat, fixLat);
         envelope.expandBy(radiusFixedLon, radiusFixedLat);

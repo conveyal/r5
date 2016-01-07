@@ -56,6 +56,13 @@ public class StreetLayer implements Serializable {
 
     private static final int SNAP_RADIUS_MM = 5 * 1000;
 
+    /**
+     * The radius of a circle in meters within which to search for nearby streets.
+     * This should not necessarily be a constant, but even if it's made settable it should be a field to avoid
+     * cluttering method signatures. Generally you'd set this once at startup and always use the same value afterward.
+     */
+    public static final double LINK_RADIUS_METERS = 300;
+
     // Edge lists should be constructed after the fact from edges. This minimizes serialized size too.
     public transient List<TIntList> outgoingEdges;
     public transient List<TIntList> incomingEdges;
@@ -389,14 +396,13 @@ public class StreetLayer implements Serializable {
      * TODO maybe move this into Split.perform(), store streetLayer ref in Split.
      * @param lat latitude in floating point geographic (not fixed point) degrees.
      * @param lon longitude in floating point geographic (not fixed point) degrees.
-     * @param radiusMeters the radius of a circle in meters within which to search for nearby streets.
      * @param destructive if this is true, allow the street splitting process to change existing edge geometries.
      *                    Set to false when performing a temporary modification that must be reversible.
      * @return the index of a street vertex very close to the supplied location,
      *         or -1 if no such vertex could be found or created.
      */
-    public int getOrCreateVertexNear (double lat, double lon, double radiusMeters, boolean destructive) {
-        Split split = findSplit(lat, lon, radiusMeters);
+    public int getOrCreateVertexNear (double lat, double lon, boolean destructive) {
+        Split split = findSplit(lat, lon, LINK_RADIUS_METERS);
         if (split == null) {
             // No linking site was found within range.
             return -1;
@@ -462,22 +468,24 @@ public class StreetLayer implements Serializable {
      *                    Set to false when performing a temporary modification that must be reversible.
      * @return the vertex of the newly created vertex at the supplied coordinates.
      */
-    public int createAndLinkVertex (double lat, double lon, double radiusMeters, boolean destructive) {
+    public int createAndLinkVertex (double lat, double lon, boolean destructive) {
         int stopVertex = vertexStore.addVertex(lat, lon);
-        int streetVertex = getOrCreateVertexNear(lat, lon, radiusMeters, destructive);
+        int streetVertex = getOrCreateVertexNear(lat, lon, destructive);
         edgeStore.addStreetPair(stopVertex, streetVertex, 1); // TODO maybe link edges should have a length.
         return stopVertex;
     }
 
     /**
      * Non-destructively find a location on an existing street near the given point.
+     * The search radius can be specified freely here because we use this function to link transit stops to streets but
+     * also to link pointsets to streets, and currently we use different distances for these two things.
      * TODO favor platforms and pedestrian paths when requested
      * @param lat latitude in floating point geographic coordinates (not fixed point int coordinates)
      * @param lon longitude in floating point geographic coordinates (not fixed point int coordinates)
      * @return a Split object representing a point along a sub-segment of a specific edge, or null if there are no streets nearby.
      */
-    public Split findSplit(double lat, double lon, double radiusMeters) {
-        return Split.find (lat, lon, radiusMeters, this);
+    public Split findSplit(double lat, double lon, double searchRadiusMeters) {
+        return Split.find (lat, lon, searchRadiusMeters, this);
     }
 
     /**
@@ -485,9 +493,9 @@ public class StreetLayer implements Serializable {
      * between the two. This is a destructive process in that it modifies existing edges, and should therefore only
      * be done during initial transport network building. Stops may be added later but must use destructive = false.
      */
-    public void associateStops (TransitLayer transitLayer, int radiusMeters) {
+    public void associateStops (TransitLayer transitLayer) {
         for (Stop stop : transitLayer.stopForIndex) {
-            int stopVertex = createAndLinkVertex(stop.stop_lat, stop.stop_lon, radiusMeters, true);
+            int stopVertex = createAndLinkVertex(stop.stop_lat, stop.stop_lon, true);
             transitLayer.streetVertexForStop.add(stopVertex); // This is always a valid, unique vertex index.
             // The inverse stopForStreetVertex map is a transient, derived index and will be built later.
         }

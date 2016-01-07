@@ -46,7 +46,7 @@ public class CreateStops extends Modification {
         // streetLayer.transitLayer
         // transitLayer.linkedStreetLayer = streetLayer;
         for (StopSpec stopSpec : stops) {
-            int newVertexIndex = streetLayer.getOrCreateVertexNear(stopSpec.lat, stopSpec.lon, radiusMeters, false);
+            int newVertexIndex = streetLayer.getOrCreateVertexNear(stopSpec.lat, stopSpec.lon, false);
             transitLayer.stopIdForIndex.add(stopSpec.id); // indexForStopId will be derived from this
             transitLayer.stopNames.add(stopSpec.name);
             transitLayer.streetVertexForStop.add(newVertexIndex); // stopForStreetVertex will be derived from this

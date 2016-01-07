@@ -352,6 +352,11 @@ public class StreetLayer implements Serializable {
         LOG.info("average response time {} msec", eTime / N);
     }
 
+    /**
+     * The edge lists (which edges go out of and come into each vertex) are derived from the edges in the EdgeStore.
+     * So any time you add edges or change their endpoints, you need to rebuild the edge index.
+     * TODO some way to signal that a few new edges have been added, rather than rebuilding the whole lists.
+     */
     public void buildEdgeLists() {
         LOG.info("Building edge lists from edges...");
         outgoingEdges = new ArrayList<>(vertexStore.getVertexCount());

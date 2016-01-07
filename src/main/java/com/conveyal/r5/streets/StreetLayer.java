@@ -192,7 +192,7 @@ public class StreetLayer implements Serializable {
             edgesPerWayHistogram.add(nEdgesCreated);
         }
         LOG.info("Done making street edges.");
-        LOG.info("Made {} vertices and {} edges.", vertexStore.nVertices, edgeStore.nEdges);
+        LOG.info("Made {} vertices and {} edges.", vertexStore.getVertexCount(), edgeStore.nEdges);
 
         // need edge lists to apply intersection costs
         buildEdgeLists();
@@ -354,9 +354,9 @@ public class StreetLayer implements Serializable {
 
     public void buildEdgeLists() {
         LOG.info("Building edge lists from edges...");
-        outgoingEdges = new ArrayList<>(vertexStore.nVertices);
-        incomingEdges = new ArrayList<>(vertexStore.nVertices);
-        for (int v = 0; v < vertexStore.nVertices; v++) {
+        outgoingEdges = new ArrayList<>(vertexStore.getVertexCount());
+        incomingEdges = new ArrayList<>(vertexStore.getVertexCount());
+        for (int v = 0; v < vertexStore.getVertexCount(); v++) {
             outgoingEdges.add(new TIntArrayList(4));
             incomingEdges.add(new TIntArrayList(4));
         }
@@ -492,7 +492,7 @@ public class StreetLayer implements Serializable {
     }
 
     public int getVertexCount() {
-        return vertexStore.nVertices;
+        return vertexStore.getVertexCount();
     }
 
     /**
@@ -516,7 +516,7 @@ public class StreetLayer implements Serializable {
         TIntSet edgesToRemove = new TIntHashSet();
 
         int nOrigins = 0;
-        for (int vertex = 0; vertex < vertexStore.nVertices; vertex++) {
+        for (int vertex = 0; vertex < vertexStore.getVertexCount(); vertex++) {
             // N.B. this is not actually running a search for every vertex as after the first few
             // almost all of the vertices are labeled
             if (vertexLabels.containsKey(vertex))
@@ -533,7 +533,7 @@ public class StreetLayer implements Serializable {
 
             TIntList reachedVertices = new TIntArrayList();
             int nReached = 0;
-            for (int reachedVertex = 0; reachedVertex < vertexStore.nVertices; reachedVertex++) {
+            for (int reachedVertex = 0; reachedVertex < vertexStore.getVertexCount(); reachedVertex++) {
                 if (r.getTravelTimeToVertex(reachedVertex) != Integer.MAX_VALUE) {
                     nReached++;
                     // use source vertex as label, saves a variable

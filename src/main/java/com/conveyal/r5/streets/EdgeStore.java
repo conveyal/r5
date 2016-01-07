@@ -89,16 +89,17 @@ public class EdgeStore implements Serializable {
     /**
      * Remove the specified edges from this edge store.
      * Removing edges causes their indexes to change, but the only place these indexes are used is in the incoming
-     * and outgoing edge lists of vertices. Those are transient data structures derived from the edges themselves,
-     * so fortunately we don't need to update them when the edges are shifted around, we just rebuild them.
+     * and outgoing edge lists of vertices. Those edge lists are transient data structures derived from the edges
+     * themselves, so fortunately we don't need to update them while the edges are shifted around, we just rebuild them
+     * afterward.
      */
-    public void remove (int[] edgesToOmit) {
+    public void remove (int[] edgesToRemove) {
         // Sort the list and traverse it backward. Removing an element only affects the array indices of elements later
         // in the list, so backward traversal ensures that all edge indexes remain valid during a bulk remove operation.
-        Arrays.sort(edgesToOmit);
+        Arrays.sort(edgesToRemove);
         int prevPair = -1;
-        for (int cursor = edgesToOmit.length - 1; cursor >= 0; cursor--) {
-            int edgePair = edgesToOmit[cursor] / 2;
+        for (int cursor = edgesToRemove.length - 1; cursor >= 0; cursor--) {
+            int edgePair = edgesToRemove[cursor] / 2;
             if (edgePair == prevPair) {
                 // Ignore duplicate edge indexes, which would cause two different edges to be removed.
                 continue;

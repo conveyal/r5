@@ -1,7 +1,9 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.trove.TIntAugmentedList;
+import gnu.trove.list.TByteList;
 import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 
 import java.io.Serializable;
@@ -24,15 +26,14 @@ public class VertexStore implements Serializable {
     public static final double FIXED_FACTOR = 1e7; // we could just reuse the constant from osm-lib Node.
     // TODO direct mm_per_fixed_degree conversion, work entirely in mm and fixed degrees.
 
-    public int nVertices = 0;
     public TIntList fixedLats;
     public TIntList fixedLons;
-    public List<EnumSet<VertexFlag>> vertexFlags; // TODO change this to use one big int array of bit flags.
+    public TByteList vertexFlags;
 
     public VertexStore (int initialSize) {
         fixedLats = new TIntArrayList(initialSize);
         fixedLons = new TIntArrayList(initialSize);
-        vertexFlags = new ArrayList<>(initialSize);
+        vertexFlags = new TByteArrayList(initialSize);
     }
 
     /**
@@ -50,10 +51,10 @@ public class VertexStore implements Serializable {
      * @return the index of the new vertex.
      */
     public int addVertexFixed (int fixedLat, int fixedLon) {
-        int vertexIndex = nVertices++;
+        int vertexIndex = vertexFlags.size();
         fixedLats.add(fixedLat);
         fixedLons.add(fixedLon);
-        vertexFlags.add(EnumSet.noneOf(VertexFlag.class));
+        vertexFlags.add((byte)0);
         return vertexIndex;
     }
 
@@ -73,7 +74,7 @@ public class VertexStore implements Serializable {
         /** @return whether this cursor is still within the list (there is a vertex to read). */
         public boolean advance () {
             index += 1;
-            return index < nVertices;
+            return index < getVertexCount();
         }
 
         public void seek (int index) {
@@ -85,24 +86,15 @@ public class VertexStore implements Serializable {
         }
 
         public void setLon(double lon) {
-            fixedLons.set(index, (int)(lon * FIXED_FACTOR));
+            fixedLons.set(index, (int) (lon * FIXED_FACTOR));
         }
 
-        public void setLatLon(double lat, double lon) {
-            setLat(lat);
-            setLon(lon);
+        public boolean getFlag(VertexFlag flag) {
+            return (vertexFlags.get(index) & flag.flag) != 0;
         }
 
-        public boolean getFlag (VertexFlag flag) {
-            return vertexFlags.get(index).contains(flag);
-        }
-
-        public void setFlag (VertexFlag flag) {
-            vertexFlags.get(index).add(flag);
-        }
-
-        public void clearFlag (VertexFlag flag) {
-            vertexFlags.get(index).remove(flag);
+        public void setFlag(VertexFlag flag) {
+            vertexFlags.set(index, (byte)(vertexFlags.get(index) | flag.flag));
         }
 
         public double getLat() {
@@ -139,6 +131,10 @@ public class VertexStore implements Serializable {
         return fixed / FIXED_FACTOR;
     }
 
+    /** Return the number of vertices currently stored in this VertexStore. */
+    public int getVertexCount() {
+        return vertexFlags.size();
+    }
 
     //Used when converting fixed latitude and longitude to floating from Split
     //It is in double type even though it is fixed
@@ -148,8 +144,18 @@ public class VertexStore implements Serializable {
 
 
     public enum VertexFlag {
+
         /** this intersection has a traffic signal */
-        TRAFFIC_SIGNAL
+        TRAFFIC_SIGNAL(0);
+
+        /** In each enum value this field should contain an integer with only a single bit switched on. */
+        public final int flag;
+
+        /** Conveniently create a unique integer flag pattern for each of the enum values. */
+        private VertexFlag (int bitNumber) {
+            flag = 1 << bitNumber;
+        }
+
     }
 
     /**
@@ -158,7 +164,6 @@ public class VertexStore implements Serializable {
      */
     public VertexStore extendOnlyCopy() {
         VertexStore copy = new VertexStore(100);
-        copy.nVertices = 0;
         copy.fixedLats = new TIntAugmentedList(this.fixedLats);
         copy.fixedLons = new TIntAugmentedList(this.fixedLons);
         copy.vertexFlags = null; // TODO change this to use one big int array of bit flags.

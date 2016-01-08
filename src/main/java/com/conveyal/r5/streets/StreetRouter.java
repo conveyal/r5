@@ -246,6 +246,15 @@ public class StreetRouter {
         }
     }
 
+    /**
+     * Returns best state of this vertexIndex
+     * @param vertexIndex
+     * @return
+     */
+    public State getState(int vertexIndex) {
+        return bestStates.get(vertexIndex);
+    }
+
     public static class State implements Cloneable {
         public int vertex;
         public int weight;

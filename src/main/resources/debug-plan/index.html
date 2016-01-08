@@ -19,10 +19,12 @@
         <input type="text" placeholder="to lat" id="toLat" name="toLat">
         <input type="text" placeholder="to lon" id="toLon" name="toLon">
         <button type="submit" value="submit" disabled="true" id="planButton">plan</button>
+        <button type="submit" value="submit" disabled="true" id="stopButton">Show reached stops</button>
         <div id="map" style="position: absolute; top: 40px; left: 0; width: 100%; height: 100%;"></div>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
         <script src="//cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
         <script src="./leaflet_context/leaflet.contextmenu.js"></script>
+        <script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
         <script>
             var hostname = "http://localhost:8080";
             var my_map;
@@ -30,6 +32,7 @@
             var layer = null;
 
             var m1, m2;
+            var weightSize;
 
             var icon_start = L.icon({
                 iconUrl: 'images/marker-flag-start-shadowed.png',
@@ -73,6 +76,9 @@
             function enable_button() {
                 if (m1 != undefined && m2 != undefined) {
                     $("#planButton").prop('disabled', false);
+                }
+                if (m1 != undefined) {
+                    $("#stopButton").prop('disabled', false);
                 }
             }
 
@@ -147,6 +153,15 @@
                     opacity: 0.8
                 };
             }
+            function styleStop(feature) {
+                return {
+                    color: getModeColor(feature.properties.mode),
+                    //weight:speedWeight(feature.properties.speed_ms),
+                    //radius:feature.properties.weight/10,
+                    radius:weightSize(feature.properties.weight),
+                    opacity: 0.8
+                };
+            }
 
             function onEachFeature(feature, layer) {
                 if (feature.properties) {
@@ -173,6 +188,42 @@
                 if (m != undefined) {
                     m.setLatLng(L.latLng($("#"+which+"Lat").val(), $("#"+which+"Lon").val()));
                 }
+
+            }
+
+            function requestStops() {
+                var params = {
+                    fromLat: m1.getLatLng().lat,
+                    fromLon: m1.getLatLng().lng,
+                    mode: $("#mode").val(),
+                }
+                console.log(params);
+                //make a request
+                $.ajax({
+                    data: params,
+                    url: hostname + "/reachedStops",
+                    success: function (data) {
+                        console.log(data);
+                        //Removes line from previous request
+                        if (layer != null) {
+                            layer.clearLayers();
+                        }
+                        if (data.errors) {
+                            alert(data.errors);
+                        }
+                        if (data.data) {
+                            //scales point size radius from 4-20 based on min max of point weight
+                            weightSize = d3.scale.linear()
+                            .domain(d3.extent(data.data.features, function(feature) { return feature.properties.weight;}))
+                            .range([4, 20]);
+                            layer = L.geoJson(data.data, {pointToLayer:function(feature, latlng) {
+                                return L.circleMarker(latlng, { filColor:getModeColor(feature.properties.mode), weight:1});
+                            },
+                                style: styleStop, onEachFeature:onEachFeature});
+                            layer.addTo(window.my_map);
+                        }
+                    }
+                });
 
             }
 
@@ -240,6 +291,7 @@
 
             $(document).ready(function() {
                 $("#planButton").click(requestPlan);
+                $("#stopButton").click(requestStops);
                 $("#full").change(requestPlan);
                 $("#fromLat").keyup(function(e) {
                     //Enter pressed

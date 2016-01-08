@@ -14,6 +14,10 @@
         <label for="full">
             <input type="checkbox" value="full_load" id="full" name="full">Load all states
         </label>
+        <input type="text" placeholder="from lat" id="fromLat" name="fromLat">
+        <input type="text" placeholder="from lon" id="fromLon" name="fromLon">
+        <input type="text" placeholder="to lat" id="toLat" name="toLat">
+        <input type="text" placeholder="to lon" id="toLon" name="toLon">
         <button type="submit" value="submit" disabled="true" id="planButton">plan</button>
         <div id="map" style="position: absolute; top: 40px; left: 0; width: 100%; height: 100%;"></div>
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.4/jquery.min.js"></script>
@@ -82,6 +86,14 @@
                 });
                 enable_button()
 
+                $("#fromLat").val(m1.getLatLng().lat);
+                $("#fromLon").val(m1.getLatLng().lng);
+
+                m1.on('move', function(e) {
+                    $("#fromLat").val(e.latlng.lat);
+                    $("#fromLon").val(e.latlng.lng);
+                });
+
                 m1.addTo(my_map);
             }
 
@@ -94,6 +106,12 @@
                     icon: icon_end
                 });
                 enable_button()
+                $("#toLat").val(m2.getLatLng().lat);
+                $("#toLon").val(m2.getLatLng().lng);
+                m2.on('move', function(e) {
+                    $("#toLat").val(e.latlng.lat);
+                    $("#toLon").val(e.latlng.lng);
+                });
 
                 m2.addTo(my_map);
             }
@@ -143,6 +161,19 @@
                     pop +="</p>";
                     layer.bindPopup(pop);
                 }
+            }
+
+            function moveMarker(which) {
+                var m;
+                if (which == "from") {
+                    m = m1;
+                } else {
+                    m = m2;
+                }
+                if (m != undefined) {
+                    m.setLatLng(L.latLng($("#"+which+"Lat").val(), $("#"+which+"Lon").val()));
+                }
+
             }
 
             function requestPlan() {
@@ -210,6 +241,35 @@
             $(document).ready(function() {
                 $("#planButton").click(requestPlan);
                 $("#full").change(requestPlan);
+                $("#fromLat").keyup(function(e) {
+                    //Enter pressed
+                    if(e.keyCode == 13)
+                        {
+                            moveMarker("from");
+                        }
+                });
+                $("#fromLon").keyup(function(e) {
+                    //Enter pressed
+                    if(e.keyCode == 13)
+                        {
+                            moveMarker("from");
+                        }
+                });
+                $("#toLat").keyup(function(e) {
+                    //Enter pressed
+                    if(e.keyCode == 13)
+                        {
+                            moveMarker("to");
+                        }
+                });
+                $("#toLon").keyup(function(e) {
+                    //Enter pressed
+                    if(e.keyCode == 13)
+                        {
+                            moveMarker("to");
+                        }
+                });
+
             });
 
 

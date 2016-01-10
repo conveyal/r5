@@ -4,6 +4,7 @@ import com.conveyal.osmlib.Node;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.trove.TIntAugmentedList;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.LineString;
@@ -763,6 +764,31 @@ public class EdgeStore implements Serializable {
      */
     public int nEdgePairs() {
         return fromVertices.size();
+    }
+
+    private EdgeStore() {
+        // Private trivial constructor. Leaves all fields blank for use in extend-only copy method.
+    }
+
+    /**
+     * Returns a semi-deep copy of this EdgeStore for use when applying Scenarios. Mutable objects and collections
+     * will be cloned, but their contents will not. The lists containing the edge characteristics will be copied
+     * in such a way that all threads applying Scenarios will share the same baseline data, and only extend those
+     * lists.
+     */
+    public EdgeStore extendOnlyCopy() {
+        EdgeStore copy = new EdgeStore();
+        // The Edge store references a vertex store, and the StreetLayer should also hold the same reference.
+        // So the StreetLayer that makes this copy needs to grab a pointer to the new extend only VertexStore
+        copy.vertexStore = vertexStore.extendOnlyCopy();
+        copy.flags = new TIntAugmentedList(flags);
+        copy.speeds = new TShortArrayList(speeds); // This is a deep copy, we should do an extend-copy but need a new class for that. Can we just use ints?
+        // Vertex indices, geometries, and lengths are shared between pairs of forward and backward edges.
+        copy.fromVertices = new TIntAugmentedList(fromVertices);
+        copy.toVertices = new TIntAugmentedList(toVertices);
+        copy.geometries = new ArrayList<>(geometries); // This is a deep copy, we should do an extend-copy but need a new class for List<Object>.
+        copy.lengths_mm = new TIntAugmentedList(lengths_mm);
+        return copy;
     }
 
 }

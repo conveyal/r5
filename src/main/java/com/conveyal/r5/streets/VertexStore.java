@@ -166,7 +166,7 @@ public class VertexStore implements Serializable {
         VertexStore copy = new VertexStore(100);
         copy.fixedLats = new TIntAugmentedList(this.fixedLats);
         copy.fixedLons = new TIntAugmentedList(this.fixedLons);
-        copy.vertexFlags = null; // TODO change this to use one big int array of bit flags.
+        copy.vertexFlags = new TByteArrayList(vertexFlags); // This is a deep copy, we should do an extend-copy but need a new class for that.
         return copy;
     }
 

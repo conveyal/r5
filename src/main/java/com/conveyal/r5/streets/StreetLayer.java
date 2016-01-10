@@ -66,7 +66,7 @@ public class StreetLayer implements Serializable {
     // Edge lists should be constructed after the fact from edges. This minimizes serialized size too.
     public transient List<TIntList> outgoingEdges;
     public transient List<TIntList> incomingEdges;
-    public transient IntHashGrid spatialIndex = new IntHashGrid();
+    private transient IntHashGrid spatialIndex = new IntHashGrid();
 
     private transient TraversalPermissionLabeler permissions = new USTraversalPermissionLabeler(); // TODO don't hardwire to US
     private transient LevelOfTrafficStressLabeler stressLabeler = new LevelOfTrafficStressLabeler();
@@ -261,7 +261,7 @@ public class StreetLayer implements Serializable {
     }
 
     /**
-     * Make an edge for a sub-section of an OSM way, typically between two intersections or dead ends.
+     * Make an edge for a sub-section of an OSM way, typically between two intersections or leading up to a dead end.
      */
     private void makeEdge (Way way, int beginIdx, int endIdx) {
 
@@ -336,6 +336,22 @@ public class StreetLayer implements Serializable {
         LOG.info("Done indexing streets.");
     }
 
+    /**
+     * Rather than querying the spatial index directly, going through this method will ensure that any temporary edges
+     * not in the index are also visible. Temporary edges, created when applying a scenario in a single thread, are
+     * not added to the spatial index, which is read by all threads.
+     * Note: the spatial index can and will return false positives, but should not produce false negatives.
+     * We return the unfiltered results including false positives because calculating the true distance to each edge
+     * is quite a slow operation. The caller must post-filter the set of edges if more distance information is needed,
+     * including knowledge of whether an edge passes inside the query envelope at all.
+     */
+    public TIntSet findEdgesInEnvelope (Envelope envelope) {
+        TIntSet candidates = spatialIndex.query(envelope);
+        // Always include any temporary edges, since over-selection is allowed.
+        candidates.addAll(edgeStore.temporarilyAddedEdges);
+        return candidates;
+    }
+
     /** After JIT this appears to scale almost linearly with number of cores. */
     public void testRouting (boolean withDestinations, TransitLayer transitLayer) {
         LOG.info("Routing from random vertices in the graph...");
@@ -396,12 +412,10 @@ public class StreetLayer implements Serializable {
      * TODO maybe move this into Split.perform(), store streetLayer ref in Split.
      * @param lat latitude in floating point geographic (not fixed point) degrees.
      * @param lon longitude in floating point geographic (not fixed point) degrees.
-     * @param destructive if this is true, allow the street splitting process to change existing edge geometries.
-     *                    Set to false when performing a temporary modification that must be reversible.
      * @return the index of a street vertex very close to the supplied location,
      *         or -1 if no such vertex could be found or created.
      */
-    public int getOrCreateVertexNear (double lat, double lon, boolean destructive) {
+    public int getOrCreateVertexNear (double lat, double lon) {
         Split split = findSplit(lat, lon, LINK_RADIUS_METERS);
         if (split == null) {
             // No linking site was found within range.
@@ -425,8 +439,10 @@ public class StreetLayer implements Serializable {
 
         // The split is somewhere along a street away from an existing intersection vertex. Make a new splitter vertex.
         int newVertexIndex = vertexStore.addVertexFixed((int) split.fLat, (int) split.fLon);
-        int oldToVertex = edge.getToVertex(); // Grab this value before potentially modifying the existing edge.
-        if (destructive) {
+        int oldToVertex = edge.getToVertex(); // Hold a copy of the to vertex index, because it may be modified below.
+        if (edge.isMutable()) {
+            // The edge we are going to split is mutable.
+            // We're either building a baseline graph, or modifying an edge created within the same scenario.
             // Modify the existing bidirectional edge pair to serve as the first segment leading up to the split point.
             // Its spatial index entry is still valid, since the edge's envelope will only shrink.
             edge.setLengthMm(split.distance0_mm);
@@ -434,19 +450,23 @@ public class StreetLayer implements Serializable {
             // Turn the edge into a straight line. FIXME split edges and new edges should have geometries!
             edge.setGeometry(Collections.EMPTY_LIST);
         } else {
+            // The edge we are going to split is immutable, and should be left as-is.
+            // We must be applying a scenario, and this edge is part of the baseline graph shared between threads.
             // Preserve the existing edge pair, creating a new edge pair to lead up to the split.
             // The new edge will be added to the edge lists later (the edge lists are a transient index).
+            // We don't add it to the spatial index, which is shared between all threads. TODO include all temp edges in every spatial index query result.
             EdgeStore.Edge newEdge0 = edgeStore.addStreetPair(edge.getFromVertex(), newVertexIndex, split.distance0_mm);
-            spatialIndex.insert(newEdge0.getEnvelope(), newEdge0.edgeIndex);
             // Copy the flags and speeds for both directions, making the new edge like the existing one.
             newEdge0.copyPairFlagsAndSpeeds(edge);
         }
-        // Make a second new bidirectional edge pair after the split and add it to the spatial index.
+        // Make a new bidirectional edge pair for the segment after the split.
         // The new edge will be added to the edge lists later (the edge lists are a transient index).
         EdgeStore.Edge newEdge1 = edgeStore.addStreetPair(newVertexIndex, oldToVertex, split.distance1_mm);
-        spatialIndex.insert(newEdge1.getEnvelope(), newEdge1.edgeIndex);
-        // Copy the flags and speeds for both directions, making the new edge like the existing one.
+        // Copy the flags and speeds for both directions, making the new edge1 like the existing edge.
         newEdge1.copyPairFlagsAndSpeeds(edge);
+        if (!edgeStore.isProtectiveCopy()) {
+            spatialIndex.insert(newEdge1.getEnvelope(), newEdge1.edgeIndex);
+        }
 
         // Return the splitter vertex ID
         return newVertexIndex;
@@ -464,19 +484,17 @@ public class StreetLayer implements Serializable {
      * reused. So in sum, this will create one or two new vertices, and all necessary edge pairs to properly connect
      * these new vertices.
      * TODO store street-to-stop distance in a table in TransitLayer, or change the link edge length. This also allows adjusting for subway entrances etc.
-     * @param destructive if this is true, allow changes to existing edges, vertices, and geometries.
-     *                    Set to false when performing a temporary modification that must be reversible.
      * @return the vertex of the newly created vertex at the supplied coordinates.
      */
-    public int createAndLinkVertex (double lat, double lon, boolean destructive) {
+    public int createAndLinkVertex (double lat, double lon) {
         int stopVertex = vertexStore.addVertex(lat, lon);
-        int streetVertex = getOrCreateVertexNear(lat, lon, destructive);
+        int streetVertex = getOrCreateVertexNear(lat, lon);
         edgeStore.addStreetPair(stopVertex, streetVertex, 1); // TODO maybe link edges should have a length.
         return stopVertex;
     }
 
     /**
-     * Non-destructively find a location on an existing street near the given point.
+     * Find a location on an existing street near the given point, without actually creating any vertices or edges.
      * The search radius can be specified freely here because we use this function to link transit stops to streets but
      * also to link pointsets to streets, and currently we use different distances for these two things.
      * TODO favor platforms and pedestrian paths when requested
@@ -485,17 +503,16 @@ public class StreetLayer implements Serializable {
      * @return a Split object representing a point along a sub-segment of a specific edge, or null if there are no streets nearby.
      */
     public Split findSplit(double lat, double lon, double searchRadiusMeters) {
-        return Split.find (lat, lon, searchRadiusMeters, this);
+        return Split.find(lat, lon, searchRadiusMeters, this);
     }
 
     /**
      * For every stop in a TransitLayer, find or create a nearby vertex in the street layer and record the connection
-     * between the two. This is a destructive process in that it modifies existing edges, and should therefore only
-     * be done during initial transport network building. Stops may be added later but must use destructive = false.
+     * between the two.
      */
     public void associateStops (TransitLayer transitLayer) {
         for (Stop stop : transitLayer.stopForIndex) {
-            int stopVertex = createAndLinkVertex(stop.stop_lat, stop.stop_lon, true);
+            int stopVertex = createAndLinkVertex(stop.stop_lat, stop.stop_lon);
             transitLayer.streetVertexForStop.add(stopVertex); // This is always a valid, unique vertex index.
             // The inverse stopForStreetVertex map is a transient, derived index and will be built later.
         }

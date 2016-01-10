@@ -40,6 +40,7 @@ public class Split {
     }
 
     /**
+     * Find a location on an existing street near the given point, without actually creating any vertices or edges.
      * @return a new Split object, or null if no edge was found in range.
      */
     public static Split find (double lat, double lon, double searchRadiusMeters, StreetLayer streetLayer) {
@@ -59,7 +60,7 @@ public class Split {
         double squaredRadiusFixedLat = radiusFixedLat * radiusFixedLat; // May overflow, don't use an int
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
         // Iterate over the set of forward (even) edges that may be near the given coordinate.
-        TIntIterator edgeIterator = streetLayer.spatialIndex.query(envelope).iterator();
+        TIntIterator edgeIterator = streetLayer.findEdgesInEnvelope(envelope).iterator();
         // The split location currently being examined and the best one seen so far.
         Split curr = new Split();
         Split best = new Split();

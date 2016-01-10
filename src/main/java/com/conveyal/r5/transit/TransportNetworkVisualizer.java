@@ -109,7 +109,7 @@ public class TransportNetworkVisualizer {
                         floatingDegreesToFixed(south), floatingDegreesToFixed(north));
 
                 if ("streetEdges".equals(layer)) {
-                    TIntSet streets = network.streetLayer.spatialIndex.query(env);
+                    TIntSet streets = network.streetLayer.findEdgesInEnvelope(env);
 
                     if (streets.size() > 10_000) {
                         LOG.warn("Refusing to include more than 10000 edges in result");

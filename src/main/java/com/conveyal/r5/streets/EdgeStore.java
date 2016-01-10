@@ -11,6 +11,7 @@ import gnu.trove.list.TIntList;
 import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TShortArrayList;
+import gnu.trove.set.TIntSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -67,6 +68,43 @@ public class EdgeStore implements Serializable {
 
     /** Geometries. One entry for each edge pair. */
     public List<int[]> geometries; // intermediate points along the edge, other than the intersection endpoints
+
+    /**
+     * When applying scenarios, we don't duplicate the entire set of edges and vertices. We extend them, treating
+     * the baseline graph as immutable. We have to be careful not to change or delete any elements of that baseline
+     * graph which is shared between all threads. All edges at or above the index firstModifiableEdge can be modified,
+     * all lower indexes should be treated as immutable.
+     * All edges from firstModifiableEdge up to nEdges() are temporary and are not in the spatial index.
+     * This field also serves as an indication that a scenario is being applied and this EdgeStore is a protective copy,
+     * whenever firstModifiableEdge > 0.
+     */
+    public int firstModifiableEdge = 0;
+
+    /**
+     * When applying a scenario, we can't touch the baseline graph which is shared between all threads. Whenever we
+     * must delete one of these immutable edges (e.g. when splitting a road to connect a new stop) we instead record
+     * its index in temporarilyDeletedEdges, meaning it should be ignored as if it did not exist in this thread.
+     */
+    public TIntSet temporarilyDeletedEdges = null;
+
+    /**
+     * If this EdgeStore has has a Scenario applied, this list contains all the edge indexes created by that scenario.
+     * This is a bit redundant since the edges added temporarily by a Scenario should always be the numbers from
+     * firstModifiableEdge to nEdges. But it's useful to have a list of these numbers around (e.g. for spatial index
+     * queries) and placing it in a field rather than generating it on demand means the list instance gets reused.
+     */
+    public TIntList temporarilyAddedEdges = new TIntArrayList();
+
+    /**
+     * There's one case where this method will fail: using Scenarios to create street networks from a blank slate,
+     * where there are no edges before the scenario is applied.
+     *
+     * @return true if this EdgeStore has already been extended,
+     * and can therefore be modified without affecting the baseline graph shared between all threads.
+     */
+    public boolean isProtectiveCopy() {
+        return firstModifiableEdge > 0;
+    }
 
     public static final transient EnumSet<EdgeFlag> PERMISSION_FLAGS = EnumSet
         .of(EdgeFlag.ALLOWS_PEDESTRIAN, EdgeFlag.ALLOWS_BIKE, EdgeFlag.ALLOWS_CAR);
@@ -227,6 +265,11 @@ public class EdgeStore implements Serializable {
 
         // Increment total number of edges created so far, and return the index of the first new edge.
         int forwardEdgeIndex = nEdges();
+        if (isProtectiveCopy()) {
+            // If we're working on a copy made for a Scenario the edges will not be spatially indexed, so record them.
+            temporarilyAddedEdges.add(forwardEdgeIndex);
+            temporarilyAddedEdges.add(forwardEdgeIndex + 1);
+        }
         return getCursor(forwardEdgeIndex);
 
     }
@@ -398,8 +441,7 @@ public class EdgeStore implements Serializable {
          *
          * Otherwise speed is based on wanted walking, cycling speed provided in ProfileRequest.
          */
-        private float calculateSpeed(ProfileRequest options, Mode traverseMode,
-            long time) {
+        private float calculateSpeed(ProfileRequest options, Mode traverseMode, long time) {
             if (traverseMode == null) {
                 return Float.NaN;
             } else if (traverseMode == Mode.CAR) {
@@ -658,6 +700,16 @@ public class EdgeStore implements Serializable {
         public int getEdgeIndex() {
             return edgeIndex;
         }
+
+        /**
+         * @return whether this edge may be modified. It may not be modified if it is part of a baseline graph that has
+         * been extended by a scenario. It may be modified if it's part of a baseline graph in the process of being
+         * built, or if it was created as part of the scenario being applied.
+         */
+        public boolean isMutable() {
+            return edgeIndex >= firstModifiableEdge;
+        }
+
     }
 
     public Edge getCursor() {

@@ -281,7 +281,7 @@ public class PointToPointRouterServer {
 
             Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
                 floatingDegreesToFixed(south), floatingDegreesToFixed(north));
-            TIntSet streets = transportNetwork.streetLayer.spatialIndex.query(env);
+            TIntSet streets = transportNetwork.streetLayer.findEdgesInEnvelope(env);
 
             if (streets.size() > 100_000) {
                 LOG.warn("Refusing to include more than 100,000 edges in result");
@@ -388,7 +388,7 @@ public class PointToPointRouterServer {
 
             Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
                 floatingDegreesToFixed(south), floatingDegreesToFixed(north));
-            TIntSet streets = transportNetwork.streetLayer.spatialIndex.query(env);
+            TIntSet streets = transportNetwork.streetLayer.findEdgesInEnvelope(env);
             //transportNetwork.streetLayer.edgeStore.getCursor()
 
             if (streets.size() > 100_000) {
@@ -454,7 +454,7 @@ public class PointToPointRouterServer {
 
             Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
                 floatingDegreesToFixed(south), floatingDegreesToFixed(north));
-            TIntSet streets = transportNetwork.streetLayer.spatialIndex.query(env);
+            TIntSet streets = transportNetwork.streetLayer.findEdgesInEnvelope(env);
 
             if (streets.size() > 100_000) {
                 LOG.warn("Refusing to include more than 100,000 edges in result");

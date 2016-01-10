@@ -712,10 +712,17 @@ public class EdgeStore implements Serializable {
 
     }
 
+    /**
+     * @return an Edge object that can be moved around in the EdgeStore to get a view of any edge in the graph.
+     * This object is not pointing at any edge upon creation, so you'll need to call seek() on it to select an edge.
+     */
     public Edge getCursor() {
         return new Edge();
     }
 
+    /**
+     * @return an Edge object that can be moved around in the EdgeStore to get a view of any edge in the graph.
+     */
     public Edge getCursor(int pos) {
         Edge edge = new Edge();
         edge.seek(pos);
@@ -742,10 +749,18 @@ public class EdgeStore implements Serializable {
         }
     }
 
+    /**
+     * @return the total number of individual directed edges in the graph, including temporary ones from Scenarios.
+     * Forward and backward edges in pairs are counted separately.
+     */
     public int nEdges() {
         return flags.size();
     }
 
+    /**
+     * @return the number of forward+backward edge pairs in the graph, including temporary ones from applied Scenarios.
+     * This should always be always nEdges/2.
+     */
     public int nEdgePairs() {
         return fromVertices.size();
     }

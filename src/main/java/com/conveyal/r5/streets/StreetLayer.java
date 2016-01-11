@@ -460,7 +460,20 @@ public class StreetLayer implements Serializable {
     public int createAndLinkVertex (double lat, double lon, double radiusMeters, boolean destructive) {
         int stopVertex = vertexStore.addVertex(lat, lon);
         int streetVertex = getOrCreateVertexNear(lat, lon, radiusMeters, destructive);
-        edgeStore.addStreetPair(stopVertex, streetVertex, 1); // TODO maybe link edges should have a length.
+        EdgeStore.Edge e = edgeStore.addStreetPair(stopVertex, streetVertex, 1); // TODO maybe link edges should have a length.
+
+        // all permissions true, permissions are controlled by whatever leads into this edge.
+        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+        e.advance();
+        // set flags on reverse edge
+        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+
         return stopVertex;
     }
 

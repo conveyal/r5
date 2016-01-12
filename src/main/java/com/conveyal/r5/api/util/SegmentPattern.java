@@ -53,7 +53,10 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
 
     public SegmentPattern(TransitLayer transitLayer, TripPattern pattern, int patternIdx, int boardStopIdx,
         int alightStopIdx, int alightTime, ZonedDateTime fromTimeDateZD) {
-        fromArrivalTime = fromDepartureTime = toArrivalTime = toDepartureTime = new ArrayList<>();
+        fromArrivalTime = new ArrayList<>();
+        fromDepartureTime = new ArrayList<>();
+        toArrivalTime = new ArrayList<>();
+        toDepartureTime = new ArrayList<>();
         realTime = false;
         patternId = Integer.toString(patternIdx);
         fromIndex = -1;

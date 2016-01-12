@@ -619,4 +619,8 @@ public class StreetLayer implements Serializable {
         return outgoingEdges;
     }
 
+    public StreetLayer extendOnlyCopy () {
+        return null;
+    }
+
 }

@@ -1,6 +1,8 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.publish.StaticComputer;
+import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TripPattern;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
@@ -88,4 +90,15 @@ public class Path {
             return this == p || Arrays.equals(patterns, p.patterns) && Arrays.equals(boardStops, p.boardStops) && Arrays.equals(alightStops, p.alightStops);
         } else return false;
     }
+
+    /**
+     * Gets tripPattern at provided pathIndex
+     * @param transitLayer
+     * @param pathIndex
+     * @return
+     */
+    public TripPattern getPattern(TransitLayer transitLayer, int pathIndex) {
+        return transitLayer.tripPatterns.get(this.patterns[pathIndex]);
+    }
+
 }

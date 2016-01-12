@@ -54,10 +54,13 @@ public class PointToPointQuery {
 
         TIntIntMap reachedTransitStops = new TIntIntHashMap();
 
+        TIntIntMap destinationTransitStops = new TIntIntHashMap();
+
         EnumSet<Mode> modes = transit ? request.accessModes : request.directModes;
         ProfileOption option = new ProfileOption();
 
-        Map<Integer, StreetPath> pathsToStops = new HashMap<>();
+        Map<Mode, StreetRouter> accessRouter = new HashMap<>(modes.size());
+        Map<Mode, StreetRouter> egressRouter = new HashMap<>(request.egressModes.size());
 
         //Routes all direct (if no transit)/access modes
         for(Mode mode: modes) {
@@ -67,13 +70,14 @@ public class PointToPointQuery {
             streetRouter.profileRequest = request;
             // TODO add time and distance limits to routing, not just weight.
             // TODO apply walk and bike speeds and maxBike time.
-            streetRouter.distanceLimitMeters = transit ? 2000 : 100_000; // FIXME arbitrary, and account for bike or car access mode
+            streetRouter.distanceLimitMeters = transit ? 200 : 100_000; // FIXME arbitrary, and account for bike or car access mode
             if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
                 streetRouter.route();
                 if (transit) {
                     TIntIntMap stops = streetRouter.getReachedStops();
                     reachedTransitStops.putAll(stops);
                     LOG.info("Added {} stops for mode {}",stops.size(), mode);
+                    accessRouter.put(mode, streetRouter);
                     ts.initialStopSearch += (int) (System.currentTimeMillis() - initialStopStartTime);
 
                     //TODO: we need to save street paths from start to all the stops somehow
@@ -113,9 +117,31 @@ public class PointToPointQuery {
                         option.addDirect(streetSegment, request.getFromTimeDateZD());
                     }
                 } else {
+                    LOG.warn("MODE:{}, Edge near the destination coordinate wasn't found. Routing didn't start!", mode);
+                }
+            }
+
+            //For egress
+            //TODO: this must be reverse search
+            for(Mode mode: request.egressModes) {
+                StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+                streetRouter.mode = mode;
+                streetRouter.profileRequest = request;
+                // TODO add time and distance limits to routing, not just weight.
+                // TODO apply walk and bike speeds and maxBike time.
+                streetRouter.distanceLimitMeters =  200; // FIXME arbitrary, and account for bike or car access mode
+                if(streetRouter.setOrigin(request.toLat, request.toLon)) {
+                    streetRouter.route();
+                    TIntIntMap stops = streetRouter.getReachedStops();
+                    destinationTransitStops.putAll(stops);
+                    egressRouter.put(mode, streetRouter);
+                    LOG.info("Added {} edgres stops for mode {}",stops.size(), mode);
+
+                } else {
                     LOG.warn("MODE:{}, Edge near the origin coordinate wasn't found. Routing didn't start!", mode);
                 }
             }
+
             option.summary = option.generateSummary();
             profileResponse.addOption(option);
             RaptorWorker worker = new RaptorWorker(transportNetwork.transitLayer, null, request);
@@ -125,7 +151,10 @@ public class PointToPointQuery {
             int iterations = pts.times.length;
             //TODO: use only stops which are usefull to get to destination
             int stops = pts.times[0].length;
+            int usefull_path = 0;
+            List<Path> usefullpathList = new ArrayList<>();
 
+            //This is copied from StaticServer
             for (int stop = 0; stop < stops; stop++) {
                 int prev = 0;
                 int prevPath = 0;
@@ -162,28 +191,112 @@ public class PointToPointQuery {
 
                 // write the paths
                 //out.writeInt(pathList.size());
+                //LOG.info("Paths:{}", pathList.size());
                 for (Path path : pathList) {
+                    /**
+                     * Since search finds paths from requested stops to all of the stops we need to filter the paths
+                     * This skips the paths that don't end last leg in one of destination transit stops
+                     * Multiple legs here are multiple transit transfers
+                     */
+                    int lastStop = path.alightStops[path.patterns.length-1];
+                    if (!destinationTransitStops.containsKey(lastStop)) {
+                        continue;
+                    }
+                    usefullpathList.add(path);
+                    usefull_path++;
+
+                    /*
                     //out.writeInt(path.patterns.length);
-                    LOG.info("Num patterns:{}", path.patterns.length);
+                    //LOG.info("Num patterns:{}", path.patterns.length);
                     ProfileOption transit_option = new ProfileOption();
 
                     for (int i = 0; i < path.patterns.length; i++) {
                         TransitSegment transitSegment = new TransitSegment(transportNetwork.transitLayer, path.boardStops[i], path.alightStops[i], path.patterns[i]);
-                        LOG.info("   BoardStop: {} pattern: {} allightStop: {}", path.boardStops[i], path.patterns[i], path.alightStops[i]);
+                        //LOG.info("   BoardStop: {} pattern: {} allightStop: {}", path.boardStops[i], path.patterns[i], path.alightStops[i]);
                         TripPattern pattern =transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]);
                         if (pattern.routeIndex >= 0) {
                             RouteInfo routeInfo = transportNetwork.transitLayer.routes.get(pattern.routeIndex);
-                            LOG.info("     Pattern:{} on route:{} ({}) with {} stops", path.patterns[i],routeInfo.route_long_name, routeInfo.route_short_name,
-                                pattern.stops.length);
+                            //LOG.info("     Pattern:{} on route:{} ({}) with {} stops", path.patterns[i],routeInfo.route_long_name, routeInfo.route_short_name,
+                            //    pattern.stops.length);
                         }
-                        LOG.info("     {}->{} ({}:{})", transportNetwork.transitLayer.stopNames.get(path.boardStops[i]),
-                            transportNetwork.transitLayer.stopNames.get(path.alightStops[i]),
-                            path.alightTimes[i]/3600, path.alightTimes[i]%3600/60);
+                        //LOG.info("     {}->{} ({}:{})", transportNetwork.transitLayer.stopNames.get(path.boardStops[i]),
+                        //    transportNetwork.transitLayer.stopNames.get(path.alightStops[i]),
+                        //    path.alightTimes[i]/3600, path.alightTimes[i]%3600/60);
                         transit_option.addTransit(transitSegment);
                     }
                     transit_option.summary = transit_option.generateSummary();
                     profileResponse.addOption(transit_option);
+                    */
                 }
+            }
+            /**
+             * Orders first no transfers then one transfers 2 etc
+             * - then orders according to first trip:
+             *   - board stop
+             *   - alight stop
+             *   - alight time
+             * - same for one transfer trip
+             */
+            usefullpathList.sort((o1, o2) -> {
+                int c;
+                c = Integer.compare(o1.patterns.length, o2.patterns.length);
+                if (c==0) {
+                    c = Integer.compare(o1.boardStops[0], o2.boardStops[0]);
+                }
+                if (c==0) {
+                    c = Integer.compare(o1.alightStops[0], o2.alightStops[0]);
+                }
+                if (c==0) {
+                    c = Integer.compare(o1.alightTimes[0], o2.alightTimes[0]);
+                }
+                if (c==0 && o1.patterns.length == 2) {
+                    c = Integer.compare(o1.boardStops[1], o2.boardStops[1]);
+                    if (c==0) {
+                        c = Integer.compare(o1.alightStops[1], o2.alightStops[1]);
+                    }
+                    if (c==0) {
+                        c = Integer.compare(o1.alightTimes[1], o2.alightTimes[1]);
+                    }
+                }
+                return c;
+            });
+            LOG.info("Usefull paths:{}", usefull_path);
+            int seen_paths = 0;
+            int boardStop =-1, alightStop = -1;
+            for (Path path : usefullpathList) {
+                profileResponse.addTransitPath(accessRouter, egressRouter, path, transportNetwork, request.getFromTimeDateZD());
+                //LOG.info("Num patterns:{}", path.patterns.length);
+                //ProfileOption transit_option = new ProfileOption();
+
+
+                /*if (path.patterns.length == 1) {
+                    continue;
+                }*/
+
+                if (seen_paths > 20) {
+                    break;
+                }
+                LOG.info(" ");
+                for (int i = 0; i < path.patterns.length; i++) {
+                    //TransitSegment transitSegment = new TransitSegment(transportNetwork.transitLayer, path.boardStops[i], path.alightStops[i], path.patterns[i]);
+                    if (!(((boardStop == path.boardStops[i] && alightStop == path.alightStops[i]) ))) {
+                        LOG.info("   BoardStop: {} pattern: {} allightStop: {}", path.boardStops[i],
+                            path.patterns[i], path.alightStops[i]);
+                    }
+                    TripPattern pattern =transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]);
+                    if (pattern.routeIndex >= 0) {
+                        RouteInfo routeInfo = transportNetwork.transitLayer.routes.get(pattern.routeIndex);
+                        LOG.info("     Pattern:{} on route:{} ({}) with {} stops", path.patterns[i],routeInfo.route_long_name, routeInfo.route_short_name,
+                            pattern.stops.length);
+                    }
+                    LOG.info("     {}->{} ({}:{})", transportNetwork.transitLayer.stopNames.get(path.boardStops[i]),
+                        transportNetwork.transitLayer.stopNames.get(path.alightStops[i]),
+                        path.alightTimes[i]/3600, path.alightTimes[i]%3600/60);
+                    //transit_option.addTransit(transitSegment);
+                }
+                boardStop = path.boardStops[0];
+                alightStop = path.alightStops[0];
+                seen_paths++;
             }
         } else {
             option.summary = option.generateSummary();

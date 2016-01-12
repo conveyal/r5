@@ -10,4 +10,9 @@ public class TransitJourneyID {
     public int pattern;
     //index of time in chosen pattern @notnull
     public int time;
+
+    public TransitJourneyID(int patternIdx, int timeIdx) {
+        pattern = patternIdx;
+        time = timeIdx;
+    }
 }

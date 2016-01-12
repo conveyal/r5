@@ -55,8 +55,16 @@ public class Itinerary {
         transitTime = 0;
         startTime = fromTimeDateZD;
         endTime = fromTimeDateZD.plusSeconds(streetSegment.duration);
-        PointToPointConnection pointToPointConnection = new PointToPointConnection();
-        pointToPointConnection.access = accessIndex;
+        PointToPointConnection pointToPointConnection = new PointToPointConnection(accessIndex);
+        connection.add(pointToPointConnection);
+    }
+
+    public Itinerary() {
+        connection = new ArrayList<>();
+
+    }
+
+    public void addConnection(PointToPointConnection pointToPointConnection) {
         connection.add(pointToPointConnection);
     }
 }

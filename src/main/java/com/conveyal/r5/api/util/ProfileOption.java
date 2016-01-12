@@ -4,7 +4,7 @@ import com.conveyal.r5.profile.StreetPath;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
 
-import java.time.ZonedDateTime;
+import java.time.*;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -72,7 +72,7 @@ public class ProfileOption {
                 routeShortNames.add(routeName);
             }
             routes.add(Joiner.on("/").join(routeShortNames));
-            vias.add(segment.toName);
+            vias.add(segment.to.name);
         }
         StringBuilder sb = new StringBuilder();
         sb.append("routes ");
@@ -99,7 +99,45 @@ public class ProfileOption {
     }
 
     public void addTransit(TransitSegment transitSegment) {
-        transit = new ArrayList<>(5);
+        if (transit == null) {
+            transit = new ArrayList<>(5);
+        }
         transit.add(transitSegment);
+    }
+
+    public int addAccess(StreetSegment streetSegment) {
+        access.add(streetSegment);
+        return (access.size() - 1);
+    }
+
+    public int addEgress(StreetSegment streetSegment) {
+        if (egress == null) {
+            egress = new ArrayList<>();
+        }
+        egress.add(streetSegment);
+        return (egress.size() - 1);
+    }
+
+    public void addItinerary(Integer accessIdx, Integer egressIdx,
+        List<TransitJourneyID> transitJourneyIDs, ZoneId timeZone) {
+        Itinerary itinerary = new Itinerary();
+        itinerary.transfers = transitJourneyIDs.size();
+
+        //FIXME: actual waiting time
+        itinerary.waitingTime = 0;
+        //TODO: middle part duration
+        itinerary.walkTime = access.get(accessIdx).duration+egress.get(egressIdx).duration;
+        itinerary.distance = access.get(accessIdx).distance+egress.get(egressIdx).distance;
+        LocalDateTime transitStart = transit.get(0).segmentPatterns.get(transitJourneyIDs.get(0).pattern).fromDepartureTime.get(transitJourneyIDs.get(0).time);
+        itinerary.startTime = transitStart.minusSeconds(access.get(accessIdx).duration).atZone(timeZone);
+        int lastTransit = transitJourneyIDs.size()-1;
+        LocalDateTime transitStop = transit.get(lastTransit).segmentPatterns.get(transitJourneyIDs.get(lastTransit).pattern).toArrivalTime.get(transitJourneyIDs.get(lastTransit).time);
+        itinerary.endTime = transitStop.plusSeconds(egress.get(egressIdx).duration).atZone(timeZone);
+        //FIXME: this ignores waiting in transfers
+        itinerary.transitTime = (int) Duration.between(transitStart, transitStop).getSeconds();
+        PointToPointConnection pointToPointConnection = new PointToPointConnection(accessIdx, egressIdx, transitJourneyIDs);
+        itinerary.addConnection(pointToPointConnection);
+        this.itinerary.add(itinerary);
+
     }
 }

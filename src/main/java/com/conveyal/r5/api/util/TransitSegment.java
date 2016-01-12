@@ -2,6 +2,7 @@ package com.conveyal.r5.api.util;
 
 import com.beust.jcommander.internal.Lists;
 import com.conveyal.gtfs.model.Agency;
+import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
@@ -9,6 +10,7 @@ import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -42,12 +44,15 @@ public class TransitSegment {
     public List<SegmentPattern> segmentPatterns = Lists.newArrayList();
     private transient TransitLayer transitLayer;
 
-    public TransitSegment(TransitLayer transitLayer, int boardStopIdx, int alightStopIdx,
-        int patternIdx) {
+
+    public TransitSegment(TransitLayer transitLayer, Path currentTransitPath, int pathIndex,
+        ZonedDateTime fromTimeDateZD, List<TransitJourneyID> transitJourneyIDs) {
         this.transitLayer = transitLayer;
         StreetLayer streetLayer = transitLayer.linkedStreetLayer;
         routes = new ArrayList<>(5);
-        TripPattern pattern = transitLayer.tripPatterns.get(patternIdx);
+        int boardStopIdx = currentTransitPath.boardStops[pathIndex];
+        int alightStopIdx = currentTransitPath.alightStops[pathIndex];
+        TripPattern pattern = currentTransitPath.getPattern(transitLayer, pathIndex);
         if (pattern.routeIndex >= 0) {
             RouteInfo routeInfo = transitLayer.routes.get(pattern.routeIndex);
             //TODO: this needs to be Stop instead of StopCluster in point to point routing
@@ -62,6 +67,12 @@ public class TransitSegment {
             to.lat = (float) vertex.getLat();
             to.lon = (float) vertex.getLon();
             routes.add(Route.from(routeInfo));
+
+            SegmentPattern segmentPattern = new SegmentPattern(transitLayer, pattern, currentTransitPath.patterns[pathIndex], boardStopIdx, alightStopIdx, currentTransitPath.alightTimes[pathIndex], fromTimeDateZD);
+            segmentPatterns.add(segmentPattern);
+            //FIXME: set pattern and time based on real values
+            transitJourneyIDs.add(new TransitJourneyID(0,0));
+
         }
     }
 

@@ -162,9 +162,9 @@ public class TransportNetworkCache {
 
             // Upload the serialized TransportNetwork to S3
             LOG.info("Uploading the serialized TransportNetwork to S3 for use by other workers.");
-            LOG.warn("SKIPPING"); // TODO use offline mode
-            // s3.putObject(sourceBucket, filename, cacheLocation);
-            // LOG.info("Done uploading the serialized TransportNetwork to S3.");
+
+            s3.putObject(sourceBucket, filename, cacheLocation);
+            LOG.info("Done uploading the serialized TransportNetwork to S3.");
 
         } catch (Exception e) {
             // Don't break here as we do have a network to return, we just couldn't cache it.

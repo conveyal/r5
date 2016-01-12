@@ -8,7 +8,6 @@ import com.vividsolutions.jts.util.Assert;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -43,14 +42,14 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
     public boolean realTime;
 
     //arrival times of from stop in this pattern
-    public List<LocalDateTime> fromArrivalTime;
+    public List<ZonedDateTime> fromArrivalTime;
     //departure times of from stop in this pattern
-    public List<LocalDateTime> fromDepartureTime;
+    public List<ZonedDateTime> fromDepartureTime;
 
     //arrival times of to stop in this pattern
-    public List<LocalDateTime> toArrivalTime;
+    public List<ZonedDateTime> toArrivalTime;
     //departure times of to stop in this pattern
-    public List<LocalDateTime> toDepartureTime;
+    public List<ZonedDateTime> toDepartureTime;
 
     public SegmentPattern(TransitLayer transitLayer, TripPattern pattern, int patternIdx, int boardStopIdx,
         int alightStopIdx, int alightTime, ZonedDateTime fromTimeDateZD) {
@@ -115,10 +114,10 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
      * @param fromTimeDateZD
      * @return
      */
-    private LocalDateTime createTime(int time, ZonedDateTime fromTimeDateZD) {
+    private ZonedDateTime createTime(int time, ZonedDateTime fromTimeDateZD) {
         //TODO: check timezones correct time etc. this is untested
         LocalDateTime localDateTime = LocalDateTime.of(fromTimeDateZD.getYear(), fromTimeDateZD.getMonth(), fromTimeDateZD.getDayOfMonth(), 0,0);
-        return localDateTime.plusSeconds(time);
+        return localDateTime.plusSeconds(time).atZone(fromTimeDateZD.getZone());
     }
 
     //TODO: from/to Departure/Arrival delay

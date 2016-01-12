@@ -128,11 +128,11 @@ public class ProfileOption {
         //TODO: middle part duration
         itinerary.walkTime = access.get(accessIdx).duration+egress.get(egressIdx).duration;
         itinerary.distance = access.get(accessIdx).distance+egress.get(egressIdx).distance;
-        LocalDateTime transitStart = transit.get(0).segmentPatterns.get(transitJourneyIDs.get(0).pattern).fromDepartureTime.get(transitJourneyIDs.get(0).time);
-        itinerary.startTime = transitStart.minusSeconds(access.get(accessIdx).duration).atZone(timeZone);
+        ZonedDateTime transitStart = transit.get(0).segmentPatterns.get(transitJourneyIDs.get(0).pattern).fromDepartureTime.get(transitJourneyIDs.get(0).time);
+        itinerary.startTime = transitStart.minusSeconds(access.get(accessIdx).duration);
         int lastTransit = transitJourneyIDs.size()-1;
-        LocalDateTime transitStop = transit.get(lastTransit).segmentPatterns.get(transitJourneyIDs.get(lastTransit).pattern).toArrivalTime.get(transitJourneyIDs.get(lastTransit).time);
-        itinerary.endTime = transitStop.plusSeconds(egress.get(egressIdx).duration).atZone(timeZone);
+        ZonedDateTime transitStop = transit.get(lastTransit).segmentPatterns.get(transitJourneyIDs.get(lastTransit).pattern).toArrivalTime.get(transitJourneyIDs.get(lastTransit).time);
+        itinerary.endTime = transitStop.plusSeconds(egress.get(egressIdx).duration);
         //FIXME: this ignores waiting in transfers
         itinerary.transitTime = (int) Duration.between(transitStart, transitStop).getSeconds();
         PointToPointConnection pointToPointConnection = new PointToPointConnection(accessIdx, egressIdx, transitJourneyIDs);

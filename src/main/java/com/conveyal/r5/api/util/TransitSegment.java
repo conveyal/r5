@@ -10,6 +10,7 @@ import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -96,5 +97,19 @@ public class TransitSegment {
 
     public String getToId() {
         return toId;
+    }
+
+    /**
+     * Gets number of seconds between fromDepartureTime and toArrival time
+     * for specified pattern and time in that pattern
+     *
+     * It is assumed that pattern and time exists
+     * @param transitJourneyID index of patern and time in selected pattern
+     * @return number of seconds between times
+     */
+    public int getTransitTime(TransitJourneyID transitJourneyID) {
+        SegmentPattern segmentPattern = segmentPatterns.get(transitJourneyID.pattern);
+        return (int) Duration.between(segmentPattern.fromDepartureTime.get(transitJourneyID.time),
+            segmentPattern.toArrivalTime.get(transitJourneyID.time)).getSeconds();
     }
 }

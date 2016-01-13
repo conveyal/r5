@@ -133,8 +133,13 @@ public class ProfileOption {
         int lastTransit = transitJourneyIDs.size()-1;
         ZonedDateTime transitStop = transit.get(lastTransit).segmentPatterns.get(transitJourneyIDs.get(lastTransit).pattern).toArrivalTime.get(transitJourneyIDs.get(lastTransit).time);
         itinerary.endTime = transitStop.plusSeconds(egress.get(egressIdx).duration);
-        //FIXME: this ignores waiting in transfers
-        itinerary.transitTime = (int) Duration.between(transitStart, transitStop).getSeconds();
+
+        itinerary.transitTime = 0;
+        int transitJourneyIDIdx=0;
+        for(TransitJourneyID transitJourneyID: transitJourneyIDs) {
+            itinerary.transitTime += transit.get(transitJourneyIDIdx).getTransitTime(transitJourneyID);
+            transitJourneyIDIdx++;
+        }
         PointToPointConnection pointToPointConnection = new PointToPointConnection(accessIdx, egressIdx, transitJourneyIDs);
         itinerary.addConnection(pointToPointConnection);
         this.itinerary.add(itinerary);

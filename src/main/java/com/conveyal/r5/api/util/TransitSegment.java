@@ -12,8 +12,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Duration;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 /**
  * The equivalent of a ride in an API response. Information degenerates to Strings and ints here.
@@ -41,7 +40,7 @@ public class TransitSegment {
     public String fromName;
     public String toName;
     public Stats rideStats;
-    public List<Route> routes;
+    public Map<Integer,Route> routes;
     public List<SegmentPattern> segmentPatterns = Lists.newArrayList();
     private transient TransitLayer transitLayer;
 
@@ -50,7 +49,7 @@ public class TransitSegment {
         ZonedDateTime fromTimeDateZD, List<TransitJourneyID> transitJourneyIDs) {
         this.transitLayer = transitLayer;
         StreetLayer streetLayer = transitLayer.linkedStreetLayer;
-        routes = new ArrayList<>(5);
+        routes = new HashMap<>();
         int boardStopIdx = currentTransitPath.boardStops[pathIndex];
         int alightStopIdx = currentTransitPath.alightStops[pathIndex];
         TripPattern pattern = currentTransitPath.getPattern(transitLayer, pathIndex);
@@ -67,7 +66,7 @@ public class TransitSegment {
             vertex.seek(transitLayer.streetVertexForStop.get(alightStopIdx));
             to.lat = (float) vertex.getLat();
             to.lon = (float) vertex.getLon();
-            routes.add(Route.from(routeInfo));
+            routes.putIfAbsent(pattern.routeIndex, Route.from(routeInfo));
 
             SegmentPattern segmentPattern = new SegmentPattern(transitLayer, pattern, currentTransitPath.patterns[pathIndex], boardStopIdx, alightStopIdx, currentTransitPath.alightTimes[pathIndex], fromTimeDateZD);
             segmentPatterns.add(segmentPattern);
@@ -111,5 +110,67 @@ public class TransitSegment {
         SegmentPattern segmentPattern = segmentPatterns.get(transitJourneyID.pattern);
         return (int) Duration.between(segmentPattern.fromDepartureTime.get(transitJourneyID.time),
             segmentPattern.toArrivalTime.get(transitJourneyID.time)).getSeconds();
+    }
+
+    /**
+     * Add new segmentPattern if needed otherwise just adds new time to existing one
+     * <p>
+     * If there is already segment pattern with same patternIndex as pattern in current Path it only
+     * adds times to this pattern if needed. It also updates routes array if needed and transitJourneyID
+     *
+     * @param transitLayer
+     * @param currentTransitPath object with transit information (board/alight stop, pattern and alight time)
+     * @param pathIndex          index of current leg of transit journey inside currentTransitPath
+     * @param fromTimeDateZD     requested fromTime from which date and timezone is read
+     * @param transitJourneyIDs  this is updated with created/found indexes of pattern and time
+     */
+    public void addSegmentPattern(TransitLayer transitLayer, Path currentTransitPath, int pathIndex,
+        ZonedDateTime fromTimeDateZD, List<TransitJourneyID> transitJourneyIDs) {
+        //If we are here we can be sure that from stop and to stop are the same in all segment patterns as in currentTransitPath
+        //We only need to check pattern
+        int currentPatternID = currentTransitPath.patterns[pathIndex];
+        int segmentPatternIdx = 0;
+        for (SegmentPattern segmentPattern : segmentPatterns) {
+            if (currentPatternID == segmentPattern.patternIdx) {
+                int timeIndex = segmentPattern.addTime(transitLayer, currentPatternID,
+                    currentTransitPath.alightTimes[pathIndex], fromTimeDateZD);
+                transitJourneyIDs.add(new TransitJourneyID(segmentPatternIdx, timeIndex));
+                return;
+            }
+            segmentPatternIdx++;
+        }
+
+        //This pattern doesn't exist yet in this transitSegment we need to create it
+        final TripPattern tripPattern = currentTransitPath.getPattern(transitLayer, pathIndex);
+        SegmentPattern segmentPattern = new SegmentPattern(transitLayer, tripPattern,
+            currentTransitPath.patterns[pathIndex], currentTransitPath.boardStops[pathIndex],
+            currentTransitPath.alightStops[pathIndex], currentTransitPath.alightTimes[pathIndex],
+            fromTimeDateZD);
+        segmentPatterns.add(segmentPattern);
+        //Time is always 0 here since we created new segmentPattern
+        transitJourneyIDs.add(new TransitJourneyID(segmentPatterns.size() - 1, 0));
+        //Adds route to routeMap if needed
+        if (tripPattern.routeIndex >= 0) {
+            RouteInfo routeInfo = transitLayer.routes.get(tripPattern.routeIndex);
+            routes.putIfAbsent(tripPattern.routeIndex, Route.from(routeInfo));
+        }
+    }
+
+    /**
+     * @param currentTransitPath transit part with transfers
+     * @param pathIndex          index of current leg in currentTransitPath
+     * @return true if transit leg at pathIndex has same board and alight stop as current transitSegment
+     */
+    public boolean hasSameStops(Path currentTransitPath, int pathIndex) {
+        int boardStopIdx = currentTransitPath.boardStops[pathIndex];
+        int alightStopIdx = currentTransitPath.alightStops[pathIndex];
+        String fromStopID = transitLayer.stopIdForIndex.get(boardStopIdx);
+        String toStopID = transitLayer.stopIdForIndex.get(alightStopIdx);
+
+        return from.id.equals(fromStopID) && to.id.equals(toStopID);
+    }
+
+    public Collection<Route> getRoutes() {
+        return routes.values();
     }
 }

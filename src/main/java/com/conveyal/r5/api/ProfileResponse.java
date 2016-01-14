@@ -1,11 +1,14 @@
 package com.conveyal.r5.api;
 
 import com.conveyal.r5.api.util.*;
+import com.conveyal.r5.profile.HashPath;
 import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.ZonedDateTime;
 import java.util.*;
@@ -14,6 +17,8 @@ import java.util.*;
  * Created by mabu on 30.10.2015.
  */
 public class ProfileResponse {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ProfileResponse.class);
     public List<ProfileOption> options = new ArrayList<>();
 
     @Override public String toString() {
@@ -21,6 +26,8 @@ public class ProfileResponse {
             "options=" + options +
             '}';
     }
+    //This connect which transits are in which profileOption
+    private Map<HashPath, ProfileOption> transitToOption = new HashMap<>();
 
     public List<ProfileOption> getOptions() {
         return options;
@@ -55,7 +62,13 @@ public class ProfileResponse {
     /**
      * It creates option, transit/street segment itinerary and segments
      *
-     * Currently it creates one option for each call. (There is no deduplication yet)
+     * It creates options, transitSegment, segmentPatterns as needed.
+     *
+     * Transit paths with same stops but different patterns are in same transitSegment
+     * but different segmentPatterns.
+     * Paths with same pattern but different times are in same segmentPattern but different times.
+     *
+     * Access and egress paths are also inserted only once per mode and stopIndex.
      *
      * @param accessRouter map of modes to each street router for access paths
      * @param egressRouter map of modes to each street router for access paths
@@ -67,9 +80,15 @@ public class ProfileResponse {
         Map<Mode, StreetRouter> egressRouter, Path currentTransitPath,
         TransportNetwork transportNetwork, ZonedDateTime fromTimeDateZD) {
 
-        //start stop doesn't exist and time also
-        //we need to insert everything
-        ProfileOption profileOption = new ProfileOption();
+        HashPath hashPath = new HashPath(currentTransitPath);
+        ProfileOption profileOption = transitToOption.getOrDefault(hashPath, new ProfileOption());
+
+
+        if (profileOption.isEmpty()) {
+            LOG.info("Creating new profile option");
+            options.add(profileOption);
+        }
+
         List<Integer> accessPathIndexes = new ArrayList<>();
         List<Integer> egressPathIndexes = new ArrayList<>();
 
@@ -84,27 +103,28 @@ public class ProfileResponse {
 
           */
         accessRouter.forEach((mode, streetRouter) -> {
+            //TODO: create streetSegment only if it doesn't already exists
             StreetRouter.State state = streetRouter.getState(startVertexStopIndex);
             if (state != null) {
                 StreetPath streetPath = new StreetPath(state, transportNetwork);
                 StreetSegment streetSegment = new StreetSegment(streetPath, mode);
-                accessPathIndexes.add(profileOption.addAccess(streetSegment));
+                accessPathIndexes.add(profileOption.addAccess(streetSegment, mode, startVertexStopIndex));
             }
         });
 
         egressRouter.forEach((mode, streetRouter) -> {
+            //TODO: create streetSegment only if it doesn't already exists
             StreetRouter.State state = streetRouter.getState(endVertexStopIndex);
             if (state != null) {
                 StreetPath streetPath = new StreetPath(state, transportNetwork);
                 StreetSegment streetSegment = new StreetSegment(streetPath, mode);
-                egressPathIndexes.add(profileOption.addEgress(streetSegment));
+                egressPathIndexes.add(profileOption.addEgress(streetSegment, mode, endVertexStopIndex));
             }
         });
         List<TransitJourneyID> transitJourneyIDs = new ArrayList<>(currentTransitPath.patterns.length);
         for (int i = 0; i < currentTransitPath.patterns.length; i++) {
-            TransitSegment transitSegment = new TransitSegment(transportNetwork.transitLayer,
-                currentTransitPath, i, fromTimeDateZD, transitJourneyIDs);
-                profileOption.addTransit(transitSegment);
+                profileOption.addTransit(transportNetwork.transitLayer,
+                    currentTransitPath, i, fromTimeDateZD, transitJourneyIDs);
 
 
         }
@@ -116,10 +136,6 @@ public class ProfileResponse {
 
         profileOption.summary = profileOption.generateSummary();
 
-
-
-        //accessPathIndexes.add(profileOption.addAccess())
-
-        options.add(profileOption);
+        transitToOption.putIfAbsent(hashPath, profileOption);
     }
 }

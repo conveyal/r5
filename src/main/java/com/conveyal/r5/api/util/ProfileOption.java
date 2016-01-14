@@ -1,18 +1,25 @@
 package com.conveyal.r5.api.util;
 
-import com.conveyal.r5.profile.StreetPath;
+import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.Path;
+import com.conveyal.r5.transit.TransitLayer;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * This is a response model class which holds data that will be serialized and returned to the client.
  * It is not used internally in routing.
  */
 public class ProfileOption {
+    private static final Logger LOG = LoggerFactory.getLogger(ProfileOption.class);
     //Transit leg of a journey
     public List<TransitSegment> transit;
     //Part of journey from start to transit (or end) @notnull
@@ -28,6 +35,9 @@ public class ProfileOption {
     //Text description of this part of a journey @notnull
     public String summary;
     public List<Fare> fares;
+
+    private transient Map<ModeStopIndex, Integer> accessIndexes = new HashMap<>();
+    private transient Map<ModeStopIndex, Integer> egressIndexes = new HashMap<>();
 
     @Override public String toString() {
         return "ProfileOption{" +
@@ -50,6 +60,10 @@ public class ProfileOption {
         itinerary = new ArrayList<>();
     }
 
+    public boolean isEmpty() {
+        return access.isEmpty() && itinerary.isEmpty() && transit == null;
+    }
+
     /** Make a human readable text summary of this option.
      * There are basically four options:
      * - Direct non-transit routes which are named "Non-transit options"
@@ -67,7 +81,7 @@ public class ProfileOption {
         List<String> routes = Lists.newArrayList();
         for (TransitSegment segment : transit) {
             List<String> routeShortNames = Lists.newArrayList();
-            for (Route rs : segment.routes) {
+            for (Route rs : segment.getRoutes()) {
                 String routeName = rs.shortName == null ? rs.longName : rs.shortName;
                 routeShortNames.add(routeName);
             }
@@ -98,24 +112,93 @@ public class ProfileOption {
         this.itinerary.add(itinerary);
     }
 
-    public void addTransit(TransitSegment transitSegment) {
+    private void addTransit(TransitSegment transitSegment) {
         if (transit == null) {
             transit = new ArrayList<>(5);
         }
         transit.add(transitSegment);
     }
 
-    public int addAccess(StreetSegment streetSegment) {
-        access.add(streetSegment);
-        return (access.size() - 1);
+    /**
+     * Creates new transit path
+     *
+     * This creates necessary TransitSegment, segmentPattern and times in segmentPattern
+     *
+     * For example if you call it twice with same pattern but only different times only times will be added to segmentPattern
+     * @param transitLayer transit layer
+     * @param currentTransitPath transit path
+     * @param pathIndex index of current transit path in currentTransitPath
+     * @param fromTimeDateZD date/time object used to get date and timezone
+     * @param transitJourneyIDs list of patterns and times in those patterns in this path
+     */
+    public void addTransit(TransitLayer transitLayer, Path currentTransitPath, int pathIndex,
+        ZonedDateTime fromTimeDateZD, List<TransitJourneyID> transitJourneyIDs) {
+        //If this is first transit in this option or leg that doesn't exist yet we need to create new transitSegment
+        if (transit == null || pathIndex >= transit.size()) {
+            addTransit(new TransitSegment(transitLayer, currentTransitPath, pathIndex, fromTimeDateZD, transitJourneyIDs));
+            LOG.info("Making new transit segment:{}", currentTransitPath);
+        } else {
+            //Each transitSegment is for each part of transitPath. Since one path consist of multiple transfers.
+            TransitSegment transitSegment = transit.get(pathIndex);
+
+            if (transitSegment.hasSameStops(currentTransitPath, pathIndex)) {
+                //This adds new segment pattern with times or just new times
+                //It allso updates transitJourneyIDs with found/created pattern and time indexes
+                transitSegment
+                    .addSegmentPattern(transitLayer, currentTransitPath, pathIndex, fromTimeDateZD,
+                        transitJourneyIDs);
+            } else {
+                LOG.warn("Incorrect stop in pathIndex:{}", pathIndex);
+            }
+        }
+
     }
 
-    public int addEgress(StreetSegment streetSegment) {
+    /**
+     * Adds access path if same access path doesn't exist yet in this option
+     *
+     * Equality is made based on mode and stopIndex
+     * @param streetSegment turn by turn information for this access part
+     * @param mode which is used on this path
+     * @param startVertexStopIndex StreetVertexIndex which is end destination for this path
+     * @return index in access array for this path
+     */
+    public int addAccess(StreetSegment streetSegment, Mode mode, int startVertexStopIndex) {
+        ModeStopIndex modeStopIndex = new ModeStopIndex(mode, startVertexStopIndex);
+        int accessIndex;
+        if (!accessIndexes.containsKey(modeStopIndex)) {
+            access.add(streetSegment);
+             accessIndex = (access.size() - 1);
+            accessIndexes.put(modeStopIndex, accessIndex);
+        } else {
+            accessIndex = accessIndexes.get(modeStopIndex);
+        }
+        return accessIndex;
+    }
+
+    /**
+     * Adds egress path if same egress path doesn't exist yet in this option
+     *
+     * Equality is made based on mode and stopIndex
+     * @param streetSegment turn by turn information for this egress part
+     * @param mode which is used on this path
+     * @param endVertexStopIndex StreetVertexIndex which is end destination for this path
+     * @return index in egress array for this path
+     */
+    public int addEgress(StreetSegment streetSegment, Mode mode, int endVertexStopIndex) {
         if (egress == null) {
             egress = new ArrayList<>();
         }
-        egress.add(streetSegment);
-        return (egress.size() - 1);
+        ModeStopIndex modeStopIndex = new ModeStopIndex(mode, endVertexStopIndex);
+        int egressIndex;
+        if (!egressIndexes.containsKey(modeStopIndex)) {
+            egress.add(streetSegment);
+            egressIndex = (egress.size() - 1);
+            egressIndexes.put(modeStopIndex, egressIndex);
+        } else {
+            egressIndex = egressIndexes.get(modeStopIndex);
+        }
+        return egressIndex;
     }
 
     public void addItinerary(Integer accessIdx, Integer egressIdx,

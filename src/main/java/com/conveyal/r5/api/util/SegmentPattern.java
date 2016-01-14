@@ -8,6 +8,7 @@ import com.vividsolutions.jts.util.Assert;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -51,14 +52,24 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
     //departure times of to stop in this pattern
     public List<ZonedDateTime> toDepartureTime;
 
+    //TOOD: check if we really need this
+    private List<Integer> alightTimes;
+    final int patternIdx;
+
+
+
+
+
     public SegmentPattern(TransitLayer transitLayer, TripPattern pattern, int patternIdx, int boardStopIdx,
         int alightStopIdx, int alightTime, ZonedDateTime fromTimeDateZD) {
         fromArrivalTime = new ArrayList<>();
         fromDepartureTime = new ArrayList<>();
         toArrivalTime = new ArrayList<>();
         toDepartureTime = new ArrayList<>();
+        alightTimes = new ArrayList<>();
         realTime = false;
         patternId = Integer.toString(patternIdx);
+        this.patternIdx = patternIdx;
         fromIndex = -1;
         toIndex = -1;
 
@@ -94,6 +105,21 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
         }
         Assert.isTrue(fromIndex != -1);
         Assert.isTrue(toIndex != -1);
+        addTime(pattern, alightTime, fromTimeDateZD);
+
+    }
+
+    /**
+     * Found a trip in tripPattern based on from/to indexes and alight time
+     * and fills to/from arrival/Departure time arrays with time information for found trip.
+     *
+     * Time is created based on seconds from midnight and date and timezone from fromTimeDateZD with help of {@link #createTime(int, ZonedDateTime)}.
+     * @param pattern TripPattern for current trip
+     * @param alightTime seconds from midnight time for trip we are searching for
+     * @param fromTimeDateZD time/date object from which date and timezone is read
+     * @return index of created time
+     */
+    private int addTime(TripPattern pattern, int alightTime, ZonedDateTime fromTimeDateZD) {
         //We search for a trip based on provided tripPattern board, alight stop and alightTime
         //TODO: this will be removed when support for tripIDs is added into Path
         for (TripSchedule schedule: pattern.tripSchedules) {
@@ -103,10 +129,36 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
 
                 fromArrivalTime.add(createTime(schedule.arrivals[fromIndex], fromTimeDateZD));
                 fromDepartureTime.add(createTime(schedule.departures[fromIndex], fromTimeDateZD));
+                alightTimes.add(alightTime);
                 break;
             }
         }
+        return (fromDepartureTime.size() -1);
+    }
 
+    /**
+     * Adds times to current segmentPattern as needed if they don't exist yet
+     *
+     * @param transitLayer transitInformation
+     * @param currentPatternIdx index of current trip pattern
+     * @param alightTime seconds from midnight alight time for trip we are searching for
+     * @param fromTimeDateZD time and date object which is used to get date and timezone
+     * @see #addTime(TripPattern, int, ZonedDateTime)
+     * @return index of time that is added or found (This is used in TransitJourneyID)
+     */
+    public int addTime(TransitLayer transitLayer, int currentPatternIdx, int alightTime,
+        ZonedDateTime fromTimeDateZD) {
+        int timeIndex = 0;
+        for (int patternAlightTime : alightTimes) {
+            //If there already exists same pattern with same time we don't need to insert it again
+            //We know that it is a same pattern
+            if (patternAlightTime == alightTime) {
+                return timeIndex;
+            }
+            timeIndex++;
+        }
+        TripPattern pattern = transitLayer.tripPatterns.get(currentPatternIdx);
+        return addTime(pattern, alightTime, fromTimeDateZD);
 
     }
 

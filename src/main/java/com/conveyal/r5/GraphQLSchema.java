@@ -18,6 +18,7 @@ import java.text.ParseException;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.stream.Collectors;
 
 /**
  * Created by mabu on 30.10.2015.
@@ -821,7 +822,8 @@ public class GraphQLSchema {
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("routes")
                 .type(new GraphQLList(routeType))
-                .dataFetcher(environment -> ((TransitSegment) environment.getSource()).routes)
+                .dataFetcher(environment -> ((TransitSegment) environment.getSource()).getRoutes().stream().collect(
+                    Collectors.toList()))
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("segmentPatterns")

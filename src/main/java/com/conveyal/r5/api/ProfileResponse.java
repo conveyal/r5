@@ -103,22 +103,32 @@ public class ProfileResponse {
 
           */
         accessRouter.forEach((mode, streetRouter) -> {
-            //TODO: create streetSegment only if it doesn't already exists
-            StreetRouter.State state = streetRouter.getState(startVertexStopIndex);
-            if (state != null) {
-                StreetPath streetPath = new StreetPath(state, transportNetwork);
-                StreetSegment streetSegment = new StreetSegment(streetPath, mode);
-                accessPathIndexes.add(profileOption.addAccess(streetSegment, mode, startVertexStopIndex));
+            int accessPathIndex = profileOption.getAccessIndex(mode, startVertexStopIndex);
+            if (accessPathIndex < 0) {
+                StreetRouter.State state = streetRouter.getState(startVertexStopIndex);
+                if (state != null) {
+                    StreetPath streetPath = new StreetPath(state, transportNetwork);
+                    StreetSegment streetSegment = new StreetSegment(streetPath, mode);
+                    accessPathIndexes
+                        .add(profileOption.addAccess(streetSegment, mode, startVertexStopIndex));
+                }
+            } else {
+                accessPathIndexes.add(accessPathIndex);
             }
         });
 
         egressRouter.forEach((mode, streetRouter) -> {
-            //TODO: create streetSegment only if it doesn't already exists
-            StreetRouter.State state = streetRouter.getState(endVertexStopIndex);
-            if (state != null) {
-                StreetPath streetPath = new StreetPath(state, transportNetwork);
-                StreetSegment streetSegment = new StreetSegment(streetPath, mode);
-                egressPathIndexes.add(profileOption.addEgress(streetSegment, mode, endVertexStopIndex));
+            int egressPathIndex = profileOption.getEgressIndex(mode, endVertexStopIndex);
+            if (egressPathIndex < 0) {
+                StreetRouter.State state = streetRouter.getState(endVertexStopIndex);
+                if (state != null) {
+                    StreetPath streetPath = new StreetPath(state, transportNetwork);
+                    StreetSegment streetSegment = new StreetSegment(streetPath, mode);
+                    egressPathIndexes
+                        .add(profileOption.addEgress(streetSegment, mode, endVertexStopIndex));
+                }
+            } else {
+                egressPathIndexes.add(egressPathIndex);
             }
         });
         List<TransitJourneyID> transitJourneyIDs = new ArrayList<>(currentTransitPath.patterns.length);

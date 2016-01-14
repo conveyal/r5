@@ -228,4 +228,24 @@ public class ProfileOption {
         this.itinerary.add(itinerary);
 
     }
+
+    /**
+     * Returns index of this acces path or -1 if it isn't in list yet
+     * @param mode
+     * @param startVertexStopIndex
+     * @return
+     */
+    public int getAccessIndex(Mode mode, int startVertexStopIndex) {
+        return accessIndexes.getOrDefault(new ModeStopIndex(mode, startVertexStopIndex), -1);
+    }
+
+    /**
+     * Returns index of this egress path or -1 if it isn't in list yet
+     * @param mode
+     * @param endVertexStopIndex
+     * @return
+     */
+    public int getEgressIndex(Mode mode, int endVertexStopIndex) {
+        return egressIndexes.getOrDefault(new ModeStopIndex(mode, endVertexStopIndex), -1);
+    }
 }

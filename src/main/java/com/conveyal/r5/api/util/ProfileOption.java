@@ -204,7 +204,7 @@ public class ProfileOption {
     public void addItinerary(Integer accessIdx, Integer egressIdx,
         List<TransitJourneyID> transitJourneyIDs, ZoneId timeZone) {
         Itinerary itinerary = new Itinerary();
-        itinerary.transfers = transitJourneyIDs.size();
+        itinerary.transfers = transitJourneyIDs.size() - 1;
 
         //FIXME: actual waiting time
         itinerary.waitingTime = 0;

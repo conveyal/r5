@@ -18,6 +18,7 @@ import java.text.ParseException;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.EnumSet;
 import java.util.stream.Collectors;
 
 /**
@@ -1247,22 +1248,26 @@ public class GraphQLSchema {
                 .build())
             .argument(GraphQLArgument.newArgument()
                 .name("accessModes")
-                .type(new GraphQLList(legModeEnum))
+                .type(new GraphQLNonNull(new GraphQLList(legModeEnum)))
+                .defaultValue(EnumSet.of(LegMode.WALK, LegMode.BICYCLE))
                 .description("The modes used to reach transit")
                 .build())
             .argument(GraphQLArgument.newArgument()
                 .name("egressModes")
-                .type(new GraphQLList(legModeEnum))
+                .type(new GraphQLNonNull(new GraphQLList(legModeEnum)))
+                .defaultValue(EnumSet.of(LegMode.WALK))
                 .description("The modes used to reach the destination after leaving transit")
                 .build())
             .argument(GraphQLArgument.newArgument()
                 .name("directModes")
-                .type(new GraphQLList(legModeEnum))
+                .type(new GraphQLNonNull(new GraphQLList(legModeEnum)))
+                .defaultValue(EnumSet.of(LegMode.WALK, LegMode.BICYCLE))
                 .description("The modes used to reach the destination without transit")
                 .build())
             .argument(GraphQLArgument.newArgument()
                 .name("transitModes")
-                .type(new GraphQLList(transitmodeEnum))
+                .type(new GraphQLNonNull(new GraphQLList(transitmodeEnum)))
+                .defaultValue(EnumSet.of(TransitModes.TRANSIT))
                 .description("The transit modes used")
                 .build())
             .argument(GraphQLArgument.newArgument()

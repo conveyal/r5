@@ -2,6 +2,7 @@ package com.conveyal.r5.point_to_point.builder;
 
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
 import com.conveyal.r5.api.ProfileResponse;
+import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.ProfileOption;
 import com.conveyal.r5.api.util.StreetSegment;
 import com.conveyal.r5.api.util.TransitSegment;
@@ -31,6 +32,8 @@ public class PointToPointQuery {
     public static final int RADIUS_METERS = 200;
     private final TransportNetwork transportNetwork;
 
+    private static final EnumSet<LegMode> currentlyUnsupportedModes = EnumSet.of(LegMode.BICYCLE_RENT, LegMode.CAR_PARK);
+
     public PointToPointQuery(TransportNetwork transportNetwork) {
         this.transportNetwork = transportNetwork;
     }
@@ -56,17 +59,21 @@ public class PointToPointQuery {
 
         TIntIntMap destinationTransitStops = new TIntIntHashMap();
 
-        EnumSet<Mode> modes = transit ? request.accessModes : request.directModes;
+        EnumSet<LegMode> modes = transit ? request.accessModes : request.directModes;
         ProfileOption option = new ProfileOption();
 
-        Map<Mode, StreetRouter> accessRouter = new HashMap<>(modes.size());
-        Map<Mode, StreetRouter> egressRouter = new HashMap<>(request.egressModes.size());
+        Map<LegMode, StreetRouter> accessRouter = new HashMap<>(modes.size());
+        Map<LegMode, StreetRouter> egressRouter = new HashMap<>(request.egressModes.size());
 
         //Routes all direct (if no transit)/access modes
-        for(Mode mode: modes) {
+        for(LegMode mode: modes) {
             long initialStopStartTime = System.currentTimeMillis();
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
-            streetRouter.mode = mode;
+            if (currentlyUnsupportedModes.contains(mode)) {
+                continue;
+            }
+            //TODO: add support for bike sharing and park and ri
+            streetRouter.mode = Mode.valueOf(mode.toString());
             streetRouter.profileRequest = request;
             // TODO add time and distance limits to routing, not just weight.
             // TODO apply walk and bike speeds and maxBike time.
@@ -100,9 +107,13 @@ public class PointToPointQuery {
         }
         if (transit) {
             //For direct modes
-            for(Mode mode: modes) {
+            for(LegMode mode: modes) {
                 StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
-                streetRouter.mode = mode;
+                if (currentlyUnsupportedModes.contains(mode)) {
+                    continue;
+                }
+                //TODO: add support for bike sharing and park and ride
+                streetRouter.mode = Mode.valueOf(mode.toString());
                 streetRouter.profileRequest = request;
                 // TODO add time and distance limits to routing, not just weight.
                 // TODO apply walk and bike speeds and maxBike time.
@@ -123,9 +134,13 @@ public class PointToPointQuery {
 
             //For egress
             //TODO: this must be reverse search
-            for(Mode mode: request.egressModes) {
+            for(LegMode mode: request.egressModes) {
                 StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
-                streetRouter.mode = mode;
+                if (currentlyUnsupportedModes.contains(mode)) {
+                    continue;
+                }
+                //TODO: add support for bike sharing and park and ride
+                streetRouter.mode = Mode.valueOf(mode.toString());
                 streetRouter.profileRequest = request;
                 // TODO add time and distance limits to routing, not just weight.
                 // TODO apply walk and bike speeds and maxBike time.

@@ -1,7 +1,5 @@
 package com.conveyal.r5.api.util;
 
-import com.conveyal.r5.profile.Mode;
-
 import java.util.Objects;
 
 /**
@@ -15,12 +13,6 @@ public class ModeStopIndex {
     public ModeStopIndex(LegMode mode, int stopIndex) {
         this.mode = mode;
         this.stopIndex = stopIndex;
-    }
-
-    @Deprecated
-    public ModeStopIndex(Mode mode, int startVertexStopIndex) {
-        this.mode = LegMode.valueOf(mode.toString());
-        this.stopIndex = startVertexStopIndex;
     }
 
     @Override

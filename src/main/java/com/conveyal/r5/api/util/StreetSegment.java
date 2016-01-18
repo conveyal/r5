@@ -1,6 +1,5 @@
 package com.conveyal.r5.api.util;
 
-import com.conveyal.r5.profile.Mode;
 import com.vividsolutions.jts.geom.LineString;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetPath;
@@ -44,7 +43,7 @@ public class StreetSegment {
      * @param path
      * @param mode requested mode for this path
      */
-    public StreetSegment(StreetPath path, Mode mode) {
+    public StreetSegment(StreetPath path, LegMode mode) {
         duration = path.getDuration();
         distance = path.getDistance();
         streetEdges = new LinkedList<>();
@@ -79,9 +78,8 @@ public class StreetSegment {
         coordinatesArray = coordinates.toArray(coordinatesArray);
         //FIXME: copy from array to coordinates sequence
         this.geometry = GeometryUtils.geometryFactory.createLineString(coordinatesArray);
-        //TODO: decide between LegMode or Mode
         //This is not read from state because this is requested mode which is not always the same as state mode
         //For example bicycle plan can consist of bicycle and walk modes if walking the bike is required
-        this.mode = LegMode.valueOf(mode.toString());
+        this.mode = mode;
     }
 }

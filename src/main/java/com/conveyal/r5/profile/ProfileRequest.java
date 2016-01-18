@@ -4,10 +4,9 @@ import com.conveyal.r5.analyst.BoardingAssumption;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import java.time.LocalDate;
 
-import com.conveyal.r5.model.json_serialization.ModeSetDeserializer;
-import com.conveyal.r5.model.json_serialization.ModeSetSerializer;
-import com.conveyal.r5.model.json_serialization.ZoneIdDeserializer;
-import com.conveyal.r5.model.json_serialization.ZoneIdSerializer;
+import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.r5.model.json_serialization.*;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -19,6 +18,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
 import java.util.EnumSet;
 import java.util.HashMap;
 
@@ -99,24 +99,24 @@ public class ProfileRequest implements Serializable, Cloneable {
     public int limit;
     
     /** The modes used to access transit */
-    @JsonSerialize(using = ModeSetSerializer.class)
-    @JsonDeserialize(using = ModeSetDeserializer.class)
-    public EnumSet<Mode> accessModes;
+    @JsonSerialize(using = LegModeSetSerializer.class)
+    @JsonDeserialize(using = LegModeSetDeserializer.class)
+    public EnumSet<LegMode> accessModes;
     
     /** The modes used to reach the destination after leaving transit */
-    @JsonSerialize(using = ModeSetSerializer.class)
-    @JsonDeserialize(using = ModeSetDeserializer.class)
-    public EnumSet<Mode> egressModes;
+    @JsonSerialize(using = LegModeSetSerializer.class)
+    @JsonDeserialize(using = LegModeSetDeserializer.class)
+    public EnumSet<LegMode> egressModes;
     
     /** The modes used to reach the destination without transit */
-    @JsonSerialize(using = ModeSetSerializer.class)
-    @JsonDeserialize(using = ModeSetDeserializer.class)
-    public EnumSet<Mode> directModes;
+    @JsonSerialize(using = LegModeSetSerializer.class)
+    @JsonDeserialize(using = LegModeSetDeserializer.class)
+    public EnumSet<LegMode> directModes;
     
     /** The transit modes used */
-    @JsonSerialize(using = ModeSetSerializer.class)
-    @JsonDeserialize(using = ModeSetDeserializer.class)
-    public EnumSet<Mode> transitModes;
+    @JsonSerialize(using = TransitModeSetSerializer.class)
+    @JsonDeserialize(using = TransitModeSetDeserializer.class)
+    public EnumSet<TransitModes> transitModes;
     
     /** If true, disable all goal direction and propagate results to the street network */
     public boolean analyst = false;
@@ -266,15 +266,13 @@ public class ProfileRequest implements Serializable, Cloneable {
         profileRequest.toLat = toCoordinate.get("lat");
         profileRequest.toLon = toCoordinate.get("lon");
 
-        //profileRequest.directModes = EnumSet.of(Mode.WALK, Mode.BICYCLE, Mode.CAR);
-        profileRequest.transitModes = EnumSet.of(Mode.TRANSIT);
-        profileRequest.accessModes = EnumSet.of(Mode.WALK);
-        profileRequest.egressModes = profileRequest.accessModes;
-        //TODO: get mode from request
-        //profileRequest.directModes.add(Mode.WALK);
+        profileRequest.transitModes = EnumSet.copyOf((Collection<TransitModes>) environment.getArgument("transitModes"));
+        profileRequest.accessModes = EnumSet.copyOf((Collection<LegMode>) environment.getArgument("accessModes"));
+        profileRequest.egressModes = EnumSet.copyOf((Collection<LegMode>)environment.getArgument("egressModes"));
 
-        //Doesn't work currently since Mode != LegMode
-        //profileRequest.directModes.addAll(environment.getArgument("directModes"));
+        profileRequest.directModes = EnumSet.copyOf((Collection<LegMode>)environment.getArgument("directModes"));
+
+
         return profileRequest;
     }
 }

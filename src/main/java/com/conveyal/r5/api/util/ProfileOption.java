@@ -163,7 +163,7 @@ public class ProfileOption {
      * @param startVertexStopIndex StreetVertexIndex which is end destination for this path
      * @return index in access array for this path
      */
-    public int addAccess(StreetSegment streetSegment, Mode mode, int startVertexStopIndex) {
+    public int addAccess(StreetSegment streetSegment, LegMode mode, int startVertexStopIndex) {
         ModeStopIndex modeStopIndex = new ModeStopIndex(mode, startVertexStopIndex);
         int accessIndex;
         if (!accessIndexes.containsKey(modeStopIndex)) {
@@ -185,7 +185,7 @@ public class ProfileOption {
      * @param endVertexStopIndex StreetVertexIndex which is end destination for this path
      * @return index in egress array for this path
      */
-    public int addEgress(StreetSegment streetSegment, Mode mode, int endVertexStopIndex) {
+    public int addEgress(StreetSegment streetSegment, LegMode mode, int endVertexStopIndex) {
         if (egress == null) {
             egress = new ArrayList<>();
         }
@@ -235,7 +235,7 @@ public class ProfileOption {
      * @param startVertexStopIndex
      * @return
      */
-    public int getAccessIndex(Mode mode, int startVertexStopIndex) {
+    public int getAccessIndex(LegMode mode, int startVertexStopIndex) {
         return accessIndexes.getOrDefault(new ModeStopIndex(mode, startVertexStopIndex), -1);
     }
 
@@ -245,7 +245,7 @@ public class ProfileOption {
      * @param endVertexStopIndex
      * @return
      */
-    public int getEgressIndex(Mode mode, int endVertexStopIndex) {
+    public int getEgressIndex(LegMode mode, int endVertexStopIndex) {
         return egressIndexes.getOrDefault(new ModeStopIndex(mode, endVertexStopIndex), -1);
     }
 }

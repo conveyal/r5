@@ -76,8 +76,8 @@ public class ProfileResponse {
      * @param transportNetwork which is used to get stop names, etc.
      * @param fromTimeDateZD this is used to get date
      */
-    public void addTransitPath(Map<Mode, StreetRouter> accessRouter,
-        Map<Mode, StreetRouter> egressRouter, Path currentTransitPath,
+    public void addTransitPath(Map<LegMode, StreetRouter> accessRouter,
+        Map<LegMode, StreetRouter> egressRouter, Path currentTransitPath,
         TransportNetwork transportNetwork, ZonedDateTime fromTimeDateZD) {
 
         HashPath hashPath = new HashPath(currentTransitPath);

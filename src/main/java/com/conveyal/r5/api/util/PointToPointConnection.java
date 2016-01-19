@@ -9,7 +9,7 @@ public class PointToPointConnection {
     //Index of access part of this trip @notnull
     public int access;
     //Index of egress part of this trip
-    public int egress;
+    public Integer egress;
     /*chooses which specific trip should be used
     Index in transit list specifies transit with same index
     Each TransitJourneyID has pattern in chosen index an time index in chosen pattern
@@ -28,5 +28,6 @@ public class PointToPointConnection {
     //Connection for direct modes
     public PointToPointConnection(int accessIndex) {
         access = accessIndex;
+        egress = null;
     }
 }

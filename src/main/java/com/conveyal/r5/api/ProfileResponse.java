@@ -89,9 +89,6 @@ public class ProfileResponse {
             options.add(profileOption);
         }
 
-        List<Integer> accessPathIndexes = new ArrayList<>();
-        List<Integer> egressPathIndexes = new ArrayList<>();
-
         int startStopIndex = currentTransitPath.boardStops[0];
         int endStopIndex = currentTransitPath.alightStops[currentTransitPath.length-1];
         int startVertexStopIndex = transportNetwork.transitLayer.streetVertexForStop.get(startStopIndex);
@@ -109,11 +106,8 @@ public class ProfileResponse {
                 if (state != null) {
                     StreetPath streetPath = new StreetPath(state, transportNetwork);
                     StreetSegment streetSegment = new StreetSegment(streetPath, mode);
-                    accessPathIndexes
-                        .add(profileOption.addAccess(streetSegment, mode, startVertexStopIndex));
+                    profileOption.addAccess(streetSegment, mode, startVertexStopIndex);
                 }
-            } else {
-                accessPathIndexes.add(accessPathIndex);
             }
         });
 
@@ -124,11 +118,8 @@ public class ProfileResponse {
                 if (state != null) {
                     StreetPath streetPath = new StreetPath(state, transportNetwork);
                     StreetSegment streetSegment = new StreetSegment(streetPath, mode);
-                    egressPathIndexes
-                        .add(profileOption.addEgress(streetSegment, mode, endVertexStopIndex));
+                    profileOption.addEgress(streetSegment, mode, endVertexStopIndex);
                 }
-            } else {
-                egressPathIndexes.add(egressPathIndex);
             }
         });
         List<TransitJourneyID> transitJourneyIDs = new ArrayList<>(currentTransitPath.patterns.length);
@@ -138,11 +129,8 @@ public class ProfileResponse {
 
 
         }
-        for (Integer accessIdx: accessPathIndexes) {
-            for (Integer egressIdx: egressPathIndexes) {
-                profileOption.addItinerary(accessIdx, egressIdx, transitJourneyIDs, transportNetwork.getTimeZone());
-            }
-        }
+
+        profileOption.addItineraries(transitJourneyIDs, transportNetwork.getTimeZone());
 
         profileOption.summary = profileOption.generateSummary();
 

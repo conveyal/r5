@@ -147,6 +147,7 @@ public class ProfileOption {
                 transitSegment
                     .addSegmentPattern(transitLayer, currentTransitPath, pathIndex, fromTimeDateZD,
                         transitJourneyIDs);
+                LOG.info("Adding segment pattern to existing transit");
             } else {
                 LOG.warn("Incorrect stop in pathIndex:{}", pathIndex);
             }
@@ -201,7 +202,7 @@ public class ProfileOption {
         return egressIndex;
     }
 
-    public void addItinerary(Integer accessIdx, Integer egressIdx,
+    void addItinerary(Integer accessIdx, Integer egressIdx,
         List<TransitJourneyID> transitJourneyIDs, ZoneId timeZone) {
         Itinerary itinerary = new Itinerary();
         itinerary.transfers = transitJourneyIDs.size() - 1;
@@ -247,5 +248,18 @@ public class ProfileOption {
      */
     public int getEgressIndex(LegMode mode, int endVertexStopIndex) {
         return egressIndexes.getOrDefault(new ModeStopIndex(mode, endVertexStopIndex), -1);
+    }
+
+    /**
+     * Creates itineraries for all access index and egress index combinations
+     * @param transitJourneyIDs
+     * @param timeZone
+     */
+    public void addItineraries(List<TransitJourneyID> transitJourneyIDs, ZoneId timeZone) {
+        for(Integer accessIdx:accessIndexes.values()) {
+            for (Integer egressIdx: egressIndexes.values()) {
+                addItinerary(accessIdx, egressIdx, transitJourneyIDs, timeZone);
+            }
+        }
     }
 }

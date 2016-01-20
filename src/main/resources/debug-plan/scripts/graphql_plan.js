@@ -2,6 +2,7 @@ var hostname = "http://localhost:8080";
 var my_map;
 var MARIBOR_COOR = [46.562483, 15.643975];
 var layer = null;
+var graphqlResponse = null;
 
 var PlanConfig = function() {
     this.accessModes="WALK";
@@ -145,9 +146,17 @@ function getModeColor (mode) {
     if (mode === 'CAR') return '#444'
     return '#aaa'
 }; 
+
+function getDash (mode) {
+    if (mode == 'WALK' || mode === 'BICYCLE' || mode === 'CAR') {
+        return null;
+    }
+    return [5,10]
+};
 function styleMode(feature) {
     return {
         color: getModeColor(feature.properties.mode),
+        dashArray: getDash(feature.properties.mode),
         //weight:speedWeight(feature.properties.speed_ms),
         //weight:feature.properties.weight/10,
         opacity: 0.8
@@ -228,6 +237,117 @@ function requestStops() {
 
 }
 
+function getStopFeature(stop) {
+    var stopFeature = {
+        "properties":{
+            "name": stop.name,
+            "id": stop.id
+        },
+        "type":"Feature",
+        "geometry":{
+            "type":"Point",
+            "coordinates":[
+                stop.lon,
+                stop.lat
+            ]
+        }
+    };
+    return stopFeature;
+}
+
+
+function getTransitFeature(fromStop, toStop, route) {
+    var transitFeature = {
+        "properties":{
+            "mode":route.mode,
+            "line":route.shortName,
+            "info":fromStop.name + " -> " + toStop.name
+        },
+        "type": "Feature",
+        "geometry": {
+            "type": "LineString",
+            "coordinates":
+            [
+                [fromStop.lon, fromStop.lat],
+                [toStop.lon, toStop.lat]
+            ],
+        }
+    };
+    return transitFeature;
+}
+
+
+function getFeature(streetSegment) {
+    var accesFeature = {
+        "properties":{
+            "mode":streetSegment.mode
+        },
+        "type": "Feature",
+        "geometry": JSON.parse(streetSegment.geometryGeoJSON)
+    };
+    return accesFeature;
+}
+
+function showItinerary(optionIdx, itineraryIdx) {
+    console.info("Option", optionIdx, "Itinerary", itineraryIdx);
+    var option = graphqlResponse.data.plan.options[optionIdx];
+    var itinerary = option.itinerary[itineraryIdx];
+    console.log(itinerary);
+    var access = option.access;
+    var egress = option.egress;
+    var transit = option.transit;
+    //Removes line from previous request
+    if (layer != null) {
+        layer.clearLayers();
+    }
+    var connection = itinerary.connection[0];
+    var accessData = access[connection.access];
+    var features = {
+        "type": "FeatureCollection",
+        "features": []
+    };
+    var accesFeature = getFeature(accessData);
+    features.features.push(accesFeature);
+    if (connection.transit !== null) {
+        for(var k=0;k < connection.transit.length; k++) {
+            var transitInfo = connection.transit[k];
+            var transitData = transit[k];
+            var patternInfo = transitData.segmentPatterns[transitInfo.pattern];
+            var route;
+            for (var routeIdx=0; routeIdx < transitData.routes.length; routeIdx++) {
+                var currentRoute= transitData.routes[routeIdx];
+                if (currentRoute.routeIdx === patternInfo.routeIdx) {
+                    route = currentRoute;
+                    break;
+                }
+            }
+            var fromStop = transitData.from;
+            var toStop = transitData.to;
+            var transitFeature = getTransitFeature(fromStop, toStop, route);
+            var fromTime = patternInfo.fromDepartureTime[transitInfo.time];
+            var toTime = patternInfo.toArrivalTime[transitInfo.time];
+            transitFeature.properties.patternId = patternInfo.patternId;
+            transitFeature.properties.fromTime = fromTime;
+            transitFeature.properties.toTime = toTime;
+            features.features.push(transitFeature);
+            features.features.push(getStopFeature(fromStop));
+            features.features.push(getStopFeature(toStop));
+            
+        }
+    }
+    if (connection.egress !== null) { 
+        var egressData = egress[connection.egress];
+        var egressFeature = getFeature(egressData);
+        features.features.push(egressFeature);
+    }
+    layer = L.geoJson(features, {
+        pointToLayer:function(feature, latlng) {
+            return L.circleMarker(latlng, {filColor:getModeColor(feature.properties.mode), radius:10, opacity:0.8, weight:1});
+        },
+        style: styleMode, onEachFeature:onEachFeature});
+    layer.addTo(window.my_map);
+}
+
 function secondsToTime(seconds) { 
     return new Date(seconds * 1000).toISOString().substr(11, 8);
 }
@@ -236,6 +356,10 @@ function makeTextResponse(data) {
     var options = data.data.plan.options;
     console.info("Options:", options.length);
     $(".response").html("");
+    //Removes line from previous request
+    if (layer != null) {
+        layer.clearLayers();
+    }
     var infos = "<ul>";
     for(var i=0; i < options.length; i++) {
         var option = options[i];
@@ -245,7 +369,7 @@ function makeTextResponse(data) {
         var transit = option.transit;
         console.log("Summary:", option.summary);
         for(var j=0; j < option.itinerary.length; j++) {
-            item+="<p>Itinerary:</p>";
+            item+="<br /><a href=\"#\" class=\"itinerary\" data-option=\""+i+"\" data-itinerary=\""+j+"\">Itinerary:</a>";
             item+="<ul>";
             var itinerary=option.itinerary[j];
             item+="<li>waitingTime: "+secondsToTime(itinerary.waitingTime)+"</li>";
@@ -294,6 +418,11 @@ function makeTextResponse(data) {
         infos+=item;
     }
     $(".response").append(infos+"</ul>");
+    $(".itinerary").click(function() {
+        var option = $(this).data("option");
+        var itinerary = $(this).data("itinerary");
+        showItinerary(option, itinerary);
+    });
 
 }
 
@@ -323,12 +452,9 @@ function requestPlan() {
         url: hostname + "/otp/routers/default/index/graphql",
         success: function (data) {
             console.log(data);
+            graphqlResponse=data;
             makeTextResponse(data);
             /*
-            //Removes line from previous request
-            if (layer != null) {
-                layer.clearLayers();
-            }
             if (data.errors) {
                 alert(data.errors);
             }

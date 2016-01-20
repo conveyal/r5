@@ -1,5 +1,6 @@
 package com.conveyal.r5.transit;
 
+import com.conveyal.r5.api.util.ParkRideParking;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -36,6 +37,48 @@ public class TransferFinder {
     public TransferFinder(TransportNetwork network) {
         this.transitLayer = network.transitLayer;
         this.streetLayer = network.streetLayer;
+    }
+
+    public void findParkRideTransfer() {
+        int unconnectedParkRides = 0;
+        LOG.info("Finding closest stops to P+R for {} P+Rs", this.streetLayer.parkRideLocationsMap.size());
+        for (ParkRideParking parkRideParking : this.streetLayer.parkRideLocationsMap.valueCollection()) {
+            int originStreetVertex;
+            if (parkRideParking.id == null || parkRideParking.id < 0) {
+                unconnectedParkRides++;
+                continue;
+            } else {
+                originStreetVertex = parkRideParking.id;
+            }
+
+            StreetRouter streetRouter = new StreetRouter(streetLayer);
+            streetRouter.distanceLimitMeters = TransitLayer.PARKRIDE_DISTANCE_LIMIT;
+            streetRouter.setOrigin(originStreetVertex);
+            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+
+            streetRouter.transitStopSearch = true;
+            streetRouter.route();
+
+            TIntIntMap distancesToReachedStops = streetRouter.getReachedStops();
+            // FIXME the following is technically incorrect, measure that it's actually improving calculation speed
+            retainClosestStopsOnPatterns(distancesToReachedStops);
+            // At this point we have the distances to all stops that are the closest one on some pattern.
+            // Make transfers to them, packed as pairs of (target stop index, distance).
+            TIntList packedTransfers = new TIntArrayList();
+            distancesToReachedStops.forEachEntry((targetStopIndex, distance) -> {
+                packedTransfers.add(targetStopIndex);
+                packedTransfers.add(distance);
+                return true;
+            });
+            // Record this list of transfers as leading out of the stop with index s.
+            if (packedTransfers.size() > 0) {
+                parkRideParking.closestTransfers = packedTransfers;
+                LOG.info("Found {} stops for P+R:{}", distancesToReachedStops.size(), parkRideParking.id);
+            } else {
+                parkRideParking.closestTransfers = EMPTY_INT_LIST;
+                LOG.info("Not found stops for Park ride:{}", parkRideParking.id);
+            }
+        }
     }
 
     public void findTransfers () {

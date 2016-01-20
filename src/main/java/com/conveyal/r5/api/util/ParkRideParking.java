@@ -1,6 +1,8 @@
 package com.conveyal.r5.api.util;
 
 import com.conveyal.osmlib.OSMEntity;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,6 +23,11 @@ public class ParkRideParking implements Serializable {
 
     public float lat;
     public float lon;
+
+    /**
+     * List of closest stop, time
+     */
+    public TIntList closestTransfers = new TIntArrayList();
 
     public ParkRideParking(int vertexIdx, double lat, double lon, OSMEntity way) {
         id = vertexIdx;

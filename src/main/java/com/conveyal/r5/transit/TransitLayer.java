@@ -64,6 +64,11 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     public static final int TRANSFER_DISTANCE_LIMIT = 1000;
 
+    /**
+     * Distance limit from P+R to transit in meters
+     */
+    public static final int PARKRIDE_DISTANCE_LIMIT = 500;
+
     private static final Logger LOG = LoggerFactory.getLogger(TransitLayer.class);
 
     /**

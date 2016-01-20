@@ -66,7 +66,7 @@ public class TransitSegment {
             vertex.seek(transitLayer.streetVertexForStop.get(alightStopIdx));
             to.lat = (float) vertex.getLat();
             to.lon = (float) vertex.getLon();
-            routes.putIfAbsent(pattern.routeIndex, Route.from(routeInfo));
+            routes.putIfAbsent(pattern.routeIndex, Route.from(routeInfo, pattern.routeIndex));
 
             SegmentPattern segmentPattern = new SegmentPattern(transitLayer, pattern, currentTransitPath.patterns[pathIndex], boardStopIdx, alightStopIdx, currentTransitPath.alightTimes[pathIndex], fromTimeDateZD);
             segmentPatterns.add(segmentPattern);
@@ -152,7 +152,7 @@ public class TransitSegment {
         //Adds route to routeMap if needed
         if (tripPattern.routeIndex >= 0) {
             RouteInfo routeInfo = transitLayer.routes.get(tripPattern.routeIndex);
-            routes.putIfAbsent(tripPattern.routeIndex, Route.from(routeInfo));
+            routes.putIfAbsent(tripPattern.routeIndex, Route.from(routeInfo, tripPattern.routeIndex));
         }
     }
 

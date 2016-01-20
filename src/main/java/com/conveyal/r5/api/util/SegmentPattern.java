@@ -55,6 +55,7 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
     //TOOD: check if we really need this
     private List<Integer> alightTimes;
     final int patternIdx;
+    final public int routeIndex;
 
 
 
@@ -72,6 +73,7 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
         this.patternIdx = patternIdx;
         fromIndex = -1;
         toIndex = -1;
+        routeIndex = pattern.routeIndex;
 
         //Finds at which indexes are board and alight stops in wanted trippattern
         //This is used in response and we need indexes to find used trip

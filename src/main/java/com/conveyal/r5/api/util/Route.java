@@ -59,6 +59,12 @@ public class Route {
      */
     public String agencyName;
 
+    /**
+     * Transport network unique integer ID of route
+     * @notnull
+     */
+    public int routeIdx;
+
     public Route() {
 
     }
@@ -94,7 +100,7 @@ public class Route {
     }
 
     //TODO: we need to decide if we would use Route or RouteInfo since copying RouteInfo data to Route is just stupid
-    public static Route from(RouteInfo routeInfo) {
+    public static Route from(RouteInfo routeInfo, int routeIndex) {
         Route route = new Route();
 
         route.shortName = routeInfo.route_short_name;
@@ -105,6 +111,7 @@ public class Route {
         route.mode = TransitModes.BUS;
         //FIXME: get from GTFS
         route.agencyName = "MARPROM";
+        route.routeIdx = routeIndex;
 
         return route;
     }

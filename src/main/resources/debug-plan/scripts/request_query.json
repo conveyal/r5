@@ -1,0 +1,132 @@
+{plan(from:{lat:FROMLAT,lon:FROMLON},
+  to:{lat:TOLAT,lon:TOLON},
+  date:"DATE", directModes:[DIRECTMODES],
+  accessModes:[ACCESSMODES], egressModes:[EGRESSMODES],
+transitModes:[TRANSITMODES]) {
+  options {
+    summary,
+    itinerary {
+      waitingTime
+      walkTime
+      distance
+      transfers
+      duration
+      transitTime
+      startTime
+      endTime,
+      connection {
+        access
+        egress,
+        transit {
+          pattern
+          time
+        }
+      }
+    
+    }
+    
+    
+    transit {
+      from {
+        name,
+        id,
+        lon,
+        lat,
+      },
+       to {
+        name,
+        id,
+        lon,
+        lat,
+      },
+      mode,
+      routes {id, routeIdx shortName, mode, agencyName},
+      segmentPatterns {
+        patternId
+	routeIdx
+        fromIndex
+        toIndex,
+        fromDepartureTime
+        toArrivalTime
+        
+     
+      }
+    },
+    
+    access {
+      mode,
+      duration,
+      distance,
+      geometryGeoJSON,
+      
+      #elevation {
+        #distance
+        #elevation
+      #},
+      #alerts {
+        #alertHeaderText
+        #alertDescriptionText
+        #alertUrl
+        #effectiveStartDate
+        #effectiveEndDate
+      #},
+      #streetEdges {
+        #edgeId
+        #distance
+        #geometryGeoJSON
+        #mode
+        #streetName
+        #relativeDirection
+        #absoluteDirection
+        #stayOn
+        #area
+        #exit
+        #bogusName,
+        #bikeRentalOnStation {
+          #id,
+          #name,
+          #lat,lon
+        #}
+      #}
+    },
+     egress {
+      mode,
+      duration,
+      distance,
+      geometryGeoJSON,
+     
+      #elevation {
+        #distance
+        #elevation
+      #},
+      #alerts {
+        #alertHeaderText
+        #alertDescriptionText
+        #alertUrl
+        #effectiveStartDate
+        #effectiveEndDate
+      #},
+      #streetEdges {
+        #edgeId
+        #distance
+        #geometryPolyline
+        #mode
+        #streetName
+        #relativeDirection
+        #absoluteDirection
+        #stayOn
+        #area
+        #exit
+        #bogusName,
+        #bikeRentalOnStation {
+          #id,
+          #name,
+          #lon,lat
+        #}
+      #}
+    }
+  } 
+  }
+  
+  #patterns{patternId, startTime, endTime, realTime, arrivalDelay, departureDelay}
+} 

@@ -243,6 +243,10 @@ public class GraphQLSchema {
 
     public GraphQLOutputType itineraryType = new GraphQLTypeReference("Itinerary");
 
+    public GraphQLOutputType tripPatternType = new GraphQLTypeReference("TripPattern");
+
+    public GraphQLOutputType tripType = new GraphQLTypeReference("Trip");
+
     private final String INPUTCOORDINATENAME = "Coordinate";
 
     // @formatter:off
@@ -531,6 +535,55 @@ public class GraphQLSchema {
                 .name("realTimeData")
                 .type(Scalars.GraphQLBoolean)
                 .dataFetcher(environment -> ((BikeRentalStation) environment.getSource()).realTimeData)
+                .build())
+            .build();
+
+        tripType = GraphQLObjectType.newObject()
+            .name("Trip")
+            .description("Information about one trip")
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("tripId")
+                .type(new GraphQLNonNull(Scalars.GraphQLString))
+                .description("GTFS trip ID (Agency unique)")
+                .dataFetcher(environment -> ((Trip) environment.getSource()).tripId)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("serviceId")
+                .type(Scalars.GraphQLString)
+                .description("Generated Service ID")
+                .dataFetcher(environment -> ((Trip) environment.getSource()).serviceId)
+                .build())
+            .build();
+
+        tripPatternType = GraphQLObjectType.newObject()
+            .name("TripPattern")
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("tripPatternIdx")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("Index of this trip pattern in patterns array")
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("routeIdx")
+                .type(Scalars.GraphQLInt)
+                .description("Index of route in route array")
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("routeId")
+                .type(Scalars.GraphQLString)
+                .description("GTFS route ID (Agency unique)")
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("directionId")
+                .type(Scalars.GraphQLString)
+                .description("Direction ID of all trips in this trip pattern")
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("stops")
+                .type(new GraphQLList(stopType))
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("trips")
+                .type(new GraphQLList(tripType))
                 .build())
             .build();
 
@@ -1004,7 +1057,7 @@ public class GraphQLSchema {
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("patterns")
-                .type(new GraphQLList(segmentPatternType))
+                .type(new GraphQLList(tripPatternType))
                 .build())
             .build();
 

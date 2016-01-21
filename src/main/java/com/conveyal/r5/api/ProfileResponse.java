@@ -20,6 +20,7 @@ public class ProfileResponse {
 
     private static final Logger LOG = LoggerFactory.getLogger(ProfileResponse.class);
     public List<ProfileOption> options = new ArrayList<>();
+    private Map<Integer, TripPattern> patterns = new HashMap<>();
 
     @Override public String toString() {
         return "ProfileResponse{" +
@@ -33,21 +34,7 @@ public class ProfileResponse {
         return options;
     }
 
-    public List<SegmentPattern> getPatterns() {
-        Map<String, SegmentPattern> patterns = new HashMap<>(10);
-
-        for (ProfileOption option: options) {
-            if (option.transit != null && !option.transit.isEmpty()) {
-                for (TransitSegment transitSegment: option.transit) {
-                    if (transitSegment.segmentPatterns != null && !transitSegment.segmentPatterns.isEmpty()) {
-                        for (SegmentPattern segmentPattern : transitSegment.segmentPatterns) {
-                            patterns.put(segmentPattern.patternId, segmentPattern);
-                        }
-                    }
-                }
-            }
-        }
-
+    public List<TripPattern> getPatterns() {
         //TODO: return as a map since I think it will be more usefull but GraphQL doesn't support map
         return new ArrayList<>(patterns.values());
     }
@@ -127,8 +114,10 @@ public class ProfileResponse {
                 profileOption.addTransit(transportNetwork.transitLayer,
                     currentTransitPath, i, fromTimeDateZD, transitJourneyIDs);
 
-
+            patterns.putIfAbsent(currentTransitPath.patterns[i], new TripPattern(transportNetwork.transitLayer,currentTransitPath.patterns[i]));
         }
+
+
 
         profileOption.addItineraries(transitJourneyIDs, transportNetwork.getTimeZone());
 

@@ -2,7 +2,8 @@ package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.BoardingAssumption;
 import com.conveyal.r5.analyst.scenario.Scenario;
-import java.time.LocalDate;
+
+import java.time.*;
 
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
@@ -14,9 +15,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import graphql.schema.DataFetchingEnvironment;
 
 import java.io.Serializable;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -255,8 +254,14 @@ public class ProfileRequest implements Serializable, Cloneable {
         HashMap<String, Float> fromCoordinate = environment.getArgument("from");
         HashMap<String, Float> toCoordinate = environment.getArgument("to");
 
-        profileRequest.fromTime = environment.getArgument("time");
-        profileRequest.toTime = profileRequest.fromTime + 3*3600;
+        LocalTime fromLocalTime = LocalTime.parse(environment.getArgument("fromTime"),
+            DateTimeFormatter.ISO_TIME);
+
+        LocalTime toLocalTime = LocalTime.parse(environment.getArgument("toTime"),
+            DateTimeFormatter.ISO_TIME);
+
+        profileRequest.fromTime = fromLocalTime.getHour()*3600+fromLocalTime.getMinute()*60+fromLocalTime.getSecond();
+        profileRequest.toTime = toLocalTime.getHour()*3600+toLocalTime.getMinute()*60+toLocalTime.getSecond();
         profileRequest.date = environment.getArgument("date");
 
 

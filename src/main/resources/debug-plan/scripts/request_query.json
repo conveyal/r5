@@ -1,6 +1,6 @@
 {plan(from:{lat:FROMLAT,lon:FROMLON},
   to:{lat:TOLAT,lon:TOLON},
-  date:"DATE", directModes:[DIRECTMODES],
+  date:"DATE", fromTime:"FROMTIME", toTime:"TOTIME", directModes:[DIRECTMODES],
   accessModes:[ACCESSMODES], egressModes:[EGRESSMODES],
 transitModes:[TRANSITMODES]) {
   options {

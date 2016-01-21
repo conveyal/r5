@@ -10,6 +10,8 @@ var PlanConfig = function() {
     this.directModes="WALK,BICYCLE";
     this.transitModes="BUS";
     this.date="2015-02-05";
+    this.fromTime="7:30";
+    this.toTime="10:30";
     this.fromLat = "";
     this.fromLon = "";
     this.toLat = "";
@@ -433,6 +435,8 @@ function requestPlan() {
                 .replace("TOLAT", planConfig.toLat)
                 .replace("TOLON", planConfig.toLon)
                 .replace("DATE", planConfig.date)
+                .replace("FROMTIME", planConfig.fromTime)
+                .replace("TOTIME", planConfig.toTime)
                 .replace("DIRECTMODES", planConfig.directModes)
                 .replace("ACCESSMODES", planConfig.accessModes)
                 .replace("EGRESSMODES", planConfig.egressModes)
@@ -506,12 +510,14 @@ $(document).ready(function() {
     gui.add(planConfig, "directModes");
     gui.add(planConfig, "transitModes");
     gui.add(planConfig, "date");
+    gui.add(planConfig, "fromTime");
+    gui.add(planConfig, "toTime");
     gui.add(planConfig, "fromLat").listen().onFinishChange(function(value) { moveMarker("from");});
     gui.add(planConfig, "fromLon").listen().onFinishChange(function(value) {moveMarker("from"); });
     gui.add(planConfig, "toLat").listen().onFinishChange(function(value) {moveMarker("to"); });
     gui.add(planConfig, "toLon").listen().onFinishChange(function(value) {moveMarker("to"); });
     gui.add(planConfig, "plan");
-    gui.add(planConfig, "showReachedStops");
+    /*gui.add(planConfig, "showReachedStops");*/
 var sidebar = L.control.sidebar('sidebar').addTo(my_map);
 
 });

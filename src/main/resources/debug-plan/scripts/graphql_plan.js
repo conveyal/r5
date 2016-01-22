@@ -302,7 +302,7 @@ function showItinerary(optionIdx, itineraryIdx) {
     if (layer != null) {
         layer.clearLayers();
     }
-    var connection = itinerary.connection[0];
+    var connection = itinerary.connection;
     var accessData = access[connection.access];
     var features = {
         "type": "FeatureCollection",
@@ -386,7 +386,7 @@ function makeTextResponse(data) {
             item+="<li>distance: "+itinerary.distance/1000+"m</li>";
             item+="<li>startTime: "+itinerary.startTime+"</li>";
             item+="<li>endTime: "+itinerary.endTime+"</li>";
-            var connection = itinerary.connection[0];
+            var connection = itinerary.connection
             var accessData = access[connection.access];
             item+="<ol>";
             item+="<li>Mode:"+accessData.mode+" Duration: " + secondsToTime(accessData.duration) + "Distance: "+accessData.distance/1000 + "m</li>";

@@ -28,7 +28,7 @@ public class Itinerary {
     //How much time did we spend on transit in seconds @notnull
     public int transitTime;
 
-    public List<PointToPointConnection> connection;
+    public PointToPointConnection connection;
 
     //ISO 8061 date time when this journey started @notnull
     public ZonedDateTime startTime;
@@ -47,7 +47,6 @@ public class Itinerary {
      * @param fromTimeDateZD
      */
     public Itinerary(StreetSegment streetSegment, int accessIndex, ZonedDateTime fromTimeDateZD) {
-        connection = new ArrayList<>();
         transfers = 0;
         waitingTime = 0;
         walkTime = duration = streetSegment.duration;
@@ -56,15 +55,14 @@ public class Itinerary {
         startTime = fromTimeDateZD;
         endTime = fromTimeDateZD.plusSeconds(streetSegment.duration);
         PointToPointConnection pointToPointConnection = new PointToPointConnection(accessIndex);
-        connection.add(pointToPointConnection);
+        connection = pointToPointConnection;
     }
 
     public Itinerary() {
-        connection = new ArrayList<>();
 
     }
 
     public void addConnection(PointToPointConnection pointToPointConnection) {
-        connection.add(pointToPointConnection);
+        connection = pointToPointConnection;
     }
 }

@@ -985,7 +985,7 @@ public class GraphQLSchema {
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("connection")
-                .type(new GraphQLList(pointToPointConnectionType))
+                .type(pointToPointConnectionType)
                 .dataFetcher(environment -> ((Itinerary) environment.getSource()).connection)
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()

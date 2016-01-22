@@ -33,8 +33,6 @@ public class TransitSegment {
     public StopCluster from;
     public StopCluster to;
 
-    //this is index of non transit part of a journey in middle between this transit part and the next
-    public  int middle_id;
     public Stats waitStats;
     public TransitModes mode;
     public String fromName;
@@ -42,6 +40,8 @@ public class TransitSegment {
     public Stats rideStats;
     public Map<Integer,Route> routes;
     public List<SegmentPattern> segmentPatterns = Lists.newArrayList();
+    //Part of a journey between transit stops (transfers)
+    public StreetSegment middle;
     private transient TransitLayer transitLayer;
 
 
@@ -172,5 +172,10 @@ public class TransitSegment {
 
     public Collection<Route> getRoutes() {
         return routes.values();
+    }
+
+    public void addMiddle(StreetSegment streetSegment) {
+        middle = streetSegment;
+
     }
 }

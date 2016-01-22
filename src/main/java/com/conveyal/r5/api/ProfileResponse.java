@@ -1,17 +1,17 @@
 package com.conveyal.r5.api;
 
 import com.conveyal.r5.api.util.*;
-import com.conveyal.r5.profile.HashPath;
-import com.conveyal.r5.profile.Mode;
-import com.conveyal.r5.profile.Path;
-import com.conveyal.r5.profile.StreetPath;
+import com.conveyal.r5.profile.*;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.ZonedDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Created by mabu on 30.10.2015.
@@ -21,6 +21,8 @@ public class ProfileResponse {
     private static final Logger LOG = LoggerFactory.getLogger(ProfileResponse.class);
     public List<ProfileOption> options = new ArrayList<>();
     private Map<Integer, TripPattern> patterns = new HashMap<>();
+    //This is used to find which transfers are used in which Profileoption when calculating street transfers
+    private Multimap<Transfer, ProfileOption> transferToOption = HashMultimap.create();
 
     @Override public String toString() {
         return "ProfileResponse{" +
@@ -113,6 +115,10 @@ public class ProfileResponse {
         for (int i = 0; i < currentTransitPath.patterns.length; i++) {
                 profileOption.addTransit(transportNetwork.transitLayer,
                     currentTransitPath, i, fromTimeDateZD, transitJourneyIDs);
+            if (i>0) {
+                //Adds transfer and transitIndex where it is used (Used when searching for street paths between transit stops)
+                transferToOption.put(new Transfer(currentTransitPath.alightStops[i-1], currentTransitPath.boardStops[i], i-1), profileOption);
+            }
 
             patterns.putIfAbsent(currentTransitPath.patterns[i], new TripPattern(transportNetwork.transitLayer,currentTransitPath.patterns[i]));
         }
@@ -124,5 +130,44 @@ public class ProfileResponse {
         profileOption.summary = profileOption.generateSummary();
 
         transitToOption.putIfAbsent(hashPath, profileOption);
+    }
+
+    /**
+     * With help of street router generates paths on streetlayer for all transfer combinations.
+     *
+     * Each path is calculated only once and then added to all options which use it.
+     * StreetRouter is called once per start transfer.
+     * @param transportNetwork
+     * @param request
+     */
+    public void generateStreetTransfers(TransportNetwork transportNetwork, ProfileRequest request) {
+        //Groups transfers on alight stop so that StreetRouter is called only once per start stop
+        Map<Integer, List<Transfer>> transfersWithSameStart = transferToOption.keySet().stream()
+            .collect(Collectors.groupingBy(Transfer::getAlightStop));
+        for (Map.Entry<Integer, List<Transfer>> entry: transfersWithSameStart.entrySet()) {
+            StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+            streetRouter.mode = Mode.WALK;
+            streetRouter.profileRequest = request;
+            //TODO: make configurable distanceLimitMeters in middle
+            streetRouter.distanceLimitMeters = 2000;
+            int stopIndex = transportNetwork.transitLayer.streetVertexForStop.get(entry.getKey());
+            streetRouter.setOrigin(stopIndex);
+            streetRouter.route();
+            //For each transfer with same start stop calculate street path and add it as middle to
+            //all the Profileoptions that have this transfer
+            for (Transfer transfer: entry.getValue()) {
+                int endIndex = transportNetwork.transitLayer.streetVertexForStop.get(transfer.boardStop);
+                StreetRouter.State lastState = streetRouter.getState(endIndex);
+                if (lastState != null) {
+                    StreetPath streetPath = new StreetPath(lastState, transportNetwork);
+                    StreetSegment streetSegment = new StreetSegment(streetPath, LegMode.WALK);
+                    for (ProfileOption profileOption: transferToOption.get(transfer)) {
+                        profileOption.addMiddle(streetSegment, transfer);
+                    }
+                } else {
+                    LOG.warn("Street transfer: {} not found in streetlayer", transfer);
+                }
+            }
+        }
     }
 }

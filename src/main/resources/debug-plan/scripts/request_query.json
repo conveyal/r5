@@ -50,7 +50,13 @@ transitModes:[TRANSITMODES]) {
         toArrivalTime
         
      
-      }
+      },
+    middle {
+      mode,
+      duration,
+      distance,
+      geometryGeoJSON,
+    }
     },
     
     access {

@@ -24,8 +24,6 @@ public class ProfileOption {
     public List<TransitSegment> transit;
     //Part of journey from start to transit (or end) @notnull
     public List<StreetSegment> access;
-    //Part of a journey between transit stops (transfers)
-    public List<StreetSegment> middle;
     //Part of journey from transit to end
     public List<StreetSegment> egress;
     //Connects all the trip part to a trip at specific time with specific modes of transportation
@@ -261,5 +259,15 @@ public class ProfileOption {
                 addItinerary(accessIdx, egressIdx, transitJourneyIDs, timeZone);
             }
         }
+    }
+
+    /**
+     * Adds street path between stops when transfering
+     * @param streetSegment on streetLayer
+     * @param transfer object which is used to get which transitSegment is used
+     */
+    public void addMiddle(StreetSegment streetSegment, Transfer transfer) {
+        TransitSegment transitSegment = transit.get(transfer.transitSegmentIndex);
+        transitSegment.addMiddle(streetSegment);
     }
 }

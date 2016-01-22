@@ -313,6 +313,7 @@ public class PointToPointQuery {
                 alightStop = path.alightStops[0];
                 seen_paths++;
             }
+            profileResponse.generateStreetTransfers(transportNetwork, request);
         } else {
             option.summary = option.generateSummary();
             profileResponse.addOption(option);

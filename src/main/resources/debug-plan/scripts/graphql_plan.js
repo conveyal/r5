@@ -334,6 +334,10 @@ function showItinerary(optionIdx, itineraryIdx) {
             features.features.push(transitFeature);
             features.features.push(getStopFeature(fromStop));
             features.features.push(getStopFeature(toStop));
+            if (transitData["middle"] != null) {
+                var middleData = transitData["middle"]
+                features.features.push(getFeature(middleData));
+            }
             
         }
     }
@@ -403,6 +407,11 @@ function makeTextResponse(data) {
                     var toTime = patternInfo.toArrivalTime[transitInfo.time];
                     item+="<li>Mode: " + route.mode + "<br />From:"+transitData.from.name+" --> "+transitData.to.name+ "<br /> Pattern:";
                     item+=patternInfo.patternId+ " Line:" + route.shortName + " " +fromTime+" --> " +toTime+ "</li>";
+                    if (transitData["middle"] != null) {
+                        var middleData = transitData["middle"]
+                        item+="<li>Mode:"+middleData.mode+" Duration: " + secondsToTime(middleData.duration) + "Distance: "+middleData.distance/1000 + "m</li>";
+                    }
+
                 }
 
             }

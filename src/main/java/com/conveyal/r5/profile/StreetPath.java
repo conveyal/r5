@@ -65,4 +65,25 @@ public class StreetPath {
     public EdgeStore.Edge getEdge(Integer edgeIdx) {
         return transportNetwork.streetLayer.edgeStore.getCursor(edgeIdx);
     }
+
+    /**
+     * Adds streetpath of this state to existing
+     *
+     * it adds all the new states before existing ones. Since path is reconstructed from end to start
+     * @param lastState
+     */
+    public void add(StreetRouter.State lastState) {
+/*
+         * Starting from latest (time-wise) state, copy states to the head of a list in reverse
+         * chronological order. List indices will thus increase forward in time, and backEdges will
+         * be chronologically 'back' relative to their state.
+         */
+        for (StreetRouter.State cur = lastState; cur != null; cur = cur.backState) {
+            states.addFirst(cur);
+            if (cur.backEdge != -1 && cur.backState != null) {
+                edges.addFirst(cur.backEdge);
+            }
+        }
+        firstState = states.getFirst();
+    }
 }

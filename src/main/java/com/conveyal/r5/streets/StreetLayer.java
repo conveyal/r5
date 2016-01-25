@@ -94,7 +94,7 @@ public class StreetLayer implements Serializable {
             EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_BIKE, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_PEDESTRIAN,
             EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
 
-    private boolean bikeSharing = false;
+    public boolean bikeSharing = false;
 
     public StreetLayer(TNBuilderConfig tnBuilderConfig) {
             speedConfigurator = new SpeedConfigurator(tnBuilderConfig.speeds);

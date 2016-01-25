@@ -91,6 +91,21 @@ public class StreetRouter {
     }
 
     /**
+     * @return a map where all the keys are vertex indexes of bike shares and values are weights.
+     */
+    public TIntIntMap getReachedBikeShares() {
+        TIntIntMap result = new TIntIntHashMap();
+        bestStates.forEachEntry((vertexIndex, state) -> {
+            VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor(vertexIndex);
+            if (vertex.getFlag(VertexStore.VertexFlag.BIKE_SHARING)) {
+                result.put(vertexIndex, state.weight);
+            }
+            return true;
+        });
+        return result;
+    }
+
+    /**
      * Get a distance table to all street vertices touched by the last search operation on this StreetRouter.
      * @return A packed list of (vertex, distance) for every reachable street vertex.
      * This is currently returning the weight, which is the distance in meters.
@@ -140,6 +155,24 @@ public class StreetRouter {
         queue.clear();
         State startState = new State(fromVertex, -1, profileRequest.getFromTimeDate(), mode);
         queue.add(startState);
+    }
+
+    /**
+     * Adds multiple origins.
+     *
+     * Each bike Station is one origin. Weight is copied from state.
+     * @param bikeStations
+     */
+    public void setOrigin(TIntIntMap bikeStations) {
+        bestStates.clear();
+        queue.clear();
+        bikeStations.forEachEntry((vertexIdx, weight) -> {
+           State state = new State(vertexIdx, -1, profileRequest.getFromTimeDate(), mode);
+            state.weight = weight;
+            queue.add(state);
+            return true;
+        });
+
     }
 
     /**

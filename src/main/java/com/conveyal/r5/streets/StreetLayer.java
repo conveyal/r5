@@ -388,6 +388,9 @@ public class StreetLayer implements Serializable {
      * Connect that new vertex to the street network if possible.
      * The vertex will be created and assigned an index whether or not it is successfully linked.
      *
+     * This uses {@link #findSplit(double, double, double)} and {@link Split} which need filled spatialIndex
+     * In other works {@link #indexStreets()} needs to be called before this is used. Otherwise no near vertex is found.
+     *
      * TODO maybe use X and Y everywhere for fixed point, and lat/lon for double precision degrees.
      * TODO move this into Split.perform(), store streetLayer ref in Split
      *

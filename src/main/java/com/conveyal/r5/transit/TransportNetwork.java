@@ -108,6 +108,10 @@ public class TransportNetwork implements Serializable, Cloneable {
         streetLayer.loadFromOsm(osm);
         osm.close();
 
+        // The street index is needed for associating transit stops with the street network
+        // and for associating bike shares with the street network
+        streetLayer.indexStreets();
+
         if (tnBuilderConfig.bikeRentalFile != null) {
             streetLayer.associateBikeSharing(tnBuilderConfig, 500);
         }
@@ -115,8 +119,6 @@ public class TransportNetwork implements Serializable, Cloneable {
         // Load transit data TODO remove need to supply street layer at this stage
         TransitLayer transitLayer = TransitLayer.fromGtfs(gtfsSourceFiles);
 
-        // The street index is needed for associating transit stops with the street network.
-        streetLayer.indexStreets();
         streetLayer.associateStops(transitLayer, 500);
         // Edge lists must be built after all inter-layer linking has occurred.
         streetLayer.buildEdgeLists();

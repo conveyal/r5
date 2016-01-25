@@ -108,6 +108,10 @@ public class TransportNetwork implements Serializable, Cloneable {
         streetLayer.loadFromOsm(osm);
         osm.close();
 
+        if (tnBuilderConfig.bikeRentalFile != null) {
+            streetLayer.associateBikeSharing(tnBuilderConfig, 500);
+        }
+
         // Load transit data TODO remove need to supply street layer at this stage
         TransitLayer transitLayer = TransitLayer.fromGtfs(gtfsSourceFiles);
 
@@ -172,6 +176,7 @@ public class TransportNetwork implements Serializable, Cloneable {
         try (FileInputStream jsonStream = new FileInputStream(file)) {
             TNBuilderConfig config = JsonUtilities.objectMapper
                 .readValue(jsonStream, TNBuilderConfig.class);
+            config.fillPath(file.getParent());
             LOG.info("Found and loaded JSON configuration file '{}'", file);
             return config;
         } catch (FileNotFoundException ex) {

@@ -139,7 +139,8 @@ public class VertexStore implements Serializable {
 
     public enum VertexFlag {
         /** this intersection has a traffic signal */
-        TRAFFIC_SIGNAL
+        TRAFFIC_SIGNAL,
+        BIKE_SHARING
     }
 
 }

@@ -4,6 +4,7 @@ import com.conveyal.gtfs.model.Stop;
 import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.osmlib.Way;
+import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.*;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
@@ -20,6 +21,7 @@ import com.conveyal.r5.transit.TransitLayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.Serializable;
 import java.util.*;
 
@@ -91,6 +93,8 @@ public class StreetLayer implements Serializable {
             EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC,
             EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_BIKE, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_PEDESTRIAN,
             EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
+
+    private boolean bikeSharing = false;
 
     public StreetLayer(TNBuilderConfig tnBuilderConfig) {
             speedConfigurator = new SpeedConfigurator(tnBuilderConfig.speeds);
@@ -567,5 +571,26 @@ public class StreetLayer implements Serializable {
 
     public List<TIntList> getOutgoingEdges() {
         return outgoingEdges;
+    }
+
+    public void associateBikeSharing(TNBuilderConfig tnBuilderConfig, int radiusMeters) {
+        LOG.info("Builder file:{}", tnBuilderConfig.bikeRentalFile);
+        BikeRentalBuilder bikeRentalBuilder = new BikeRentalBuilder(new File(tnBuilderConfig.bikeRentalFile));
+        List<BikeRentalStation> bikeRentalStations = bikeRentalBuilder.getRentalStations();
+        LOG.info("Bike rental stations:{}", bikeRentalStations.size());
+        int numAddedStations = 0;
+        for (BikeRentalStation bikeRentalStation: bikeRentalStations) {
+            int streetVertexIndex = getOrCreateVertexNear(bikeRentalStation.lat, bikeRentalStation.lon, radiusMeters);
+            if (streetVertexIndex > -1) {
+                numAddedStations++;
+                VertexStore.Vertex vertex = vertexStore.getCursor(streetVertexIndex);
+                vertex.setFlag(VertexStore.VertexFlag.BIKE_SHARING);
+            }
+        }
+        if (numAddedStations > 0) {
+            this.bikeSharing = true;
+        }
+        LOG.info("Added {} out of {} stations ratio:{}", numAddedStations, bikeRentalStations.size(), numAddedStations/bikeRentalStations.size());
+
     }
 }

@@ -91,14 +91,14 @@ public class StreetRouter {
     }
 
     /**
-     * @return a map where all the keys are vertex indexes of bike shares and values are weights.
+     * @return a map where all the keys are vertex indexes of bike shares and values are states.
      */
-    public TIntIntMap getReachedBikeShares() {
-        TIntIntMap result = new TIntIntHashMap();
+    public TIntObjectMap<State> getReachedBikeShares() {
+        TIntObjectHashMap<State> result = new TIntObjectHashMap<>();
         bestStates.forEachEntry((vertexIndex, state) -> {
             VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor(vertexIndex);
             if (vertex.getFlag(VertexStore.VertexFlag.BIKE_SHARING)) {
-                result.put(vertexIndex, state.weight);
+                result.put(vertexIndex, state);
             }
             return true;
         });
@@ -161,14 +161,16 @@ public class StreetRouter {
      * Adds multiple origins.
      *
      * Each bike Station is one origin. Weight is copied from state.
-     * @param bikeStations
+     * @param bikeStations map of bikeStation vertexIndexes and states Return of {@link #getReachedBikeShares()}
+     * @param switchTime How many ms is added to state time (this is used when switching modes, renting bike, parking a car etc.)
+     * @param switchCost This is added to the weight and is a cost of switching modes
      */
-    public void setOrigin(TIntIntMap bikeStations) {
+    public void setOrigin(TIntObjectMap<State> bikeStations, int switchTime, int switchCost) {
         bestStates.clear();
         queue.clear();
-        bikeStations.forEachEntry((vertexIdx, weight) -> {
-           State state = new State(vertexIdx, -1, profileRequest.getFromTimeDate(), mode);
-            state.weight = weight;
+        bikeStations.forEachEntry((vertexIdx, bikeStationState) -> {
+           State state = new State(vertexIdx, -1, bikeStationState.getTime()+switchTime, mode);
+            state.weight = bikeStationState.weight+switchCost;
             queue.add(state);
             return true;
         });

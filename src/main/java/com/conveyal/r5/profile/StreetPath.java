@@ -22,6 +22,7 @@ public class StreetPath {
     private StreetRouter.State lastState;
     private StreetRouter.State firstState;
     private TransportNetwork transportNetwork;
+    private int distance;
 
     public StreetPath(StreetRouter.State s, TransportNetwork transportNetwork) {
         edges = new LinkedList<>();
@@ -42,6 +43,7 @@ public class StreetPath {
             }
         }
         firstState = states.getFirst();
+        distance = lastState.distance;
     }
 
     public LinkedList<StreetRouter.State> getStates() {
@@ -59,7 +61,7 @@ public class StreetPath {
 
     //Gets distance in mm
     public int getDistance() {
-        return lastState.distance;
+        return distance;
     }
 
     public EdgeStore.Edge getEdge(Integer edgeIdx) {
@@ -85,5 +87,6 @@ public class StreetPath {
             }
         }
         firstState = states.getFirst();
+        distance+=lastState.distance;
     }
 }

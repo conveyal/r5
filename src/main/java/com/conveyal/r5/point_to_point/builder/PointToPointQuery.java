@@ -15,6 +15,7 @@ import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import gnu.trove.map.TIntIntMap;
+import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
@@ -33,6 +34,17 @@ public class PointToPointQuery {
     private final TransportNetwork transportNetwork;
 
     private static final EnumSet<LegMode> currentlyUnsupportedModes = EnumSet.of(LegMode.CAR_PARK);
+
+    /** Time to rent a bike */
+    private static final int BIKE_RENTAL_PICKUP_TIMEMS = 60*1000;
+    /**
+     * Cost of renting a bike. The cost is a bit more than actual time to model the associated cost and trouble.
+     */
+    private static final int BIKE_RENTAL_PICKUP_COST = 120;
+    /** Time to drop-off a rented bike */
+    private static final int BIKE_RENTAL_DROPOFF_TIMEMS = 30*1000;
+    /** Cost of dropping-off a rented bike */
+    private static final int BIKE_RENTAL_DROPOFF_COST = 30;
 
     public PointToPointQuery(TransportNetwork transportNetwork) {
         this.transportNetwork = transportNetwork;
@@ -134,7 +146,7 @@ public class PointToPointQuery {
                     streetRouter.route();
                     if (mode == LegMode.BICYCLE_RENT) {
                         //This finds all the nearest bicycle rent stations when walking
-                        TIntIntMap bikeStations = streetRouter.getReachedBikeShares();
+                        TIntObjectMap<StreetRouter.State> bikeStations = streetRouter.getReachedBikeShares();
                         LOG.info("BIKE RENT: Found {} bike stations", bikeStations.size());
                         /*LOG.info("Start to bike share:");
                         bikeStations.forEachEntry((idx, weight) -> {
@@ -147,9 +159,9 @@ public class PointToPointQuery {
                         bicycle.mode = Mode.BICYCLE;
                         bicycle.profileRequest = request;
                         bicycle.distanceLimitMeters = 100_000;
-                        bicycle.setOrigin(bikeStations);
+                        bicycle.setOrigin(bikeStations, BIKE_RENTAL_PICKUP_TIMEMS, BIKE_RENTAL_PICKUP_COST);
                         bicycle.route();
-                        TIntIntMap cycledStations = bicycle.getReachedBikeShares();
+                        TIntObjectMap<StreetRouter.State> cycledStations = bicycle.getReachedBikeShares();
                         LOG.info("BIKE RENT: Found {} cycled stations", cycledStations.size());
                         /*LOG.info("Bike share to bike share:");
                         cycledStations.forEachEntry((idx, weight) -> {
@@ -161,10 +173,9 @@ public class PointToPointQuery {
                         end.mode = Mode.WALK;
                         end.profileRequest = request;
                         end.distanceLimitMeters = 2_000+100_000;
-                        end.setOrigin(cycledStations);
+                        end.setOrigin(cycledStations, BIKE_RENTAL_DROPOFF_TIMEMS, BIKE_RENTAL_DROPOFF_COST);
                         end.route();
                         StreetRouter.State lastState = end.getState(split);
-                        //TODO: add correct times when searching
                         //TODO: split geometry on different modes?
                         if (lastState != null) {
                             StreetPath streetPath = new StreetPath(lastState, transportNetwork);

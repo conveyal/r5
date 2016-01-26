@@ -7,8 +7,6 @@ import com.conveyal.r5.publish.StaticPropagatedTimesStore;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.transit.TripPattern;
-import com.google.common.collect.Lists;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
@@ -16,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.stream.Stream;
 
 /**
  * A profile router that finds some number of suboptimal paths.
@@ -117,11 +116,14 @@ public class SuboptimalPathProfileRouter {
         // remove appropriate trips
         if (bannedPatterns != null && !bannedPatterns.isEmpty()) {
             RemoveTrip rt = new RemoveTrip();
+            rt.tripId = new ArrayList<>();
             rt.patternIds = bannedPatterns;
             req.scenario.modifications.add(rt);
         }
 
-        RaptorWorker worker = new RaptorWorker(transportNetwork.transitLayer, null, req);
+        TransportNetwork modified = req.scenario.applyToTransportNetwork(transportNetwork);
+
+        RaptorWorker worker = new RaptorWorker(modified.transitLayer, null, req);
         StaticPropagatedTimesStore pts = (StaticPropagatedTimesStore) worker.runRaptor(stopsNearOrigin, null, new TaskStatistics());
 
         // chop off the last few minutes of the time window so we don't get a lot of unoptimized
@@ -143,13 +145,20 @@ public class SuboptimalPathProfileRouter {
                 if (state.bestNonTransferTimes[stop] != RaptorWorker.UNREACHED &&
                         state.bestNonTransferTimes[stop] + stopsNearDestination.get(stop) < optimalTimesEachIteration[iter]) {
                     optimalTimesEachIteration[iter] = state.bestNonTransferTimes[stop] + stopsNearDestination.get(stop);
-                    PathWithTimes path = new PathWithTimes(state, stop, transportNetwork, req, stopsNearOrigin, stopsNearDestination);
+                    PathWithTimes path = new PathWithTimes(state, stop, modified, req, stopsNearOrigin, stopsNearDestination);
                     optimalPathsEachIteration[iter] = path;
                 }
             }
         }
 
-        paths.addAll(Arrays.asList(optimalPathsEachIteration));
+        // map pattern ids back to the original transport network
+        Stream.of(optimalPathsEachIteration).forEach(path -> {
+            for (int pidx = 0; pidx < path.length; pidx++) {
+                path.patterns[pidx] = modified.transitLayer.tripPatterns.get(path.patterns[pidx]).originalId;
+            }
+        });
+
+        Stream.of(optimalPathsEachIteration).filter(p -> p != null).forEach(paths::add);
 
         return paths;
     }

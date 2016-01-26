@@ -96,18 +96,23 @@ public class PathWithTimes extends Path {
                     // find the transfer time
                     TIntList transfers = network.transitLayer.transfersForStop.get(this.alightStops[patIdx]);
 
-                    int transferTime = -1;
+                    int transferTime;
 
-                    for (int i = 0; i < transfers.size(); i += 2) {
-                        if (transfers.get(i) == this.boardStops[patIdx + 1]) {
-                            transferTime = transfers.get(i + 1);
-                            break;
+                    if (this.alightStops[patIdx] != this.boardStops[patIdx + 1]) {
+                        transferTime = -1;
+
+                        for (int i = 0; i < transfers.size(); i += 2) {
+                            if (transfers.get(i) == this.boardStops[patIdx + 1]) {
+                                transferTime = transfers.get(i + 1);
+                                break;
+                            }
+                        }
+
+                        if (transferTime == -1) {
+                            throw new IllegalStateException("Did not find transfer in transit network, indicates an internal error");
                         }
                     }
-
-                    if (transferTime == -1) {
-                        throw new IllegalStateException("Did not find transfer in transit network, indicates an internal error");
-                    }
+                    else transferTime = 0; // no transfer time, we are at the same stop (board slack applied below)
 
                     // TODO should board slack be applied at the origin stop? Is this done in RaptorWorker?
                     // See also below in computeStatistics

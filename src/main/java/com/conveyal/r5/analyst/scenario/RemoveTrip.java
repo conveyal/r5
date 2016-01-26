@@ -4,8 +4,6 @@ import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
 import gnu.trove.set.TIntSet;
 
-import java.util.Objects;
-
 /**
  * Remove trips from a scenario.
  * This could remove all trips on a route, since its superclass TimetableFilter provides both route and trip matching.
@@ -23,6 +21,9 @@ public class RemoveTrip extends TripScheduleModification {
 
     @Override
     public TripPattern applyToTripPattern(TripPattern originalTripPattern) {
+        if (patternIds != null && patternIds.contains(originalTripPattern.originalId))
+            return null;
+
         // Check first whether it's even possible that this Modification will apply to any trips on this pattern
         if (!couldMatch(originalTripPattern)) {
             return originalTripPattern;
@@ -34,8 +35,6 @@ public class RemoveTrip extends TripScheduleModification {
                 return null;
             }
         }
-
-        if (patternIds != null && patternIds.contains(originalTripPattern.id)) return null;
 
         // Actually apply the Modification to each TripSchedule within this TripPattern individually.
         return super.applyToTripPattern(originalTripPattern);

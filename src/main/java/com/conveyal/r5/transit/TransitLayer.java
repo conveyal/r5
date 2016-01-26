@@ -2,12 +2,8 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.*;
-import com.conveyal.r5.analyst.scenario.Modification;
-import com.conveyal.r5.analyst.scenario.RemoveTrip;
-import com.conveyal.r5.analyst.scenario.Scenario;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -26,7 +22,6 @@ import java.time.DateTimeException;
 import java.time.ZoneId;
 import java.time.zone.ZoneRulesException;
 import java.util.*;
-import java.util.stream.Collectors;
 
 
 /**
@@ -187,7 +182,7 @@ public class TransitLayer implements Serializable, Cloneable {
                 }
 
                 tripPatternForStopSequence.put(tripPatternKey, tripPattern);
-                tripPattern.id = tripPatterns.size();
+                tripPattern.originalId = tripPatterns.size();
                 tripPatterns.add(tripPattern);
             }
             tripPattern.setOrVerifyDirection(trip.direction_id);

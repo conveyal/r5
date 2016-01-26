@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Arrays;
 
 /**
- * Created by matthewc on 12/9/15.
+ * Class used to represent paths in Browsochrones.
  */
 public class Path {
     private static final Logger LOG = LoggerFactory.getLogger(Path.class);

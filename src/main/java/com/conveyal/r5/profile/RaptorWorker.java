@@ -111,7 +111,7 @@ public class RaptorWorker {
 
         this.servicesActive = data.getActiveServicesForDate(req.date);
 
-        this.req = req;
+        this.req = req.clone();
         offsets = new FrequencyRandomOffsets(data);
     }
 

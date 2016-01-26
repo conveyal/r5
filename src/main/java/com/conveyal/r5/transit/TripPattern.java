@@ -24,6 +24,8 @@ public class TripPattern implements Serializable, Cloneable {
 
     private static Logger LOG = LoggerFactory.getLogger(TripPattern.class);
 
+    public int id;
+
     public String routeId;
     public int directionId = Integer.MIN_VALUE;
     public int[] stops;

@@ -154,11 +154,21 @@ public class TransitLayer implements Serializable, Cloneable {
             TripPatternKey tripPatternKey = new TripPatternKey(trip.route.route_id);
             TIntList arrivals = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
             TIntList departures = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
+
+            int nStops = 0;
+
             for (StopTime st : gtfs.getOrderedStopTimesForTrip(tripId)) {
                 tripPatternKey.addStopTime(st, indexForStopId);
                 arrivals.add(st.arrival_time);
                 departures.add(st.departure_time);
+                nStops++;
             }
+
+            if (nStops == 0) {
+                LOG.warn("Trip {} on route {} has no stops, it will not be used", trip.trip_id, trip.route.route_id);
+                continue;
+            }
+
             TripPattern tripPattern = tripPatternForStopSequence.get(tripPatternKey);
             if (tripPattern == null) {
                 tripPattern = new TripPattern(tripPatternKey);
@@ -177,6 +187,7 @@ public class TransitLayer implements Serializable, Cloneable {
                 }
 
                 tripPatternForStopSequence.put(tripPatternKey, tripPattern);
+                tripPattern.id = tripPatterns.size();
                 tripPatterns.add(tripPattern);
             }
             tripPattern.setOrVerifyDirection(trip.direction_id);

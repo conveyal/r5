@@ -12,8 +12,10 @@ import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
+import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TLongIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
+import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
@@ -62,6 +64,8 @@ public class StreetLayer implements Serializable {
     public transient List<TIntList> outgoingEdges;
     public transient List<TIntList> incomingEdges;
     public transient IntHashGrid spatialIndex = new IntHashGrid();
+    //Key is street vertex ID value is BikeRentalStation (with name, number of bikes, spaces id etc.)
+    public TIntObjectMap<BikeRentalStation> bikeRentalStationMap;
 
     private transient TraversalPermissionLabeler permissions = new USTraversalPermissionLabeler(); // TODO don't hardwire to US
     private transient LevelOfTrafficStressLabeler stressLabeler = new LevelOfTrafficStressLabeler();
@@ -580,6 +584,7 @@ public class StreetLayer implements Serializable {
         LOG.info("Builder file:{}", tnBuilderConfig.bikeRentalFile);
         BikeRentalBuilder bikeRentalBuilder = new BikeRentalBuilder(new File(tnBuilderConfig.bikeRentalFile));
         List<BikeRentalStation> bikeRentalStations = bikeRentalBuilder.getRentalStations();
+        bikeRentalStationMap = new TIntObjectHashMap<>(bikeRentalStations.size());
         LOG.info("Bike rental stations:{}", bikeRentalStations.size());
         int numAddedStations = 0;
         for (BikeRentalStation bikeRentalStation: bikeRentalStations) {
@@ -588,6 +593,7 @@ public class StreetLayer implements Serializable {
                 numAddedStations++;
                 VertexStore.Vertex vertex = vertexStore.getCursor(streetVertexIndex);
                 vertex.setFlag(VertexStore.VertexFlag.BIKE_SHARING);
+                bikeRentalStationMap.put(streetVertexIndex, bikeRentalStation);
             }
         }
         if (numAddedStations > 0) {

@@ -1,11 +1,12 @@
 package com.conveyal.r5.api.util;
 
+import java.io.Serializable;
 import java.util.Set;
 
 /**
  * Information about Bike rental station
  */
-public class BikeRentalStation {
+public class BikeRentalStation implements Serializable {
 
     //@notnull
     public String id;

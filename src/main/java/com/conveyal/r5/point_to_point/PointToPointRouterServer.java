@@ -1,6 +1,7 @@
 package com.conveyal.r5.point_to_point;
 
 import com.conveyal.r5.api.GraphQlRequest;
+import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.common.GeoJsonFeature;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.common.JsonUtilities;
@@ -182,6 +183,65 @@ public class PointToPointRouterServer {
                     GeoJsonFeature feature = new GeoJsonFeature(stopVertex.getLon(), stopVertex.getLat());
                     feature.addProperty("weight", weight);
                     feature.addProperty("name", transportNetwork.transitLayer.stopNames.get(stopIdx));
+                    feature.addProperty("type", "stop");
+                    feature.addProperty("mode", mode.toString());
+                    if (state != null) {
+                        feature.addProperty("distance_m", state.distance/1000);
+                    }
+                    features.add(feature);
+                    return true;
+                });
+            } else {
+                content.put("errors", "Start point isn't found!");
+            }
+
+            LOG.info("Num features:{}", features.size());
+            featureCollection.put("features", features);
+            content.put("data", featureCollection);
+
+            return content;
+        }, JsonUtilities.objectMapper::writeValueAsString);
+
+        get("/reachedBikeShares", (request, response) -> {
+            response.header("Content-Type", "application/json");
+
+            Map<String, Object> content = new HashMap<>(2);
+            String queryMode = request.queryParams("mode");
+
+            Mode mode = Mode.valueOf(queryMode);
+            if (mode == null) {
+                content.put("errors", "Mode is wrong");
+                return content;
+            }
+            Float fromLat = request.queryMap("fromLat").floatValue();
+
+            Float fromLon = request.queryMap("fromLon").floatValue();
+
+            Map<String, Object> featureCollection = new HashMap<>(2);
+            featureCollection.put("type", "FeatureCollection");
+            List<GeoJsonFeature> features = new ArrayList<>();
+            ProfileRequest profileRequest = new ProfileRequest();
+            profileRequest.zoneId = transportNetwork.getTimeZone();
+            profileRequest.fromLat = fromLat;
+            profileRequest.fromLon = fromLon;
+            StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+
+            streetRouter.profileRequest = profileRequest;
+            streetRouter.mode = mode;
+            streetRouter.distanceLimitMeters = 2000;
+            if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
+                streetRouter.route();
+                streetRouter.getReachedBikeShares().forEachEntry((vertexIdx, state) -> {
+                    VertexStore.Vertex bikeShareVertex = transportNetwork.streetLayer.vertexStore.getCursor(vertexIdx);
+                    BikeRentalStation bikeRentalStation = transportNetwork.streetLayer.bikeRentalStationMap.get(vertexIdx);
+                    GeoJsonFeature feature = new GeoJsonFeature(bikeShareVertex.getLon(), bikeShareVertex.getLat());
+                    feature.addProperty("weight", state.weight);
+                    if (bikeRentalStation != null) {
+                        feature.addProperty("name", bikeRentalStation.name);
+                        feature.addProperty("id", bikeRentalStation.id);
+                        feature.addProperty("bikes", bikeRentalStation.bikesAvailable);
+                        feature.addProperty("places", bikeRentalStation.spacesAvailable);
+                    }
                     feature.addProperty("type", "stop");
                     feature.addProperty("mode", mode.toString());
                     if (state != null) {

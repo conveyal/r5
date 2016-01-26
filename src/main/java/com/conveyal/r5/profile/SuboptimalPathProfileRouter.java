@@ -8,6 +8,7 @@ import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.map.TIntIntMap;
+import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.slf4j.Logger;
@@ -32,6 +33,8 @@ public class SuboptimalPathProfileRouter {
 
     public final TransportNetwork transportNetwork;
     public final ProfileRequest req;
+
+    public final int TIMEOUT_MS = 5000;
 
     private Set<PathWithTimes> paths = new HashSet<>();
 
@@ -80,15 +83,29 @@ public class SuboptimalPathProfileRouter {
 
         LOG.info("Found {} optimal paths", optimalPaths.size());
 
-        // score all the different options and ban the combinatorial possibilities.
-        scoreAndAddToQueue(optimalPaths);
+        TIntSet patternsUsed = new TIntHashSet();
 
-        LOG.info("Running {} searches for suboptimal paths", this.patternsToBan.size());
+        paths.forEach(p -> patternsUsed.addAll(p.patterns));
 
-        while (!patternsToBan.isEmpty()) {
+        patternsUsed.forEach(i -> {
+            TIntHashSet set = new TIntHashSet(1);
+            set.add(i);
+            patternsToBan.add(set);
+            return true;
+        });
+
+        paths.forEach(p -> patternsToBan.add(new TIntHashSet(p.patterns)));
+
+        LOG.info("Running up to {} searches for suboptimal paths", this.patternsToBan.size());
+
+        long startTime = System.currentTimeMillis();
+
+        while (!patternsToBan.isEmpty() && !disjointOptionsPresent() && System.currentTimeMillis() < startTime + TIMEOUT_MS) {
             Set<PathWithTimes> paths = findPaths(patternsToBan.remove());
             paths.stream().filter(p -> p.min < worstTimeToAccept).forEach(this.paths::add);
         }
+
+        if (!disjointOptionsPresent()) LOG.warn("Found no disjoint options!");
 
         LOG.info("done");
 
@@ -96,6 +113,29 @@ public class SuboptimalPathProfileRouter {
         dump();
 
         return this.paths;
+    }
+
+    /** are there any disjoint options (options which do not share patterns)? */
+    private boolean disjointOptionsPresent () {
+        // count how many times each pattern is used
+        TIntIntMap patternUsage = new TIntIntHashMap();
+        for (PathWithTimes path : paths) {
+            for (int pattern : path.patterns) {
+                patternUsage.adjustOrPutValue(pattern, 1, 1);
+            }
+        }
+
+        // check if any path is disjoint
+        PATHS: for (PathWithTimes path : paths) {
+            for (int pattern : path.patterns) {
+                if (patternUsage.get(pattern) > 1) continue PATHS; // not disjoint
+            }
+
+            // this path is disjoint
+            return true;
+        }
+
+        return false;
     }
 
     /** find paths and add them to the set of possible paths, respecting banned patterns */
@@ -161,29 +201,6 @@ public class SuboptimalPathProfileRouter {
         Stream.of(optimalPathsEachIteration).filter(p -> p != null).forEach(paths::add);
 
         return paths;
-    }
-
-    /** score possible routes to ban and add them to the queue */
-    private void scoreAndAddToQueue (Set<PathWithTimes> paths) {
-        // enqueue all combinatorial possibilities for routes to ban
-        TIntSet patternsUsed = new TIntHashSet();
-
-        paths.forEach(p -> patternsUsed.addAll(p.patterns));
-
-        // We need a heuristic to determine what to ban, so we just ban all single routes, and all combinations of routes
-        // using a particular path, and then all patterns used.
-        // One concern is that we'll just find other paths we already found.
-
-        patternsUsed.forEach(i -> {
-            TIntHashSet set = new TIntHashSet(1);
-            set.add(i);
-            patternsToBan.add(set);
-            return true;
-        });
-
-        paths.forEach(p -> patternsToBan.add(new TIntHashSet(p.patterns)));
-
-        patternsToBan.add(patternsUsed);
     }
 
     public void dump () {

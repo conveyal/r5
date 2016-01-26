@@ -1,5 +1,6 @@
 package com.conveyal.r5.api.util;
 
+import com.conveyal.r5.streets.StreetLayer;
 import com.vividsolutions.jts.geom.LineString;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetPath;
@@ -42,8 +43,9 @@ public class StreetSegment {
      * It fills geometry fields and duration for now.
      * @param path
      * @param mode requested mode for this path
+     * @param streetLayer
      */
-    public StreetSegment(StreetPath path, LegMode mode) {
+    public StreetSegment(StreetPath path, LegMode mode, StreetLayer streetLayer) {
         duration = path.getDuration();
         distance = path.getDistance();
         streetEdges = new LinkedList<>();
@@ -61,6 +63,8 @@ public class StreetSegment {
                 }
             }
         }
+        //Used to know if found bike rental station where we picked a bike or one where we dropped of a bike
+        boolean first = true;
         for (StreetRouter.State state: path.getStates()) {
             int edgeIdx = state.backEdge;
             if (edgeIdx != -1) {
@@ -70,6 +74,18 @@ public class StreetSegment {
                 streetEdgeInfo.geometry = edge.getGeometry();
                 //TODO: decide between NonTransitMode and mode
                 streetEdgeInfo.mode = NonTransitMode.valueOf(state.mode.toString());
+                //Adds bikeRentalStation to streetEdgeInfo
+                if (state.isBikeShare && streetLayer != null && streetLayer.bikeRentalStationMap != null) {
+                    BikeRentalStation bikeRentalStation = streetLayer.bikeRentalStationMap.get(state.vertex);
+                    if (bikeRentalStation != null) {
+                        if (first) {
+                            streetEdgeInfo.bikeRentalOnStation = bikeRentalStation;
+                            first = false;
+                        } else {
+                            streetEdgeInfo.bikeRentalOffStation = bikeRentalStation;
+                        }
+                    }
+                }
                 streetEdges.add(streetEdgeInfo);
             }
         }

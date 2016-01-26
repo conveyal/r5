@@ -310,6 +310,21 @@ function showItinerary(optionIdx, itineraryIdx) {
     };
     var accesFeature = getFeature(accessData);
     features.features.push(accesFeature);
+    for(var edgeIdx=0; edgeIdx < accessData.streetEdges.length; edgeIdx++) {
+        var curStreetEdge = accessData.streetEdges[edgeIdx];
+        if (curStreetEdge.bikeRentalOnStation != null) {
+            /*console.log("On: ", curStreetEdge.bikeRentalOnStation);*/
+            var bikeFeature = getStopFeature(curStreetEdge.bikeRentalOnStation);
+            bikeFeature.properties.which = "ON";
+            features.features.push(bikeFeature);
+        }
+        if (curStreetEdge.bikeRentalOffStation != null) {
+            /*console.log("Off: ", curStreetEdge.bikeRentalOffStation);*/
+            var bikeFeature = getStopFeature(curStreetEdge.bikeRentalOffStation);
+            bikeFeature.properties.which = "OFF";
+            features.features.push(bikeFeature);
+        }
+    }
     if (connection.transit !== null) {
         for(var k=0;k < connection.transit.length; k++) {
             var transitInfo = connection.transit[k];

@@ -94,7 +94,7 @@ public class ProfileResponse {
                 StreetRouter.State state = streetRouter.getState(startVertexStopIndex);
                 if (state != null) {
                     StreetPath streetPath = new StreetPath(state, transportNetwork);
-                    StreetSegment streetSegment = new StreetSegment(streetPath, mode);
+                    StreetSegment streetSegment = new StreetSegment(streetPath, mode, null);
                     profileOption.addAccess(streetSegment, mode, startVertexStopIndex);
                 }
             }
@@ -106,7 +106,7 @@ public class ProfileResponse {
                 StreetRouter.State state = streetRouter.getState(endVertexStopIndex);
                 if (state != null) {
                     StreetPath streetPath = new StreetPath(state, transportNetwork);
-                    StreetSegment streetSegment = new StreetSegment(streetPath, mode);
+                    StreetSegment streetSegment = new StreetSegment(streetPath, mode, null);
                     profileOption.addEgress(streetSegment, mode, endVertexStopIndex);
                 }
             }
@@ -160,7 +160,7 @@ public class ProfileResponse {
                 StreetRouter.State lastState = streetRouter.getState(endIndex);
                 if (lastState != null) {
                     StreetPath streetPath = new StreetPath(lastState, transportNetwork);
-                    StreetSegment streetSegment = new StreetSegment(streetPath, LegMode.WALK);
+                    StreetSegment streetSegment = new StreetSegment(streetPath, LegMode.WALK, null);
                     for (ProfileOption profileOption: transferToOption.get(transfer)) {
                         profileOption.addMiddle(streetSegment, transfer);
                     }

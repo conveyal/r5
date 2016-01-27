@@ -18,10 +18,8 @@ import java.util.*;
 
 /**
  * A profile routing implementation which uses McRAPTOR to store bags of arrival times and paths per
- * vertex, so we can find suboptimal paths. (It actually uses a combination of McRAPTOR and rRAPTOR). It is designed for
- * use in point-to-point searches.
- *
- * For the time being it only works on scheduled networks.
+ * vertex, so we can find suboptimal paths. We're not using range-RAPTOR here, yet, as the obvious implementation
+ * produces some very strange paths for reasons I do not fully understand.
  *
  * @author mattwigway
  */

@@ -8,7 +8,9 @@ import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.map.TIntIntMap;
+import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
+import gnu.trove.map.hash.TObjectIntHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.slf4j.Logger;
@@ -118,17 +120,17 @@ public class SuboptimalPathProfileRouter {
     /** are there any disjoint options (options which do not share patterns)? */
     private boolean disjointOptionsPresent () {
         // count how many times each pattern is used
-        TIntIntMap patternUsage = new TIntIntHashMap();
+        TIntIntMap routeUsage = new TIntIntHashMap();
         for (PathWithTimes path : paths) {
             for (int pattern : path.patterns) {
-                patternUsage.adjustOrPutValue(pattern, 1, 1);
+                routeUsage.adjustOrPutValue(transportNetwork.transitLayer.tripPatterns.get(pattern).routeIndex, 1, 1);
             }
         }
 
         // check if any path is disjoint
         PATHS: for (PathWithTimes path : paths) {
             for (int pattern : path.patterns) {
-                if (patternUsage.get(pattern) > 1) continue PATHS; // not disjoint
+                if (routeUsage.get(transportNetwork.transitLayer.tripPatterns.get(pattern).routeIndex) > 1) continue PATHS; // not disjoint
             }
 
             // this path is disjoint

@@ -11,6 +11,7 @@ import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
+import org.apache.commons.math3.random.MersenneTwister;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,6 +28,14 @@ public class McRaptorSuboptimalPathProfileRouter {
     private static final Logger LOG = LoggerFactory.getLogger(McRaptorSuboptimalPathProfileRouter.class);
 
     public static final int BOARD_SLACK = 60;
+
+    /**
+     * how often to sample the transit service. This is not a simple systematic sample but rather a constrained random walk,
+     * with each sample being between 1 and SAMPLING_FREQUENCY_SECONDS before the previous sample.
+     */
+    public static final int SAMPLING_FREQUENCY_SECONDS = 300;
+
+    private MersenneTwister mersenneTwister = new MersenneTwister();
 
     private TransportNetwork network;
     private ProfileRequest request;
@@ -50,15 +59,11 @@ public class McRaptorSuboptimalPathProfileRouter {
     /** Get a McRAPTOR state bag for every departure minute */
     public Collection<McRaptorState> route () {
         LOG.info("Found {} access stops", accessTimes.size());
-        accessTimes.forEachEntry((stop, time) -> {
-           LOG.info("{} ({}) at {}m {}s", network.transitLayer.stopNames.get(stop), stop, time / 60, time % 60);
-            return true;
-        });
-
         List<McRaptorState> ret = new ArrayList<>();
 
-        // start at end of time window and work backwards (range-RAPTOR)
-        for (int departureTime = request.toTime - 60, n = 0; departureTime > request.fromTime; departureTime -= 60, n++) {
+        // start at end of time window and work backwards, eventually we may use range-RAPTOR
+        // We use a constrained random walk to reduce the number of samples without causing an issue with variance in routes.
+        for (int departureTime = request.toTime - 60, n = 0; departureTime > request.fromTime; departureTime -= mersenneTwister.nextInt(SAMPLING_FREQUENCY_SECONDS), n++) {
             bestStates.clear(); // disabling range-raptor fttb, it's just confusing things
             touchedPatterns.clear();
             touchedStops.clear();

@@ -80,6 +80,40 @@ public class Path {
             LOG.error("Transit path computed without a transit segment!");
     }
 
+    public Path(McRaptorSuboptimalPathProfileRouter.McRaptorState s) {
+        TIntList patterns = new TIntArrayList();
+        TIntList boardStops = new TIntArrayList();
+        TIntList alightStops = new TIntArrayList();
+        TIntList alightTimes = new TIntArrayList();
+
+        // trace path from this McRaptorState
+        do {
+            // skip transfers, they are implied
+            if (s.pattern == -1) s = s.back;
+
+            patterns.add(s.pattern);
+            alightTimes.add(s.time);
+            alightStops.add(s.stop);
+            boardStops.add(s.back.stop);
+
+            s = s.back;
+        } while (s.back != null);
+
+        patterns.reverse();
+        boardStops.reverse();
+        alightStops.reverse();
+        alightTimes.reverse();
+
+        this.patterns = patterns.toArray();
+        this.boardStops = boardStops.toArray();
+        this.alightStops = alightStops.toArray();
+        this.alightTimes = alightTimes.toArray();
+        this.length = this.patterns.length;
+
+        if (this.patterns.length == 0)
+            LOG.error("Transit path computed without a transit segment!");
+    }
+
     public int hashCode() {
         return Arrays.hashCode(patterns) + 2 * Arrays.hashCode(boardStops) + 5 * Arrays.hashCode(alightStops);
     }

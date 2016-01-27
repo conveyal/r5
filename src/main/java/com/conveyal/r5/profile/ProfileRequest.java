@@ -170,7 +170,7 @@ public class ProfileRequest implements Serializable, Cloneable {
       eliminated by an alternative that is only marginally better. We want to effectively push the max travel time of
       alternatives out a bit to account for the fact that they don't always run on schedule.
     */
-    public int suboptimalMinutes;
+    public int suboptimalMinutes = 5;
 
     /** A non-destructive scenario to apply when executing this request */
     public Scenario scenario;

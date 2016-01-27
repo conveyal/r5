@@ -28,6 +28,10 @@ public class PathWithTimes extends Path {
 
     public PathWithTimes(RaptorState state, int stop, TransportNetwork network, ProfileRequest req, TIntIntMap accessTimes, TIntIntMap egressTimes) {
         super(state, stop);
+        computeTimes(network, req, accessTimes, egressTimes);
+    }
+
+    private void computeTimes (TransportNetwork network, ProfileRequest req, TIntIntMap accessTimes, TIntIntMap egressTimes) {
 
         if (!accessTimes.containsKey(this.boardStops[0])) throw new IllegalArgumentException("Access times do not contain first stop of path!");
         if (!egressTimes.containsKey(this.alightStops[this.length - 1])) throw new IllegalArgumentException("Egress times do not contain last stop of path!");
@@ -126,6 +130,11 @@ public class PathWithTimes extends Path {
 
         sortAndFilterItineraries();
         computeStatistics(req, accessTime, egressTime);
+    }
+
+    public PathWithTimes(McRaptorSuboptimalPathProfileRouter.McRaptorState s, TransportNetwork network, ProfileRequest req, TIntIntMap accessTimes, TIntIntMap egressTimes) {
+        super(s);
+        computeTimes(network, req, accessTimes, egressTimes);
     }
 
     /**

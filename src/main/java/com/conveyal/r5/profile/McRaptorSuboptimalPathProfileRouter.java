@@ -5,14 +5,12 @@ import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
 import gnu.trove.list.TIntList;
+import gnu.trove.list.TLongList;
 import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
-import gnu.trove.set.TIntSet;
-import gnu.trove.set.TLongSet;
-import gnu.trove.set.hash.TIntHashSet;
-import gnu.trove.set.hash.TLongHashSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,6 +27,8 @@ import java.util.*;
  */
 public class McRaptorSuboptimalPathProfileRouter {
     private static final Logger LOG = LoggerFactory.getLogger(McRaptorSuboptimalPathProfileRouter.class);
+
+    public static final int BOARD_SLACK = 60;
 
     private TransportNetwork network;
     private ProfileRequest request;
@@ -51,10 +51,19 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     /** Get a McRAPTOR state bag for every departure minute */
     public Collection<McRaptorState> route () {
+        LOG.info("Found {} access stops", accessTimes.size());
+        accessTimes.forEachEntry((stop, time) -> {
+           LOG.info("{} ({}) at {}m {}s", network.transitLayer.stopNames.get(stop), stop, time / 60, time % 60);
+            return true;
+        });
+
         List<McRaptorState> ret = new ArrayList<>();
 
         // start at end of time window and work backwards (range-RAPTOR)
         for (int departureTime = request.toTime - 60, n = 0; departureTime > request.fromTime; departureTime -= 60, n++) {
+            bestStates.clear(); // disabling range-raptor fttb, it's just confusing things
+            touchedPatterns.clear();
+            touchedStops.clear();
             round = 0;
             final int finalDepartureTime = departureTime;
 
@@ -156,7 +165,7 @@ public class McRaptorSuboptimalPathProfileRouter {
                         for (TripSchedule tripSchedule : pattern.tripSchedules) {
                             currentTrip++;
 
-                            if (tripSchedule.departures[stopPositionInPattern] > state.time + RaptorWorker.BOARD_SLACK) {
+                            if (tripSchedule.departures[stopPositionInPattern] > state.time + BOARD_SLACK) {
                                 // board this trip
                                 states.add(state);
                                 trips.add(currentTrip);
@@ -164,6 +173,11 @@ public class McRaptorSuboptimalPathProfileRouter {
                             }
                         }
                     }
+
+                    if (stop == 27245) {
+                        LOG.info("Boarded at Van Ness-UDC");
+                    }
+
                 }
             }
         }
@@ -238,6 +252,9 @@ public class McRaptorSuboptimalPathProfileRouter {
         // TODO cutoff should be based upon start time of _this_ search
         if (time > request.toTime + 3 * 60 * 60) return false; // cut off excessively long trips
 
+        if (back != null && back.time > time)
+            throw new IllegalStateException("Attempt to decrement time in state!");
+
         McRaptorState state = new McRaptorState();
         state.stop = stop;
         state.time = time;
@@ -249,7 +266,13 @@ public class McRaptorSuboptimalPathProfileRouter {
         if (!bestStates.containsKey(stop)) bestStates.put(stop, new McRaptorStateBag(request.suboptimalMinutes));
 
         McRaptorStateBag bag = bestStates.get(stop);
-        return bag.add(state);
+        boolean ret = bag.add(state);
+
+        if (ret && stop == 27285) {
+            LOG.info("Van Ness UDC at {}s, via {}", time, pattern == -1 && back != null ? back.pattern : pattern);
+        }
+
+        return ret;
     }
 
     /**
@@ -366,13 +389,13 @@ public class McRaptorSuboptimalPathProfileRouter {
         private int[] patterns;
 
         public static StatePatternKey create (McRaptorState state) {
-            TLongSet usedPatternTrips = new TLongHashSet();
+            TLongList usedPatternTrips = new TLongArrayList();
 
             TIntList patterns = new TIntArrayList();
             while (state.back != null) {
                 if (state.pattern == -1) state = state.back;
 
-                long pattTripKey = ((long) state.pattern) << 32 + state.trip;
+                long pattTripKey = (((long) state.pattern) << 32) + state.trip;
 
                 // don't allow routes which use the same trip twice
                 if (usedPatternTrips.contains(pattTripKey)) return null;

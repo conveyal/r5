@@ -106,12 +106,217 @@ public class PointToPointQuery {
             }
         }
         if (transit) {
+            //For direct modes
+            for(LegMode mode: request.directModes) {
+                StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+                if (currentlyUnsupportedModes.contains(mode)) {
+                    continue;
+                }
+                if (mode == LegMode.BICYCLE_RENT) {
+                    if (!transportNetwork.streetLayer.bikeSharing) {
+                        LOG.warn("Bike sharing trip requested but no bike sharing stations in the streetlayer");
+                        continue;
+                    }
+                    streetRouter.mode = Mode.WALK;
+                } else {
+                    //TODO: add support for bike sharing and park and ride
+                    streetRouter.mode = Mode.valueOf(mode.toString());
+                }
+                streetRouter.profileRequest = request;
+                // TODO add time and distance limits to routing, not just weight.
+                // TODO apply walk and bike speeds and maxBike time.
+                if (mode == LegMode.BICYCLE_RENT) {
+                    streetRouter.distanceLimitMeters = 2_000;
+                } else {
+                    streetRouter.distanceLimitMeters = 100_000; // FIXME arbitrary, and account for bike or car access mode
+                }
+                if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
+                    streetRouter.route();
+                    if (mode == LegMode.BICYCLE_RENT) {
+                        //This finds all the nearest bicycle rent stations when walking
+                        TIntIntMap bikeStations = streetRouter.getReachedBikeShares();
+                        LOG.info("BIKE RENT: Found {} bike stations", bikeStations.size());
+                        /*LOG.info("Start to bike share:");
+                        bikeStations.forEachEntry((idx, weight) -> {
+                            LOG.info("   {} ({})", idx, weight);
+                            return true;
+                        });*/
 
-            SuboptimalPathProfileRouter r = new SuboptimalPathProfileRouter(transportNetwork, request);
+                        //This finds best cycling path from best start bicycle station to end bicycle station
+                        StreetRouter bicycle = new StreetRouter(transportNetwork.streetLayer);
+                        bicycle.mode = Mode.BICYCLE;
+                        bicycle.profileRequest = request;
+                        bicycle.distanceLimitMeters = 100_000;
+                        bicycle.setOrigin(bikeStations);
+                        bicycle.route();
+                        TIntIntMap cycledStations = bicycle.getReachedBikeShares();
+                        LOG.info("BIKE RENT: Found {} cycled stations", cycledStations.size());
+                        /*LOG.info("Bike share to bike share:");
+                        cycledStations.forEachEntry((idx, weight) -> {
+                            LOG.info("   {} ({})", idx, weight);
+                            return true;
+                        });*/
+                        //This searches for walking path from end bicycle station to end point
+                        StreetRouter end = new StreetRouter(transportNetwork.streetLayer);
+                        end.mode = Mode.WALK;
+                        end.profileRequest = request;
+                        end.distanceLimitMeters = 2_000+100_000;
+                        end.setOrigin(cycledStations);
+                        end.route();
+                        StreetRouter.State lastState = end.getState(split);
+                        //TODO: add correct times when searching
+                        //TODO: split geometry on different modes?
+                        if (lastState != null) {
+                            StreetPath streetPath = new StreetPath(lastState, transportNetwork);
+                            //StreetSegment streetSegment = new StreetSegment(streetPath, mode);
+                            //option.addDirect(streetSegment, request.getFromTimeDateZD());
+                            StreetRouter.State endCycling = streetPath.getStates().getFirst();
+                            lastState = bicycle.getState(endCycling.vertex);
+                            if (lastState != null) {
+                                streetPath.add(lastState);
+                                //streetSegment = new StreetSegment(streetPath, mode);
+                                //option.addDirect(streetSegment, request.getFromTimeDateZD());
+                                StreetRouter.State startCycling = streetPath.getStates().getFirst();
+                                lastState = streetRouter.getState(startCycling.vertex);
+                                if (lastState != null) {
+                                    streetPath.add(lastState);
+                                    StreetSegment streetSegment = new StreetSegment(streetPath, mode);
+                                    option.addDirect(streetSegment, request.getFromTimeDateZD());
+                                } else {
+                                    LOG.warn("Start to cycle path missing");
+                                }
+                            } else {
+                                LOG.warn("Cycle to cycle path not found");
+                            }
+                        } else {
+                            LOG.warn("Not found path from cycle to end");
+                        }
+                    } else {
+                        StreetRouter.State lastState = streetRouter.getState(split);
+                        if (lastState != null) {
+                            StreetPath streetPath = new StreetPath(lastState, transportNetwork);
+                            StreetSegment streetSegment = new StreetSegment(streetPath, mode);
+                            //This always adds direct mode
+                            option.addDirect(streetSegment, request.getFromTimeDateZD());
+                        }
+                    }
+                } else {
+                    LOG.warn("MODE:{}, Edge near the destination coordinate wasn't found. Routing didn't start!", mode);
+                }
+            }
 
-            List<PathWithTimes> usefullpathList = new ArrayList<>();
-            usefullpathList.addAll(r.route());
+            //For egress
+            //TODO: this must be reverse search
+            for(LegMode mode: request.egressModes) {
+                StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+                if (currentlyUnsupportedModes.contains(mode)) {
+                    continue;
+                }
+                //TODO: add support for bike sharing and park and ride
+                streetRouter.mode = Mode.valueOf(mode.toString());
+                streetRouter.profileRequest = request;
+                // TODO add time and distance limits to routing, not just weight.
+                // TODO apply walk and bike speeds and maxBike time.
+                streetRouter.distanceLimitMeters =  200; // FIXME arbitrary, and account for bike or car access mode
+                if(streetRouter.setOrigin(request.toLat, request.toLon)) {
+                    streetRouter.route();
+                    TIntIntMap stops = streetRouter.getReachedStops();
+                    destinationTransitStops.putAll(stops);
+                    egressRouter.put(mode, streetRouter);
+                    LOG.info("Added {} edgres stops for mode {}",stops.size(), mode);
 
+                } else {
+                    LOG.warn("MODE:{}, Edge near the origin coordinate wasn't found. Routing didn't start!", mode);
+                }
+            }
+
+            option.summary = option.generateSummary();
+            profileResponse.addOption(option);
+            RaptorWorker worker = new RaptorWorker(transportNetwork.transitLayer, null, request);
+            StaticPropagatedTimesStore pts = (StaticPropagatedTimesStore) worker.runRaptor(reachedTransitStops, null, ts);
+            ts.targetsReached = pts.countTargetsReached();
+            //FIXME: do we need to use all the iterations?
+            int iterations = pts.times.length;
+            //TODO: use only stops which are usefull to get to destination
+            int stops = pts.times[0].length;
+            int usefull_path = 0;
+            List<Path> usefullpathList = new ArrayList<>();
+
+            //This is copied from StaticServer
+            for (int stop = 0; stop < stops; stop++) {
+                int prev = 0;
+                int prevPath = 0;
+                int maxPathIdx = 0;
+
+                TObjectIntMap<Path> paths = new TObjectIntHashMap<>();
+                List<Path> pathList = new ArrayList<>();
+
+                for (int iter = 0; iter < iterations; iter++) {
+                    int time = pts.times[iter][stop];
+                    if (time == Integer.MAX_VALUE) time = -1;
+
+                    //out.writeInt(time - prev);
+                    prev = time;
+
+                    // write out which path to use, delta coded
+                    int pathIdx = -1;
+
+                    RaptorState state = worker.statesEachIteration.get(iter);
+                    // only compute a path if this stop was reached
+                    if (state.bestNonTransferTimes[stop] != RaptorWorker.UNREACHED) {
+                        Path path = new Path(state, stop);
+                        if (!paths.containsKey(path)) {
+                            paths.put(path, maxPathIdx++);
+                            pathList.add(path);
+                        }
+
+                        pathIdx = paths.get(path);
+                    }
+
+                    //out.writeInt(pathIdx - prevPath);
+                    prevPath = pathIdx;
+                }
+
+                // write the paths
+                //out.writeInt(pathList.size());
+                //LOG.info("Paths:{}", pathList.size());
+                for (Path path : pathList) {
+                    /**
+                     * Since search finds paths from requested stops to all of the stops we need to filter the paths
+                     * This skips the paths that don't end last leg in one of destination transit stops
+                     * Multiple legs here are multiple transit transfers
+                     */
+                    int lastStop = path.alightStops[path.patterns.length-1];
+                    if (!destinationTransitStops.containsKey(lastStop)) {
+                        continue;
+                    }
+                    usefullpathList.add(path);
+                    usefull_path++;
+
+                    /*
+                    //out.writeInt(path.patterns.length);
+                    //LOG.info("Num patterns:{}", path.patterns.length);
+                    ProfileOption transit_option = new ProfileOption();
+
+                    for (int i = 0; i < path.patterns.length; i++) {
+                        TransitSegment transitSegment = new TransitSegment(transportNetwork.transitLayer, path.boardStops[i], path.alightStops[i], path.patterns[i]);
+                        //LOG.info("   BoardStop: {} pattern: {} allightStop: {}", path.boardStops[i], path.patterns[i], path.alightStops[i]);
+                        TripPattern pattern =transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]);
+                        if (pattern.routeIndex >= 0) {
+                            RouteInfo routeInfo = transportNetwork.transitLayer.routes.get(pattern.routeIndex);
+                            //LOG.info("     Pattern:{} on route:{} ({}) with {} stops", path.patterns[i],routeInfo.route_long_name, routeInfo.route_short_name,
+                            //    pattern.stops.length);
+                        }
+                        //LOG.info("     {}->{} ({}:{})", transportNetwork.transitLayer.stopNames.get(path.boardStops[i]),
+                        //    transportNetwork.transitLayer.stopNames.get(path.alightStops[i]),
+                        //    path.alightTimes[i]/3600, path.alightTimes[i]%3600/60);
+                        transit_option.addTransit(transitSegment);
+                    }
+                    transit_option.summary = transit_option.generateSummary();
+                    profileResponse.addOption(transit_option);
+                    */
+                }
+            }
             /**
              * Orders first no transfers then one transfers 2 etc
              * - then orders according to first trip:
@@ -143,7 +348,7 @@ public class PointToPointQuery {
                 }
                 return c;
             });
-            LOG.info("Usefull paths:{}", usefullpathList.size());
+            LOG.info("Usefull paths:{}", usefull_path);
             int seen_paths = 0;
             int boardStop =-1, alightStop = -1;
             for (Path path : usefullpathList) {

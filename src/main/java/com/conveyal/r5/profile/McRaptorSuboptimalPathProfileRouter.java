@@ -173,11 +173,6 @@ public class McRaptorSuboptimalPathProfileRouter {
                             }
                         }
                     }
-
-                    if (stop == 27245) {
-                        LOG.info("Boarded at Van Ness-UDC");
-                    }
-
                 }
             }
         }
@@ -267,10 +262,6 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         McRaptorStateBag bag = bestStates.get(stop);
         boolean ret = bag.add(state);
-
-        if (ret && stop == 27285) {
-            LOG.info("Van Ness UDC at {}s, via {}", time, pattern == -1 && back != null ? back.pattern : pattern);
-        }
 
         return ret;
     }

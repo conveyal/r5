@@ -98,31 +98,6 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         states.forEach(s -> paths.add(new PathWithTimes(s, network, request, accessTimes, egressTimes)));
 
-        LOG.info("BEGIN PATH DUMP");
-
-        for (PathWithTimes pwt : paths) {
-            StringBuilder sb = new StringBuilder();
-            sb.append("min/avg/max ");
-            sb.append(pwt.min / 60);
-            sb.append('/');
-            sb.append(pwt.avg / 60);
-            sb.append('/');
-            sb.append(pwt.max / 60);
-
-            sb.append(' ');
-
-            for (int i = 0; i < pwt.length; i++) {
-                int routeIdx = network.transitLayer.tripPatterns.get(pwt.patterns[i]).routeIndex;
-                RouteInfo ri = network.transitLayer.routes.get(routeIdx);
-                sb.append(ri.route_short_name != null ? ri.route_short_name : ri.route_long_name);
-                sb.append(" -> ");
-            }
-
-            System.out.println(sb.toString());
-        }
-
-        LOG.info("END PATH DUMP");
-
         return paths;
     }
 

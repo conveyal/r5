@@ -98,8 +98,9 @@ public class TransportNetwork implements Serializable, Cloneable {
 
         System.out.println("Summarizing builder config: " + BUILDER_CONFIG_FILENAME);
         System.out.println(tnBuilderConfig);
+        File dir = new File(osmSourceFile).getParentFile();
         // Load OSM data into MapDB
-        OSM osm = new OSM(null);
+        OSM osm = new OSM(new File(dir,"osm.mapdb").getPath());
         osm.intersectionDetection = true;
         osm.readFromFile(osmSourceFile);
 
@@ -188,6 +189,22 @@ public class TransportNetwork implements Serializable, Cloneable {
             LOG.error("Error while parsing JSON config file '{}': {}", file, ex.getMessage());
             System.exit(42); // probably "should" be done with an exception
             return null;
+        }
+    }
+
+    /**
+     * Opens OSM MapDB database if it exists
+     * Otherwise it prints a warning
+     *
+     * OSM MapDB is used for names of streets. Since they are needed only in display of paths.
+     * They aren't saved in street layer.
+     * @param file
+     */
+    public void readOSM(File file) {
+        if (file.exists()) {
+            streetLayer.openOSM(file);
+        } else {
+            LOG.info("osm.mapdb doesn't exist in graph folder. This means that street names won't be shown");
         }
     }
 

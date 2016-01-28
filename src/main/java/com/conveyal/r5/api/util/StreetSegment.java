@@ -72,6 +72,7 @@ public class StreetSegment {
                 StreetEdgeInfo streetEdgeInfo = new StreetEdgeInfo();
                 streetEdgeInfo.edgeId = edgeIdx;
                 streetEdgeInfo.geometry = edge.getGeometry();
+                streetEdgeInfo.streetName = streetLayer.getNameEdgeIdx(edgeIdx, Locale.ENGLISH);
                 //TODO: decide between NonTransitMode and mode
                 streetEdgeInfo.mode = NonTransitMode.valueOf(state.mode.toString());
                 //Adds bikeRentalStation to streetEdgeInfo

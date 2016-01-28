@@ -104,7 +104,7 @@ public class PointToPointQuery {
                 StreetRouter.State lastState = streetRouter.getState(split);
                 if (lastState != null) {
                     StreetPath streetPath = new StreetPath(lastState, transportNetwork);
-                    StreetSegment streetSegment = new StreetSegment(streetPath, mode, null);
+                    StreetSegment streetSegment = new StreetSegment(streetPath, mode, transportNetwork.streetLayer);
                     //TODO: this needs to be different if transit is requested
                     if (transit) {
                         //addAccess
@@ -179,21 +179,26 @@ public class PointToPointQuery {
                         //TODO: split geometry on different modes?
                         if (lastState != null) {
                             StreetPath streetPath = new StreetPath(lastState, transportNetwork);
-                            //StreetSegment streetSegment = new StreetSegment(streetPath, mode);
-                            //option.addDirect(streetSegment, request.getFromTimeDateZD());
+                            //LOG.info("{} - {}", streetPath.getStates().getFirst().getInstant(), streetPath.getStates().getLast().getInstant());
+                            //StreetSegment streetSegment = new StreetSegment(streetPath, LegMode.WALK);
+                            //option.addDirect(streetSegment, ZonedDateTime.ofInstant(streetPath.getStates().getFirst().getInstant(), transportNetwork.getTimeZone()));
                             StreetRouter.State endCycling = streetPath.getStates().getFirst();
                             lastState = bicycle.getState(endCycling.vertex);
                             if (lastState != null) {
                                 //Copies bikeshare setting
                                 lastState.isBikeShare = endCycling.isBikeShare;
                                 streetPath.add(lastState);
-                                //streetSegment = new StreetSegment(streetPath, mode);
-                                //option.addDirect(streetSegment, request.getFromTimeDateZD());
+                                //LOG.info("  {} - {}", streetPath.getStates().getFirst().getInstant(), lastState.getInstant());
+                                //streetSegment = new StreetSegment(new StreetPath(lastState, transportNetwork), LegMode.BICYCLE);
+                                //option.addDirect(streetSegment, ZonedDateTime.ofInstant(streetPath.getStates().getFirst().getInstant(), transportNetwork.getTimeZone()));
                                 StreetRouter.State startCycling = streetPath.getStates().getFirst();
                                 lastState = streetRouter.getState(startCycling.vertex);
                                 if (lastState != null) {
                                     lastState.isBikeShare = startCycling.isBikeShare;
                                     streetPath.add(lastState);
+                                    //LOG.info("    {} - {}", streetPath.getStates().getFirst().getInstant(), lastState.getInstant());
+                                    //streetSegment = new StreetSegment(new StreetPath(lastState, transportNetwork), LegMode.WALK);
+                                    //option.addDirect(streetSegment, ZonedDateTime.ofInstant(streetPath.getStates().getFirst().getInstant(), transportNetwork.getTimeZone()));
                                     StreetSegment streetSegment = new StreetSegment(streetPath, mode,
                                         transportNetwork.streetLayer);
                                     option.addDirect(streetSegment, request.getFromTimeDateZD());
@@ -210,9 +215,11 @@ public class PointToPointQuery {
                         StreetRouter.State lastState = streetRouter.getState(split);
                         if (lastState != null) {
                             StreetPath streetPath = new StreetPath(lastState, transportNetwork);
-                            StreetSegment streetSegment = new StreetSegment(streetPath, mode, null);
+                            StreetSegment streetSegment = new StreetSegment(streetPath, mode, transportNetwork.streetLayer);
                             //This always adds direct mode
                             option.addDirect(streetSegment, request.getFromTimeDateZD());
+                        } else {
+                            LOG.warn("Direct mode last state wasn't found!");
                         }
                     }
                 } else {
@@ -412,6 +419,7 @@ public class PointToPointQuery {
          * add egress part
          */
 
+        LOG.info("Returned {} options", profileResponse.getOptions().size());
 
         return profileResponse;
     }

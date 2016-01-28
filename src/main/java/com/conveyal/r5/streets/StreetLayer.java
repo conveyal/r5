@@ -218,6 +218,47 @@ public class StreetLayer implements Serializable {
         osm = null;
     }
 
+    public void openOSM(File file) {
+        osm = new OSM(file.getPath());
+        LOG.info("Read OSM");
+    }
+
+    /**
+     * Gets way name from OSM name tag
+     *
+     * It uses OSM Mapdb
+     *
+     * Uses {@link #getName(long, Locale)}
+     *
+     * @param edgeIdx edgeStore EdgeIDX
+     * @param locale which locale to use
+     * @return null if edge doesn't have name tag or if OSM data isn't loaded
+     */
+    public String getNameEdgeIdx(int edgeIdx, Locale locale) {
+        if (osm == null) {
+            return null;
+        }
+        EdgeStore.Edge edge = edgeStore.getCursor(edgeIdx);
+        return getName(edge.getOSMID(), locale);
+    }
+
+    /**
+     * Gets way name from OSM name tag
+     *
+     * TODO: generate name on unnamed ways (sidewalks, cycleways etc.)
+     * @param OSMid OSM ID of a way
+     * @param locale which locale to use
+     * @return
+     */
+    private String getName(long OSMid, Locale locale) {
+        String name = null;
+        Way way = osm.getWay(OSMid);
+        if (way != null) {
+            name = way.getTag("name");
+        }
+        return name;
+    }
+
     /**
      * Get or create mapping from a global long OSM ID to an internal street vertex ID, creating the vertex as needed.
      */

@@ -90,6 +90,7 @@ public class PointToPointRouterServer {
                 LOG.info("Loading transit networks from: {}", dir);
                 InputStream inputStream = new BufferedInputStream(new FileInputStream(new File(dir, "network.dat")));
                 TransportNetwork transportNetwork = TransportNetwork.read(inputStream);
+                transportNetwork.readOSM(new File(dir, "osm.mapdb"));
                 run(transportNetwork);
                 inputStream.close();
             } catch (IOException e) {

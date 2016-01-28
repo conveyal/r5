@@ -64,7 +64,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         // start at end of time window and work backwards, eventually we may use range-RAPTOR
         // We use a constrained random walk to reduce the number of samples without causing an issue with variance in routes.
         for (int departureTime = request.toTime - 60, n = 0; departureTime > request.fromTime; departureTime -= mersenneTwister.nextInt(SAMPLING_FREQUENCY_SECONDS), n++) {
-            bestStates.clear(); // disabling range-raptor fttb, it's just confusing things
+            //bestStates.clear(); // disabling range-raptor fttb, it's just confusing things
             touchedPatterns.clear();
             touchedStops.clear();
             round = 0;

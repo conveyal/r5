@@ -8,8 +8,10 @@ import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.LineString;
 import gnu.trove.list.TIntList;
+import gnu.trove.list.TLongList;
 import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.list.array.TShortArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,6 +69,9 @@ public class EdgeStore implements Serializable {
     /** Length (millimeters). One entry for each edge pair */
     public TIntList lengths_mm;
 
+    /** OSM ids of edges. One entry for each edge pair */
+    public TLongList osmids;
+
     /** Geometries. One entry for each edge pair */
     public List<int[]> geometries; // intermediate points along the edge, other than the intersection endpoints
 
@@ -84,6 +89,7 @@ public class EdgeStore implements Serializable {
         toVertices = new TIntArrayList(initialEdgePairs);
         geometries = new ArrayList<>(initialEdgePairs);
         lengths_mm = new TIntArrayList(initialEdgePairs);
+        osmids = new TLongArrayList(initialEdgePairs);
     }
 
     /** Remove the specified edges from this edge store */
@@ -108,6 +114,7 @@ public class EdgeStore implements Serializable {
             fromVertices.remove(edge, 1);
             toVertices.remove(edge, 1);
             lengths_mm.remove(edge, 1);
+            osmids.remove(edge, 1);
             // This is not a TIntList, so use the 1-arg remove function to remove by index.
             geometries.remove(edge);
             nEdges -= 2;
@@ -204,13 +211,14 @@ public class EdgeStore implements Serializable {
      * This avoids having a tangle of different edge creator functions for different circumstances.
      * @return a cursor pointing to the forward edge in the pair, which always has an even index.
      */
-    public Edge addStreetPair(int beginVertexIndex, int endVertexIndex, int edgeLengthMillimeters) {
+    public Edge addStreetPair(int beginVertexIndex, int endVertexIndex, int edgeLengthMillimeters, long osmID) {
 
         // Store only one length, set of endpoints, and intermediate geometry per pair of edges.
         lengths_mm.add(edgeLengthMillimeters);
         fromVertices.add(beginVertexIndex);
         toVertices.add(endVertexIndex);
         geometries.add(EMPTY_INT_ARRAY);
+        osmids.add(osmID);
 
         // Forward edge.
         // No speed or flags are set, they must be set afterward using the edge cursor.
@@ -659,6 +667,10 @@ public class EdgeStore implements Serializable {
 
         public int getEdgeIndex() {
             return edgeIndex;
+        }
+
+        public long getOSMID() {
+            return osmids.get(pairIndex);
         }
     }
 

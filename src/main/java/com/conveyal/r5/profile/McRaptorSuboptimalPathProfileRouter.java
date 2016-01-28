@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
@@ -135,15 +136,16 @@ public class McRaptorSuboptimalPathProfileRouter {
                 if (stopPreviouslyReached) {
                     for (McRaptorState state : bestStates.get(stop).getBestStates()) {
                         if (state.round != round - 1) continue; // don't continually reexplore states
-                        if (state.pattern == patIdx) continue; // don't reboard next trip on same pattern
+                        if (state.pattern == patIdx || state.back != null && state.back.pattern == patIdx) continue; // don't reboard same pattern, even after a transfer
 
                         // find a trip, if we can
                         int currentTrip = -1; // first increment lands at zero
+
                         for (TripSchedule tripSchedule : pattern.tripSchedules) {
                             currentTrip++;
 
-                            if (tripSchedule.departures[stopPositionInPattern] > state.time + BOARD_SLACK) {
-                                // board this trip
+                            int departure = tripSchedule.departures[stopPositionInPattern];
+                            if (departure > state.time + BOARD_SLACK) {
                                 states.add(state);
                                 trips.add(currentTrip);
                                 break;
@@ -181,7 +183,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     /** propagate states to the destination */
     private Collection<McRaptorState> doPropagation () {
-        McRaptorStateBag bag = new McRaptorStateBag(request.suboptimalMinutes);
+        McRaptorStateBag bag = new McRaptorStateBag(request.suboptimalMinutes, network);
 
         egressTimes.forEachEntry((stop, egressTime) -> {
             McRaptorStateBag bagAtStop = bestStates.get(stop);
@@ -235,7 +237,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         state.back = back;
         state.round = round;
 
-        if (!bestStates.containsKey(stop)) bestStates.put(stop, new McRaptorStateBag(request.suboptimalMinutes));
+        if (!bestStates.containsKey(stop)) bestStates.put(stop, new McRaptorStateBag(request.suboptimalMinutes, network));
 
         McRaptorStateBag bag = bestStates.get(stop);
         boolean ret = bag.add(state);
@@ -265,6 +267,30 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         /** What stop are we at */
         public int stop;
+
+        public String dump(TransportNetwork network) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("BEGIN PATH DUMP (reverse chronological order, read up)\n");
+            McRaptorState state = this;
+            while (state != null) {
+                String toStop = network.transitLayer.stopNames.get(state.stop);
+
+                if (state.pattern != -1) {
+                    RouteInfo ri = network.transitLayer.routes.get(network.transitLayer.tripPatterns.get(state.pattern).routeIndex);
+                    sb.append(String.format("%s %s to %s, p%st%s end at %d:%2d\n", ri.route_short_name, ri.route_long_name,
+                            toStop, state.pattern, state.trip, state.time / 3600, state.time % 3600 / 60));
+                }
+                else {
+                    sb.append(String.format("transfer via street to %s, end at %d:%2d\n", toStop, state.time / 3600, state.time % 3600 / 60));
+                }
+
+                state = state.back;
+            }
+
+            sb.append("END PATH DUMP");
+
+            return sb.toString();
+        }
     }
 
     /** A bag of states which maintains dominance, and also keeps transfer and non-transfer states separately. */
@@ -275,9 +301,9 @@ public class McRaptorSuboptimalPathProfileRouter {
         /** best non-transferring states at stops */
         private DominatingList nonTransfer;
 
-        public McRaptorStateBag(int suboptimalMinutes) {
-            this.best = new DominatingList(suboptimalMinutes);
-            this.nonTransfer = new DominatingList(suboptimalMinutes);
+        public McRaptorStateBag(int suboptimalMinutes, TransportNetwork network) {
+            this.best = new DominatingList(suboptimalMinutes, network);
+            this.nonTransfer = new DominatingList(suboptimalMinutes, network);
         }
 
         public boolean add (McRaptorState state) {
@@ -302,8 +328,11 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     /** A list that handles domination automatically */
     private static class DominatingList {
-        public DominatingList (int suboptimalMinutes) {
+        private TransportNetwork network;
+
+        public DominatingList (int suboptimalMinutes, TransportNetwork network) {
             this.suboptimalSeconds = suboptimalMinutes * 60;
+            this.network = network;
         }
 
         /** The best time of any state in this bag */
@@ -336,7 +365,7 @@ public class McRaptorSuboptimalPathProfileRouter {
             for (McRaptorState state : list) {
                 if (state.time > bestTime + suboptimalSeconds) continue; // state is strictly dominated
 
-                StatePatternKey key = StatePatternKey.create(state);
+                StatePatternKey key = StatePatternKey.create(state, network);
 
                 if (key == null) continue;
 
@@ -359,8 +388,10 @@ public class McRaptorSuboptimalPathProfileRouter {
     private static class StatePatternKey {
         private int[] patterns;
 
-        public static StatePatternKey create (McRaptorState state) {
+        public static StatePatternKey create (McRaptorState state, TransportNetwork network) {
             TLongList usedPatternTrips = new TLongArrayList();
+
+            McRaptorState originalState = state;
 
             TIntList patterns = new TIntArrayList();
             while (state.back != null) {
@@ -369,7 +400,12 @@ public class McRaptorSuboptimalPathProfileRouter {
                 long pattTripKey = (((long) state.pattern) << 32) + state.trip;
 
                 // don't allow routes which use the same trip twice
-                if (usedPatternTrips.contains(pattTripKey)) return null;
+                // this can happen when you have routes with really crazy loops, but we may as well just tell the user
+                // to stay on board.
+                if (usedPatternTrips.contains(pattTripKey)) {
+                    //LOG.warn("Trip used pattern {} trip {} twice\n{}", state.pattern, state.trip, originalState.dump(network));
+                    return null;
+                }
                 usedPatternTrips.add(pattTripKey);
 
                 state = state.back;

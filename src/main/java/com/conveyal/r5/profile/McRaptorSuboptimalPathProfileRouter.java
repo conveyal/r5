@@ -30,12 +30,9 @@ public class McRaptorSuboptimalPathProfileRouter {
     public static final int BOARD_SLACK = 60;
 
     /**
-     * how often to sample the transit service. This is not a simple systematic sample but rather a constrained random walk,
-     * with each sample being between 1 and SAMPLING_FREQUENCY_SECONDS before the previous sample.
+     * the number of searches to run (approximately). We use a constrained random walk to get about this many searches.
      */
-    public static final int SAMPLING_FREQUENCY_SECONDS = 300;
-
-    private MersenneTwister mersenneTwister = new MersenneTwister();
+    public static final int NUMBER_OF_SEARCHES = 35;
 
     private TransportNetwork network;
     private ProfileRequest request;
@@ -63,7 +60,13 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         // start at end of time window and work backwards, eventually we may use range-RAPTOR
         // We use a constrained random walk to reduce the number of samples without causing an issue with variance in routes.
-        for (int departureTime = request.toTime - 60, n = 0; departureTime > request.fromTime; departureTime -= mersenneTwister.nextInt(SAMPLING_FREQUENCY_SECONDS), n++) {
+        // multiply by two because E[random] = 1/2 * max
+        int maxSamplingFrequency = 2 * (request.toTime - request.fromTime) / NUMBER_OF_SEARCHES;
+
+        // seed with last few digits of latitude so that requests are deterministic
+        MersenneTwister mersenneTwister = new MersenneTwister((int) (request.fromLat * 1e9));
+
+        for (int departureTime = request.toTime - 60, n = 0; departureTime > request.fromTime; departureTime -= mersenneTwister.nextInt(maxSamplingFrequency), n++) {
             //bestStates.clear(); // disabling range-raptor fttb, it's just confusing things
             touchedPatterns.clear();
             touchedStops.clear();
@@ -389,7 +392,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         private int[] patterns;
 
         public static StatePatternKey create (McRaptorState state, TransportNetwork network) {
-            TLongList usedPatternTrips = new TLongArrayList();
+            //TIntList usedPatterns = new TIntArrayList();
 
             McRaptorState originalState = state;
 
@@ -402,11 +405,11 @@ public class McRaptorSuboptimalPathProfileRouter {
                 // don't allow routes which use the same trip twice
                 // this can happen when you have routes with really crazy loops, but we may as well just tell the user
                 // to stay on board.
-                if (usedPatternTrips.contains(pattTripKey)) {
+                //if (usedPatterns.contains(state.pattern)) {
                     //LOG.warn("Trip used pattern {} trip {} twice\n{}", state.pattern, state.trip, originalState.dump(network));
-                    return null;
-                }
-                usedPatternTrips.add(pattTripKey);
+                  //  return null;
+                //}
+                //usedPatterns.add(state.pattern);
 
                 state = state.back;
             }

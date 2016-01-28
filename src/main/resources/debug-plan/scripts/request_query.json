@@ -76,24 +76,29 @@ transitModes:[TRANSITMODES]) {
         #effectiveStartDate
         #effectiveEndDate
       #},
-      #streetEdges {
+      streetEdges {
         #edgeId
         #distance
-        #geometryGeoJSON
-        #mode
-        #streetName
+        geometryGeoJSON
+        mode
+        streetName
         #relativeDirection
         #absoluteDirection
         #stayOn
         #area
         #exit
         #bogusName,
-        #bikeRentalOnStation {
-          #id,
-          #name,
-          #lat,lon
-        #}
-      #}
+        bikeRentalOnStation {
+          id,
+          name,
+          lat,lon
+        }
+        bikeRentalOffStation {
+          id,
+          name,
+          lat,lon
+        }
+      }
     },
      egress {
       mode,

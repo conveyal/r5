@@ -1,6 +1,5 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
@@ -349,6 +348,9 @@ public class McRaptorSuboptimalPathProfileRouter {
         }
 
         public Collection<McRaptorState> getNonDominatedStates () {
+            // We prune here. I've also tried pruning on add, but it slows the algorithm down due to all of the looping.
+            // I also tried pruning once per round, but that also slows the algorithm down (perhaps because it's doing
+            // so many pairwise comparisons).
             prune();
             return list;
         }

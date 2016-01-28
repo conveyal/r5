@@ -171,6 +171,7 @@ public class StreetRouter {
         bikeStations.forEachEntry((vertexIdx, bikeStationState) -> {
            State state = new State(vertexIdx, -1, bikeStationState.getTime()+switchTime, mode);
             state.weight = bikeStationState.weight+switchCost;
+            state.isBikeShare = true;
             queue.add(state);
             return true;
         });
@@ -301,6 +302,7 @@ public class StreetRouter {
         public Mode mode;
         public State backState; // previous state in the path chain
         public State nextState; // next state at the same location (for turn restrictions and other cases with co-dominant states)
+        public boolean isBikeShare = false; //is true if vertex in this state is Bike sharing station where mode switching occurs
         public State(int atVertex, int viaEdge, long fromTimeDate, State backState) {
             this.vertex = atVertex;
             this.backEdge = viaEdge;

@@ -733,10 +733,10 @@ public class PointToPointRouterServer {
     /**
      * Creates geojson feature from specified vertex
      *
-     * Currently it only does that if vertex have TRAFFIC_SIGNAL flag.
+     * Currently it only does that if vertex have TRAFFIC_SIGNAL or BIKE_SHARING flag.
      * Properties in GeoJSON are:
      * - vertex_id
-     * - flags: TRAFFIC_SIGNAL
+     * - flags: TRAFFIC_SIGNAL or BIKE_SHARING currently not both
      * @param vertex
      * @return
      */
@@ -746,6 +746,13 @@ public class PointToPointRouterServer {
             feature.addProperty("vertex_id", vertex.index);
             //TODO: add all flags (when there is more)
             feature.addProperty("flags", VertexStore.VertexFlag.TRAFFIC_SIGNAL.toString());
+            return feature;
+        }
+        if (vertex.getFlag(VertexStore.VertexFlag.BIKE_SHARING)) {
+            GeoJsonFeature feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
+            feature.addProperty("vertex_id", vertex.index);
+            //TODO: add all flags (when there is more)
+            feature.addProperty("flags", VertexStore.VertexFlag.BIKE_SHARING.toString());
             return feature;
         }
         return null;

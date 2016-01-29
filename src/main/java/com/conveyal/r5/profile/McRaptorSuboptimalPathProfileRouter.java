@@ -5,9 +5,7 @@ import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
 import gnu.trove.list.TIntList;
-import gnu.trove.list.TLongList;
 import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TLongObjectMap;
@@ -87,7 +85,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
             round++;
 
-            while (doOneRound() && round < 5);
+            while (doOneRound() && round < 4);
 
             // TODO this means we wind up with some duplicated states.
             ret.addAll(doPropagation());
@@ -105,6 +103,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         Set<PathWithTimes> paths = new HashSet<>();
 
         states.forEach(s -> paths.add(new PathWithTimes(s, network, request, accessTimes, egressTimes)));
+        states.forEach(s -> LOG.info("{}", s.dump(network)));
 
         paths.forEach(p -> LOG.info("{}", p.dump(network)));
 
@@ -178,9 +177,14 @@ public class McRaptorSuboptimalPathProfileRouter {
         for (int stop = stopsReachedInTransitSearch.nextSetBit(0); stop >= 0; stop = stopsReachedInTransitSearch.nextSetBit(stop + 1)) {
             TIntList transfers = network.transitLayer.transfersForStop.get(stop);
 
+            String from = network.transitLayer.stopNames.get(stop);
+
             for (McRaptorState state : bestStates.get(stop).getNonTransferStates()) {
                 for (int transfer = 0; transfer < transfers.size(); transfer += 2) {
                     if (addState(transfers.get(transfer), state.time + transfers.get(transfer + 1), -1, -1, state)) {
+                        String to = network.transitLayer.stopNames.get(transfers.get(transfer));
+                        LOG.info("Transfer from {} to {} is optimal", from, to);
+
                         touchedStops.set(stop);
                     }
                 }
@@ -190,7 +194,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     /** propagate states to the destination */
     private Collection<McRaptorState> doPropagation () {
-        McRaptorStateBag bag = new McRaptorStateBag(request.suboptimalMinutes, network);
+        McRaptorStateBag bag = new McRaptorStateBag(request.suboptimalMinutes);
 
         egressTimes.forEachEntry((stop, egressTime) -> {
             McRaptorStateBag bagAtStop = bestStates.get(stop);
@@ -248,7 +252,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         if (pattern != -1) state.key |= ((long) pattern) << ((round - 1) * 16);
 
-        if (!bestStates.containsKey(stop)) bestStates.put(stop, new McRaptorStateBag(request.suboptimalMinutes, network));
+        if (!bestStates.containsKey(stop)) bestStates.put(stop, new McRaptorStateBag(request.suboptimalMinutes));
 
         McRaptorStateBag bag = bestStates.get(stop);
         boolean ret = bag.add(state);
@@ -279,23 +283,23 @@ public class McRaptorSuboptimalPathProfileRouter {
         /** What stop are we at */
         public int stop;
 
-        /** the key of this representing the pattern sequece. represents up to four rides, with 16 bits representing each */
-        public long key = -1 << 48 + -1 << 32 + -1 << 16 + -1;
+        /** the key of this representing the pattern sequence. represents up to four rides, with 16 bits representing each */
+        public long key = -1l << 48 | -1l << 32 | -1l << 16 | -1l;
 
         public String dump(TransportNetwork network) {
             StringBuilder sb = new StringBuilder();
             sb.append("BEGIN PATH DUMP (reverse chronological order, read up)\n");
             McRaptorState state = this;
             while (state != null) {
-                String toStop = network.transitLayer.stopNames.get(state.stop);
+                String toStop = state.stop == -1 ? "destination" : network.transitLayer.stopNames.get(state.stop);
 
                 if (state.pattern != -1) {
                     RouteInfo ri = network.transitLayer.routes.get(network.transitLayer.tripPatterns.get(state.pattern).routeIndex);
-                    sb.append(String.format("%s %s to %s, p%st%s end at %d:%2d\n", ri.route_short_name, ri.route_long_name,
+                    sb.append(String.format("%s %s to %s, p%st%s end at %d:%02d\n", ri.route_short_name, ri.route_long_name,
                             toStop, state.pattern, state.trip, state.time / 3600, state.time % 3600 / 60));
                 }
                 else {
-                    sb.append(String.format("transfer via street to %s, end at %d:%2d\n", toStop, state.time / 3600, state.time % 3600 / 60));
+                    sb.append(String.format("transfer via street to %s, end at %d:%02d\n", toStop, state.time / 3600, state.time % 3600 / 60));
                 }
 
                 state = state.back;
@@ -315,9 +319,9 @@ public class McRaptorSuboptimalPathProfileRouter {
         /** best non-transferring states at stops */
         private DominatingList nonTransfer;
 
-        public McRaptorStateBag(int suboptimalMinutes, TransportNetwork network) {
-            this.best = new DominatingList(suboptimalMinutes, network);
-            this.nonTransfer = new DominatingList(suboptimalMinutes, network);
+        public McRaptorStateBag(int suboptimalMinutes) {
+            this.best = new DominatingList(suboptimalMinutes);
+            this.nonTransfer = new DominatingList(suboptimalMinutes);
         }
 
         public boolean add (McRaptorState state) {
@@ -342,11 +346,8 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     /** A list that handles domination automatically */
     private static class DominatingList {
-        private TransportNetwork network;
-
-        public DominatingList (int suboptimalMinutes, TransportNetwork network) {
+        public DominatingList (int suboptimalMinutes) {
             this.suboptimalSeconds = suboptimalMinutes * 60;
-            this.network = network;
         }
 
         /** The best time of any state in this bag */
@@ -363,8 +364,6 @@ public class McRaptorSuboptimalPathProfileRouter {
                 return false;
 
             if (state.time < bestTime) bestTime = state.time;
-
-            // remove dominated states
 
             // don't forget this
             list.add(state);
@@ -396,49 +395,6 @@ public class McRaptorSuboptimalPathProfileRouter {
             // so many pairwise comparisons).
             prune();
             return list;
-        }
-    }
-
-    private static class StatePatternKey {
-        private int[] patterns;
-
-        public static StatePatternKey create (McRaptorState state, TransportNetwork network) {
-            //TIntList usedPatterns = new TIntArrayList();
-
-            McRaptorState originalState = state;
-
-            TIntList patterns = new TIntArrayList();
-            while (state.back != null) {
-                if (state.pattern == -1) state = state.back;
-
-                long pattTripKey = (((long) state.pattern) << 32) + state.trip;
-
-                // don't allow routes which use the same trip twice
-                // this can happen when you have routes with really crazy loops, but we may as well just tell the user
-                // to stay on board.
-                //if (usedPatterns.contains(state.pattern)) {
-                    //LOG.warn("Trip used pattern {} trip {} twice\n{}", state.pattern, state.trip, originalState.dump(network));
-                  //  return null;
-                //}
-                //usedPatterns.add(state.pattern);
-
-                state = state.back;
-            }
-
-            // NB this list is reversed but it doesn't matter
-            StatePatternKey ret = new StatePatternKey();
-            ret.patterns = patterns.toArray();
-            return ret;
-        }
-
-        public int hashCode () {
-            return Arrays.hashCode(patterns);
-        }
-
-        public boolean equals(Object o) {
-            if (o instanceof StatePatternKey)
-                return Arrays.equals(patterns, ((StatePatternKey) o).patterns);
-            else return false;
         }
     }
 }

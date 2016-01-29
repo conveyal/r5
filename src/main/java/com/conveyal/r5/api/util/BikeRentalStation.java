@@ -26,4 +26,18 @@ public class BikeRentalStation implements Serializable {
 
     public boolean realTimeData = false;
 
+    @Override
+    public String toString() {
+        String sb = "BikeRentalStation{" + "id='" + id + '\'' +
+            ", name='" + name + '\'' +
+            ", lat=" + lat +
+            ", lon=" + lon +
+            ", bikesAvailable=" + bikesAvailable +
+            ", spacesAvailable=" + spacesAvailable +
+            ", allowDropoff=" + allowDropoff +
+            ", networks=" + networks +
+            ", realTimeData=" + realTimeData +
+            '}';
+        return sb;
+    }
 }

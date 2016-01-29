@@ -239,7 +239,20 @@ public class StreetLayer implements Serializable {
             return null;
         }
         EdgeStore.Edge edge = edgeStore.getCursor(edgeIdx);
-        return getName(edge.getOSMID(), locale);
+        String name = getName(edge.getOSMID(), locale);
+        if (name == null) {
+            //TODO: localize generated street names
+            if (edge.getFlag(EdgeStore.EdgeFlag.STAIRS)) {
+                return "stairs";
+            } else if (edge.getFlag(EdgeStore.EdgeFlag.CROSSING)) {
+                return "street crossing";
+            } else if (edge.getFlag(EdgeStore.EdgeFlag.BIKE_PATH)) {
+                return "bike path";
+            } else if (edge.getFlag(EdgeStore.EdgeFlag.SIDEWALK)) {
+                return "sidewalk";
+            }
+        }
+        return name;
     }
 
     /**

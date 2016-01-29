@@ -82,8 +82,8 @@ transitModes:[TRANSITMODES]) {
         geometryGeoJSON
         mode
         streetName
-        #relativeDirection
-        #absoluteDirection
+        relativeDirection
+        absoluteDirection
         #stayOn
         #area
         #exit
@@ -117,14 +117,14 @@ transitModes:[TRANSITMODES]) {
         #effectiveStartDate
         #effectiveEndDate
       #},
-      #streetEdges {
+      streetEdges {
         #edgeId
         #distance
         #geometryPolyline
         #mode
-        #streetName
-        #relativeDirection
-        #absoluteDirection
+        streetName
+        relativeDirection
+        absoluteDirection
         #stayOn
         #area
         #exit
@@ -134,7 +134,7 @@ transitModes:[TRANSITMODES]) {
           #name,
           #lon,lat
         #}
-      #}
+      }
     }
   } 
   }

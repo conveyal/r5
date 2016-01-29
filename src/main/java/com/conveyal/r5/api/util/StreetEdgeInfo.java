@@ -44,4 +44,15 @@ public class StreetEdgeInfo {
     public BikeRentalStation bikeRentalOffStation;
     //TODO: P+R
 
+    public void setDirections(double lastAngle, double thisAngle, boolean roundabout) {
+        relativeDirection = RelativeDirection.setRelativeDirection(lastAngle, thisAngle, roundabout);
+        setAbsoluteDirection(thisAngle);
+    }
+
+    public void setAbsoluteDirection(double thisAngle) {
+        thisAngle = Math.toRadians(thisAngle);
+        int octant = (int) (8 + Math.round(thisAngle * 8 / (Math.PI * 2))) % 8;
+        absoluteDirection = AbsoluteDirection.values()[octant];
+    }
+
 }

@@ -1,6 +1,7 @@
 package com.conveyal.r5.api.util;
 
 import com.conveyal.r5.streets.StreetLayer;
+import com.conveyal.r5.common.DirectionUtils;
 import com.vividsolutions.jts.geom.LineString;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetPath;
@@ -67,6 +68,7 @@ public class StreetSegment {
         boolean first = true;
         for (StreetRouter.State state: path.getStates()) {
             int edgeIdx = state.backEdge;
+            double lastAngle = 0;
             if (edgeIdx != -1) {
                 EdgeStore.Edge edge = path.getEdge(edgeIdx);
                 StreetEdgeInfo streetEdgeInfo = new StreetEdgeInfo();
@@ -87,6 +89,15 @@ public class StreetSegment {
                         }
                     }
                 }
+
+                double thisAngle = DirectionUtils.getFirstAngle(streetEdgeInfo.geometry);
+                if (streetEdges.isEmpty()) {
+                    streetEdgeInfo.setAbsoluteDirection(thisAngle);
+                    streetEdgeInfo.relativeDirection = RelativeDirection.DEPART;
+                } else {
+                    streetEdgeInfo.setDirections(lastAngle, thisAngle, false);
+                }
+                lastAngle = DirectionUtils.getLastAngle(streetEdgeInfo.geometry);
                 streetEdges.add(streetEdgeInfo);
             }
         }

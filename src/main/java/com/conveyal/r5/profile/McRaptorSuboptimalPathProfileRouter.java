@@ -10,7 +10,9 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
+import gnu.trove.map.TLongObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
+import gnu.trove.map.hash.TLongObjectHashMap;
 import org.apache.commons.math3.random.MersenneTwister;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,7 +87,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
             round++;
 
-            while (doOneRound());
+            while (doOneRound() && round < 5);
 
             // TODO this means we wind up with some duplicated states.
             ret.addAll(doPropagation());
@@ -103,6 +105,8 @@ public class McRaptorSuboptimalPathProfileRouter {
         Set<PathWithTimes> paths = new HashSet<>();
 
         states.forEach(s -> paths.add(new PathWithTimes(s, network, request, accessTimes, egressTimes)));
+
+        paths.forEach(p -> LOG.info("{}", p.dump(network)));
 
         return paths;
     }
@@ -240,6 +244,10 @@ public class McRaptorSuboptimalPathProfileRouter {
         state.back = back;
         state.round = round;
 
+        if (back != null) state.key = back.key;
+
+        if (pattern != -1) state.key |= ((long) pattern) << ((round - 1) * 16);
+
         if (!bestStates.containsKey(stop)) bestStates.put(stop, new McRaptorStateBag(request.suboptimalMinutes, network));
 
         McRaptorStateBag bag = bestStates.get(stop);
@@ -270,6 +278,9 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         /** What stop are we at */
         public int stop;
+
+        /** the key of this representing the pattern sequece. represents up to four rides, with 16 bits representing each */
+        public long key = -1 << 48 + -1 << 32 + -1 << 16 + -1;
 
         public String dump(TransportNetwork network) {
             StringBuilder sb = new StringBuilder();
@@ -364,19 +375,19 @@ public class McRaptorSuboptimalPathProfileRouter {
         /** prune dominated and excessive states */
         public void prune () {
             // group states that have the same sequence of patterns, throwing out dominated states as we go
-            Map<StatePatternKey, McRaptorState> bestStateForPatternSequence = new HashMap<>();
+            TLongObjectMap<McRaptorState> bestStateForPatternSequence = new TLongObjectHashMap<>();
             for (McRaptorState state : list) {
                 if (state.time > bestTime + suboptimalSeconds) continue; // state is strictly dominated
 
-                StatePatternKey key = StatePatternKey.create(state, network);
-
-                if (key == null) continue;
-
-                if (!bestStateForPatternSequence.containsKey(key) || bestStateForPatternSequence.get(key).time > state.time)
-                    bestStateForPatternSequence.put(key, state);
+                if (!bestStateForPatternSequence.containsKey(state.key) || bestStateForPatternSequence.get(state.key).time > state.time)
+                    bestStateForPatternSequence.put(state.key, state);
             }
 
-            this.list = new ArrayList<>(bestStateForPatternSequence.values());
+            this.list = new ArrayList<>();
+            bestStateForPatternSequence.forEachValue(s -> {
+                this.list.add(s);
+                return true;
+            });
         }
 
         public Collection<McRaptorState> getNonDominatedStates () {

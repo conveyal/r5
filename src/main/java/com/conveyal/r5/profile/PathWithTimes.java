@@ -217,4 +217,18 @@ public class PathWithTimes extends Path {
             return this.boardTimes[0] - o.boardTimes[0];
         }
     }
+
+    public String dump (TransportNetwork network) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("min %d/avg %d/max %d ", min / 60, avg / 60, max / 60));
+
+        String[] routes = IntStream.of(patterns).mapToObj(p -> {
+            int routeIdx = network.transitLayer.tripPatterns.get(p).routeIndex;
+            return network.transitLayer.routes.get(routeIdx).route_short_name;
+        }).toArray(s -> new String[s]);
+
+        sb.append(String.join(" -> ", routes));
+
+        return sb.toString();
+    }
 }

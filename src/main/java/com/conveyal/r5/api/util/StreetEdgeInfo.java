@@ -16,7 +16,7 @@ public class StreetEdgeInfo {
     public Integer edgeId;
 
     /**
-     * Distance of driving on these edge (meters)
+     * Distance of driving on these edge (milimeters)
      * @notnull
      */
     public int distance;

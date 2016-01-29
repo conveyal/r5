@@ -78,7 +78,7 @@ transitModes:[TRANSITMODES]) {
       #},
       streetEdges {
         #edgeId
-        #distance
+        distance
         geometryGeoJSON
         mode
         streetName

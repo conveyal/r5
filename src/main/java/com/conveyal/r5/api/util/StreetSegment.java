@@ -77,6 +77,7 @@ public class StreetSegment {
                 streetEdgeInfo.streetName = streetLayer.getNameEdgeIdx(edgeIdx, Locale.ENGLISH);
                 //TODO: decide between NonTransitMode and mode
                 streetEdgeInfo.mode = NonTransitMode.valueOf(state.mode.toString());
+                streetEdgeInfo.distance = edge.getLengthMm();
                 //Adds bikeRentalStation to streetEdgeInfo
                 if (state.isBikeShare && streetLayer != null && streetLayer.bikeRentalStationMap != null) {
                     BikeRentalStation bikeRentalStation = streetLayer.bikeRentalStationMap.get(state.vertex);

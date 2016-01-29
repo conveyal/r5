@@ -252,7 +252,7 @@ public class StreetLayer implements Serializable {
      */
     private String getName(long OSMid, Locale locale) {
         String name = null;
-        Way way = osm.getWay(OSMid);
+        Way way = osm.ways.get(OSMid);
         if (way != null) {
             name = way.getTag("name");
         }

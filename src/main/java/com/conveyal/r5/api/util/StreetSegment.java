@@ -96,7 +96,8 @@ public class StreetSegment {
                     streetEdgeInfo.setAbsoluteDirection(thisAngle);
                     streetEdgeInfo.relativeDirection = RelativeDirection.DEPART;
                 } else {
-                    streetEdgeInfo.setDirections(lastAngle, thisAngle, false);
+                    streetEdgeInfo.setDirections(lastAngle, thisAngle, edge.getFlag(
+                        EdgeStore.EdgeFlag.ROUNDABOUT));
                 }
                 lastAngle = DirectionUtils.getLastAngle(streetEdgeInfo.geometry);
                 streetEdges.add(streetEdgeInfo);

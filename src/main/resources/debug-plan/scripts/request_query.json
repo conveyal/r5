@@ -63,7 +63,7 @@ transitModes:[TRANSITMODES]) {
       mode,
       duration,
       distance,
-      geometryGeoJSON,
+      #geometryGeoJSON,
       
       #elevation {
         #distance

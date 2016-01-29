@@ -308,22 +308,40 @@ function showItinerary(optionIdx, itineraryIdx) {
         "type": "FeatureCollection",
         "features": []
     };
-    var accesFeature = getFeature(accessData);
-    features.features.push(accesFeature);
+    var rentedBike=false;
     for(var edgeIdx=0; edgeIdx < accessData.streetEdges.length; edgeIdx++) {
         var curStreetEdge = accessData.streetEdges[edgeIdx];
+        var curStreetEdgeFeature = getFeature(curStreetEdge);
+        curStreetEdgeFeature.properties.distance = curStreetEdge.distance/1000;
+        curStreetEdgeFeature.properties.aDir = curStreetEdge.absoluteDirection;
+        curStreetEdgeFeature.properties.relDir = curStreetEdge.relativeDirection;
         if (curStreetEdge.bikeRentalOnStation != null) {
             /*console.log("On: ", curStreetEdge.bikeRentalOnStation);*/
             var bikeFeature = getStopFeature(curStreetEdge.bikeRentalOnStation);
             bikeFeature.properties.which = "ON";
             features.features.push(bikeFeature);
+            rentedBike = true;
         }
         if (curStreetEdge.bikeRentalOffStation != null) {
             /*console.log("Off: ", curStreetEdge.bikeRentalOffStation);*/
             var bikeFeature = getStopFeature(curStreetEdge.bikeRentalOffStation);
             bikeFeature.properties.which = "OFF";
             features.features.push(bikeFeature);
+            rentedBike = false;
         }
+        if (accessData.mode == "BICYCLE" && curStreetEdge.mode == "WALK") {
+            curStreetEdgeFeature.properties.info = "WALK_BICYCLE";
+        }
+        if (accessData.mode == "BICYCLE_RENT") {
+            if (rentedBike) {
+                if(curStreetEdge.mode == "WALK") {
+                    curStreetEdgeFeature.properties.info = "WALK_RENTED_BICYCLE";
+                } else {
+                    curStreetEdgeFeature.properties.info = "RENTED_BICYCLE";
+                }
+            }
+        }
+        features.features.push(curStreetEdgeFeature);
     }
     if (connection.transit !== null) {
         for(var k=0;k < connection.transit.length; k++) {

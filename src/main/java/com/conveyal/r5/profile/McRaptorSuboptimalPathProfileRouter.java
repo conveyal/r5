@@ -119,14 +119,21 @@ public class McRaptorSuboptimalPathProfileRouter {
     /** Perform a McRAPTOR search and extract paths */
     public Collection<PathWithTimes> getPaths () {
         Collection<McRaptorState> states = route();
-        Set<PathWithTimes> paths = new HashSet<>();
+        // using a map here because even paths that are considered equal may have different times and we want to apply
+        // strict dominance to equal paths
+        Map<PathWithTimes, PathWithTimes> paths = new HashMap<>();
 
-        states.forEach(s -> paths.add(new PathWithTimes(s, network, request, accessTimes, egressTimes)));
+        states.forEach(s -> {
+            PathWithTimes pwt = new PathWithTimes(s, network, request, accessTimes, egressTimes);
+
+            if (!paths.containsKey(pwt) || paths.get(pwt).avg > pwt.avg)
+                paths.put(pwt, pwt);
+        });
         //states.forEach(s -> LOG.info("{}", s.dump(network)));
 
-        paths.forEach(p -> LOG.info("{}", p.dump(network)));
+        paths.values().forEach(p -> LOG.info("{}", p.dump(network)));
 
-        return paths;
+        return new ArrayList<>(paths.values());
     }
 
     /** perform one round of the McRAPTOR search. Returns true if anything changed */
@@ -212,7 +219,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         for (int stop = stopsReachedInTransitSearch.nextSetBit(0); stop >= 0; stop = stopsReachedInTransitSearch.nextSetBit(stop + 1)) {
             TIntList transfers = network.transitLayer.transfersForStop.get(stop);
-                
+
             for (McRaptorState state : bestStates.get(stop).getNonTransferStates()) {
                 for (int transfer = 0; transfer < transfers.size(); transfer += 2) {
                     int toStop = transfers.get(transfer);

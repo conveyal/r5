@@ -73,7 +73,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         MersenneTwister mersenneTwister = new MersenneTwister((int) (request.fromLat * 1e9));
 
         for (int departureTime = request.toTime - 60, n = 0; departureTime > request.fromTime; departureTime -= mersenneTwister.nextInt(maxSamplingFrequency), n++) {
-            //bestStates.clear(); // disabling range-raptor fttb, it's just confusing things
+            bestStates.clear(); // disabling range-raptor fttb, it's just confusing things
             touchedPatterns.clear();
             touchedStops.clear();
             round = 0;

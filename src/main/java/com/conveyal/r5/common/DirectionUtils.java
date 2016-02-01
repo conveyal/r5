@@ -38,6 +38,7 @@ public class DirectionUtils {
     /**
      * Computes the angle of the last segment of a LineString or MultiLineString in radians clockwise from North
      * in the range (-180, 180).
+     * FIXME: JTS distance doesn't return distance in meters
      * @param geometry a LineString
      */
     public static double getLastAngle(LineString geometry) {
@@ -59,7 +60,7 @@ public class DirectionUtils {
         while(d < DIST && i >= 0) {
             seglength = geometry.getCoordinateN(i).distance(geometry.getCoordinateN(i+1));
             if (d + seglength > DIST) {
-                return getAzimuth(geometry.getCoordinateN(i), geometry.getCoordinateN(i+1));
+                return getAzimuth(geometry.getCoordinateN(i), geometry.getCoordinateN(n-1));
             } else {
                 d += seglength;
                 i--;
@@ -73,6 +74,7 @@ public class DirectionUtils {
     /**
      * Computes the angle of the first segment of a LineString or MultiLineString in radians clockwise from North
      * in the range (-180, 180).
+     * FIXME: JTS distance doesn't return distance in meters
      * @param geometry a LineString
      */
     public static double getFirstAngle(LineString geometry) {

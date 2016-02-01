@@ -66,9 +66,9 @@ public class StreetSegment {
         }
         //Used to know if found bike rental station where we picked a bike or one where we dropped of a bike
         boolean first = true;
+        double lastAngle = 0;
         for (StreetRouter.State state: path.getStates()) {
             int edgeIdx = state.backEdge;
-            double lastAngle = 0;
             if (edgeIdx != -1) {
                 EdgeStore.Edge edge = path.getEdge(edgeIdx);
                 StreetEdgeInfo streetEdgeInfo = new StreetEdgeInfo();

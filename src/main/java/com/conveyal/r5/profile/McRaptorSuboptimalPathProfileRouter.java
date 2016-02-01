@@ -298,7 +298,14 @@ public class McRaptorSuboptimalPathProfileRouter {
 
             state.patterns[round - 1] = pattern;
 
+            // NB using the below implementation from Arrays.hashCode makes the algorithm 2x slower
+            // (not using Arrays.hashCode, obviously that would be slow due to retraversal, but just using the same algorithm is slow)
+            // state.patternHash = state.patternHash * 31 + pattern
             state.patternHash += pattern * PRIMES[round % PRIMES.length];
+        }
+        else if (state.back != null) {
+            state.patterns = state.back.patterns;
+            state.patternHash = state.back.patternHash;
         }
 
         if (!bestStates.containsKey(stop)) bestStates.put(stop, new McRaptorStateBag(request.suboptimalMinutes));

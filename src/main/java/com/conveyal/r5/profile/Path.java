@@ -114,13 +114,13 @@ public class Path {
     }
 
     public int hashCode() {
-        return Arrays.hashCode(patterns) + 2 * Arrays.hashCode(boardStops) + 5 * Arrays.hashCode(alightStops);
+        return Arrays.hashCode(patterns);
     }
 
     public boolean equals(Object o) {
         if (o instanceof Path) {
             Path p = (Path) o;
-            return this == p || Arrays.equals(patterns, p.patterns) && Arrays.equals(boardStops, p.boardStops) && Arrays.equals(alightStops, p.alightStops);
+            return this == p || Arrays.equals(patterns, p.patterns);
         } else return false;
     }
 

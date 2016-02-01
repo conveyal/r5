@@ -224,7 +224,7 @@ public class PathWithTimes extends Path {
 
         String[] routes = IntStream.of(patterns).mapToObj(p -> {
             int routeIdx = network.transitLayer.tripPatterns.get(p).routeIndex;
-            return network.transitLayer.routes.get(routeIdx).route_short_name;
+            return String.format("%s %d", network.transitLayer.routes.get(routeIdx).route_short_name, p);
         }).toArray(s -> new String[s]);
 
         sb.append(String.join(" -> ", routes));

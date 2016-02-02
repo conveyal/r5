@@ -1,5 +1,6 @@
 package com.conveyal.r5.streets;
 
+import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 
@@ -136,11 +137,20 @@ public class VertexStore implements Serializable {
         return fixed / FIXED_FACTOR;
     }
 
+    /** Convert a JTS envelope to fixed degrees */
+    public static Envelope envelopeToFixed(Envelope env) {
+        return new Envelope(
+                floatingDegreesToFixed(env.getMinX()),
+                floatingDegreesToFixed(env.getMaxX()),
+                floatingDegreesToFixed(env.getMinY()),
+                floatingDegreesToFixed(env.getMaxY())
+        );
+    }
 
     public enum VertexFlag {
         /** this intersection has a traffic signal */
         TRAFFIC_SIGNAL,
-        BIKE_SHARING
+        PARK_AND_RIDE, BIKE_SHARING
     }
 
 }

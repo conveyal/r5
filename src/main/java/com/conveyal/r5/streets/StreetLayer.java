@@ -8,12 +8,14 @@ import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.*;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
-import com.vividsolutions.jts.geom.Envelope;
+import com.vividsolutions.jts.geom.*;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
+import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TLongIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
+import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
@@ -24,6 +26,8 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.Serializable;
 import java.util.*;
+import java.util.stream.IntStream;
+import java.util.stream.LongStream;
 
 /**
  * This stores the street layer of OTP routing data.
@@ -178,8 +182,16 @@ public class StreetLayer implements Serializable {
 
         LOG.info("Making street edges from OSM ways...");
         this.osm = osm;
+
+        // keep track of ways that need to later become park and rides
+        List<Way> parkAndRideWays = new ArrayList<>();
+
         for (Map.Entry<Long, Way> entry : osm.ways.entrySet()) {
             Way way = entry.getValue();
+
+            if (way.hasTag("park_ride", "yes"))
+                parkAndRideWays.add(way);
+
             if (!isWayRoutable(way)) {
                 continue;
             }
@@ -195,15 +207,28 @@ public class StreetLayer implements Serializable {
             }
             edgesPerWayHistogram.add(nEdgesCreated);
         }
+
+        List<Node> parkAndRideNodes = new ArrayList<>();
+
+        for (Node node : osm.nodes.values()) {
+            if (node.hasTag("park_ride", "yes")) parkAndRideNodes.add(node);
+        }
+
         LOG.info("Done making street edges.");
         LOG.info("Made {} vertices and {} edges.", vertexStore.nVertices, edgeStore.nEdges);
 
         // need edge lists to apply intersection costs
         buildEdgeLists();
         stressLabeler.applyIntersectionCosts(this);
+//        TEMPORARILY REMOVING FOR SPEED IMPROVEMENT
+//        if (removeIslands)
+//            removeDisconnectedSubgraphs(MIN_SUBGRAPH_SIZE);
 
-        if (removeIslands)
-            removeDisconnectedSubgraphs(MIN_SUBGRAPH_SIZE);
+        // index the streets, we need the index to connect things to them.
+        this.indexStreets();
+
+        buildParkAndRideAreas(parkAndRideWays);
+        buildParkAndRideNodes(parkAndRideNodes);
 
         //edgesPerWayHistogram.display();
         //pointsPerEdgeHistogram.display();
@@ -212,6 +237,114 @@ public class StreetLayer implements Serializable {
             vertexIndexForOsmNode = null;
 
         osm = null;
+    }
+
+    /** Connect areal park and rides to the graph */
+    private void buildParkAndRideAreas(List<Way> parkAndRideWays) {
+        VertexStore.Vertex v = this.vertexStore.getCursor();
+        EdgeStore.Edge e = this.edgeStore.getCursor();
+
+        for (Way way : parkAndRideWays) {
+
+            Coordinate[] coords = LongStream.of(way.nodes).mapToObj(nid -> {
+                Node n = osm.nodes.get(nid);
+                return new Coordinate(n.getLon(), n.getLat());
+            }).toArray(s -> new Coordinate[s]);
+
+            // nb using linestring not polygon so all found intersections are at edges.
+            LineString g = GeometryUtils.geometryFactory.createLineString(coords);
+
+            // create a vertex in the middle of the lot to reflect the park and ride
+            Coordinate centroid = g.getCentroid().getCoordinate();
+            int centerVertex = vertexStore.addVertex(centroid.y, centroid.x);
+            v.seek(centerVertex);
+            v.setFlag(VertexStore.VertexFlag.PARK_AND_RIDE);
+
+            // find nearby edges
+            Envelope env = g.getEnvelopeInternal();
+            TIntSet nearbyEdges = this.spatialIndex.query(VertexStore.envelopeToFixed(env));
+
+            nearbyEdges.forEach(eidx -> {
+                e.seek(eidx);
+                LineString edgeGeometry = e.getGeometry();
+
+                if (edgeGeometry.intersects(g)) {
+                    // we found an intersection! yay!
+                    Geometry intersection = edgeGeometry.intersection(g);
+
+                    for (int i = 0; i < intersection.getNumGeometries(); i++) {
+                        Geometry single = intersection.getGeometryN(i);
+
+                        if (single instanceof Point) {
+                            connectParkAndRide(centerVertex, single.getCoordinate(), e);
+                        }
+
+                        else if (single instanceof LineString) {
+                            // coincident segments. TODO can this even happen?
+                            // just connect start and end of coincident segment
+                            Coordinate[] singleCoords = single.getCoordinates();
+
+                            if (singleCoords.length > 0) {
+                                connectParkAndRide(centerVertex, coords[0], e);
+
+                                // TODO is conditional even necessary?
+                                if (singleCoords.length > 1) {
+                                    connectParkAndRide(centerVertex, coords[coords.length - 1], e);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                return true;
+            });
+
+            // TODO check if we didn't connect anything and fall back to proximity based connection
+        }
+    }
+
+    private void buildParkAndRideNodes (List<Node> nodes) {
+        VertexStore.Vertex v = vertexStore.getCursor();
+        for (Node node : nodes) {
+            int vidx = vertexStore.addVertex(node.getLat(), node.getLon());
+            v.seek(vidx);
+            v.setFlag(VertexStore.VertexFlag.PARK_AND_RIDE);
+
+            int target = getOrCreateVertexNear(node.getLat(), node.getLon(), 500);
+            EdgeStore.Edge created = edgeStore.addStreetPair(vidx, target, 1);
+
+            // allow link edges to be traversed by all, access is controlled by connected edges
+            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+
+            // and the back edge
+            created.advance();
+            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+        }
+    }
+
+    /** Connect a park and ride vertex to the street network at a particular location and edge */
+    private void connectParkAndRide (int centerVertex, Coordinate coord, EdgeStore.Edge edge) {
+        Split split = Split.findOnEdge(coord.y, coord.x, edge);
+        int targetVertex = splitEdge(split);
+        EdgeStore.Edge created = edgeStore.addStreetPair(centerVertex, targetVertex, 1); // basically free to enter/leave P&R for now.
+        // allow link edges to be traversed by all, access is controlled by connected edges
+        created.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+        created.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+        created.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+        created.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+
+        // and the back edge
+        created.advance();
+        created.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+        created.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+        created.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+        created.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
     }
 
     /**
@@ -404,6 +537,11 @@ public class StreetLayer implements Serializable {
             return -1;
         }
 
+        return splitEdge(split);
+    }
+
+    /** perform destructive splitting of edges */
+    public int splitEdge(Split split) {
         // We have a linking site. Find or make a suitable vertex at that site.
         // Retaining the original Edge cursor object inside findSplit is not necessary, one object creation is harmless.
         EdgeStore.Edge edge = edgeStore.getCursor(split.edge);

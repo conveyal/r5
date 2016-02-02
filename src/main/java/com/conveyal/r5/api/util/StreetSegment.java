@@ -131,7 +131,7 @@ public class StreetSegment {
      * Similar edges are found with {@link StreetEdgeInfo#similarTo(StreetEdgeInfo)} and joined with {@link StreetEdgeInfo#add(StreetEdgeInfo)}
      */
     void compactEdges() {
-        if (streetEdges.size() == 1) {
+        if (streetEdges.size() < 2) {
             return;
         }
         List<StreetEdgeInfo> newEdges = new ArrayList<>(streetEdges.size());

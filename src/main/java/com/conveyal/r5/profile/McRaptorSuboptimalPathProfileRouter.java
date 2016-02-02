@@ -31,6 +31,9 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     public static final int BOARD_SLACK = 60;
 
+    /** maximum number of rounds (rides) */
+    public static final int MAX_ROUNDS = 4;
+
     public static final int[] EMPTY_INT_ARRAY = new int[0];
 
     /** large primes for use in hashing, computed using R numbers package */
@@ -39,8 +42,8 @@ public class McRaptorSuboptimalPathProfileRouter {
             600000007, 1600000009, 1200000041, 1500000041 };
 
     // DEBUG: USED TO EVALUATE HASH PERFORMANCE
-    //Set<StatePatternKey> keys = new HashSet<>(); // all unique keys
-    //TIntSet hashes = new TIntHashSet(); // all unique hashes
+//    Set<StatePatternKey> keys = new HashSet<>(); // all unique keys
+//    TIntSet hashes = new TIntHashSet(); // all unique hashes
 
     /**
      * the number of searches to run (approximately). We use a constrained random walk to get about this many searches.
@@ -53,6 +56,9 @@ public class McRaptorSuboptimalPathProfileRouter {
     private TIntIntMap egressTimes;
 
     private TIntObjectMap<McRaptorStateBag> bestStates = new TIntObjectHashMap<>();
+
+    /** target pruning as described in the RAPTOR paper: cut off states that can't possibly reach the target in time */
+    private int bestTimeAtTarget = Integer.MAX_VALUE;
 
     private int round = 0;
     // used in hashing
@@ -104,7 +110,8 @@ public class McRaptorSuboptimalPathProfileRouter {
 
             round++;
 
-            while (doOneRound() && round < 4);
+            // NB the walk search is an initial round, so MAX_ROUNDS + 1
+            while (doOneRound() && round < MAX_ROUNDS + 1);
 
             // TODO this means we wind up with some duplicated states.
             ret.addAll(doPropagation());
@@ -114,7 +121,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         }
 
         // DEBUG: print hash table performance
-        //LOG.info("Hash performance: {} hashes, {} states", hashes.size(), keys.size());
+//        LOG.info("Hash performance: {} hashes, {} states", hashes.size(), keys.size());
 
         return ret;
     }
@@ -294,8 +301,13 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     /** Add a state */
     private boolean addState (int stop, int time, int pattern, int trip, McRaptorState back) {
-        // TODO cutoff should be based upon start time of _this_ search
-        if (time > request.toTime + 3 * 60 * 60) return false; // cut off excessively long trips
+        /**
+         * local pruning, and cutting off of excessively long searches
+         * NB need to have cutoff be relative to toTime because otherwise when we do range-RAPTOR we'll have left over states
+         * that are past the cutoff.
+         */
+        // NB subtracting suboptimal minutes from LHS to avoid int overflow when adding to Integer.MAX_VALUE
+        if (time - request.suboptimalMinutes * 60 > bestTimeAtTarget || time > request.toTime + 3 * 60 * 60) return false;
 
         if (back != null && back.time > time)
             throw new IllegalStateException("Attempt to decrement time in state!");
@@ -309,10 +321,13 @@ public class McRaptorSuboptimalPathProfileRouter {
         state.round = round;
 
         if (pattern != -1) {
-            if (state.back != null)
+            if (state.back != null) {
                 state.patterns = Arrays.copyOf(state.back.patterns, round);
-            else
+                state.patternHash = state.back.patternHash;
+            }
+            else {
                 state.patterns = new int[1];
+            }
 
             state.patterns[round - 1] = pattern;
 
@@ -330,13 +345,21 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         // BELOW CODE IS USED TO EVALUATE HASH PERFORMANCE
         // uncomment it, the variables it uses, and the log statement in route to print a hash collision report
-        //keys.add(new StatePatternKey(state));
-        //hashes.add(state.patternHash);
+//        keys.add(new StatePatternKey(state));
+//        hashes.add(state.patternHash);
 
         if (!bestStates.containsKey(stop)) bestStates.put(stop, new McRaptorStateBag(request.suboptimalMinutes));
 
         McRaptorStateBag bag = bestStates.get(stop);
-        return bag.add(state);
+        boolean optimal = bag.add(state);
+
+        // target pruning: keep track of best time at destination
+        if (optimal && pattern != -1 && egressTimes.containsKey(stop)) {
+            int timeAtDest = time + egressTimes.get(stop);
+            if (timeAtDest < bestTimeAtTarget) bestTimeAtTarget = timeAtDest;
+        }
+
+        return optimal;
     }
 
     /**

@@ -318,6 +318,7 @@ public class StreetLayer implements Serializable {
             created.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
             created.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
             created.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+            created.setFlag(EdgeStore.EdgeFlag.LINK);
 
             // and the back edge
             created.advance();
@@ -325,6 +326,7 @@ public class StreetLayer implements Serializable {
             created.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
             created.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
             created.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+            created.setFlag(EdgeStore.EdgeFlag.LINK);
         }
     }
 
@@ -338,6 +340,7 @@ public class StreetLayer implements Serializable {
         created.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
         created.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
         created.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+        created.setFlag(EdgeStore.EdgeFlag.LINK);
 
         // and the back edge
         created.advance();
@@ -345,6 +348,7 @@ public class StreetLayer implements Serializable {
         created.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
         created.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
         created.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+        created.setFlag(EdgeStore.EdgeFlag.LINK);
     }
 
     /**

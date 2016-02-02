@@ -138,7 +138,8 @@ public class EdgeStore implements Serializable {
         NO_THRU_TRAFFIC_BIKE (11),
         NO_THRU_TRAFFIC_CAR (12),
         SLOPE_OVERRIDE (13),
-        TRANSIT_LINK (14), // This edge is a one-way connection from a street to a transit stop. Target is a transit stop index, not an intersection index.
+        /** Link edge, two should not be traversed one-after-another */
+        LINK (14),
 
         // Permissions
         ALLOWS_PEDESTRIAN (15),
@@ -417,6 +418,10 @@ public class EdgeStore implements Serializable {
             float speedms = calculateSpeed(req, mode, s0.getTime());
             float time = (float) (getLengthM() / speedms);
             float weight = 0;
+
+            if (s0.backEdge != -1 && getFlag(EdgeFlag.LINK) && getCursor(s0.backEdge).getFlag(EdgeFlag.LINK))
+                // two link edges in a row, in other words a shortcut. Disallow this.
+                return null;
 
             //Currently weigh is basically the same as weight. It differs only on stairs and when walking.
 

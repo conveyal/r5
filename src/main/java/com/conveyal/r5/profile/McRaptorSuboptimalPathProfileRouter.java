@@ -230,10 +230,9 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     /** Perform transfers */
     private void doTransfers () {
-        BitSet stopsReachedInTransitSearch = new BitSet(network.transitLayer.getStopCount());
-        stopsReachedInTransitSearch.or(touchedStops);
+        BitSet stopsTouchedByTransfer = new BitSet(network.transitLayer.getStopCount());
 
-        for (int stop = stopsReachedInTransitSearch.nextSetBit(0); stop >= 0; stop = stopsReachedInTransitSearch.nextSetBit(stop + 1)) {
+        for (int stop = touchedStops.nextSetBit(0); stop >= 0; stop = touchedStops.nextSetBit(stop + 1)) {
             TIntList transfers = network.transitLayer.transfersForStop.get(stop);
 
             for (McRaptorState state : bestStates.get(stop).getNonTransferStates()) {
@@ -243,11 +242,14 @@ public class McRaptorSuboptimalPathProfileRouter {
                         String to = network.transitLayer.stopNames.get(transfers.get(transfer));
                         //LOG.info("Transfer from {} to {} is optimal", from, to);
 
-                        touchedStops.set(toStop);
+                        stopsTouchedByTransfer.set(toStop);
                     }
                 }
             }
         }
+
+        // copy all stops touched by transfers into the touched stops bitset.
+        touchedStops.or(stopsTouchedByTransfer);
     }
 
     /** propagate states to the destination */

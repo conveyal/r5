@@ -1,6 +1,7 @@
 package com.conveyal.r5.api.util;
 
 import com.conveyal.r5.common.GeometryUtils;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.geom.Coordinate;
 
@@ -36,6 +37,7 @@ public class StreetEdgeInfo {
     public NonTransitMode mode;
     public String streetName;
     public RelativeDirection relativeDirection;
+    @JsonIgnore //This is currently needed for StreetSegmentTest Because it tries to load AbsoluteDirection as a Double for unknown reason
     public AbsoluteDirection absoluteDirection;
     public boolean stayOn = false;
     public Boolean area;

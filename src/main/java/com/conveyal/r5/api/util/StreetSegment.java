@@ -38,6 +38,10 @@ public class StreetSegment {
             '}' + "\n";
     }
 
+    //For Jackson reading used in StreetSegmentTest
+    public StreetSegment() {
+    }
+
     /**
      * creates StreetSegment from path
      *

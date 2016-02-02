@@ -91,13 +91,13 @@ public class StreetRouter {
     }
 
     /**
-     * @return a map where all the keys are vertex indexes of bike shares and values are weights.
+     * @return a map where all the keys are vertex indexes with the particular flag and all the values are weights.
      */
-    public TIntIntMap getReachedBikeShares() {
+    public TIntIntMap getReachedVertices (VertexStore.VertexFlag flag) {
         TIntIntMap result = new TIntIntHashMap();
         bestStates.forEachEntry((vertexIndex, state) -> {
             VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor(vertexIndex);
-            if (vertex.getFlag(VertexStore.VertexFlag.BIKE_SHARING)) {
+            if (vertex.getFlag(flag)) {
                 result.put(vertexIndex, state.weight);
             }
             return true;

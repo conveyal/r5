@@ -11,6 +11,7 @@ import com.conveyal.r5.publish.StaticPropagatedTimesStore;
 import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetRouter;
+import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
@@ -134,7 +135,7 @@ public class PointToPointQuery {
                     streetRouter.route();
                     if (mode == LegMode.BICYCLE_RENT) {
                         //This finds all the nearest bicycle rent stations when walking
-                        TIntIntMap bikeStations = streetRouter.getReachedBikeShares();
+                        TIntIntMap bikeStations = streetRouter.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
                         LOG.info("BIKE RENT: Found {} bike stations", bikeStations.size());
                         /*LOG.info("Start to bike share:");
                         bikeStations.forEachEntry((idx, weight) -> {
@@ -149,7 +150,7 @@ public class PointToPointQuery {
                         bicycle.distanceLimitMeters = 100_000;
                         bicycle.setOrigin(bikeStations);
                         bicycle.route();
-                        TIntIntMap cycledStations = bicycle.getReachedBikeShares();
+                        TIntIntMap cycledStations = bicycle.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
                         LOG.info("BIKE RENT: Found {} cycled stations", cycledStations.size());
                         /*LOG.info("Bike share to bike share:");
                         cycledStations.forEachEntry((idx, weight) -> {

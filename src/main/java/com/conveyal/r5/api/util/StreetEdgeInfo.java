@@ -1,6 +1,13 @@
 package com.conveyal.r5.api.util;
 
-import com.vividsolutions.jts.geom.LineString;
+import com.conveyal.r5.common.GeometryUtils;
+import com.vividsolutions.jts.geom.*;
+import com.vividsolutions.jts.geom.Coordinate;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  * This is a response model class which holds data that will be serialized and returned to the client.
@@ -55,4 +62,71 @@ public class StreetEdgeInfo {
         absoluteDirection = AbsoluteDirection.values()[octant];
     }
 
+    @Override
+    public String toString() {
+        String sb = "StreetEdgeInfo{" + "edgeId=" + edgeId +
+            ", distance=" + distance +
+            ", geometry=" + geometry +
+            ", mode=" + mode +
+            ", streetName='" + streetName + '\'' +
+            ", relativeDirection=" + relativeDirection +
+            ", absoluteDirection=" + absoluteDirection +
+            ", stayOn=" + stayOn +
+            ", area=" + area +
+            ", exit='" + exit + '\'' +
+            ", bogusName=" + bogusName +
+            ", bikeRentalOnStation=" + bikeRentalOnStation +
+            ", bikeRentalOffStation=" + bikeRentalOffStation +
+            '}';
+        return sb;
+    }
+
+    /**
+     * Returns true if pair of streetEdgeInfos have same:
+     * - mode
+     * - bikeRentalOnStation
+     * - bikeRentalOffStation
+     * - both have stayOn true
+     * - both have relativeDirection as CONTINUE
+     *
+     * This is used to find out which two consecutive StreetEdges to join together
+     * to show as one step in Turn by turn directions
+     *
+     * It is called from {@link StreetSegment#compactEdges()}
+     * @param streetEdgeInfo
+     * @return true if similar
+     */
+    boolean similarTo(StreetEdgeInfo streetEdgeInfo) {
+        return mode.equals(streetEdgeInfo.mode) &&
+            relativeDirection == RelativeDirection.CONTINUE
+            && streetEdgeInfo.relativeDirection == RelativeDirection.CONTINUE
+            && stayOn && streetEdgeInfo.stayOn
+            && bikeRentalOnStation == streetEdgeInfo.bikeRentalOnStation
+            && bikeRentalOffStation == streetEdgeInfo.bikeRentalOffStation;
+    }
+
+    /**
+     * Joins current streetEdgeInfo with provided one
+     *
+     * This adds together distance and geometry
+     * Other things are assumed to be the same since this is called only if
+     * {@link #similarTo(StreetEdgeInfo)} returns true on same pair of StreetEdgeInfos
+     *
+     * It is used to contract StreetEdgeInfos in {@link StreetSegment#compactEdges()}
+     * @param streetEdgeInfo
+     */
+    void add(StreetEdgeInfo streetEdgeInfo) {
+        distance+=streetEdgeInfo.distance;
+
+        List<com.vividsolutions.jts.geom.Coordinate> coordinates = new LinkedList<>();
+        Collections.addAll(coordinates, geometry.getCoordinates());
+
+        coordinates.addAll(Arrays.asList(streetEdgeInfo.geometry.getCoordinates()).subList(1, streetEdgeInfo.geometry.getNumPoints())); // Avoid duplications
+        com.vividsolutions.jts.geom.Coordinate[] coordinatesArray = new Coordinate[coordinates.size()];
+        //FIXME: copy from list to array
+        coordinatesArray = coordinates.toArray(coordinatesArray);
+        //FIXME: copy from array to coordinates sequence
+        this.geometry = GeometryUtils.geometryFactory.createLineString(coordinatesArray);
+
+    }
 }

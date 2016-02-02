@@ -108,6 +108,8 @@ public class StreetSegment {
                 streetEdges.add(streetEdgeInfo);
             }
         }
+        //This joins consecutive streetEdgeInfos with CONTINUE Relative direction and same street name to one StreetEdgeInfo
+        compactEdges(); //TODO: this needs to be optional because of profile routing and edgeIDs
         Coordinate[] coordinatesArray = new Coordinate[coordinates.size()];
         //FIXME: copy from list to array
         coordinatesArray = coordinates.toArray(coordinatesArray);
@@ -116,5 +118,30 @@ public class StreetSegment {
         //This is not read from state because this is requested mode which is not always the same as state mode
         //For example bicycle plan can consist of bicycle and walk modes if walking the bike is required
         this.mode = mode;
+    }
+
+    /**
+     * This joins consecutive streetEdgeInfos with CONTINUE
+     * Relative direction and same street name to one StreetEdgeInfo
+     *
+     * Similar edges are found with {@link StreetEdgeInfo#similarTo(StreetEdgeInfo)} and joined with {@link StreetEdgeInfo#add(StreetEdgeInfo)}
+     */
+    void compactEdges() {
+        if (streetEdges.size() == 1) {
+            return;
+        }
+        List<StreetEdgeInfo> newEdges = new ArrayList<>(streetEdges.size());
+        StreetEdgeInfo prev = streetEdges.get(0);
+        for (int i=1; i < streetEdges.size(); i++) {
+            StreetEdgeInfo current = streetEdges.get(i);
+            if (prev.similarTo(current)) {
+                prev.add(current);
+            } else {
+                newEdges.add(prev);
+                prev = current;
+            }
+        }
+        streetEdges = newEdges;
+
     }
 }

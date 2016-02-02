@@ -66,6 +66,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     private BitSet touchedStops;
     private BitSet touchedPatterns;
+    private BitSet patternsNearDestination;
 
     public McRaptorSuboptimalPathProfileRouter (TransportNetwork network, ProfileRequest req, TIntIntMap accessTimes, TIntIntMap egressTimes) {
         this.network = network;
@@ -74,12 +75,25 @@ public class McRaptorSuboptimalPathProfileRouter {
         this.egressTimes = egressTimes;
         this.touchedStops = new BitSet(network.transitLayer.getStopCount());
         this.touchedPatterns = new BitSet(network.transitLayer.tripPatterns.size());
+        this.patternsNearDestination = new BitSet(network.transitLayer.tripPatterns.size());
     }
 
     /** Get a McRAPTOR state bag for every departure minute */
     public Collection<McRaptorState> route () {
         LOG.info("Found {} access stops:\n{}", accessTimes.size(), dumpStops(accessTimes));
         LOG.info("Found {} egress stops:\n{}", egressTimes.size(), dumpStops(egressTimes));
+
+        // find patterns near destination
+        // on the final round of the search we only explore these patterns
+        this.egressTimes.forEachKey(s -> {
+            network.transitLayer.patternsForStop.get(s).forEach(p -> {
+                patternsNearDestination.set(p);
+                return true;
+            });
+            return true;
+        });
+
+        LOG.info("{} patterns found near the destination", patternsNearDestination.cardinality());
 
         List<McRaptorState> ret = new ArrayList<>();
 
@@ -161,6 +175,10 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     /** perform one round of the McRAPTOR search. Returns true if anything changed */
     private boolean doOneRound () {
+        // optimization: on the last round, only explore patterns near the destination
+        if (round == MAX_ROUNDS)
+            touchedPatterns.and(patternsNearDestination);
+
         for (int patIdx = touchedPatterns.nextSetBit(0); patIdx >= 0; patIdx = touchedPatterns.nextSetBit(patIdx + 1)) {
             // walk along the route, picking up states as we go
             // We never propagate more than one state from the same previous pattern _sequence_

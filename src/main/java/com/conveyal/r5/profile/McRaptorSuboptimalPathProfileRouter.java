@@ -10,6 +10,8 @@ import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
+import gnu.trove.set.TIntSet;
+import gnu.trove.set.hash.TIntHashSet;
 import org.apache.commons.math3.random.MersenneTwister;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +33,14 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     public static final int[] EMPTY_INT_ARRAY = new int[0];
 
-    public static final int[] PRIMES = new int[] { 2687, 1723, 5011, 7541, 6967, 7919, 307, 4831, 7001, 3209, 499 };
+    /** large primes for use in hashing, computed using R numbers package */
+    public static final int[] PRIMES = new int[] { 400000009, 200000033, 2, 1100000009, 1900000043, 800000011, 1300000003,
+            1000000007, 500000003, 300000007, 1700000009, 100000007, 700000031, 900000011, 1800000011, 1400000023,
+            600000007, 1600000009, 1200000041, 1500000041 };
+
+    // DEBUG: USED TO EVALUATE HASH PERFORMANCE
+    //Set<StatePatternKey> keys = new HashSet<>(); // all unique keys
+    //TIntSet hashes = new TIntHashSet(); // all unique hashes
 
     /**
      * the number of searches to run (approximately). We use a constrained random walk to get about this many searches.
@@ -46,6 +55,8 @@ public class McRaptorSuboptimalPathProfileRouter {
     private TIntObjectMap<McRaptorStateBag> bestStates = new TIntObjectHashMap<>();
 
     private int round = 0;
+    // used in hashing
+    //private int roundSquared = 0;
 
     private BitSet touchedStops = new BitSet();
     private BitSet touchedPatterns = new BitSet();
@@ -99,6 +110,9 @@ public class McRaptorSuboptimalPathProfileRouter {
             if (n % 15 == 0)
                 LOG.info("minute {}, {} rounds", n, round);
         }
+
+        // DEBUG: print hash table performance
+        //LOG.info("Hash performance: {} hashes, {} states", hashes.size(), keys.size());
 
         return ret;
     }
@@ -300,13 +314,20 @@ public class McRaptorSuboptimalPathProfileRouter {
 
             // NB using the below implementation from Arrays.hashCode makes the algorithm 2x slower
             // (not using Arrays.hashCode, obviously that would be slow due to retraversal, but just using the same algorithm is slow)
-            // state.patternHash = state.patternHash * 31 + pattern
-            state.patternHash += pattern * PRIMES[round % PRIMES.length];
+            //state.patternHash = state.patternHash * 31 + pattern;
+            // Take advantage of the fact that we only ever compare states from the same round, and maximize entropy at each round
+            // also keep in mind that
+            state.patternHash += pattern * PRIMES[round];
         }
         else if (state.back != null) {
             state.patterns = state.back.patterns;
             state.patternHash = state.back.patternHash;
         }
+
+        // BELOW CODE IS USED TO EVALUATE HASH PERFORMANCE
+        // uncomment it, the variables it uses, and the log statement in route to print a hash collision report
+        //keys.add(new StatePatternKey(state));
+        //hashes.add(state.patternHash);
 
         if (!bestStates.containsKey(stop)) bestStates.put(stop, new McRaptorStateBag(request.suboptimalMinutes));
 

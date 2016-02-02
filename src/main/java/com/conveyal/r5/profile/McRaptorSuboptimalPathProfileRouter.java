@@ -437,7 +437,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         /** the number of seconds a state can be worse without being dominated. */
         public int suboptimalSeconds;
 
-        private List<McRaptorState> list = new ArrayList<>();
+        private List<McRaptorState> list = new LinkedList<>();
 
         public boolean add (McRaptorState state) {
             // is this state dominated?
@@ -455,7 +455,10 @@ public class McRaptorSuboptimalPathProfileRouter {
         /** prune dominated and excessive states */
         public void prune () {
             // group states that have the same sequence of patterns, throwing out dominated states as we go
-            this.list = this.list.stream().filter(s -> s.time < bestTime + suboptimalSeconds).collect(Collectors.toCollection(ArrayList::new));
+            for (Iterator<McRaptorState> it = list.iterator(); it.hasNext();) {
+                if (it.next().time >= bestTime + suboptimalSeconds)
+                    it.remove();
+            }
         }
 
         public Collection<McRaptorState> getNonDominatedStates () {

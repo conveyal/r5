@@ -235,8 +235,8 @@ public class PointToPointQuery {
             profileResponse.addOption(option);
 
             // fold access and egress times into single maps
-            TIntIntMap accessTimes = combineMultimodalRoutingAccessTimes(accessRouter);
-            TIntIntMap egressTimes = combineMultimodalRoutingAccessTimes(egressRouter);
+            TIntIntMap accessTimes = combineMultimodalRoutingAccessTimes(accessRouter, request);
+            TIntIntMap egressTimes = combineMultimodalRoutingAccessTimes(egressRouter, request);
 
             McRaptorSuboptimalPathProfileRouter router = new McRaptorSuboptimalPathProfileRouter(transportNetwork, request, accessTimes, egressTimes);
             List<PathWithTimes> usefullpathList = new ArrayList<>();
@@ -330,11 +330,39 @@ public class PointToPointQuery {
     }
 
     /** Combine the results of several street searches using different modes into a single map */
-    private TIntIntMap combineMultimodalRoutingAccessTimes(Map<LegMode, StreetRouter> routers) {
+    private TIntIntMap combineMultimodalRoutingAccessTimes(Map<LegMode, StreetRouter> routers, ProfileRequest request) {
         TIntIntMap ret = new TIntIntHashMap();
 
-        for (StreetRouter router : routers.values()) {
+        for (Map.Entry<LegMode, StreetRouter> entry : routers.entrySet()) {
+            int maxTime = 30;
+            int minTime = 0;
+            LegMode mode = entry.getKey();
+            switch (mode) {
+                case BICYCLE:
+                // TODO this is not strictly correct, bike rent is partly walking
+                case BICYCLE_RENT:
+                    maxTime = request.maxBikeTime;
+                    minTime = request.minBikeTime;
+                    break;
+                case WALK:
+                    maxTime = request.maxWalkTime;
+                    break;
+                case CAR:
+                    maxTime = request.maxCarTime;
+                    minTime = request.minCarTime;
+                    break;
+            }
+
+            maxTime *= 60; // convert to seconds
+            minTime *= 60; // convert to seconds
+
+            final int maxTimeFinal = maxTime;
+            final int minTimeFinal = minTime;
+
+            StreetRouter router = entry.getValue();
             router.getReachedStops().forEachEntry((stop, time) -> {
+                if (time > maxTimeFinal || time < minTimeFinal) return true;
+
                 if (!ret.containsKey(stop) || ret.get(stop) > time) {
                     ret.put(stop, time);
                 }

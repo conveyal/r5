@@ -648,7 +648,7 @@ public class GraphQLSchema {
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("stayOn")
-                .type(Scalars.GraphQLBoolean)
+                .type(new GraphQLNonNull(Scalars.GraphQLBoolean))
                 .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).stayOn)
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()

@@ -98,6 +98,11 @@ public class StreetSegment {
                 } else {
                     streetEdgeInfo.setDirections(lastAngle, thisAngle, edge.getFlag(
                         EdgeStore.EdgeFlag.ROUNDABOUT));
+                    //If we are moving on street with same name we need to set stayOn to true
+                    StreetEdgeInfo prev = streetEdges.get(streetEdges.size()-1);
+                    if (prev.streetName != null && prev.streetName.equals(streetEdgeInfo.streetName)) {
+                        streetEdgeInfo.stayOn = true;
+                    }
                 }
                 lastAngle = DirectionUtils.getLastAngle(streetEdgeInfo.geometry);
                 streetEdges.add(streetEdgeInfo);

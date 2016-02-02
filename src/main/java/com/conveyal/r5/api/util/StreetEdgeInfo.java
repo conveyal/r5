@@ -30,7 +30,7 @@ public class StreetEdgeInfo {
     public String streetName;
     public RelativeDirection relativeDirection;
     public AbsoluteDirection absoluteDirection;
-    public Boolean stayOn;
+    public boolean stayOn = false;
     public Boolean area;
     //Exit name when exiting highway or roundabout
     public String exit;

@@ -7,44 +7,45 @@ import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
-import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.LineString;
 import com.vividsolutions.jts.io.ParseException;
 import com.vividsolutions.jts.io.WKTReader;
+import org.junit.*;
 import org.junit.Assert;
-import org.junit.Before;
-import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-
-import static org.junit.Assert.*;
 
 /**
  * Created by mabu on 2.2.2016.
  */
 public class StreetSegmentTest {
     private static final Logger LOG = LoggerFactory.getLogger(StreetSegmentTest.class);
-    StreetSegment streetSegment;
 
-    @Before
-    public void setUp() throws Exception {
+    private static ObjectMapper mapper;
+
+    private StreetSegment loadFile(String filename) throws IOException {
+        InputStream file = getClass().getResourceAsStream(filename);
+        return mapper.readValue(file, StreetSegment.class);
+    }
+
+    @BeforeClass
+    public static void setUpClass() throws Exception {
         GeometryWKTDeserializer geometryWKTDeserializer = new GeometryWKTDeserializer();
 
         SimpleModule module = new SimpleModule("GeometryWKTDeserializerModule",
             new Version(1,0,0, null));
         module.addDeserializer(LineString.class, geometryWKTDeserializer);
-        ObjectMapper mapper = new ObjectMapper();
+        mapper = new ObjectMapper();
         mapper.registerModule(module);
-        InputStream file = getClass().getResourceAsStream("streetSegmentWALK.json");
-        streetSegment = mapper.readValue(file, StreetSegment.class);
+
     }
 
     @Test
     public void testCompact() throws Exception {
+        StreetSegment streetSegment = loadFile("streetSegmentWALK.json");
         Assert.assertNotNull(streetSegment);
         Assert.assertEquals(24, streetSegment.streetEdges.size());
         /*LOG.info("BEFORE:");
@@ -59,6 +60,32 @@ public class StreetSegmentTest {
         Assert.assertEquals(20, streetSegment.streetEdges.size());
 
 
+    }
+    @Ignore("Roundabout currently gets both CLOCKWISE and COUNTERCLOCKWISE relative directions so test Fails")
+    @Test
+    public void testRoundabout() throws Exception {
+        StreetSegment streetSegment = loadFile("streetSegmentCAR_ROUNDABOUT.json");
+        for (StreetEdgeInfo streetEdgeInfo: streetSegment.streetEdges) {
+            LOG.info(streetEdgeInfo.toString());
+        }
+
+        Assert.assertEquals(RelativeDirection.CIRCLE_COUNTERCLOCKWISE, streetSegment.streetEdges.get(2).relativeDirection);
+        Assert.assertEquals(RelativeDirection.CIRCLE_COUNTERCLOCKWISE, streetSegment.streetEdges.get(3).relativeDirection);
+        Assert.assertEquals(RelativeDirection.CIRCLE_COUNTERCLOCKWISE, streetSegment.streetEdges.get(4).relativeDirection);
+    }
+
+    @Ignore("Roundabout exit numbers and compactness isn't supported yet")
+    @Test
+    public void testRoundaboutExit() throws Exception {
+        StreetSegment streetSegment = loadFile("streetSegmentCAR_ROUNDABOUT.json");
+        for (StreetEdgeInfo streetEdgeInfo: streetSegment.streetEdges) {
+            LOG.info(streetEdgeInfo.toString());
+        }
+
+        //Compact roundabout and add exit number
+        Assert.assertEquals(RelativeDirection.CIRCLE_COUNTERCLOCKWISE, streetSegment.streetEdges.get(2).relativeDirection);
+        Assert.assertEquals("3", streetSegment.streetEdges.get(2).exit);
+        Assert.assertEquals(RelativeDirection.RIGHT, streetSegment.streetEdges.get(3).relativeDirection);
     }
 }
 

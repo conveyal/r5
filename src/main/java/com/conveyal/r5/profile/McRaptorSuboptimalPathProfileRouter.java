@@ -58,14 +58,16 @@ public class McRaptorSuboptimalPathProfileRouter {
     // used in hashing
     //private int roundSquared = 0;
 
-    private BitSet touchedStops = new BitSet();
-    private BitSet touchedPatterns = new BitSet();
+    private BitSet touchedStops;
+    private BitSet touchedPatterns;
 
     public McRaptorSuboptimalPathProfileRouter (TransportNetwork network, ProfileRequest req, TIntIntMap accessTimes, TIntIntMap egressTimes) {
         this.network = network;
         this.request = req;
         this.accessTimes = accessTimes;
         this.egressTimes = egressTimes;
+        this.touchedStops = new BitSet(network.transitLayer.getStopCount());
+        this.touchedPatterns = new BitSet(network.transitLayer.tripPatterns.size());
     }
 
     /** Get a McRAPTOR state bag for every departure minute */
@@ -228,7 +230,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     /** Perform transfers */
     private void doTransfers () {
-        BitSet stopsReachedInTransitSearch = new BitSet();
+        BitSet stopsReachedInTransitSearch = new BitSet(network.transitLayer.getStopCount());
         stopsReachedInTransitSearch.or(touchedStops);
 
         for (int stop = stopsReachedInTransitSearch.nextSetBit(0); stop >= 0; stop = stopsReachedInTransitSearch.nextSetBit(stop + 1)) {

@@ -49,6 +49,15 @@ public class StreetRouter {
 
     private Split originSplit;
 
+    /**
+     * Here is previous streetRouter in multi router search
+     * For example if we are searching for P+R we need 2 street searches
+     * First from start to all car parks and next from all the car parks to transit stops
+     * <p>
+     * Second street router has first one in previous. This is needed so the paths can be reconstructed in response
+     **/
+    public StreetRouter previous;
+
     public void setRoutingVisitor(RoutingVisitor routingVisitor) {
         this.routingVisitor = routingVisitor;
     }

@@ -46,6 +46,10 @@ public class PointToPointQuery {
     private static final int BIKE_RENTAL_DROPOFF_TIMEMS = 30*1000;
     /** Cost of dropping-off a rented bike */
     private static final int BIKE_RENTAL_DROPOFF_COST = 30;
+    /** Time to park car in P+R **/
+    private static final int CAR_PARK_DROPOFF_TIMEMS = 120*1000;
+
+    private static final int CAR_PARK_DROPOFF_COST = 120;
 
     public PointToPointQuery(TransportNetwork transportNetwork) {
         this.transportNetwork = transportNetwork;
@@ -82,37 +86,62 @@ public class PointToPointQuery {
         for(LegMode mode: modes) {
             long initialStopStartTime = System.currentTimeMillis();
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
-            if (currentlyUnsupportedModes.contains(mode)) {
+            if (mode == LegMode.CAR_PARK && !transit) {
+                LOG.warn("Can't search for P+R without transit");
                 continue;
             }
-            //TODO: add support for bike sharing and park and ri
-            streetRouter.mode = Mode.valueOf(mode.toString());
+            if (mode == LegMode.CAR_PARK) {
+                streetRouter.mode = Mode.CAR;
+            } else {
+                //TODO: add support for bike sharing and park and ride
+                streetRouter.mode = Mode.valueOf(mode.toString());
+            }
             streetRouter.profileRequest = request;
             // TODO add time and distance limits to routing, not just weight.
             // TODO apply walk and bike speeds and maxBike time.
             streetRouter.distanceLimitMeters = transit ? 2000 : 100_000; // FIXME arbitrary, and account for bike or car access mode
+            if (mode == LegMode.CAR_PARK) {
+                streetRouter.distanceLimitMeters = 15_000;
+            }
             if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
                 streetRouter.route();
-                if (transit) {
-                    //TIntIntMap stops = streetRouter.getReachedStops();
-                    //reachedTransitStops.putAll(stops);
-                    //LOG.info("Added {} stops for mode {}",stops.size(), mode);
-                    accessRouter.put(mode, streetRouter);
+                if (mode == LegMode.CAR_PARK) {
+                    TIntObjectMap<StreetRouter.State> carParks = streetRouter.getReachedVertices(
+                        VertexStore.VertexFlag.PARK_AND_RIDE);
+                    LOG.info("CAR PARK: Found {} car parks", carParks.size());
+                    StreetRouter walking = new StreetRouter(transportNetwork.streetLayer);
+                    walking.mode = Mode.WALK;
+                    walking.profileRequest = request;
+                    walking.distanceLimitMeters = 2_000+streetRouter.distanceLimitMeters;
+                    walking.setOrigin(carParks, CAR_PARK_DROPOFF_TIMEMS, CAR_PARK_DROPOFF_COST);
+                    walking.route();
+                    walking.previous = streetRouter;
+                    accessRouter.put(LegMode.CAR_PARK, walking);
                     ts.initialStopSearch += (int) (System.currentTimeMillis() - initialStopStartTime);
 
-                    //TODO: we need to save street paths from start to all the stops somehow
-                }
-                StreetRouter.State lastState = streetRouter.getState(split);
-                if (lastState != null) {
-                    StreetPath streetPath = new StreetPath(lastState, transportNetwork);
-                    StreetSegment streetSegment = new StreetSegment(streetPath, mode, transportNetwork.streetLayer);
-                    //TODO: this needs to be different if transit is requested
+                } else {
                     if (transit) {
-                        //addAccess
-                    } else {
-                        option.addDirect(streetSegment, request.getFromTimeDateZD());
-                    }
+                        //TIntIntMap stops = streetRouter.getReachedStops();
+                        //reachedTransitStops.putAll(stops);
+                        //LOG.info("Added {} stops for mode {}",stops.size(), mode);
+                        accessRouter.put(mode, streetRouter);
+                        ts.initialStopSearch += (int) (System.currentTimeMillis() - initialStopStartTime);
 
+                        //TODO: we need to save street paths from start to all the stops somehow
+                    }
+                    StreetRouter.State lastState = streetRouter.getState(split);
+                    if (lastState != null) {
+                        StreetPath streetPath = new StreetPath(lastState, transportNetwork);
+                        StreetSegment streetSegment = new StreetSegment(streetPath, mode,
+                            transportNetwork.streetLayer);
+                        //TODO: this needs to be different if transit is requested
+                        if (transit) {
+                            //addAccess
+                        } else {
+                            option.addDirect(streetSegment, request.getFromTimeDateZD());
+                        }
+
+                    }
                 }
             } else {
                 LOG.warn("MODE:{}, Edge near the origin coordinate wasn't found. Routing didn't start!", mode);
@@ -371,6 +400,8 @@ public class PointToPointQuery {
                     maxTime = request.maxWalkTime;
                     break;
                 case CAR:
+                    //TODO this is not strictly correct, CAR PARK is partly walking
+                case CAR_PARK:
                     maxTime = request.maxCarTime;
                     minTime = request.minCarTime;
                     break;

@@ -216,6 +216,7 @@ public class StreetLayer implements Serializable {
 
         LOG.info("Done making street edges.");
         LOG.info("Made {} vertices and {} edges.", vertexStore.nVertices, edgeStore.nEdges);
+        LOG.info("Found {} P+R node candidates", parkAndRideNodes.size());
 
         // need edge lists to apply intersection costs
         buildEdgeLists();
@@ -229,6 +230,16 @@ public class StreetLayer implements Serializable {
 
         buildParkAndRideAreas(parkAndRideWays);
         buildParkAndRideNodes(parkAndRideNodes);
+
+        VertexStore.Vertex vertex = vertexStore.getCursor();
+        long numOfParkAndRides = 0;
+        while (vertex.advance()) {
+            if (vertex.getFlag(VertexStore.VertexFlag.PARK_AND_RIDE)) {
+                numOfParkAndRides++;
+            }
+        }
+        LOG.info("Made {} P+R vertices", numOfParkAndRides);
+
 
         //edgesPerWayHistogram.display();
         //pointsPerEdgeHistogram.display();

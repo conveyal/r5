@@ -88,8 +88,12 @@ public class StreetEdgeInfo {
      * - mode
      * - bikeRentalOnStation
      * - bikeRentalOffStation
-     * - both have stayOn true
-     * - both have relativeDirection as CONTINUE
+     * - (both have stayOn true AND both have relativeDirection as CONTINUE
+     * - OR both have CIRCLE_CLOCKWISE or CIRCLE_COUNTERCLOCKWISE)
+     *
+     * Joining of streetEdges with different relative directions in roundabouts is needed
+     * since only the first relativeDirection is correct in roundabout.
+     *
      *
      * This is used to find out which two consecutive StreetEdges to join together
      * to show as one step in Turn by turn directions
@@ -99,12 +103,16 @@ public class StreetEdgeInfo {
      * @return true if similar
      */
     boolean similarTo(StreetEdgeInfo streetEdgeInfo) {
-        return mode.equals(streetEdgeInfo.mode) &&
-            relativeDirection == RelativeDirection.CONTINUE
-            && streetEdgeInfo.relativeDirection == RelativeDirection.CONTINUE
-            && stayOn && streetEdgeInfo.stayOn
+        boolean bothSimilar = mode.equals(streetEdgeInfo.mode)
             && bikeRentalOnStation == streetEdgeInfo.bikeRentalOnStation
             && bikeRentalOffStation == streetEdgeInfo.bikeRentalOffStation;
+        boolean normalSimilar = relativeDirection == RelativeDirection.CONTINUE
+            && streetEdgeInfo.relativeDirection == RelativeDirection.CONTINUE;
+        boolean roundaboutSimilar = (relativeDirection == RelativeDirection.CIRCLE_CLOCKWISE || relativeDirection == RelativeDirection.CIRCLE_COUNTERCLOCKWISE)
+            && (streetEdgeInfo.relativeDirection == RelativeDirection.CIRCLE_CLOCKWISE || streetEdgeInfo.relativeDirection == RelativeDirection.CIRCLE_COUNTERCLOCKWISE);
+        return bothSimilar && ((normalSimilar && stayOn && streetEdgeInfo.stayOn) || roundaboutSimilar);
+
+
     }
 
     /**

@@ -61,17 +61,19 @@ public class StreetSegmentTest {
 
 
     }
-    @Ignore("Roundabout currently gets both CLOCKWISE and COUNTERCLOCKWISE relative directions so test Fails")
+
     @Test
     public void testRoundabout() throws Exception {
         StreetSegment streetSegment = loadFile("streetSegmentCAR_ROUNDABOUT.json");
-        for (StreetEdgeInfo streetEdgeInfo: streetSegment.streetEdges) {
+        /*for (StreetEdgeInfo streetEdgeInfo: streetSegment.streetEdges) {
             LOG.info(streetEdgeInfo.toString());
-        }
-
+        }*/
         Assert.assertEquals(RelativeDirection.CIRCLE_COUNTERCLOCKWISE, streetSegment.streetEdges.get(2).relativeDirection);
-        Assert.assertEquals(RelativeDirection.CIRCLE_COUNTERCLOCKWISE, streetSegment.streetEdges.get(3).relativeDirection);
-        Assert.assertEquals(RelativeDirection.CIRCLE_COUNTERCLOCKWISE, streetSegment.streetEdges.get(4).relativeDirection);
+        Assert.assertEquals(RelativeDirection.CIRCLE_CLOCKWISE, streetSegment.streetEdges.get(3).relativeDirection);
+        Assert.assertEquals(RelativeDirection.CIRCLE_CLOCKWISE, streetSegment.streetEdges.get(4).relativeDirection);
+        streetSegment.compactEdges();
+        Assert.assertEquals(RelativeDirection.CIRCLE_COUNTERCLOCKWISE, streetSegment.streetEdges.get(2).relativeDirection);
+        Assert.assertEquals(RelativeDirection.RIGHT, streetSegment.streetEdges.get(3).relativeDirection);
     }
 
     @Ignore("Roundabout exit numbers and compactness isn't supported yet")
@@ -86,6 +88,17 @@ public class StreetSegmentTest {
         Assert.assertEquals(RelativeDirection.CIRCLE_COUNTERCLOCKWISE, streetSegment.streetEdges.get(2).relativeDirection);
         Assert.assertEquals("3", streetSegment.streetEdges.get(2).exit);
         Assert.assertEquals(RelativeDirection.RIGHT, streetSegment.streetEdges.get(3).relativeDirection);
+    }
+
+    @Test
+    public void testSimilarTo() throws Exception {
+        StreetSegment streetSegment = loadFile("streetSegmentCAR_ROUNDABOUT.json");
+
+        Assert.assertFalse(streetSegment.streetEdges.get(0).similarTo(streetSegment.streetEdges.get(1)));
+        Assert.assertFalse(streetSegment.streetEdges.get(1).similarTo(streetSegment.streetEdges.get(2)));
+        Assert.assertTrue(streetSegment.streetEdges.get(2).similarTo(streetSegment.streetEdges.get(3)));
+        Assert.assertTrue(streetSegment.streetEdges.get(3).similarTo(streetSegment.streetEdges.get(4)));
+
     }
 }
 

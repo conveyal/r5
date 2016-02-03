@@ -87,6 +87,7 @@ public class ProfileResponse {
          but if we choose bicycle we are on time?
 
 
+        TODO: update this so that each stopIndex and mode pair is changed to streetpath only once
           */
         accessRouter.forEach((mode, streetRouter) -> {
             int accessPathIndex = profileOption.getAccessIndex(mode, startVertexStopIndex);

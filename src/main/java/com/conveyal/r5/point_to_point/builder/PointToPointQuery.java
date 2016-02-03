@@ -11,6 +11,7 @@ import com.conveyal.r5.publish.StaticPropagatedTimesStore;
 import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetRouter;
+import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
@@ -89,13 +90,13 @@ public class PointToPointQuery {
             streetRouter.profileRequest = request;
             // TODO add time and distance limits to routing, not just weight.
             // TODO apply walk and bike speeds and maxBike time.
-            streetRouter.distanceLimitMeters = transit ? 200 : 100_000; // FIXME arbitrary, and account for bike or car access mode
+            streetRouter.distanceLimitMeters = transit ? 2000 : 100_000; // FIXME arbitrary, and account for bike or car access mode
             if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
                 streetRouter.route();
                 if (transit) {
-                    TIntIntMap stops = streetRouter.getReachedStops();
-                    reachedTransitStops.putAll(stops);
-                    LOG.info("Added {} stops for mode {}",stops.size(), mode);
+                    //TIntIntMap stops = streetRouter.getReachedStops();
+                    //reachedTransitStops.putAll(stops);
+                    //LOG.info("Added {} stops for mode {}",stops.size(), mode);
                     accessRouter.put(mode, streetRouter);
                     ts.initialStopSearch += (int) (System.currentTimeMillis() - initialStopStartTime);
 
@@ -146,7 +147,7 @@ public class PointToPointQuery {
                     streetRouter.route();
                     if (mode == LegMode.BICYCLE_RENT) {
                         //This finds all the nearest bicycle rent stations when walking
-                        TIntObjectMap<StreetRouter.State> bikeStations = streetRouter.getReachedBikeShares();
+                        TIntObjectMap<StreetRouter.State> bikeStations = streetRouter.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
                         LOG.info("BIKE RENT: Found {} bike stations", bikeStations.size());
                         /*LOG.info("Start to bike share:");
                         bikeStations.forEachEntry((idx, weight) -> {
@@ -161,7 +162,7 @@ public class PointToPointQuery {
                         bicycle.distanceLimitMeters = 100_000;
                         bicycle.setOrigin(bikeStations, BIKE_RENTAL_PICKUP_TIMEMS, BIKE_RENTAL_PICKUP_COST);
                         bicycle.route();
-                        TIntObjectMap<StreetRouter.State> cycledStations = bicycle.getReachedBikeShares();
+                        TIntObjectMap<StreetRouter.State> cycledStations = bicycle.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
                         LOG.info("BIKE RENT: Found {} cycled stations", cycledStations.size());
                         /*LOG.info("Bike share to bike share:");
                         cycledStations.forEachEntry((idx, weight) -> {
@@ -239,7 +240,7 @@ public class PointToPointQuery {
                 streetRouter.profileRequest = request;
                 // TODO add time and distance limits to routing, not just weight.
                 // TODO apply walk and bike speeds and maxBike time.
-                streetRouter.distanceLimitMeters =  200; // FIXME arbitrary, and account for bike or car access mode
+                streetRouter.distanceLimitMeters =  2000; // FIXME arbitrary, and account for bike or car access mode
                 if(streetRouter.setOrigin(request.toLat, request.toLon)) {
                     streetRouter.route();
                     TIntIntMap stops = streetRouter.getReachedStops();
@@ -254,91 +255,18 @@ public class PointToPointQuery {
 
             option.summary = option.generateSummary();
             profileResponse.addOption(option);
-            RaptorWorker worker = new RaptorWorker(transportNetwork.transitLayer, null, request);
-            StaticPropagatedTimesStore pts = (StaticPropagatedTimesStore) worker.runRaptor(reachedTransitStops, null, ts);
-            ts.targetsReached = pts.countTargetsReached();
-            //FIXME: do we need to use all the iterations?
-            int iterations = pts.times.length;
-            //TODO: use only stops which are usefull to get to destination
-            int stops = pts.times[0].length;
-            int usefull_path = 0;
-            List<Path> usefullpathList = new ArrayList<>();
 
-            //This is copied from StaticServer
-            for (int stop = 0; stop < stops; stop++) {
-                int prev = 0;
-                int prevPath = 0;
-                int maxPathIdx = 0;
+            // fold access and egress times into single maps
+            TIntIntMap accessTimes = combineMultimodalRoutingAccessTimes(accessRouter, request);
+            TIntIntMap egressTimes = combineMultimodalRoutingAccessTimes(egressRouter, request);
 
-                TObjectIntMap<Path> paths = new TObjectIntHashMap<>();
-                List<Path> pathList = new ArrayList<>();
+            McRaptorSuboptimalPathProfileRouter router = new McRaptorSuboptimalPathProfileRouter(transportNetwork, request, accessTimes, egressTimes);
+            List<PathWithTimes> usefullpathList = new ArrayList<>();
 
-                for (int iter = 0; iter < iterations; iter++) {
-                    int time = pts.times[iter][stop];
-                    if (time == Integer.MAX_VALUE) time = -1;
+            // getPaths actually returns a set, which is important so that things are deduplicated. However we need a list
+            // so we can sort it below.
+            usefullpathList.addAll(router.getPaths());
 
-                    //out.writeInt(time - prev);
-                    prev = time;
-
-                    // write out which path to use, delta coded
-                    int pathIdx = -1;
-
-                    RaptorState state = worker.statesEachIteration.get(iter);
-                    // only compute a path if this stop was reached
-                    if (state.bestNonTransferTimes[stop] != RaptorWorker.UNREACHED) {
-                        Path path = new Path(state, stop);
-                        if (!paths.containsKey(path)) {
-                            paths.put(path, maxPathIdx++);
-                            pathList.add(path);
-                        }
-
-                        pathIdx = paths.get(path);
-                    }
-
-                    //out.writeInt(pathIdx - prevPath);
-                    prevPath = pathIdx;
-                }
-
-                // write the paths
-                //out.writeInt(pathList.size());
-                //LOG.info("Paths:{}", pathList.size());
-                for (Path path : pathList) {
-                    /**
-                     * Since search finds paths from requested stops to all of the stops we need to filter the paths
-                     * This skips the paths that don't end last leg in one of destination transit stops
-                     * Multiple legs here are multiple transit transfers
-                     */
-                    int lastStop = path.alightStops[path.patterns.length-1];
-                    if (!destinationTransitStops.containsKey(lastStop)) {
-                        continue;
-                    }
-                    usefullpathList.add(path);
-                    usefull_path++;
-
-                    /*
-                    //out.writeInt(path.patterns.length);
-                    //LOG.info("Num patterns:{}", path.patterns.length);
-                    ProfileOption transit_option = new ProfileOption();
-
-                    for (int i = 0; i < path.patterns.length; i++) {
-                        TransitSegment transitSegment = new TransitSegment(transportNetwork.transitLayer, path.boardStops[i], path.alightStops[i], path.patterns[i]);
-                        //LOG.info("   BoardStop: {} pattern: {} allightStop: {}", path.boardStops[i], path.patterns[i], path.alightStops[i]);
-                        TripPattern pattern =transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]);
-                        if (pattern.routeIndex >= 0) {
-                            RouteInfo routeInfo = transportNetwork.transitLayer.routes.get(pattern.routeIndex);
-                            //LOG.info("     Pattern:{} on route:{} ({}) with {} stops", path.patterns[i],routeInfo.route_long_name, routeInfo.route_short_name,
-                            //    pattern.stops.length);
-                        }
-                        //LOG.info("     {}->{} ({}:{})", transportNetwork.transitLayer.stopNames.get(path.boardStops[i]),
-                        //    transportNetwork.transitLayer.stopNames.get(path.alightStops[i]),
-                        //    path.alightTimes[i]/3600, path.alightTimes[i]%3600/60);
-                        transit_option.addTransit(transitSegment);
-                    }
-                    transit_option.summary = transit_option.generateSummary();
-                    profileResponse.addOption(transit_option);
-                    */
-                }
-            }
             /**
              * Orders first no transfers then one transfers 2 etc
              * - then orders according to first trip:
@@ -370,7 +298,7 @@ public class PointToPointQuery {
                 }
                 return c;
             });
-            LOG.info("Usefull paths:{}", usefull_path);
+            LOG.info("Usefull paths:{}", usefullpathList.size());
             int seen_paths = 0;
             int boardStop =-1, alightStop = -1;
             for (Path path : usefullpathList) {
@@ -422,5 +350,49 @@ public class PointToPointQuery {
         LOG.info("Returned {} options", profileResponse.getOptions().size());
 
         return profileResponse;
+    }
+
+    /** Combine the results of several street searches using different modes into a single map */
+    private TIntIntMap combineMultimodalRoutingAccessTimes(Map<LegMode, StreetRouter> routers, ProfileRequest request) {
+        TIntIntMap ret = new TIntIntHashMap();
+
+        for (Map.Entry<LegMode, StreetRouter> entry : routers.entrySet()) {
+            int maxTime = 30;
+            int minTime = 0;
+            LegMode mode = entry.getKey();
+            switch (mode) {
+                case BICYCLE:
+                // TODO this is not strictly correct, bike rent is partly walking
+                case BICYCLE_RENT:
+                    maxTime = request.maxBikeTime;
+                    minTime = request.minBikeTime;
+                    break;
+                case WALK:
+                    maxTime = request.maxWalkTime;
+                    break;
+                case CAR:
+                    maxTime = request.maxCarTime;
+                    minTime = request.minCarTime;
+                    break;
+            }
+
+            maxTime *= 60; // convert to seconds
+            minTime *= 60; // convert to seconds
+
+            final int maxTimeFinal = maxTime;
+            final int minTimeFinal = minTime;
+
+            StreetRouter router = entry.getValue();
+            router.getReachedStops().forEachEntry((stop, time) -> {
+                if (time > maxTimeFinal || time < minTimeFinal) return true;
+
+                if (!ret.containsKey(stop) || ret.get(stop) > time) {
+                    ret.put(stop, time);
+                }
+                return true; // iteration should continue
+            });
+        }
+
+        return ret;
     }
 }

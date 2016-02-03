@@ -78,6 +78,8 @@ public class EdgeStore implements Serializable {
     public static final transient EnumSet<EdgeFlag> PERMISSION_FLAGS = EnumSet
         .of(EdgeFlag.ALLOWS_PEDESTRIAN, EdgeFlag.ALLOWS_BIKE, EdgeFlag.ALLOWS_CAR);
 
+    private long generatedOSMID = 1;
+
     public EdgeStore (VertexStore vertexStore, int initialSize) {
         this.vertexStore = vertexStore;
         // There is one flags and speeds entry per edge.
@@ -145,7 +147,8 @@ public class EdgeStore implements Serializable {
         NO_THRU_TRAFFIC_BIKE (11),
         NO_THRU_TRAFFIC_CAR (12),
         SLOPE_OVERRIDE (13),
-        TRANSIT_LINK (14), // This edge is a one-way connection from a street to a transit stop. Target is a transit stop index, not an intersection index.
+        /** Link edge, two should not be traversed one-after-another */
+        LINK (14),
 
         // Permissions
         ALLOWS_PEDESTRIAN (15),
@@ -212,6 +215,12 @@ public class EdgeStore implements Serializable {
      * @return a cursor pointing to the forward edge in the pair, which always has an even index.
      */
     public Edge addStreetPair(int beginVertexIndex, int endVertexIndex, int edgeLengthMillimeters, long osmID) {
+        //If osmID is smaller then 0 this means it is from generated edge
+        //Edge IDs of edges not in OSM database have OSMIDS smaller then 0 by custom
+        if (osmID < 0) {
+            osmID = -generatedOSMID;
+            generatedOSMID++;
+        }
 
         // Store only one length, set of endpoints, and intermediate geometry per pair of edges.
         lengths_mm.add(edgeLengthMillimeters);
@@ -425,6 +434,10 @@ public class EdgeStore implements Serializable {
             float speedms = calculateSpeed(req, mode, s0.getTime());
             float time = (float) (getLengthM() / speedms);
             float weight = 0;
+
+            if (s0.backEdge != -1 && getFlag(EdgeFlag.LINK) && getCursor(s0.backEdge).getFlag(EdgeFlag.LINK))
+                // two link edges in a row, in other words a shortcut. Disallow this.
+                return null;
 
             //Currently weigh is basically the same as weight. It differs only on stairs and when walking.
 

@@ -24,6 +24,13 @@ public class TripPattern implements Serializable, Cloneable {
 
     private static Logger LOG = LoggerFactory.getLogger(TripPattern.class);
 
+    /**
+     * This is the ID of this trip pattern _in the original transport network_. This is important because if it were the
+     * ID in this transport network the ID would depend on the order of application of scenarios, and because this ID is
+     * used to map results back to the original network.
+     */
+    public int originalId;
+
     public String routeId;
     public int directionId = Integer.MIN_VALUE;
     public int[] stops;

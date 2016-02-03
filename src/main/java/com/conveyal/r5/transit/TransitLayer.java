@@ -2,12 +2,8 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.*;
-import com.conveyal.r5.analyst.scenario.Modification;
-import com.conveyal.r5.analyst.scenario.RemoveTrip;
-import com.conveyal.r5.analyst.scenario.Scenario;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -26,7 +22,6 @@ import java.time.DateTimeException;
 import java.time.ZoneId;
 import java.time.zone.ZoneRulesException;
 import java.util.*;
-import java.util.stream.Collectors;
 
 
 /**
@@ -154,11 +149,21 @@ public class TransitLayer implements Serializable, Cloneable {
             TripPatternKey tripPatternKey = new TripPatternKey(trip.route.route_id);
             TIntList arrivals = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
             TIntList departures = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
+
+            int nStops = 0;
+
             for (StopTime st : gtfs.getOrderedStopTimesForTrip(tripId)) {
                 tripPatternKey.addStopTime(st, indexForStopId);
                 arrivals.add(st.arrival_time);
                 departures.add(st.departure_time);
+                nStops++;
             }
+
+            if (nStops == 0) {
+                LOG.warn("Trip {} on route {} has no stops, it will not be used", trip.trip_id, trip.route.route_id);
+                continue;
+            }
+
             TripPattern tripPattern = tripPatternForStopSequence.get(tripPatternKey);
             if (tripPattern == null) {
                 tripPattern = new TripPattern(tripPatternKey);
@@ -177,6 +182,7 @@ public class TransitLayer implements Serializable, Cloneable {
                 }
 
                 tripPatternForStopSequence.put(tripPatternKey, tripPattern);
+                tripPattern.originalId = tripPatterns.size();
                 tripPatterns.add(tripPattern);
             }
             tripPattern.setOrVerifyDirection(trip.direction_id);

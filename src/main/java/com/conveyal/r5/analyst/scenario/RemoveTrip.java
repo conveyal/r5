@@ -2,8 +2,7 @@ package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
-
-import java.util.Objects;
+import gnu.trove.set.TIntSet;
 
 /**
  * Remove trips from a scenario.
@@ -13,6 +12,8 @@ public class RemoveTrip extends TripScheduleModification {
 
     public static final long serialVersionUID = 1L;
 
+    public TIntSet patternIds;
+
     @Override
     public String getType() {
         return "remove-trip";
@@ -20,6 +21,9 @@ public class RemoveTrip extends TripScheduleModification {
 
     @Override
     public TripPattern applyToTripPattern(TripPattern originalTripPattern) {
+        if (patternIds != null && patternIds.contains(originalTripPattern.originalId))
+            return null;
+
         // Check first whether it's even possible that this Modification will apply to any trips on this pattern
         if (!couldMatch(originalTripPattern)) {
             return originalTripPattern;
@@ -31,6 +35,7 @@ public class RemoveTrip extends TripScheduleModification {
                 return null;
             }
         }
+
         // Actually apply the Modification to each TripSchedule within this TripPattern individually.
         return super.applyToTripPattern(originalTripPattern);
     }

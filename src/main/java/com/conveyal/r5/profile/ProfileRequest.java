@@ -58,7 +58,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     public float  carSpeed;
 
     /** Maximum time to reach the destination without using transit */
-    public int    streetTime;
+    public int    streetTime = 60;
     
     /**
      * Maximum walk time before and after using transit, in minutes
@@ -77,19 +77,19 @@ public class ProfileRequest implements Serializable, Cloneable {
      * This is solved by using separate walk budgets at the origin and destination. It could also be solved (although this
      * would slow the algorithm down) by retaining all Pareto-optimal combinations of (travel time, walk distance).
      */
-    public int    maxWalkTime;
+    public int    maxWalkTime = 30;
     
     /** Maximum bike time when using transit */
-    public int    maxBikeTime;
+    public int    maxBikeTime = 30;
     
     /** Maximum car time before when using transit */ 
-    public int    maxCarTime;
+    public int    maxCarTime = 30;
     
     /** Minimum time to ride a bike (to prevent extremely short bike legs) */
-    public int    minBikeTime;
+    public int    minBikeTime = 5;
     
     /** Minimum time to drive (to prevent extremely short driving legs) */
-    public int    minCarTime;
+    public int    minCarTime = 5;
 
     /** The date of the search */
     public LocalDate date;
@@ -170,7 +170,7 @@ public class ProfileRequest implements Serializable, Cloneable {
       eliminated by an alternative that is only marginally better. We want to effectively push the max travel time of
       alternatives out a bit to account for the fact that they don't always run on schedule.
     */
-    public int suboptimalMinutes;
+    public int suboptimalMinutes = 5;
 
     /** A non-destructive scenario to apply when executing this request */
     public Scenario scenario;
@@ -179,8 +179,13 @@ public class ProfileRequest implements Serializable, Cloneable {
     @JsonDeserialize(using=ZoneIdDeserializer.class)
     public ZoneId zoneId = ZoneOffset.UTC;
 
-    public ProfileRequest clone () throws CloneNotSupportedException {
-        return (ProfileRequest) super.clone();
+    public ProfileRequest clone () {
+        try {
+            return (ProfileRequest) super.clone();
+        } catch (CloneNotSupportedException e) {
+            // checked clonenotsupportedexception is about the stupidest thing in java
+            throw new RuntimeException(e);
+        }
     }
 
     /**

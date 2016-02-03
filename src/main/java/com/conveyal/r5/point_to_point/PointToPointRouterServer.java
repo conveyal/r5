@@ -232,7 +232,7 @@ public class PointToPointRouterServer {
             streetRouter.distanceLimitMeters = 2000;
             if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
                 streetRouter.route();
-                streetRouter.getReachedBikeShares().forEachEntry((vertexIdx, state) -> {
+                streetRouter.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING).forEachEntry((vertexIdx, state) -> {
                     VertexStore.Vertex bikeShareVertex = transportNetwork.streetLayer.vertexStore.getCursor(vertexIdx);
                     BikeRentalStation bikeRentalStation = transportNetwork.streetLayer.bikeRentalStationMap.get(vertexIdx);
                     GeoJsonFeature feature = new GeoJsonFeature(bikeShareVertex.getLon(), bikeShareVertex.getLat());

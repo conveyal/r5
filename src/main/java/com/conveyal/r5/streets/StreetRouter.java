@@ -91,13 +91,13 @@ public class StreetRouter {
     }
 
     /**
-     * @return a map where all the keys are vertex indexes of bike shares and values are states.
+     * @return a map where all the keys are vertex indexes with the particular flag and all the values are states.
      */
-    public TIntObjectMap<State> getReachedBikeShares() {
-        TIntObjectHashMap<State> result = new TIntObjectHashMap<>();
+    public TIntObjectMap<State> getReachedVertices (VertexStore.VertexFlag flag) {
+        TIntObjectMap<State> result = new TIntObjectHashMap<>();
         bestStates.forEachEntry((vertexIndex, state) -> {
             VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor(vertexIndex);
-            if (vertex.getFlag(VertexStore.VertexFlag.BIKE_SHARING)) {
+            if (vertex.getFlag(flag)) {
                 result.put(vertexIndex, state);
             }
             return true;
@@ -161,7 +161,7 @@ public class StreetRouter {
      * Adds multiple origins.
      *
      * Each bike Station is one origin. Weight is copied from state.
-     * @param bikeStations map of bikeStation vertexIndexes and states Return of {@link #getReachedBikeShares()}
+     * @param bikeStations map of bikeStation vertexIndexes and states Return of {@link #getReachedVertices(VertexStore.VertexFlag)}}
      * @param switchTime How many ms is added to state time (this is used when switching modes, renting bike, parking a car etc.)
      * @param switchCost This is added to the weight and is a cost of switching modes
      */

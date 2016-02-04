@@ -289,9 +289,10 @@ public class PointToPointQuery {
                     continue;
                 }*/
 
-                if (seen_paths > 20) {
+                /*if (seen_paths > 20) {
                     break;
-                }
+                }*/
+                
                 LOG.info(" ");
                 for (int i = 0; i < path.patterns.length; i++) {
                     //TransitSegment transitSegment = new TransitSegment(transportNetwork.transitLayer, path.boardStops[i], path.alightStops[i], path.patterns[i]);

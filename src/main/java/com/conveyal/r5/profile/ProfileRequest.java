@@ -6,10 +6,12 @@ import com.conveyal.r5.analyst.scenario.Scenario;
 import java.time.*;
 
 import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.api.util.SearchType;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.model.json_serialization.*;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import graphql.GraphQLException;
 import graphql.schema.DataFetchingEnvironment;
 
 import java.io.Serializable;
@@ -183,6 +185,11 @@ public class ProfileRequest implements Serializable, Cloneable {
     @JsonDeserialize(using=ZoneIdDeserializer.class)
     public ZoneId zoneId = ZoneOffset.UTC;
 
+    //If routing with wheelchair is needed
+    private boolean wheelchair;
+
+    private SearchType searchType;
+
     public ProfileRequest clone () {
         try {
             return (ProfileRequest) super.clone();
@@ -262,6 +269,8 @@ public class ProfileRequest implements Serializable, Cloneable {
         ProfileRequest profileRequest = new ProfileRequest();
         profileRequest.zoneId = timezone;
 
+        String operation = environment.getFields().get(0).getName();
+
         //This is always set otherwise GraphQL validation fails
         HashMap<String, Float> fromCoordinate = environment.getArgument("from");
         HashMap<String, Float> toCoordinate = environment.getArgument("to");
@@ -271,6 +280,35 @@ public class ProfileRequest implements Serializable, Cloneable {
         profileRequest.fromZonedDateTime = environment.getArgument("fromTime");
         profileRequest.toZonedDateTime = environment.getArgument("toTime");
         profileRequest.setTime();
+
+        profileRequest.wheelchair = environment.getArgument("wheelchair");
+        if (operation.equals("plan")) {
+            profileRequest.searchType = environment.getArgument("searchType");
+        }
+        //FIXME: if any of those three values is integer not float it gets converted to java integer instead of Double (So why did we even specify type)?
+        // this is needed since walkSpeed/bikeSpeed/carSpeed are GraphQLFloats which are converted to java Doubles
+        double walkSpeed = environment.getArgument("walkSpeed");
+        profileRequest.walkSpeed = (float) walkSpeed;
+        double bikeSpeed = environment.getArgument("bikeSpeed");
+        profileRequest.bikeSpeed = (float) bikeSpeed;
+        double carSpeed = environment.getArgument("carSpeed");
+        profileRequest.carSpeed = (float) carSpeed;
+        profileRequest.streetTime = environment.getArgument("streetTime");
+        profileRequest.maxWalkTime = environment.getArgument("maxWalkTime");
+        profileRequest.maxBikeTime = environment.getArgument("maxBikeTime");
+        profileRequest.maxCarTime = environment.getArgument("maxCarTime");
+        profileRequest.minBikeTime = environment.getArgument("minBikeTime");
+        profileRequest.minCarTime = environment.getArgument("minCarTime");
+        profileRequest.limit = environment.getArgument("limit");
+
+        profileRequest.suboptimalMinutes = environment.getArgument("suboptimalMinutes");
+        profileRequest.bikeTrafficStress = environment.getArgument("bikeTrafficStress");
+        //Bike traffic stress needs to be between 1 and 4
+        if (profileRequest.bikeTrafficStress > 4) {
+            profileRequest.bikeTrafficStress = 4;
+        } else if (profileRequest.bikeTrafficStress < 1) {
+            profileRequest.bikeTrafficStress = 1;
+        }
 
 
         profileRequest.fromLon = fromCoordinate.get("lon");

@@ -485,6 +485,39 @@ public class McRaptorSuboptimalPathProfileRouter {
             if (bestTime != Integer.MAX_VALUE && bestTime + suboptimalSeconds < state.time)
                 return false;
 
+            // apply strict dominance if there is a state at the previous round on the same previous pattern arriving at this
+            // stop (prevents reboarding/hopping between routes on common trunks)
+            // For example, consider the red line in DC, which runs from Shady Grove to Glenmont. At rush hour, every other
+            // train is a short-turn pattern running from Grosvenor to Silver Spring. While these are clearly separate
+            // patterns, there's never a reason to get off the Silver Spring train and get on the Glenmont train, unless
+            // you want to go past Silver Spring. These trains are running every two minutes, so you can jump between them
+            // a few times before the suboptimal dominance will cut off the search.
+
+            // We don't just want to cut off switching to another vehicle on the same route direction; consider the Rush+
+            // yellow line in DC. One pattern runs from Fort Totten to Huntington, while the other runs from Greenbelt
+            // to Franconia-Springfield. Suppose you wanted to go from Greenbelt to Huntington. It would make complete sense
+            // to transfer from one yellow line train to another.
+
+            // We also don't want to cut off switching between vehicles on common trunks. Consider the L2 and the Red Line
+            // in DC, which both serve Connecticut Ave between Van Ness-UDC and Farragut Square. The Red Line is much faster
+            // so it makes sense to transfer to it if you get on the L2 somewhere outside the common trunk.
+
+            // In this particular case, the L2 and the red line don't serve the same stops; however, this is still important.
+            // Suppose you wanted to get on the circulator, which meets the red line and L2 at Woodley Park. It could make
+            // sense to take L2 -> Red -> Circulator, even though the L2 would have taken you all the way. That's why we
+            // apply strict dominance, rather than just forbidding this situation.
+
+            // We only look back one pattern; the reason for this is that we want to avoid a lot of looping in a function
+            // that gets called a lot, and it seems unlikely that there would be time to take two other patterns and still
+            // slip into the window of suboptimality. I haven't tested it though to see its effect on response times.
+            if (state.pattern != -1 && state.patterns.length > 1) {
+                for (McRaptorState s : list) {
+                    if (s.round == state.round - 1 && s.pattern == state.patterns[s.round - 1] && s.time <= state.time) {
+                        return false;
+                    }
+                }
+            }
+
             if (state.time < bestTime) bestTime = state.time;
 
             // don't forget this

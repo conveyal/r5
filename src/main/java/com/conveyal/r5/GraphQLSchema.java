@@ -1,6 +1,5 @@
 package com.conveyal.r5;
 
-import com.conveyal.r5.api.ProfileResponse;
 import com.conveyal.r5.api.util.*;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.model.json_serialization.PolyUtil;
@@ -14,7 +13,6 @@ import graphql.schema.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.text.ParseException;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -1109,15 +1107,15 @@ public class GraphQLSchema {
                 .build())
             .argument(GraphQLArgument.newArgument()
                 .name("fromTime")
-                .type(Scalars.GraphQLInt)
-                .description("The beginning of the departure window, in seconds since midnight.")
-                .defaultValue(27000) //7:30
+                .type(GraphQLZonedDateTime)
+                .description("The beginning of the departure window, in ISO 8061 YYYY-MM-DDTHH:MM:SS+HH:MM")
+                //.defaultValue("7:30")
                 .build())
             .argument(GraphQLArgument.newArgument()
                 .name("toTime")
-                .type(Scalars.GraphQLInt)
-                .description("The end of the departure window, in seconds since midnight.")
-                .defaultValue(34200) //8:30
+                .type(GraphQLZonedDateTime)
+                .description("The end of the departure window, in ISO 8061 YYYY-MM-DDTHH:MM:SS+HH:MM")
+                //.defaultValue("10:30")
                 .build())
             .argument(GraphQLArgument.newArgument()
                 .name("wheelchair")
@@ -1179,12 +1177,6 @@ public class GraphQLSchema {
                 .type(Scalars.GraphQLInt)
                 .description("Minimum time to drive (to prevent extremely short driving legs)")
                 .defaultValue(5)
-                .build())
-            .argument(GraphQLArgument.newArgument()
-                .name("date")
-                .type(GraphQLLocalDate)
-                .description("The date of the search YYYY-MM-DD")
-                .defaultValue("today")
                 .build())
             .argument(GraphQLArgument.newArgument()
                 .name("limit")
@@ -1262,15 +1254,15 @@ public class GraphQLSchema {
                 .build())
             .argument(GraphQLArgument.newArgument()
                 .name("fromTime")
-                .type(Scalars.GraphQLString)
-                .description("The beginning of the departure window, in HH:MM")
-                .defaultValue("07:30")
+                .type(GraphQLZonedDateTime)
+                .description("The beginning of the departure window, in ISO 8061 YYYY-MM-DDTHH:MM:SS+HH:MM")
+                //.defaultValue("7:30")
                 .build())
             .argument(GraphQLArgument.newArgument()
                 .name("toTime")
-                .type(Scalars.GraphQLString)
-                .description("The end of the departure window, in HH:MM")
-                .defaultValue("10:30")
+                .type(GraphQLZonedDateTime)
+                .description("The end of the departure window, in ISO 8061 YYYY-MM-DDTHH:MM:SS+HH:MM")
+                //.defaultValue("10:30")
                 .build())
             .argument(GraphQLArgument.newArgument()
                 .name("wheelchair")
@@ -1340,12 +1332,6 @@ public class GraphQLSchema {
                 .defaultValue(5)
                 .build())
             .argument(GraphQLArgument.newArgument()
-                .name("date")
-                .type(GraphQLLocalDate)
-                .description("The date of the search YYYY-MM-DD")
-                .defaultValue(LocalDate.now()) //TODO: when is defaultValue evaluated?
-                .build())
-            .argument(GraphQLArgument.newArgument()
                 .name("limit")
                 .type(Scalars.GraphQLInt)
                 .description("the maximum number of options presented PER ACCESS MODE")
@@ -1409,7 +1395,7 @@ public class GraphQLSchema {
                 .type(Scalars.GraphQLInt)
                 .build())
             .dataFetcher(environment -> {
-                 return profileResponse.getPlan(ProfileRequest.fromEnvironment(environment));
+                 return profileResponse.getPlan(ProfileRequest.fromEnvironment(environment, profileResponse.getTimezone()));
             })
             .build();
 

@@ -8,14 +8,11 @@ import java.time.*;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.model.json_serialization.*;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import graphql.schema.DataFetchingEnvironment;
 
 import java.io.Serializable;
-import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -26,6 +23,13 @@ import java.util.HashMap;
  */
 public class ProfileRequest implements Serializable, Cloneable {
     private static final long serialVersionUID = -6501962907644662303L;
+
+    //From and to zonedDateTime filled in GraphQL request
+    //Based on those two variables and timezone from/totime and date is filled
+    //Since from/to time and date is assumed to be in local timezone AKA same timezone as TransportNetwork
+    private ZonedDateTime fromZonedDateTime;
+
+    private ZonedDateTime toZonedDateTime;
 
     /** The latitude of the origin. */
     public double fromLat;
@@ -250,24 +254,23 @@ public class ProfileRequest implements Serializable, Cloneable {
     /**
      * Sets profile request with parameters from GraphQL request
      * @param environment
+     * @param timezone transportNetwork timezone
      * @return
      */
-    public static ProfileRequest fromEnvironment(DataFetchingEnvironment environment) {
+    public static ProfileRequest fromEnvironment(DataFetchingEnvironment environment,
+        ZoneId timezone) {
         ProfileRequest profileRequest = new ProfileRequest();
+        profileRequest.zoneId = timezone;
 
         //This is always set otherwise GraphQL validation fails
         HashMap<String, Float> fromCoordinate = environment.getArgument("from");
         HashMap<String, Float> toCoordinate = environment.getArgument("to");
 
-        LocalTime fromLocalTime = LocalTime.parse(environment.getArgument("fromTime"),
-            DateTimeFormatter.ISO_TIME);
-
-        LocalTime toLocalTime = LocalTime.parse(environment.getArgument("toTime"),
-            DateTimeFormatter.ISO_TIME);
-
-        profileRequest.fromTime = fromLocalTime.getHour()*3600+fromLocalTime.getMinute()*60+fromLocalTime.getSecond();
-        profileRequest.toTime = toLocalTime.getHour()*3600+toLocalTime.getMinute()*60+toLocalTime.getSecond();
-        profileRequest.date = environment.getArgument("date");
+        //ZonedDatetime is used to fill fromTime/toTime and date
+        //we need to have a network Timezone for that so that all the times are in network own timezone
+        profileRequest.fromZonedDateTime = environment.getArgument("fromTime");
+        profileRequest.toZonedDateTime = environment.getArgument("toTime");
+        profileRequest.setTime();
 
 
         profileRequest.fromLon = fromCoordinate.get("lon");
@@ -284,5 +287,22 @@ public class ProfileRequest implements Serializable, Cloneable {
 
 
         return profileRequest;
+    }
+
+    /**
+     * Converts from/to zonedDateTime to graph timezone and fill from/totime and date
+     */
+    private void setTime() {
+        if (fromZonedDateTime != null) {
+            fromZonedDateTime = fromZonedDateTime.withZoneSameInstant(zoneId);
+            fromTime = fromZonedDateTime.getHour()*3600+fromZonedDateTime.getMinute()*60+fromZonedDateTime.getSecond();
+            date = fromZonedDateTime.toLocalDate();
+        }
+        if (toZonedDateTime != null) {
+            toZonedDateTime = toZonedDateTime.withZoneSameInstant(zoneId);
+            toTime = toZonedDateTime.getHour() * 3600 + toZonedDateTime.getMinute() * 60
+                + toZonedDateTime.getSecond();
+            date = toZonedDateTime.toLocalDate();
+        }
     }
 }

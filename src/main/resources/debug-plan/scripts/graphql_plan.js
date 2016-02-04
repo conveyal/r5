@@ -4,6 +4,19 @@ var MARIBOR_COOR = [46.562483, 15.643975];
 var layer = null;
 var graphqlResponse = null;
 
+function pad(number, length){
+    var str = "" + number
+    while (str.length < length) {
+        str = '0'+str
+    }
+    return str
+}
+
+var offset = new Date().getTimezoneOffset()
+offset = ((offset<0? '+':'-')+ // Note the reversed sign!
+          pad(parseInt(Math.abs(offset/60)), 2)+":"+
+          pad(Math.abs(offset%60), 2))
+
 var PlanConfig = function() {
     this.accessModes="WALK";
     this.egressModes="WALK";
@@ -16,6 +29,7 @@ var PlanConfig = function() {
     this.fromLon = "";
     this.toLat = "";
     this.toLon = "";
+    this.offset = offset;
     this.plan = requestPlan;
     this.showReachedStops = requestStops;
 };
@@ -476,9 +490,10 @@ function requestPlan() {
                 .replace("FROMLON", planConfig.fromLon)
                 .replace("TOLAT", planConfig.toLat)
                 .replace("TOLON", planConfig.toLon)
-                .replace("DATE", planConfig.date)
+                .replace(/DATE/g, planConfig.date)
                 .replace("FROMTIME", planConfig.fromTime)
                 .replace("TOTIME", planConfig.toTime)
+		.replace(/OFFSET/g, planConfig.offset)
                 .replace("DIRECTMODES", planConfig.directModes)
                 .replace("ACCESSMODES", planConfig.accessModes)
                 .replace("EGRESSMODES", planConfig.egressModes)
@@ -554,6 +569,7 @@ $(document).ready(function() {
     gui.add(planConfig, "date");
     gui.add(planConfig, "fromTime");
     gui.add(planConfig, "toTime");
+    gui.add(planConfig, "offset");
     gui.add(planConfig, "fromLat").listen().onFinishChange(function(value) { moveMarker("from");});
     gui.add(planConfig, "fromLon").listen().onFinishChange(function(value) {moveMarker("from"); });
     gui.add(planConfig, "toLat").listen().onFinishChange(function(value) {moveMarker("to"); });

@@ -23,6 +23,7 @@ import gnu.trove.map.hash.TObjectIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.ZoneId;
 import java.util.*;
 
 /**
@@ -53,6 +54,10 @@ public class PointToPointQuery {
 
     public PointToPointQuery(TransportNetwork transportNetwork) {
         this.transportNetwork = transportNetwork;
+    }
+
+    public ZoneId getTimezone() {
+        return this.transportNetwork.getTimeZone();
     }
 
     //Does point to point routing with data from request

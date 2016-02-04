@@ -15,6 +15,9 @@ import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
+import gnu.trove.iterator.TIntIntIterator;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
@@ -31,6 +34,14 @@ import java.util.*;
 public class PointToPointQuery {
     private static final Logger LOG = LoggerFactory.getLogger(PointToPointQuery.class);
     public static final int RADIUS_METERS = 200;
+
+    /**
+     * The largest number of stops to consider boarding at. If there are 1000 stops within 2km, only consider boarding at the closest 200.
+     *
+     * It's not clear this has a major effect on speed, so we could consider removing it.
+     */
+    private static final int MAX_ACCESS_STOPS = 200;
+
     private final TransportNetwork transportNetwork;
 
     // interpretation of below parameters: if biking is less than BIKE_PENALTY seconds faster than walking, we prefer to walk
@@ -400,6 +411,30 @@ public class PointToPointQuery {
                 return true; // iteration should continue
             });
         }
+
+        // we don't want to explore a boatload of access/egress stops. Pick only the closest several hundred.
+        // What this means is that in urban environments you'll get on the bus nearby, in suburban environments
+        // you may walk/bike/drive a very long way.
+        // NB in testing it's not clear this actually does a lot for performance.
+        int stopsFound = times.size();
+        if (stopsFound > MAX_ACCESS_STOPS) {
+            TIntList timeList = new TIntArrayList();
+            times.forEachValue(timeList::add);
+
+            timeList.sort();
+
+            int cutoff = timeList.get(201);
+
+            for (TIntIntIterator it = times.iterator(); it.hasNext();) {
+                it.advance();
+
+                if (it.value() > cutoff) it.remove();
+            }
+
+            LOG.warn("{} stops found, using {} nearest", stopsFound, times.size());
+        }
+
+        LOG.info("{} stops found", stopsFound);
 
         // return the times, not the weights
         return times;

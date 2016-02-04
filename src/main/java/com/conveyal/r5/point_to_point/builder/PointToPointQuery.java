@@ -415,7 +415,7 @@ public class PointToPointQuery {
         // we don't want to explore a boatload of access/egress stops. Pick only the closest several hundred.
         // What this means is that in urban environments you'll get on the bus nearby, in suburban environments
         // you may walk/bike/drive a very long way.
-        // NB in testing it's not clear this actually does a lot for performance.
+        // NB in testing it's not clear this actually does a lot for performance, maybe 1-1.5s
         int stopsFound = times.size();
         if (stopsFound > MAX_ACCESS_STOPS) {
             TIntList timeList = new TIntArrayList();

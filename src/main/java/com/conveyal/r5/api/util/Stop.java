@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * Transit stop
  */
 public class Stop {
-    //Stop ID @notnull
+    //GTFS Stop ID @notnull
     @JsonProperty("id")
     public String stopId;
     //Stop name @notnull
@@ -18,4 +18,9 @@ public class Stop {
     //Fare zone for stop
     public String zoneId;
     public int wheelchairBoarding = 0;
+
+    public Stop(String stopId, String name) {
+        this.stopId = stopId;
+        this.name = name;
+    }
 }

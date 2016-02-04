@@ -29,13 +29,13 @@ transitModes:[TRANSITMODES]) {
     transit {
       from {
         name,
-        id,
+        stopId,
         lon,
         lat,
       },
        to {
         name,
-        id,
+        stopId,
         lon,
         lat,
       },

@@ -58,13 +58,11 @@ public class TripPattern {
         StreetLayer streetLayer = transitLayer.linkedStreetLayer;
         VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor();
         for(int i=0; i< tripPattern.stops.length; i++) {
-            Stop stop = new Stop();
             int stopIdx = tripPattern.stops[i];
+            Stop stop = new Stop(transitLayer.stopIdForIndex.get(stopIdx), transitLayer.stopNames.get(stopIdx));
             vertex.seek(transitLayer.streetVertexForStop.get(stopIdx));
-            stop.name = transitLayer.stopNames.get(stopIdx);
             stop.lon = (float) vertex.getLon();
             stop.lat = (float) vertex.getLat();
-            stop.stopId = transitLayer.stopIdForIndex.get(stopIdx);
             stops.add(stop);
         }
 

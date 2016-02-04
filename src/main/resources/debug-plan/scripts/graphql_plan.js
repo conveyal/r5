@@ -243,7 +243,7 @@ function getStopFeature(stop) {
     var stopFeature = {
         "properties":{
             "name": stop.name,
-            "id": stop.id
+            "id": stop.stopId
         },
         "type":"Feature",
         "geometry":{

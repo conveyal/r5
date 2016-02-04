@@ -1,14 +1,12 @@
 package com.conveyal.r5.api.util;
 
 import com.beust.jcommander.internal.Lists;
-import com.conveyal.gtfs.model.Agency;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
-import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -18,20 +16,8 @@ import java.util.*;
  * The equivalent of a ride in an API response. Information degenerates to Strings and ints here.
  */
 public class TransitSegment {
-
-
-
-
-    //TODO: this is stopCluster in Profile and Stop in point to point
-    //from, to and fromName, toName are actually from stopCluster
-    // Use AgencyAndId instead of String to get both since we are now multi-feed
-    @JsonProperty("from")
-    private String fromId;
-    @JsonProperty("to")
-    private String toId;
-
-    public StopCluster from;
-    public StopCluster to;
+    public Stop from;
+    public Stop to;
 
     public Stats waitStats;
     public TransitModes mode;
@@ -55,9 +41,8 @@ public class TransitSegment {
         TripPattern pattern = currentTransitPath.getPattern(transitLayer, pathIndex);
         if (pattern.routeIndex >= 0) {
             RouteInfo routeInfo = transitLayer.routes.get(pattern.routeIndex);
-            //TODO: this needs to be Stop instead of StopCluster in point to point routing
-            from = new StopCluster(transitLayer.stopIdForIndex.get(boardStopIdx), transitLayer.stopNames.get(boardStopIdx));
-            to = new StopCluster(transitLayer.stopIdForIndex.get(alightStopIdx), transitLayer.stopNames.get(alightStopIdx));
+            from = new Stop(transitLayer.stopIdForIndex.get(boardStopIdx), transitLayer.stopNames.get(boardStopIdx));
+            to = new Stop(transitLayer.stopIdForIndex.get(alightStopIdx), transitLayer.stopNames.get(alightStopIdx));
             VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor();
             vertex.seek(transitLayer.streetVertexForStop.get(boardStopIdx));
             from.lat = (float) vertex.getLat();
@@ -88,14 +73,6 @@ public class TransitSegment {
             ",\n\t routes=" + routes +
             ",\n\t segmentPatterns=" + segmentPatterns +
             '}' +"\n\t";
-    }
-
-    public String getFromId() {
-        return fromId;
-    }
-
-    public String getToId() {
-        return toId;
     }
 
     /**
@@ -167,7 +144,7 @@ public class TransitSegment {
         String fromStopID = transitLayer.stopIdForIndex.get(boardStopIdx);
         String toStopID = transitLayer.stopIdForIndex.get(alightStopIdx);
 
-        return from.id.equals(fromStopID) && to.id.equals(toStopID);
+        return from.stopId.equals(fromStopID) && to.stopId.equals(toStopID);
     }
 
     public Collection<Route> getRoutes() {

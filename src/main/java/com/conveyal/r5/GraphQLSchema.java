@@ -124,10 +124,11 @@ public class GraphQLSchema {
             "Search is made for a trip that needs to depart at specific time/date")
         .build();
 
+    //Input only for now
     public static GraphQLScalarType GraphQLLocalDate = new GraphQLScalarType("LocalDate",
         "Java 8 LocalDate type YYYY-MM-DD", new Coercing() {
         @Override
-        public Object coerce(Object input) {
+        public Object serialize(Object input) {
             LOG.info("Date coerce:{}", input);
             if (input instanceof String) {
                 try {
@@ -147,7 +148,12 @@ public class GraphQLSchema {
         }
 
         @Override
-        public Object coerceLiteral(Object input) {
+        public Object parseValue(Object input) {
+            return serialize(input);
+        }
+
+        @Override
+        public Object parseLiteral(Object input) {
             //Seems to be used in querying
             LOG.info("Date coerce literal:{}", input);
             if (!(input instanceof StringValue)) {
@@ -166,12 +172,13 @@ public class GraphQLSchema {
         }
     });
 
+    //Output type for now
     //FIXME: ISO8601 parsing and outputting in java is little broken it doesn't support timezone as +HH+MM
     //https://stackoverflow.com/questions/32079459/java-time-zoneddatetime-parse-and-iso8601
     public static GraphQLScalarType GraphQLZonedDateTime = new GraphQLScalarType("ZonedDateTime",
         "Java 8 ZonedDateTime type ISO 8601 YYYY-MM-DDTHH:MM:SS+HH:MM", new Coercing() {
         @Override
-        public Object coerce(Object input) {
+        public Object serialize(Object input) {
             //LOG.info("TDate coerce:{}", input);
             if (input instanceof String) {
                 try {
@@ -189,7 +196,12 @@ public class GraphQLSchema {
         }
 
         @Override
-        public Object coerceLiteral(Object input) {
+        public Object parseValue(Object input) {
+            return serialize(input);
+        }
+
+        @Override
+        public Object parseLiteral(Object input) {
             //Seems to be used in querying
             //LOG.info("TDate coerce literal:{}", input);
             if (!(input instanceof StringValue)) {

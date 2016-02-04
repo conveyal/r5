@@ -33,6 +33,17 @@ public class PointToPointQuery {
     public static final int RADIUS_METERS = 200;
     private final TransportNetwork transportNetwork;
 
+    // interpretation of below parameters: if biking is less than BIKE_PENALTY seconds faster than walking, we prefer to walk
+
+    /** how many seconds worse biking to transit is than walking */
+    private static final int BIKE_PENALTY = 600;
+
+    /** how many seconds worse bikeshare is than just walking */
+    private static final int BIKESHARE_PENALTY = 300;
+
+    /** How many seconds worse driving to transit is than just walking */
+    private static final int CAR_PENALTY = 1200;
+
     private static final EnumSet<LegMode> currentlyUnsupportedModes = EnumSet.of(LegMode.CAR_PARK);
 
     public PointToPointQuery(TransportNetwork transportNetwork) {
@@ -292,7 +303,7 @@ public class PointToPointQuery {
                 /*if (seen_paths > 20) {
                     break;
                 }*/
-                
+
                 LOG.info(" ");
                 for (int i = 0; i < path.patterns.length; i++) {
                     //TransitSegment transitSegment = new TransitSegment(transportNetwork.transitLayer, path.boardStops[i], path.alightStops[i], path.patterns[i]);
@@ -332,18 +343,29 @@ public class PointToPointQuery {
 
     /** Combine the results of several street searches using different modes into a single map */
     private TIntIntMap combineMultimodalRoutingAccessTimes(Map<LegMode, StreetRouter> routers, ProfileRequest request) {
-        TIntIntMap ret = new TIntIntHashMap();
+        // times at transit stops
+        TIntIntMap times = new TIntIntHashMap();
+
+        // weights at transit stops
+        TIntIntMap weights = new TIntIntHashMap();
 
         for (Map.Entry<LegMode, StreetRouter> entry : routers.entrySet()) {
             int maxTime = 30;
             int minTime = 0;
+            int penalty = 0;
+
             LegMode mode = entry.getKey();
             switch (mode) {
                 case BICYCLE:
-                // TODO this is not strictly correct, bike rent is partly walking
-                case BICYCLE_RENT:
                     maxTime = request.maxBikeTime;
                     minTime = request.minBikeTime;
+                    penalty = BIKE_PENALTY;
+                    break;
+                case BICYCLE_RENT:
+                    // TODO this is not strictly correct, bike rent is partly walking
+                    maxTime = request.maxBikeTime;
+                    minTime = request.minBikeTime;
+                    penalty = BIKESHARE_PENALTY;
                     break;
                 case WALK:
                     maxTime = request.maxWalkTime;
@@ -351,6 +373,7 @@ public class PointToPointQuery {
                 case CAR:
                     maxTime = request.maxCarTime;
                     minTime = request.minCarTime;
+                    penalty = CAR_PENALTY;
                     break;
             }
 
@@ -359,18 +382,26 @@ public class PointToPointQuery {
 
             final int maxTimeFinal = maxTime;
             final int minTimeFinal = minTime;
+            final int penaltyFinal = penalty;
 
             StreetRouter router = entry.getValue();
             router.getReachedStops().forEachEntry((stop, time) -> {
                 if (time > maxTimeFinal || time < minTimeFinal) return true;
 
-                if (!ret.containsKey(stop) || ret.get(stop) > time) {
-                    ret.put(stop, time);
+                int weight = time + penaltyFinal;
+
+                // There are penalties for using certain modes, to avoid bike/car trips that are only marginally faster
+                // than walking, so we use weights to decide which mode "wins" to access a particular stop.
+                if (!weights.containsKey(stop) || weight < weights.get(stop)) {
+                    times.put(stop, time);
+                    weights.put(stop, weight);
                 }
+
                 return true; // iteration should continue
             });
         }
 
-        return ret;
+        // return the times, not the weights
+        return times;
     }
 }

@@ -294,11 +294,10 @@ public class StreetRouter {
         public int backEdge;
         // the current time at this state, in milliseconds UNIX time
         protected Instant time;
-        //Distance in mm
+        // Distance in mm
         public int distance;
         public Mode mode;
         public State backState; // previous state in the path chain
-        public State nextState; // next state at the same location (for turn restrictions and other cases with co-dominant states)
         public State(int atVertex, int viaEdge, long fromTimeDate, State backState) {
             this.vertex = atVertex;
             this.backEdge = viaEdge;

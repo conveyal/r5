@@ -330,12 +330,8 @@ public class EdgeStore implements Serializable {
             }
         }
 
-        public short getSpeed() {
+        public short getSpeedCms() {
             return speeds.get(edgeIndex);
-        }
-
-        public float getSpeedMs() {
-            return (float) ((speeds.get(edgeIndex) / 100.));
         }
 
         public float getSpeedkmh() {
@@ -396,16 +392,18 @@ public class EdgeStore implements Serializable {
          * If driving speed is based on max edge speed. (or from traffic if traffic is supported)
          *
          * Otherwise speed is based on wanted walking, cycling speed provided in ProfileRequest.
+         *
+         * Returns speed in millimeters per second
          */
-        private float calculateSpeed(ProfileRequest options, Mode traverseMode,
+        private short calculateSpeed(ProfileRequest options, Mode traverseMode,
             long time) {
             if (traverseMode == null) {
-                return Float.NaN;
+                return -1;
             } else if (traverseMode == Mode.CAR) {
                 /*if (options.useTraffic) {
                     //TODO: speed based on traffic information
                 }*/
-                return getSpeedMs();
+                return getSpeedCms();
             }
             return options.getSpeed(traverseMode);
         }
@@ -414,9 +412,9 @@ public class EdgeStore implements Serializable {
             StreetRouter.State s1 = new StreetRouter.State(getToVertex(), edgeIndex,
                 s0.getTime(), s0);
             s1.weight = s0.weight;
-            float speedms = calculateSpeed(req, mode, s0.getTime());
-            float time = (float) (getLengthM() / speedms);
-            float weight = 0;
+            short speedcms = calculateSpeed(req, mode, s0.getTime());
+            int time = getLengthMm() / speedcms / 10;
+            int weight = 0;
 
             if (s0.backEdge != -1 && getFlag(EdgeFlag.LINK) && getCursor(s0.backEdge).getFlag(EdgeFlag.LINK))
                 // two link edges in a row, in other words a shortcut. Disallow this.
@@ -663,6 +661,10 @@ public class EdgeStore implements Serializable {
 
         public int getEdgeIndex() {
             return edgeIndex;
+        }
+
+        public float getSpeedMs() {
+            return getSpeedCms() * 100f;
         }
     }
 

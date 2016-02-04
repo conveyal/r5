@@ -225,14 +225,16 @@ public class ProfileRequest implements Serializable, Cloneable {
         return  currentDateTime.plusSeconds(fromTime);
     }
 
-    public float getSpeed(Mode mode) {
+    /** get speed in _centimeters per second_ */
+    public short getSpeed(Mode mode) {
         switch (mode) {
         case WALK:
-            return walkSpeed;
+            // TODO cache shorts?
+            return (short) (walkSpeed * 100);
         case BICYCLE:
-            return bikeSpeed;
+            return (short) (bikeSpeed * 100);
         case CAR:
-            return carSpeed;
+            return (short) (carSpeed * 100);
         default:
             break;
         }

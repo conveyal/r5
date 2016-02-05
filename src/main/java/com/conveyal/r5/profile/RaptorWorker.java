@@ -269,13 +269,9 @@ public class RaptorWorker {
 
                     RaptorState stateCopy = null;
                     if (computePaths) {
-                        // we run a mini range raptor search when there are frequencies. This should work fine when there are
-                        // scheduled, but because we the search back an additional 20 minutes from each minute it means the time
-                        // window gets offset 20 minutes back in time.
-                        if (data.hasSchedules) {
-                            LOG.warn("Computing paths on a mixed schedule/frequency network. Results will be correct but time window will be offset 20 minutes");
-                        }
-
+                        // It's OK that we're not making a copy here, because runRaptorFrequency never modifies the base states.
+                        // The only thing that could happen is that it will be made longer if the frequency search runs for more
+                        // rounds than the scheduled search, but that's harmless.
                         List<RaptorState> states = scheduleState;
                         // if we're computing paths, we need to run several range-raptor-style subsearches to get
                         // properly reverse optimized paths from frequency networks
@@ -446,8 +442,6 @@ public class RaptorWorker {
         // we need to do this because when calculating paths we run a mini range raptor search for each frequency search
         // to get transfer-compressed paths (NB, using range raptor produces transfer-compressed paths, see
         // https://github.com/conveyal/r5/issues/42)
-        // Of course in a combined frequency/schedule network this doesn't work because we would also need to re-do the
-        // scheduled search as we step back.
         // Copy initial stops over to the first round
         TIntIntIterator iterator = initialStops.iterator();
         while (iterator.hasNext()) {

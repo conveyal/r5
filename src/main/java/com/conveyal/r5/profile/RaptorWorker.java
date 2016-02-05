@@ -21,10 +21,7 @@ import org.slf4j.LoggerFactory;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.List;
+import java.util.*;
 import java.util.stream.IntStream;
 
 /**
@@ -65,6 +62,12 @@ public class RaptorWorker {
     /** minimum slack time to board transit */
     public static final int BOARD_SLACK = 60;
 
+    /** How many minutes back in time to run a range raptor search from each minute to get properly compressed frequency paths */
+    public static final int FREQUENCY_TRANSFER_COMPRESSION_MINUTES = 40;
+
+    /** what step to use when compressing transfers in frequency trips */
+    public static final int FREQUENCY_TRANSFER_COMPRESSION_STEP = 5;
+
     int max_time = 0;
     int round = 0;
 
@@ -88,6 +91,8 @@ public class RaptorWorker {
 
     private FrequencyRandomOffsets offsets;
 
+    private TIntIntMap initialStops;
+
     public PropagatedTimesStore propagatedTimesStore;
 
     public LinkedPointSet targets;
@@ -95,6 +100,8 @@ public class RaptorWorker {
     public BitSet servicesActive;
 
     public List<RaptorState> statesEachIteration = new ArrayList<>();
+
+    public boolean computePaths = false;
 
     public RaptorWorker(TransitLayer data, LinkedPointSet targets, ProfileRequest req) {
         this.data = data;
@@ -115,15 +122,27 @@ public class RaptorWorker {
         offsets = new FrequencyRandomOffsets(data);
     }
 
+    /**
+     * plain-vanilla advance function that advances scheduleState.
+     */
     public void advance () {
+        advance(scheduleState);
+    }
+
+    /**
+     * advance function that takes a list of states, used when running the mini-range-raptor search for frequencies,
+     * which runs on a completely parallel copy of the search state.
+     */
+    public void advance (List<RaptorState> states) {
         // if we've never gotten to this round before, initialize from this round
         // always advancing scheduleState here, copies for frequency routing are made in runRaptorFrequency
-        if (scheduleState.size() == round + 1)
-            scheduleState.add(scheduleState.get(round).copy());
+        // NB even if we are doing a frequency search, this adds an empty state, which is harmless.
+        if (states.size() == round + 1)
+            states.add(scheduleState.get(round).copy());
 
         // otherwise copy best times forward
         else
-            scheduleState.get(round + 1).min(scheduleState.get(round));
+            states.get(round + 1).min(states.get(round));
 
         round++;
         //        timesPerStop = new int[data.nStops];
@@ -139,7 +158,7 @@ public class RaptorWorker {
      */
     public PropagatedTimesStore runRaptor (TIntIntMap accessTimes, PointSetTimes nonTransitTimes, TaskStatistics ts) {
         long beginCalcTime = System.currentTimeMillis();
-        TIntIntMap initialStops = new TIntIntHashMap();
+        initialStops = new TIntIntHashMap();
         TIntIntIterator initialIterator = accessTimes.iterator();
         // TODO Isn't this just copying an int-int map into another one? Why reimplement map copy?
         while (initialIterator.hasNext()) {
@@ -199,8 +218,17 @@ public class RaptorWorker {
         // current iteration
         int iteration = 0;
 
+        int toTime = req.toTime;
+
+        // if we have frequencies and we are computing transfer-compressed paths, then offset the time window
+        // into the future as we will offset it back when we perform the transfer compression.
+        if (computePaths && data.hasFrequencies) {
+            toTime += FREQUENCY_TRANSFER_COMPRESSION_MINUTES * 60;
+            fromTime += FREQUENCY_TRANSFER_COMPRESSION_MINUTES * 60;
+        }
+
         // FIXME this should be changed to tolerate a zero-width time range
-        for (int departureTime = req.toTime - 60, n = 0; departureTime >= fromTime; departureTime -= 60, n++) {
+        for (int departureTime = toTime - 60, n = 0; departureTime >= fromTime; departureTime -= 60, n++) {
             if (n % 15 == 0) {
                 LOG.info("minute {}", n);
             }
@@ -209,7 +237,7 @@ public class RaptorWorker {
             scheduleState.stream().forEach(rs -> rs.departureTime = departureTimeFinal);
 
             // Run the search on scheduled routes.
-            this.runRaptorScheduled(initialStops, departureTime);
+            this.runRaptorScheduled(departureTime);
 
             // If we're doing propagation from transit stops out to street vertices, do it now.
             // If we are instead saving travel times to transit stops (not propagating out to the streets)
@@ -233,17 +261,47 @@ public class RaptorWorker {
                 for (int i = 0; i < monteCarloDraws + 2; i++) {
                     offsets.randomize();
 
-                    RaptorState stateCopy;
-                    if (i == 0)
-                        stateCopy = this.runRaptorFrequency(departureTime, BoardingAssumption.BEST_CASE);
-                    else if (i == 1)
-                        stateCopy = this.runRaptorFrequency(departureTime, BoardingAssumption.WORST_CASE);
-                    else
-                        stateCopy = this.runRaptorFrequency(departureTime, BoardingAssumption.RANDOM);
+                    BoardingAssumption assumption;
+
+                    if (i == 0) assumption = BoardingAssumption.BEST_CASE;
+                    else if (i == 1) assumption = BoardingAssumption.WORST_CASE;
+                    else assumption = BoardingAssumption.RANDOM;
+
+                    RaptorState stateCopy = null;
+                    if (computePaths) {
+                        // we run a mini range raptor search when there are frequencies. This should work fine when there are
+                        // scheduled, but because we the search back an additional 20 minutes from each minute it means the time
+                        // window gets offset 20 minutes back in time.
+                        if (data.hasSchedules) {
+                            LOG.warn("Computing paths on a mixed schedule/frequency network. Results will be correct but time window will be offset 20 minutes");
+                        }
+
+                        List<RaptorState> states = scheduleState;
+                        // if we're computing paths, we need to run several range-raptor-style subsearches to get
+                        // properly reverse optimized paths from frequency networks
+                        for (int freqDepartureTime = departureTime; freqDepartureTime >= departureTime - FREQUENCY_TRANSFER_COMPRESSION_MINUTES * 60; freqDepartureTime -= FREQUENCY_TRANSFER_COMPRESSION_STEP * 60) {
+                            stateCopy = this.runRaptorFrequency(freqDepartureTime, assumption, states);
+                            states = new ArrayList<>();
+
+                            RaptorState current = stateCopy;
+                            do {
+                                states.add(current);
+                                current = current.previous;
+                            } while (current != null);
+
+                            Collections.reverse(states);
+                        }
+                    }
+                    else {
+                        stateCopy = this.runRaptorFrequency(departureTime, assumption, scheduleState);
+                    }
 
                     // do propagation
                     int[] frequencyTimesAtTargets = timesAtTargetsEachIteration[iteration++];
                     if (doPropagation) {
+                        // we can't propagate after computing paths because the departure time changes during the search
+                        if (computePaths) throw new UnsupportedOperationException("Cannot compute paths when performing propagation to a pointset");
+
                         System.arraycopy(scheduledTimesAtTargets, 0, frequencyTimesAtTargets, 0,
                                 scheduledTimesAtTargets.length);
                         // updates timesAtTargetsEachIteration directly because it has a reference into the array.
@@ -257,8 +315,12 @@ public class RaptorWorker {
 
                     // convert to elapsed time
                     for (int t = 0; t < frequencyTimesAtTargets.length; t++) {
-                        if (frequencyTimesAtTargets[t] != UNREACHED)
-                            frequencyTimesAtTargets[t] -= departureTime;
+                        if (frequencyTimesAtTargets[t] != UNREACHED) {
+                            // use departure time from the state b/c it may be different from the global departure time
+                            // if we're computing transfer-compressed paths; we may have run a small range raptor to compress
+                            // the paths.
+                            frequencyTimesAtTargets[t] -= stateCopy.departureTime;
+                        }
                     }
                 }
             } else {
@@ -313,7 +375,7 @@ public class RaptorWorker {
     }
 
     /** Run a raptor search not using frequencies */
-    public void runRaptorScheduled (TIntIntMap initialStops, int departureTime) {
+    public void runRaptorScheduled (int departureTime) {
         // Arrays.fill(bestTimes, UNREACHED); hold on to old state
         max_time = departureTime + MAX_DURATION;
         round = 0;
@@ -355,7 +417,7 @@ public class RaptorWorker {
      * Run a RAPTOR search using frequencies. Return the resulting state, which is a copy of scheduled states with
      * frequencies applied. We make a copy because range-RAPTOR is invalid with frequencies.
      */
-    public RaptorState runRaptorFrequency (int departureTime, BoardingAssumption boardingAssumption) {
+    public RaptorState runRaptorFrequency (int departureTime, BoardingAssumption boardingAssumption, List<RaptorState> baseState) {
         max_time = departureTime + MAX_DURATION;
         round = 0;
         advance(); // go to first round
@@ -373,18 +435,58 @@ public class RaptorWorker {
         }
 
         // initialize with first round from scheduled search
-        // no need to make a copy here as this is not updated in the search
-        RaptorState previousRound = scheduleState.get(round - 1);
-        RaptorState currentRound = scheduleState.get(round).copy();
+        RaptorState previousRound = baseState.get(round - 1).copy();
+        RaptorState currentRound = baseState.get(round).copy();
         currentRound.previous = previousRound;
+
+        // The departure time may differ here because of the mini range raptor search being undertaken.
+        previousRound.departureTime = currentRound.departureTime = departureTime;
+
+        // copy in the access times
+        // we need to do this because when calculating paths we run a mini range raptor search for each frequency search
+        // to get transfer-compressed paths (NB, using range raptor produces transfer-compressed paths, see
+        // https://github.com/conveyal/r5/issues/42)
+        // Of course in a combined frequency/schedule network this doesn't work because we would also need to re-do the
+        // scheduled search as we step back.
+        // Copy initial stops over to the first round
+        TIntIntIterator iterator = initialStops.iterator();
+        while (iterator.hasNext()) {
+            iterator.advance();
+            int stopIndex = iterator.key();
+            int time = iterator.value() + departureTime;
+            // note not setting bestNonTransferTimes here because the initial walk is effectively a "transfer"
+            // previousRound here is the result of the initial walk.
+            if (time < previousRound.bestTimes[stopIndex]) {
+                previousRound.bestTimes[stopIndex] = time;
+                // don't clear previousPatterns/previousStops because we want to avoid egressing from the stop at which
+                // we boarded, allowing one to blow past the walk limit. See #22.
+                previousRound.transferStop[stopIndex] = -1;
+                // we still mark patterns here so we perform a scheduled search as well for our mini-range-raptor search.
+                markPatternsForStop(stopIndex);
+            }
+        }
+
+        // propagate new access times forward
+        currentRound.min(previousRound);
 
         // Anytime a round updates some stops, move on to another round
         while (doOneRound(previousRound, currentRound, true, boardingAssumption)) {
-             advance();
+             advance(baseState);
             previousRound = currentRound;
             currentRound = previousRound.copy();
+
             // copy in scheduled times
-            currentRound.min(scheduleState.get(round));
+            currentRound.min(baseState.get(round));
+
+            for (int i = 0; i < currentRound.bestTimes.length; i++) {
+                if (currentRound.bestTimes[i] > previousRound.bestTimes[i]) {
+                    LOG.error("Later round has higher travel time than earlier round!");
+                }
+
+                if (currentRound.bestNonTransferTimes[i] > previousRound.bestNonTransferTimes[i]) {
+                    LOG.error("Later round has higher nontransfer travel time than earlier round!");
+                }
+            }
         }
         
         return currentRound;

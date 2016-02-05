@@ -65,6 +65,7 @@ public class StaticComputer implements Runnable {
 
         // tell the Raptor Worker that we want a travel time to each stop by leaving the point set null
         RaptorWorker worker = new RaptorWorker(network.transitLayer, null, req.request.request);
+        worker.computePaths = true; // get properly transfer-compressed paths from frequency networks.
         StaticPropagatedTimesStore pts = (StaticPropagatedTimesStore) worker.runRaptor(sr.getReachedStops(), null, ts);
 
         // get non-transit times

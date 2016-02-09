@@ -13,6 +13,7 @@ import com.conveyal.r5.streets.*;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
 import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.operation.buffer.BufferParameters;
 import com.vividsolutions.jts.operation.buffer.OffsetCurveBuilder;
@@ -115,6 +116,9 @@ public class PointToPointRouterServer {
     private static void run(TransportNetwork transportNetwork) {
         port(DEFAULT_PORT);
         ObjectMapper mapper = new ObjectMapper();
+        //ObjectReader is a new lightweight mapper which can only deserialize specified class
+        ObjectReader graphQlRequestReader = mapper.reader(GraphQlRequest.class);
+        ObjectReader mapReader = mapper.reader(HashMap.class);
         staticFileLocation("debug-plan");
         PointToPointQuery pointToPointQuery = new PointToPointQuery(transportNetwork);
 
@@ -663,12 +667,11 @@ public class PointToPointRouterServer {
 
             HashMap<String, Object> content = new HashMap<>();
             try {
-                //TODO: use ObjectReader
-                GraphQlRequest graphQlRequest = mapper
-                    .readValue(request.body(), GraphQlRequest.class);
+                GraphQlRequest graphQlRequest = graphQlRequestReader
+                    .readValue(request.body());
 
                 //TODO: deserialize variables map automatically in GraphQLRequest object
-                Map<String, Object> variables = mapper.readValue(graphQlRequest.variables, HashMap.class);
+                Map<String, Object> variables = mapReader.readValue(graphQlRequest.variables);
                 ExecutionResult executionResult = graphQL.execute(graphQlRequest.query, null, null, variables);
                 response.status(200);
 

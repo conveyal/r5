@@ -7,5 +7,7 @@ package com.conveyal.r5.api;
  */
 public class GraphQlRequest {
     public String query;
+    //FIXME: This should be Map<String, Object> and be serialized automatically with Jackson but it
+    //doesn't seems to work.
     public String variables;
 }

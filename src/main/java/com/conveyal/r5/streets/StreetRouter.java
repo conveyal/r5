@@ -191,6 +191,8 @@ public class StreetRouter {
      * Call one of the setOrigin functions first.
      */
     public void route () {
+        //Distance in State is in mm wanted distance is in meters which means that conversion is necessary
+        int distanceLimitMm = distanceLimitMeters*1000;
         if (queue.size() == 0) {
             LOG.warn("Routing without first setting an origin, no search will happen.");
         }
@@ -238,7 +240,7 @@ public class StreetRouter {
 
                 State s1 = edge.traverse(s0, mode, profileRequest);
 
-                if (s1 != null && s1.weight <= distanceLimitMeters) {
+                if (s1 != null && s1.distance <= distanceLimitMm) {
                     queue.add(s1);
                 }
 

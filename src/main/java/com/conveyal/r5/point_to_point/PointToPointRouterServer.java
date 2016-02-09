@@ -671,7 +671,7 @@ public class PointToPointRouterServer {
                     .readValue(request.body());
 
                 //TODO: deserialize variables map automatically in GraphQLRequest object
-                Map<String, Object> variables = mapReader.readValue(graphQlRequest.variables);
+                Map<String, Object> variables = graphQlRequest.variables==null ? new HashMap<>() : mapReader.readValue(graphQlRequest.variables);
                 ExecutionResult executionResult = graphQL.execute(graphQlRequest.query, null, null, variables);
                 response.status(200);
 

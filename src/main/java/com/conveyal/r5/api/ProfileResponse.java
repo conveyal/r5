@@ -6,6 +6,7 @@ import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import gnu.trove.map.TIntObjectMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,17 +58,20 @@ public class ProfileResponse {
      * but different segmentPatterns.
      * Paths with same pattern but different times are in same segmentPattern but different times.
      *
-     * Access and egress paths are also inserted only once per mode and stopIndex.
+     * Each access and egress Mode path combination is reconstructed from StreetRouter only once per profileOption
      *
+     * Access and egress paths are also inserted only once per mode and stopIndex.
      * @param accessRouter map of modes to each street router for access paths
      * @param egressRouter map of modes to each street router for access paths
+     * @param stopModeAccessMap map of stopIds to LegModes with which they are reached the fastest for access
+     * @param stopModeEgressMap map of stopIds to LegModes with which they are reached the fastest for egress
      * @param currentTransitPath transit path with transfers stops and times
      * @param transportNetwork which is used to get stop names, etc.
      * @param fromTimeDateZD this is used to get date
      */
     public void addTransitPath(Map<LegMode, StreetRouter> accessRouter,
-        Map<LegMode, StreetRouter> egressRouter, Path currentTransitPath,
-        TransportNetwork transportNetwork, ZonedDateTime fromTimeDateZD) {
+        Map<LegMode, StreetRouter> egressRouter, TIntObjectMap<LegMode> stopModeAccessMap,
+        TIntObjectMap<LegMode> stopModeEgressMap, Path currentTransitPath, TransportNetwork transportNetwork, ZonedDateTime fromTimeDateZD) {
 
         HashPath hashPath = new HashPath(currentTransitPath);
         ProfileOption profileOption = transitToOption.getOrDefault(hashPath, new ProfileOption());
@@ -82,21 +86,18 @@ public class ProfileResponse {
         int endStopIndex = currentTransitPath.alightStops[currentTransitPath.length-1];
         int startVertexStopIndex = transportNetwork.transitLayer.streetVertexForStop.get(startStopIndex);
         int endVertexStopIndex = transportNetwork.transitLayer.streetVertexForStop.get(endStopIndex);
-        /*TODO:What happens if we route somewhere with bicycle, walk and transit and if we are walking
-        and choose transit option 1 we are too late. (later then requested arrival time),
-         but if we choose bicycle we are on time?
-
-
-        TODO: update this so that each stopIndex and mode pair is changed to streetpath only once
-          */
-        accessRouter.forEach((mode, streetRouter) -> {
-            int accessPathIndex = profileOption.getAccessIndex(mode, startVertexStopIndex);
+        //TODO: update this so that each stopIndex and mode pair is changed to streetpath only once
+        LegMode accessMode = stopModeAccessMap.get(startStopIndex);
+        if (accessMode != null) {
+            int accessPathIndex = profileOption.getAccessIndex(accessMode, startVertexStopIndex);
             if (accessPathIndex < 0) {
+                //Here accessRouter needs to have this access mode since stopModeAccessMap is filled from accessRouter
+                StreetRouter streetRouter = accessRouter.get(accessMode);
                 StreetRouter.State state = streetRouter.getState(startVertexStopIndex);
                 if (state != null) {
                     StreetPath streetPath = new StreetPath(state, transportNetwork);
                     //TODO: add similar thing for access/egress bike share and B+R
-                    if (mode == LegMode.CAR_PARK && streetRouter.previous != null) {
+                    if (accessMode == LegMode.CAR_PARK && streetRouter.previous != null) {
                         //First state in walk part of CAR PARK is state where we ended driving
                         StreetRouter.State carPark = streetPath.getStates().getFirst();
                         //So we need to search for driving part in previous streetRouter
@@ -108,23 +109,36 @@ public class ProfileResponse {
                             LOG.warn("Missing CAR part of CAR_PARK trip in streetRouter!");
                         }
                     }
-                    StreetSegment streetSegment = new StreetSegment(streetPath, mode, transportNetwork.streetLayer);
-                    profileOption.addAccess(streetSegment, mode, startVertexStopIndex);
+                    StreetSegment streetSegment = new StreetSegment(streetPath, accessMode, transportNetwork.streetLayer);
+                    profileOption.addAccess(streetSegment, accessMode, startVertexStopIndex);
+                    //This should never happen since stopModeAccessMap is filled from reached stops in accessRouter
+                } else {
+                    LOG.warn("Access: Last state not found for mode:{} stop:{}({})", accessMode, startVertexStopIndex, startStopIndex);
                 }
             }
-        });
+        } else {
+            LOG.warn("Mode is not in stopModeAccessMap for start stop:{}({})", startVertexStopIndex, startStopIndex);
+        }
 
-        egressRouter.forEach((mode, streetRouter) -> {
-            int egressPathIndex = profileOption.getEgressIndex(mode, endVertexStopIndex);
+        LegMode egressMode = stopModeEgressMap.get(endStopIndex);
+        if (egressMode != null) {
+            int egressPathIndex = profileOption.getEgressIndex(egressMode, endVertexStopIndex);
             if (egressPathIndex < 0) {
+                //Here egressRouter needs to have this egress mode since stopModeEgressMap is filled from egressRouter
+                StreetRouter streetRouter = egressRouter.get(egressMode);
                 StreetRouter.State state = streetRouter.getState(endVertexStopIndex);
                 if (state != null) {
                     StreetPath streetPath = new StreetPath(state, transportNetwork);
-                    StreetSegment streetSegment = new StreetSegment(streetPath, mode, transportNetwork.streetLayer);
-                    profileOption.addEgress(streetSegment, mode, endVertexStopIndex);
+                    StreetSegment streetSegment = new StreetSegment(streetPath, egressMode, transportNetwork.streetLayer);
+                    profileOption.addEgress(streetSegment, egressMode, endVertexStopIndex);
+                    //This should never happen since stopModeEgressMap is filled from reached stops in egressRouter
+                } else {
+                    LOG.warn("EGRESS: Last state not found for mode:{} stop:{}({})", accessMode, endVertexStopIndex, endStopIndex);
                 }
             }
-        });
+        } else {
+            LOG.warn("Mode is not in stopModeEgressMap for END stop:{}({})", endVertexStopIndex, endStopIndex);
+        }
         List<TransitJourneyID> transitJourneyIDs = new ArrayList<>(currentTransitPath.patterns.length);
         for (int i = 0; i < currentTransitPath.patterns.length; i++) {
                 profileOption.addTransit(transportNetwork.transitLayer,

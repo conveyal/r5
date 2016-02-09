@@ -15,6 +15,7 @@ import com.conveyal.r5.transit.TripPattern;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
+import gnu.trove.map.hash.TIntObjectHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,6 +78,11 @@ public class PointToPointQuery {
 
         Map<LegMode, StreetRouter> accessRouter = new HashMap<>(modes.size());
         Map<LegMode, StreetRouter> egressRouter = new HashMap<>(request.egressModes.size());
+
+        //This map saves which access mode was used to access specific stop in access mode
+        TIntObjectMap<LegMode> stopModeAccessMap = new TIntObjectHashMap<>();
+        //This map saves which egress mode was used to access specific stop in egress mode
+        TIntObjectMap<LegMode> stopModeEgressMap = new TIntObjectHashMap<>();
 
         //Routes all direct (if no transit)/access modes
         for(LegMode mode: modes) {
@@ -281,8 +287,8 @@ public class PointToPointQuery {
             profileResponse.addOption(option);
 
             // fold access and egress times into single maps
-            TIntIntMap accessTimes = combineMultimodalRoutingAccessTimes(accessRouter, request);
-            TIntIntMap egressTimes = combineMultimodalRoutingAccessTimes(egressRouter, request);
+            TIntIntMap accessTimes = combineMultimodalRoutingAccessTimes(accessRouter, stopModeAccessMap, request);
+            TIntIntMap egressTimes = combineMultimodalRoutingAccessTimes(egressRouter, stopModeEgressMap, request);
 
             McRaptorSuboptimalPathProfileRouter router = new McRaptorSuboptimalPathProfileRouter(transportNetwork, request, accessTimes, egressTimes);
             List<PathWithTimes> usefullpathList = new ArrayList<>();
@@ -326,7 +332,7 @@ public class PointToPointQuery {
             int seen_paths = 0;
             int boardStop =-1, alightStop = -1;
             for (Path path : usefullpathList) {
-                profileResponse.addTransitPath(accessRouter, egressRouter, path, transportNetwork, request.getFromTimeDateZD());
+                profileResponse.addTransitPath(accessRouter, egressRouter, stopModeAccessMap, stopModeEgressMap, path, transportNetwork, request.getFromTimeDateZD());
                 //LOG.info("Num patterns:{}", path.patterns.length);
                 //ProfileOption transit_option = new ProfileOption();
 
@@ -376,8 +382,11 @@ public class PointToPointQuery {
         return profileResponse;
     }
 
-    /** Combine the results of several street searches using different modes into a single map */
-    private TIntIntMap combineMultimodalRoutingAccessTimes(Map<LegMode, StreetRouter> routers, ProfileRequest request) {
+    /** Combine the results of several street searches using different modes into a single map
+     * It also saves with which mode was stop reached into stopModeMap. This map is then used
+     * to create itineraries in response */
+    private TIntIntMap combineMultimodalRoutingAccessTimes(Map<LegMode, StreetRouter> routers,
+        TIntObjectMap<LegMode> stopModeMap, ProfileRequest request) {
         TIntIntMap ret = new TIntIntHashMap();
 
         for (Map.Entry<LegMode, StreetRouter> entry : routers.entrySet()) {
@@ -414,6 +423,7 @@ public class PointToPointQuery {
 
                 if (!ret.containsKey(stop) || ret.get(stop) > time) {
                     ret.put(stop, time);
+                    stopModeMap.put(stop, mode);
                 }
                 return true; // iteration should continue
             });

@@ -30,7 +30,15 @@ public class StreetRouter {
 
     public final StreetLayer streetLayer;
 
+    /**
+     * It uses first nonzero limit as a limit
+     *
+     * For example if distanceLimitMeters > 0 it is used a limit. But if it isn't
+     * timeLimitSeconds is used if it is bigger then 0. If both limits are 0
+     * runtime exception is thrown.
+     */
     public int distanceLimitMeters = 2_000;
+    public int timeLimitSeconds = 0;
 
     TIntObjectMap<State> bestStates = new TIntObjectHashMap<>();
 
@@ -189,10 +197,27 @@ public class StreetRouter {
 
     /**
      * Call one of the setOrigin functions first.
+     *
+     * It uses first nonzero limit as a limit
+     * For example if distanceLimitMeters > 0 it is used a limit. But if it isn't
+     * timeLimitSeconds is used if it is bigger then 0. If both limits are 0
+     * runtime exception is thrown.
      */
     public void route () {
-        //Distance in State is in mm wanted distance is in meters which means that conversion is necessary
-        int distanceLimitMm = distanceLimitMeters*1000;
+
+        final int distanceLimitMm;
+
+        if (distanceLimitMeters > 0) {
+            //Distance in State is in mm wanted distance is in meters which means that conversion is necessary
+            distanceLimitMm = distanceLimitMeters*1000;
+            timeLimitSeconds = Integer.MAX_VALUE;
+        } else {
+            distanceLimitMm = Integer.MAX_VALUE;
+            if (timeLimitSeconds > 0) {
+            } else {
+                throw new RuntimeException("Both distanceLimitMeters and distanceLimitSeconds are 0!");
+            }
+        }
         if (queue.size() == 0) {
             LOG.warn("Routing without first setting an origin, no search will happen.");
         }
@@ -240,7 +265,7 @@ public class StreetRouter {
 
                 State s1 = edge.traverse(s0, mode, profileRequest);
 
-                if (s1 != null && s1.distance <= distanceLimitMm) {
+                if (s1 != null && s1.distance <= distanceLimitMm && s1.getDurationSeconds() < timeLimitSeconds) {
                     queue.add(s1);
                 }
 
@@ -308,6 +333,7 @@ public class StreetRouter {
         public int backEdge;
         // the current time at this state, in milliseconds UNIX time
         protected Instant time;
+        protected int durationSeconds;
         //Distance in mm
         public int distance;
         public Mode mode;
@@ -320,6 +346,7 @@ public class StreetRouter {
             this.backState = backState;
             this.time = Instant.ofEpochMilli(fromTimeDate);
             this.distance = backState.distance;
+            this.durationSeconds = backState.durationSeconds;
         }
 
         public State(int atVertex, int viaEdge, long fromTimeDate, Mode mode) {
@@ -329,6 +356,7 @@ public class StreetRouter {
             this.time = Instant.ofEpochMilli(fromTimeDate);
             this.distance = 0;
             this.mode = mode;
+            this.durationSeconds = 0;
         }
 
 
@@ -341,9 +369,15 @@ public class StreetRouter {
             }
             if (false) {
                 time = time.minusSeconds(seconds);
+                durationSeconds+=seconds;
             } else {
                 time = time.plusSeconds(seconds);
+                durationSeconds+=seconds;
             }
+        }
+
+        public int getDurationSeconds() {
+            return durationSeconds;
         }
 
         public long getTime() {

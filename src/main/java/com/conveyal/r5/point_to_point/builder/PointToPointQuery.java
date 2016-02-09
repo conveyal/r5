@@ -72,10 +72,6 @@ public class PointToPointQuery {
 
         TaskStatistics ts = new TaskStatistics();
 
-        TIntIntMap reachedTransitStops = new TIntIntHashMap();
-
-        TIntIntMap destinationTransitStops = new TIntIntHashMap();
-
         EnumSet<LegMode> modes = transit ? request.accessModes : request.directModes;
         ProfileOption option = new ProfileOption();
 
@@ -273,7 +269,6 @@ public class PointToPointQuery {
                 if(streetRouter.setOrigin(request.toLat, request.toLon)) {
                     streetRouter.route();
                     TIntIntMap stops = streetRouter.getReachedStops();
-                    destinationTransitStops.putAll(stops);
                     egressRouter.put(mode, streetRouter);
                     LOG.info("Added {} edgres stops for mode {}",stops.size(), mode);
 

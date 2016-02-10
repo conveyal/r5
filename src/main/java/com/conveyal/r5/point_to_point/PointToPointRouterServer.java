@@ -192,6 +192,7 @@ public class PointToPointRouterServer {
                     feature.addProperty("mode", mode.toString());
                     if (state != null) {
                         feature.addProperty("distance_m", state.distance/1000);
+                        feature.addProperty("duration_s", state.getDurationSeconds());
                     }
                     features.add(feature);
                     return true;

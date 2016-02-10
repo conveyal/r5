@@ -144,8 +144,12 @@ public class ProfileResponse {
                 profileOption.addTransit(transportNetwork.transitLayer,
                     currentTransitPath, i, fromTimeDateZD, transitJourneyIDs);
             if (i>0) {
-                //Adds transfer and transitIndex where it is used (Used when searching for street paths between transit stops)
-                transferToOption.put(new Transfer(currentTransitPath.alightStops[i-1], currentTransitPath.boardStops[i], i-1), profileOption);
+                //If there is a transfer between same stops we don't need to walk since we are already there
+                if (currentTransitPath.boardStops[i] != currentTransitPath.alightStops[i-1]) {
+                    //Adds transfer and transitIndex where it is used (Used when searching for street paths between transit stops)
+                    transferToOption.put(new Transfer(currentTransitPath.alightStops[i - 1],
+                        currentTransitPath.boardStops[i], i - 1), profileOption);
+                }
             }
 
             patterns.putIfAbsent(currentTransitPath.patterns[i], new TripPattern(transportNetwork.transitLayer,currentTransitPath.patterns[i]));

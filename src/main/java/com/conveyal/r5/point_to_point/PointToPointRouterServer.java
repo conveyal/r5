@@ -301,6 +301,7 @@ public class PointToPointRouterServer {
 
             streetRouter.profileRequest = profileRequest;
             streetRouter.mode = mode;
+            streetRouter.distanceLimitMeters = 2_000;
             //Split for end coordinate
             Split split = transportNetwork.streetLayer.findSplit(profileRequest.toLat, profileRequest.toLon,
                 RADIUS_METERS);

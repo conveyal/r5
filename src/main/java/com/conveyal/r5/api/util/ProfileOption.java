@@ -215,6 +215,7 @@ public class ProfileOption {
         int lastTransit = transitJourneyIDs.size()-1;
         ZonedDateTime transitStop = transit.get(lastTransit).segmentPatterns.get(transitJourneyIDs.get(lastTransit).pattern).toArrivalTime.get(transitJourneyIDs.get(lastTransit).time);
         itinerary.endTime = transitStop.plusSeconds(egress.get(egressIdx).duration);
+        itinerary.duration = (int) Duration.between(itinerary.startTime,itinerary.endTime).getSeconds();
 
         itinerary.transitTime = 0;
         int transitJourneyIDIdx=0;

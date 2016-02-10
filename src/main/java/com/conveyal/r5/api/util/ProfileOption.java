@@ -264,11 +264,17 @@ public class ProfileOption {
 
     /**
      * Adds street path between stops when transfering
+     *
+     * Also updates walkTime and distance on all itineraries with middle distance and duration
      * @param streetSegment on streetLayer
      * @param transfer object which is used to get which transitSegment is used
      */
     public void addMiddle(StreetSegment streetSegment, Transfer transfer) {
         TransitSegment transitSegment = transit.get(transfer.transitSegmentIndex);
         transitSegment.addMiddle(streetSegment);
+        for(Itinerary currentItinerary: this.itinerary) {
+            currentItinerary.walkTime += streetSegment.duration;
+            currentItinerary.distance += streetSegment.distance;
+        }
     }
 }

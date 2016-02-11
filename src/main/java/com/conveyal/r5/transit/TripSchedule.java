@@ -35,6 +35,13 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
     public int serviceCode;
     public TripSchedule nextInBlock = null;
 
+    public int[] phasedFromPattern = null;
+    public int[] phasedFromTrip = null;
+    public int[] phasedFromFrequencyEntry = null;
+    public int[] phasedFromSourceStopSequence = null;
+    public int[] phasedAtTargetStopSequence = null;
+    public int[] phaseSeconds = null;
+
     /** static factory so we can return null */
     public static TripSchedule create (Trip trip, int[] arrivals, int[] departures, int serviceCode) {
         // ensure that trip times are monotonically increasing, otherwise throw them out
@@ -158,6 +165,8 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
             // FIXME this error is extremely common in Portland because block IDs are recycled across service days.
             LOG.debug("Trip {} arrives at terminus after the next trip in its block departs.", tripId);
         }
+
+
     }
 
     /**

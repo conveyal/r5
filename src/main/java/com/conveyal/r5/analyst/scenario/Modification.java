@@ -32,7 +32,8 @@ import java.util.Set;
         @JsonSubTypes.Type(name = "convert-to-frequency", value = ConvertToFrequency.class),
         @JsonSubTypes.Type(name = "transfer-rule", value = TransferRule.class),
         @JsonSubTypes.Type(name = "scale-speed", value = ScaleSpeed.class),
-        @JsonSubTypes.Type(name = "insert-stop", value = InsertStop.class)
+        @JsonSubTypes.Type(name = "insert-stop", value = InsertStop.class),
+        @JsonSubTypes.Type(name = "set-trip-phasing", value = SetTripPhasing.class)
 })
 public abstract class Modification implements Serializable {
 

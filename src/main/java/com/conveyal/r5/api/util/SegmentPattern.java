@@ -54,7 +54,7 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
 
     //TOOD: check if we really need this
     private List<Integer> alightTimes;
-    final int patternIdx;
+    final public int patternIdx;
     final public int routeIndex;
 
 

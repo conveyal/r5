@@ -673,6 +673,7 @@ public class PointToPointRouterServer {
                     .readValue(request.body());
 
                 //TODO: deserialize variables map automatically in GraphQLRequest object
+                //FIXME: here only flat variables are supported. For example directModes:[CAR, WALK] is unsupported for now since it can't be deserialized
                 Map<String, Object> variables = graphQlRequest.variables==null ? new HashMap<>() : mapReader.readValue(graphQlRequest.variables);
                 ExecutionResult executionResult = graphQL.execute(graphQlRequest.query, null, null, variables);
                 response.status(200);

@@ -486,21 +486,20 @@ function makeTextResponse(data) {
 
 function requestPlan() {
     var request = template
-                .replace("FROMLAT", planConfig.fromLat)
-                .replace("FROMLON", planConfig.fromLon)
-                .replace("TOLAT", planConfig.toLat)
-                .replace("TOLON", planConfig.toLon)
-                .replace(/DATE/g, planConfig.date)
-                .replace("FROMTIME", planConfig.fromTime)
-                .replace("TOTIME", planConfig.toTime)
-		.replace(/OFFSET/g, planConfig.offset)
                 .replace("DIRECTMODES", planConfig.directModes)
                 .replace("ACCESSMODES", planConfig.accessModes)
                 .replace("EGRESSMODES", planConfig.egressModes)
                 .replace("TRANSITMODES", planConfig.transitModes);
     var params = {
         'query': request,
-        'variables': null
+        'variables': JSON.stringify({
+            'fromLat':planConfig.fromLat,
+            'fromLon':planConfig.fromLon,
+            'toLat': planConfig.toLat,
+            'toLon':planConfig.toLon,
+            'fromTime':planConfig.date+"T"+planConfig.fromTime+planConfig.offset,
+            'toTime':planConfig.date+"T"+planConfig.toTime+planConfig.offset
+        })
     };
 
     /*console.log(request);*/

@@ -271,9 +271,7 @@ public class ProfileRequest implements Serializable, Cloneable {
 
         String operation = environment.getFields().get(0).getName();
 
-        //This is always set otherwise GraphQL validation fails
-        HashMap<String, Float> fromCoordinate = environment.getArgument("from");
-        HashMap<String, Float> toCoordinate = environment.getArgument("to");
+
 
         //ZonedDatetime is used to fill fromTime/toTime and date
         //we need to have a network Timezone for that so that all the times are in network own timezone
@@ -311,11 +309,14 @@ public class ProfileRequest implements Serializable, Cloneable {
         }
 
 
-        profileRequest.fromLon = fromCoordinate.get("lon");
-        profileRequest.fromLat = fromCoordinate.get("lat");
+        //This is always set otherwise GraphQL validation fails
 
-        profileRequest.toLat = toCoordinate.get("lat");
-        profileRequest.toLon = toCoordinate.get("lon");
+        profileRequest.fromLat = environment.getArgument("fromLat");
+        profileRequest.fromLon = environment.getArgument("fromLon");
+
+        profileRequest.toLat = environment.getArgument("toLat");
+        profileRequest.toLon = environment.getArgument("toLon");
+
 
         profileRequest.transitModes = EnumSet.copyOf((Collection<TransitModes>) environment.getArgument("transitModes"));
         profileRequest.accessModes = EnumSet.copyOf((Collection<LegMode>) environment.getArgument("accessModes"));

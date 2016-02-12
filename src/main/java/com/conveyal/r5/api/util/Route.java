@@ -2,6 +2,7 @@ package com.conveyal.r5.api.util;
 
 import com.beust.jcommander.internal.Lists;
 import com.conveyal.r5.transit.RouteInfo;
+import com.conveyal.r5.transit.TransitLayer;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.Collection;
@@ -69,23 +70,6 @@ public class Route {
 
     }
 
-    public Route(com.conveyal.gtfs.model.Route route) {
-        id = route.route_id;
-        shortName = route.route_short_name;
-        longName = route.route_long_name;
-        //FIXME: add mode
-        //mode = GtfsLibrary.getTraverseMode(route).toString();
-        mode = TransitModes.BUS;
-        routeColor = route.route_color;
-        agencyName = route.agency.agency_name;
-    }
-
-    public static List<Route> list (Collection<com.conveyal.gtfs.model.Route> in) {
-        List<Route> out = Lists.newArrayList();
-        for (com.conveyal.gtfs.model.Route route : in) out.add(new Route(route));
-        return out;
-    }
-
 
     @Override
     public String toString() {
@@ -107,10 +91,9 @@ public class Route {
         route.longName = routeInfo.route_long_name;
         route.id = routeInfo.route_id;
         route.routeColor = routeInfo.color;
-        //TODO: get mode
-        route.mode = TransitModes.BUS;
+        route.mode = TransitLayer.getTransitModes(routeInfo.route_type);
         //FIXME: get from GTFS
-        route.agencyName = "MARPROM";
+        route.agencyName = "UNKNOWN";
         route.routeIdx = routeIndex;
 
         return route;

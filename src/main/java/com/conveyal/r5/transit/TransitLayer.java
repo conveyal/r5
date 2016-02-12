@@ -2,6 +2,7 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.*;
+import com.conveyal.r5.api.util.TransitModes;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -406,5 +407,59 @@ public class TransitLayer implements Serializable, Cloneable {
         BASIC,
         /** Load enough information for customer facing trip planning */
         FULL
+    }
+
+    public static TransitModes getTransitModes(int routeType) {
+        /* TPEG Extension  https://groups.google.com/d/msg/gtfs-changes/keT5rTPS7Y0/71uMz2l6ke0J */
+        if (routeType >= 100 && routeType < 200){ // Railway Service
+            return TransitModes.RAIL;
+        }else if (routeType >= 200 && routeType < 300){ //Coach Service
+            return TransitModes.BUS;
+        }else if (routeType >= 300 && routeType < 500){ //Suburban Railway Service and Urban Railway service
+            return TransitModes.RAIL;
+        }else if (routeType >= 500 && routeType < 700){ //Metro Service and Underground Service
+            return TransitModes.SUBWAY;
+        }else if (routeType >= 700 && routeType < 900){ //Bus Service and Trolleybus service
+            return TransitModes.BUS;
+        }else if (routeType >= 900 && routeType < 1000){ //Tram service
+            return TransitModes.TRAM;
+        }else if (routeType >= 1000 && routeType < 1100){ //Water Transport Service
+            return TransitModes.FERRY;
+        }else if (routeType >= 1100 && routeType < 1200){ //Air Service
+            throw new IllegalArgumentException("Air transport not supported" + routeType);
+        }else if (routeType >= 1200 && routeType < 1300){ //Ferry Service
+            return TransitModes.FERRY;
+        }else if (routeType >= 1300 && routeType < 1400){ //Telecabin Service
+            return TransitModes.GONDOLA;
+        }else if (routeType >= 1400 && routeType < 1500){ //Funicalar Service
+            return TransitModes.FUNICULAR;
+        }else if (routeType >= 1500 && routeType < 1600){ //Taxi Service
+            throw new IllegalArgumentException("Taxi service not supported" + routeType);
+        }
+        //Is this really needed?
+        /**else if (routeType >= 1600 && routeType < 1700){ //Self drive
+            return TransitModes.CAR;
+        }*/
+        /* Original GTFS route types. Should these be checked before TPEG types? */
+        switch (routeType) {
+        case 0:
+            return TransitModes.TRAM;
+        case 1:
+            return TransitModes.SUBWAY;
+        case 2:
+            return TransitModes.RAIL;
+        case 3:
+            return TransitModes.BUS;
+        case 4:
+            return TransitModes.FERRY;
+        case 5:
+            return TransitModes.CABLE_CAR;
+        case 6:
+            return TransitModes.GONDOLA;
+        case 7:
+            return TransitModes.FUNICULAR;
+        default:
+            throw new IllegalArgumentException("unknown gtfs route type " + routeType);
+        }
     }
 }

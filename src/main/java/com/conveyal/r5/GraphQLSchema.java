@@ -279,6 +279,8 @@ public class GraphQLSchema {
 
     public GraphQLOutputType tripType = new GraphQLTypeReference("Trip");
 
+    public GraphQLOutputType parkRideParkingType = new GraphQLTypeReference("ParkRideParking");
+
     // @formatter:off
 
 
@@ -398,6 +400,28 @@ public class GraphQLSchema {
                 .description("Stops in a cluster")
                 .type(new GraphQLList(stopType))
                 .dataFetcher(environment -> ((StopCluster) environment.getSource()).stops)
+                .build())
+            .build();
+
+        parkRideParkingType = GraphQLObjectType.newObject()
+            .name("ParkRideParking")
+            .description("Information about P+R parking lots")
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("id")
+                .type(new GraphQLNonNull(Scalars.GraphQLString))
+                .description("")
+                .dataFetcher(environment -> ((ParkRideParking) environment.getSource()).id)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("name")
+                .type(Scalars.GraphQLString)
+                .dataFetcher(environment -> ((ParkRideParking) environment.getSource()).name)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("capacity")
+                .type(Scalars.GraphQLInt)
+                .description("Number of all spaces")
+                .dataFetcher(environment -> ((ParkRideParking) environment.getSource()).capacity)
                 .build())
             .build();
 
@@ -696,6 +720,16 @@ public class GraphQLSchema {
                 .name("bikeRentalOffStation")
                 .type(bikeRentalStationType)
                 .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).bikeRentalOffStation)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("parkRideOn")
+                .type(parkRideParkingType)
+                .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).parkRideOn)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("parkRideOff")
+                .type(parkRideParkingType)
+                .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).parkRideOff)
                 .build())
             .build();
 

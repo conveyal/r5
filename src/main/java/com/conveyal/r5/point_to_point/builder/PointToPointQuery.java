@@ -331,7 +331,7 @@ public class PointToPointQuery {
             LOG.info("Usefull paths:{}", usefullpathList.size());
             int seen_paths = 0;
             int boardStop =-1, alightStop = -1;
-            for (Path path : usefullpathList) {
+            for (PathWithTimes path : usefullpathList) {
                 profileResponse.addTransitPath(accessRouter, egressRouter, stopModeAccessMap, stopModeEgressMap, path, transportNetwork, request.getFromTimeDateZD());
                 //LOG.info("Num patterns:{}", path.patterns.length);
                 //ProfileOption transit_option = new ProfileOption();

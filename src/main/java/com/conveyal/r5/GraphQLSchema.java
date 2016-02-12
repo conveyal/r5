@@ -427,19 +427,22 @@ public class GraphQLSchema {
 
         statsType = GraphQLObjectType.newObject()
             .name("Stats")
-            .field(GraphQLFieldDefinition.newFieldDefinition().name("min")
-                .type(new GraphQLNonNull(Scalars.GraphQLInt)).description("Minimal time")
-                .dataFetcher(environment -> ((Stats) environment.getSource()).min).build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("min")
+                .type(new GraphQLNonNull(Scalars.GraphQLInt))
+                .description("Minimum travel time (seconds)")
+                .dataFetcher(environment -> ((Stats) environment.getSource()).min)
+                .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("avg")
                 .type(new GraphQLNonNull(Scalars.GraphQLInt))
-                .description("Average time")
+                .description("Average travel time (including waiting) (seconds)")
                 .dataFetcher(environment -> ((Stats) environment.getSource()).avg)
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("max")
                 .type(new GraphQLNonNull(Scalars.GraphQLInt))
-                .description("Maximal time")
+                .description("Maximum travel time (seconds)")
                 .dataFetcher(environment -> ((Stats) environment.getSource()).max)
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
@@ -1280,7 +1283,7 @@ public class GraphQLSchema {
                 .defaultValue(15)
                 .build())
             .dataFetcher(environment -> {
-                return profileResponse;
+                return profileResponse.getPlan(ProfileRequest.fromEnvironment(environment, profileResponse.getTimezone()));
             })
             .build();
 

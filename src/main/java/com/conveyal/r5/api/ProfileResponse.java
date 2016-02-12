@@ -71,7 +71,7 @@ public class ProfileResponse {
      */
     public void addTransitPath(Map<LegMode, StreetRouter> accessRouter,
         Map<LegMode, StreetRouter> egressRouter, TIntObjectMap<LegMode> stopModeAccessMap,
-        TIntObjectMap<LegMode> stopModeEgressMap, Path currentTransitPath, TransportNetwork transportNetwork, ZonedDateTime fromTimeDateZD) {
+        TIntObjectMap<LegMode> stopModeEgressMap, PathWithTimes currentTransitPath, TransportNetwork transportNetwork, ZonedDateTime fromTimeDateZD) {
 
         HashPath hashPath = new HashPath(currentTransitPath);
         ProfileOption profileOption = transitToOption.getOrDefault(hashPath, new ProfileOption());

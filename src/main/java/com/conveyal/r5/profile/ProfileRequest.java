@@ -190,6 +190,9 @@ public class ProfileRequest implements Serializable, Cloneable {
 
     private SearchType searchType;
 
+    //If this is profile or point to point route request
+    private boolean profile = false;
+
     public ProfileRequest clone () {
         try {
             return (ProfileRequest) super.clone();
@@ -270,6 +273,10 @@ public class ProfileRequest implements Serializable, Cloneable {
         profileRequest.zoneId = timezone;
 
         String operation = environment.getFields().get(0).getName();
+
+        if  (operation.equals("profile")) {
+            profileRequest.profile=true;
+        }
 
 
 

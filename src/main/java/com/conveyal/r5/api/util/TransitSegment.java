@@ -2,6 +2,7 @@ package com.conveyal.r5.api.util;
 
 import com.beust.jcommander.internal.Lists;
 import com.conveyal.r5.profile.Path;
+import com.conveyal.r5.profile.PathWithTimes;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
@@ -31,7 +32,7 @@ public class TransitSegment {
     private transient TransitLayer transitLayer;
 
 
-    public TransitSegment(TransitLayer transitLayer, Path currentTransitPath, int pathIndex,
+    public TransitSegment(TransitLayer transitLayer, PathWithTimes currentTransitPath, int pathIndex,
         ZonedDateTime fromTimeDateZD, List<TransitJourneyID> transitJourneyIDs) {
         this.transitLayer = transitLayer;
         StreetLayer streetLayer = transitLayer.linkedStreetLayer;
@@ -39,6 +40,11 @@ public class TransitSegment {
         int boardStopIdx = currentTransitPath.boardStops[pathIndex];
         int alightStopIdx = currentTransitPath.alightStops[pathIndex];
         TripPattern pattern = currentTransitPath.getPattern(transitLayer, pathIndex);
+        rideStats = new Stats();
+        rideStats.max = currentTransitPath.max;
+        rideStats.min = currentTransitPath.min;
+        rideStats.avg = currentTransitPath.avg;
+        rideStats.num = currentTransitPath.length;
         if (pattern.routeIndex >= 0) {
             RouteInfo routeInfo = transitLayer.routes.get(pattern.routeIndex);
             from = new Stop(transitLayer.stopIdForIndex.get(boardStopIdx), transitLayer.stopNames.get(boardStopIdx));

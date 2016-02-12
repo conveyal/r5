@@ -2,6 +2,7 @@ package com.conveyal.r5.api.util;
 
 import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.Path;
+import com.conveyal.r5.profile.PathWithTimes;
 import com.conveyal.r5.transit.TransitLayer;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
@@ -129,7 +130,7 @@ public class ProfileOption {
      * @param fromTimeDateZD date/time object used to get date and timezone
      * @param transitJourneyIDs list of patterns and times in those patterns in this path
      */
-    public void addTransit(TransitLayer transitLayer, Path currentTransitPath, int pathIndex,
+    public void addTransit(TransitLayer transitLayer, PathWithTimes currentTransitPath, int pathIndex,
         ZonedDateTime fromTimeDateZD, List<TransitJourneyID> transitJourneyIDs) {
         //If this is first transit in this option or leg that doesn't exist yet we need to create new transitSegment
         if (transit == null || pathIndex >= transit.size()) {

@@ -7,19 +7,19 @@ package com.conveyal.r5.api.util;
 public class Stats implements Cloneable {
 
     /**
-     * Minimal time
+     * Minimum travel time (seconds)
      * @notnull
      */
     public int min = 0;
 
     /**
-     * Average time
+     * Average travel time (including waiting) (seconds)
      * @notnull
      */
     public int avg = 0;
 
     /**
-     * Maximal time
+     * Maximum travel time (seconds)
      * @notnull
      */
     public int max = 0;

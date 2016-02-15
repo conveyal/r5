@@ -122,24 +122,20 @@ public class PointToPointQuery {
                     ts.initialStopSearch += (int) (System.currentTimeMillis() - initialStopStartTime);
 
                 } else {
+                    //Searching for access paths
                     if (transit) {
                         //TIntIntMap stops = streetRouter.getReachedStops();
                         //reachedTransitStops.putAll(stops);
                         //LOG.info("Added {} stops for mode {}",stops.size(), mode);
                         accessRouter.put(mode, streetRouter);
                         ts.initialStopSearch += (int) (System.currentTimeMillis() - initialStopStartTime);
-
-                        //TODO: we need to save street paths from start to all the stops somehow
-                    }
-                    StreetRouter.State lastState = streetRouter.getState(split);
-                    if (lastState != null) {
-                        StreetPath streetPath = new StreetPath(lastState, transportNetwork);
-                        StreetSegment streetSegment = new StreetSegment(streetPath, mode,
-                            transportNetwork.streetLayer);
-                        //TODO: this needs to be different if transit is requested
-                        if (transit) {
-                            //addAccess
-                        } else {
+                    //Searching for direct paths
+                    } else{
+                        StreetRouter.State lastState = streetRouter.getState(split);
+                        if (lastState != null) {
+                            StreetPath streetPath = new StreetPath(lastState, transportNetwork);
+                            StreetSegment streetSegment = new StreetSegment(streetPath, mode,
+                                transportNetwork.streetLayer);
                             option.addDirect(streetSegment, request.getFromTimeDateZD());
                         }
 
@@ -208,7 +204,6 @@ public class PointToPointQuery {
                         end.setOrigin(cycledStations, BIKE_RENTAL_DROPOFF_TIMEMS, BIKE_RENTAL_DROPOFF_COST);
                         end.route();
                         StreetRouter.State lastState = end.getState(split);
-                        //TODO: split geometry on different modes?
                         if (lastState != null) {
                             StreetPath streetPath = new StreetPath(lastState, transportNetwork);
                             //LOG.info("{} - {}", streetPath.getStates().getFirst().getInstant(), streetPath.getStates().getLast().getInstant());
@@ -266,7 +261,7 @@ public class PointToPointQuery {
                 if (currentlyUnsupportedModes.contains(mode)) {
                     continue;
                 }
-                //TODO: add support for bike sharing and park and ride
+                //TODO: add support for bike sharing
                 streetRouter.mode = Mode.valueOf(mode.toString());
                 streetRouter.profileRequest = request;
                 // TODO add time and distance limits to routing, not just weight.
@@ -296,6 +291,8 @@ public class PointToPointQuery {
             // getPaths actually returns a set, which is important so that things are deduplicated. However we need a list
             // so we can sort it below.
             usefullpathList.addAll(router.getPaths());
+
+            //This sort is necessary only for text debug output so it will be disabled when it is finished
 
             /**
              * Orders first no transfers then one transfers 2 etc
@@ -371,11 +368,6 @@ public class PointToPointQuery {
             option.summary = option.generateSummary();
             profileResponse.addOption(option);
         }
-        /**
-         * TODO: search for transit from all stops accesed in stop trees in access search.
-         * add them to options and generate itinerary for each time option
-         * add egress part
-         */
 
         LOG.info("Returned {} options", profileResponse.getOptions().size());
 

@@ -184,6 +184,7 @@ public class PointToPointQuery {
 
                         //This finds best cycling path from best start bicycle station to end bicycle station
                         StreetRouter bicycle = new StreetRouter(transportNetwork.streetLayer);
+                        bicycle.previous = streetRouter;
                         bicycle.mode = Mode.BICYCLE;
                         bicycle.profileRequest = request;
                         bicycle.distanceLimitMeters = 100_000;
@@ -203,38 +204,13 @@ public class PointToPointQuery {
                         end.distanceLimitMeters = 2_000+100_000;
                         end.setOrigin(cycledStations, BIKE_RENTAL_DROPOFF_TIMEMS, BIKE_RENTAL_DROPOFF_COST);
                         end.route();
+                        end.previous = bicycle;
                         StreetRouter.State lastState = end.getState(split);
                         if (lastState != null) {
-                            StreetPath streetPath = new StreetPath(lastState, transportNetwork);
-                            //LOG.info("{} - {}", streetPath.getStates().getFirst().getInstant(), streetPath.getStates().getLast().getInstant());
-                            //StreetSegment streetSegment = new StreetSegment(streetPath, LegMode.WALK);
-                            //option.addDirect(streetSegment, ZonedDateTime.ofInstant(streetPath.getStates().getFirst().getInstant(), transportNetwork.getTimeZone()));
-                            StreetRouter.State endCycling = streetPath.getStates().getFirst();
-                            lastState = bicycle.getState(endCycling.vertex);
-                            if (lastState != null) {
-                                //Copies bikeshare setting
-                                lastState.isBikeShare = endCycling.isBikeShare;
-                                streetPath.add(lastState);
-                                //LOG.info("  {} - {}", streetPath.getStates().getFirst().getInstant(), lastState.getInstant());
-                                //streetSegment = new StreetSegment(new StreetPath(lastState, transportNetwork), LegMode.BICYCLE);
-                                //option.addDirect(streetSegment, ZonedDateTime.ofInstant(streetPath.getStates().getFirst().getInstant(), transportNetwork.getTimeZone()));
-                                StreetRouter.State startCycling = streetPath.getStates().getFirst();
-                                lastState = streetRouter.getState(startCycling.vertex);
-                                if (lastState != null) {
-                                    lastState.isBikeShare = startCycling.isBikeShare;
-                                    streetPath.add(lastState);
-                                    //LOG.info("    {} - {}", streetPath.getStates().getFirst().getInstant(), lastState.getInstant());
-                                    //streetSegment = new StreetSegment(new StreetPath(lastState, transportNetwork), LegMode.WALK);
-                                    //option.addDirect(streetSegment, ZonedDateTime.ofInstant(streetPath.getStates().getFirst().getInstant(), transportNetwork.getTimeZone()));
-                                    StreetSegment streetSegment = new StreetSegment(streetPath, mode,
-                                        transportNetwork.streetLayer);
-                                    option.addDirect(streetSegment, request.getFromTimeDateZD());
-                                } else {
-                                    LOG.warn("Start to cycle path missing");
-                                }
-                            } else {
-                                LOG.warn("Cycle to cycle path not found");
-                            }
+                            StreetPath streetPath = new StreetPath(lastState, end, LegMode.BICYCLE_RENT, transportNetwork);
+                            StreetSegment streetSegment = new StreetSegment(streetPath, mode,
+                                transportNetwork.streetLayer);
+                            option.addDirect(streetSegment, request.getFromTimeDateZD());
                         } else {
                             LOG.warn("Not found path from cycle to end");
                         }

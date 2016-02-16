@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -44,6 +45,46 @@ public class StreetPath {
         }
         firstState = states.getFirst();
         distance = lastState.distance;
+    }
+
+    /**
+     * Creates Streetpaths which consists of multiple parts
+     *
+     * Like in Bike sharing and P+R
+     * @param lastState last state of last streetrouter (walking from bike station or from P+R parking) this is destination
+     * @param streetRouter last streetRouter (previus routers are read from previous variable)
+     * @param mode BICYCLE_RENT is the only supported currently
+     * @param transportNetwork
+     */
+    public StreetPath(StreetRouter.State lastState, StreetRouter streetRouter, LegMode mode,
+        TransportNetwork transportNetwork) {
+        this(lastState, transportNetwork);
+        //First streetPath is part of path from last bicycle station to the end destination on foot
+        if (mode == LegMode.BICYCLE_RENT) {
+            StreetRouter.State endCycling = getStates().getFirst();
+            StreetRouter bicycle = streetRouter.previous;
+            lastState = bicycle.getState(endCycling.vertex);
+            if (lastState != null) {
+                //Copies bikeshare setting
+                lastState.isBikeShare = endCycling.isBikeShare;
+                //Here part from first bikeshare to the last bikeshare on rented bike is created
+                add(lastState);
+                StreetRouter first = bicycle.previous;
+                StreetRouter.State startCycling = getStates().getFirst();
+                lastState = first.getState(startCycling.vertex);
+                if (lastState != null) {
+                    lastState.isBikeShare = startCycling.isBikeShare;
+                    add(lastState);
+                } else {
+                    LOG.warn("Start to cycle path missing");
+                }
+            } else {
+                LOG.warn("Cycle to cycle path not found");
+            }
+        } else {
+            LOG.error("Unknown Mode in streetpath:{}", mode);
+            throw new RuntimeException("Unknown mode!");
+        }
     }
 
     public LinkedList<StreetRouter.State> getStates() {

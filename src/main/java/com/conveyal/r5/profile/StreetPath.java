@@ -81,6 +81,17 @@ public class StreetPath {
             } else {
                 LOG.warn("Cycle to cycle path not found");
             }
+        } else if(mode == LegMode.CAR_PARK) {
+             //First state in walk part of CAR PARK is state where we ended driving
+            StreetRouter.State carPark = getStates().getFirst();
+            //So we need to search for driving part in previous streetRouter
+            StreetRouter.State carState = streetRouter.previous.getState(carPark.vertex);
+            //TODO: add car park info (name, etc)
+            if (carState != null) {
+                add(carState);
+            } else {
+                LOG.warn("Missing CAR part of CAR_PARK trip in streetRouter!");
+            }
         } else {
             LOG.error("Unknown Mode in streetpath:{}", mode);
             throw new RuntimeException("Unknown mode!");

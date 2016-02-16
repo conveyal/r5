@@ -95,19 +95,12 @@ public class ProfileResponse {
                 StreetRouter streetRouter = accessRouter.get(accessMode);
                 StreetRouter.State state = streetRouter.getState(startVertexStopIndex);
                 if (state != null) {
-                    StreetPath streetPath = new StreetPath(state, transportNetwork);
-                    //TODO: add similar thing for access/egress bike share and B+R
+                    StreetPath streetPath;
                     if (accessMode == LegMode.CAR_PARK && streetRouter.previous != null) {
-                        //First state in walk part of CAR PARK is state where we ended driving
-                        StreetRouter.State carPark = streetPath.getStates().getFirst();
-                        //So we need to search for driving part in previous streetRouter
-                        StreetRouter.State carState = streetRouter.previous.getState(carPark.vertex);
-                        //TODO: add car park info (name, etc)
-                        if (carState != null) {
-                            streetPath.add(carState);
-                        } else {
-                            LOG.warn("Missing CAR part of CAR_PARK trip in streetRouter!");
-                        }
+                        streetPath = new StreetPath(state, streetRouter, accessMode,
+                            transportNetwork);
+                    } else {
+                        streetPath = new StreetPath(state, transportNetwork);
                     }
                     StreetSegment streetSegment = new StreetSegment(streetPath, accessMode, transportNetwork.streetLayer);
                     profileOption.addAccess(streetSegment, accessMode, startVertexStopIndex);

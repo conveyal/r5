@@ -247,12 +247,17 @@ public class EdgeStore implements Serializable {
      * @return a cursor pointing to the forward edge in the pair, which always has an even index.
      */
     public Edge addStreetPair(int beginVertexIndex, int endVertexIndex, int edgeLengthMillimeters) {
+        // The first new edge to be created will have an index equal to the number of existing edges.
+        int forwardEdgeIndex = nEdges();
 
+        // Extend the parallel lists in the EdgeStore to hold the values for the new edge pair.
         // Store only one length, set of endpoints, and intermediate geometry per pair of edges.
         lengths_mm.add(edgeLengthMillimeters);
         fromVertices.add(beginVertexIndex);
         toVertices.add(endVertexIndex);
         geometries.add(EMPTY_INT_ARRAY);
+
+        // Speed and flags are stored separately for each edge in a pair (unlike length, geom, etc.)
 
         // Forward edge.
         // No speed or flags are set, they must be set afterward using the edge cursor.
@@ -264,15 +269,13 @@ public class EdgeStore implements Serializable {
         speeds.add(DEFAULT_SPEED_KPH);
         flags.add(0);
 
-        // Increment total number of edges created so far, and return the index of the first new edge.
-        int forwardEdgeIndex = nEdges();
         if (isProtectiveCopy()) {
             // If we're working on a copy made for a Scenario the edges will not be spatially indexed, so record them.
             temporarilyAddedEdges.add(forwardEdgeIndex);
             temporarilyAddedEdges.add(forwardEdgeIndex + 1);
         }
-        return getCursor(forwardEdgeIndex);
 
+        return getCursor(forwardEdgeIndex);
     }
 
     /**

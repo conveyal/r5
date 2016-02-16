@@ -16,6 +16,9 @@ public class JobStatus {
     /** number of workers on this job */
     public int nWorkers;
 
+    /** The graph ID */
+    public String graphId;
+
     /** ID of this job */
     public String jobId;
 
@@ -24,6 +27,7 @@ public class JobStatus {
         this.inFlight = job.invisibleUntil.size();
         this.remaining = job.tasksAwaitingDelivery.size();
         this.jobId = job.jobId;
+        this.graphId = job.graphId;
     }
 
     /** default constructor for JSON deserialization */

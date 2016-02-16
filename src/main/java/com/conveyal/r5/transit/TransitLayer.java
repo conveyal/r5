@@ -143,7 +143,7 @@ public class TransitLayer implements Serializable, Cloneable {
         Multimap<String, TripSchedule> tripsForBlock = HashMultimap.create();
         TObjectIntMap<Route> routeIndexForRoute = new TObjectIntHashMap<>();
         int nTripsAdded = 0;
-        for (String tripId : gtfs.trips.keySet()) {
+        TRIPS: for (String tripId : gtfs.trips.keySet()) {
             Trip trip = gtfs.trips.get(tripId);
             // Construct the stop pattern and schedule for this trip
             // Should we really be resolving to an object reference for Route?
@@ -151,10 +151,24 @@ public class TransitLayer implements Serializable, Cloneable {
             TripPatternKey tripPatternKey = new TripPatternKey(trip.route.route_id);
             TIntList arrivals = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
             TIntList departures = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
+
+            int previousDeparture = Integer.MIN_VALUE;
+
             for (StopTime st : gtfs.getOrderedStopTimesForTrip(tripId)) {
                 tripPatternKey.addStopTime(st, indexForStopId);
                 arrivals.add(st.arrival_time);
                 departures.add(st.departure_time);
+
+                if (previousDeparture > st.arrival_time || st.arrival_time > st.departure_time) {
+                    LOG.warn("Reverse travel at stop {} on trip {} on route {}, skipping this trip as it will wreak havoc with routing", st.stop_id, trip.trip_id, trip.route.route_id);
+                    continue TRIPS;
+                }
+
+                if (previousDeparture == st.arrival_time) {
+                    LOG.warn("Zero-length hop at stop {} on trip {} on route {} {}", st.stop_id, trip.trip_id, trip.route.route_id, trip.route.route_short_name);
+                }
+
+                previousDeparture = st.departure_time;
             }
             TripPattern tripPattern = tripPatternForStopSequence.get(tripPatternKey);
             if (tripPattern == null) {

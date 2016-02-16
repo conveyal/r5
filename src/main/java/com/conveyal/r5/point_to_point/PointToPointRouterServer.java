@@ -312,7 +312,7 @@ public class PointToPointRouterServer {
                         cursor.seek(s);
 
                         GeoJsonFeature feature = getEdgeFeature(both, cursor, offsetBuilder,
-                            distance);
+                            distance, transportNetwork);
 
                         if (!both) {
                             //Adds fake flag oneway which is added to forward edge if permission flags on forward and backward edge differ.
@@ -327,12 +327,12 @@ public class PointToPointRouterServer {
                         }
                         features.add(feature);
 
-                        getVertexFeatures(cursor, vcursor, seenVertices, features);
+                        getVertexFeatures(cursor, vcursor, seenVertices, features, transportNetwork);
                         if (both) {
                             //backward edge
                             cursor.seek(s+1);
                             feature = getEdgeFeature(both, cursor, offsetBuilder,
-                                distance);
+                                distance, transportNetwork);
                             features.add(feature);
 
                         }
@@ -525,12 +525,12 @@ public class PointToPointRouterServer {
      * @param features
      */
     private static void getVertexFeatures(EdgeStore.Edge cursor, VertexStore.Vertex vcursor,
-        Set<Integer> seenVertices, List<GeoJsonFeature> features) {
+        Set<Integer> seenVertices, List<GeoJsonFeature> features, TransportNetwork network) {
 
         int fromVertex = cursor.getFromVertex();
         if (!seenVertices.contains(fromVertex)) {
             vcursor.seek(fromVertex);
-            GeoJsonFeature feature = getVertexFeature(vcursor);
+            GeoJsonFeature feature = getVertexFeature(vcursor, network);
             //It can be null since we only insert vertices with flags
             if (feature != null) {
                 features.add(feature);
@@ -540,7 +540,7 @@ public class PointToPointRouterServer {
         int toVertex = cursor.getToVertex();
         if (!seenVertices.contains(toVertex)) {
             vcursor.seek(toVertex);
-            GeoJsonFeature feature = getVertexFeature(vcursor);
+            GeoJsonFeature feature = getVertexFeature(vcursor, network);
             //It can be null since we only insert vertices with flags
             if (feature != null) {
                 features.add(feature);
@@ -552,14 +552,23 @@ public class PointToPointRouterServer {
     /**
      * Creates geojson feature from specified vertex
      *
-     * Currently it only does that if vertex have TRAFFIC_SIGNAL flag.
+     * Currently it only does that if vertex have TRAFFIC_SIGNAL flag, or is a transit stop.
      * Properties in GeoJSON are:
      * - vertex_id
      * - flags: TRAFFIC_SIGNAL
      * @param vertex
      * @return
      */
-    private static GeoJsonFeature getVertexFeature(VertexStore.Vertex vertex) {
+    private static GeoJsonFeature getVertexFeature(VertexStore.Vertex vertex, TransportNetwork network) {
+        if (network.transitLayer.stopForStreetVertex.containsKey(vertex.index)) {
+            // jitter transit stops slightly, in a deterministic way, so we can see if they're linked correctly
+            GeoJsonFeature feature = new GeoJsonFeature(GeometryUtils.geometryFactory.createPoint(jitter(vertex)));
+            feature.addProperty("vertex_id", vertex.index);
+            //TODO: add all flags (when there is more)
+            feature.addProperty("flags", VertexStore.VertexFlag.TRAFFIC_SIGNAL.toString());
+            return feature;
+        }
+
         if (vertex.getFlag(VertexStore.VertexFlag.TRAFFIC_SIGNAL)) {
             GeoJsonFeature feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
             feature.addProperty("vertex_id", vertex.index);
@@ -568,6 +577,19 @@ public class PointToPointRouterServer {
             return feature;
         }
         return null;
+    }
+
+    /**
+     * Jitter the location of a vertex in a deterministic way.
+     * Used to displace transit stops from the vertices they are linked to, so we can see the linking structure of
+     * complex stops.
+     */
+    public static Coordinate jitter (VertexStore.Vertex v) {
+        double lat = v.getLat();
+        lat += (v.index % 7 - 3.5) * 1e-5;
+        double lon = v.getLon();
+        lon += (v.index % 11 - 5.5) * 1e-5;
+        return new Coordinate(lon, lat);
     }
 
     private static void fillFeature(TransportNetwork transportNetwork, Mode mode,
@@ -608,13 +630,26 @@ public class PointToPointRouterServer {
      * @return
      */
     private static GeoJsonFeature getEdgeFeature(boolean both, EdgeStore.Edge cursor,
-        OffsetCurveBuilder offsetBuilder, float distance) {
+        OffsetCurveBuilder offsetBuilder, float distance, TransportNetwork network) {
         LineString geometry = cursor.getGeometry();
+        Coordinate[] coords = geometry.getCoordinates();
 
         if (both) {
-            Coordinate[] coords = offsetBuilder.getOffsetCurve(geometry.getCoordinates(),
+            coords = offsetBuilder.getOffsetCurve(coords,
                 distance);
-            geometry = GeometryUtils.geometryFactory.createLineString(coords);
+        }
+
+
+        if (network.transitLayer.stopForStreetVertex.containsKey(cursor.getFromVertex())) {
+            // from vertex is a transit stop, jitter it so that it doesn't sit exactly on top of the street vertex
+            // and so that we can see when multiple stops get linked to the same place
+            VertexStore.Vertex v = network.streetLayer.vertexStore.getCursor(cursor.getFromVertex());
+            coords[0] = jitter(v);
+        }
+
+        if (network.transitLayer.stopForStreetVertex.containsKey(cursor.getToVertex())) {
+            VertexStore.Vertex v = network.streetLayer.vertexStore.getCursor(cursor.getToVertex());
+            coords[coords.length - 1] = jitter(v);
         }
 
         GeoJsonFeature feature = new GeoJsonFeature(geometry);

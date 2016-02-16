@@ -164,6 +164,7 @@ public class TransportNetworkCache {
             LOG.info("Uploading the serialized TransportNetwork to S3 for use by other workers.");
             s3.putObject(sourceBucket, filename, cacheLocation);
             LOG.info("Done uploading the serialized TransportNetwork to S3.");
+
         } catch (Exception e) {
             // Don't break here as we do have a network to return, we just couldn't cache it.
             LOG.error("Error saving cached network", e);

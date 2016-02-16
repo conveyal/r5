@@ -7,6 +7,7 @@ import com.conveyal.osmlib.Way;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.*;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+import com.conveyal.r5.streets.EdgeStore.Edge;
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -489,7 +490,21 @@ public class StreetLayer implements Serializable {
     public int createAndLinkVertex (double lat, double lon) {
         int stopVertex = vertexStore.addVertex(lat, lon);
         int streetVertex = getOrCreateVertexNear(lat, lon);
-        edgeStore.addStreetPair(stopVertex, streetVertex, 1); // TODO maybe link edges should have a length.
+        Edge e = edgeStore.addStreetPair(stopVertex, streetVertex, 1); // TODO maybe link edges should have a length.
+
+        // Allow all modes to traverse street-to-transit link edges.
+        // In practice, mode permissions will be affected by are controlled by whatever leads into this edge.
+        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+        e.advance();
+        // set flags on reverse edge
+        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+
         return stopVertex;
     }
 

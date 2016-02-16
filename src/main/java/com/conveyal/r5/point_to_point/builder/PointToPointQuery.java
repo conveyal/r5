@@ -149,82 +149,44 @@ public class PointToPointQuery {
             //For direct modes
             for(LegMode mode: request.directModes) {
                 StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+                StreetPath streetPath = null;
                 if (currentlyUnsupportedModes.contains(mode)) {
                     continue;
                 }
+                streetRouter.profileRequest = request;
                 if (mode == LegMode.BICYCLE_RENT) {
                     if (!transportNetwork.streetLayer.bikeSharing) {
                         LOG.warn("Bike sharing trip requested but no bike sharing stations in the streetlayer");
                         continue;
                     }
-                    streetRouter.mode = Mode.WALK;
-                } else {
-                    //TODO: add support for bike sharing and park and ride
-                    streetRouter.mode = Mode.valueOf(mode.toString());
-                }
-                streetRouter.profileRequest = request;
-                // TODO add time and distance limits to routing, not just weight.
-                // TODO apply walk and bike speeds and maxBike time.
-                if (mode == LegMode.BICYCLE_RENT) {
-                    streetRouter.distanceLimitMeters = 2_000;
-                } else {
-                    streetRouter.distanceLimitMeters = 100_000; // FIXME arbitrary, and account for bike or car access mode
-                }
-                if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
-                    streetRouter.route();
-                    if (mode == LegMode.BICYCLE_RENT) {
-                        //This finds all the nearest bicycle rent stations when walking
-                        TIntObjectMap<StreetRouter.State> bikeStations = streetRouter.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
-                        LOG.info("BIKE RENT: Found {} bike stations", bikeStations.size());
-                        /*LOG.info("Start to bike share:");
-                        bikeStations.forEachEntry((idx, weight) -> {
-                            LOG.info("   {} ({})", idx, weight);
-                            return true;
-                        });*/
-
-                        //This finds best cycling path from best start bicycle station to end bicycle station
-                        StreetRouter bicycle = new StreetRouter(transportNetwork.streetLayer);
-                        bicycle.previous = streetRouter;
-                        bicycle.mode = Mode.BICYCLE;
-                        bicycle.profileRequest = request;
-                        bicycle.distanceLimitMeters = 100_000;
-                        bicycle.setOrigin(bikeStations, BIKE_RENTAL_PICKUP_TIMEMS, BIKE_RENTAL_PICKUP_COST);
-                        bicycle.route();
-                        TIntObjectMap<StreetRouter.State> cycledStations = bicycle.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
-                        LOG.info("BIKE RENT: Found {} cycled stations", cycledStations.size());
-                        /*LOG.info("Bike share to bike share:");
-                        cycledStations.forEachEntry((idx, weight) -> {
-                            LOG.info("   {} ({})", idx, weight);
-                            return true;
-                        });*/
-                        //This searches for walking path from end bicycle station to end point
-                        StreetRouter end = new StreetRouter(transportNetwork.streetLayer);
-                        end.mode = Mode.WALK;
-                        end.profileRequest = request;
-                        end.distanceLimitMeters = 2_000+100_000;
-                        end.setOrigin(cycledStations, BIKE_RENTAL_DROPOFF_TIMEMS, BIKE_RENTAL_DROPOFF_COST);
-                        end.route();
-                        end.previous = bicycle;
-                        StreetRouter.State lastState = end.getState(split);
-                        if (lastState != null) {
-                            StreetPath streetPath = new StreetPath(lastState, end, LegMode.BICYCLE_RENT, transportNetwork);
-                            StreetSegment streetSegment = new StreetSegment(streetPath, mode,
-                                transportNetwork.streetLayer);
-                            option.addDirect(streetSegment, request.getFromTimeDateZD());
-                        } else {
-                            LOG.warn("Not found path from cycle to end");
-                        }
-                    } else {
+                    streetRouter = findBikeRentalPath(request, streetRouter);
+                    if (streetRouter != null) {
                         StreetRouter.State lastState = streetRouter.getState(split);
                         if (lastState != null) {
-                            StreetPath streetPath = new StreetPath(lastState, transportNetwork);
-                            StreetSegment streetSegment = new StreetSegment(streetPath, mode, transportNetwork.streetLayer);
-                            //This always adds direct mode
-                            option.addDirect(streetSegment, request.getFromTimeDateZD());
-                        } else {
-                            LOG.warn("Direct mode last state wasn't found!");
+                            streetPath = new StreetPath(lastState, streetRouter, LegMode.BICYCLE_RENT, transportNetwork);
+
                         }
+                    } else {
+                        LOG.warn("Not found path from cycle to end");
+                        continue;
                     }
+                } else {
+                    streetRouter.mode = Mode.valueOf(mode.toString());
+                    streetRouter.distanceLimitMeters = 100_000; // FIXME arbitrary, and account for bike or car access mode
+                    if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
+                        streetRouter.route();
+                        StreetRouter.State lastState = streetRouter.getState(split);
+                        streetPath = new StreetPath(lastState, transportNetwork);
+                    } else {
+                        LOG.warn("Direct mode last state wasn't found!");
+                        continue;
+                    }
+                }
+                if (streetPath != null) {
+                    StreetSegment streetSegment = new StreetSegment(streetPath, mode,
+                        transportNetwork.streetLayer);
+                    option.addDirect(streetSegment, request.getFromTimeDateZD());
+
                 } else {
                     LOG.warn("MODE:{}, Edge near the destination coordinate wasn't found. Routing didn't start!", mode);
                 }
@@ -348,6 +310,63 @@ public class PointToPointQuery {
         LOG.info("Returned {} options", profileResponse.getOptions().size());
 
         return profileResponse;
+    }
+
+    /**
+     * Uses 3 streetSearches to first search from fromLat/fromLon to all the bike renting places in
+     * WALK mode. Then from all found bike renting places to other bike renting places with BIKE
+     * and then just routing from those found bike renting places in WALK mode.
+     *
+     * This can then be used as streetRouter for access paths or as a direct search for specific destination
+     *
+     * Last streetRouter (WALK from bike rentals) is returned
+     * @param request profileRequest from which from/to destination is used
+     * @param streetRouter where profileRequest was already set
+     * @return null if path isn't found
+     */
+    private StreetRouter findBikeRentalPath(ProfileRequest request, StreetRouter streetRouter) {
+        streetRouter.mode = Mode.WALK;
+        // TODO add time and distance limits to routing, not just weight.
+        // TODO apply walk and bike speeds and maxBike time.
+        streetRouter.distanceLimitMeters = 2_000;
+        if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
+            streetRouter.route();
+            //This finds all the nearest bicycle rent stations when walking
+            TIntObjectMap<StreetRouter.State> bikeStations = streetRouter.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
+            LOG.info("BIKE RENT: Found {} bike stations", bikeStations.size());
+                        /*LOG.info("Start to bike share:");
+                        bikeStations.forEachEntry((idx, weight) -> {
+                            LOG.info("   {} ({})", idx, weight);
+                            return true;
+                        });*/
+
+            //This finds best cycling path from best start bicycle station to end bicycle station
+            StreetRouter bicycle = new StreetRouter(transportNetwork.streetLayer);
+            bicycle.previous = streetRouter;
+            bicycle.mode = Mode.BICYCLE;
+            bicycle.profileRequest = request;
+            bicycle.distanceLimitMeters = 100_000;
+            bicycle.setOrigin(bikeStations, BIKE_RENTAL_PICKUP_TIMEMS, BIKE_RENTAL_PICKUP_COST);
+            bicycle.route();
+            TIntObjectMap<StreetRouter.State> cycledStations = bicycle.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
+            LOG.info("BIKE RENT: Found {} cycled stations", cycledStations.size());
+                        /*LOG.info("Bike share to bike share:");
+                        cycledStations.forEachEntry((idx, weight) -> {
+                            LOG.info("   {} ({})", idx, weight);
+                            return true;
+                        });*/
+            //This searches for walking path from end bicycle station to end point
+            StreetRouter end = new StreetRouter(transportNetwork.streetLayer);
+            end.mode = Mode.WALK;
+            end.profileRequest = request;
+            end.distanceLimitMeters = 2_000 + 100_000;
+            end.setOrigin(cycledStations, BIKE_RENTAL_DROPOFF_TIMEMS, BIKE_RENTAL_DROPOFF_COST);
+            end.route();
+            end.previous = bicycle;
+            return end;
+        } else {
+            return null;
+        }
     }
 
     /** Combine the results of several street searches using different modes into a single map

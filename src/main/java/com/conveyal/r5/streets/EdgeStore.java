@@ -714,6 +714,16 @@ public class EdgeStore implements Serializable {
             return edgeIndex >= firstModifiableEdge;
         }
 
+        /**
+         * Set the flags for all on-street modes of transportation to "true", so that any mode can traverse this edge.
+         */
+        public void allowAllModes() {
+            setFlag(EdgeFlag.ALLOWS_PEDESTRIAN);
+            setFlag(EdgeFlag.ALLOWS_BIKE);
+            setFlag(EdgeFlag.ALLOWS_CAR);
+            setFlag(EdgeFlag.ALLOWS_WHEELCHAIR);
+        }
+
     }
 
     /**

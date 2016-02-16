@@ -491,20 +491,11 @@ public class StreetLayer implements Serializable {
         int stopVertex = vertexStore.addVertex(lat, lon);
         int streetVertex = getOrCreateVertexNear(lat, lon);
         Edge e = edgeStore.addStreetPair(stopVertex, streetVertex, 1); // TODO maybe link edges should have a length.
-
         // Allow all modes to traverse street-to-transit link edges.
-        // In practice, mode permissions will be affected by are controlled by whatever leads into this edge.
-        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
-        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
-        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+        // In practice, mode permissions will be controlled by whatever street edges lead up to these link edges.
+        e.allowAllModes(); // forward edge
         e.advance();
-        // set flags on reverse edge
-        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
-        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
-        e.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
-
+        e.allowAllModes(); // backward edge
         return stopVertex;
     }
 

@@ -100,9 +100,35 @@ public class PointToPointQuery {
                     accessRouter.put(LegMode.CAR_PARK, streetRouter);
                     ts.initialStopSearch += (int) (System.currentTimeMillis() - initialStopStartTime);
                 } else {
-                    LOG.warn("MODE:{}, Edge near the origin coordinate wasn't found. Routing didn't start!", mode);
+                    LOG.warn(
+                        "MODE:{}, Edge near the origin coordinate wasn't found. Routing didn't start!",
+                        mode);
                 }
                 continue;
+            } else if (mode == LegMode.BICYCLE_RENT) {
+                if (!transportNetwork.streetLayer.bikeSharing) {
+                    LOG.warn("Bike sharing trip requested but no bike sharing stations in the streetlayer");
+                    continue;
+                }
+                streetRouter = findBikeRentalPath(request, streetRouter);
+                if (streetRouter != null) {
+                    if (transit) {
+                        accessRouter.put(LegMode.BICYCLE_RENT, streetRouter);
+                        continue;
+                    } else {
+                        StreetRouter.State lastState = streetRouter.getState(split);
+                        if (lastState != null) {
+                            streetPath = new StreetPath(lastState, streetRouter, LegMode.BICYCLE_RENT, transportNetwork);
+
+                        } else {
+                            LOG.warn("MODE:{}, Edge near the destination coordinate wasn't found. Routing didn't start!", mode);
+                            continue;
+                        }
+                    }
+                } else {
+                    LOG.warn("Not found path from cycle to end");
+                    continue;
+                }
             } else {
                 //TODO: add support for bike sharing and park and ride
                 streetRouter.mode = Mode.valueOf(mode.toString());

@@ -88,62 +88,57 @@ public class PointToPointQuery {
         for(LegMode mode: modes) {
             long initialStopStartTime = System.currentTimeMillis();
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+            StreetPath streetPath;
+            streetRouter.profileRequest = request;
             if (mode == LegMode.CAR_PARK && !transit) {
                 LOG.warn("Can't search for P+R without transit");
                 continue;
             }
             if (mode == LegMode.CAR_PARK) {
-                streetRouter.mode = Mode.CAR;
+                streetRouter = findParkRidePath(request, streetRouter);
+                if (streetRouter != null) {
+                    accessRouter.put(LegMode.CAR_PARK, streetRouter);
+                    ts.initialStopSearch += (int) (System.currentTimeMillis() - initialStopStartTime);
+                } else {
+                    LOG.warn("MODE:{}, Edge near the origin coordinate wasn't found. Routing didn't start!", mode);
+                }
+                continue;
             } else {
                 //TODO: add support for bike sharing and park and ride
                 streetRouter.mode = Mode.valueOf(mode.toString());
-            }
-            streetRouter.profileRequest = request;
-            // TODO add time and distance limits to routing, not just weight.
-            // TODO apply walk and bike speeds and maxBike time.
-            streetRouter.distanceLimitMeters = transit ? 2000 : 100_000; // FIXME arbitrary, and account for bike or car access mode
-            if (mode == LegMode.CAR_PARK) {
-                streetRouter.distanceLimitMeters = 15_000;
-            }
-            if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
-                streetRouter.route();
-                if (mode == LegMode.CAR_PARK) {
-                    TIntObjectMap<StreetRouter.State> carParks = streetRouter.getReachedVertices(
-                        VertexStore.VertexFlag.PARK_AND_RIDE);
-                    LOG.info("CAR PARK: Found {} car parks", carParks.size());
-                    StreetRouter walking = new StreetRouter(transportNetwork.streetLayer);
-                    walking.mode = Mode.WALK;
-                    walking.profileRequest = request;
-                    walking.distanceLimitMeters = 2_000+streetRouter.distanceLimitMeters;
-                    walking.setOrigin(carParks, CAR_PARK_DROPOFF_TIMEMS, CAR_PARK_DROPOFF_COST);
-                    walking.route();
-                    walking.previous = streetRouter;
-                    accessRouter.put(LegMode.CAR_PARK, walking);
-                    ts.initialStopSearch += (int) (System.currentTimeMillis() - initialStopStartTime);
-
-                } else {
-                    //Searching for access paths
+                // TODO add time and distance limits to routing, not just weight.
+                // TODO apply walk and bike speeds and maxBike time.
+                streetRouter.distanceLimitMeters = transit ? 2000 : 100_000; // FIXME arbitrary, and account for bike or car access mode
+                if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
+                    streetRouter.route();
+                     //Searching for access paths
                     if (transit) {
                         //TIntIntMap stops = streetRouter.getReachedStops();
                         //reachedTransitStops.putAll(stops);
                         //LOG.info("Added {} stops for mode {}",stops.size(), mode);
                         accessRouter.put(mode, streetRouter);
                         ts.initialStopSearch += (int) (System.currentTimeMillis() - initialStopStartTime);
+                        continue;
                     //Searching for direct paths
                     } else{
                         StreetRouter.State lastState = streetRouter.getState(split);
                         if (lastState != null) {
-                            StreetPath streetPath = new StreetPath(lastState, transportNetwork);
-                            StreetSegment streetSegment = new StreetSegment(streetPath, mode,
-                                transportNetwork.streetLayer);
-                            option.addDirect(streetSegment, request.getFromTimeDateZD());
+                            streetPath = new StreetPath(lastState, transportNetwork);
+                        } else {
+                            LOG.warn("MODE:{}, Edge near the end coordinate wasn't found. Routing didn't start!", mode);
+                            continue;
                         }
 
                     }
+                } else {
+                    LOG.warn("MODE:{}, Edge near the origin coordinate wasn't found. Routing didn't start!", mode);
+                    continue;
                 }
-            } else {
-                LOG.warn("MODE:{}, Edge near the origin coordinate wasn't found. Routing didn't start!", mode);
             }
+            StreetSegment streetSegment = new StreetSegment(streetPath, mode,
+                transportNetwork.streetLayer);
+            option.addDirect(streetSegment, request.getFromTimeDateZD());
+
         }
         if (transit) {
             //For direct modes
@@ -306,6 +301,36 @@ public class PointToPointQuery {
         LOG.info("Returned {} options", profileResponse.getOptions().size());
 
         return profileResponse;
+    }
+
+    /**
+     * Uses 2 streetSearches to get P+R path
+     *
+     * First CAR search from fromLat/fromLon to all car parks. Then from those found places WALK search.
+     *
+     * Result is then used as access part. Since P+R in direct mode is useless.
+     * @param request profileRequest from which from/to destination is used
+     * @param streetRouter where profileRequest was already set
+     * @return null if path isn't found
+     */
+    private StreetRouter findParkRidePath(ProfileRequest request, StreetRouter streetRouter) {
+        streetRouter.mode = Mode.CAR;
+        streetRouter.distanceLimitMeters = 15_000;
+        if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
+            streetRouter.route();
+            TIntObjectMap<StreetRouter.State> carParks = streetRouter.getReachedVertices(VertexStore.VertexFlag.PARK_AND_RIDE);
+            LOG.info("CAR PARK: Found {} car parks", carParks.size());
+            StreetRouter walking = new StreetRouter(transportNetwork.streetLayer);
+            walking.mode = Mode.WALK;
+            walking.profileRequest = request;
+            walking.distanceLimitMeters = 2_000 + streetRouter.distanceLimitMeters;
+            walking.setOrigin(carParks, CAR_PARK_DROPOFF_TIMEMS, CAR_PARK_DROPOFF_COST);
+            walking.route();
+            walking.previous = streetRouter;
+            return walking;
+        } else {
+            return null;
+        }
     }
 
     /**

@@ -149,10 +149,7 @@ public class PointToPointQuery {
             //For direct modes
             for(LegMode mode: request.directModes) {
                 StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
-                StreetPath streetPath = null;
-                if (currentlyUnsupportedModes.contains(mode)) {
-                    continue;
-                }
+                StreetPath streetPath;
                 streetRouter.profileRequest = request;
                 if (mode == LegMode.BICYCLE_RENT) {
                     if (!transportNetwork.streetLayer.bikeSharing) {
@@ -165,6 +162,9 @@ public class PointToPointQuery {
                         if (lastState != null) {
                             streetPath = new StreetPath(lastState, streetRouter, LegMode.BICYCLE_RENT, transportNetwork);
 
+                        } else {
+                            LOG.warn("MODE:{}, Edge near the destination coordinate wasn't found. Routing didn't start!", mode);
+                            continue;
                         }
                     } else {
                         LOG.warn("Not found path from cycle to end");
@@ -182,14 +182,10 @@ public class PointToPointQuery {
                         continue;
                     }
                 }
-                if (streetPath != null) {
-                    StreetSegment streetSegment = new StreetSegment(streetPath, mode,
-                        transportNetwork.streetLayer);
-                    option.addDirect(streetSegment, request.getFromTimeDateZD());
 
-                } else {
-                    LOG.warn("MODE:{}, Edge near the destination coordinate wasn't found. Routing didn't start!", mode);
-                }
+                StreetSegment streetSegment = new StreetSegment(streetPath, mode,
+                    transportNetwork.streetLayer);
+                option.addDirect(streetSegment, request.getFromTimeDateZD());
             }
 
             //For egress

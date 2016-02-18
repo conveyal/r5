@@ -7,9 +7,7 @@ import com.conveyal.r5.transit.TripSchedule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 /**
  * Set the phase between two frequency-based patterns.
@@ -39,7 +37,7 @@ public class SetTripPhasing extends Modification {
 
     @Override
     protected TransitLayer applyToTransitLayer(TransitLayer originalTransitLayer) {
-        List<TripSchedule> targetTrips = new ArrayList<>();
+        Map<TripSchedule, TripPattern> targetTrips = new HashMap<>();
         TripSchedule sourceTrip = null;
         int sourcePattern = -1;
         int sourceTripIndex = -1;
@@ -106,7 +104,7 @@ public class SetTripPhasing extends Modification {
 
                         schedule = schedule.clone();
 
-                        targetTrips.add(schedule);
+                        targetTrips.put(schedule, pattern);
                     }
                 }
 
@@ -128,7 +126,10 @@ public class SetTripPhasing extends Modification {
         while (sourceTrip.stopSequences[sourceStopPosition] != sourceStopSequence) sourceStopPosition++;
 
 
-        for (TripSchedule schedule : targetTrips) {
+        for (Map.Entry<TripSchedule, TripPattern> entry : targetTrips.entrySet()) {
+            TripSchedule schedule = entry.getKey();
+            TripPattern pattern = entry.getValue();
+
             // TODO we compute this on every iteration but only allow a single target stop sequence
             // Also note that this breaks when the target trips have the same pattern but not the same stop sequences.
             int targetStopPosition = 0;
@@ -151,6 +152,27 @@ public class SetTripPhasing extends Modification {
 
             schedule.phaseSeconds = new int[schedule.headwaySeconds.length];
             Arrays.fill(schedule.phaseSeconds, phaseSeconds);
+
+            TripPattern sourcePatternObj = originalTransitLayer.tripPatterns.get(sourcePattern);
+            int sourceRouteIdx = sourcePatternObj.routeIndex;
+            String sourceRouteName = originalTransitLayer.routes.get(sourceRouteIdx).route_short_name + " " + originalTransitLayer.routes.get(sourceRouteIdx).route_long_name;
+            String sourceFinalStop = originalTransitLayer.stopNames.get(sourcePatternObj.stops[sourcePatternObj.stops.length - 1]);
+            String sourcePhaseStop = originalTransitLayer.stopNames.get(sourcePatternObj.stops[sourceStopPosition]);
+            int sourceStopCount = sourcePatternObj.stops.length;
+
+            int targetRouteIdx = pattern.routeIndex;
+            String targetRouteName = originalTransitLayer.routes.get(targetRouteIdx).route_short_name + " " + originalTransitLayer.routes.get(targetRouteIdx).route_long_name;
+            String targetFinalStop = originalTransitLayer.stopNames.get(pattern.stops[pattern.stops.length - 1]);
+            String targetPhaseStop = originalTransitLayer.stopNames.get(pattern.stops[targetStopPosition]);
+            int targetStopCount = pattern.stops.length;
+
+
+            LOG.info("Applying phase of {} seconds\n" +
+                    "   from route {} trip towards {} with {} stops at stop {} (trip id {})\n" +
+                    "     to route {} trip towards {} with {} stops at stop {} (trip id {})",
+                    phaseSeconds,
+                    sourceRouteName, sourceFinalStop, sourceStopCount, sourcePhaseStop, sourceTrip.tripId,
+                    targetRouteName, targetFinalStop, targetStopCount, targetPhaseStop, schedule.tripId);
         }
 
         return out;

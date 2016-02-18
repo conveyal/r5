@@ -55,6 +55,10 @@ public abstract class Modification implements Serializable {
      */
     public List<String> activeInVariants;
 
+    /**
+     * The "resolve" method is called on each Modification before it is applied. If any problems are detected, the
+     * Modification should not be applied, and this Set should contain Strings describing all the problems.
+     */
     public final Set<String> warnings = new HashSet<String>();
 
     /**
@@ -87,13 +91,13 @@ public abstract class Modification implements Serializable {
      * 2. Resolve any GTFS IDs contained in this Modification to integer IDs in the given TransportNetwork.
      * 3. Sanity check the resulting values to allow early failure, avoiding missing identifiers, infinite loops etc.
      *
-     * A particular Modification instance should only be used by one thread on a single TransportNetwork, so it is
-     * fine to store the canonical parameter representations and resolved IDs in instance fields.
+     * A particular Modification instance should only be used by one thread on a single TransportNetwork, so it is fine
+     * to store the canonical parameter representations and resolved IDs in instance fields of Modification subclasses.
      *
      * The function should return true if it encounters an out of range, missing, or otherwise problematic parameter,
      * rather than throwing an exception. Besides providing cleaner program flow, this allows us to accumulate and
      * provide more error messages at once, rather than reporting only the first error encountered. Messages describing
-     * the errors encountered should be added to collection in the field "warnings".
+     * the errors encountered should be added to the list of Strings in the field "warnings".
      */
     public boolean resolve (TransportNetwork network) {
         // Default implementation: do nothing and affirm that there are no known problems with the parameters.

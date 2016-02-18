@@ -34,6 +34,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.IntStream;
 
 /** Add a trip pattern */
 public class AddTripPattern extends TransitLayerModification {
@@ -288,8 +289,11 @@ public class AddTripPattern extends TransitLayerModification {
             freq.end_time = timetable.endTime;
             freq.headway_secs = timetable.headwaySecs;
             trip.frequencies = Lists.newArrayList(freq);
-            schedules.add(TripSchedule.create(trip, arrivals, departures, serviceCode));
+            schedules.add(TripSchedule.create(trip, arrivals, departures, IntStream.range(0, arrivals.length).toArray(), serviceCode));
         } else {
+            // TODO if the trip is not a frequency trip should we be creating multiple schedules?
+            // my understanding had been that when frequency == false, endTime and headway are ignored and the trip is
+            // assumed to only run once.
             for (int t = timetable.startTime; t < timetable.endTime; t += timetable.headwaySecs) {
                 int[] shiftedArrivals = new int[arrivals.length];
                 int[] shiftedDepartures = new int[departures.length];
@@ -297,7 +301,7 @@ public class AddTripPattern extends TransitLayerModification {
                     shiftedArrivals[i] = arrivals[i] + t;
                     shiftedDepartures[i] = departures[i] + t;
                 }
-                schedules.add(TripSchedule.create(trip, shiftedArrivals, shiftedDepartures, serviceCode));
+                schedules.add(TripSchedule.create(trip, shiftedArrivals, shiftedDepartures, IntStream.range(0, arrivals.length).toArray(), serviceCode));
             }
         }
         return schedules;

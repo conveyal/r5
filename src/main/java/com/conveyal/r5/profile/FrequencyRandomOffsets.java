@@ -75,11 +75,15 @@ public class FrequencyRandomOffsets {
                     else {
                         for (int tripIndex = 0; tripIndex < val[tripScheduleIndex].length; tripIndex++) {
                             if (schedule.phasedFromPattern == null || schedule.phasedFromPattern[tripIndex] == -1) {
-                                // not phased
-                                val[tripScheduleIndex][tripIndex] = mt.nextInt(schedule.headwaySeconds[tripIndex]);
-                                remaining--;
+                                // not phased. also, don't overwrite on each iteration, as other trips may be phased from this one
+                                if (val[tripScheduleIndex][tripIndex] == -1) {
+                                    val[tripScheduleIndex][tripIndex] = mt.nextInt(schedule.headwaySeconds[tripIndex]);
+                                    remaining--;
+                                }
                             }
                             else {
+                                if (val[tripScheduleIndex][tripIndex] != -1) continue; // already randomized
+
                                 // check if it's already been randomized
                                 int previousOffset = offsets.get(schedule.phasedFromPattern[tripIndex])[schedule.phasedFromTrip[tripIndex]][schedule.phasedFromFrequencyEntry[tripIndex]];
 
@@ -89,14 +93,17 @@ public class FrequencyRandomOffsets {
 
                                     // figure out the offset if they were to pass the stops at the same time
                                     int timeAtSourceStop = phaseFromSchedule.startTimes[tripIndex] +
-                                            phaseFromSchedule.arrivals[schedule.phasedFromSourceStopSequence[tripIndex]] +
+                                            phaseFromSchedule.arrivals[schedule.phasedFromSourceStopPosition[tripIndex]] +
                                             previousOffset;
 
                                     // figure out when the target trip passes the stop if the offset were 0.
                                     int timeAtTargetStop = schedule.startTimes[tripIndex] +
-                                            schedule.arrivals[schedule.phasedAtTargetStopSequence[tripIndex]];
+                                            schedule.arrivals[schedule.phasedAtTargetStopPosition[tripIndex]];
 
                                     int offset = timeAtSourceStop - timeAtTargetStop;
+
+                                    // this is the offset so the trips arrive at the same time. We now add the desired phase.
+                                    offset += schedule.phaseSeconds[tripIndex];
 
                                     // make sure it's positive
                                     while (offset < 0) offset += schedule.headwaySeconds[tripIndex];

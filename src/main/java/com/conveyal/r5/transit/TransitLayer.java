@@ -151,6 +151,7 @@ public class TransitLayer implements Serializable, Cloneable {
             TripPatternKey tripPatternKey = new TripPatternKey(trip.route.route_id);
             TIntList arrivals = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
             TIntList departures = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
+            TIntList stopSequences = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
 
             int previousDeparture = Integer.MIN_VALUE;
 
@@ -158,6 +159,7 @@ public class TransitLayer implements Serializable, Cloneable {
                 tripPatternKey.addStopTime(st, indexForStopId);
                 arrivals.add(st.arrival_time);
                 departures.add(st.departure_time);
+                stopSequences.add(st.stop_sequence);
 
                 if (previousDeparture > st.arrival_time || st.arrival_time > st.departure_time) {
                     LOG.warn("Reverse travel at stop {} on trip {} on route {}, skipping this trip as it will wreak havoc with routing", st.stop_id, trip.trip_id, trip.route.route_id);
@@ -169,6 +171,13 @@ public class TransitLayer implements Serializable, Cloneable {
                 }
 
                 previousDeparture = st.departure_time;
+
+
+
+
+
+
+
             }
             TripPattern tripPattern = tripPatternForStopSequence.get(tripPatternKey);
             if (tripPattern == null) {
@@ -195,7 +204,7 @@ public class TransitLayer implements Serializable, Cloneable {
 
             // TODO there's no reason why we can't just filter trips like this, correct?
             // TODO this means that invalid trips still have empty patterns created
-            TripSchedule tripSchedule = TripSchedule.create(trip, arrivals.toArray(), departures.toArray(), serviceCode);
+            TripSchedule tripSchedule = TripSchedule.create(trip, arrivals.toArray(), departures.toArray(), stopSequences.toArray(), serviceCode);
             if (tripSchedule == null) continue;
 
             tripPattern.addTrip(tripSchedule);

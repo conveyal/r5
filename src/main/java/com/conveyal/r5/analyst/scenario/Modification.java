@@ -33,7 +33,11 @@ import java.util.Set;
         @JsonSubTypes.Type(name = "transfer-rule", value = TransferRule.class),
         @JsonSubTypes.Type(name = "scale-speed", value = ScaleSpeed.class),
         @JsonSubTypes.Type(name = "insert-stop", value = InsertStop.class),
-        @JsonSubTypes.Type(name = "set-trip-phasing", value = SetTripPhasing.class)
+        @JsonSubTypes.Type(name = "set-trip-phasing", value = SetTripPhasing.class),
+        // HACK: this modification type should only be instantiated as a member of SetTripPhasing, and Jackson shouldn't
+        // need type info because there is no polymorphism where it is used. Why, one might ask, is the class that selects
+        // a frequency entry a Modification? Because it recycles the code that matches trip patterns and trips, that's why.
+        @JsonSubTypes.Type(name = "frequency-entry-selector", value= SetTripPhasing.FrequencyEntrySelector.class)
 })
 public abstract class Modification implements Serializable {
 

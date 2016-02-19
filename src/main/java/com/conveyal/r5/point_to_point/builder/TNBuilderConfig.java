@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
+import java.io.File;
+
 /**
  * These are parameters that when changed, necessitate a Graph rebuild.
  * They are distinct from the RouterParameters which can be applied to a pre-built graph or on the fly at runtime.
@@ -114,6 +116,11 @@ public class TNBuilderConfig {
      */
     public final boolean staticBikeParkAndRide;
 
+    /**
+     * Path to bikeRental file currently only XML is support and file needs to be in same folder as OSM files
+     */
+    public String bikeRentalFile;
+
     public TNBuilderConfig() {
         htmlAnnotations = false;
         maxHtmlAnnotationsPerFile = 1000;
@@ -130,6 +137,7 @@ public class TNBuilderConfig {
         staticBikeRental = false;
         staticParkAndRide = true;
         staticBikeParkAndRide = false;
+        bikeRentalFile = null;
         speeds = SpeedConfig.defaultConfig();
     }
 
@@ -148,5 +156,12 @@ public class TNBuilderConfig {
             e.printStackTrace();
             return "Failure";
         }
+    }
+
+    public void fillPath(String parent) {
+        if (bikeRentalFile == null) {
+            return;
+        }
+        bikeRentalFile = new File(parent, bikeRentalFile).getAbsolutePath();
     }
 }

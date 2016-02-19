@@ -30,7 +30,14 @@ public class StreetRouter {
 
     public final StreetLayer streetLayer;
 
-    public int distanceLimitMeters = 2_000;
+    /**
+     * It uses all nonzero limit as a limit whichever gets hit first
+     * For example if distanceLimitMeters > 0 it is used as a limit. But if it isn't
+     * timeLimitSeconds is used if it is bigger then 0. If both limits are 0 or both are set
+     * warning is shown and both are used.
+     */
+    public int distanceLimitMeters = 0;
+    public int timeLimitSeconds = 0;
 
     TIntObjectMap<State> bestStates = new TIntObjectHashMap<>();
 
@@ -48,6 +55,15 @@ public class StreetRouter {
     private RoutingVisitor routingVisitor;
 
     private Split originSplit;
+
+    /**
+     * Here is previous streetRouter in multi router search
+     * For example if we are searching for P+R we need 2 street searches
+     * First from start to all car parks and next from all the car parks to transit stops
+     * <p>
+     * Second street router has first one in previous. This is needed so the paths can be reconstructed in response
+     **/
+    public StreetRouter previous;
 
     public void setRoutingVisitor(RoutingVisitor routingVisitor) {
         this.routingVisitor = routingVisitor;
@@ -91,6 +107,21 @@ public class StreetRouter {
     }
 
     /**
+     * @return a map where all the keys are vertex indexes with the particular flag and all the values are states.
+     */
+    public TIntObjectMap<State> getReachedVertices (VertexStore.VertexFlag flag) {
+        TIntObjectMap<State> result = new TIntObjectHashMap<>();
+        bestStates.forEachEntry((vertexIndex, state) -> {
+            VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor(vertexIndex);
+            if (vertex.getFlag(flag)) {
+                result.put(vertexIndex, state);
+            }
+            return true;
+        });
+        return result;
+    }
+
+    /**
      * Get a distance table to all street vertices touched by the last search operation on this StreetRouter.
      * @return A packed list of (vertex, distance) for every reachable street vertex.
      * This is currently returning the weight, which is the distance in meters.
@@ -124,8 +155,8 @@ public class StreetRouter {
         originSplit = split;
         bestStates.clear();
         queue.clear();
-        State startState0 = new State(split.vertex0, -1, profileRequest.getFromTimeDate(), null);
-        State startState1 = new State(split.vertex1, -1, profileRequest.getFromTimeDate(), null);
+        State startState0 = new State(split.vertex0, -1, profileRequest.getFromTimeDate(), mode);
+        State startState1 = new State(split.vertex1, -1, profileRequest.getFromTimeDate(), mode);
         // TODO walk speed, assuming 1 m/sec currently.
         startState0.weight = split.distance0_mm / 1000;
         startState1.weight = split.distance1_mm / 1000;
@@ -138,14 +169,72 @@ public class StreetRouter {
     public void setOrigin (int fromVertex) {
         bestStates.clear();
         queue.clear();
-        State startState = new State(fromVertex, -1, profileRequest.getFromTimeDate(), null);
+        State startState = new State(fromVertex, -1, profileRequest.getFromTimeDate(), mode);
         queue.add(startState);
     }
 
     /**
+     * Adds multiple origins.
+     *
+     * Each bike Station is one origin. Weight is copied from state.
+     * @param bikeStations map of bikeStation vertexIndexes and states Return of {@link #getReachedVertices(VertexStore.VertexFlag)}}
+     * @param switchTime How many ms is added to state time (this is used when switching modes, renting bike, parking a car etc.)
+     * @param switchCost This is added to the weight and is a cost of switching modes
+     */
+    public void setOrigin(TIntObjectMap<State> bikeStations, int switchTime, int switchCost) {
+        bestStates.clear();
+        queue.clear();
+        bikeStations.forEachEntry((vertexIdx, bikeStationState) -> {
+           State state = new State(vertexIdx, -1, bikeStationState.getTime()+switchTime, mode);
+            state.weight = bikeStationState.weight+switchCost;
+            state.isBikeShare = true;
+            queue.add(state);
+            return true;
+        });
+
+    }
+
+    /**
      * Call one of the setOrigin functions first.
+     *
+     * It uses all nonzero limit as a limit whichever gets hit first
+     * For example if distanceLimitMeters > 0 it is used a limit. But if it isn't
+     * timeLimitSeconds is used if it is bigger then 0. If both limits are 0 or both are set
+     * warning is shown and both are used.
      */
     public void route () {
+
+        final int distanceLimitMm;
+        //This is needed otherwise timeLimitSeconds gets changed and
+        // on next call of route on same streetRouter wrong warnings are returned
+        // (since timeLimitSeconds is MAX_INTEGER not 0)
+        final int tmpTimeLimitSeconds;
+
+        if (distanceLimitMeters > 0) {
+            //Distance in State is in mm wanted distance is in meters which means that conversion is necessary
+            distanceLimitMm = distanceLimitMeters * 1000;
+        } else {
+            //We need to set distance limit to largest possible value otherwise nothing would get routed
+            //since first edge distance would be larger then 0 m and routing would stop
+            distanceLimitMm = Integer.MAX_VALUE;
+        }
+        if (timeLimitSeconds > 0) {
+            tmpTimeLimitSeconds = timeLimitSeconds;
+        } else {
+            //Same issue with time limit
+            tmpTimeLimitSeconds = Integer.MAX_VALUE;
+        }
+
+        if (timeLimitSeconds > 0 && distanceLimitMeters > 0) {
+            LOG.warn("Both distance limit of {}m and time limit of {}s are set in streetrouter", distanceLimitMeters, timeLimitSeconds);
+        } else if (timeLimitSeconds == 0 && distanceLimitMeters == 0) {
+            LOG.warn("Distance and time limit are set to 0 in streetrouter. This means NO LIMIT in searching so WHOLE of street graph will be searched. This can be slow.");
+        } else if (distanceLimitMeters > 0) {
+            LOG.info("Using distance limit of {}m", distanceLimitMeters);
+        } else if (timeLimitSeconds > 0) {
+            LOG.info("Using time limit of {}s", timeLimitSeconds);
+        }
+
         if (queue.size() == 0) {
             LOG.warn("Routing without first setting an origin, no search will happen.");
         }
@@ -193,7 +282,7 @@ public class StreetRouter {
 
                 State s1 = edge.traverse(s0, mode, profileRequest);
 
-                if (s1 != null && s1.weight <= distanceLimitMeters) {
+                if (s1 != null && s1.distance <= distanceLimitMm && s1.getDurationSeconds() < tmpTimeLimitSeconds) {
                     queue.add(s1);
                 }
 
@@ -246,20 +335,44 @@ public class StreetRouter {
         }
     }
 
+    /**
+     * Returns best state of this vertexIndex
+     * @param vertexIndex
+     * @return
+     */
+    public State getState(int vertexIndex) {
+        return bestStates.get(vertexIndex);
+    }
+
     public static class State implements Cloneable {
         public int vertex;
         public int weight;
         public int backEdge;
         // the current time at this state, in milliseconds UNIX time
         protected Instant time;
+        protected int durationSeconds;
+        //Distance in mm
+        public int distance;
+        public Mode mode;
         public State backState; // previous state in the path chain
-        public State nextState; // next state at the same location (for turn restrictions and other cases with co-dominant states)
+        public boolean isBikeShare = false; //is true if vertex in this state is Bike sharing station where mode switching occurs
         public State(int atVertex, int viaEdge, long fromTimeDate, State backState) {
             this.vertex = atVertex;
             this.backEdge = viaEdge;
             this.backState = backState;
             this.time = Instant.ofEpochMilli(fromTimeDate);
+            this.distance = backState.distance;
+            this.durationSeconds = backState.durationSeconds;
+        }
 
+        public State(int atVertex, int viaEdge, long fromTimeDate, Mode mode) {
+            this.vertex = atVertex;
+            this.backEdge = viaEdge;
+            this.backState = null;
+            this.time = Instant.ofEpochMilli(fromTimeDate);
+            this.distance = 0;
+            this.mode = mode;
+            this.durationSeconds = 0;
         }
 
 
@@ -272,9 +385,15 @@ public class StreetRouter {
             }
             if (false) {
                 time = time.minusSeconds(seconds);
+                durationSeconds+=seconds;
             } else {
                 time = time.plusSeconds(seconds);
+                durationSeconds+=seconds;
             }
+        }
+
+        public int getDurationSeconds() {
+            return durationSeconds;
         }
 
         public long getTime() {

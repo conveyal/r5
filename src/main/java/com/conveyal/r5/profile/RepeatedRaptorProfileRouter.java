@@ -3,6 +3,7 @@ package com.conveyal.r5.profile;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
 import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
+import com.conveyal.r5.api.util.LegMode;
 import gnu.trove.map.TIntIntMap;
 import com.conveyal.r5.analyst.cluster.ResultEnvelope;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
@@ -107,10 +108,10 @@ public class RepeatedRaptorProfileRouter {
 
         // default to heaviest mode
         // FIXME what does WALK,CAR even mean in this context
-        EnumSet<Mode> modes = transit ? request.accessModes : request.directModes;
-        if (modes.contains(Mode.CAR))
+        EnumSet<LegMode> modes = transit ? request.accessModes : request.directModes;
+        if (modes.contains(LegMode.CAR))
             streetRouter.mode = Mode.CAR;
-        else if (modes.contains(Mode.BICYCLE))
+        else if (modes.contains(LegMode.BICYCLE))
             streetRouter.mode = Mode.BICYCLE;
         else
             streetRouter.mode = Mode.WALK;

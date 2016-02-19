@@ -38,7 +38,6 @@ public class StaticMain {
         StaticMetadata metadata = new StaticMetadata(ssr, net);
         metadata.run();
 
-
         LOG.info("Enqueueing requests");
         List<StaticSiteRequest.PointRequest> requests = new ArrayList<>();
 

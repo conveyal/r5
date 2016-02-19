@@ -134,4 +134,62 @@ public class Split {
         best.distance1_mm = edge.getLengthMm() - best.distance0_mm;
         return best;
     }
+
+    /** find a split on a particular edge */
+    public static Split findOnEdge (double lat, double lon, EdgeStore.Edge edge) {
+        // NOTE THIS ENTIRE GEOMETRIC CALCULATION IS HAPPENING IN FIXED PRECISION INT DEGREES
+        int fixLat = VertexStore.floatingDegreesToFixed(lat);
+        int fixLon = VertexStore.floatingDegreesToFixed(lon);
+
+        // We won't worry about the perpendicular walks yet.
+        // Just insert or find a vertex on the nearest road and return that vertex.
+
+        final double metersPerDegreeLat = 111111.111;
+        double cosLat = FastMath.cos(FastMath.toRadians(lat)); // The projection factor, Earth is a "sphere"
+
+        // TODO copy paste code
+        // The split location currently being examined and the best one seen so far.
+        Split curr = new Split();
+        Split best = new Split();
+        curr.edge = edge.edgeIndex;
+
+        best.vertex0 = edge.getFromVertex();
+        best.vertex1 = edge.getToVertex();
+        double[] lengthBefore_fixedDeg = new double[1];
+        edge.forEachSegment((seg, fLat0, fLon0, fLat1, fLon1) -> {
+            // Find the fraction along the current segment
+            curr.seg = seg;
+            curr.frac = GeometryUtils.segmentFraction(fLon0, fLat0, fLon1, fLat1, fixLon, fixLat, cosLat);
+            // Project to get the closest point on the segment.
+            // Note: the fraction is scaleless, xScale is accounted for in the segmentFraction function.
+            curr.fLon = fLon0 + curr.frac * (fLon1 - fLon0);
+            curr.fLat = fLat0 + curr.frac * (fLat1 - fLat0);
+
+            double dx = (fLon1 - fLon0) * cosLat;
+            double dy = (fLat1 - fLat0);
+            double length = FastMath.sqrt(dx * dx + dy * dy);
+
+            curr.distance0_mm = (int) ((lengthBefore_fixedDeg[0] + length * curr.frac) * metersPerDegreeLat * 1000);
+
+            lengthBefore_fixedDeg[0] += length;
+
+            curr.distSquared = dx * dx + dy * dy;
+            // Replace the best segment if we've found something closer.
+            if (curr.distSquared < best.distSquared) {
+                best.setFrom(curr);
+            }
+        }); // end loop over segments
+
+        int edgeLengthMm = edge.getLengthMm();
+        if (best.distance0_mm > edgeLengthMm) {
+            // rounding errors
+            best.distance0_mm = edgeLengthMm;
+            best.distance1_mm = 0;
+        }
+        else {
+            best.distance1_mm = edgeLengthMm - best.distance0_mm;
+        }
+
+        return best;
+    }
 }

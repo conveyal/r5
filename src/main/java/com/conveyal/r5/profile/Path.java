@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.publish.StaticComputer;
+import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TripPattern;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
@@ -9,7 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.util.Arrays;
 
 /**
- * Created by matthewc on 12/9/15.
+ * Class used to represent paths in Browsochrones.
  */
 public class Path {
     private static final Logger LOG = LoggerFactory.getLogger(Path.class);
@@ -78,14 +79,59 @@ public class Path {
             LOG.error("Transit path computed without a transit segment!");
     }
 
+    public Path(McRaptorSuboptimalPathProfileRouter.McRaptorState s) {
+        TIntList patterns = new TIntArrayList();
+        TIntList boardStops = new TIntArrayList();
+        TIntList alightStops = new TIntArrayList();
+        TIntList alightTimes = new TIntArrayList();
+
+        // trace path from this McRaptorState
+        do {
+            // skip transfers, they are implied
+            if (s.pattern == -1) s = s.back;
+
+            patterns.add(s.pattern);
+            alightTimes.add(s.time);
+            alightStops.add(s.stop);
+            boardStops.add(s.back.stop);
+
+            s = s.back;
+        } while (s.back != null);
+
+        patterns.reverse();
+        boardStops.reverse();
+        alightStops.reverse();
+        alightTimes.reverse();
+
+        this.patterns = patterns.toArray();
+        this.boardStops = boardStops.toArray();
+        this.alightStops = alightStops.toArray();
+        this.alightTimes = alightTimes.toArray();
+        this.length = this.patterns.length;
+
+        if (this.patterns.length == 0)
+            LOG.error("Transit path computed without a transit segment!");
+    }
+
     public int hashCode() {
-        return Arrays.hashCode(patterns) + 2 * Arrays.hashCode(boardStops) + 5 * Arrays.hashCode(alightStops);
+        return Arrays.hashCode(patterns);
     }
 
     public boolean equals(Object o) {
         if (o instanceof Path) {
             Path p = (Path) o;
-            return this == p || Arrays.equals(patterns, p.patterns) && Arrays.equals(boardStops, p.boardStops) && Arrays.equals(alightStops, p.alightStops);
+            return this == p || Arrays.equals(patterns, p.patterns);
         } else return false;
     }
+
+    /**
+     * Gets tripPattern at provided pathIndex
+     * @param transitLayer
+     * @param pathIndex
+     * @return
+     */
+    public TripPattern getPattern(TransitLayer transitLayer, int pathIndex) {
+        return transitLayer.tripPatterns.get(this.patterns[pathIndex]);
+    }
+
 }

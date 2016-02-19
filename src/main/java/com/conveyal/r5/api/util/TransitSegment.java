@@ -40,11 +40,6 @@ public class TransitSegment {
         int boardStopIdx = currentTransitPath.boardStops[pathIndex];
         int alightStopIdx = currentTransitPath.alightStops[pathIndex];
         TripPattern pattern = currentTransitPath.getPattern(transitLayer, pathIndex);
-        rideStats = new Stats();
-        rideStats.max = currentTransitPath.max;
-        rideStats.min = currentTransitPath.min;
-        rideStats.avg = currentTransitPath.avg;
-        rideStats.num = currentTransitPath.length;
         if (pattern.routeIndex >= 0) {
             RouteInfo routeInfo = transitLayer.routes.get(pattern.routeIndex);
             from = new Stop(transitLayer.stopIdForIndex.get(boardStopIdx), transitLayer.stopNames.get(boardStopIdx));

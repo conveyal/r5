@@ -134,6 +134,11 @@ public class ProfileOption {
         ZonedDateTime fromTimeDateZD, List<TransitJourneyID> transitJourneyIDs) {
         //If this is first transit in this option or leg that doesn't exist yet we need to create new transitSegment
         if (transit == null || pathIndex >= transit.size()) {
+            stats = new Stats();
+            stats.max = currentTransitPath.max;
+            stats.min = currentTransitPath.min;
+            stats.avg = currentTransitPath.avg;
+            stats.num = currentTransitPath.length;
             addTransit(new TransitSegment(transitLayer, currentTransitPath, pathIndex, fromTimeDateZD, transitJourneyIDs));
             LOG.info("Making new transit segment:{}", currentTransitPath);
         } else {

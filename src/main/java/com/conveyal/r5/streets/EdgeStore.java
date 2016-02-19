@@ -4,9 +4,14 @@ import com.conveyal.osmlib.Node;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.util.TIntIntHashMultimap;
+import com.conveyal.r5.util.TIntIntMultimap;
+import com.conveyal.r5.util.TIntObjectHashMultimap;
+import com.conveyal.r5.util.TIntObjectMultimap;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.LineString;
+import gnu.trove.TIntCollection;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.TLongList;
 import gnu.trove.list.TShortList;
@@ -75,13 +80,20 @@ public class EdgeStore implements Serializable {
     /** Geometries. One entry for each edge pair */
     public List<int[]> geometries; // intermediate points along the edge, other than the intersection endpoints
 
+    /** Turn restrictions for turning _out of_ each edge */
+    public TIntIntMultimap turnRestrictions;
+
+    public StreetLayer layer;
+
     public static final transient EnumSet<EdgeFlag> PERMISSION_FLAGS = EnumSet
         .of(EdgeFlag.ALLOWS_PEDESTRIAN, EdgeFlag.ALLOWS_BIKE, EdgeFlag.ALLOWS_CAR);
 
     private long generatedOSMID = 1;
 
-    public EdgeStore (VertexStore vertexStore, int initialSize) {
+    public EdgeStore (VertexStore vertexStore, StreetLayer layer, int initialSize) {
         this.vertexStore = vertexStore;
+        this.layer = layer;
+
         // There are separate flags and speeds entries for the forward and backward edges in each pair.
         flags = new TIntArrayList(initialSize);
         speeds = new TShortArrayList(initialSize);
@@ -92,6 +104,7 @@ public class EdgeStore implements Serializable {
         geometries = new ArrayList<>(initialEdgePairs);
         lengths_mm = new TIntArrayList(initialEdgePairs);
         osmids = new TLongArrayList(initialEdgePairs);
+        turnRestrictions = new TIntIntHashMultimap();
     }
 
     /**
@@ -385,6 +398,7 @@ public class EdgeStore implements Serializable {
             flags.set(backEdge, other.getEdgeStore().flags.get(otherBackEdge));
             speeds.set(foreEdge, other.getEdgeStore().speeds.get(otherForeEdge));
             speeds.set(backEdge, other.getEdgeStore().speeds.get(otherBackEdge));
+            osmids.set(pairIndex, other.pairIndex);
         }
 
         /**
@@ -439,6 +453,37 @@ public class EdgeStore implements Serializable {
             float speedms = calculateSpeed(req, mode, s0.getTime());
             float time = (float) (getLengthM() / speedms);
             float weight = 0;
+
+            // add turn restrictions that start on this edge
+            if (turnRestrictions.containsKey(getEdgeIndex())) {
+                s1.inTurnRestriction = true;
+            }
+
+            if (s0.inTurnRestriction) {
+                // check if we have exited any turn restrictions, and make sure the movement is not restricted
+                TIntCollection currentRestrictions = turnRestrictions.get(getEdgeIndex());
+
+                // array to dodge effectively final nonsense
+                boolean[] blockTraversal = new boolean[] { false };
+                turnRestrictions.get(s0.backEdge).forEach(ridx -> {
+                    if (currentRestrictions.contains(ridx)) return true; // we have not exited this restriction, but continue iteration
+
+                    // we have exited this restriction, check to see if we should block traversal
+                    TurnRestriction restriction = layer.turnRestrictions.get(ridx);
+
+                    // first check if the restriction applies to this traversal
+                    // we don't need to check via here, as if we ever left the via edges we would have terminated the restriction then.
+                    boolean applies = restriction.toEdge == getEdgeIndex();
+
+                    if (applies && !restriction.only || !applies && restriction.only) blockTraversal[0] = true;
+
+                    // only continue iteration if we're not already blocking traversal
+                    return !blockTraversal[0];
+                });
+
+                if (blockTraversal[0])
+                    return null;
+            }
 
             if (s0.backEdge != -1 && getFlag(EdgeFlag.LINK) && getCursor(s0.backEdge).getFlag(EdgeFlag.LINK))
                 // two link edges in a row, in other words a shortcut. Disallow this.

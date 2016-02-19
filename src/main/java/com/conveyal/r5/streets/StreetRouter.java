@@ -2,6 +2,8 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.util.TIntObjectHashMultimap;
+import com.conveyal.r5.util.TIntObjectMultimap;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -13,6 +15,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.PriorityQueue;
 
 /**
@@ -39,7 +43,9 @@ public class StreetRouter {
     public int distanceLimitMeters = 0;
     public int timeLimitSeconds = 0;
 
-    TIntObjectMap<State> bestStates = new TIntObjectHashMap<>();
+    // TODO we might be able to make this more efficient by taking advantage of the fact that we almost always have a
+    // single state per vertex (the only time we don't is when we're in the middle of a turn restriction).
+    TIntObjectMultimap<State> bestStates = new TIntObjectHashMultimap<>();
 
     PriorityQueue<State> queue = new PriorityQueue<>((s0, s1) -> s0.weight - s1.weight);
 
@@ -84,23 +90,23 @@ public class StreetRouter {
      */
     public TIntIntMap getReachedStops() {
         TIntIntMap result = new TIntIntHashMap();
-        // Convert stop vertex indexes in street layer to transit layer stop indexes.
-        bestStates.forEachEntry((vertexIndex, state) -> {
-            int stopIndex = streetLayer.linkedTransitLayer.stopForStreetVertex.get(vertexIndex);
-            // -1 indicates no value, this street vertex is not a transit stop
-            if (stopIndex >= 0) {
-                result.put(stopIndex, state.weight);
-            }
+
+        streetLayer.linkedTransitLayer.stopForStreetVertex.forEachEntry((streetVertex, stop) -> {
+            State state = getState(streetVertex);
+            // TODO should this be time?
+            if (state != null) result.put(stop, state.weight);
             return true; // continue iteration
         });
+
         return result;
     }
 
     /** Return a map where the keys are all the reached vertices, and the values are their distances from the origin. */
     public TIntIntMap getReachedVertices () {
         TIntIntMap result = new TIntIntHashMap();
-        bestStates.forEachEntry((vertexIndex, state) -> {
-            result.put(vertexIndex, state.weight);
+        bestStates.forEachEntry((vidx, states) -> {
+            State state = states.stream().reduce((s0, s1) -> s0.weight < s1.weight ? s0 : s1).get();
+            result.put(vidx, state.weight);
             return true; // continue iteration
         });
         return result;
@@ -111,9 +117,10 @@ public class StreetRouter {
      */
     public TIntObjectMap<State> getReachedVertices (VertexStore.VertexFlag flag) {
         TIntObjectMap<State> result = new TIntObjectHashMap<>();
-        bestStates.forEachEntry((vertexIndex, state) -> {
+        bestStates.forEachEntry((vertexIndex, states) -> {
             VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor(vertexIndex);
             if (vertex.getFlag(flag)) {
+                State state = states.stream().reduce((s0, s1) -> s0.weight < s1.weight ? s0 : s1).get();
                 result.put(vertexIndex, state);
             }
             return true;
@@ -129,7 +136,8 @@ public class StreetRouter {
     public int[] getStopTree () {
         TIntList result = new TIntArrayList(bestStates.size() * 2);
         // Convert stop vertex indexes in street layer to transit layer stop indexes.
-        bestStates.forEachEntry((vertexIndex, state) -> {
+        bestStates.forEachEntry((vertexIndex, states) -> {
+            State state = states.stream().reduce((s0, s1) -> s0.weight < s1.weight ? s0 : s1).get();
             result.add(vertexIndex);
             result.add(state.weight);
             return true; // continue iteration
@@ -230,16 +238,16 @@ public class StreetRouter {
         } else if (timeLimitSeconds == 0 && distanceLimitMeters == 0) {
             LOG.warn("Distance and time limit are set to 0 in streetrouter. This means NO LIMIT in searching so WHOLE of street graph will be searched. This can be slow.");
         } else if (distanceLimitMeters > 0) {
-            LOG.info("Using distance limit of {}m", distanceLimitMeters);
+            LOG.debug("Using distance limit of {}m", distanceLimitMeters);
         } else if (timeLimitSeconds > 0) {
-            LOG.info("Using time limit of {}s", timeLimitSeconds);
+            LOG.debug("Using time limit of {}s", timeLimitSeconds);
         }
 
         if (queue.size() == 0) {
             LOG.warn("Routing without first setting an origin, no search will happen.");
         }
 
-        PrintStream printStream; // for debug output
+        PrintStream printStream = null; // for debug output
         if (DEBUG_OUTPUT) {
             File debugFile = new File(String.format("street-router-debug.csv"));
             OutputStream outputStream;
@@ -253,16 +261,19 @@ public class StreetRouter {
         }
 
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
-        while (!queue.isEmpty()) {
+        QUEUE: while (!queue.isEmpty()) {
             State s0 = queue.poll();
 
             if (DEBUG_OUTPUT) {
                 VertexStore.Vertex v = streetLayer.vertexStore.getCursor(s0.vertex);
                 printStream.println(String.format("%.6f,%.6f,%d", v.getLat(), v.getLon(), s0.weight));
             }
-            if (bestStates.containsKey(s0.vertex))
-                // dominated
-                continue;
+            if (bestStates.containsKey(s0.vertex)) {
+                for (State state : bestStates.get(s0.vertex)) {
+                    // states in turn restrictions don't dominate anything
+                    if (!state.inTurnRestriction) continue QUEUE;
+                }
+            }
 
             if (toVertex > 0 && toVertex == s0.vertex) {
                 // found destination
@@ -270,7 +281,18 @@ public class StreetRouter {
             }
 
             // non-dominated state coming off the pqueue is by definition the best way to get to that vertex
-            bestStates.put(s0.vertex, s0);
+            // but states in turn restrictions don't dominate anything, to avoid resource limiting issues
+            if (s0.inTurnRestriction)
+                bestStates.put(s0.vertex, s0);
+            else {
+                // we might need to save an existing state that is in a turn restriction so is codominant
+                for (Iterator<State> it = bestStates.get(s0.vertex).iterator(); it.hasNext();) {
+                    State other = it.next();
+                    if (s0.weight < other.weight) it.remove();
+                    else if (s0.weight == other.weight) continue QUEUE; // avoid a ton of codominant states when there is e.g. duplicated OSM data
+                }
+                bestStates.put(s0.vertex, s0);
+            }
 
             if (routingVisitor != null) {
                 routingVisitor.visitVertex(s0);
@@ -293,12 +315,22 @@ public class StreetRouter {
             printStream.close();
         }
     }
-    public int getTravelTimeToVertex (int vertexIndex) {
-        State state = bestStates.get(vertexIndex);
-        if (state == null) {
-            return Integer.MAX_VALUE; // Unreachable
+
+    /** get a single best state at a vertex. There can be more than one state at a vertex due to turn restrictions */
+    public State getState (int vertexIndex) {
+        Collection<State> states = bestStates.get(vertexIndex);
+        if (states.isEmpty()) {
+            return null; // Unreachable
         }
-        return state.weight; // TODO true walk speed
+
+        // get the lowest weight, even if it's in the middle of a turn restriction
+        return states.stream().reduce((s0, s1) -> s0.weight < s1.weight ? s0 : s1).get();
+    }
+
+    public int getTravelTimeToVertex (int vertexIndex) {
+        State state = getState(vertexIndex);
+
+        return state != null ? state.weight : Integer.MAX_VALUE;
     }
 
     /**
@@ -310,8 +342,8 @@ public class StreetRouter {
      * @return
      */
     public State getState(Split split) {
-        State weight0 = bestStates.get(split.vertex0);
-        State weight1 = bestStates.get(split.vertex1);
+        State weight0 = getState(split.vertex0);
+        State weight1 = getState(split.vertex1);
         if (weight0 == null) {
             if (weight1 == null) {
                 //Both vertices aren't found
@@ -335,15 +367,6 @@ public class StreetRouter {
         }
     }
 
-    /**
-     * Returns best state of this vertexIndex
-     * @param vertexIndex
-     * @return
-     */
-    public State getState(int vertexIndex) {
-        return bestStates.get(vertexIndex);
-    }
-
     public static class State implements Cloneable {
         public int vertex;
         public int weight;
@@ -356,6 +379,10 @@ public class StreetRouter {
         public Mode mode;
         public State backState; // previous state in the path chain
         public boolean isBikeShare = false; //is true if vertex in this state is Bike sharing station where mode switching occurs
+
+        /** we are in the middle of a turn restriction. */
+        public boolean inTurnRestriction = false;
+
         public State(int atVertex, int viaEdge, long fromTimeDate, State backState) {
             this.vertex = atVertex;
             this.backEdge = viaEdge;

@@ -1,9 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.gtfs.model.Stop;
-import com.conveyal.osmlib.Node;
-import com.conveyal.osmlib.OSM;
-import com.conveyal.osmlib.Way;
+import com.conveyal.osmlib.*;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.*;
@@ -87,7 +85,10 @@ public class StreetLayer implements Serializable {
 
     // Initialize these when we have an estimate of the number of expected edges.
     public VertexStore vertexStore = new VertexStore(100_000);
-    public EdgeStore edgeStore = new EdgeStore(vertexStore, 200_000);
+    public EdgeStore edgeStore = new EdgeStore(vertexStore, this, 200_000);
+
+    /** Turn restrictions can potentially have a large number of affected edges, so store them once and reference them */
+    public List<TurnRestriction> turnRestrictions = new ArrayList<>();
 
     transient Histogram edgesPerWayHistogram = new Histogram("Number of edges per way per direction");
     transient Histogram pointsPerEdgeHistogram = new Histogram("Number of geometry points per edge");
@@ -244,6 +245,10 @@ public class StreetLayer implements Serializable {
         }
         LOG.info("Made {} P+R vertices", numOfParkAndRides);
 
+        // create turn restrictions.
+        // TODO transit splitting is going to mess this up
+        osm.relations.entrySet().stream().filter(e -> e.getValue().hasTag("type", "restriction")).forEach(e -> this.applyTurnRestriction(e.getKey(), e.getValue()));
+        LOG.info("Created {} turn restrictions", turnRestrictions.size());
 
         //edgesPerWayHistogram.display();
         //pointsPerEdgeHistogram.display();
@@ -418,6 +423,141 @@ public class StreetLayer implements Serializable {
         created.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
         created.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
         created.setFlag(EdgeStore.EdgeFlag.LINK);
+    }
+
+    private void applyTurnRestriction (long id, Relation restriction) {
+        boolean only;
+
+        if (!restriction.hasTag("restriction")) {
+            LOG.error("Restriction {} has no restriction tag, skipping", id);
+            return;
+        }
+
+        if (restriction.getTag("restriction").startsWith("no_")) only = false;
+        else if (restriction.getTag("restriction").startsWith("only_")) only = true;
+        else {
+            LOG.error("Restriction {} has invalid restriction tag {}, skipping", id, restriction.getTag("restriction"));
+            return;
+        }
+
+        TurnRestriction out = new TurnRestriction();
+        out.only = only;
+
+        // sort out the members
+        Relation.Member from = null, to = null;
+        List<Relation.Member> via = new ArrayList<>();
+
+        for (Relation.Member member : restriction.members) {
+            if ("from".equals(member.role)) {
+                if (from != null) {
+                    LOG.error("Turn restriction {} has multiple from members, skipping", id);
+                    return;
+                }
+
+                from = member;
+            }
+            else if ("to".equals(member.role)) {
+                if (to != null) {
+                    LOG.error("Turn restriction {} has multiple to members, skipping", id);
+                    return;
+                }
+
+                to = member;
+            }
+            else if ("via".equals(member.role)) {
+                via.add(member);
+            }
+        }
+
+
+        if (from == null || to == null || via.isEmpty()) {
+            LOG.error("Invalid turn restriction {}, does not have from, to and via, skipping", id);
+            return;
+        }
+
+        boolean hasWays = false, hasNodes = false;
+
+        for (Relation.Member m : via) {
+            if (m.type == OSMEntity.Type.WAY) hasWays = true;
+            else if (m.type == OSMEntity.Type.NODE) hasNodes = true;
+            else {
+                LOG.error("via must be node or way, skipping restriction {}", id);
+                return;
+            }
+        }
+
+        if (hasWays && hasNodes || hasNodes && via.size() > 1) {
+            LOG.error("via must be single node or one or more ways, skipping restriction {}", id);
+            return;
+        }
+
+        EdgeStore.Edge e = edgeStore.getCursor();
+
+        if (hasNodes) {
+            // via node, this is a fairly simple turn restriction. First find the relevant vertex.
+            int vertex = vertexIndexForOsmNode.get(via.get(0).id);
+
+            if (vertex == -1) {
+                LOG.warn("Vertex {} not found to use as via node for restriction {}, skipping this restriction", via.get(0).id, id);
+                return;
+            }
+
+            // use array to dodge effectively final nonsense
+            final int[] fromEdge = new int[] { -1 };
+            final long fromWayId = from.id; // more effectively final nonsense
+            final boolean[] bad = new boolean[] { false };
+
+            // find the edges
+            incomingEdges.get(vertex).forEach(eidx -> {
+                e.seek(eidx);
+                if (e.getOSMID() == fromWayId) {
+                    if (fromEdge[0] != -1) {
+                        LOG.error("From way enters vertex {} twice, restriction {} is therefore ambiguous, skipping", vertex, id);
+                        bad[0] = true;
+                        return false;
+                    }
+
+                    fromEdge[0] = eidx;
+                }
+
+                return true; // iteration should continue
+            });
+
+
+            final int[] toEdge = new int[] { -1 };
+            final long toWayId = to.id; // more effectively final nonsense
+            outgoingEdges.get(vertex).forEach(eidx -> {
+                e.seek(eidx);
+                if (e.getOSMID() == toWayId) {
+                    if (toEdge[0] != -1) {
+                        LOG.error("To way exits vertex {} twice, restriction {} is therefore ambiguous, skipping", vertex, id);
+                        bad[0] = true;
+                        return false;
+                    }
+
+                    toEdge[0] = eidx;
+                }
+
+                return true; // iteration should continue
+            });
+
+            if (bad[0]) return; // log message already printed
+
+            if (fromEdge[0] == -1 || toEdge[0] == -1) {
+                LOG.error("Did not find from/to edges for restriction {}, skipping", id);
+                return;
+            }
+
+            // phew. create the restriction and apply it where needed
+            out.fromEdge = fromEdge[0];
+            out.toEdge = toEdge[0];
+
+            int index = turnRestrictions.size();
+            turnRestrictions.add(out);
+            edgeStore.turnRestrictions.put(out.fromEdge, index);
+        } else {
+            LOG.info("Restriction {} has way(s) as via members, which is not yet supported.");
+        }
     }
 
     /**
@@ -689,6 +829,11 @@ public class StreetLayer implements Serializable {
 
         // Copy the flags and speeds for both directions, making the new edge like the existing one.
         newEdge.copyPairFlagsAndSpeeds(edge);
+
+        // clean up any turn restrictions that exist
+        // turn restrictions on the forward edge go to the new edge's forward edge. Turn restrictions on the back edge stay
+        // where they are
+        edgeStore.turnRestrictions.removeAll(split.edge).forEach(ridx -> edgeStore.turnRestrictions.put(newEdge.edgeIndex, ridx));
 
         return newVertexIndex;
         // TODO store street-to-stop distance in a table in TransitLayer. This also allows adjusting for subway entrances etc.

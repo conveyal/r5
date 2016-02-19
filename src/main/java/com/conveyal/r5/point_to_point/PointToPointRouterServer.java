@@ -740,11 +740,7 @@ public class PointToPointRouterServer {
     /**
      * Creates geojson feature from specified vertex
      *
-<<<<<<< HEAD
-     * Currently it only does that if vertex have TRAFFIC_SIGNAL flag, or is a transit stop.
-=======
      * Currently it only does that if vertex have TRAFFIC_SIGNAL or BIKE_SHARING flag.
->>>>>>> graphQL
      * Properties in GeoJSON are:
      * - vertex_id
      * - flags: TRAFFIC_SIGNAL or BIKE_SHARING currently not both

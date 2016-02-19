@@ -241,6 +241,14 @@ public class EdgeStore implements Serializable {
             generatedOSMID++;
         }
 
+        if (beginVertexIndex < 0 || beginVertexIndex >= vertexStore.getVertexCount()) {
+            throw new IllegalArgumentException(String.format("Attempt to begin edge pair at nonexistent vertex %s", beginVertexIndex));
+        }
+
+        if (endVertexIndex < 0 || endVertexIndex >= vertexStore.getVertexCount()) {
+            throw new IllegalArgumentException(String.format("Attempt to end edge pair at nonexistent vertex %s", endVertexIndex));
+        }
+
         // Store only one length, set of endpoints, and intermediate geometry per pair of edges.
         lengths_mm.add(edgeLengthMillimeters);
         fromVertices.add(beginVertexIndex);

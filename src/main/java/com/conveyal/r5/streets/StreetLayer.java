@@ -16,8 +16,10 @@ import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.set.TIntSet;
+import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TIntHashSet;
 import com.conveyal.r5.transit.TransitLayer;
+import gnu.trove.set.hash.TLongHashSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -556,7 +558,199 @@ public class StreetLayer implements Serializable {
             turnRestrictions.add(out);
             edgeStore.turnRestrictions.put(out.fromEdge, index);
         } else {
-            LOG.info("Restriction {} has way(s) as via members, which is not yet supported.");
+            // via member(s) are ways, which is more tricky
+            // do a little street search constrained to the ways in question
+            Way fromWay = osm.ways.get(from.id);
+            long[][] viaNodes = via.stream().map(m -> osm.ways.get(m.id).nodes).toArray(i -> new long[i][]);
+            Way toWay = osm.ways.get(to.id);
+
+            // We do a little search, keeping in mind that there must be the same number of ways as there are via members
+            List<long[]> nodes = new ArrayList<>();
+            List<long[]> ways = new ArrayList<>();
+
+            // loop over from way to initialize search
+            for (long node : fromWay.nodes) {
+                for (int viaPos = 0; viaPos < viaNodes.length; viaPos++) {
+                    for (long viaNode : viaNodes[viaPos]) {
+                        if (node == viaNode) {
+                            nodes.add(new long[] { node });
+                            ways.add(new long[] { via.get(viaPos).id });
+                        }
+                    }
+                }
+            }
+
+            List<long[]> previousNodes;
+            List<long[]> previousWays;
+
+            // via.size() - 1 because we've already explored one via way where we transferred from the the from way
+            for (int round = 0; round < via.size() - 1; round++) {
+                previousNodes = nodes;
+                previousWays = ways;
+
+                nodes = new ArrayList<>();
+                ways = new ArrayList<>();
+
+                for (int statePos = 0; statePos < previousNodes.size(); statePos++) {
+                    // get the way we are on and search all its nodes
+                    long wayId = previousWays.get(statePos)[round];
+                    Way way = osm.ways.get(wayId);
+
+                    for (long node : way.nodes) {
+                        VIA:
+                        for (int viaPos = 0; viaPos < viaNodes.length; viaPos++) {
+                            long viaWayId = via.get(viaPos).id;
+
+                            // don't do looping searches
+                            for (long prevWay : previousWays.get(statePos)) {
+                                if (viaWayId == prevWay) continue VIA;
+                            }
+
+                            for (long viaNode : osm.ways.get(viaWayId).nodes) {
+                                if (viaNode == node) {
+                                    long[] newNodes = Arrays.copyOf(previousNodes.get(statePos), round + 2);
+                                    long[] newWays = Arrays.copyOf(previousWays.get(statePos), round + 2);
+
+                                    newNodes[round + 1] = node;
+                                    newWays[round + 1] = viaWayId;
+
+                                    nodes.add(newNodes);
+                                    ways.add(newWays);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // now filter them to just ones that reach the to way
+            long[] pathNodes = null;
+            long[] pathWays = null;
+
+            for (int statePos = 0; statePos < nodes.size(); statePos++) {
+                long[] theseWays = ways.get(statePos);
+                Way finalWay = osm.ways.get(theseWays[theseWays.length - 1]);
+
+                for (long node : finalWay.nodes) {
+                    for (long toNode : toWay.nodes) {
+                        if (node == toNode) {
+                            if (pathNodes != null) {
+                                LOG.error("Turn restriction {} has ambiguous via ways (multiple paths through via ways between from and to), skipping", id);
+                                return;
+                            }
+
+                            pathNodes = Arrays.copyOf(nodes.get(statePos), theseWays.length + 1);
+                            pathNodes[pathNodes.length - 1] = node;
+                            pathWays = theseWays;
+                        }
+                    }
+                }
+            }
+
+            if (pathNodes == null) {
+                LOG.error("Invalid turn restriction {}, no way from from to to via via, skipping", id);
+                return;
+            }
+
+            // convert OSM nodes and ways into IDs
+            // first find the fromEdge and toEdge. dodge effectively final nonsense
+            final int[] fromEdge = new int[] { -1 };
+            final long fromWayId = from.id; // more effectively final nonsense
+            final boolean[] bad = new boolean[] { false };
+
+            int fromVertex = vertexIndexForOsmNode.get(pathNodes[0]);
+
+            // find the edges
+            incomingEdges.get(fromVertex).forEach(eidx -> {
+                e.seek(eidx);
+                if (e.getOSMID() == fromWayId) {
+                    if (fromEdge[0] != -1) {
+                        LOG.error("From way enters vertex {} twice, restriction {} is therefore ambiguous, skipping", fromVertex, id);
+                        bad[0] = true;
+                        return false;
+                    }
+
+                    fromEdge[0] = eidx;
+                }
+
+                return true; // iteration should continue
+            });
+
+            int toVertex = vertexIndexForOsmNode.get(pathNodes[pathNodes.length - 1]);
+
+            final int[] toEdge = new int[] { -1 };
+            final long toWayId = to.id; // more effectively final nonsense
+            outgoingEdges.get(toVertex).forEach(eidx -> {
+                e.seek(eidx);
+                if (e.getOSMID() == toWayId) {
+                    if (toEdge[0] != -1) {
+                        LOG.error("To way exits vertex {} twice, restriction {} is therefore ambiguous, skipping", toVertex, id);
+                        bad[0] = true;
+                        return false;
+                    }
+
+                    toEdge[0] = eidx;
+                }
+
+                return true; // iteration should continue
+            });
+
+            if (bad[0]) return; // log message already printed
+
+            if (fromEdge[0] == -1 || toEdge[0] == -1) {
+                LOG.error("Did not find from/to edges for restriction {}, skipping", id);
+                return;
+            }
+
+            out.fromEdge = fromEdge[0];
+            out.toEdge = toEdge[0];
+
+            // edges affected by this turn restriction. Make a list in case something goes awry when trying to find edges
+            TIntList affectedEdges = new TIntArrayList();
+
+            // now apply to all via ways.
+            // > 0 is intentional. pathNodes[0] is the node on the from edge
+            for (int nidx = pathNodes.length - 1; nidx > 0; nidx--) {
+                final int[] edge = new int[] { -1 };
+                // fencepost problem: one more node than ways
+                final long wayId = pathWays[nidx - 1]; // more effectively final nonsense
+                int vertex = vertexIndexForOsmNode.get(pathNodes[nidx]);
+                incomingEdges.get(vertex).forEach(eidx -> {
+                    e.seek(eidx);
+                    if (e.getOSMID() == wayId) {
+                        if (edge[0] != -1) {
+                            // TODO we've already started messing with data structures!
+                            LOG.error("To way exits vertex {} twice, restriction {} is therefore ambiguous, skipping", vertex, id);
+                            bad[0] = true;
+                            return false;
+                        }
+
+                        edge[0] = eidx;
+                    }
+
+                    return true; // iteration should continue
+                });
+
+                if (bad[0]) return; // log message already printed
+                if (edge[0] == -1) {
+                    LOG.warn("Did not find via way {} for restriction {}, skipping", wayId, id);
+                    return;
+                }
+
+                affectedEdges.add(edge[0]);
+            }
+
+            affectedEdges.add(out.fromEdge);
+
+            int index = turnRestrictions.size();
+            turnRestrictions.add(out);
+
+            affectedEdges.forEach(eidx -> {
+                edgeStore.turnRestrictions.put(eidx, index);
+                return true; // continue iteration
+            });
+
+            // take a deep breath
         }
     }
 
@@ -858,6 +1052,10 @@ public class StreetLayer implements Serializable {
     public int createAndLinkVertex (double lat, double lon, double radiusMeters, boolean destructive) {
         int stopVertex = vertexStore.addVertex(lat, lon);
         int streetVertex = getOrCreateVertexNear(lat, lon, radiusMeters, destructive);
+
+        // unlinked
+        if (streetVertex == -1) return -1;
+
         EdgeStore.Edge e = edgeStore.addStreetPair(stopVertex, streetVertex, 1, -1); // TODO maybe link edges should have a length.
 
         // all permissions true, permissions are controlled by whatever leads into this edge.
@@ -1021,5 +1219,11 @@ public class StreetLayer implements Serializable {
         }
         LOG.info("Added {} out of {} stations ratio:{}", numAddedStations, bikeRentalStations.size(), numAddedStations/bikeRentalStations.size());
 
+    }
+
+    private static class TurnRestrictionSearchState {
+        public TurnRestrictionSearchState back;
+        public long node;
+        public long backWay;
     }
 }

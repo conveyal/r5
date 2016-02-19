@@ -424,7 +424,7 @@
     <dependency>
       <groupId>com.graphql-java</groupId>
       <artifactId>graphql-java</artifactId>
-      <version>2016-02-01T07-19-40</version>
+      <version>2016-02-19T11-51-00</version>
     </dependency>
     <dependency>
       <groupId>com.sparkjava</groupId>

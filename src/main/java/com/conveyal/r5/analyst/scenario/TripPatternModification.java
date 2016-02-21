@@ -12,8 +12,11 @@ import java.util.stream.Collectors;
  * It supplies a mechanism to target only certain TripPatterns based on their routeId or GTFS routeType (transport mode).
  * The filter fields are filled in by deserializing from JSON, and may be null if no filter criteria are supplied.
  * Any fields that is not supplied is a wildcard and matches all TripPatterns.
+ *
+ * This has been deprecated, I'm leaving it around to copy methods from later.
  */
-public abstract class TripPatternModification extends TransitLayerModification {
+@Deprecated
+public abstract class TripPatternModification{
 
     /**
      * Agency ID to match. Each modification can apply to only one agency, as having multiple agencies
@@ -87,10 +90,7 @@ public abstract class TripPatternModification extends TransitLayerModification {
         return true;
     }
 
-    /* Implementation of superclass method */
-
-    @Override
-    public TransitLayer applyToTransitLayer (TransitLayer originalTransitLayer) {
+    public TransitLayer apply (TransitLayer originalTransitLayer) {
         // if (modNet.xyzList = network.xyzList)...
         TransitLayer transitLayer = originalTransitLayer.clone();
         transitLayer.tripPatterns = transitLayer.tripPatterns.stream()

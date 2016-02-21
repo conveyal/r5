@@ -1,17 +1,26 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
 
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Remove trips from a scenario.
- * This could remove all trips on a route, since its superclass TimetableFilter provides both route and trip matching.
+ * Currently this can only remove all trips on an entire route.
+ * In order to remove certain patterns we may want to support removing trips individually by tripId.
  */
-public class RemoveTrip extends TripScheduleModification {
+public class RemoveTrip extends Modification {
 
     public static final long serialVersionUID = 1L;
+
+    /** On which route the stops should be skipped. */
+    public Set<String> routeId;
 
     @Override
     public String getType() {
@@ -19,25 +28,12 @@ public class RemoveTrip extends TripScheduleModification {
     }
 
     @Override
-    public TripPattern applyToTripPattern(TripPattern originalTripPattern) {
-        // Check first whether it's even possible that this Modification will apply to any trips on this pattern
-        if (!couldMatch(originalTripPattern)) {
-            return originalTripPattern;
-        }
-        // Stopgap efficient check for route filtration.
-        // All trips on a TripPattern are on the same route so we can remove them all at once.
-        if (routeId != null && (tripId == null || tripId.isEmpty())) {
-            if (routeId.contains(originalTripPattern.routeId)) {
-                return null;
-            }
-        }
-        // Actually apply the Modification to each TripSchedule within this TripPattern individually.
-        return super.applyToTripPattern(originalTripPattern);
-    }
-
-    @Override
-    public TripSchedule applyToTripSchedule(TripPattern tripPattern, TripSchedule tripSchedule) {
-        return matches(tripSchedule.tripId) ? null : tripSchedule;
+    public boolean apply(TransportNetwork network) {
+        TransitLayer transitLayer = network.transitLayer.clone();
+        transitLayer.tripPatterns = transitLayer.tripPatterns.stream()
+            .filter(tp -> !routeId.contains(tp.routeId)).collect(Collectors.toList());
+        network.transitLayer = transitLayer;
+        return false;
     }
 
 }

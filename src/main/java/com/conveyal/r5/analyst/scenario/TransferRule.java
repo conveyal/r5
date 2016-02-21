@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst.scenario;
 import com.conveyal.r5.analyst.BoardingAssumption;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 
 import java.util.stream.IntStream;
@@ -66,13 +67,8 @@ public class TransferRule extends Modification {
     }
 
     @Override
-    protected TransitLayer applyToTransitLayer(TransitLayer originalTransitLayer) {
-        return null;
-    }
-
-    @Override
-    protected StreetLayer applyToStreetLayer(StreetLayer originalStreetLayer) {
-        return null;
+    public boolean apply(TransportNetwork network) {
+        return false;
     }
 
     public boolean matches (TripPattern from, TripPattern to) {

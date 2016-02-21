@@ -62,28 +62,13 @@ public abstract class Modification implements Serializable {
     public final Set<String> warnings = new HashSet<String>();
 
     /**
-     * Apply this single modification to a TransportNetwork, making copies as necessary.
-     * TODO pre-clone the network so this function doesn't need to return a TransportNetwork, and can return a success/error value.
+     * Apply this single modification to a TransportNetwork.
+     * The TransportNetwork should be pre-cloned by the caller, but may still contain references to collections
+     * or other deep objects from the original TransportNetwork. The Modification is responsible for ensuring that
+     * no damage is done to the original TransportNetwork by making copies of referenced objects as necessary.
+     * @return true if any errors happened while applying the modification.
      */
-    public TransportNetwork applyToTransportNetwork(TransportNetwork originalNetwork) {
-        // We don't need a base implementation to return the unmodified TransportNetwork.
-        // Any Modification should produce a protective copy at least at level 0.
-        TransportNetwork network = originalNetwork.clone();
-        network.transitLayer = this.applyToTransitLayer(network.transitLayer);
-        network.streetLayer = this.applyToStreetLayer(network.streetLayer);
-        //network.gridPointSet = this.gridPointSet; // apply modification?
-        return network;
-    }
-
-    /**
-     * Apply this Modification to a TransitLayer, making protective copies of the TransitLayer's elements as needed.
-     */
-    protected abstract TransitLayer applyToTransitLayer (TransitLayer originalTransitLayer);
-
-    /**
-     * Apply this Modification to a StreetLayer, making protective copies of the StreetLayer's elements as needed.
-     */
-    protected abstract StreetLayer applyToStreetLayer (StreetLayer originalStreetLayer);
+    public abstract boolean apply (TransportNetwork network);
 
     /**
      * Implementations of this function on concrete Modification classes should do three things:
@@ -93,11 +78,11 @@ public abstract class Modification implements Serializable {
      *
      * A particular Modification instance should only be used by one thread on a single TransportNetwork, so it is fine
      * to store the canonical parameter representations and resolved IDs in instance fields of Modification subclasses.
+     * We return a boolean rather than throwing an exception to provide cleaner program flow. This also allows
+     * accumulation of error messages, rather than reporting only the first error encountered. Messages describing
+     * the errors encountered should be added to the list of Strings in the Modification field "warnings".
      *
-     * The function should return true if it encounters an out of range, missing, or otherwise problematic parameter,
-     * rather than throwing an exception. Besides providing cleaner program flow, this allows us to accumulate and
-     * provide more error messages at once, rather than reporting only the first error encountered. Messages describing
-     * the errors encountered should be added to the list of Strings in the field "warnings".
+     * @return true if an out of range, missing, or otherwise problematic parameter is encountered.
      */
     public boolean resolve (TransportNetwork network) {
         // Default implementation: do nothing and affirm that there are no known problems with the parameters.

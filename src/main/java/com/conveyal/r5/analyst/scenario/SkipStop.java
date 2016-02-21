@@ -27,21 +27,29 @@ import java.util.Set;
  * Skipped stops are no longer served by the matched trips, and and dwell time at a skipped stop is removed from the schedule.
  * If stops are skipped at the start of a trip, the start of the trip is simply removed; the remaining times are not shifted.
  */
-public class SkipStop extends TripPatternModification {
+public class SkipStop extends Modification {
 
     public static final long serialVersionUID = 1L;
 
     private static final Logger LOG = LoggerFactory.getLogger(SkipStop.class);
 
-    /** Stops to skip. Note that setting this to null as a wildcard is not supported, obviously */
+    /** On which route the stops should be skipped. */
+    public String routeId;
+
+    /** Stops to skip. Note that setting this to null as a wildcard is not supported, obviously. */
     public Collection<String> stopId;
 
-    // integer IDs. TODO resolve method that attaches a Modification to a specific TransportNetwork.
+    /** Internal integer IDs for a specific transit network, converted from the string IDs. */
     private transient TIntSet stopsToRemove;
 
     @Override
     public String getType() {
         return "skip-stop";
+    }
+
+    @Override
+    public boolean apply(TransportNetwork network) {
+        return false;
     }
 
     @Override
@@ -70,7 +78,6 @@ public class SkipStop extends TripPatternModification {
         return foundErrors;
     }
 
-    @Override
     public TripPattern applyToTripPattern(TripPattern originalTripPattern) {
         // TODO filter by trip IDs too
         if (!routeId.contains(originalTripPattern.routeId)) {

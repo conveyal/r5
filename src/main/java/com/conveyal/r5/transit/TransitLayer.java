@@ -412,4 +412,5 @@ public class TransitLayer implements Serializable, Cloneable {
         /** Load enough information for customer facing trip planning */
         FULL
     }
+
 }

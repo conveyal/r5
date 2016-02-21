@@ -629,4 +629,8 @@ public class StreetLayer implements Serializable {
         return null;
     }
 
+    public boolean isExtendOnlyCopy() {
+        return this.edgeStore.isProtectiveCopy();
+    }
+
 }

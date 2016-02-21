@@ -13,7 +13,7 @@ import java.util.BitSet;
  * A Filter that removes any trips that are not running in a given time window.
  * This reduces the size of the timetables before the search.
  */
-public class InactiveTripsFilter extends TripScheduleModification {
+public class InactiveTripsFilter extends Modification {
 
     BitSet activeServices;
     int fromTime;
@@ -36,34 +36,32 @@ public class InactiveTripsFilter extends TripScheduleModification {
     }
 
     @Override
-    public TransitLayer applyToTransitLayer(TransitLayer originalTransitLayer) {
-        if (activeServices == null) {
-            return originalTransitLayer;
-        }
-        return super.applyToTransitLayer(originalTransitLayer);
-    }
-
-    /**
-     * For each trip pattern, if that trip pattern is used on any of the service schedules that are active on
-     * the date in question, apply the filter to each trip schedule individually. Otherwise reject the entire pattern,
-     * it will not be used in the search.
-     */
-    @Override
-    public TripPattern applyToTripPattern(TripPattern originalTripPattern) {
-        if (activeServices.intersects(originalTripPattern.servicesActive)) {
-            return super.applyToTripPattern(originalTripPattern);
-        } else {
-            return null;
-        }
+    public boolean apply(TransportNetwork network) {
+//        if (activeServices == null) {
+//            return originalTransitLayer;
+//        }
+//        return super.applyToTransitLayer(originalTransitLayer);
+        /**
+         * For each trip pattern, if that trip pattern is used on any of the service schedules that are active on
+         * the date in question, apply the filter to each trip schedule individually. Otherwise reject the entire pattern,
+         * it will not be used in the search.
+         */
+//        if (activeServices.intersects(originalTripPattern.servicesActive)) {
+//            return super.applyToTripPattern(originalTripPattern);
+//        } else {
+//            return null;
+//        }
+        return false;
     }
 
 
+
     /**
-     * For each trip within a pattern, check whether that trip occurs on the supplied date. If so, keep the trip. If
-     * not, return null eliminating it from the TransportNetwork that will be used in the search.
+     * For each trip within a pattern, check whether that trip occurs on the supplied date and during the supplied
+     * time range. If so, keep the trip. If not, return null eliminating it from the TransportNetwork that will be
+     * used in the search.
      */
-    @Override
-    public TripSchedule applyToTripSchedule(TripPattern tripPattern, TripSchedule tripSchedule) {
+    public TripSchedule applyToTripSchedule(TripSchedule tripSchedule) {
         if (activeServices.get(tripSchedule.serviceCode) && tripSchedule.overlapsTimeRange(fromTime, toTime)) {
             return tripSchedule;
         } else {

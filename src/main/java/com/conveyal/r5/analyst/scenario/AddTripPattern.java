@@ -35,8 +35,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/** Add a trip pattern */
-public class AddTripPattern extends TransitLayerModification {
+/**
+ * Add a trip pattern.
+ * May add new stops or reuse existing stops.
+ * Can include a full timetable of trips or be a frequency-based pattern.
+ */
+public class AddTripPattern extends Modification {
 
     public static final long serialVersionUID = 1L;
     public static final Logger LOG = LoggerFactory.getLogger(AddTripPattern.class);
@@ -101,13 +105,14 @@ public class AddTripPattern extends TransitLayerModification {
     }
 
     @Override
-    protected TransitLayer applyToTransitLayer(TransitLayer originalTransitLayer) {
-        // Protective copy of original transit layer so we can make non-destructive modifications.
-        TransitLayer transitLayer = originalTransitLayer.clone();
+    public boolean apply (TransportNetwork network) {
+        // Protective copy of original transit layer so we can make modifications without affecting the original.
+        TransitLayer transitLayer = network.transitLayer.clone();
+        network.transitLayer = transitLayer;
         // We will be extending the list of TripPatterns, so make a protective copy of it.
-        transitLayer.tripPatterns = new ArrayList<>(originalTransitLayer.tripPatterns);
+        transitLayer.tripPatterns = new ArrayList<>(transitLayer.tripPatterns);
         // We will be creating a service for each supplied timetable, make a protective copy of the list of services.
-        transitLayer.services = new ArrayList<>(originalTransitLayer.services);
+        transitLayer.services = new ArrayList<>(transitLayer.services);
         generatePattern(transitLayer);
         if (generateReversePattern) {
             // Reverse the stopIds in place. Not sure how wise this is but it works.
@@ -130,7 +135,7 @@ public class AddTripPattern extends TransitLayerModification {
         }
         // FIXME shouldn't rebuilding indexes happen automatically higher up?
         transitLayer.rebuildTransientIndexes();
-        return transitLayer;
+        return false;
     }
 
     /**

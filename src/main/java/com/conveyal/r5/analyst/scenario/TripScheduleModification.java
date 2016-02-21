@@ -8,7 +8,10 @@ import java.util.stream.Collectors;
 
 /**
  * A Modification that is applied to each specific TripSchedule within a TripPattern separately.
+ *
+ * This has been deprecated, I'm leaving it around to copy methods from later.
  */
+@Deprecated
 public abstract class TripScheduleModification extends TripPatternModification implements Cloneable {
 
     /* Implementation of superclass method */

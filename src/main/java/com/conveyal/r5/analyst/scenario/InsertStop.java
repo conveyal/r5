@@ -20,16 +20,14 @@ import java.util.Set;
  * afterStopId encountered. This allows inserting the same stop into multiple patterns on the same route,
  * such as branches converging on a common trunk or opposite directions of the same route.
  */
-public class InsertStop extends TripPatternModification {
+public class InsertStop extends Modification {
 
     public static final long serialVersionUID = 1L;
 
     private static final Logger LOG = LoggerFactory.getLogger(InsertStop.class);
 
-    @Override
-    public String getType() {
-        return "insert-stop";
-    }
+    /** On which routes the stop should be inserted. */
+    public Set<String> routeId;
 
     /** Stop to insert. */
     public String insertStop;
@@ -47,6 +45,16 @@ public class InsertStop extends TripPatternModification {
     public int extraTravelTime;
 
     private transient TransitLayer transitLayer;
+
+    @Override
+    public String getType() {
+        return "insert-stop";
+    }
+
+    @Override
+    public boolean apply(TransportNetwork network) {
+        return false;
+    }
 
     @Override
     public boolean resolve (TransportNetwork network) {
@@ -68,8 +76,7 @@ public class InsertStop extends TripPatternModification {
         return errorsFound;
     }
 
-    @Override
-    public TripPattern applyToTripPattern(TripPattern originalTripPattern) {
+    private TripPattern applyToTripPattern(TripPattern originalTripPattern) {
         // TODO match individual trips. For now this can only handle entire routes.
         if (!routeId.contains(originalTripPattern.routeId)) {
             return originalTripPattern;

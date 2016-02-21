@@ -324,4 +324,17 @@ public class TransportNetwork implements Serializable, Cloneable {
         return newStopIndex;
     }
 
+    /**
+     * When applying a Modification that will change the street network as part of a Scenario, call this method to
+     * make sure that the StreetLayer has been duplicated in such a way that it can be modified without affecting the
+     * original base TransportNetwork.
+     *
+     * We don't want to always do this because it adds an extra layer of indirection to most edge accesses.
+     */
+    public void ensureExtendOnlyStreetLayer () {
+        if (!streetLayer.isExtendOnlyCopy()) {
+            streetLayer = streetLayer.extendOnlyCopy();
+        }
+    }
+
 }

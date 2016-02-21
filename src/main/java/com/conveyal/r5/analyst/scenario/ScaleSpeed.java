@@ -15,23 +15,32 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
  * Scale travel times by a constant factor over the whole length of trips.
  * That is, uniformly speed trips up or slow them down.
  */
-public class ScaleSpeed extends TripPatternModification {
+public class ScaleSpeed extends Modification {
 
     public static final long serialVersionUID = 1L;
 
     private static final Logger LOG = LoggerFactory.getLogger(ScaleSpeed.class);
+
+    /** The route which should be sped up or slowed down. */
+    public Set<String> routeId;
 
     /** The multiplicative scale factor for travel times. */
     public double scaleFactor = 1;
 
     /** Which stop in the route serves as the fixed point around which trips are contracted or expanded. */
     // public int referenceStop = 0;
+
+    @Override
+    public String getType() {
+        return "scale-speed";
+    }
 
     @Override
     public boolean resolve (TransportNetwork network) {
@@ -44,15 +53,11 @@ public class ScaleSpeed extends TripPatternModification {
     }
 
     @Override
-    public String getType() {
-        return "scale-speed";
+    public boolean apply(TransportNetwork network) {
+        return false;
     }
 
-    @Override
-    public TripPattern applyToTripPattern(TripPattern originalTripPattern) {
-        if (!couldMatch(originalTripPattern)) {
-            return originalTripPattern;
-        }
+    private TripPattern applyToTripPattern (TripPattern originalTripPattern) {
         if (!routeId.contains(originalTripPattern.routeId)) {
             return originalTripPattern;
         }
@@ -84,7 +89,7 @@ public class ScaleSpeed extends TripPatternModification {
     }
 
     private static void postSanityCheck (TripSchedule schedule) {
-
+        // TODO check that modified trips still make sense after applying the modification
     }
 
 }

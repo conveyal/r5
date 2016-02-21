@@ -39,9 +39,9 @@ public class Scenario implements Serializable {
     public TransportNetwork applyToTransportNetwork (TransportNetwork originalNetwork) {
         LOG.info("Applying scenario {}", this);
         useVariant = null;
+        // This is a kludge to select a variant by looking at the modification comments TODO replace this kludge
         for (Modification modification : modifications) {
             if (modification.comment != null && modification.comment.startsWith("useVariant: ")) {
-                // TODO replace this kludge to get the variant from comment
                 useVariant = modification.comment.split(" ")[1];
             }
         }
@@ -49,7 +49,7 @@ public class Scenario implements Serializable {
                 .filter(m -> m.isActiveInVariant(useVariant)).collect(Collectors.toList());
         LOG.info("Variant '{}' selected, with {} modifications active out of {} total.",
                 useVariant, filteredModifications.size(), modifications.size());
-        TransportNetwork network = originalNetwork.clone();
+        TransportNetwork copiedNetwork = originalNetwork.clone();
         LOG.info("Resolving modifications against TransportNetwork and sanity checking.");
         // FIXME actually we don't want to check all the parameters before applying any modifications.
         // Some parameters may become valid/invalid because of previous modifications.
@@ -69,9 +69,13 @@ public class Scenario implements Serializable {
         LOG.info("Applying modifications to TransportNetwork.");
         for (Modification modification : filteredModifications) {
             LOG.info("Applying modification of type {}", modification.getType());
-            network = modification.applyToTransportNetwork(network);
+            boolean errors = modification.apply(copiedNetwork);
+            if (errors) {
+                LOG.error("Error while applying modification {}", modification);
+                break;
+            }
         }
-        return network;
+        return copiedNetwork;
     }
 
 }

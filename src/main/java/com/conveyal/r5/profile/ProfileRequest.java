@@ -2,29 +2,36 @@ package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.BoardingAssumption;
 import com.conveyal.r5.analyst.scenario.Scenario;
-import java.time.LocalDate;
 
-import com.conveyal.r5.model.json_serialization.ModeSetDeserializer;
-import com.conveyal.r5.model.json_serialization.ModeSetSerializer;
-import com.conveyal.r5.model.json_serialization.ZoneIdDeserializer;
-import com.conveyal.r5.model.json_serialization.ZoneIdSerializer;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonSetter;
+import java.time.*;
+
+import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.api.util.SearchType;
+import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.r5.model.json_serialization.*;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import graphql.GraphQLException;
+import graphql.schema.DataFetchingEnvironment;
 
 import java.io.Serializable;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Collection;
 import java.util.EnumSet;
+import java.util.HashMap;
 
 /**
  * All the modifiable parameters for profile routing.
  */
 public class ProfileRequest implements Serializable, Cloneable {
     private static final long serialVersionUID = -6501962907644662303L;
+
+    //From and to zonedDateTime filled in GraphQL request
+    //Based on those two variables and timezone from/totime and date is filled
+    //Since from/to time and date is assumed to be in local timezone AKA same timezone as TransportNetwork
+    private ZonedDateTime fromZonedDateTime;
+
+    private ZonedDateTime toZonedDateTime;
 
     /** The latitude of the origin. */
     public double fromLat;
@@ -57,7 +64,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     public float  carSpeed;
 
     /** Maximum time to reach the destination without using transit */
-    public int    streetTime;
+    public int    streetTime = 60;
     
     /**
      * Maximum walk time before and after using transit, in minutes
@@ -76,19 +83,19 @@ public class ProfileRequest implements Serializable, Cloneable {
      * This is solved by using separate walk budgets at the origin and destination. It could also be solved (although this
      * would slow the algorithm down) by retaining all Pareto-optimal combinations of (travel time, walk distance).
      */
-    public int    maxWalkTime;
+    public int    maxWalkTime = 30;
     
     /** Maximum bike time when using transit */
-    public int    maxBikeTime;
+    public int    maxBikeTime = 30;
     
     /** Maximum car time before when using transit */ 
-    public int    maxCarTime;
+    public int    maxCarTime = 30;
     
     /** Minimum time to ride a bike (to prevent extremely short bike legs) */
-    public int    minBikeTime;
+    public int    minBikeTime = 5;
     
     /** Minimum time to drive (to prevent extremely short driving legs) */
-    public int    minCarTime;
+    public int    minCarTime = 5;
 
     /** The date of the search */
     public LocalDate date;
@@ -97,24 +104,24 @@ public class ProfileRequest implements Serializable, Cloneable {
     public int limit;
     
     /** The modes used to access transit */
-    @JsonSerialize(using = ModeSetSerializer.class)
-    @JsonDeserialize(using = ModeSetDeserializer.class)
-    public EnumSet<Mode> accessModes;
+    @JsonSerialize(using = LegModeSetSerializer.class)
+    @JsonDeserialize(using = LegModeSetDeserializer.class)
+    public EnumSet<LegMode> accessModes;
     
     /** The modes used to reach the destination after leaving transit */
-    @JsonSerialize(using = ModeSetSerializer.class)
-    @JsonDeserialize(using = ModeSetDeserializer.class)
-    public EnumSet<Mode> egressModes;
+    @JsonSerialize(using = LegModeSetSerializer.class)
+    @JsonDeserialize(using = LegModeSetDeserializer.class)
+    public EnumSet<LegMode> egressModes;
     
     /** The modes used to reach the destination without transit */
-    @JsonSerialize(using = ModeSetSerializer.class)
-    @JsonDeserialize(using = ModeSetDeserializer.class)
-    public EnumSet<Mode> directModes;
+    @JsonSerialize(using = LegModeSetSerializer.class)
+    @JsonDeserialize(using = LegModeSetDeserializer.class)
+    public EnumSet<LegMode> directModes;
     
     /** The transit modes used */
-    @JsonSerialize(using = ModeSetSerializer.class)
-    @JsonDeserialize(using = ModeSetDeserializer.class)
-    public EnumSet<Mode> transitModes;
+    @JsonSerialize(using = TransitModeSetSerializer.class)
+    @JsonDeserialize(using = TransitModeSetDeserializer.class)
+    public EnumSet<TransitModes> transitModes;
     
     /** If true, disable all goal direction and propagate results to the street network */
     public boolean analyst = false;
@@ -169,7 +176,7 @@ public class ProfileRequest implements Serializable, Cloneable {
       eliminated by an alternative that is only marginally better. We want to effectively push the max travel time of
       alternatives out a bit to account for the fact that they don't always run on schedule.
     */
-    public int suboptimalMinutes;
+    public int suboptimalMinutes = 5;
 
     /** A non-destructive scenario to apply when executing this request */
     public Scenario scenario;
@@ -178,8 +185,21 @@ public class ProfileRequest implements Serializable, Cloneable {
     @JsonDeserialize(using=ZoneIdDeserializer.class)
     public ZoneId zoneId = ZoneOffset.UTC;
 
-    public ProfileRequest clone () throws CloneNotSupportedException {
-        return (ProfileRequest) super.clone();
+    //If routing with wheelchair is needed
+    private boolean wheelchair;
+
+    private SearchType searchType;
+
+    //If this is profile or point to point route request
+    private boolean profile = false;
+
+    public ProfileRequest clone () {
+        try {
+            return (ProfileRequest) super.clone();
+        } catch (CloneNotSupportedException e) {
+            // checked clonenotsupportedexception is about the stupidest thing in java
+            throw new RuntimeException(e);
+        }
     }
 
     /**
@@ -190,18 +210,33 @@ public class ProfileRequest implements Serializable, Cloneable {
      * It needs to be decided how to do this correctly: #37
      *
      * If date isn't set current date is used. Time is empty (one hour before midnight in UTC if +1 timezone is used)
+     *
+     * uses {@link this#getFromTimeDateZD()}
      */
     public long getFromTimeDate() {
-        long currentDateTime;
+        return getFromTimeDateZD().toInstant().toEpochMilli();
+    }
+
+    /**
+     * Returns ZonedDateTime made with date and fromTime fields
+     *
+     * It reads date as date in transportNetwork timezone when it is converted to UNIX time it is in UTC
+     *
+     * It needs to be decided how to do this correctly: #37
+     *
+     * If date isn't set current date is used. Time is empty (one hour before midnight in UTC if +1 timezone is used)
+     */
+    public ZonedDateTime getFromTimeDateZD() {
+        ZonedDateTime currentDateTime;
 
         if (date == null) {
-            currentDateTime = ZonedDateTime.now(zoneId).truncatedTo(ChronoUnit.DAYS).toInstant().toEpochMilli();
+            currentDateTime = ZonedDateTime.now(zoneId).truncatedTo(ChronoUnit.DAYS);
         } else {
-            currentDateTime = ZonedDateTime.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth(), 0,0,0,0,zoneId).toInstant().toEpochMilli();
+            currentDateTime = ZonedDateTime.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth(), 0,0,0,0,zoneId);
         }
 
         //fromTime is in seconds and there are 1000 ms in a second
-        return  currentDateTime + (fromTime*1000);
+        return  currentDateTime.plusSeconds(fromTime);
     }
 
     public float getSpeed(Mode mode) {
@@ -216,5 +251,108 @@ public class ProfileRequest implements Serializable, Cloneable {
             break;
         }
         throw new IllegalArgumentException("getSpeed(): Invalid mode " + mode);
+    }
+
+    /**
+     *
+     * @return true if there is any transitMode in transitModes (Safe to call if transitModes is null)
+     */
+    public boolean useTransit() {
+        return this.transitModes != null && !this.transitModes.isEmpty();
+    }
+
+    /**
+     * Sets profile request with parameters from GraphQL request
+     * @param environment
+     * @param timezone transportNetwork timezone
+     * @return
+     */
+    public static ProfileRequest fromEnvironment(DataFetchingEnvironment environment,
+        ZoneId timezone) {
+        ProfileRequest profileRequest = new ProfileRequest();
+        profileRequest.zoneId = timezone;
+
+        String operation = environment.getFields().get(0).getName();
+
+        if  (operation.equals("profile")) {
+            profileRequest.profile=true;
+        }
+
+
+
+        //ZonedDatetime is used to fill fromTime/toTime and date
+        //we need to have a network Timezone for that so that all the times are in network own timezone
+        profileRequest.fromZonedDateTime = environment.getArgument("fromTime");
+        profileRequest.toZonedDateTime = environment.getArgument("toTime");
+        profileRequest.setTime();
+
+        profileRequest.wheelchair = environment.getArgument("wheelchair");
+        if (operation.equals("plan")) {
+            profileRequest.searchType = environment.getArgument("searchType");
+        }
+        //FIXME: if any of those three values is integer not float it gets converted to java integer instead of Double (So why did we even specify type)?
+        // this is needed since walkSpeed/bikeSpeed/carSpeed are GraphQLFloats which are converted to java Doubles
+        double walkSpeed = environment.getArgument("walkSpeed");
+        profileRequest.walkSpeed = (float) walkSpeed;
+        double bikeSpeed = environment.getArgument("bikeSpeed");
+        profileRequest.bikeSpeed = (float) bikeSpeed;
+        double carSpeed = environment.getArgument("carSpeed");
+        profileRequest.carSpeed = (float) carSpeed;
+        profileRequest.streetTime = environment.getArgument("streetTime");
+        profileRequest.maxWalkTime = environment.getArgument("maxWalkTime");
+        profileRequest.maxBikeTime = environment.getArgument("maxBikeTime");
+        profileRequest.maxCarTime = environment.getArgument("maxCarTime");
+        profileRequest.minBikeTime = environment.getArgument("minBikeTime");
+        profileRequest.minCarTime = environment.getArgument("minCarTime");
+        profileRequest.limit = environment.getArgument("limit");
+
+        profileRequest.suboptimalMinutes = environment.getArgument("suboptimalMinutes");
+        profileRequest.bikeTrafficStress = environment.getArgument("bikeTrafficStress");
+        //Bike traffic stress needs to be between 1 and 4
+        if (profileRequest.bikeTrafficStress > 4) {
+            profileRequest.bikeTrafficStress = 4;
+        } else if (profileRequest.bikeTrafficStress < 1) {
+            profileRequest.bikeTrafficStress = 1;
+        }
+
+
+        //This is always set otherwise GraphQL validation fails
+
+        profileRequest.fromLat = environment.getArgument("fromLat");
+        profileRequest.fromLon = environment.getArgument("fromLon");
+
+        profileRequest.toLat = environment.getArgument("toLat");
+        profileRequest.toLon = environment.getArgument("toLon");
+
+
+        //Transit modes can be empty if searching for path without transit is requested
+        Collection<TransitModes> transitModes = environment.getArgument("transitModes");
+        if (transitModes.size() > 0) {
+            profileRequest.transitModes = EnumSet.copyOf(transitModes);
+        }
+        profileRequest.accessModes = EnumSet.copyOf((Collection<LegMode>) environment.getArgument("accessModes"));
+        profileRequest.egressModes = EnumSet.copyOf((Collection<LegMode>)environment.getArgument("egressModes"));
+
+        profileRequest.directModes = EnumSet.copyOf((Collection<LegMode>)environment.getArgument("directModes"));
+
+
+        return profileRequest;
+    }
+
+    /**
+     * Converts from/to zonedDateTime to graph timezone and fill from/totime and date
+     */
+    private void setTime() {
+        if (fromZonedDateTime != null) {
+            fromZonedDateTime = fromZonedDateTime.withZoneSameInstant(zoneId);
+            fromTime = fromZonedDateTime.getHour()*3600+fromZonedDateTime.getMinute()*60+fromZonedDateTime.getSecond();
+            date = fromZonedDateTime.toLocalDate();
+        }
+        if (toZonedDateTime != null) {
+            toZonedDateTime = toZonedDateTime.withZoneSameInstant(zoneId);
+            toTime = toZonedDateTime.getHour() * 3600 + toZonedDateTime.getMinute() * 60
+                + toZonedDateTime.getSecond();
+            date = toZonedDateTime.toLocalDate();
+        }
     }
 }

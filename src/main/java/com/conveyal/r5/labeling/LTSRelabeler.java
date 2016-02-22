@@ -1,5 +1,6 @@
 package com.conveyal.r5.labeling;
 
+import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.StreetLayer;
@@ -125,7 +126,7 @@ public class LTSRelabeler {
             IntStream.range(0, SEARCHES_PER_ITERATION).parallel().forEach(search -> {
                 StreetRouter router = new StreetRouter(network.streetLayer);
                 router.profileRequest.bikeTrafficStress = 2;
-                router.profileRequest.accessModes = router.profileRequest.egressModes = router.profileRequest.directModes = EnumSet.of(Mode.BICYCLE);
+                router.profileRequest.accessModes = router.profileRequest.egressModes = router.profileRequest.directModes = EnumSet.of(LegMode.BICYCLE);
                 router.mode = Mode.BICYCLE;
                 router.setOrigin(origins[search]);
                 router.distanceLimitMeters = 10_000;
@@ -145,7 +146,7 @@ public class LTSRelabeler {
             IntStream.range(0, SEARCHES_PER_ITERATION).parallel().forEach(search -> {
                 StreetRouter router = new StreetRouter(network.streetLayer);
                 router.profileRequest.bikeTrafficStress = 2;
-                router.profileRequest.accessModes = router.profileRequest.egressModes = router.profileRequest.directModes = EnumSet.of(Mode.BICYCLE);
+                router.profileRequest.accessModes = router.profileRequest.egressModes = router.profileRequest.directModes = EnumSet.of(LegMode.BICYCLE);
                 router.mode = Mode.BICYCLE;
                 router.setOrigin(origins[search]);
                 router.distanceLimitMeters = 10_000;

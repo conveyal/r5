@@ -292,6 +292,15 @@
       <name>Boundless Maven Repository</name>
       <url>http://repo.boundlessgeo.com/main</url>
     </repository>
+    <!-- Needed  for graphql-java-->
+    <repository>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <id>bintray-andimarek-graphql-java</id>
+      <name>bintray</name>
+      <url>http://dl.bintray.com/andimarek/graphql-java</url>
+    </repository>
   </repositories>
 
   <dependencies>
@@ -413,14 +422,19 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-      <groupId>com.conveyal</groupId>
-      <artifactId>jackson2-geojson</artifactId>
-      <version>0.8</version>
+      <groupId>com.graphql-java</groupId>
+      <artifactId>graphql-java</artifactId>
+      <version>2016-02-19T11-51-00</version>
     </dependency>
     <dependency>
       <groupId>com.sparkjava</groupId>
       <artifactId>spark-core</artifactId>
       <version>2.3</version>
+   </dependency>
+   <dependency>
+      <groupId>com.conveyal</groupId>
+      <artifactId>jackson2-geojson</artifactId>
+      <version>0.8</version>
     </dependency>
   </dependencies>
 </project>

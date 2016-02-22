@@ -2,12 +2,9 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.*;
-import com.conveyal.r5.analyst.scenario.Modification;
-import com.conveyal.r5.analyst.scenario.RemoveTrip;
-import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.api.util.TransitModes;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Multimap;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -26,7 +23,6 @@ import java.time.DateTimeException;
 import java.time.ZoneId;
 import java.time.zone.ZoneRulesException;
 import java.util.*;
-import java.util.stream.Collectors;
 
 
 /**
@@ -151,13 +147,17 @@ public class TransitLayer implements Serializable, Cloneable {
             TripPatternKey tripPatternKey = new TripPatternKey(trip.route.route_id);
             TIntList arrivals = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
             TIntList departures = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
+            TIntList stopSequences = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
 
             int previousDeparture = Integer.MIN_VALUE;
+
+            int nStops = 0;
 
             for (StopTime st : gtfs.getOrderedStopTimesForTrip(tripId)) {
                 tripPatternKey.addStopTime(st, indexForStopId);
                 arrivals.add(st.arrival_time);
                 departures.add(st.departure_time);
+                stopSequences.add(st.stop_sequence);
 
                 if (previousDeparture > st.arrival_time || st.arrival_time > st.departure_time) {
                     LOG.warn("Reverse travel at stop {} on trip {} on route {}, skipping this trip as it will wreak havoc with routing", st.stop_id, trip.trip_id, trip.route.route_id);
@@ -169,7 +169,16 @@ public class TransitLayer implements Serializable, Cloneable {
                 }
 
                 previousDeparture = st.departure_time;
+
+                nStops++;
             }
+
+            if (nStops == 0) {
+                LOG.warn("Trip {} on route {} has no stops, it will not be used", trip.trip_id, trip.route.route_id);
+                continue;
+
+            }
+
             TripPattern tripPattern = tripPatternForStopSequence.get(tripPatternKey);
             if (tripPattern == null) {
                 tripPattern = new TripPattern(tripPatternKey);
@@ -188,6 +197,7 @@ public class TransitLayer implements Serializable, Cloneable {
                 }
 
                 tripPatternForStopSequence.put(tripPatternKey, tripPattern);
+                tripPattern.originalId = tripPatterns.size();
                 tripPatterns.add(tripPattern);
             }
             tripPattern.setOrVerifyDirection(trip.direction_id);
@@ -195,7 +205,7 @@ public class TransitLayer implements Serializable, Cloneable {
 
             // TODO there's no reason why we can't just filter trips like this, correct?
             // TODO this means that invalid trips still have empty patterns created
-            TripSchedule tripSchedule = TripSchedule.create(trip, arrivals.toArray(), departures.toArray(), serviceCode);
+            TripSchedule tripSchedule = TripSchedule.create(trip, arrivals.toArray(), departures.toArray(), stopSequences.toArray(), serviceCode);
             if (tripSchedule == null) continue;
 
             tripPattern.addTrip(tripSchedule);
@@ -411,6 +421,60 @@ public class TransitLayer implements Serializable, Cloneable {
         BASIC,
         /** Load enough information for customer facing trip planning */
         FULL
+    }
+
+    public static TransitModes getTransitModes(int routeType) {
+        /* TPEG Extension  https://groups.google.com/d/msg/gtfs-changes/keT5rTPS7Y0/71uMz2l6ke0J */
+        if (routeType >= 100 && routeType < 200){ // Railway Service
+            return TransitModes.RAIL;
+        }else if (routeType >= 200 && routeType < 300){ //Coach Service
+            return TransitModes.BUS;
+        }else if (routeType >= 300 && routeType < 500){ //Suburban Railway Service and Urban Railway service
+            return TransitModes.RAIL;
+        }else if (routeType >= 500 && routeType < 700){ //Metro Service and Underground Service
+            return TransitModes.SUBWAY;
+        }else if (routeType >= 700 && routeType < 900){ //Bus Service and Trolleybus service
+            return TransitModes.BUS;
+        }else if (routeType >= 900 && routeType < 1000){ //Tram service
+            return TransitModes.TRAM;
+        }else if (routeType >= 1000 && routeType < 1100){ //Water Transport Service
+            return TransitModes.FERRY;
+        }else if (routeType >= 1100 && routeType < 1200){ //Air Service
+            throw new IllegalArgumentException("Air transport not supported" + routeType);
+        }else if (routeType >= 1200 && routeType < 1300){ //Ferry Service
+            return TransitModes.FERRY;
+        }else if (routeType >= 1300 && routeType < 1400){ //Telecabin Service
+            return TransitModes.GONDOLA;
+        }else if (routeType >= 1400 && routeType < 1500){ //Funicalar Service
+            return TransitModes.FUNICULAR;
+        }else if (routeType >= 1500 && routeType < 1600){ //Taxi Service
+            throw new IllegalArgumentException("Taxi service not supported" + routeType);
+        }
+        //Is this really needed?
+        /**else if (routeType >= 1600 && routeType < 1700){ //Self drive
+            return TransitModes.CAR;
+        }*/
+        /* Original GTFS route types. Should these be checked before TPEG types? */
+        switch (routeType) {
+        case 0:
+            return TransitModes.TRAM;
+        case 1:
+            return TransitModes.SUBWAY;
+        case 2:
+            return TransitModes.RAIL;
+        case 3:
+            return TransitModes.BUS;
+        case 4:
+            return TransitModes.FERRY;
+        case 5:
+            return TransitModes.CABLE_CAR;
+        case 6:
+            return TransitModes.GONDOLA;
+        case 7:
+            return TransitModes.FUNICULAR;
+        default:
+            throw new IllegalArgumentException("unknown gtfs route type " + routeType);
+        }
     }
 
 }

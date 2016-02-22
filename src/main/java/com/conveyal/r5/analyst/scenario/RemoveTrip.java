@@ -1,14 +1,9 @@
 package com.conveyal.r5.analyst.scenario;
-
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.transit.TripPattern;
-import com.conveyal.r5.transit.TripSchedule;
-
-import java.util.List;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import gnu.trove.set.TIntSet;
 
 /**
  * Remove trips from a scenario.
@@ -22,6 +17,9 @@ public class RemoveTrip extends Modification {
     /** On which route the stops should be skipped. */
     public Set<String> routeId;
 
+    // FIXME What is this? Are these pattern ID numbers supposed to be supplied in the API call or pre-looked-up?
+    public TIntSet patternIds;
+
     @Override
     public String getType() {
         return "remove-trip";
@@ -31,7 +29,7 @@ public class RemoveTrip extends Modification {
     public boolean apply(TransportNetwork network) {
         TransitLayer transitLayer = network.transitLayer.clone();
         transitLayer.tripPatterns = transitLayer.tripPatterns.stream()
-            .filter(tp -> !routeId.contains(tp.routeId)).collect(Collectors.toList());
+                .filter(tp -> !routeId.contains(tp.routeId)).collect(Collectors.toList());
         network.transitLayer = transitLayer;
         return false;
     }

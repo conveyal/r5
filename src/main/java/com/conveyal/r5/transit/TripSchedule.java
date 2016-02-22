@@ -35,8 +35,24 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
     public int serviceCode;
     public TripSchedule nextInBlock = null;
 
+    public int[] phasedFromPattern = null;
+    public int[] phasedFromTrip = null;
+    public int[] phasedFromFrequencyEntry = null;
+    /** NB these are stop positions (0-based, incrementing by 1), NOT GTFS stop sequences */
+    public int[] phasedFromSourceStopPosition = null;
+    public int[] phasedAtTargetStopPosition = null;
+    public int[] phaseSeconds = null;
+
+    /**
+     * The stop sequences of this trip in the GTFS. Unfortunately we need to store this at the trip level as every
+     * trip on a pattern could have different stop sequence numbers. We need to save the sequence numbers so we can
+     * uniquely identify stop positions in patterns in SetPhasing modifications (this could potentially be ripped out
+     * when we change how setting phasing is done, for example by not allowing changing phasing on existing routes at all)
+     */
+    public int[] stopSequences;
+
     /** static factory so we can return null */
-    public static TripSchedule create (Trip trip, int[] arrivals, int[] departures, int serviceCode) {
+    public static TripSchedule create (Trip trip, int[] arrivals, int[] departures, int[] stopSequences, int serviceCode) {
         // ensure that trip times are monotonically increasing, otherwise throw them out
         for (int i = 0; i < arrivals.length; i++) {
             if (departures[i] < arrivals[i]) {
@@ -57,11 +73,11 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
             }
         }
 
-        return new TripSchedule(trip, arrivals, departures, serviceCode);
+        return new TripSchedule(trip, arrivals, departures, stopSequences, serviceCode);
     }
 
     // Maybe make a TripSchedule.Factory so we don't have to pass in serviceCode or map.
-    private TripSchedule(Trip trip, int[] arrivals, int[] departures, int serviceCode) {
+    private TripSchedule(Trip trip, int[] arrivals, int[] departures, int[] stopSequences, int serviceCode) {
         this.tripId = trip.trip_id;
         if (trip.bikes_allowed > 0) {
             setFlag(TripFlag.BICYCLE);
@@ -71,6 +87,7 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
         }
         this.arrivals = arrivals;
         this.departures = departures;
+        this.stopSequences = stopSequences;
         this.serviceCode = serviceCode;
 
         // TODO handle exact times!
@@ -158,6 +175,8 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
             // FIXME this error is extremely common in Portland because block IDs are recycled across service days.
             LOG.debug("Trip {} arrives at terminus after the next trip in its block departs.", tripId);
         }
+
+
     }
 
     /**

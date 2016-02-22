@@ -50,11 +50,8 @@ public class AnalystClusterRequest extends GenericClusterRequest implements Seri
      */
     public AnalystClusterRequest (String destinationPointsetId, String graphId, ProfileRequest req) {
         this(destinationPointsetId, graphId);
-        try {
-            profileRequest = req.clone();
-        } catch (CloneNotSupportedException e) {
-            throw new AssertionError();
-        }
+        profileRequest = req.clone();
+
         profileRequest.analyst = true;
         profileRequest.toLat = profileRequest.fromLat;
         profileRequest.toLon = profileRequest.fromLon;

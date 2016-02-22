@@ -5,19 +5,29 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.trove.TIntAugmentedList;
+import com.conveyal.r5.util.TIntIntHashMultimap;
+import com.conveyal.r5.util.TIntIntMultimap;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.LineString;
+import gnu.trove.TIntCollection;
 import gnu.trove.list.TIntList;
+import gnu.trove.list.TLongList;
 import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.list.array.TShortArrayList;
 import gnu.trove.set.TIntSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Set;
+import java.util.StringJoiner;
 
 /**
  * A column store with parallel arrays is better than a struct simulation because:
@@ -67,7 +77,10 @@ public class EdgeStore implements Serializable {
     /** Length of the edge along its geometry (millimeters). One entry for each edge pair. */
     public TIntList lengths_mm;
 
-    /** Geometries. One entry for each edge pair. */
+    /** OSM ids of edges. One entry for each edge pair */
+    public TLongList osmids;
+
+    /** Geometries. One entry for each edge pair */
     public List<int[]> geometries; // intermediate points along the edge, other than the intersection endpoints
 
     /**
@@ -107,11 +120,20 @@ public class EdgeStore implements Serializable {
         return firstModifiableEdge > 0;
     }
 
+    /** Turn restrictions for turning _out of_ each edge */
+    public TIntIntMultimap turnRestrictions;
+
+    public StreetLayer layer;
+
     public static final transient EnumSet<EdgeFlag> PERMISSION_FLAGS = EnumSet
         .of(EdgeFlag.ALLOWS_PEDESTRIAN, EdgeFlag.ALLOWS_BIKE, EdgeFlag.ALLOWS_CAR);
 
-    public EdgeStore (VertexStore vertexStore, int initialSize) {
+    private long generatedOSMID = 1;
+
+    public EdgeStore (VertexStore vertexStore, StreetLayer layer, int initialSize) {
         this.vertexStore = vertexStore;
+        this.layer = layer;
+
         // There are separate flags and speeds entries for the forward and backward edges in each pair.
         flags = new TIntArrayList(initialSize);
         speeds = new TShortArrayList(initialSize);
@@ -121,6 +143,8 @@ public class EdgeStore implements Serializable {
         toVertices = new TIntArrayList(initialEdgePairs);
         geometries = new ArrayList<>(initialEdgePairs);
         lengths_mm = new TIntArrayList(initialEdgePairs);
+        osmids = new TLongArrayList(initialEdgePairs);
+        turnRestrictions = new TIntIntHashMultimap();
     }
 
     /**
@@ -151,6 +175,7 @@ public class EdgeStore implements Serializable {
             fromVertices.remove(edgePair, 1);
             toVertices.remove(edgePair, 1);
             lengths_mm.remove(edgePair, 1);
+            osmids.remove(edgePair, 1);
             // This is not a TIntList, so use the 1-arg remove function to remove by index.
             geometries.remove(edgePair);
         }
@@ -180,7 +205,8 @@ public class EdgeStore implements Serializable {
         NO_THRU_TRAFFIC_BIKE (11),
         NO_THRU_TRAFFIC_CAR (12),
         SLOPE_OVERRIDE (13),
-        TRANSIT_LINK (14), // This edge is a one-way connection from a street to a transit stop. Target is a transit stop index, not an intersection index.
+        /** Link edge, two should not be traversed one-after-another */
+        LINK (14),
 
         // Permissions
         ALLOWS_PEDESTRIAN (15),
@@ -246,9 +272,24 @@ public class EdgeStore implements Serializable {
      * This avoids having a tangle of different edge creator functions for different circumstances.
      * @return a cursor pointing to the forward edge in the pair, which always has an even index.
      */
-    public Edge addStreetPair(int beginVertexIndex, int endVertexIndex, int edgeLengthMillimeters) {
+    public Edge addStreetPair(int beginVertexIndex, int endVertexIndex, int edgeLengthMillimeters, long osmID) {
         // The first new edge to be created will have an index equal to the number of existing edges.
         int forwardEdgeIndex = nEdges();
+        // The caller supplies an OSM ID less than 0 to indicate that the edges being created are not derived
+        // from any OSM way. A unique negative OSM ID is generated.
+        // By convention, OSM IDs less than 0 represent ways not in the main public OSM database.
+        if (osmID < 0) {
+            osmID = -generatedOSMID;
+            generatedOSMID++;
+        }
+
+        if (beginVertexIndex < 0 || beginVertexIndex >= vertexStore.getVertexCount()) {
+            throw new IllegalArgumentException(String.format("Attempt to begin edge pair at nonexistent vertex %s", beginVertexIndex));
+        }
+
+        if (endVertexIndex < 0 || endVertexIndex >= vertexStore.getVertexCount()) {
+            throw new IllegalArgumentException(String.format("Attempt to end edge pair at nonexistent vertex %s", endVertexIndex));
+        }
 
         // Extend the parallel lists in the EdgeStore to hold the values for the new edge pair.
         // Store only one length, set of endpoints, and intermediate geometry per pair of edges.
@@ -256,6 +297,7 @@ public class EdgeStore implements Serializable {
         fromVertices.add(beginVertexIndex);
         toVertices.add(endVertexIndex);
         geometries.add(EMPTY_INT_ARRAY);
+        osmids.add(osmID);
 
         // Speed and flags are stored separately for each edge in a pair (unlike length, geom, etc.)
 
@@ -411,6 +453,7 @@ public class EdgeStore implements Serializable {
             flags.set(backEdge, other.getEdgeStore().flags.get(otherBackEdge));
             speeds.set(foreEdge, other.getEdgeStore().speeds.get(otherForeEdge));
             speeds.set(backEdge, other.getEdgeStore().speeds.get(otherBackEdge));
+            osmids.set(pairIndex, other.pairIndex);
         }
 
         /**
@@ -460,14 +503,49 @@ public class EdgeStore implements Serializable {
         public StreetRouter.State traverse (StreetRouter.State s0, Mode mode, ProfileRequest req) {
             StreetRouter.State s1 = new StreetRouter.State(getToVertex(), edgeIndex,
                 s0.getTime(), s0);
-            s1.nextState = null;
             s1.weight = s0.weight;
             float speedms = calculateSpeed(req, mode, s0.getTime());
             float time = (float) (getLengthM() / speedms);
             float weight = 0;
 
+            // add turn restrictions that start on this edge
+            if (turnRestrictions.containsKey(getEdgeIndex())) {
+                s1.inTurnRestriction = true;
+            }
+
+            if (s0.inTurnRestriction) {
+                // check if we have exited any turn restrictions, and make sure the movement is not restricted
+                TIntCollection currentRestrictions = turnRestrictions.get(getEdgeIndex());
+
+                // array to dodge effectively final nonsense
+                boolean[] blockTraversal = new boolean[] { false };
+                turnRestrictions.get(s0.backEdge).forEach(ridx -> {
+                    if (currentRestrictions.contains(ridx)) return true; // we have not exited this restriction, but continue iteration
+
+                    // we have exited this restriction, check to see if we should block traversal
+                    TurnRestriction restriction = layer.turnRestrictions.get(ridx);
+
+                    // first check if the restriction applies to this traversal
+                    // we don't need to check via here, as if we ever left the via edges we would have terminated the restriction then.
+                    boolean applies = restriction.toEdge == getEdgeIndex();
+
+                    if (applies && !restriction.only || !applies && restriction.only) blockTraversal[0] = true;
+
+                    // only continue iteration if we're not already blocking traversal
+                    return !blockTraversal[0];
+                });
+
+                if (blockTraversal[0])
+                    return null;
+            }
+
+            if (s0.backEdge != -1 && getFlag(EdgeFlag.LINK) && getCursor(s0.backEdge).getFlag(EdgeFlag.LINK))
+                // two link edges in a row, in other words a shortcut. Disallow this.
+                return null;
+
             //Currently weigh is basically the same as weight. It differs only on stairs and when walking.
 
+            s1.mode = mode;
             if (mode == Mode.WALK && getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) {
                 weight = time;
                 //elevation which changes weight
@@ -491,6 +569,8 @@ public class EdgeStore implements Serializable {
 
 
                 if (walking) {
+                    //TODO: set bike walking in state
+                    s1.mode = Mode.WALK;
                     // * 1.5 to account for time to get off bike and slower walk speed once off
                     // this will tend to prefer to bike a slightly longer route than walk a long way,
                     // but will allow walking to cross a busy street, etc.
@@ -515,6 +595,7 @@ public class EdgeStore implements Serializable {
             int roundedTime = (int) Math.ceil(time);
             s1.incrementTimeInSeconds(roundedTime);
             s1.incrementWeight(weight);
+            s1.distance += getLengthMm();
             return s1;
         }
 
@@ -724,6 +805,9 @@ public class EdgeStore implements Serializable {
             setFlag(EdgeFlag.ALLOWS_WHEELCHAIR);
         }
 
+        public long getOSMID() {
+            return osmids.get(pairIndex);
+        }
     }
 
     /**

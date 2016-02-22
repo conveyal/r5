@@ -54,7 +54,9 @@ public class StaticComputer implements Runnable {
 
         TaskStatistics ts = new TaskStatistics();
 
-        LinkedPointSet lps = points.link(network.streetLayer);
+        if (req.request.request.scenario != null) {
+            network = network.applyScenario(req.request.request.scenario);
+        }
 
 
         // perform street search to find transit stops and non-transit times

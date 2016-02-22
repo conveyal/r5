@@ -1,17 +1,26 @@
 package com.conveyal.r5.point_to_point;
 
+import com.conveyal.r5.api.GraphQlRequest;
+import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.common.GeoJsonFeature;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.point_to_point.builder.RouterInfo;
 import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.streets.*;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectReader;
 import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.operation.buffer.BufferParameters;
 import com.vividsolutions.jts.operation.buffer.OffsetCurveBuilder;
 import gnu.trove.set.TIntSet;
+import graphql.ExecutionResult;
+import graphql.GraphQL;
+import graphql.GraphQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,6 +91,7 @@ public class PointToPointRouterServer {
                 LOG.info("Loading transit networks from: {}", dir);
                 InputStream inputStream = new BufferedInputStream(new FileInputStream(new File(dir, "network.dat")));
                 TransportNetwork transportNetwork = TransportNetwork.read(inputStream);
+                transportNetwork.readOSM(new File(dir, "osm.mapdb"));
                 run(transportNetwork);
                 inputStream.close();
             } catch (IOException e) {
@@ -105,9 +115,34 @@ public class PointToPointRouterServer {
 
     private static void run(TransportNetwork transportNetwork) {
         port(DEFAULT_PORT);
+        ObjectMapper mapper = new ObjectMapper();
+        //ObjectReader is a new lightweight mapper which can only deserialize specified class
+        ObjectReader graphQlRequestReader = mapper.reader(GraphQlRequest.class);
+        ObjectReader mapReader = mapper.reader(HashMap.class);
         staticFileLocation("debug-plan");
+        PointToPointQuery pointToPointQuery = new PointToPointQuery(transportNetwork);
+
+        //TODO: executor strategies
+        GraphQL graphQL = new GraphQL(new com.conveyal.r5.GraphQLSchema(pointToPointQuery).indexSchema);
         // add cors header
         before((req, res) -> res.header("Access-Control-Allow-Origin", "*"));
+
+        options("/*", (request, response) -> {
+
+            String accessControlRequestHeaders = request
+                .headers("Access-Control-Request-Headers");
+            if (accessControlRequestHeaders != null) {
+                response.header("Access-Control-Allow-Headers", accessControlRequestHeaders);
+            }
+
+            String accessControlRequestMethod = request
+                .headers("Access-Control-Request-Method");
+            if (accessControlRequestMethod != null) {
+                response.header("Access-Control-Allow-Methods", accessControlRequestMethod);
+            }
+
+            return "OK";
+        });
 
         get("/metadata", (request, response) -> {
             response.header("Content-Type", "application/json");
@@ -115,6 +150,121 @@ public class PointToPointRouterServer {
             routerInfo.envelope = transportNetwork.getEnvelope();
             return routerInfo;
 
+        }, JsonUtilities.objectMapper::writeValueAsString);
+
+        get("/reachedStops", (request, response) -> {
+            response.header("Content-Type", "application/json");
+
+            Map<String, Object> content = new HashMap<>(2);
+            String queryMode = request.queryParams("mode");
+
+            Mode mode = Mode.valueOf(queryMode);
+            if (mode == null) {
+                content.put("errors", "Mode is wrong");
+                return content;
+            }
+            Float fromLat = request.queryMap("fromLat").floatValue();
+
+            Float fromLon = request.queryMap("fromLon").floatValue();
+
+            Map<String, Object> featureCollection = new HashMap<>(2);
+            featureCollection.put("type", "FeatureCollection");
+            List<GeoJsonFeature> features = new ArrayList<>();
+            ProfileRequest profileRequest = new ProfileRequest();
+            profileRequest.zoneId = transportNetwork.getTimeZone();
+            profileRequest.fromLat = fromLat;
+            profileRequest.fromLon = fromLon;
+            StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+
+            streetRouter.profileRequest = profileRequest;
+            streetRouter.mode = mode;
+            streetRouter.distanceLimitMeters = 2000;
+            if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
+                streetRouter.route();
+                streetRouter.getReachedStops().forEachEntry((stopIdx, weight) -> {
+                    VertexStore.Vertex stopVertex = transportNetwork.streetLayer.vertexStore.getCursor(
+                        transportNetwork.transitLayer.streetVertexForStop.get(stopIdx));
+                    StreetRouter.State state = streetRouter.getState(stopVertex.index);
+                    GeoJsonFeature feature = new GeoJsonFeature(stopVertex.getLon(), stopVertex.getLat());
+                    feature.addProperty("weight", weight);
+                    feature.addProperty("name", transportNetwork.transitLayer.stopNames.get(stopIdx));
+                    feature.addProperty("type", "stop");
+                    feature.addProperty("mode", mode.toString());
+                    if (state != null) {
+                        feature.addProperty("distance_m", state.distance/1000);
+                        feature.addProperty("duration_s", state.getDurationSeconds());
+                    }
+                    features.add(feature);
+                    return true;
+                });
+            } else {
+                content.put("errors", "Start point isn't found!");
+            }
+
+            LOG.info("Num features:{}", features.size());
+            featureCollection.put("features", features);
+            content.put("data", featureCollection);
+
+            return content;
+        }, JsonUtilities.objectMapper::writeValueAsString);
+
+        get("/reachedBikeShares", (request, response) -> {
+            response.header("Content-Type", "application/json");
+
+            Map<String, Object> content = new HashMap<>(2);
+            String queryMode = request.queryParams("mode");
+
+            Mode mode = Mode.valueOf(queryMode);
+            if (mode == null) {
+                content.put("errors", "Mode is wrong");
+                return content;
+            }
+            Float fromLat = request.queryMap("fromLat").floatValue();
+
+            Float fromLon = request.queryMap("fromLon").floatValue();
+
+            Map<String, Object> featureCollection = new HashMap<>(2);
+            featureCollection.put("type", "FeatureCollection");
+            List<GeoJsonFeature> features = new ArrayList<>();
+            ProfileRequest profileRequest = new ProfileRequest();
+            profileRequest.zoneId = transportNetwork.getTimeZone();
+            profileRequest.fromLat = fromLat;
+            profileRequest.fromLon = fromLon;
+            StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+
+            streetRouter.profileRequest = profileRequest;
+            streetRouter.mode = mode;
+            streetRouter.distanceLimitMeters = 2000;
+            if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
+                streetRouter.route();
+                streetRouter.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING).forEachEntry((vertexIdx, state) -> {
+                    VertexStore.Vertex bikeShareVertex = transportNetwork.streetLayer.vertexStore.getCursor(vertexIdx);
+                    BikeRentalStation bikeRentalStation = transportNetwork.streetLayer.bikeRentalStationMap.get(vertexIdx);
+                    GeoJsonFeature feature = new GeoJsonFeature(bikeShareVertex.getLon(), bikeShareVertex.getLat());
+                    feature.addProperty("weight", state.weight);
+                    if (bikeRentalStation != null) {
+                        feature.addProperty("name", bikeRentalStation.name);
+                        feature.addProperty("id", bikeRentalStation.id);
+                        feature.addProperty("bikes", bikeRentalStation.bikesAvailable);
+                        feature.addProperty("places", bikeRentalStation.spacesAvailable);
+                    }
+                    feature.addProperty("type", "stop");
+                    feature.addProperty("mode", mode.toString());
+                    if (state != null) {
+                        feature.addProperty("distance_m", state.distance/1000);
+                    }
+                    features.add(feature);
+                    return true;
+                });
+            } else {
+                content.put("errors", "Start point isn't found!");
+            }
+
+            LOG.info("Num features:{}", features.size());
+            featureCollection.put("features", features);
+            content.put("data", featureCollection);
+
+            return content;
         }, JsonUtilities.objectMapper::writeValueAsString);
 
         get("/plan", (request, response) -> {
@@ -151,6 +301,7 @@ public class PointToPointRouterServer {
 
             streetRouter.profileRequest = profileRequest;
             streetRouter.mode = mode;
+            streetRouter.distanceLimitMeters = 2_000;
             //Split for end coordinate
             Split split = transportNetwork.streetLayer.findSplit(profileRequest.toLat, profileRequest.toLon,
                 RADIUS_METERS);
@@ -185,7 +336,7 @@ public class PointToPointRouterServer {
                 featureCollection.put("type", "FeatureCollection");
                 List<GeoJsonFeature> features = new ArrayList<>();
 
-                fillFeature(transportNetwork, mode, lastState, features);
+                fillFeature(transportNetwork, lastState, features);
                 featureCollection.put("features", features);
                 content.put("data", featureCollection);
             } else {
@@ -513,6 +664,43 @@ public class PointToPointRouterServer {
 
         }, JsonUtilities.objectMapper::writeValueAsString);
 
+        post("/otp/routers/default/index/graphql", ((request, response) -> {
+            response.type("application/json");
+
+            HashMap<String, Object> content = new HashMap<>();
+            try {
+                GraphQlRequest graphQlRequest = graphQlRequestReader
+                    .readValue(request.body());
+
+                //TODO: deserialize variables map automatically in GraphQLRequest object
+                //FIXME: here only flat variables are supported. For example directModes:[CAR, WALK] is unsupported for now since it can't be deserialized
+                Map<String, Object> variables = graphQlRequest.variables==null ? new HashMap<>() : mapReader.readValue(graphQlRequest.variables);
+                ExecutionResult executionResult = graphQL.execute(graphQlRequest.query, null, null, variables);
+                response.status(200);
+
+                if (!executionResult.getErrors().isEmpty()) {
+                    response.status(500);
+                    content.put("errors", executionResult.getErrors());
+                }
+                if (executionResult.getData() != null) {
+                    content.put("data", executionResult.getData());
+                }
+            } catch (JsonParseException jpe) {
+                response.status(400);
+                content.put("errors", "Problem parsing query: " + jpe.getMessage());
+            } catch (GraphQLException ql) {
+                response.status(500);
+                content.put("errors", ql.getMessage());
+                LOG.error("GraphQL problem:", ql);
+            } catch (Exception e) {
+                response.status(500);
+                content.put("errors", e.getMessage());
+                LOG.error("Unknown error:", e);
+            }
+            return content;
+
+        }), JsonUtilities.objectMapper::writeValueAsString);
+
     }
 
     /**
@@ -552,10 +740,10 @@ public class PointToPointRouterServer {
     /**
      * Creates geojson feature from specified vertex
      *
-     * Currently it only does that if vertex have TRAFFIC_SIGNAL flag, or is a transit stop.
+     * Currently it only does that if vertex have TRAFFIC_SIGNAL or BIKE_SHARING flag.
      * Properties in GeoJSON are:
      * - vertex_id
-     * - flags: TRAFFIC_SIGNAL
+     * - flags: TRAFFIC_SIGNAL or BIKE_SHARING currently not both
      * @param vertex
      * @return
      */
@@ -576,6 +764,13 @@ public class PointToPointRouterServer {
             feature.addProperty("flags", VertexStore.VertexFlag.TRAFFIC_SIGNAL.toString());
             return feature;
         }
+        if (vertex.getFlag(VertexStore.VertexFlag.BIKE_SHARING)) {
+            GeoJsonFeature feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
+            feature.addProperty("vertex_id", vertex.index);
+            //TODO: add all flags (when there is more)
+            feature.addProperty("flags", VertexStore.VertexFlag.BIKE_SHARING.toString());
+            return feature;
+        }
         return null;
     }
 
@@ -592,8 +787,9 @@ public class PointToPointRouterServer {
         return new Coordinate(lon, lat);
     }
 
-    private static void fillFeature(TransportNetwork transportNetwork, Mode mode,
-        StreetRouter.State lastState, List<GeoJsonFeature> features) {
+
+    private static void fillFeature(TransportNetwork transportNetwork, StreetRouter.State lastState,
+        List<GeoJsonFeature> features) {
         LinkedList<StreetRouter.State> states = new LinkedList<>();
 
                 /*
@@ -613,8 +809,7 @@ public class PointToPointRouterServer {
                     .getCursor(edgeIdx);
                 GeoJsonFeature feature = new GeoJsonFeature(edge.getGeometry());
                 feature.addProperty("weight", state.weight);
-                //FIXME: get this from state
-                feature.addProperty("mode", mode);
+                feature.addProperty("mode", state.mode);
                 features.add(feature);
                 feature.addProperty("time", Instant.ofEpochMilli(state.getTime()).toString());
             }

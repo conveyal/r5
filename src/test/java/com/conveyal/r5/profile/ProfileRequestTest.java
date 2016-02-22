@@ -30,8 +30,6 @@ public class ProfileRequestTest {
 
     @Test
     public void testEmptyGetFromTimeDate() throws Exception {
-        //FIXME: this actually returns yesterday:23:00 as time and date
-        //To fix or not to fix depends on #37
         Instant expected = ZonedDateTime.now(profileRequest.zoneId).truncatedTo(ChronoUnit.DAYS).toInstant();
         Instant got = Instant.ofEpochMilli(profileRequest.getFromTimeDate());
         assertEquals(expected, got);

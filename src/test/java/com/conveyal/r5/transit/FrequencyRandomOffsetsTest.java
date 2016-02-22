@@ -85,6 +85,6 @@ public class FrequencyRandomOffsetsTest {
         int timeDifference = timeAtTargetStop - timeAtSourceStop;
         // Depending on how large the offset on the first route is, the new route may come 10 minutes after on its first
         // trip, or 20 minutes before (which is the same phasing, just changing which route arrives first).
-        assertTrue(10 * 60 == timeDifference || (30 - 10) * 60 == timeDifference);
+        assertTrue(10 * 60 == timeDifference || -1 * (30 - 10) * 60 == timeDifference);
     }
 }

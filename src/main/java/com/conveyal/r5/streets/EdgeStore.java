@@ -37,9 +37,10 @@ import java.util.StringJoiner;
  * Therefore many of the arrays are only half as big as the number of edges. All even numbered edges are forward, all
  * odd numbered edges are reversed.
  *
- * Typically, somewhat more than half of street segment edges have intermediate points (other than the two intersection
- * endpoints). Therefore it's more efficient to add a complete dense column for the intermediate point arrays, instead
- * of using a sparse hashmap to store values only for edges with intermediate points.
+ * Typically, somewhat more than half of street segment edges have intermediate points (ie. their geometry contains
+ * points other than the two endpoints endpoints). Therefore it's more efficient to add a complete dense column for
+ * references to intermediate point arrays, instead of using a sparse HashMap to store values only for those edges that
+ * have intermediate points.
  *
  * For geometry storage I tried several methods. Full Netherlands load in 4GB of heap:
  * Build time is around 8 minutes. 2.5-3GB was actually in use.

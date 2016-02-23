@@ -153,7 +153,16 @@ public class TransitLayer implements Serializable, Cloneable {
 
             int nStops = 0;
 
-            for (StopTime st : gtfs.getOrderedStopTimesForTrip(tripId)) {
+            Iterable<StopTime> stopTimes;
+
+            try {
+                stopTimes = gtfs.getInterpolatedStopTimesForTrip(tripId);
+            } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes e) {
+                LOG.warn("First and last stops do not both have times specified on trip {} on route {}, skipping this as interpolation is impossible", trip.trip_id, trip.route.route_id);
+                continue TRIPS;
+            }
+
+            for (StopTime st : stopTimes) {
                 tripPatternKey.addStopTime(st, indexForStopId);
                 arrivals.add(st.arrival_time);
                 departures.add(st.departure_time);

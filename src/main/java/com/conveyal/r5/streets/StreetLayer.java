@@ -984,6 +984,9 @@ public class StreetLayer implements Serializable {
         // Copy the flags and speeds for both directions, making the new edge like the existing one.
         newEdge1.copyPairFlagsAndSpeeds(edge);
 
+        // don't allow the router to make ill-advised U-turns at splitter vertices
+
+
         // Return the splitter vertex ID
         return newVertexIndex;
     }

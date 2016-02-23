@@ -67,6 +67,7 @@ public class RaptorWorker {
 
     int max_time = 0;
     int round = 0;
+    private int scheduledRounds = -1;
 
     /** Single raptor state for scheduled search, as we can use range-raptor on the scheduled search */
     List<RaptorState> scheduleState;
@@ -344,6 +345,12 @@ public class RaptorWorker {
             advance();
         }
 
+        // we need to save the number of scheduled rounds so we can do at least this many frequency rounds plus one.
+        // however, we can't do the test below as empty rounds are added to the end of scheduleState when the frequency
+        // search runs off the end of it.
+        // we can't just use scheduleState.size() because it will be expanded with empty states by the frequency search.
+        scheduledRounds = round + 1;
+
         // make sure new times are propagated all the way to the end even if we did fewer rounds on a future search
         while (round < scheduleState.size() - 1) {
             scheduleState.get(round + 1).min(scheduleState.get(round));
@@ -357,6 +364,7 @@ public class RaptorWorker {
      */
     public RaptorState runRaptorFrequency (int departureTime, BoardingAssumption boardingAssumption) {
         max_time = departureTime + MAX_DURATION;
+
         round = 0;
         advance(); // go to first round
         patternsTouched.clear(); // clear patterns left over from previous calls.
@@ -379,12 +387,26 @@ public class RaptorWorker {
         currentRound.previous = previousRound;
 
         // Anytime a round updates some stops, move on to another round
-        while (doOneRound(previousRound, currentRound, true, boardingAssumption)) {
-             advance();
+        // Do at least as many rounds as were done in the scheduled search plus one, so that we don't return a state
+        // at a previous round and cut off the scheduled search after 0, 1 or 2 transfers (see https://github.com/conveyal/r5/issues/82)
+        // However, if we didn't run a scheduled search, don't apply this constraint
+        while (doOneRound(previousRound, currentRound, true, boardingAssumption) || (scheduledRounds != -1 && round <= scheduledRounds)) {
+            advance();
             previousRound = currentRound;
             currentRound = previousRound.copy();
             // copy in scheduled times
             currentRound.min(scheduleState.get(round));
+
+            // re-mark all frequency patterns if we did a scheduled search, so that we explore them again;
+            // they may be reached at the second, third or later round by a scheduled trips
+            if (data.hasSchedules) {
+                for (int p = 0; p < data.tripPatterns.size(); p++) {
+                    TripPattern pat = data.tripPatterns.get(p);
+                    if (pat.hasFrequencies) {
+                        patternsTouched.set(p);
+                    }
+                }
+            }
         }
         
         return currentRound;
@@ -740,10 +762,13 @@ public class RaptorWorker {
     }
 
     /** Mark all the patterns passing through the given stop. */
-    private void markPatternsForStop(int stop) {
+    private void markPatternsForStop (int stop) { this.markPatternsForStop(stop, false); }
+
+    private void markPatternsForStop(int stop, boolean useFrequencies) {
         TIntList patterns = data.patternsForStop.get(stop);
         for (TIntIterator it = patterns.iterator(); it.hasNext();) {
-            patternsTouched.set(it.next());
+            int pattern = it.next();
+            patternsTouched.set(pattern);
         }
     }
 }

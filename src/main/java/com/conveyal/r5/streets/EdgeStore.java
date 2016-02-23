@@ -22,6 +22,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalUnit;
 import java.util.*;
 
 /**
@@ -550,6 +552,11 @@ public class EdgeStore implements Serializable {
             s1.incrementTimeInSeconds(roundedTime);
             s1.incrementWeight(weight);
             s1.distance += getLengthMm();
+
+            // make sure we don't have states that don't increment weight/time, otherwise we can get weird loops
+            if (s1.weight == s0.weight) s1.weight += 1;
+            if (s1.time.equals(s0.time)) s1.time = s1.time.plus(1, ChronoUnit.MILLIS);
+
             return s1;
         }
 

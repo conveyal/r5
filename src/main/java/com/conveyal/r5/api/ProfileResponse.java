@@ -93,7 +93,7 @@ public class ProfileResponse {
             if (accessPathIndex < 0) {
                 //Here accessRouter needs to have this access mode since stopModeAccessMap is filled from accessRouter
                 StreetRouter streetRouter = accessRouter.get(accessMode);
-                StreetRouter.State state = streetRouter.getState(startVertexStopIndex);
+                StreetRouter.State state = streetRouter.getStateAtVertex(startVertexStopIndex);
                 if (state != null) {
                     StreetPath streetPath;
                     if ((accessMode == LegMode.CAR_PARK || accessMode == LegMode.BICYCLE_RENT) && streetRouter.previous != null) {
@@ -119,7 +119,7 @@ public class ProfileResponse {
             if (egressPathIndex < 0) {
                 //Here egressRouter needs to have this egress mode since stopModeEgressMap is filled from egressRouter
                 StreetRouter streetRouter = egressRouter.get(egressMode);
-                StreetRouter.State state = streetRouter.getState(endVertexStopIndex);
+                StreetRouter.State state = streetRouter.getStateAtVertex(endVertexStopIndex);
                 if (state != null) {
                     StreetPath streetPath = new StreetPath(state, transportNetwork);
                     StreetSegment streetSegment = new StreetSegment(streetPath, egressMode, transportNetwork.streetLayer);
@@ -182,7 +182,7 @@ public class ProfileResponse {
             //all the Profileoptions that have this transfer
             for (Transfer transfer: entry.getValue()) {
                 int endIndex = transportNetwork.transitLayer.streetVertexForStop.get(transfer.boardStop);
-                StreetRouter.State lastState = streetRouter.getState(endIndex);
+                StreetRouter.State lastState = streetRouter.getStateAtVertex(endIndex);
                 if (lastState != null) {
                     StreetPath streetPath = new StreetPath(lastState, transportNetwork);
                     StreetSegment streetSegment = new StreetSegment(streetPath, LegMode.WALK, transportNetwork.streetLayer);

@@ -184,7 +184,7 @@ public class PointToPointRouterServer {
                 streetRouter.getReachedStops().forEachEntry((stopIdx, weight) -> {
                     VertexStore.Vertex stopVertex = transportNetwork.streetLayer.vertexStore.getCursor(
                         transportNetwork.transitLayer.streetVertexForStop.get(stopIdx));
-                    StreetRouter.State state = streetRouter.getState(stopVertex.index);
+                    StreetRouter.State state = streetRouter.getStateAtVertex(stopVertex.index);
                     GeoJsonFeature feature = new GeoJsonFeature(stopVertex.getLon(), stopVertex.getLat());
                     feature.addProperty("weight", weight);
                     feature.addProperty("name", transportNetwork.transitLayer.stopNames.get(stopIdx));
@@ -301,7 +301,9 @@ public class PointToPointRouterServer {
 
             streetRouter.profileRequest = profileRequest;
             streetRouter.mode = mode;
-            streetRouter.distanceLimitMeters = 2_000;
+
+            // TODO use target pruning instead of a distance limit
+            streetRouter.distanceLimitMeters = 10_000;
             //Split for end coordinate
             Split split = transportNetwork.streetLayer.findSplit(profileRequest.toLat, profileRequest.toLon,
                 RADIUS_METERS);
@@ -332,6 +334,8 @@ public class PointToPointRouterServer {
             //Gets lowest weight state for end coordinate split
             StreetRouter.State lastState = streetRouter.getState(split);
             if (lastState != null) {
+                LOG.info("STATE DUMP:\n{}", lastState.dump());
+
                 Map<String, Object> featureCollection = new HashMap<>(2);
                 featureCollection.put("type", "FeatureCollection");
                 List<GeoJsonFeature> features = new ArrayList<>();

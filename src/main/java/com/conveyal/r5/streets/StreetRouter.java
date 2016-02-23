@@ -4,6 +4,7 @@ import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.util.TIntObjectHashMultimap;
 import com.conveyal.r5.util.TIntObjectMultimap;
+import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -43,9 +44,36 @@ public class StreetRouter {
     public int distanceLimitMeters = 0;
     public int timeLimitSeconds = 0;
 
+    /**
+     * Store the best state at the end of each edge. We store states at the ends of edges, rather than at vertices, so
+     * that we can apply turn costs. You can't apply turn costs (which are vertex costs) when you are storing a single state
+     * per vertex, because the vertex cost is not applied until leaving the vertex. This means that a state that must make
+     * an expensive U-turn to reach the destination may beat out a state that is slightly less costly _at that vertex_ but
+     * will complete the search with a cheap straight-through movement. We use the ends rather than the beginnings of edges
+     * to avoid state proliferation (otherwise after traversing an edge you'd have to create states, many of which would
+     * be dominated pretty quickly, for every outgoing edge at the to vertex).
+     *
+     * Storing states per edge is mathematically equivalent to creating a so-called edge-based graph in which all of the
+     * street segments have been represented as nodes and all of the intersections/turn possibilities as edges, but that
+     * is a very theoretical view and creates a semantic nightmare because it's hard to think about nodes that represent
+     * things with dimension (not to mention never being sure whether you're talking about the original, standard graph
+     * or the transformed, edge-based graph). We had a nightmarish time trying to keep this straight in OTP, and eventually
+     * removed it. Using edge-based graphs to represent turn costs/restrictions is documented at http://geo.fsv.cvut.cz/gdata/2013/pin2/d/dokumentace/line_graph_teorie.pdf
+     *
+     * This would seem to obviate the need to have incomparable states at all, but it in fact does not, because of the existence
+     * of complex turn restrictions that have via ways. This could be a simple U-turn on a dual carriageway, but could also be
+     * something more complex (no right turn after left &c.). In these cases, we still have to have incomparable states when
+     * we are partway through the restriction.
+     *
+     * When determining the weight at a vertex, one should just grab all the incoming edges, and take the minimum. However,
+     * it's a bit more complicated to properly determine the time/weight at a split, because of turn costs. Suppose that
+     * the best state at a particular vertex require a left turn onto the split edge; it is important to apply that left
+     * turn costs. Even more important is to make sure that the split edge is not the end of a restricted turn; if it is,
+     * one must reach the split via an alternate state.
+     */
     // TODO we might be able to make this more efficient by taking advantage of the fact that we almost always have a
-    // single state per vertex (the only time we don't is when we're in the middle of a turn restriction).
-    TIntObjectMultimap<State> bestStates = new TIntObjectHashMultimap<>();
+    // single state per edge (the only time we don't is when we're in the middle of a turn restriction).
+    TIntObjectMultimap<State> bestStatesAtEdge = new TIntObjectHashMultimap<>();
 
     PriorityQueue<State> queue = new PriorityQueue<>((s0, s1) -> s0.weight - s1.weight);
 
@@ -92,7 +120,7 @@ public class StreetRouter {
         TIntIntMap result = new TIntIntHashMap();
 
         streetLayer.linkedTransitLayer.stopForStreetVertex.forEachEntry((streetVertex, stop) -> {
-            State state = getState(streetVertex);
+            State state = getStateAtVertex(streetVertex);
             // TODO should this be time?
             if (state != null) result.put(stop, state.weight);
             return true; // continue iteration
@@ -104,9 +132,15 @@ public class StreetRouter {
     /** Return a map where the keys are all the reached vertices, and the values are their distances from the origin. */
     public TIntIntMap getReachedVertices () {
         TIntIntMap result = new TIntIntHashMap();
-        bestStates.forEachEntry((vidx, states) -> {
+        EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
+        bestStatesAtEdge.forEachEntry((eidx, states) -> {
             State state = states.stream().reduce((s0, s1) -> s0.weight < s1.weight ? s0 : s1).get();
-            result.put(vidx, state.weight);
+            e.seek(eidx);
+            int vidx = e.getToVertex();
+
+            if (!result.containsKey(vidx) || result.get(vidx) > state.weight)
+                result.put(vidx, state.weight);
+
             return true; // continue iteration
         });
         return result;
@@ -117,13 +151,21 @@ public class StreetRouter {
      */
     public TIntObjectMap<State> getReachedVertices (VertexStore.VertexFlag flag) {
         TIntObjectMap<State> result = new TIntObjectHashMap<>();
-        bestStates.forEachEntry((vertexIndex, states) -> {
-            VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor(vertexIndex);
-            if (vertex.getFlag(flag)) {
-                State state = states.stream().reduce((s0, s1) -> s0.weight < s1.weight ? s0 : s1).get();
-                result.put(vertexIndex, state);
+        EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
+        VertexStore.Vertex v = streetLayer.vertexStore.getCursor();
+        bestStatesAtEdge.forEachEntry((eidx, states) -> {
+            State state = states.stream().reduce((s0, s1) -> s0.weight < s1.weight ? s0 : s1).get();
+            e.seek(eidx);
+            int vidx = e.getToVertex();
+            v.seek(vidx);
+
+            if (v.getFlag(flag)) {
+                if (!result.containsKey(vidx) || result.get(vidx).weight > state.weight) {
+                    result.put(vidx, state);
+                }
             }
-            return true;
+
+            return true; // continue iteration
         });
         return result;
     }
@@ -134,12 +176,13 @@ public class StreetRouter {
      * This is currently returning the weight, which is the distance in meters.
      */
     public int[] getStopTree () {
-        TIntList result = new TIntArrayList(bestStates.size() * 2);
+        TIntIntMap states = getReachedVertices();
+
+        TIntList result = new TIntArrayList(states.size() * 2);
         // Convert stop vertex indexes in street layer to transit layer stop indexes.
-        bestStates.forEachEntry((vertexIndex, states) -> {
-            State state = states.stream().reduce((s0, s1) -> s0.weight < s1.weight ? s0 : s1).get();
+        states.forEachEntry((vertexIndex, weight) -> {
             result.add(vertexIndex);
-            result.add(state.weight);
+            result.add(weight);
             return true; // continue iteration
         });
         return result.toArray();
@@ -161,10 +204,12 @@ public class StreetRouter {
             return false;
         }
         originSplit = split;
-        bestStates.clear();
+        bestStatesAtEdge.clear();
         queue.clear();
-        State startState0 = new State(split.vertex0, -1, profileRequest.getFromTimeDate(), mode);
-        State startState1 = new State(split.vertex1, -1, profileRequest.getFromTimeDate(), mode);
+        // from vertex is at end of back edge. Set edge correctly so that turn restrictions/costs are applied correctly
+        // at the origin.
+        State startState0 = new State(split.vertex0, split.edge + 1, profileRequest.getFromTimeDate(), mode);
+        State startState1 = new State(split.vertex1, split.edge, profileRequest.getFromTimeDate(), mode);
         // TODO walk speed, assuming 1 m/sec currently.
         startState0.weight = split.distance0_mm / 1000;
         startState1.weight = split.distance1_mm / 1000;
@@ -175,8 +220,10 @@ public class StreetRouter {
     }
 
     public void setOrigin (int fromVertex) {
-        bestStates.clear();
+        bestStatesAtEdge.clear();
         queue.clear();
+
+        // NB backEdge of -1 is no problem as it is a special case that indicates that the origin was a vertex.
         State startState = new State(fromVertex, -1, profileRequest.getFromTimeDate(), mode);
         queue.add(startState);
     }
@@ -190,10 +237,13 @@ public class StreetRouter {
      * @param switchCost This is added to the weight and is a cost of switching modes
      */
     public void setOrigin(TIntObjectMap<State> bikeStations, int switchTime, int switchCost) {
-        bestStates.clear();
+        bestStatesAtEdge.clear();
         queue.clear();
+
         bikeStations.forEachEntry((vertexIdx, bikeStationState) -> {
-           State state = new State(vertexIdx, -1, bikeStationState.getTime()+switchTime, mode);
+            // backEdge needs to be unique for each start state or they will wind up dominating each other.
+            // subtract 1 from -vertexIdx because -0 == 0
+            State state = new State(vertexIdx, -vertexIdx - 1, bikeStationState.getTime()+switchTime, mode);
             state.weight = bikeStationState.weight+switchCost;
             state.isBikeShare = true;
             queue.add(state);
@@ -261,17 +311,30 @@ public class StreetRouter {
         }
 
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
+
         QUEUE: while (!queue.isEmpty()) {
             State s0 = queue.poll();
 
             if (DEBUG_OUTPUT) {
                 VertexStore.Vertex v = streetLayer.vertexStore.getCursor(s0.vertex);
+
+                double lat = v.getLat();
+                double lon = v.getLon();
+
+                if (s0.backEdge != -1) {
+                    EdgeStore.Edge e = streetLayer.edgeStore.getCursor(s0.backEdge);
+                    v.seek(e.getFromVertex());
+                    lat = (lat + v.getLat()) / 2;
+                    lon = (lon + v.getLon()) / 2;
+                }
+
                 printStream.println(String.format("%.6f,%.6f,%d", v.getLat(), v.getLon(), s0.weight));
             }
-            if (bestStates.containsKey(s0.vertex)) {
-                for (State state : bestStates.get(s0.vertex)) {
+            if (bestStatesAtEdge.containsKey(s0.backEdge)) {
+                for (State state : bestStatesAtEdge.get(s0.backEdge)) {
                     // states in turn restrictions don't dominate anything
-                    if (!state.inTurnRestriction) continue QUEUE;
+                    if (!state.inTurnRestriction)
+                        continue QUEUE;
                 }
             }
 
@@ -283,15 +346,18 @@ public class StreetRouter {
             // non-dominated state coming off the pqueue is by definition the best way to get to that vertex
             // but states in turn restrictions don't dominate anything, to avoid resource limiting issues
             if (s0.inTurnRestriction)
-                bestStates.put(s0.vertex, s0);
+                bestStatesAtEdge.put(s0.backEdge, s0);
             else {
                 // we might need to save an existing state that is in a turn restriction so is codominant
-                for (Iterator<State> it = bestStates.get(s0.vertex).iterator(); it.hasNext();) {
+                for (Iterator<State> it = bestStatesAtEdge.get(s0.backEdge).iterator(); it.hasNext();) {
                     State other = it.next();
                     if (s0.weight < other.weight) it.remove();
-                    else if (s0.weight == other.weight) continue QUEUE; // avoid a ton of codominant states when there is e.g. duplicated OSM data
+                    // avoid a ton of codominant states when there is e.g. duplicated OSM data
+                    // However, save this state if it is not in a turn restriction and the other state is
+                    else if (s0.weight == other.weight && !(other.inTurnRestriction && !s0.inTurnRestriction))
+                        continue QUEUE;
                 }
-                bestStates.put(s0.vertex, s0);
+                bestStatesAtEdge.put(s0.backEdge, s0);
             }
 
             if (routingVisitor != null) {
@@ -316,9 +382,9 @@ public class StreetRouter {
         }
     }
 
-    /** get a single best state at a vertex. There can be more than one state at a vertex due to turn restrictions */
-    public State getState (int vertexIndex) {
-        Collection<State> states = bestStates.get(vertexIndex);
+    /** get a single best state at the end of an edge. There can be more than one state at the end of an edge due to turn restrictions */
+    public State getStateAtEdge (int edgeIndex) {
+        Collection<State> states = bestStatesAtEdge.get(edgeIndex);
         if (states.isEmpty()) {
             return null; // Unreachable
         }
@@ -327,8 +393,29 @@ public class StreetRouter {
         return states.stream().reduce((s0, s1) -> s0.weight < s1.weight ? s0 : s1).get();
     }
 
+    /**
+     * Get a single best state at a vertex. NB this should not be used for propagating to samples, as you need to apply
+     * turn costs/restrictions during propagation.
+     */
+    public State getStateAtVertex (int vertexIndex) {
+        State ret = null;
+
+        for (TIntIterator it = streetLayer.incomingEdges.get(vertexIndex).iterator(); it.hasNext();) {
+            int eidx = it.next();
+
+            State state = getStateAtEdge(eidx);
+
+            if (state == null) continue;
+
+            if (ret == null) ret = state;
+            else if (ret.weight > state.weight) ret = state;
+        }
+
+        return ret;
+    }
+
     public int getTravelTimeToVertex (int vertexIndex) {
-        State state = getState(vertexIndex);
+        State state = getStateAtVertex(vertexIndex);
 
         return state != null ? state.weight : Integer.MAX_VALUE;
     }
@@ -342,8 +429,9 @@ public class StreetRouter {
      * @return
      */
     public State getState(Split split) {
-        State weight0 = getState(split.vertex0);
-        State weight1 = getState(split.vertex1);
+        // TODO check turn restrictions and apply turn costs here!
+        State weight0 = getStateAtVertex(split.vertex0);
+        State weight1 = getStateAtVertex(split.vertex1);
         if (weight0 == null) {
             if (weight1 == null) {
                 //Both vertices aren't found
@@ -429,6 +517,19 @@ public class StreetRouter {
 
         public void incrementWeight(float weight) {
             this.weight+=(int)weight;
+        }
+
+        public String dump() {
+            State state = this;
+            StringBuilder out = new StringBuilder();
+            out.append("BEGIN PATH DUMP\n");
+            while (state != null) {
+                out.append(String.format("%s at %s via %s\n", state.vertex, state.weight, state.backEdge));
+                state = state.backState;
+            }
+            out.append("END PATH DUMP\n");
+
+            return out.toString();
         }
     }
 

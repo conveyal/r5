@@ -303,11 +303,9 @@ public class PointToPointRouterServer {
             streetRouter.mode = mode;
 
             // TODO use target pruning instead of a distance limit
-            streetRouter.distanceLimitMeters = 10_000;
+            streetRouter.distanceLimitMeters = 100_000;
             //Split for end coordinate
-            Split split = transportNetwork.streetLayer.findSplit(profileRequest.toLat, profileRequest.toLon,
-                RADIUS_METERS);
-            if (split == null) {
+            if (!streetRouter.setDestination(profileRequest.toLat, profileRequest.toLon)) {
                 content.put("errors", "Edge near the end coordinate wasn't found. Routing didn't start!");
                 return content;
             }
@@ -318,6 +316,7 @@ public class PointToPointRouterServer {
             if (fullStateList) {
                 streetRouter.setRoutingVisitor(routingVisitor);
             }
+
             streetRouter.route();
 
             if (fullStateList) {
@@ -332,7 +331,7 @@ public class PointToPointRouterServer {
             }
 
             //Gets lowest weight state for end coordinate split
-            StreetRouter.State lastState = streetRouter.getState(split);
+            StreetRouter.State lastState = streetRouter.getState(streetRouter.getDestinationSplit());
             if (lastState != null) {
                 Map<String, Object> featureCollection = new HashMap<>(2);
                 featureCollection.put("type", "FeatureCollection");

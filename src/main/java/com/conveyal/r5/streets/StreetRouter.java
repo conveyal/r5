@@ -262,8 +262,13 @@ public class StreetRouter {
 
     }
 
-    public void setDestination (double lat, double lon) {
+    public boolean setDestination (double lat, double lon) {
         this.destinationSplit = streetLayer.findSplit(lat, lon, 300);
+        return this.destinationSplit != null;
+    }
+
+    public void setDestination (Split split) {
+        this.destinationSplit = split;
     }
 
     /**
@@ -361,7 +366,7 @@ public class StreetRouter {
 
             if (destinationSplit != null && (s0.vertex == destinationSplit.vertex0 || s0.vertex == destinationSplit.vertex1)) {
                 // TODO make sure this state can actually reach the destination, applying turn costs and turn restrictions
-                bestWeightAtDestination = s0.weight;
+                if (bestWeightAtDestination > s0.weight) bestWeightAtDestination = s0.weight;
             }
 
             if (s0.weight > bestWeightAtDestination) break;
@@ -475,6 +480,10 @@ public class StreetRouter {
                 }
             }
         }
+    }
+
+    public Split getDestinationSplit() {
+        return destinationSplit;
     }
 
     public static class State implements Cloneable {

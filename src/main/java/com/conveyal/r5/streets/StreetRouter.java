@@ -134,6 +134,8 @@ public class StreetRouter {
         TIntIntMap result = new TIntIntHashMap();
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
         bestStatesAtEdge.forEachEntry((eidx, states) -> {
+            if (eidx < 0) return true;
+
             State state = states.stream().reduce((s0, s1) -> s0.weight < s1.weight ? s0 : s1).get();
             e.seek(eidx);
             int vidx = e.getToVertex();
@@ -154,6 +156,8 @@ public class StreetRouter {
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
         VertexStore.Vertex v = streetLayer.vertexStore.getCursor();
         bestStatesAtEdge.forEachEntry((eidx, states) -> {
+            if (eidx < 0) return true;
+
             State state = states.stream().reduce((s0, s1) -> s0.weight < s1.weight ? s0 : s1).get();
             e.seek(eidx);
             int vidx = e.getToVertex();
@@ -418,7 +422,6 @@ public class StreetRouter {
 
     public int getTravelTimeToVertex (int vertexIndex) {
         State state = getStateAtVertex(vertexIndex);
-
         return state != null ? state.weight : Integer.MAX_VALUE;
     }
 

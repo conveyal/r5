@@ -6,6 +6,7 @@ import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.*;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+import com.conveyal.r5.profile.Mode;
 import com.vividsolutions.jts.geom.*;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -1134,6 +1135,7 @@ public class StreetLayer implements Serializable {
             if (vertexLabels.containsKey(vertex))
                 continue;
             StreetRouter r = new StreetRouter(this);
+            r.mode = Mode.WALK;
             r.setOrigin(vertex);
             // walk to the end of the graph
             r.distanceLimitMeters = Integer.MAX_VALUE;
@@ -1153,6 +1155,10 @@ public class StreetLayer implements Serializable {
                     reachedVertices.add(reachedVertex);
                 }
             }
+
+            // when origin is a vertex, the origin vertex is not included in the result
+            reachedVertices.add(vertex);
+            vertexLabels.put(vertex, vertex);
 
             if (nReached < minSubgraphSize) {
                 nSmallSubgraphs++;

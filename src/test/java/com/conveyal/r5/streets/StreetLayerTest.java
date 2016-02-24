@@ -27,6 +27,12 @@ public class StreetLayerTest extends TestCase {
         assertEquals(3, sl.incomingEdges.get(v).size());
         assertEquals(3, sl.outgoingEdges.get(v).size());
 
+        // make sure that it's a subgraph
+        StreetRouter r = new StreetRouter(sl);
+        r.setOrigin(v);
+        r.route();
+        assertTrue(r.getReachedVertices().size() < 40);
+
         int e0 = sl.incomingEdges.get(v).get(0);
         int e1 = e0 % 2 == 0 ? e0 + 1 : e0 - 1;
 

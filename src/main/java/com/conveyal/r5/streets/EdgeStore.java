@@ -541,7 +541,7 @@ public class EdgeStore implements Serializable {
 
         /** Can we turn onto this edge from this state? */
         public boolean canTurnFrom (StreetRouter.State s0) {
-            if (s0.inTurnRestriction) {
+            if (s0.inTurnRestriction && s0.mode == Mode.CAR) {
                 // check if we have exited any turn restrictions, and make sure the movement is not restricted
                 TIntCollection currentRestrictions = turnRestrictions.get(getEdgeIndex());
 

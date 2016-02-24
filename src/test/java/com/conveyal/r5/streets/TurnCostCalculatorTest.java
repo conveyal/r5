@@ -76,6 +76,7 @@ public class TurnCostCalculatorTest extends TestCase {
 
     @Test
     public void testCost () throws Exception {
+        setUp(false);
         TurnCostCalculator calculator = new TurnCostCalculator(streetLayer, true);
         assertEquals(calculator.LEFT_TURN, calculator.computeTurnCost(EE + 1, ES, Mode.CAR));
     }

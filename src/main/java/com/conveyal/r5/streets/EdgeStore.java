@@ -465,7 +465,9 @@ public class EdgeStore implements Serializable {
             float weight = 0;
 
             // add turn restrictions that start on this edge
-            if (turnRestrictions.containsKey(getEdgeIndex())) {
+            // Turn restrictions only apply to cars for now. This is also coded in canTurnFrom, so change it both places
+            // if/when it gets changed.
+            if (s0.mode == Mode.CAR && turnRestrictions.containsKey(getEdgeIndex())) {
                 s1.inTurnRestriction = true;
             }
 
@@ -541,6 +543,8 @@ public class EdgeStore implements Serializable {
 
         /** Can we turn onto this edge from this state? */
         public boolean canTurnFrom (StreetRouter.State s0) {
+            // Turn restrictions only apply to cars for now. This is also coded in traverse, so change it both places
+            // if/when it gets changed.
             if (s0.inTurnRestriction && s0.mode == Mode.CAR) {
                 // check if we have exited any turn restrictions, and make sure the movement is not restricted
                 TIntCollection currentRestrictions = turnRestrictions.get(getEdgeIndex());
@@ -555,6 +559,7 @@ public class EdgeStore implements Serializable {
 
                     // first check if the restriction applies to this traversal
                     // we don't need to check via here, as if we ever left the via edges we would have terminated the restriction then.
+                    // TODO is this right? What if there is more than one way to get from from to to?
                     boolean applies = restriction.toEdge == getEdgeIndex();
 
                     if (applies && !restriction.only || !applies && restriction.only) blockTraversal[0] = true;

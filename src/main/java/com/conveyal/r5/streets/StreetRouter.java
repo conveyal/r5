@@ -473,6 +473,7 @@ public class StreetRouter {
             states.stream().filter(s -> e.canTurnFrom(s))
                     .map(s -> {
                         State ret = new State(-1, split.edge, 0, s);
+                        ret.mode = s.mode;
 
                         // figure out the turn cost
                         int turnCost = this.turnCostCalculator.computeTurnCost(s.backEdge, split.edge, s.mode);
@@ -495,6 +496,7 @@ public class StreetRouter {
             states.stream().filter(s -> e.canTurnFrom(s))
                     .map(s -> {
                         State ret = new State(-1, split.edge + 1, 0, s);
+                        ret.mode = s.mode;
 
                         // figure out the turn cost
                         int turnCost = this.turnCostCalculator.computeTurnCost(s.backEdge, split.edge + 1, s.mode);
@@ -521,6 +523,8 @@ public class StreetRouter {
         public int weight;
         public int backEdge;
         // the current time at this state, in milliseconds UNIX time
+        public long time;
+
         protected int durationSeconds;
         //Distance in mm
         public int distance;
@@ -535,6 +539,7 @@ public class StreetRouter {
             this.vertex = atVertex;
             this.backEdge = viaEdge;
             this.backState = backState;
+            this.time = fromTimeDate;
             this.distance = backState.distance;
             this.durationSeconds = backState.durationSeconds;
         }
@@ -546,6 +551,7 @@ public class StreetRouter {
             this.distance = 0;
             this.mode = mode;
             this.durationSeconds = 0;
+            this.time = fromTimeDate;
         }
 
 
@@ -557,6 +563,7 @@ public class StreetRouter {
                 return;
             }
             durationSeconds += seconds;
+            time += seconds;
         }
 
         public int getDurationSeconds() {
@@ -564,7 +571,7 @@ public class StreetRouter {
         }
 
         public long getTime() {
-            return durationSeconds;
+            return time;
         }
 
         public void incrementWeight(float weight) {

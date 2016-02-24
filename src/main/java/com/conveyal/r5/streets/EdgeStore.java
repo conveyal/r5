@@ -527,7 +527,8 @@ public class EdgeStore implements Serializable {
 
             int roundedTime = (int) Math.ceil(time);
 
-            int turnCost = turnCostCalculator.computeTurnCost(s0.backEdge, getEdgeIndex(), mode);
+            // negative backedge is start of search.
+            int turnCost = s0.backEdge >= 0 ? turnCostCalculator.computeTurnCost(s0.backEdge, getEdgeIndex(), mode) : 0;
 
             s1.incrementTimeInSeconds(roundedTime + turnCost);
             s1.incrementWeight(weight + turnCost);

@@ -1,6 +1,10 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+import com.conveyal.r5.profile.Mode;
+import com.sun.xml.internal.ws.api.message.ExceptionHasMessage;
+import com.vividsolutions.jts.algorithm.Angle;
+import com.vividsolutions.jts.geom.Coordinate;
 import junit.framework.TestCase;
 import org.junit.Before;
 import org.junit.Test;
@@ -28,12 +32,12 @@ public class TurnCostCalculatorTest extends TestCase {
         //     |
         //     4
         streetLayer = new StreetLayer(new TNBuilderConfig());
-        VCENTER = streetLayer.vertexStore.addVertex(-122.123, 37.363);
-        VN = streetLayer.vertexStore.addVertex(-122.123, 37.364);
-        VS = streetLayer.vertexStore.addVertex(-122.123, 37.362);
-        VE = streetLayer.vertexStore.addVertex(-122.122, 37.363);
-        VNE = streetLayer.vertexStore.addVertex(-122.122, 37.3631);
-        VW = streetLayer.vertexStore.addVertex(-122.124, 37.363);
+        VCENTER = streetLayer.vertexStore.addVertex(37.363, -122.123);
+        VN = streetLayer.vertexStore.addVertex(37.364, -122.123);
+        VS = streetLayer.vertexStore.addVertex(37.362, -122.123);
+        VE = streetLayer.vertexStore.addVertex(37.363, -122.122);
+        VNE = streetLayer.vertexStore.addVertex(37.3631, -122.122);
+        VW = streetLayer.vertexStore.addVertex(37.363, -122.124);
 
         EN = streetLayer.edgeStore.addStreetPair(VCENTER, VN, 15000, 4).getEdgeIndex();
         EE = streetLayer.edgeStore.addStreetPair(VCENTER, VE, 15000, 2).getEdgeIndex();
@@ -45,11 +49,31 @@ public class TurnCostCalculatorTest extends TestCase {
     @Test
     public void testAngle() throws Exception {
         TurnCostCalculator calculator = new TurnCostCalculator(streetLayer, true);
-        assertEquals(1.5 * Math.PI, calculator.computeAngle(EE + 1, ES), 1e-6);
+        assertEquals(0.5 * Math.PI, calculator.computeAngle(EE + 1, ES), 1e-6);
         assertEquals(Math.PI, calculator.computeAngle(EE, EE + 1), 1e-6);
         assertEquals(0, calculator.computeAngle(EW + 1, EE), 1e-6);
         double angle = calculator.computeAngle(EW + 1, ENE);
-        assertTrue(angle > 1.75 * Math.PI);
-        assertEquals(0.5 * Math.PI, calculator.computeAngle(EE + 1, EN), 1e-6);
+        assertTrue(angle < 0.15 * Math.PI);
+        assertEquals(1.5 * Math.PI, calculator.computeAngle(EE + 1, EN), 1e-6);
+        assertEquals(1.5 * Math.PI, calculator.computeAngle(ES + 1, EE), 1e-6);
+    }
+
+    @Test
+    public void testCost () throws Exception {
+        TurnCostCalculator calculator = new TurnCostCalculator(streetLayer, true);
+        assertEquals(calculator.LEFT_TURN, calculator.computeTurnCost(EE + 1, ES, Mode.CAR));
+    }
+
+    /**
+     * Test that JTS returns angles that are counterclockwise from the positive X axis (so negative angle is south of X
+     * axis).
+     *
+     * This is a completely nonstandard implementation of angles so I wrote a test to ensure it's stable between JTS releases.
+     */
+    @Test
+    public void testJtsAngle () {
+        double a0 = Angle.angle(new Coordinate(10, 10), new Coordinate(10, 9));
+        double a1 = Angle.angle(new Coordinate(10, 10), new Coordinate(9, 9));
+        assertTrue(a1 < a0);
     }
 }

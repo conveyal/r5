@@ -549,7 +549,7 @@ public class EdgeStore implements Serializable {
 
             int roundedTime = (int) Math.ceil(time);
 
-            int turnCost = turnCostCalculator.computeTurnCost(getEdgeIndex(), s0.backEdge, mode);
+            int turnCost = turnCostCalculator.computeTurnCost(s0.backEdge, getEdgeIndex(), mode);
 
             s1.incrementTimeInSeconds(roundedTime + turnCost);
             s1.incrementWeight(weight + turnCost);
@@ -612,6 +612,9 @@ public class EdgeStore implements Serializable {
             double firstCoorLat = reverse ? toVertexLat : fromVertexLat;
             double lastCoorLon = reverse ? fromVertexLon : toVertexLon;
             double lastCoorLat = reverse ? fromVertexLat : toVertexLat;
+
+            // NB it initially appears that we are reversing the from and to vertex twice, but keep in mind that getFromVertex
+            // returns the from vertex when on a forward edge, or the to vertex on a back edge.
             c[0] = new Coordinate(firstCoorLon, firstCoorLat);
             if (coords != null) {
                 for (int i = 1; i < c.length - 1; i++) {

@@ -18,10 +18,10 @@ public class TurnCostCalculator {
     public final StreetLayer layer;
 
     /** Turn costs for various types of turns, in seconds. These are all specified for drive-on-right countries, and reversed in drive-on-left countries */
-    public static final int LEFT_TURN = 10;
+    public static final int LEFT_TURN = 30;
     public static final int STRAIGHT_ON = 0;
     public static final int RIGHT_TURN = 10;
-    public static final int U_TURN = 6000; // penalize U turns extremely heavily
+    public static final int U_TURN = 90; // penalize U turns extremely heavily
 
     public boolean driveOnRight;
 
@@ -34,14 +34,14 @@ public class TurnCostCalculator {
         if (mode == Mode.CAR) {
             double angle = computeAngle(fromEdge, toEdge);
 
-            if (angle < 0.25 * Math.PI)
+            if (angle < 0.15 * Math.PI)
                 return STRAIGHT_ON;
-            else if (angle < 0.75 * Math.PI)
-                return driveOnRight ? RIGHT_TURN : LEFT_TURN;
-            else if (angle < 1.25 * Math.PI)
-                return U_TURN;
-            else if (angle < 1.75 * Math.PI)
+            else if (angle < 0.85 * Math.PI)
                 return driveOnRight ? LEFT_TURN : RIGHT_TURN;
+            else if (angle < 1.15 * Math.PI)
+                return U_TURN;
+            else if (angle < 1.85 * Math.PI)
+                return driveOnRight ? RIGHT_TURN : LEFT_TURN;
             else
                 return STRAIGHT_ON;
         }
@@ -49,7 +49,7 @@ public class TurnCostCalculator {
         return 0;
     }
 
-    /** Compute the angle between two edges, positive, from 0 to 2 * Pi */
+    /** Compute the angle between two edges, positive, from 0 to 2 * Pi. The angle is _counterclockwise_ because that's how it's done in JTS. */
     public double computeAngle (int fromEdge, int toEdge) {
         // figure out turn angle
         EdgeStore.Edge e = layer.edgeStore.getCursor(fromEdge);
@@ -60,7 +60,13 @@ public class TurnCostCalculator {
         e.seek(toEdge);
         Coordinate p3 = pointOnLine(e.getGeometry(), false);
 
-        // figure out the angle. All below computations in radians. Add pi so everything is positive.
+        // project to local coordinate system, but don't reverse axes
+        double cosLat = Math.abs(Math.cos(p2.y * Math.PI / 180));
+        p1.x /= cosLat;
+        p2.x /= cosLat;
+        p3.x /= cosLat;
+
+        // figure out the angle. All below computations in radians. Add 2 * pi so everything is positive.
         double angleIn = Angle.angle(p1, p2);
         double angleOut = Angle.angle(p2, p3);
 

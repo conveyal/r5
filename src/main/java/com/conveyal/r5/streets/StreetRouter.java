@@ -310,6 +310,8 @@ public class StreetRouter {
             printStream.println("lat,lon,weight");
         }
 
+        // TODO don't hardwire drive-on-right
+        TurnCostCalculator turnCostCalculator = new TurnCostCalculator(streetLayer, true);
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
 
         QUEUE: while (!queue.isEmpty()) {
@@ -368,7 +370,7 @@ public class StreetRouter {
             streetLayer.outgoingEdges.get(s0.vertex).forEach(eidx -> {
                 edge.seek(eidx);
 
-                State s1 = edge.traverse(s0, mode, profileRequest);
+                State s1 = edge.traverse(s0, mode, profileRequest, turnCostCalculator);
 
                 if (s1 != null && s1.distance <= distanceLimitMm && s1.getDurationSeconds() < tmpTimeLimitSeconds) {
                     queue.add(s1);

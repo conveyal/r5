@@ -334,8 +334,6 @@ public class PointToPointRouterServer {
             //Gets lowest weight state for end coordinate split
             StreetRouter.State lastState = streetRouter.getState(split);
             if (lastState != null) {
-                LOG.info("STATE DUMP:\n{}", lastState.dump());
-
                 Map<String, Object> featureCollection = new HashMap<>(2);
                 featureCollection.put("type", "FeatureCollection");
                 List<GeoJsonFeature> features = new ArrayList<>();

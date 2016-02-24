@@ -456,7 +456,7 @@ public class EdgeStore implements Serializable {
             return options.getSpeed(traverseMode);
         }
 
-        public StreetRouter.State traverse (StreetRouter.State s0, Mode mode, ProfileRequest req) {
+        public StreetRouter.State traverse (StreetRouter.State s0, Mode mode, ProfileRequest req, TurnCostCalculator turnCostCalculator) {
             StreetRouter.State s1 = new StreetRouter.State(getToVertex(), edgeIndex,
                 s0.getTime(), s0);
             s1.weight = s0.weight;
@@ -545,12 +545,14 @@ public class EdgeStore implements Serializable {
                 weight*=2.0; //walk reluctance
             }
 
-            //TODO: turn costs
 
 
             int roundedTime = (int) Math.ceil(time);
-            s1.incrementTimeInSeconds(roundedTime);
-            s1.incrementWeight(weight);
+
+            int turnCost = turnCostCalculator.computeTurnCost(getEdgeIndex(), s0.backEdge, mode);
+
+            s1.incrementTimeInSeconds(roundedTime + turnCost);
+            s1.incrementWeight(weight + turnCost);
             s1.distance += getLengthMm();
 
             // make sure we don't have states that don't increment weight/time, otherwise we can get weird loops

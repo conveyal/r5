@@ -217,6 +217,7 @@ public class PointToPointQuery {
                     streetRouter.mode = Mode.valueOf(mode.toString());
                     streetRouter.distanceLimitMeters = 100_000; // FIXME arbitrary, and account for bike or car access mode
                     if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
+                        streetRouter.setDestination(request.toLat, request.toLon);
                         streetRouter.route();
                         StreetRouter.State lastState = streetRouter.getState(split);
                         streetPath = new StreetPath(lastState, transportNetwork);

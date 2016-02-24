@@ -557,7 +557,8 @@ public class EdgeStore implements Serializable {
 
             // make sure we don't have states that don't increment weight/time, otherwise we can get weird loops
             if (s1.weight == s0.weight) s1.weight += 1;
-            if (s1.time.equals(s0.time)) s1.time = s1.time.plus(1, ChronoUnit.MILLIS);
+            if (s1.durationSeconds == s0.durationSeconds) s0.durationSeconds += 1;
+            //if (s1.time.equals(s0.time)) s1.time = s1.time.plus(1, ChronoUnit.MILLIS);
 
             return s1;
         }

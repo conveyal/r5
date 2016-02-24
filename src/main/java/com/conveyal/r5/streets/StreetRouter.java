@@ -90,6 +90,10 @@ public class StreetRouter {
 
     private Split originSplit;
 
+    private Split destinationSplit;
+
+    private int bestWeightAtDestination = Integer.MAX_VALUE;
+
     /**
      * Here is previous streetRouter in multi router search
      * For example if we are searching for P+R we need 2 street searches
@@ -258,6 +262,10 @@ public class StreetRouter {
 
     }
 
+    public void setDestination (double lat, double lon) {
+        this.destinationSplit = streetLayer.findSplit(lat, lon, 300);
+    }
+
     /**
      * Call one of the setOrigin functions first.
      *
@@ -350,6 +358,13 @@ public class StreetRouter {
                 // found destination
                 break;
             }
+
+            if (destinationSplit != null && (s0.vertex == destinationSplit.vertex0 || s0.vertex == destinationSplit.vertex1)) {
+                // TODO make sure this state can actually reach the destination, applying turn costs and turn restrictions
+                bestWeightAtDestination = s0.weight;
+            }
+
+            if (s0.weight > bestWeightAtDestination) break;
 
             // non-dominated state coming off the pqueue is by definition the best way to get to that vertex
             // but states in turn restrictions don't dominate anything, to avoid resource limiting issues
@@ -467,7 +482,6 @@ public class StreetRouter {
         public int weight;
         public int backEdge;
         // the current time at this state, in milliseconds UNIX time
-        protected Instant time;
         protected int durationSeconds;
         //Distance in mm
         public int distance;
@@ -482,7 +496,6 @@ public class StreetRouter {
             this.vertex = atVertex;
             this.backEdge = viaEdge;
             this.backState = backState;
-            this.time = Instant.ofEpochMilli(fromTimeDate);
             this.distance = backState.distance;
             this.durationSeconds = backState.durationSeconds;
         }
@@ -491,7 +504,6 @@ public class StreetRouter {
             this.vertex = atVertex;
             this.backEdge = viaEdge;
             this.backState = null;
-            this.time = Instant.ofEpochMilli(fromTimeDate);
             this.distance = 0;
             this.mode = mode;
             this.durationSeconds = 0;
@@ -505,13 +517,7 @@ public class StreetRouter {
                 //defectiveTraversal = true;
                 return;
             }
-            if (false) {
-                time = time.minusSeconds(seconds);
-                durationSeconds+=seconds;
-            } else {
-                time = time.plusSeconds(seconds);
-                durationSeconds+=seconds;
-            }
+            durationSeconds+=seconds;
         }
 
         public int getDurationSeconds() {
@@ -519,7 +525,7 @@ public class StreetRouter {
         }
 
         public long getTime() {
-            return time.toEpochMilli();
+            return durationSeconds;
         }
 
         public void incrementWeight(float weight) {

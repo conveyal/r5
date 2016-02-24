@@ -443,7 +443,7 @@ public class EdgeStore implements Serializable {
          *
          * Otherwise speed is based on wanted walking, cycling speed provided in ProfileRequest.
          */
-        private float calculateSpeed(ProfileRequest options, Mode traverseMode,
+        public float calculateSpeed(ProfileRequest options, Mode traverseMode,
             long time) {
             if (traverseMode == null) {
                 return Float.NaN;
@@ -469,31 +469,7 @@ public class EdgeStore implements Serializable {
                 s1.inTurnRestriction = true;
             }
 
-            if (s0.inTurnRestriction) {
-                // check if we have exited any turn restrictions, and make sure the movement is not restricted
-                TIntCollection currentRestrictions = turnRestrictions.get(getEdgeIndex());
-
-                // array to dodge effectively final nonsense
-                boolean[] blockTraversal = new boolean[] { false };
-                turnRestrictions.get(s0.backEdge).forEach(ridx -> {
-                    if (currentRestrictions.contains(ridx)) return true; // we have not exited this restriction, but continue iteration
-
-                    // we have exited this restriction, check to see if we should block traversal
-                    TurnRestriction restriction = layer.turnRestrictions.get(ridx);
-
-                    // first check if the restriction applies to this traversal
-                    // we don't need to check via here, as if we ever left the via edges we would have terminated the restriction then.
-                    boolean applies = restriction.toEdge == getEdgeIndex();
-
-                    if (applies && !restriction.only || !applies && restriction.only) blockTraversal[0] = true;
-
-                    // only continue iteration if we're not already blocking traversal
-                    return !blockTraversal[0];
-                });
-
-                if (blockTraversal[0])
-                    return null;
-            }
+            if (!canTurnFrom(s0)) return null;
 
             if (s0.backEdge != -1 && getFlag(EdgeFlag.LINK) && getCursor(s0.backEdge).getFlag(EdgeFlag.LINK))
                 // two link edges in a row, in other words a shortcut. Disallow this.
@@ -561,6 +537,36 @@ public class EdgeStore implements Serializable {
             //if (s1.time.equals(s0.time)) s1.time = s1.time.plus(1, ChronoUnit.MILLIS);
 
             return s1;
+        }
+
+        /** Can we turn onto this edge from this state? */
+        public boolean canTurnFrom (StreetRouter.State s0) {
+            if (s0.inTurnRestriction) {
+                // check if we have exited any turn restrictions, and make sure the movement is not restricted
+                TIntCollection currentRestrictions = turnRestrictions.get(getEdgeIndex());
+
+                // array to dodge effectively final nonsense
+                boolean[] blockTraversal = new boolean[] { false };
+                turnRestrictions.get(s0.backEdge).forEach(ridx -> {
+                    if (currentRestrictions.contains(ridx)) return true; // we have not exited this restriction, but continue iteration
+
+                    // we have exited this restriction, check to see if we should block traversal
+                    TurnRestriction restriction = layer.turnRestrictions.get(ridx);
+
+                    // first check if the restriction applies to this traversal
+                    // we don't need to check via here, as if we ever left the via edges we would have terminated the restriction then.
+                    boolean applies = restriction.toEdge == getEdgeIndex();
+
+                    if (applies && !restriction.only || !applies && restriction.only) blockTraversal[0] = true;
+
+                    // only continue iteration if we're not already blocking traversal
+                    return !blockTraversal[0];
+                });
+
+                if (blockTraversal[0])
+                    return false;
+            }
+            return true;
         }
 
         public void setGeometry (List<Node> nodes) {

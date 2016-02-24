@@ -16,9 +16,9 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.time.Instant;
-import java.util.Collection;
-import java.util.Iterator;
-import java.util.PriorityQueue;
+import java.util.*;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 /**
  * This routes over the street layer of a TransitNetwork.
@@ -34,6 +34,9 @@ public class StreetRouter {
     public static final int ALL_VERTICES = -1;
 
     public final StreetLayer streetLayer;
+
+    // TODO don't hardwire drive-on-right
+    private TurnCostCalculator turnCostCalculator;
 
     /**
      * It uses all nonzero limit as a limit whichever gets hit first
@@ -200,6 +203,8 @@ public class StreetRouter {
 
     public StreetRouter (StreetLayer streetLayer) {
         this.streetLayer = streetLayer;
+        // TODO one of two things: 1) don't hardwire drive-on-right, or 2) https://en.wikipedia.org/wiki/Dagen_H
+        this.turnCostCalculator = new TurnCostCalculator(streetLayer, true);
     }
 
     /**
@@ -329,8 +334,6 @@ public class StreetRouter {
             printStream.println("lat,lon,weight");
         }
 
-        // TODO don't hardwire drive-on-right
-        TurnCostCalculator turnCostCalculator = new TurnCostCalculator(streetLayer, true);
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
 
         QUEUE: while (!queue.isEmpty()) {
@@ -364,11 +367,6 @@ public class StreetRouter {
                 break;
             }
 
-            if (destinationSplit != null && (s0.vertex == destinationSplit.vertex0 || s0.vertex == destinationSplit.vertex1)) {
-                // TODO make sure this state can actually reach the destination, applying turn costs and turn restrictions
-                if (bestWeightAtDestination > s0.weight) bestWeightAtDestination = s0.weight;
-            }
-
             if (s0.weight > bestWeightAtDestination) break;
 
             // non-dominated state coming off the pqueue is by definition the best way to get to that vertex
@@ -390,6 +388,15 @@ public class StreetRouter {
 
             if (routingVisitor != null) {
                 routingVisitor.visitVertex(s0);
+            }
+
+            // if this state is at the destination, figure out the cost at the destination and use it for target pruning
+            // by using getState(split) we include turn restrictions and turn costs. We've already addded this state
+            // to bestStates so getState will be correct
+            if (destinationSplit != null && (s0.vertex == destinationSplit.vertex0 || s0.vertex == destinationSplit.vertex1)) {
+                State atDest = getState(destinationSplit);
+                // atDest could be null even though we've found a nearby vertex because of a turn restriction
+                if (atDest != null && bestWeightAtDestination > atDest.weight) bestWeightAtDestination = atDest.weight;
             }
 
             // explore edges leaving this vertex
@@ -456,30 +463,53 @@ public class StreetRouter {
      * @return
      */
     public State getState(Split split) {
-        // TODO check turn restrictions and apply turn costs here!
-        State weight0 = getStateAtVertex(split.vertex0);
-        State weight1 = getStateAtVertex(split.vertex1);
-        if (weight0 == null) {
-            if (weight1 == null) {
-                //Both vertices aren't found
-                return null;
-            } else {
-                //vertex1 found vertex 0 not
-                return weight1;
-            }
-        } else {
-            //vertex 0 found vertex 1 not
-            if (weight1 == null) {
-                return weight0;
-            } else {
-                //both found
-                if (weight0.weight < weight1.weight) {
-                    return  weight0;
-                } else {
-                    return weight1;
-                }
-            }
+        // get all the states at all the vertices
+        List<State> relevantStates = new ArrayList<>();
+
+        EdgeStore.Edge e = streetLayer.edgeStore.getCursor(split.edge);
+
+        for (TIntIterator it = streetLayer.incomingEdges.get(split.vertex0).iterator(); it.hasNext();) {
+            Collection<State> states = bestStatesAtEdge.get(it.next());
+            states.stream().filter(s -> e.canTurnFrom(s))
+                    .map(s -> {
+                        State ret = new State(-1, split.edge, 0, s);
+
+                        // figure out the turn cost
+                        int turnCost = this.turnCostCalculator.computeTurnCost(s.backEdge, split.edge, s.mode);
+                        int traversalCost = (int) Math.round(split.distance0_mm / 1000d / e.calculateSpeed(profileRequest, s.mode, 0));
+
+                        // TODO length of perpendicular
+                        ret.incrementWeight(turnCost + traversalCost);
+                        ret.incrementTimeInSeconds(turnCost + traversalCost);
+
+                        return ret;
+                    })
+                    .forEach(relevantStates::add);
         }
+
+        // advance to back edge
+        e.advance();
+
+        for (TIntIterator it = streetLayer.incomingEdges.get(split.vertex1).iterator(); it.hasNext();) {
+            Collection<State> states = bestStatesAtEdge.get(it.next());
+            states.stream().filter(s -> e.canTurnFrom(s))
+                    .map(s -> {
+                        State ret = new State(-1, split.edge + 1, 0, s);
+
+                        // figure out the turn cost
+                        int turnCost = this.turnCostCalculator.computeTurnCost(s.backEdge, split.edge + 1, s.mode);
+                        int traversalCost = (int) Math.round(split.distance1_mm / 1000d / e.calculateSpeed(profileRequest, s.mode, 0));
+
+                        // TODO length of perpendicular
+                        ret.incrementWeight(turnCost + traversalCost);
+                        ret.incrementTimeInSeconds(turnCost + traversalCost);
+
+                        return ret;
+                    })
+                    .forEach(relevantStates::add);
+        }
+
+        return relevantStates.stream().reduce((s0, s1) -> s0.weight < s1.weight ? s0 : s1).orElse(null);
     }
 
     public Split getDestinationSplit() {
@@ -526,7 +556,7 @@ public class StreetRouter {
                 //defectiveTraversal = true;
                 return;
             }
-            durationSeconds+=seconds;
+            durationSeconds += seconds;
         }
 
         public int getDurationSeconds() {

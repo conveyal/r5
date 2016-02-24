@@ -48,7 +48,7 @@ public class McRaptorSuboptimalPathProfileRouter {
     /**
      * the number of searches to run (approximately). We use a constrained random walk to get about this many searches.
      */
-    public static final int NUMBER_OF_SEARCHES = 35;
+    public static final int NUMBER_OF_SEARCHES = 20;
 
     private TransportNetwork network;
     private ProfileRequest request;
@@ -83,6 +83,8 @@ public class McRaptorSuboptimalPathProfileRouter {
         LOG.info("Found {} access stops:\n{}", accessTimes.size(), dumpStops(accessTimes));
         LOG.info("Found {} egress stops:\n{}", egressTimes.size(), dumpStops(egressTimes));
 
+        long startTime = System.currentTimeMillis();
+
         // find patterns near destination
         // on the final round of the search we only explore these patterns
         this.egressTimes.forEachKey(s -> {
@@ -106,7 +108,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         MersenneTwister mersenneTwister = new MersenneTwister((int) (request.fromLat * 1e9));
 
         for (int departureTime = request.toTime - 60, n = 0; departureTime > request.fromTime; departureTime -= mersenneTwister.nextInt(maxSamplingFrequency), n++) {
-            bestStates.clear(); // disabling range-raptor fttb, it's just confusing things
+            bestStates.clear(); // for range-raptor to be valid in a search with a limited number of transfers we need a separate state after each round
             touchedPatterns.clear();
             touchedStops.clear();
             round = 0;
@@ -136,6 +138,8 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         // DEBUG: print hash table performance
 //        LOG.info("Hash performance: {} hashes, {} states", hashes.size(), keys.size());
+
+        LOG.info("McRAPTOR took {}ms", System.currentTimeMillis() - startTime);
 
         return ret;
     }
@@ -210,7 +214,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
                 // get on the bus, if we can
                 if (stopPreviouslyReached) {
-                    for (McRaptorState state : bestStates.get(stop).getBestStates()) {
+                    STATES: for (McRaptorState state : bestStates.get(stop).getBestStates()) {
                         if (state.round != round - 1) continue; // don't continually reexplore states
 
                         int prevPattern = state.pattern;
@@ -219,7 +223,11 @@ public class McRaptorSuboptimalPathProfileRouter {
                         // if pattern is -1 and state.back is null, then this is the initial walk to reach transit
                         if (prevPattern == -1 && state.back != null) prevPattern = state.back.pattern;
 
-                        // don't reexplore trips
+                        // don't reexplore trips.
+                        // NB checking and preventing reboarding any pattern that's previously been boarded doesn't save
+                        // a signifiant amount of search time (anecdotally), and forbids some rare but possible optimal routes
+                        // that use the same pattern twice (consider a trip from Shady Grove to Glenmont in DC that cuts
+                        // through Maryland on a bus before reboarding the Glenmont-bound red line).
                         if (prevPattern == patIdx) continue;
 
                         // find a trip, if we can

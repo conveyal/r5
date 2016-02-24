@@ -2,7 +2,6 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.Mode;
-import com.sun.xml.internal.ws.api.message.ExceptionHasMessage;
 import com.vividsolutions.jts.algorithm.Angle;
 import com.vividsolutions.jts.geom.Coordinate;
 import junit.framework.TestCase;

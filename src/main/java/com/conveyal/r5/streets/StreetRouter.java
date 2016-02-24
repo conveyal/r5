@@ -120,6 +120,8 @@ public class StreetRouter {
         TIntIntMap result = new TIntIntHashMap();
 
         streetLayer.linkedTransitLayer.stopForStreetVertex.forEachEntry((streetVertex, stop) -> {
+            if (streetVertex == -1) return true;
+
             State state = getStateAtVertex(streetVertex);
             // TODO should this be time?
             if (state != null) result.put(stop, state.weight);

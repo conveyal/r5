@@ -22,8 +22,7 @@ public class TurnCostCalculatorTest extends TestCase {
     // center vertex index, n/s/e/w vertex indices, n/s/e/w edge indices (always starting from center).
     public int VCENTER, VN, VS, VE, VW, VNE, EN, ES, EE, EW, ENE;
 
-    @Before
-    public void setUp () {
+    public void setUp (boolean southernHemisphere) {
         // generate a street layer that looks like this
         //     0
         //     |
@@ -31,13 +30,16 @@ public class TurnCostCalculatorTest extends TestCase {
         // 6 --*-- 2
         //     |
         //     4
+
+        double latOffset = southernHemisphere ? -60 : 0;
+
         streetLayer = new StreetLayer(new TNBuilderConfig());
-        VCENTER = streetLayer.vertexStore.addVertex(37.363, -122.123);
-        VN = streetLayer.vertexStore.addVertex(37.364, -122.123);
-        VS = streetLayer.vertexStore.addVertex(37.362, -122.123);
-        VE = streetLayer.vertexStore.addVertex(37.363, -122.122);
-        VNE = streetLayer.vertexStore.addVertex(37.3631, -122.122);
-        VW = streetLayer.vertexStore.addVertex(37.363, -122.124);
+        VCENTER = streetLayer.vertexStore.addVertex(37.363 + latOffset, -122.123);
+        VN = streetLayer.vertexStore.addVertex(37.364 + latOffset, -122.123);
+        VS = streetLayer.vertexStore.addVertex(37.362 + latOffset, -122.123);
+        VE = streetLayer.vertexStore.addVertex(37.363 + latOffset, -122.122);
+        VNE = streetLayer.vertexStore.addVertex(37.3631 + latOffset, -122.122);
+        VW = streetLayer.vertexStore.addVertex(37.363 + latOffset, -122.124);
 
         EN = streetLayer.edgeStore.addStreetPair(VCENTER, VN, 15000, 4).getEdgeIndex();
         EE = streetLayer.edgeStore.addStreetPair(VCENTER, VE, 15000, 2).getEdgeIndex();
@@ -48,6 +50,21 @@ public class TurnCostCalculatorTest extends TestCase {
 
     @Test
     public void testAngle() throws Exception {
+        setUp(false);
+        TurnCostCalculator calculator = new TurnCostCalculator(streetLayer, true);
+        assertEquals(0.5 * Math.PI, calculator.computeAngle(EE + 1, ES), 1e-6);
+        assertEquals(Math.PI, calculator.computeAngle(EE, EE + 1), 1e-6);
+        assertEquals(0, calculator.computeAngle(EW + 1, EE), 1e-6);
+        double angle = calculator.computeAngle(EW + 1, ENE);
+        assertTrue(angle < 0.15 * Math.PI);
+        assertEquals(1.5 * Math.PI, calculator.computeAngle(EE + 1, EN), 1e-6);
+        assertEquals(1.5 * Math.PI, calculator.computeAngle(ES + 1, EE), 1e-6);
+    }
+
+    /** Make sure angles are right in the southern hemisphere as well. We scale by the cosine of latitude, which is negative in the southern hemisphere. */
+    @Test
+    public void testAngleSouthernHemisphere() throws Exception {
+        setUp(true);
         TurnCostCalculator calculator = new TurnCostCalculator(streetLayer, true);
         assertEquals(0.5 * Math.PI, calculator.computeAngle(EE + 1, ES), 1e-6);
         assertEquals(Math.PI, calculator.computeAngle(EE, EE + 1), 1e-6);

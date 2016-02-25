@@ -10,16 +10,17 @@ public abstract class TurnTest extends TestCase {
     public StreetLayer streetLayer;
 
     // center vertex index, n/s/e/w vertex indices, n/s/e/w edge indices (always starting from center).
-    public int VCENTER, VN, VS, VE, VW, VNE, EN, ES, EE, EW, ENE;
+    public int VCENTER, VN, VS, VE, VW, VNE, VNW, EN, ES, EE, EW, ENE, ENW;
 
     public void setUp (boolean southernHemisphere) {
         // generate a street layer that looks like this
-        //     0
+        // VNW VN
+        // |   |
+        // |   |/--VNE
+        // VW--*-- VE
         //     |
-        //     |/--3
-        // 6 --*-- 2
-        //     |
-        //     4
+        //     VS
+        // Edges have the same names (EW, EE, etc), and all start from the central vertex (except ENW which starts at VW)
 
         double latOffset = southernHemisphere ? -60 : 0;
 
@@ -30,12 +31,14 @@ public abstract class TurnTest extends TestCase {
         VE = streetLayer.vertexStore.addVertex(37.363 + latOffset, -122.122);
         VNE = streetLayer.vertexStore.addVertex(37.3631 + latOffset, -122.122);
         VW = streetLayer.vertexStore.addVertex(37.363 + latOffset, -122.124);
+        VNW = streetLayer.vertexStore.addVertex(37.364 + latOffset, -122.124);
 
         EN = streetLayer.edgeStore.addStreetPair(VCENTER, VN, 15000, 4).getEdgeIndex();
         EE = streetLayer.edgeStore.addStreetPair(VCENTER, VE, 15000, 2).getEdgeIndex();
         ES = streetLayer.edgeStore.addStreetPair(VCENTER, VS, 15000, 3).getEdgeIndex();
         EW = streetLayer.edgeStore.addStreetPair(VCENTER, VW, 15000, 1).getEdgeIndex();
         ENE = streetLayer.edgeStore.addStreetPair(VCENTER, VNE, 15000, 5).getEdgeIndex();
+        ENW = streetLayer.edgeStore.addStreetPair(VW, VNW, 15000, 6).getEdgeIndex();
 
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor(0);
 
@@ -54,12 +57,9 @@ public abstract class TurnTest extends TestCase {
         restriction.fromEdge = from;
         restriction.toEdge = to;
         restriction.only = onlyTurn;
+        restriction.viaEdges = via;
         int ridx = streetLayer.turnRestrictions.size();
         streetLayer.turnRestrictions.add(restriction);
         streetLayer.edgeStore.turnRestrictions.put(restriction.fromEdge, ridx);
-
-        for (int viaEdge : via) {
-            streetLayer.edgeStore.turnRestrictions.put(viaEdge, ridx);
-        }
     }
 }

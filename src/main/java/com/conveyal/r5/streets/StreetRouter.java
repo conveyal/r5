@@ -357,7 +357,7 @@ public class StreetRouter {
             if (bestStatesAtEdge.containsKey(s0.backEdge)) {
                 for (State state : bestStatesAtEdge.get(s0.backEdge)) {
                     // states in turn restrictions don't dominate anything
-                    if (!state.inTurnRestriction)
+                    if (state.turnRestrictions == null)
                         continue QUEUE;
                 }
             }
@@ -371,7 +371,7 @@ public class StreetRouter {
 
             // non-dominated state coming off the pqueue is by definition the best way to get to that vertex
             // but states in turn restrictions don't dominate anything, to avoid resource limiting issues
-            if (s0.inTurnRestriction)
+            if (s0.turnRestrictions != null)
                 bestStatesAtEdge.put(s0.backEdge, s0);
             else {
                 // we might need to save an existing state that is in a turn restriction so is codominant
@@ -380,7 +380,7 @@ public class StreetRouter {
                     if (s0.weight < other.weight) it.remove();
                     // avoid a ton of codominant states when there is e.g. duplicated OSM data
                     // However, save this state if it is not in a turn restriction and the other state is
-                    else if (s0.weight == other.weight && !(other.inTurnRestriction && !s0.inTurnRestriction))
+                    else if (s0.weight == other.weight && !(other.turnRestrictions != null && s0.turnRestrictions == null))
                         continue QUEUE;
                 }
                 bestStatesAtEdge.put(s0.backEdge, s0);
@@ -470,7 +470,7 @@ public class StreetRouter {
 
         for (TIntIterator it = streetLayer.incomingEdges.get(split.vertex0).iterator(); it.hasNext();) {
             Collection<State> states = bestStatesAtEdge.get(it.next());
-            states.stream().filter(s -> e.canTurnFrom(s))
+            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge, 0, s)))
                     .map(s -> {
                         State ret = new State(-1, split.edge, 0, s);
                         ret.mode = s.mode;
@@ -493,7 +493,7 @@ public class StreetRouter {
 
         for (TIntIterator it = streetLayer.incomingEdges.get(split.vertex1).iterator(); it.hasNext();) {
             Collection<State> states = bestStatesAtEdge.get(it.next());
-            states.stream().filter(s -> e.canTurnFrom(s))
+            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge + 1, 0, s)))
                     .map(s -> {
                         State ret = new State(-1, split.edge + 1, 0, s);
                         ret.mode = s.mode;
@@ -532,8 +532,11 @@ public class StreetRouter {
         public State backState; // previous state in the path chain
         public boolean isBikeShare = false; //is true if vertex in this state is Bike sharing station where mode switching occurs
 
-        /** we are in the middle of a turn restriction. */
-        public boolean inTurnRestriction = false;
+        /**
+         * turn restrictions we are in the middle of.
+         * Value is how many edges of this turn restriction we have traversed so far, so if 1 we have traversed only the from edge, etc.
+         */
+        public TIntIntMap turnRestrictions;
 
         public State(int atVertex, int viaEdge, long fromTimeDate, State backState) {
             this.vertex = atVertex;

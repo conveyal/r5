@@ -741,15 +741,13 @@ public class StreetLayer implements Serializable {
                 affectedEdges.add(edge[0]);
             }
 
-            affectedEdges.add(out.fromEdge);
+            affectedEdges.reverse();
+
+            out.viaEdges = affectedEdges.toArray();
 
             int index = turnRestrictions.size();
             turnRestrictions.add(out);
-
-            affectedEdges.forEach(eidx -> {
-                edgeStore.turnRestrictions.put(eidx, index);
-                return true; // continue iteration
-            });
+            edgeStore.turnRestrictions.put(out.fromEdge, index);
 
             // take a deep breath
         }

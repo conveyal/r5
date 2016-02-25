@@ -17,5 +17,8 @@ public class TurnRestriction implements Serializable {
     /** the edge we're turning onto */
     public int toEdge;
 
+    /** the intermediate edges in this turn restriction */
+    public int[] viaEdges;
+
     // via information is implied by the edges this turn restriction is attached to
 }

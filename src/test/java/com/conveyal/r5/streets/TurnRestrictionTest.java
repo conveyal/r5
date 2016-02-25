@@ -122,4 +122,49 @@ public class TurnRestrictionTest extends TurnTest {
         // weight should be greater because path should now include going past the intersection and making a U-turn back at it.
         assertTrue(r.getState(dest).weight > state.weight);
     }
+
+    /** Test a no-U-turn with a via member */
+    @Test
+    public void testComplexNoTurn () {
+        setUp(false);
+
+        StreetRouter r = new StreetRouter(streetLayer);
+        // turn restrictions only apply to cars
+        r.mode = Mode.CAR;
+        r.setOrigin(VN);
+        r.route();
+
+        StreetRouter.State stateFromN = r.getStateAtVertex(VNW);
+
+        r = new StreetRouter(streetLayer);
+        // turn restrictions only apply to cars
+        r.mode = Mode.CAR;
+        r.setOrigin(VCENTER);
+        r.route();
+
+        StreetRouter.State stateFromCenter = r.getStateAtVertex(VNW);
+
+        restrictTurn(false, EN + 1, ENW, EW);
+
+        r = new StreetRouter(streetLayer);
+        // turn restrictions only apply to cars
+        r.mode = Mode.CAR;
+        r.setOrigin(VN);
+        r.route();
+
+        StreetRouter.State restrictedStateFromN = r.getStateAtVertex(VNW);
+
+        // we should be forced to make a dipsy-doodle to avoid a U-turn
+        assertTrue(restrictedStateFromN.weight > stateFromN.weight);
+
+        r = new StreetRouter(streetLayer);
+        // turn restrictions only apply to cars
+        r.mode = Mode.CAR;
+        r.setOrigin(VCENTER);
+        r.route();
+
+        // No U turn should not affect the left turn
+        StreetRouter.State restrictedStateFromCenter = r.getStateAtVertex(VNW);
+        assertEquals(stateFromCenter.weight, restrictedStateFromCenter.weight);
+    }
 }

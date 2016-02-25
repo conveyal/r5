@@ -12,12 +12,14 @@ import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.LineString;
 import gnu.trove.TIntCollection;
+import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.TLongList;
 import gnu.trove.list.TShortList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.list.array.TShortArrayList;
+import gnu.trove.map.hash.TIntIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -463,14 +465,23 @@ public class EdgeStore implements Serializable {
             float time = (float) (getLengthM() / speedms);
             float weight = 0;
 
+            if (!canTurnFrom(s0, s1)) return null;
+
+            // clear out turn restrictions if they're empty
+            if (s1.turnRestrictions != null && s1.turnRestrictions.isEmpty()) s1.turnRestrictions = null;
+
+            // figure out which turn res
+
             // add turn restrictions that start on this edge
             // Turn restrictions only apply to cars for now. This is also coded in canTurnFrom, so change it both places
             // if/when it gets changed.
             if (s0.mode == Mode.CAR && turnRestrictions.containsKey(getEdgeIndex())) {
-                s1.inTurnRestriction = true;
+                if (s1.turnRestrictions == null) s1.turnRestrictions = new TIntIntHashMap();
+                turnRestrictions.get(getEdgeIndex()).forEach(r -> {
+                    s1.turnRestrictions.put(r, 1); // we have traversed one edge
+                    return true; // continue iteration
+                });
             }
-
-            if (!canTurnFrom(s0)) return null;
 
             if (s0.backEdge != -1 && getFlag(EdgeFlag.LINK) && getCursor(s0.backEdge).getFlag(EdgeFlag.LINK))
                 // two link edges in a row, in other words a shortcut. Disallow this.
@@ -541,35 +552,56 @@ public class EdgeStore implements Serializable {
             return s1;
         }
 
-        /** Can we turn onto this edge from this state? */
-        public boolean canTurnFrom (StreetRouter.State s0) {
+        /** Can we turn onto this edge from this state? Also copies still-applicable restrictions forward. */
+        public boolean canTurnFrom (StreetRouter.State s0, StreetRouter.State s1) {
             // Turn restrictions only apply to cars for now. This is also coded in traverse, so change it both places
             // if/when it gets changed.
-            if (s0.inTurnRestriction && s0.mode == Mode.CAR) {
-                // check if we have exited any turn restrictions, and make sure the movement is not restricted
-                TIntCollection currentRestrictions = turnRestrictions.get(getEdgeIndex());
+            if (s0.turnRestrictions != null && s0.mode == Mode.CAR) {
+                // clone turn restrictions
+                s1.turnRestrictions = new TIntIntHashMap(s0.turnRestrictions);
 
-                // array to dodge effectively final nonsense
-                boolean[] blockTraversal = new boolean[] { false };
-                turnRestrictions.get(s0.backEdge).forEach(ridx -> {
-                    if (currentRestrictions.contains(ridx)) return true; // we have not exited this restriction, but continue iteration
-
-                    // we have exited this restriction, check to see if we should block traversal
+                RESTRICTIONS: for (TIntIntIterator it = s1.turnRestrictions.iterator(); it.hasNext();) {
+                    it.advance();
+                    int ridx = it.key();
                     TurnRestriction restriction = layer.turnRestrictions.get(ridx);
 
-                    // first check if the restriction applies to this traversal
-                    // we don't need to check via here, as if we ever left the via edges we would have terminated the restriction then.
-                    // TODO is this right? What if there is more than one way to get from from to to?
-                    boolean applies = restriction.toEdge == getEdgeIndex();
+                    // check via ways if applicable
+                    // subtract 1 because the first (fromEdge) is not a via edge
+                    int posInRestriction = it.value() - 1;
 
-                    if (applies && !restriction.only || !applies && restriction.only) blockTraversal[0] = true;
-
-                    // only continue iteration if we're not already blocking traversal
-                    return !blockTraversal[0];
-                });
-
-                if (blockTraversal[0])
-                    return false;
+                    if (posInRestriction < restriction.viaEdges.length) {
+                        if (getEdgeIndex() != restriction.viaEdges[posInRestriction]) {
+                            // we have exited the restriction
+                            if (restriction.only) return false;
+                            else {
+                                it.remove(); // no need to worry about this one anymore
+                                continue RESTRICTIONS;
+                            }
+                        }
+                        else {
+                            // increment position
+                            it.setValue(it.value() + 1);
+                        }
+                    }
+                    else {
+                        if (restriction.toEdge != getEdgeIndex()) {
+                            // we have exited the restriction
+                            if (restriction.only)
+                                return false;
+                            else {
+                                it.remove();
+                                continue RESTRICTIONS;
+                            }
+                        } else {
+                            if (!restriction.only)
+                                return false;
+                            else {
+                                it.remove(); // done with this restriction
+                                continue RESTRICTIONS;
+                            }
+                        }
+                    }
+                }
             }
             return true;
         }

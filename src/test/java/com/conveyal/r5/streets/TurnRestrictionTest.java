@@ -1,6 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.profile.Mode;
+import com.sun.xml.internal.bind.annotation.OverrideAnnotationOf;
 import org.junit.Test;
 
 public class TurnRestrictionTest extends TurnTest {
@@ -220,6 +221,36 @@ public class TurnRestrictionTest extends TurnTest {
 
     }
 
+    /** does having turn restrictions at adjacent intersections cause an infinite loop (issue #88) */
+    @Test
+    public void testAdjacentRestrictionInfiniteLoop () {
+        setUp(false);
+
+        restrictTurn(false, EW, ENW);
+        restrictTurn(false, EW + 1, ES);
+
+        RoutingVisitor countingVisitor = new RoutingVisitor(streetLayer.edgeStore, Mode.CAR) {
+            public int count;
+
+            @Override
+            public void visitVertex (StreetRouter.State state) {
+                if (count++ > 1000) throw new CountExceededException();
+            }
+        };
+
+        StreetRouter r = new StreetRouter(streetLayer);
+        // turn restrictions only apply to cars
+        r.mode = Mode.CAR;
+        r.setRoutingVisitor(countingVisitor);
+        r.setOrigin(VCENTER);
+
+        try {
+            r.route();
+        } catch (CountExceededException e) {
+            assertTrue("Search will progress infinitely", false);
+        }
+    }
+
     /** does a state pass through a vertex? */
     public static boolean stateContainsVertex(StreetRouter.State state, int vertex) {
         while (state != null) {
@@ -228,4 +259,6 @@ public class TurnRestrictionTest extends TurnTest {
         }
         return false;
     }
+
+    private static class CountExceededException extends RuntimeException { /* nothing */ }
 }

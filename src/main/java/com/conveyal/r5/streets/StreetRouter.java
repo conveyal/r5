@@ -359,6 +359,18 @@ public class StreetRouter {
                     // states in turn restrictions don't dominate anything
                     if (state.turnRestrictions == null)
                         continue QUEUE;
+                    else if (s0.turnRestrictions != null && s0.turnRestrictions.size() == state.turnRestrictions.size()) {
+                        // if they have the same turn restrictions, dominate this state with the one in the queue.
+                        // if we make all turn-restricted states strictly incomparable we can get infinite loops with adjacent turn
+                        // restrictions, see #88.
+                        boolean[] same = new boolean [] { true };
+                        s0.turnRestrictions.forEachEntry((ridx, pos) -> {
+                            if (!state.turnRestrictions.containsKey(ridx) || state.turnRestrictions.get(ridx) != pos) same[0] = false;
+                            return same[0]; // shortcut iteration if they're not the same
+                        });
+
+                        if (same[0]) continue QUEUE;
+                    }
                 }
             }
 

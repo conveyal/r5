@@ -167,4 +167,65 @@ public class TurnRestrictionTest extends TurnTest {
         StreetRouter.State restrictedStateFromCenter = r.getStateAtVertex(VNW);
         assertEquals(stateFromCenter.weight, restrictedStateFromCenter.weight);
     }
+
+    /** Test an only-turn with a via member */
+    @Test
+    public void testOnlyTurnWithViaMember () {
+        setUp(false);
+
+        StreetRouter r = new StreetRouter(streetLayer);
+        // turn restrictions only apply to cars
+        r.mode = Mode.CAR;
+        r.setOrigin(VN);
+        r.route();
+
+        StreetRouter.State stateFromN = r.getStateAtVertex(VE);
+        assertFalse(stateContainsVertex(stateFromN, VNW));
+
+        r = new StreetRouter(streetLayer);
+        // turn restrictions only apply to cars
+        r.mode = Mode.CAR;
+        r.setOrigin(VCENTER);
+        r.route();
+
+        StreetRouter.State stateFromCenter = r.getStateAtVertex(VE);
+        assertFalse(stateContainsVertex(stateFromCenter, VNW));
+
+
+        restrictTurn(true, EN + 1, ENW, EW);
+
+        r = new StreetRouter(streetLayer);
+        // turn restrictions only apply to cars
+        r.mode = Mode.CAR;
+        r.setOrigin(VN);
+        r.route();
+
+        StreetRouter.State restrictedStateFromN = r.getStateAtVertex(VE);
+
+        // we should be forced to make a U-turn
+        assertTrue(restrictedStateFromN.weight > stateFromN.weight);
+
+        r = new StreetRouter(streetLayer);
+        // turn restrictions only apply to cars
+        r.mode = Mode.CAR;
+        r.setOrigin(VCENTER);
+        r.route();
+
+        // Only U turn should not affect a state starting at the center
+        StreetRouter.State restrictedStateFromCenter = r.getStateAtVertex(VE);
+        assertEquals(stateFromCenter.weight, restrictedStateFromCenter.weight);
+
+        // make sure the state from the north goes through VNW as there's an only U turn restriction.
+        assertTrue(stateContainsVertex(restrictedStateFromN, VNW));
+
+    }
+
+    /** does a state pass through a vertex? */
+    public static boolean stateContainsVertex(StreetRouter.State state, int vertex) {
+        while (state != null) {
+            if (state.vertex == vertex) return true;
+            state = state.backState;
+        }
+        return false;
+    }
 }

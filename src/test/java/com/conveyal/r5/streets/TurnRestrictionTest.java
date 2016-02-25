@@ -96,4 +96,30 @@ public class TurnRestrictionTest extends TurnTest {
         // weight should be greater because path should now include going past the intersection and making a U-turn back at it.
         assertTrue(r.getState(split).weight > state.weight);
     }
+
+    @Test
+    public void testNoTurnBothSplit () {
+        setUp(false);
+        StreetRouter r = new StreetRouter(streetLayer);
+        // turn restrictions only apply to cars
+        r.mode = Mode.CAR;
+        assertTrue(r.setOrigin(37.3625, -122.123));
+        r.route();
+
+        Split dest = streetLayer.findSplit(37.363, -122.1235, 100);
+
+        StreetRouter.State state = r.getState(dest);
+        assertNotNull(state);
+
+        // create a turn restriction
+        restrictTurn(false, ES + 1, EW);
+
+        r = new StreetRouter(streetLayer);
+        r.mode = Mode.CAR;
+        r.setOrigin(VS);
+        r.route();
+
+        // weight should be greater because path should now include going past the intersection and making a U-turn back at it.
+        assertTrue(r.getState(dest).weight > state.weight);
+    }
 }

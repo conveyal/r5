@@ -1,7 +1,6 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.profile.Mode;
-import com.sun.xml.internal.bind.annotation.OverrideAnnotationOf;
 import org.junit.Test;
 
 public class TurnRestrictionTest extends TurnTest {

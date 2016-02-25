@@ -542,6 +542,7 @@ public class StreetRouter {
             this.time = fromTimeDate;
             this.distance = backState.distance;
             this.durationSeconds = backState.durationSeconds;
+            this.weight = backState.weight;
         }
 
         public State(int atVertex, int viaEdge, long fromTimeDate, Mode mode) {

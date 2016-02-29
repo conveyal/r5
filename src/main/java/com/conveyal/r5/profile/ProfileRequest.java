@@ -193,6 +193,10 @@ public class ProfileRequest implements Serializable, Cloneable {
     //If this is profile or point to point route request
     private boolean profile = false;
 
+    //If true current search is reverse search AKA we are looking for a path from destination to origin in reverse
+    //It differs from searchType because it is used as egress search
+    public boolean reverseSearch = false;
+
     public ProfileRequest clone () {
         try {
             return (ProfileRequest) super.clone();

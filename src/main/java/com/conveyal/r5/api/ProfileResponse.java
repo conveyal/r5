@@ -86,6 +86,7 @@ public class ProfileResponse {
         int endStopIndex = currentTransitPath.alightStops[currentTransitPath.length-1];
         int startVertexStopIndex = transportNetwork.transitLayer.streetVertexForStop.get(startStopIndex);
         int endVertexStopIndex = transportNetwork.transitLayer.streetVertexForStop.get(endStopIndex);
+        LOG.info("Filling response access paths:");
         //TODO: update this so that each stopIndex and mode pair is changed to streetpath only once
         LegMode accessMode = stopModeAccessMap.get(startStopIndex);
         if (accessMode != null) {
@@ -100,7 +101,7 @@ public class ProfileResponse {
                         streetPath = new StreetPath(state, streetRouter, accessMode,
                             transportNetwork);
                     } else {
-                        streetPath = new StreetPath(state, transportNetwork);
+                        streetPath = new StreetPath(state, transportNetwork, false);
                     }
                     StreetSegment streetSegment = new StreetSegment(streetPath, accessMode, transportNetwork.streetLayer);
                     profileOption.addAccess(streetSegment, accessMode, startVertexStopIndex);
@@ -113,6 +114,7 @@ public class ProfileResponse {
             LOG.warn("Mode is not in stopModeAccessMap for start stop:{}({})", startVertexStopIndex, startStopIndex);
         }
 
+        LOG.info("Filling response EGRESS paths:");
         LegMode egressMode = stopModeEgressMap.get(endStopIndex);
         if (egressMode != null) {
             int egressPathIndex = profileOption.getEgressIndex(egressMode, endVertexStopIndex);
@@ -121,7 +123,7 @@ public class ProfileResponse {
                 StreetRouter streetRouter = egressRouter.get(egressMode);
                 StreetRouter.State state = streetRouter.getStateAtVertex(endVertexStopIndex);
                 if (state != null) {
-                    StreetPath streetPath = new StreetPath(state, transportNetwork);
+                    StreetPath streetPath = new StreetPath(state, transportNetwork, true);
                     StreetSegment streetSegment = new StreetSegment(streetPath, egressMode, transportNetwork.streetLayer);
                     profileOption.addEgress(streetSegment, egressMode, endVertexStopIndex);
                     //This should never happen since stopModeEgressMap is filled from reached stops in egressRouter
@@ -169,6 +171,7 @@ public class ProfileResponse {
         //Groups transfers on alight stop so that StreetRouter is called only once per start stop
         Map<Integer, List<Transfer>> transfersWithSameStart = transferToOption.keySet().stream()
             .collect(Collectors.groupingBy(Transfer::getAlightStop));
+        LOG.info("Filling middle paths");
         for (Map.Entry<Integer, List<Transfer>> entry: transfersWithSameStart.entrySet()) {
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
             streetRouter.mode = Mode.WALK;
@@ -184,7 +187,7 @@ public class ProfileResponse {
                 int endIndex = transportNetwork.transitLayer.streetVertexForStop.get(transfer.boardStop);
                 StreetRouter.State lastState = streetRouter.getStateAtVertex(endIndex);
                 if (lastState != null) {
-                    StreetPath streetPath = new StreetPath(lastState, transportNetwork);
+                    StreetPath streetPath = new StreetPath(lastState, transportNetwork, false);
                     StreetSegment streetSegment = new StreetSegment(streetPath, LegMode.WALK, transportNetwork.streetLayer);
                     for (ProfileOption profileOption: transferToOption.get(transfer)) {
                         profileOption.addMiddle(streetSegment, transfer);

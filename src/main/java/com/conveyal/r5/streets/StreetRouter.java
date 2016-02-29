@@ -5,6 +5,7 @@ import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.util.TIntObjectHashMultimap;
 import com.conveyal.r5.util.TIntObjectMultimap;
 import gnu.trove.iterator.TIntIterator;
+import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -15,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.IntStream;
@@ -411,8 +413,14 @@ public class StreetRouter {
                 if (atDest != null && bestWeightAtDestination > atDest.weight) bestWeightAtDestination = atDest.weight;
             }
 
+            TIntList edgeList;
+            if (profileRequest.reverseSearch) {
+                edgeList = streetLayer.incomingEdges.get(s0.vertex);
+            } else {
+                edgeList = streetLayer.outgoingEdges.get(s0.vertex);
+            }
             // explore edges leaving this vertex
-            streetLayer.outgoingEdges.get(s0.vertex).forEach(eidx -> {
+            edgeList.forEach(eidx -> {
                 edge.seek(eidx);
 
                 State s1 = edge.traverse(s0, mode, profileRequest, turnCostCalculator);
@@ -540,6 +548,7 @@ public class StreetRouter {
         protected int durationSeconds;
         //Distance in mm
         public int distance;
+        public int idx;
         public Mode mode;
         public State backState; // previous state in the path chain
         public boolean isBikeShare = false; //is true if vertex in this state is Bike sharing station where mode switching occurs
@@ -558,6 +567,7 @@ public class StreetRouter {
             this.distance = backState.distance;
             this.durationSeconds = backState.durationSeconds;
             this.weight = backState.weight;
+            this.idx = backState.idx+1;
         }
 
         public State(int atVertex, int viaEdge, long fromTimeDate, Mode mode) {
@@ -568,6 +578,75 @@ public class StreetRouter {
             this.mode = mode;
             this.durationSeconds = 0;
             this.time = fromTimeDate;
+            this.idx = 0;
+        }
+
+        protected State clone() {
+            State ret;
+            try {
+                ret = (State) super.clone();
+            } catch (CloneNotSupportedException e) {
+                throw new IllegalStateException("This is not happening");
+            }
+            return ret;
+        }
+
+        /**
+         * Reverses order of states in arriveBy=true searches. Because start and target are reversed there
+         * @param transportNetwork this is used for getting from/to vertex in backEdge
+         * @return last edge in reversed order
+         */
+        public State reverse(TransportNetwork transportNetwork) {
+            State orig = this;
+            State ret = orig.reversedClone();
+            int edge = -1;
+            while (orig.backState != null) {
+                edge = orig.backEdge;
+                State child = ret.clone();
+                child.backState = ret;
+                child.backEdge = edge;
+                boolean traversingBackward = false;
+                EdgeStore.Edge origBackEdge = transportNetwork.streetLayer.edgeStore.getCursor(orig.backEdge);
+                if (origBackEdge.getFromVertex() == origBackEdge.getToVertex()
+                    && ret.vertex == origBackEdge.getFromVertex()) {
+                    //traversingBackward = ret.getOptions().arriveBy;
+                    //child.vertex = origBackEdge.getToVertex();
+                } else if (ret.vertex == origBackEdge.getFromVertex()) {
+                    //child.vertex = origBackEdge.getToVertex();
+                    traversingBackward = false;
+                }else if (ret.vertex == origBackEdge.getToVertex()) {
+                    //child.vertex = origBackEdge.getFromVertex();
+                    traversingBackward = true;
+                }
+                /*
+                if (traversingBackward != ret.getOptions().arriveBy) {
+                    LOG.error("Actual traversal direction does not match traversal direction in TraverseOptions.");
+                    //defectiveTraversal = true;
+                }*/
+                child.incrementWeight(orig.weight-orig.backState.weight);
+                //TODO: check order
+                long diff = orig.backState.time - orig.time;
+                if (traversingBackward) {
+                    time -= diff;
+                    durationSeconds+=(diff/1000);
+                } else {
+                    time += diff;
+                    durationSeconds+=(diff/1000);
+                }
+                if (orig.backState != null) {
+                    child.distance += Math.abs(orig.distance-orig.backState.distance);
+                }
+                child.mode = orig.mode;
+                ret = child;
+                orig = orig.backState;
+            }
+            return ret;
+        }
+
+        public State reversedClone() {
+            State newState = new State(this.vertex, -1, time, this.mode);
+            newState.idx = idx;
+            return newState;
         }
 
 
@@ -578,8 +657,18 @@ public class StreetRouter {
                 //defectiveTraversal = true;
                 return;
             }
+/*
             durationSeconds += seconds;
             time += seconds;
+*/
+            //TODO: decrease time
+            if (false) {
+                time -= seconds*1000;
+                durationSeconds+=seconds;
+            } else {
+                time += seconds*1000;
+                durationSeconds+=seconds;
+            }
         }
 
         public int getDurationSeconds() {

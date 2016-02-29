@@ -459,8 +459,14 @@ public class EdgeStore implements Serializable {
         }
 
         public StreetRouter.State traverse (StreetRouter.State s0, Mode mode, ProfileRequest req, TurnCostCalculator turnCostCalculator) {
-            StreetRouter.State s1 = new StreetRouter.State(getToVertex(), edgeIndex,
-                s0.getTime(), s0);
+            int vertex;
+
+            if (req.reverseSearch) {
+                vertex = getFromVertex();
+            } else {
+                vertex = getToVertex();
+            }
+            StreetRouter.State s1 = new StreetRouter.State(vertex, edgeIndex, s0.getTime(), s0);
             float speedms = calculateSpeed(req, mode, s0.getTime());
             float time = (float) (getLengthM() / speedms);
             float weight = 0;

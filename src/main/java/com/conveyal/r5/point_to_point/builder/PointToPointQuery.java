@@ -106,6 +106,7 @@ public class PointToPointQuery {
         //This map saves which egress mode was used to access specific stop in egress mode
         TIntObjectMap<LegMode> stopModeEgressMap = new TIntObjectHashMap<>();
 
+        LOG.info("Making direct paths:");
         //Routes all direct (if no transit)/access modes
         for(LegMode mode: modes) {
             long initialStopStartTime = System.currentTimeMillis();
@@ -171,7 +172,7 @@ public class PointToPointQuery {
                     } else{
                         StreetRouter.State lastState = streetRouter.getState(split);
                         if (lastState != null) {
-                            streetPath = new StreetPath(lastState, transportNetwork);
+                            streetPath = new StreetPath(lastState, transportNetwork, false);
                         } else {
                             LOG.warn("MODE:{}, Edge near the end coordinate wasn't found. Routing didn't start!", mode);
                             continue;
@@ -204,7 +205,6 @@ public class PointToPointQuery {
                         StreetRouter.State lastState = streetRouter.getState(split);
                         if (lastState != null) {
                             streetPath = new StreetPath(lastState, streetRouter, LegMode.BICYCLE_RENT, transportNetwork);
-
                         } else {
                             LOG.warn("MODE:{}, Edge near the destination coordinate wasn't found. Routing didn't start!", mode);
                             continue;
@@ -220,7 +220,7 @@ public class PointToPointQuery {
                         streetRouter.setDestination(split);
                         streetRouter.route();
                         StreetRouter.State lastState = streetRouter.getState(split);
-                        streetPath = new StreetPath(lastState, transportNetwork);
+                        streetPath = new StreetPath(lastState, transportNetwork, false);
                     } else {
                         LOG.warn("Direct mode last state wasn't found!");
                         continue;
@@ -232,6 +232,7 @@ public class PointToPointQuery {
                 option.addDirect(streetSegment, request.getFromTimeDateZD());
             }
 
+            request.reverseSearch = true;
             //For egress
             //TODO: this must be reverse search
             for(LegMode mode: request.egressModes) {
@@ -255,6 +256,7 @@ public class PointToPointQuery {
                     LOG.warn("MODE:{}, Edge near the origin coordinate wasn't found. Routing didn't start!", mode);
                 }
             }
+            request.reverseSearch = false;
 
             option.summary = option.generateSummary();
             profileResponse.addOption(option);

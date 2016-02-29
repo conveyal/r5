@@ -213,7 +213,6 @@ public class ProfileOption {
 
         //FIXME: actual waiting time
         itinerary.waitingTime = 0;
-        //TODO: middle part duration
         itinerary.walkTime = access.get(accessIdx).duration+egress.get(egressIdx).duration;
         itinerary.distance = access.get(accessIdx).distance+egress.get(egressIdx).distance;
         ZonedDateTime transitStart = transit.get(0).segmentPatterns.get(transitJourneyIDs.get(0).pattern).fromDepartureTime.get(transitJourneyIDs.get(0).time);

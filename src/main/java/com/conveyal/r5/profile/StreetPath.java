@@ -25,12 +25,17 @@ public class StreetPath {
     private TransportNetwork transportNetwork;
     private int distance;
 
-    public StreetPath(StreetRouter.State s, TransportNetwork transportNetwork) {
+    public StreetPath(StreetRouter.State s, TransportNetwork transportNetwork,
+        boolean reverseSearch) {
         edges = new LinkedList<>();
         states = new LinkedList<>();
         this.transportNetwork = transportNetwork;
 
         lastState = s;
+
+        if (reverseSearch) {
+            this.lastState = s.reverse(transportNetwork);
+        }
 
         /*
          * Starting from latest (time-wise) state, copy states to the head of a list in reverse
@@ -58,7 +63,7 @@ public class StreetPath {
      */
     public StreetPath(StreetRouter.State lastState, StreetRouter streetRouter, LegMode mode,
         TransportNetwork transportNetwork) {
-        this(lastState, transportNetwork);
+        this(lastState, transportNetwork, false);
         //First streetPath is part of path from last bicycle station to the end destination on foot
         if (mode == LegMode.BICYCLE_RENT) {
             StreetRouter.State endCycling = getStates().getFirst();

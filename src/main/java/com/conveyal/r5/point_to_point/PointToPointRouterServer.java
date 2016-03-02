@@ -9,6 +9,7 @@ import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.point_to_point.builder.RouterInfo;
 import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.streets.*;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.core.JsonParseException;
@@ -17,7 +18,6 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.operation.buffer.BufferParameters;
 import com.vividsolutions.jts.operation.buffer.OffsetCurveBuilder;
-import gnu.trove.list.TIntList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.set.TIntSet;
 import graphql.ExecutionResult;
@@ -295,7 +295,10 @@ public class PointToPointRouterServer {
             }
 
             ProfileRequest profileRequest = new ProfileRequest();
-            profileRequest.reverseSearch = true;
+            Boolean reverseSearch = request.queryMap("reverse").booleanValue();
+            if (reverseSearch != null && reverseSearch) {
+                profileRequest.reverseSearch = true;
+            }
             profileRequest.zoneId = transportNetwork.getTimeZone();
             profileRequest.fromLat = fromLat;
             profileRequest.fromLon = fromLon;
@@ -343,7 +346,7 @@ public class PointToPointRouterServer {
                 featureCollection.put("type", "FeatureCollection");
                 List<GeoJsonFeature> features = new ArrayList<>();
 
-                fillFeature(transportNetwork, lastState, features);
+                fillFeature(transportNetwork, lastState, features, profileRequest.reverseSearch);
                 featureCollection.put("features", features);
                 content.put("data", featureCollection);
             } else {
@@ -796,23 +799,14 @@ public class PointToPointRouterServer {
 
 
     private static void fillFeature(TransportNetwork transportNetwork, StreetRouter.State lastState,
-        List<GeoJsonFeature> features) {
-        LinkedList<StreetRouter.State> states = new LinkedList<>();
+        List<GeoJsonFeature> features, boolean reverse) {
 
-        lastState = lastState.reverse(transportNetwork);
-                /*
-                * Starting from latest (time-wise) state, copy states to the head of a list in reverse
-                * chronological order. List indices will thus increase forward in time, and backEdges will
-                * be chronologically 'back' relative to their state.
-                */
-        for (StreetRouter.State cur = lastState; cur != null; cur = cur.backState) {
-            states.addFirst(cur);
-        }
+        StreetPath streetPath = new StreetPath(lastState, transportNetwork, reverse);
 
         int stateIdx = 0;
 
         //TODO: this can be improved since end and start vertices are the same in all the edges.
-        for (StreetRouter.State state : states) {
+        for (StreetRouter.State state : streetPath.getStates()) {
             Integer edgeIdx = state.backEdge;
             if (!(edgeIdx == -1 || edgeIdx == null)) {
                 EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore
@@ -825,6 +819,7 @@ public class PointToPointRouterServer {
                 feature.addProperty("stateIdx", state.idx);
                 features.add(feature);
                 feature.addProperty("time", Instant.ofEpochMilli(state.getTime()).toString());
+                feature.addProperty("edgeIdx", edgeIdx);
             }
         }
     }

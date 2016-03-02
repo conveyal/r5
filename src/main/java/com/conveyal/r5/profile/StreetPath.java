@@ -42,7 +42,7 @@ public class StreetPath {
          * chronological order. List indices will thus increase forward in time, and backEdges will
          * be chronologically 'back' relative to their state.
          */
-        for (StreetRouter.State cur = s; cur != null; cur = cur.backState) {
+        for (StreetRouter.State cur = lastState; cur != null; cur = cur.backState) {
             states.addFirst(cur);
             if (cur.backEdge != -1 && cur.backState != null) {
                 edges.addFirst(cur.backEdge);

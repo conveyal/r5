@@ -124,7 +124,8 @@ transitModes:[TRANSITMODES]) {
         #edgeId
         #distance
         #geometryPolyline
-        #mode
+        mode
+        geometryGeoJSON,
         streetName
         relativeDirection
         absoluteDirection

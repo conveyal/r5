@@ -455,7 +455,14 @@ public class StreetRouter {
     public State getStateAtVertex (int vertexIndex) {
         State ret = null;
 
-        for (TIntIterator it = streetLayer.incomingEdges.get(vertexIndex).iterator(); it.hasNext();) {
+        TIntList edgeList;
+        if (profileRequest.reverseSearch) {
+            edgeList = streetLayer.outgoingEdges.get(vertexIndex);
+        } else {
+            edgeList = streetLayer.incomingEdges.get(vertexIndex);
+        }
+
+        for (TIntIterator it = edgeList.iterator(); it.hasNext();) {
             int eidx = it.next();
 
             State state = getStateAtEdge(eidx);
@@ -488,7 +495,14 @@ public class StreetRouter {
 
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor(split.edge);
 
-        for (TIntIterator it = streetLayer.incomingEdges.get(split.vertex0).iterator(); it.hasNext();) {
+        TIntList edgeList;
+        if (profileRequest.reverseSearch) {
+            edgeList = streetLayer.outgoingEdges.get(split.vertex0);
+        } else {
+            edgeList = streetLayer.incomingEdges.get(split.vertex0);
+        }
+
+        for (TIntIterator it = edgeList.iterator(); it.hasNext();) {
             Collection<State> states = bestStatesAtEdge.get(it.next());
             states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge, 0, s)))
                     .map(s -> {
@@ -511,7 +525,13 @@ public class StreetRouter {
         // advance to back edge
         e.advance();
 
-        for (TIntIterator it = streetLayer.incomingEdges.get(split.vertex1).iterator(); it.hasNext();) {
+        if (profileRequest.reverseSearch) {
+            edgeList = streetLayer.outgoingEdges.get(split.vertex1);
+        } else {
+            edgeList = streetLayer.incomingEdges.get(split.vertex1);
+        }
+
+        for (TIntIterator it = edgeList.iterator(); it.hasNext();) {
             Collection<State> states = bestStatesAtEdge.get(it.next());
             states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge + 1, 0, s)))
                     .map(s -> {
@@ -601,6 +621,7 @@ public class StreetRouter {
             State ret = orig.reversedClone();
             int edge = -1;
             while (orig.backState != null) {
+                //LOG.info("START ORIG:{} RET:{}", orig, ret);
                 edge = orig.backEdge;
                 State child = ret.clone();
                 child.backState = ret;
@@ -609,34 +630,37 @@ public class StreetRouter {
                 EdgeStore.Edge origBackEdge = transportNetwork.streetLayer.edgeStore.getCursor(orig.backEdge);
                 if (origBackEdge.getFromVertex() == origBackEdge.getToVertex()
                     && ret.vertex == origBackEdge.getFromVertex()) {
-                    //traversingBackward = ret.getOptions().arriveBy;
-                    //child.vertex = origBackEdge.getToVertex();
-                } else if (ret.vertex == origBackEdge.getFromVertex()) {
-                    //child.vertex = origBackEdge.getToVertex();
-                    traversingBackward = false;
-                }else if (ret.vertex == origBackEdge.getToVertex()) {
-                    //child.vertex = origBackEdge.getFromVertex();
                     traversingBackward = true;
+                    child.vertex = origBackEdge.getToVertex();
+                    //LOG.info("Case 1");
+                } else if (ret.vertex == origBackEdge.getFromVertex()) {
+                    child.vertex = origBackEdge.getToVertex();
+                    traversingBackward = false;
+                    //LOG.info("Case 2");
+                }else if (ret.vertex == origBackEdge.getToVertex()) {
+                    child.vertex = origBackEdge.getFromVertex();
+                    traversingBackward = true;
+                    //LOG.info("Case 3");
                 }
+                //LOG.info("State idx:{} tra:{}", orig.idx, traversingBackward);
                 /*
                 if (traversingBackward != ret.getOptions().arriveBy) {
                     LOG.error("Actual traversal direction does not match traversal direction in TraverseOptions.");
                     //defectiveTraversal = true;
                 }*/
                 child.incrementWeight(orig.weight-orig.backState.weight);
-                //TODO: check order
-                long diff = orig.backState.time - orig.time;
+                child.durationSeconds += orig.durationSeconds - orig.backState.durationSeconds;
+                long diff = orig.time - orig.backState.time;
                 if (traversingBackward) {
-                    time -= diff;
-                    durationSeconds+=(diff/1000);
+                    child.time -= diff;
                 } else {
-                    time += diff;
-                    durationSeconds+=(diff/1000);
+                    child.time += diff;
                 }
                 if (orig.backState != null) {
                     child.distance += Math.abs(orig.distance-orig.backState.distance);
                 }
                 child.mode = orig.mode;
+                //LOG.info("CHILD:{}", child);
                 ret = child;
                 orig = orig.backState;
             }
@@ -694,6 +718,19 @@ public class StreetRouter {
             out.append("END PATH DUMP\n");
 
             return out.toString();
+        }
+
+        @Override
+        public String toString() {
+            final StringBuilder sb = new StringBuilder("State{");
+            sb.append("vertex=").append(vertex);
+            sb.append(", weight=").append(weight);
+            sb.append(", backEdge=").append(backEdge);
+            sb.append(", durationSeconds=").append(durationSeconds);
+            sb.append(", distance=").append(distance);
+            sb.append(", idx=").append(idx);
+            sb.append('}');
+            return sb.toString();
         }
     }
 

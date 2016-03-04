@@ -6,6 +6,7 @@ import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transitive.TransitiveNetwork;
 import com.google.common.io.LittleEndianDataOutputStream;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -53,6 +54,21 @@ public class StaticMetadata implements Runnable {
             return;
         }
 
+        // write transitive data
+        try {
+            OutputStream os = StaticDataStore.getOutputStream(request, "transitive.json", "application/json");
+            writeTransitiveData(os);
+            os.close();
+        } catch (Exception e) {
+            LOG.error("Exception writing transitive data", e);
+            return;
+        }
+
+    }
+
+    public void writeTransitiveData(OutputStream os) throws IOException {
+        TransitiveNetwork net = new TransitiveNetwork(network.transitLayer);
+        JsonUtilities.objectMapper.writeValue(os, net);
     }
 
     /** Write metadata for this query */

@@ -15,10 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.time.Instant;
 import java.util.*;
-import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 /**
  * This routes over the street layer of a TransitNetwork.
@@ -223,8 +220,8 @@ public class StreetRouter {
         queue.clear();
         // from vertex is at end of back edge. Set edge correctly so that turn restrictions/costs are applied correctly
         // at the origin.
-        State startState0 = new State(split.vertex0, split.edge + 1, profileRequest.getFromTimeDate(), mode);
-        State startState1 = new State(split.vertex1, split.edge, profileRequest.getFromTimeDate(), mode);
+        State startState0 = new State(split.vertex0, split.edge + 1, mode);
+        State startState1 = new State(split.vertex1, split.edge, mode);
         // TODO walk speed, assuming 1 m/sec currently.
         startState0.weight = split.distance0_mm / 1000;
         startState1.weight = split.distance1_mm / 1000;
@@ -239,7 +236,7 @@ public class StreetRouter {
         queue.clear();
 
         // NB backEdge of -1 is no problem as it is a special case that indicates that the origin was a vertex.
-        State startState = new State(fromVertex, -1, profileRequest.getFromTimeDate(), mode);
+        State startState = new State(fromVertex, -1, mode);
         queue.add(startState);
     }
 
@@ -258,8 +255,9 @@ public class StreetRouter {
         bikeStations.forEachEntry((vertexIdx, bikeStationState) -> {
             // backEdge needs to be unique for each start state or they will wind up dominating each other.
             // subtract 1 from -vertexIdx because -0 == 0
-            State state = new State(vertexIdx, -vertexIdx - 1, bikeStationState.getTime()+switchTime, mode);
+            State state = new State(vertexIdx, -vertexIdx - 1, mode);
             state.weight = bikeStationState.weight+switchCost;
+            state.durationSeconds = bikeStationState.durationSeconds+switchTime;
             state.isBikeShare = true;
             queue.add(state);
             return true;
@@ -482,14 +480,14 @@ public class StreetRouter {
 
         for (TIntIterator it = streetLayer.incomingEdges.get(split.vertex0).iterator(); it.hasNext();) {
             Collection<State> states = bestStatesAtEdge.get(it.next());
-            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge, 0, s)))
+            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge, s)))
                     .map(s -> {
-                        State ret = new State(-1, split.edge, 0, s);
+                        State ret = new State(-1, split.edge, s);
                         ret.mode = s.mode;
 
                         // figure out the turn cost
                         int turnCost = this.turnCostCalculator.computeTurnCost(s.backEdge, split.edge, s.mode);
-                        int traversalCost = (int) Math.round(split.distance0_mm / 1000d / e.calculateSpeed(profileRequest, s.mode, 0));
+                        int traversalCost = (int) Math.round(split.distance0_mm / 1000d / e.calculateSpeed(profileRequest, s.mode));
 
                         // TODO length of perpendicular
                         ret.incrementWeight(turnCost + traversalCost);
@@ -505,14 +503,14 @@ public class StreetRouter {
 
         for (TIntIterator it = streetLayer.incomingEdges.get(split.vertex1).iterator(); it.hasNext();) {
             Collection<State> states = bestStatesAtEdge.get(it.next());
-            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge + 1, 0, s)))
+            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge + 1, s)))
                     .map(s -> {
-                        State ret = new State(-1, split.edge + 1, 0, s);
+                        State ret = new State(-1, split.edge + 1, s);
                         ret.mode = s.mode;
 
                         // figure out the turn cost
                         int turnCost = this.turnCostCalculator.computeTurnCost(s.backEdge, split.edge + 1, s.mode);
-                        int traversalCost = (int) Math.round(split.distance1_mm / 1000d / e.calculateSpeed(profileRequest, s.mode, 0));
+                        int traversalCost = (int) Math.round(split.distance1_mm / 1000d / e.calculateSpeed(profileRequest, s.mode));
 
                         // TODO length of perpendicular
                         ret.incrementWeight(turnCost + traversalCost);
@@ -534,8 +532,6 @@ public class StreetRouter {
         public int vertex;
         public int weight;
         public int backEdge;
-        // the current time at this state, in milliseconds UNIX time
-        public long time;
 
         protected int durationSeconds;
         //Distance in mm
@@ -550,24 +546,22 @@ public class StreetRouter {
          */
         public TIntIntMap turnRestrictions;
 
-        public State(int atVertex, int viaEdge, long fromTimeDate, State backState) {
+        public State(int atVertex, int viaEdge, State backState) {
             this.vertex = atVertex;
             this.backEdge = viaEdge;
             this.backState = backState;
-            this.time = fromTimeDate;
             this.distance = backState.distance;
             this.durationSeconds = backState.durationSeconds;
             this.weight = backState.weight;
         }
 
-        public State(int atVertex, int viaEdge, long fromTimeDate, Mode mode) {
+        public State(int atVertex, int viaEdge, Mode mode) {
             this.vertex = atVertex;
             this.backEdge = viaEdge;
             this.backState = null;
             this.distance = 0;
             this.mode = mode;
             this.durationSeconds = 0;
-            this.time = fromTimeDate;
         }
 
 
@@ -579,15 +573,10 @@ public class StreetRouter {
                 return;
             }
             durationSeconds += seconds;
-            time += seconds*1000;
         }
 
         public int getDurationSeconds() {
             return durationSeconds;
-        }
-
-        public long getTime() {
-            return time;
         }
 
         public void incrementWeight(float weight) {

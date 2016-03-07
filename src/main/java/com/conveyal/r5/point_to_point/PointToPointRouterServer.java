@@ -812,7 +812,6 @@ public class PointToPointRouterServer {
                 feature.addProperty("weight", state.weight);
                 feature.addProperty("mode", state.mode);
                 features.add(feature);
-                feature.addProperty("time", Instant.ofEpochMilli(state.getTime()).toString());
             }
         }
     }

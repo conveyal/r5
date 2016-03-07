@@ -579,7 +579,7 @@ public class StreetRouter {
                 return;
             }
             durationSeconds += seconds;
-            time += seconds;
+            time += seconds*1000;
         }
 
         public int getDurationSeconds() {

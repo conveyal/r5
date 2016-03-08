@@ -1,6 +1,6 @@
 package com.conveyal.r5.transit.fare;
 
-import com.conveyal.gtfs.model.Stop;
+import com.conveyal.r5.api.util.Stop;
 import com.conveyal.r5.transit.DCFareCalculator.Fare;
 import com.conveyal.r5.util.P2;
 import com.csvreader.CsvReader;
@@ -47,7 +47,7 @@ public class FareTable {
 
     public Fare lookup (Stop from, Stop to) {
         //TODO: how does this works WRT different GTFS feeds having Stops with same Ids?
-        return lookup(from.stop_id, to.stop_id);
+        return lookup(from.stopId, to.stopId);
     }
 
 }

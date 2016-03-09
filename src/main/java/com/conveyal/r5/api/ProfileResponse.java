@@ -3,6 +3,7 @@ package com.conveyal.r5.api;
 import com.conveyal.r5.api.util.*;
 import com.conveyal.r5.profile.*;
 import com.conveyal.r5.streets.StreetRouter;
+import com.conveyal.r5.transit.DCFareCalculator;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -153,6 +154,11 @@ public class ProfileResponse {
         profileOption.addItineraries(transitJourneyIDs, transportNetwork.getTimeZone());
 
         profileOption.summary = profileOption.generateSummary();
+
+        //TODO: this calculates fares last time currentTransitPath is added to this ProfileOption
+        //What happens if we use Agency A in first transfer and B in second but at different time
+        //Agency A and agency C at next transfer if stops are the same?
+        profileOption.fares = DCFareCalculator.calculateFares(currentTransitPath, transportNetwork);
 
         transitToOption.putIfAbsent(hashPath, profileOption);
     }

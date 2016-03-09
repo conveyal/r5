@@ -1,8 +1,10 @@
 package com.conveyal.r5.transit;
 
+import com.conveyal.r5.api.util.Fare;
 import com.conveyal.r5.profile.PathWithTimes;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.fare.FareTable;
+import com.conveyal.r5.transit.fare.RideType;
 
 import java.awt.geom.Rectangle2D;
 import java.util.ArrayList;
@@ -434,63 +436,5 @@ public class DCFareCalculator {
             if (fare != null) fare.type = type;
         }
 
-    }
-
-    public static class Fare {
-
-        public RideType type;
-        public double low;
-        public double peak;
-        public double senior;
-        public boolean transferReduction;
-
-        public Fare (Fare other) {
-            this.accumulate(other);
-        }
-
-        public Fare (double base) {
-            low = peak = senior = base;
-        }
-
-        public Fare (double low, double peak, double senior) {
-            this.low = low;
-            this.peak = peak;
-            this.senior = senior;
-        }
-
-        public void accumulate (Fare other) {
-            if (other != null) {
-                low    += other.low;
-                peak   += other.peak;
-                senior += other.senior;
-            }
-        }
-
-        public void discount(double amount) {
-            low    -= amount;
-            peak   -= amount;
-            senior -= amount;
-            transferReduction = true;
-        }
-
-    }
-
-    enum RideType {
-        METRO_RAIL,
-        METRO_BUS_LOCAL,
-        METRO_BUS_EXPRESS,
-        METRO_BUS_AIRPORT,
-        DC_CIRCULATOR_BUS,
-        ART_BUS,
-        DASH_BUS,
-        MARC_RAIL,
-        MTA_BUS_LOCAL,
-        MTA_BUS_EXPRESS,
-        MTA_BUS_COMMUTER,
-        VRE_RAIL,
-        MCRO_BUS_LOCAL,
-        MCRO_BUS_EXPRESS,
-        FAIRFAX_CONNECTOR_BUS,
-        PRTC_BUS
     }
 }

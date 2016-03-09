@@ -471,6 +471,19 @@ function makeTextResponse(data) {
 
             item+="</ul>";
         }
+        if (option.fares) {
+            item+="<br /><a>Fares:</a>";
+            for(var j=0; j < option.fares.length; j++) {
+                var fare = option.fares[j];
+                item+="<br /><ul>";
+                item+="<li>type: "+fare.type+"</li>";
+                item+="<li>low: "+fare.low+"</li>";
+                item+="<li>peak: "+fare.peak+"</li>";
+                item+="<li>senior: "+fare.senior+"</li>";
+                item+="<li>transferReduction: "+fare.transferReduction+"</li>";
+                item+="</ul>";
+            }
+        }
 
         item+="</li>";
         infos+=item;

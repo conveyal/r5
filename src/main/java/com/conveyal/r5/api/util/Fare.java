@@ -1,44 +1,57 @@
 package com.conveyal.r5.api.util;
 
+import com.conveyal.r5.transit.fare.RideType;
+
 /**
  * Created by mabu on 30.10.2015.
  */
 public class Fare {
 
-    //FIXME: Change type to RideType
-    public String type;
-    public float low;
-    public float peak;
-    public float senior;
+    public RideType type;
+    public double low;
+    public double peak;
+    public double senior;
     public boolean transferReduction;
 
-    public static Fare SampleFare() {
-        Fare fare = new Fare();
-        fare.type = "NORMAL";
-        fare.low = 0.7f;
-        fare.peak = 1.2f;
-        fare.senior = 0.8f;
-        fare.transferReduction = false;
-        return fare;
+    public Fare (Fare other) {
+        this.accumulate(other);
     }
 
-    public String getType() {
-        return type;
+    public Fare (double base) {
+        low = peak = senior = base;
     }
 
-    public float getLow() {
-        return low;
+    public Fare (double low, double peak, double senior) {
+        this.low = low;
+        this.peak = peak;
+        this.senior = senior;
     }
 
-    public float getPeak() {
-        return peak;
+    public void accumulate (Fare other) {
+        if (other != null) {
+            low    += other.low;
+            peak   += other.peak;
+            senior += other.senior;
+        }
     }
 
-    public float getSenior() {
-        return senior;
+    public void discount(double amount) {
+        low    -= amount;
+        peak   -= amount;
+        senior -= amount;
+        transferReduction = true;
     }
 
-    public boolean isTransferReduction() {
-        return transferReduction;
+    @Override
+    public String toString() {
+        final StringBuilder sb = new StringBuilder("Fare{");
+        sb.append("type=").append(type);
+        sb.append(", low=").append(low);
+        sb.append(", peak=").append(peak);
+        sb.append(", senior=").append(senior);
+        sb.append(", transferReduction=").append(transferReduction);
+        sb.append('}');
+        return sb.toString();
     }
+
 }

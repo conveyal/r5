@@ -1,7 +1,7 @@
 package com.conveyal.r5.transit.fare;
 
+import com.conveyal.r5.api.util.Fare;
 import com.conveyal.r5.api.util.Stop;
-import com.conveyal.r5.transit.DCFareCalculator.Fare;
 import com.conveyal.r5.util.P2;
 import com.csvreader.CsvReader;
 import com.google.common.collect.Maps;

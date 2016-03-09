@@ -475,11 +475,16 @@ function makeTextResponse(data) {
             item+="<br /><a>Fares:</a>";
             for(var j=0; j < option.fares.length; j++) {
                 var fare = option.fares[j];
+                var unit = "";
+                //TODO: use https://gist.github.com/Fluidbyte/2973986 for this
+                if (fare.currency == "USD") {
+                    var symbol = " $";
+                }
                 item+="<br /><ul>";
                 item+="<li>type: "+fare.type+"</li>";
-                item+="<li>low: "+fare.low+"</li>";
-                item+="<li>peak: "+fare.peak+"</li>";
-                item+="<li>senior: "+fare.senior+"</li>";
+                item+="<li>low: "+fare.low.toFixed(2)+symbol+"</li>";
+                item+="<li>peak: "+fare.peak.toFixed(2)+symbol+"</li>";
+                item+="<li>senior: "+fare.senior.toFixed(2)+symbol+"</li>";
                 item+="<li>transferReduction: "+fare.transferReduction+"</li>";
                 item+="</ul>";
             }

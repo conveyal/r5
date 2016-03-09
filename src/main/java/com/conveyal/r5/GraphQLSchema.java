@@ -357,6 +357,13 @@ public class GraphQLSchema {
                 .type(Scalars.GraphQLBoolean)
                 .dataFetcher(environment -> ((Fare) environment.getSource()).transferReduction)
                 .build())
+            //FIXME: This is temporary always USD since only Washington DC fares are currently supported
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("currency")
+                .description("In which currency is the fare in ISO 4217 code")
+                .type(new GraphQLNonNull(Scalars.GraphQLString))
+                .staticValue("USD")
+                .build())
             .build();
 
         stopType = GraphQLObjectType.newObject()

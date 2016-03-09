@@ -9,7 +9,7 @@ transitModes:[TRANSITMODES]) {
   options {
     summary,
     fares {
-	    type,low,peak,senior, transferReduction
+       type,low,peak,senior, transferReduction, currency
     }
     itinerary {
       waitingTime

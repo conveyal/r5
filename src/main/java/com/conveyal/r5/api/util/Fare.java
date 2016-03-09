@@ -7,6 +7,8 @@ import com.conveyal.r5.transit.fare.RideType;
  */
 public class Fare {
 
+    //TODO: change double to float since it has enough accuracy
+
     public RideType type;
     public double low;
     public double peak;

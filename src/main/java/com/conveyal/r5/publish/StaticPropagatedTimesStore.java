@@ -2,6 +2,8 @@ package com.conveyal.r5.publish;
 
 import com.conveyal.r5.profile.PropagatedTimesStore;
 
+import java.util.BitSet;
+
 /**
  * A PropagatedTimesStore for storing travel times to transit stops.
  */
@@ -14,8 +16,14 @@ public class StaticPropagatedTimesStore extends PropagatedTimesStore {
     }
 
     @Override
-    public void setFromArray(int[][] times, ConfidenceCalculationMethod confidenceCalculationMethod) {
-        super.setFromArray(times, confidenceCalculationMethod);
-        this.times = times;
+    public void setFromArray(int[][] times, BitSet includeInAverages, ConfidenceCalculationMethod confidenceCalculationMethod) {
+        super.setFromArray(times, includeInAverages, confidenceCalculationMethod);
+
+        // don't include extrema in the times we save.
+        this.times = new int[includeInAverages.cardinality()][];
+
+        for (int i = 0, pos = 0; i < times.length; i++) {
+            if (includeInAverages.get(i)) this.times[pos++] = times[i];
+        }
     }
 }

@@ -14,6 +14,7 @@ import com.conveyal.r5.transit.TransportNetwork;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.BitSet;
 import java.util.EnumSet;
 
 /**
@@ -142,7 +143,9 @@ public class RepeatedRaptorProfileRouter {
             // TODO skip the transit search inside the worker and avoid this conditional.
             propagatedTimesStore = new PropagatedTimesStore(nonTransitTimes.size());
             int[][] singleRoundResults = new int[][] {nonTransitTimes.travelTimes};
-            propagatedTimesStore.setFromArray(singleRoundResults, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX);
+            BitSet includeInAverages = new BitSet();
+            includeInAverages.set(0);
+            propagatedTimesStore.setFromArray(singleRoundResults, includeInAverages, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX);
         }
         ts.targetsReached = propagatedTimesStore.countTargetsReached();
         ts.compute = (int) (System.currentTimeMillis() - computationStartTime);

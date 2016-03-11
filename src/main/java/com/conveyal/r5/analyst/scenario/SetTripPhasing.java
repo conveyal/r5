@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
 import org.slf4j.Logger;
@@ -36,6 +37,10 @@ public class SetTripPhasing extends Modification {
     }
 
     @Override
+    public boolean apply(TransportNetwork network) {
+        return false;
+    }
+
     protected TransitLayer applyToTransitLayer(TransitLayer originalTransitLayer) {
         Map<TripSchedule, TripPattern> targetTrips = new HashMap<>();
         TripSchedule sourceTrip = null;
@@ -178,11 +183,6 @@ public class SetTripPhasing extends Modification {
         return out;
     }
 
-    @Override
-    protected StreetLayer applyToStreetLayer(StreetLayer originalStreetLayer) {
-        return originalStreetLayer;
-    }
-
     /** we use the TripPatternModification code to select the trip patterns of interest, without actually applying it as a modification */
     // TODO TripPatternSelector should maybe be superclass of TripPatternModification, however Java doesn't do multiple
     // inheritance and TripPatternModification also needs to be subclass of TransitLayerModification.
@@ -190,11 +190,6 @@ public class SetTripPhasing extends Modification {
         @Override
         public TripSchedule applyToTripSchedule(TripPattern tripPattern, TripSchedule tripSchedule) {
             return null;
-        }
-
-        @Override
-        public String getType() {
-            return "frequency-entry-selector";
         }
     }
 }

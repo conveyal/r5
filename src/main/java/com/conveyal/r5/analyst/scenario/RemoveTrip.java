@@ -18,6 +18,7 @@ public class RemoveTrip extends Modification {
     public Set<String> routeId;
 
     // FIXME What is this? Are these pattern ID numbers supposed to be supplied in the API call or pre-looked-up?
+    // This is set in SuboptimalPathProfileRouter
     public TIntSet patternIds;
 
     @Override

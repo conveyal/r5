@@ -158,7 +158,7 @@ public class SuboptimalPathProfileRouter {
         // remove appropriate trips
         if (bannedPatterns != null && !bannedPatterns.isEmpty()) {
             RemoveTrip rt = new RemoveTrip();
-            rt.tripId = new ArrayList<>();
+            // FIXME how do patterns have IDs, and why is this being done with Modifications not a simple set?
             rt.patternIds = bannedPatterns;
             req.scenario.modifications.add(rt);
         }

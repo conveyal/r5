@@ -158,21 +158,23 @@ public class SetTripPhasing extends Modification {
             String sourceRouteName = originalTransitLayer.routes.get(sourceRouteIdx).route_short_name + " " + originalTransitLayer.routes.get(sourceRouteIdx).route_long_name;
             String sourceFinalStop = originalTransitLayer.stopNames.get(sourcePatternObj.stops[sourcePatternObj.stops.length - 1]);
             String sourcePhaseStop = originalTransitLayer.stopNames.get(sourcePatternObj.stops[sourceStopPosition]);
+            String sourcePhaseStopId = originalTransitLayer.stopIdForIndex.get(sourcePatternObj.stops[sourceStopPosition]);
             int sourceStopCount = sourcePatternObj.stops.length;
 
             int targetRouteIdx = pattern.routeIndex;
             String targetRouteName = originalTransitLayer.routes.get(targetRouteIdx).route_short_name + " " + originalTransitLayer.routes.get(targetRouteIdx).route_long_name;
             String targetFinalStop = originalTransitLayer.stopNames.get(pattern.stops[pattern.stops.length - 1]);
             String targetPhaseStop = originalTransitLayer.stopNames.get(pattern.stops[targetStopPosition]);
+            String targetPhaseStopId = originalTransitLayer.stopIdForIndex.get(pattern.stops[targetStopPosition]);
             int targetStopCount = pattern.stops.length;
 
 
             LOG.info("Applying phase of {} seconds\n" +
-                    "   from route {} trip towards {} with {} stops at stop {} (trip id {})\n" +
-                    "     to route {} trip towards {} with {} stops at stop {} (trip id {})",
+                    "   from route {} trip towards {} with {} stops at stop {} ({}) (trip id {})\n" +
+                    "     to route {} trip towards {} with {} stops at stop {} ({}) (trip id {})",
                     phaseSeconds,
-                    sourceRouteName, sourceFinalStop, sourceStopCount, sourcePhaseStop, sourceTrip.tripId,
-                    targetRouteName, targetFinalStop, targetStopCount, targetPhaseStop, schedule.tripId);
+                    sourceRouteName, sourceFinalStop, sourceStopCount, sourcePhaseStopId, sourcePhaseStop, sourceTrip.tripId,
+                    targetRouteName, targetFinalStop, targetStopCount, targetPhaseStopId, targetPhaseStop, schedule.tripId);
         }
 
         return out;

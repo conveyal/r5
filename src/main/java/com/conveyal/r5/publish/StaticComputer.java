@@ -58,7 +58,6 @@ public class StaticComputer implements Runnable {
             network = network.applyScenario(req.request.request.scenario);
         }
 
-
         // perform street search to find transit stops and non-transit times
         StreetRouter sr = new StreetRouter(network.streetLayer);
         sr.distanceLimitMeters = 2000;

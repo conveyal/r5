@@ -2,7 +2,6 @@ package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
-import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import com.conveyal.r5.api.util.LegMode;
 import gnu.trove.map.TIntIntMap;
 import com.conveyal.r5.analyst.cluster.ResultEnvelope;
@@ -84,7 +83,8 @@ public class RepeatedRaptorProfileRouter {
         LOG.info("Beginning repeated RAPTOR profile request.");
 
         boolean isochrone = targets.pointSet instanceof WebMercatorGridPointSet;
-        boolean transit = (request.transitModes != null && request.transitModes.contains(Mode.TRANSIT)); // Does the search involve transit at all?
+        // Does the search involve transit at all?
+        boolean transit = (request.transitModes != null && !request.transitModes.isEmpty());
 
         // Check that caller has supplied a LinkedPointSet and RaptorWorkerData when needed.
         // These are supplied by the caller because the caller maintains caches, and this router object is throw-away.

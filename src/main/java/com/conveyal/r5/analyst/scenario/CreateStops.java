@@ -12,8 +12,6 @@ import java.util.Collection;
  * Add some transit stops to the TransportNetwork that can be referenced by their string identifiers.
  * This Modification just adds them to the graph for subsequent use in other Modifications.
  * It makes no changes to any trips or patterns.
- *
- * This class should also provide some methods that can be reused when adding a trip pattern.
  */
 public class CreateStops extends Modification {
 
@@ -23,11 +21,6 @@ public class CreateStops extends Modification {
 
     /** Stops to create and insert into the TransportNetwork. */
     public Collection<StopSpec> stops;
-
-    /** The radius within which we will search for roads to attach the new stops. */
-    public double radiusMeters = 200;
-
-    private transient TransportNetwork network;
 
     @Override
     public String getType() {
@@ -43,12 +36,14 @@ public class CreateStops extends Modification {
     @Override
     public boolean apply (TransportNetwork network) {
         TransitLayer transitLayer = network.transitLayer.clone();
+        // Pull the following out into a method on TransportNetwork
         StreetLayer streetLayer = network.streetLayer;
         if (!streetLayer.edgeStore.isProtectiveCopy()) {
             streetLayer = streetLayer.extendOnlyCopy();
         }
-        // streetLayer.transitLayer
-        // transitLayer.linkedStreetLayer = streetLayer;
+        // This bidirectional reference is not going to work right unless transitlayer or both are always cloned.
+        streetLayer.linkedTransitLayer = transitLayer;
+        transitLayer.linkedStreetLayer = streetLayer;
         for (StopSpec stopSpec : stops) {
             int newVertexIndex = streetLayer.getOrCreateVertexNear(stopSpec.lat, stopSpec.lon);
             transitLayer.stopIdForIndex.add(stopSpec.id); // indexForStopId will be derived from this

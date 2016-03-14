@@ -267,8 +267,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      * @param timezone transportNetwork timezone
      * @return
      */
-    public static ProfileRequest fromEnvironment(DataFetchingEnvironment environment,
-        ZoneId timezone) {
+    public static ProfileRequest fromEnvironment(DataFetchingEnvironment environment, ZoneId timezone) {
         ProfileRequest profileRequest = new ProfileRequest();
         profileRequest.zoneId = timezone;
 

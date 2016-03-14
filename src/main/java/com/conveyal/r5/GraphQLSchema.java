@@ -1148,7 +1148,6 @@ public class GraphQLSchema {
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("fares")
                 .type(new GraphQLList(fareType))
-                .dataFetcher(environment -> ((ProfileOption) environment.getSource()).fares)
                 .build())
             .build();
 

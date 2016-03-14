@@ -138,6 +138,7 @@ public class DCFareCalculator {
         fares
             .addAll(fareRides.stream()
                 .map(fareRide -> fareRide.fare)
+                .filter(fare -> fare != null) //TODO: why is this needed
                 .collect(Collectors.toList()));
         return fares;
     }

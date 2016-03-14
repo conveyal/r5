@@ -2,6 +2,8 @@ package com.conveyal.r5.api.util;
 
 import com.conveyal.r5.transit.fare.RideType;
 
+import java.util.Objects;
+
 /**
  * Created by mabu on 30.10.2015.
  */
@@ -56,4 +58,22 @@ public class Fare {
         return sb.toString();
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
+        Fare fare = (Fare) o;
+        return Double.compare(fare.low, low) == 0 &&
+            Double.compare(fare.peak, peak) == 0 &&
+            Double.compare(fare.senior, senior) == 0 &&
+            transferReduction == fare.transferReduction &&
+            type == fare.type;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(type, low, peak, senior, transferReduction);
+    }
 }

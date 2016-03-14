@@ -158,7 +158,7 @@ public class ProfileResponse {
         //TODO: this calculates fares last time currentTransitPath is added to this ProfileOption
         //What happens if we use Agency A in first transfer and B in second but at different time
         //Agency A and agency C at next transfer if stops are the same?
-        profileOption.fares = DCFareCalculator.calculateFares(currentTransitPath, transportNetwork);
+        profileOption.fares.addAll(DCFareCalculator.calculateFares(currentTransitPath, transportNetwork));
 
         transitToOption.putIfAbsent(hashPath, profileOption);
     }

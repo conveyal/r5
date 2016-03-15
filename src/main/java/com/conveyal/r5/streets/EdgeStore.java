@@ -6,12 +6,9 @@ import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.util.TIntIntHashMultimap;
 import com.conveyal.r5.util.TIntIntMultimap;
-import com.conveyal.r5.util.TIntObjectHashMultimap;
-import com.conveyal.r5.util.TIntObjectMultimap;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.LineString;
-import gnu.trove.TIntCollection;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.TLongList;
@@ -24,8 +21,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.time.temporal.ChronoUnit;
-import java.time.temporal.TemporalUnit;
 import java.util.*;
 
 /**
@@ -445,8 +440,7 @@ public class EdgeStore implements Serializable {
          *
          * Otherwise speed is based on wanted walking, cycling speed provided in ProfileRequest.
          */
-        public float calculateSpeed(ProfileRequest options, Mode traverseMode,
-            long time) {
+        public float calculateSpeed(ProfileRequest options, Mode traverseMode) {
             if (traverseMode == null) {
                 return Float.NaN;
             } else if (traverseMode == Mode.CAR) {
@@ -466,8 +460,9 @@ public class EdgeStore implements Serializable {
             } else {
                 vertex = getToVertex();
             }
-            StreetRouter.State s1 = new StreetRouter.State(vertex, edgeIndex, s0.getTime(), s0);
-            float speedms = calculateSpeed(req, mode, s0.getTime());
+            StreetRouter.State s1 = new StreetRouter.State(vertex, edgeIndex, s0);
+            float speedms = calculateSpeed(req, mode);
+
             float time = (float) (getLengthM() / speedms);
             float weight = 0;
 

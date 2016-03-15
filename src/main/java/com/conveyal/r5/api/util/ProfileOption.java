@@ -10,10 +10,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * This is a response model class which holds data that will be serialized and returned to the client.
@@ -33,7 +31,7 @@ public class ProfileOption {
     public Stats stats = new Stats();
     //Text description of this part of a journey @notnull
     public String summary;
-    public List<Fare> fares;
+    public Set<Fare> fares;
 
     private transient Map<ModeStopIndex, Integer> accessIndexes = new HashMap<>();
     private transient Map<ModeStopIndex, Integer> egressIndexes = new HashMap<>();
@@ -114,6 +112,7 @@ public class ProfileOption {
     private void addTransit(TransitSegment transitSegment) {
         if (transit == null) {
             transit = new ArrayList<>(5);
+            fares = new HashSet<>();
         }
         transit.add(transitSegment);
     }
@@ -281,5 +280,9 @@ public class ProfileOption {
             currentItinerary.walkTime += streetSegment.duration;
             currentItinerary.distance += streetSegment.distance;
         }
+    }
+
+    public List<Fare> getFares() {
+        return fares == null ? null : fares.stream().collect(Collectors.toList());
     }
 }

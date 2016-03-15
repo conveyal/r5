@@ -5,6 +5,7 @@ import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.model.json_serialization.PolyUtil;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.transit.fare.RideType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import graphql.GraphQLException;
 import graphql.Scalars;
@@ -143,6 +144,28 @@ public class GraphQLSchema {
         .value("DEPART_FROM", SearchType.DEPART_FROM,
             "Search is made for a trip that needs to depart at specific time/date")
         .build();
+
+    public static GraphQLEnumType rideTypeEnum = GraphQLEnumType.newEnum()
+        .name("RideType")
+        .description("Type of Ride in Fare. (Currently only DC Metro)")
+        .value("METRO_RAIL", RideType.METRO_RAIL)
+        .value("METRO_BUS_LOCAL", RideType.METRO_BUS_LOCAL)
+        .value("METRO_BUS_EXPRESS", RideType.METRO_BUS_EXPRESS)
+        .value("METRO_BUS_AIRPORT", RideType.METRO_BUS_AIRPORT)
+        .value("DC_CIRCULATOR_BUS", RideType.DC_CIRCULATOR_BUS)
+        .value("ART_BUS", RideType.ART_BUS)
+        .value("DASH_BUS", RideType.DASH_BUS)
+        .value("MARC_RAIL", RideType.MARC_RAIL)
+        .value("MTA_BUS_LOCAL", RideType.MTA_BUS_LOCAL)
+        .value("MTA_BUS_EXPRESS", RideType.MTA_BUS_EXPRESS)
+        .value("MTA_BUS_COMMUTER", RideType.MTA_BUS_COMMUTER)
+        .value("VRE_RAIL", RideType.VRE_RAIL)
+        .value("MCRO_BUS_LOCAL", RideType.MCRO_BUS_LOCAL)
+        .value("MCRO_BUS_EXPRESS", RideType.MCRO_BUS_EXPRESS)
+        .value("FAIRFAX_CONNECTOR_BUS", RideType.FAIRFAX_CONNECTOR_BUS)
+        .value("PRTC_BUS", RideType.PRTC_BUS)
+        .build();
+
 
     //Input only for now
     public static GraphQLScalarType GraphQLLocalDate = new GraphQLScalarType("LocalDate",
@@ -308,19 +331,38 @@ public class GraphQLSchema {
 
         fareType = GraphQLObjectType.newObject()
             .name("Fare")
+            .description("Fare for transit")
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("type")
-                .type(new GraphQLNonNull(Scalars.GraphQLString))
-                .dataFetcher(environment -> ((Fare) environment.getSource()).type) //this is not necessary
+                .type(rideTypeEnum)
+                .dataFetcher(environment -> ((Fare) environment.getSource()).type)
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("low")
-                .type(new GraphQLNonNull(Scalars.GraphQLFloat))
-                .dataFetcher(environment -> ((Fare) environment.getSource()).low) //this is not necessary
+                .type(Scalars.GraphQLFloat)
+                .dataFetcher(environment -> ((Fare) environment.getSource()).low)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("peak")
+                .type(Scalars.GraphQLFloat)
+                .dataFetcher(environment -> ((Fare) environment.getSource()).peak)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("senior")
+                .type(Scalars.GraphQLFloat)
+                .dataFetcher(environment -> ((Fare) environment.getSource()).senior)
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("transferReduction")
-                .type(Scalars.GraphQLBoolean) //transferReduction is read because isTransferReduction function exists
+                .type(Scalars.GraphQLBoolean)
+                .dataFetcher(environment -> ((Fare) environment.getSource()).transferReduction)
+                .build())
+            //FIXME: This is temporary always USD since only Washington DC fares are currently supported
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("currency")
+                .description("In which currency is the fare in ISO 4217 code")
+                .type(new GraphQLNonNull(Scalars.GraphQLString))
+                .staticValue("USD")
                 .build())
             .build();
 
@@ -1106,7 +1148,6 @@ public class GraphQLSchema {
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("fares")
                 .type(new GraphQLList(fareType))
-                .dataFetcher(environment -> ((ProfileOption) environment.getSource()).fares)
                 .build())
             .build();
 
@@ -1465,14 +1506,6 @@ public class GraphQLSchema {
             .dataFetcher(environment -> {
                  return profileResponse.getPlan(ProfileRequest.fromEnvironment(environment, profileResponse.getTimezone()));
             })
-            .build();
-
-
-        GraphQLFieldDefinition fareField = GraphQLFieldDefinition.newFieldDefinition()
-            .name("fare")
-            .description("Gets information about fare")
-            .type(fareType)
-            .dataFetcher(environment -> Fare.SampleFare())
             .build();
 
 

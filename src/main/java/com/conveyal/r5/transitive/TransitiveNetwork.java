@@ -47,7 +47,7 @@ public class TransitiveNetwork {
                 route.route_long_name = ri.route_long_name;
                 route.route_id = patt.routeIndex + "";
                 route.route_type = ri.route_type;
-                route.route_color = Hex.encodeHexString(new byte[] { (byte) (pattIdx & 0xff), (byte) (pattIdx * 2 & 0xff), (byte) (pattIdx * 4 & 0xff) });
+                route.route_color = ri.color;
 
                 // Transitive always expects route short name to be defined, and the GTFS spec requires use of the empty
                 // string when the field is empty. GTFS lib converts that to null, convert it back.

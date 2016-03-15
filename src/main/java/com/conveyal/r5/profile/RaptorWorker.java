@@ -97,6 +97,10 @@ public class RaptorWorker {
 
     public List<RaptorState> statesEachIteration = new ArrayList<>();
 
+    // should a particular iteration be included in averages?
+    // extrema from the frequency search should not be.
+    public BitSet includeInAverages = new BitSet();
+
     public RaptorWorker(TransitLayer data, LinkedPointSet targets, ProfileRequest req) {
         this.data = data;
         // these should only reflect the results of the (deterministic) scheduled search
@@ -234,13 +238,21 @@ public class RaptorWorker {
                 for (int i = 0; i < monteCarloDraws + 2; i++) {
                     offsets.randomize();
 
+                    boolean includeThisIterationInAverages;
+
                     RaptorState stateCopy;
-                    if (i == 0)
+                    if (i == 0) {
                         stateCopy = this.runRaptorFrequency(departureTime, BoardingAssumption.BEST_CASE);
-                    else if (i == 1)
+                        includeThisIterationInAverages = false; // don't include extrema in averages
+                    }
+                    else if (i == 1) {
                         stateCopy = this.runRaptorFrequency(departureTime, BoardingAssumption.WORST_CASE);
-                    else
+                        includeThisIterationInAverages = false;
+                    }
+                    else {
                         stateCopy = this.runRaptorFrequency(departureTime, BoardingAssumption.RANDOM);
+                        includeThisIterationInAverages = true;
+                    }
 
                     // do propagation
                     int[] frequencyTimesAtTargets = timesAtTargetsEachIteration[iteration++];
@@ -254,6 +266,7 @@ public class RaptorWorker {
                         System.arraycopy(stateCopy.bestNonTransferTimes, 0, frequencyTimesAtTargets, 0, stateCopy.bestNonTransferTimes.length);
                     }
 
+                    if (includeThisIterationInAverages) includeInAverages.set(statesEachIteration.size());
                     statesEachIteration.add(stateCopy.deepCopy());
 
                     // convert to elapsed time
@@ -269,6 +282,7 @@ public class RaptorWorker {
                 timesAtTargetsEachIteration[iteration++] = IntStream.of(doPropagation ? scheduledTimesAtTargets : state.bestNonTransferTimes)
                         .map(i -> i != UNREACHED ? i - dt : i)
                         .toArray();
+                includeInAverages.set(statesEachIteration.size());
                 statesEachIteration.add(state.deepCopy());
             }
         }
@@ -290,7 +304,7 @@ public class RaptorWorker {
         //dumpVariableByte(timesAtTargetsEachMinute);
         // we can use min_max here as we've also run it once with best case and worst case board,
         // so the best and worst cases are meaningful.
-        propagatedTimesStore.setFromArray(timesAtTargetsEachIteration, ConfidenceCalculationMethod.MIN_MAX);
+        propagatedTimesStore.setFromArray(timesAtTargetsEachIteration, includeInAverages, ConfidenceCalculationMethod.MIN_MAX);
         return propagatedTimesStore;
     }
 

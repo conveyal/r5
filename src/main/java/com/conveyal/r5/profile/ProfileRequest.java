@@ -197,6 +197,11 @@ public class ProfileRequest implements Serializable, Cloneable {
     //It differs from searchType because it is used as egress search
     public boolean reverseSearch = false;
 
+    public boolean isProfile() {
+        return profile;
+    }
+
+
     public ProfileRequest clone () {
         try {
             return (ProfileRequest) super.clone();

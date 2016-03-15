@@ -195,7 +195,7 @@ public class PointToPointRouterServer {
                     if (state != null) {
                         feature.addProperty("distance_m", state.distance/1000);
                         feature.addProperty("duration_s", state.getDurationSeconds());
-                        LOG.info("Duration:{}s diff:{}", state.getDurationSeconds(), (state.getTime()-profileRequest.getFromTimeDate())/1000);
+                        LOG.info("Duration:{}s diff:{}", state.getDurationSeconds());
                     }
                     features.add(feature);
                     return true;
@@ -818,7 +818,6 @@ public class PointToPointRouterServer {
                 feature.addProperty("idx", stateIdx++);
                 feature.addProperty("stateIdx", state.idx);
                 features.add(feature);
-                feature.addProperty("time", Instant.ofEpochMilli(state.getTime()).toString());
                 feature.addProperty("edgeIdx", edgeIdx);
             }
         }

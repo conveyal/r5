@@ -128,14 +128,12 @@ public class ReverseRoutingTest extends TestCase {
             Integer edgeIdx = state.backEdge;
             if (!(edgeIdx == -1 || edgeIdx == null)) {
                 EdgeStore.Edge edge = streetLayer.edgeStore.getCursor(edgeIdx);
-                LOG.info("Edge IDX:{} {} -> {} {}m IDX:{} {}mm {}sec W:{} {}", edgeIdx, vertexNames.get(edge.getFromVertex()),
-                    vertexNames.get(edge.getToVertex()), edge.getLengthM(), state.idx, state.distance, state.durationSeconds, state.weight,
-                    Instant.ofEpochMilli(state.time));
+                LOG.info("Edge IDX:{} {} -> {} {}m IDX:{} {}mm {}sec W:{}", edgeIdx, vertexNames.get(edge.getFromVertex()),
+                    vertexNames.get(edge.getToVertex()), edge.getLengthM(), state.idx, state.distance, state.durationSeconds, state.weight);
                 currentEdgeIdx.add(edgeIdx);
                 currentDuration.add(state.durationSeconds);
                 currentDistance.add(state.distance);
                 currentWeight.add(state.weight);
-                currectTimes.add(state.time);
 
             }
         }

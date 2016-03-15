@@ -8,6 +8,9 @@ plan(fromLat:$fromLat, fromLon:$fromLon, toLat:$toLat,toLon:$toLon, fromTime:$fr
 transitModes:[TRANSITMODES]) {
   options {
     summary,
+    fares {
+       type,low,peak,senior, transferReduction, currency
+    }
     itinerary {
       waitingTime
       walkTime

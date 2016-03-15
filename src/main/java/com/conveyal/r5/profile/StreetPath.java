@@ -112,8 +112,7 @@ public class StreetPath {
     }
 
     public int getDuration() {
-        //Division with 1000 because time is returned in ms and we need seconds
-        return (int) Math.abs(lastState.getTime()-firstState.getTime())/1000;
+        return lastState.getDurationSeconds();
     }
 
     //Gets distance in mm

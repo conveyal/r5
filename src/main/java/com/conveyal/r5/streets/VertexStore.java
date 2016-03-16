@@ -174,12 +174,17 @@ public class VertexStore implements Serializable {
     /**
      * Makes a copy of this VertexStore that can have vertices added to it, but cannot otherwise be modified.
      * This is done efficiently by wrapping the existing lists holding the various vertex characteristics.
+     *
+     * We don't use clone() to make sure every field is explicitly copied below, avoiding any unintentional
+     * shallow-copying of collections or referenced data structures.
      */
     public VertexStore extendOnlyCopy() {
-        VertexStore copy = new VertexStore(100);
+        VertexStore copy = new VertexStore(0);
         copy.fixedLats = new TIntAugmentedList(this.fixedLats);
         copy.fixedLons = new TIntAugmentedList(this.fixedLons);
-        copy.vertexFlags = new TByteArrayList(vertexFlags); // This is a deep copy, we should do an extend-copy but need a new class for that.
+        // This is a deep copy, we should do an extend-copy but need a new TByteArrayList class for that.
+        // I would like to make sure the extend-only system works well before proliferating classes of this kind.
+        copy.vertexFlags = new TByteArrayList(vertexFlags);
         return copy;
     }
 

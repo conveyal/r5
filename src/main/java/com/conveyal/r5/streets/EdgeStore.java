@@ -18,6 +18,7 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.list.array.TShortArrayList;
 import gnu.trove.set.TIntSet;
+import gnu.trove.set.hash.TIntHashSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +57,7 @@ public class EdgeStore implements Serializable {
     private static final int[] EMPTY_INT_ARRAY = new int[0];
 
     // The vertices that are referred to in these edges
-    private VertexStore vertexStore;
+    public VertexStore vertexStore;
 
     /** Boolean flags for every edge. Separate entries for forward and backward edges. */
     public TIntList flags;
@@ -107,6 +108,7 @@ public class EdgeStore implements Serializable {
      * This is a bit redundant since the edges added temporarily by a Scenario should always be the numbers from
      * firstModifiableEdge to nEdges. But it's useful to have a list of these numbers around (e.g. for spatial index
      * queries) and placing it in a field rather than generating it on demand means the list instance gets reused.
+     * TODO perhaps this should be NULL when this is not an extend-only copy of an EdgeStore.
      */
     public TIntList temporarilyAddedEdges = new TIntArrayList();
 
@@ -873,19 +875,30 @@ public class EdgeStore implements Serializable {
      * will be cloned, but their contents will not. The lists containing the edge characteristics will be copied
      * in such a way that all threads applying Scenarios will share the same baseline data, and only extend those
      * lists.
+     *
+     * We don't use clone() to make sure every field copy is explicit below, avoiding any unintentional shallow-copying
+     * of collections or referenced data structures.
      */
     public EdgeStore extendOnlyCopy() {
         EdgeStore copy = new EdgeStore();
+        copy.firstModifiableEdge = this.nEdges();
         // The Edge store references a vertex store, and the StreetLayer should also hold the same reference.
         // So the StreetLayer that makes this copy needs to grab a pointer to the new extend only VertexStore
         copy.vertexStore = vertexStore.extendOnlyCopy();
         copy.flags = new TIntAugmentedList(flags);
-        copy.speeds = new TShortArrayList(speeds); // This is a deep copy, we should do an extend-copy but need a new class for that. Can we just use ints?
+        // This is a deep copy, we should do an extend-copy but need a new class for that. Can we just use ints?
+        copy.speeds = new TShortArrayList(speeds);
         // Vertex indices, geometries, and lengths are shared between pairs of forward and backward edges.
         copy.fromVertices = new TIntAugmentedList(fromVertices);
         copy.toVertices = new TIntAugmentedList(toVertices);
-        copy.geometries = new ArrayList<>(geometries); // This is a deep copy, we should do an extend-copy but need a new class for List<Object>.
+        // This is a deep copy, we should do an extend-copy but need a new class for List<Object>.
+        copy.geometries = new ArrayList<>(geometries);
         copy.lengths_mm = new TIntAugmentedList(lengths_mm);
+        copy.temporarilyDeletedEdges = new TIntHashSet();
+        copy.temporarilyAddedEdges = new TIntArrayList();
+        // This is a deep copy, we should do an extend-copy but need a new class for longs.
+        copy.osmids = new TLongArrayList(this.osmids);
+        copy.turnRestrictions = turnRestrictions;
         return copy;
     }
 

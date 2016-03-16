@@ -51,7 +51,7 @@ import java.util.stream.LongStream;
  *
  * TODO Morton-code-sort vertices, then sort edges by from-vertex.
  */
-public class StreetLayer implements Serializable {
+public class StreetLayer implements Serializable, Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(StreetLayer.class);
 
@@ -86,7 +86,7 @@ public class StreetLayer implements Serializable {
     private transient TypeOfEdgeLabeler typeOfEdgeLabeler = new TypeOfEdgeLabeler();
     private transient SpeedConfigurator speedConfigurator;
 
-    /** Envelope of this street layer, in decimal degrees (non-fixed-point) */
+    /** Envelope of this street layer, in decimal degrees (floating, not fixed-point) */
     public Envelope envelope = new Envelope();
 
     TLongIntMap vertexIndexForOsmNode = new TLongIntHashMap(100_000, 0.75f, -1, -1);
@@ -1223,8 +1223,18 @@ public class StreetLayer implements Serializable {
         return outgoingEdges;
     }
 
+    /**
+     * In EdgeStore and VertexStore we intentionally avoid using clone() so all field copying is explicit and we can
+     * clearly see whether we are accidentally shallow-copying any collections or data structures from the base graph.
+     * StreetLayer has a lot more fields and most of them can be shallow-copied, so here we use clone() for convenience.
+     * @return a copy of this StreetLayer to which Scenarios can be applied without affecting the original StreetLayer.
+     */
     public StreetLayer extendOnlyCopy () {
-        return null;
+        StreetLayer copy = this.clone();
+        copy.edgeStore = edgeStore.extendOnlyCopy();
+        // The extend-only copy of the EdgeStore also contains a new extend-only copy of the VertexStore.
+        copy.vertexStore = copy.edgeStore.vertexStore;
+        return copy;
     }
 
     public boolean isExtendOnlyCopy() {
@@ -1259,6 +1269,14 @@ public class StreetLayer implements Serializable {
         public TurnRestrictionSearchState back;
         public long node;
         public long backWay;
+    }
+
+    public StreetLayer clone () {
+        try {
+            return (StreetLayer) super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException("This exception cannot happen. This is why I love checked exceptions.");
+        }
     }
 
 }

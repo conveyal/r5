@@ -55,10 +55,10 @@ public class CreateStops extends Modification {
     }
 
     public static class StopSpec {
-        String id;
-        String name;
-        double lat;
-        double lon;
+        public String id;
+        public String name;
+        public double lat;
+        public double lon;
     }
 
 }

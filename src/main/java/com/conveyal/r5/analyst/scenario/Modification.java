@@ -24,6 +24,7 @@ import java.util.Set;
 // Each class's getType should return the same value.
 @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property="type")
 @JsonSubTypes({
+        @JsonSubTypes.Type(name = "create-stops", value = CreateStops.class),
         @JsonSubTypes.Type(name = "remove-trip", value = RemoveTrip.class),
         @JsonSubTypes.Type(name = "adjust-headway", value = AdjustHeadway.class),
         @JsonSubTypes.Type(name = "adjust-dwell-time", value = AdjustDwellTime.class),

@@ -517,7 +517,8 @@ public class PointToPointQuery {
 
             timeList.sort();
 
-            int cutoff = timeList.get(201);
+            //This gets last time in timeList
+            int cutoff = timeList.get(200); //it needs to be 200 since if there are minimally 201 stops the indexes are from 0-200
 
             for (TIntIntIterator it = times.iterator(); it.hasNext();) {
                 it.advance();

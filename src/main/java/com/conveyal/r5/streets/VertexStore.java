@@ -137,13 +137,15 @@ public class VertexStore implements Serializable {
         return vertexFlags.size();
     }
 
-    //Used when converting fixed latitude and longitude to floating from Split
-    //It is in double type even though it is fixed
+    /**
+     * Used when converting fixed-point latitude and longitude to floating-point from Split.
+     * The parameter datatype is double even though it is a fixed-point representation.
+     */
     public static double fixedDegreesToFloating(double fixed) {
         return fixed / FIXED_FACTOR;
     }
 
-    /** Convert a JTS envelope to fixed degrees */
+    /** Convert a JTS envelope to fixed-point degrees. */
     public static Envelope envelopeToFixed(Envelope env) {
         return new Envelope(
                 floatingDegreesToFixed(env.getMinX()),
@@ -155,8 +157,7 @@ public class VertexStore implements Serializable {
 
     public enum VertexFlag {
 
-        /** this intersection has a traffic signal */
-        TRAFFIC_SIGNAL(0),
+        TRAFFIC_SIGNAL(0), // This intersection has a traffic signal
         PARK_AND_RIDE(1),
         BIKE_SHARING(2);
 

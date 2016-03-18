@@ -12,6 +12,8 @@ import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.LineString;
 import com.vividsolutions.jts.geom.Point;
+import com.conveyal.r5.profile.Mode;
+import com.vividsolutions.jts.geom.*;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -750,15 +752,13 @@ public class StreetLayer implements Serializable, Cloneable {
                 affectedEdges.add(edge[0]);
             }
 
-            affectedEdges.add(out.fromEdge);
+            affectedEdges.reverse();
+
+            out.viaEdges = affectedEdges.toArray();
 
             int index = turnRestrictions.size();
             turnRestrictions.add(out);
-
-            affectedEdges.forEach(eidx -> {
-                edgeStore.turnRestrictions.put(eidx, index);
-                return true; // continue iteration
-            });
+            edgeStore.turnRestrictions.put(out.fromEdge, index);
 
             // take a deep breath
         }
@@ -1017,6 +1017,9 @@ public class StreetLayer implements Serializable, Cloneable {
         if (!edgeStore.isProtectiveCopy()) {
             spatialIndex.insert(newEdge1.getEnvelope(), newEdge1.edgeIndex);
         }
+
+        // don't allow the router to make ill-advised U-turns at splitter vertices
+
         // Return the splitter vertex ID
         return newVertexIndex;
     }
@@ -1098,16 +1101,25 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /**
+     * Find a split. Deprecated in favor of finding a split for a particular mode, below.
+     */
+    @Deprecated
+    public Split findSplit (double lat, double lon, double radiusMeters) {
+        return findSplit(lat, lon, radiusMeters, null);
+    }
+
+    /**
      * Find a location on an existing street near the given point, without actually creating any vertices or edges.
      * The search radius can be specified freely here because we use this function to link transit stops to streets but
      * also to link pointsets to streets, and currently we use different distances for these two things.
+     * Non-destructively find a location on an existing street near the given point.
      * TODO favor platforms and pedestrian paths when requested
      * @param lat latitude in floating point geographic coordinates (not fixed point int coordinates)
      * @param lon longitude in floating point geographic coordinates (not fixed point int coordinates)
      * @return a Split object representing a point along a sub-segment of a specific edge, or null if there are no streets nearby.
      */
-    public Split findSplit(double lat, double lon, double searchRadiusMeters) {
-        return Split.find(lat, lon, searchRadiusMeters, this);
+    public Split findSplit(double lat, double lon, double searchRadiusMeters, Mode mode) {
+        return Split.find(lat, lon, searchRadiusMeters, this, mode);
     }
 
     /**
@@ -1156,6 +1168,7 @@ public class StreetLayer implements Serializable, Cloneable {
             if (vertexLabels.containsKey(vertex))
                 continue;
             StreetRouter r = new StreetRouter(this);
+            r.mode = Mode.WALK;
             r.setOrigin(vertex);
             // walk to the end of the graph
             r.distanceLimitMeters = Integer.MAX_VALUE;
@@ -1175,6 +1188,10 @@ public class StreetLayer implements Serializable, Cloneable {
                     reachedVertices.add(reachedVertex);
                 }
             }
+
+            // when origin is a vertex, the origin vertex is not included in the result
+            reachedVertices.add(vertex);
+            vertexLabels.put(vertex, vertex);
 
             if (nReached < minSubgraphSize) {
                 nSmallSubgraphs++;

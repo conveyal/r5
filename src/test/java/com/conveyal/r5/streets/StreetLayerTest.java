@@ -2,6 +2,9 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+import gnu.trove.TIntCollection;
+import gnu.trove.iterator.TIntIterator;
+import gnu.trove.list.TIntList;
 import junit.framework.TestCase;
 import org.junit.Test;
 
@@ -26,6 +29,12 @@ public class StreetLayerTest extends TestCase {
         int v = sl.vertexIndexForOsmNode.get(961011556);
         assertEquals(3, sl.incomingEdges.get(v).size());
         assertEquals(3, sl.outgoingEdges.get(v).size());
+
+        // make sure that it's a subgraph
+        StreetRouter r = new StreetRouter(sl);
+        r.setOrigin(v);
+        r.route();
+        assertTrue(r.getReachedVertices().size() < 40);
 
         int e0 = sl.incomingEdges.get(v).get(0);
         int e1 = e0 % 2 == 0 ? e0 + 1 : e0 - 1;
@@ -109,5 +118,110 @@ public class StreetLayerTest extends TestCase {
         //assertEquals(backwardEdgeName, newBackwardEdge.getName());
 
         //streetLayer.edgeStore.dump();
+    }
+
+    /** Test that simple turn restrictions (no via ways) are read properly, using http://www.openstreetmap.org/relation/5696764 */
+    @Test
+    public void testSimpleTurnRestriction () {
+        OSM osm = new OSM(null);
+        osm.intersectionDetection = true;
+        osm.readFromUrl(StreetLayerTest.class.getResource("cathedral-no-left.pbf").toString());
+
+        StreetLayer sl = new StreetLayer(TNBuilderConfig.defaultConfig());
+        // load from OSM and don't remove floating subgraphs
+        sl.loadFromOsm(osm, false, true);
+
+        sl.buildEdgeLists();
+
+        // locate the turn restriction from northbound Connecticut Ave NW onto westbound Cathedral Ave NW (in the District of Columbia)
+        int v = sl.vertexIndexForOsmNode.get(49815553L);
+        int e = -1;
+        EdgeStore.Edge edge = sl.edgeStore.getCursor();
+
+        for (TIntIterator it = sl.incomingEdges.get(v).iterator(); it.hasNext();) {
+            e = it.next();
+            edge.seek(e);
+            // Connecticut Ave NW south of the intersection
+            if (edge.getOSMID() == 382852845L) break;
+        }
+
+        assertTrue(e != -1);
+
+        // make sure it's in the turn restrictions
+        assertTrue(sl.edgeStore.turnRestrictions.containsKey(e));
+
+        TIntCollection restrictions = sl.edgeStore.turnRestrictions.get(e);
+
+        assertEquals(1, restrictions.size());
+
+        TurnRestriction restriction = sl.turnRestrictions.get(restrictions.iterator().next());
+
+        assertEquals(e, restriction.fromEdge);
+        assertEquals(0, restriction.viaEdges.length);
+        edge.seek(restriction.toEdge);
+        // Cathedral Ave NW, west of Connecticut.
+        assertEquals(130908001L, edge.getOSMID());
+        assertFalse(restriction.only);
+    }
+
+    /** Test that complex turn restrictions (via ways) are read properly, using http://www.openstreetmap.org/relation/555630 */
+    @Test
+    public void testComplexTurnRestriction () {
+        OSM osm = new OSM(null);
+        osm.intersectionDetection = true;
+        osm.readFromUrl(StreetLayerTest.class.getResource("reisterstown-via-restriction.pbf").toString());
+
+        StreetLayer sl = new StreetLayer(TNBuilderConfig.defaultConfig());
+        // load from OSM and don't remove floating subgraphs
+        sl.loadFromOsm(osm, false, true);
+
+        sl.buildEdgeLists();
+
+        // Node at the start of U-turn restriction on Reisterstown Road just south of the Baltimore Beltway in Pikesville, MD, USA
+        int v = sl.vertexIndexForOsmNode.get(2460634038L);
+        int e = -1;
+        EdgeStore.Edge edge = sl.edgeStore.getCursor();
+
+        for (TIntIterator it = sl.incomingEdges.get(v).iterator(); it.hasNext();) {
+            e = it.next();
+            edge.seek(e);
+            // Little bit of Reisterstown Rd. in intersection
+            if (edge.getOSMID() == 238215855) break;
+        }
+
+        assertTrue(e != -1);
+
+        // make sure it's in the turn restrictions
+        assertTrue(sl.edgeStore.turnRestrictions.containsKey(e));
+
+        TIntCollection restrictions = sl.edgeStore.turnRestrictions.get(e);
+
+        assertEquals(2, restrictions.size());
+
+        // annoyingly there are two turn restrictions at that node. Find the one we care about.
+
+        TurnRestriction restriction = null;
+        for (TIntIterator it = restrictions.iterator(); it.hasNext();) {
+            restriction = sl.turnRestrictions.get(it.next());
+            if (restriction.viaEdges.length > 0) break; // we have found the complex one
+        }
+
+        assertNotNull(restriction);
+
+        assertEquals(e, restriction.fromEdge);
+        assertEquals(2, restriction.viaEdges.length);
+
+        // check the funny little bits of Reisterstown in the intersection.
+        // make sure also that they wind up in the correct order.
+        edge.seek(restriction.viaEdges[0]);
+        assertEquals(238215854L, edge.getOSMID());
+
+        edge.seek(restriction.viaEdges[1]);
+        assertEquals(53332280L, edge.getOSMID());
+
+        edge.seek(restriction.toEdge);
+        // Bit of Reisterstown in intersection but after restriction
+        assertEquals(238215856L, edge.getOSMID());
+        assertFalse(restriction.only);
     }
 }

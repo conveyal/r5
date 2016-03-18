@@ -67,6 +67,7 @@ public class RaptorWorker {
 
     int max_time = 0;
     int round = 0;
+    private int scheduledRounds = -1;
 
     /** Single raptor state for scheduled search, as we can use range-raptor on the scheduled search */
     List<RaptorState> scheduleState;
@@ -95,6 +96,10 @@ public class RaptorWorker {
     public BitSet servicesActive;
 
     public List<RaptorState> statesEachIteration = new ArrayList<>();
+
+    // should a particular iteration be included in averages?
+    // extrema from the frequency search should not be.
+    public BitSet includeInAverages = new BitSet();
 
     public RaptorWorker(TransitLayer data, LinkedPointSet targets, ProfileRequest req) {
         this.data = data;
@@ -233,13 +238,21 @@ public class RaptorWorker {
                 for (int i = 0; i < monteCarloDraws + 2; i++) {
                     offsets.randomize();
 
+                    boolean includeThisIterationInAverages;
+
                     RaptorState stateCopy;
-                    if (i == 0)
+                    if (i == 0) {
                         stateCopy = this.runRaptorFrequency(departureTime, BoardingAssumption.BEST_CASE);
-                    else if (i == 1)
+                        includeThisIterationInAverages = false; // don't include extrema in averages
+                    }
+                    else if (i == 1) {
                         stateCopy = this.runRaptorFrequency(departureTime, BoardingAssumption.WORST_CASE);
-                    else
+                        includeThisIterationInAverages = false;
+                    }
+                    else {
                         stateCopy = this.runRaptorFrequency(departureTime, BoardingAssumption.RANDOM);
+                        includeThisIterationInAverages = true;
+                    }
 
                     // do propagation
                     int[] frequencyTimesAtTargets = timesAtTargetsEachIteration[iteration++];
@@ -253,6 +266,7 @@ public class RaptorWorker {
                         System.arraycopy(stateCopy.bestNonTransferTimes, 0, frequencyTimesAtTargets, 0, stateCopy.bestNonTransferTimes.length);
                     }
 
+                    if (includeThisIterationInAverages) includeInAverages.set(statesEachIteration.size());
                     statesEachIteration.add(stateCopy.deepCopy());
 
                     // convert to elapsed time
@@ -268,6 +282,7 @@ public class RaptorWorker {
                 timesAtTargetsEachIteration[iteration++] = IntStream.of(doPropagation ? scheduledTimesAtTargets : state.bestNonTransferTimes)
                         .map(i -> i != UNREACHED ? i - dt : i)
                         .toArray();
+                includeInAverages.set(statesEachIteration.size());
                 statesEachIteration.add(state.deepCopy());
             }
         }
@@ -289,7 +304,7 @@ public class RaptorWorker {
         //dumpVariableByte(timesAtTargetsEachMinute);
         // we can use min_max here as we've also run it once with best case and worst case board,
         // so the best and worst cases are meaningful.
-        propagatedTimesStore.setFromArray(timesAtTargetsEachIteration, ConfidenceCalculationMethod.MIN_MAX);
+        propagatedTimesStore.setFromArray(timesAtTargetsEachIteration, includeInAverages, ConfidenceCalculationMethod.MIN_MAX);
         return propagatedTimesStore;
     }
 
@@ -344,6 +359,12 @@ public class RaptorWorker {
             advance();
         }
 
+        // we need to save the number of scheduled rounds so we can do at least this many frequency rounds plus one.
+        // however, we can't do the test below as empty rounds are added to the end of scheduleState when the frequency
+        // search runs off the end of it.
+        // we can't just use scheduleState.size() because it will be expanded with empty states by the frequency search.
+        scheduledRounds = round + 1;
+
         // make sure new times are propagated all the way to the end even if we did fewer rounds on a future search
         while (round < scheduleState.size() - 1) {
             scheduleState.get(round + 1).min(scheduleState.get(round));
@@ -357,6 +378,7 @@ public class RaptorWorker {
      */
     public RaptorState runRaptorFrequency (int departureTime, BoardingAssumption boardingAssumption) {
         max_time = departureTime + MAX_DURATION;
+
         round = 0;
         advance(); // go to first round
         patternsTouched.clear(); // clear patterns left over from previous calls.
@@ -379,12 +401,26 @@ public class RaptorWorker {
         currentRound.previous = previousRound;
 
         // Anytime a round updates some stops, move on to another round
-        while (doOneRound(previousRound, currentRound, true, boardingAssumption)) {
-             advance();
+        // Do at least as many rounds as were done in the scheduled search plus one, so that we don't return a state
+        // at a previous round and cut off the scheduled search after 0, 1 or 2 transfers (see https://github.com/conveyal/r5/issues/82)
+        // However, if we didn't run a scheduled search, don't apply this constraint
+        while (doOneRound(previousRound, currentRound, true, boardingAssumption) || (scheduledRounds != -1 && round <= scheduledRounds)) {
+            advance();
             previousRound = currentRound;
             currentRound = previousRound.copy();
             // copy in scheduled times
             currentRound.min(scheduleState.get(round));
+
+            // re-mark all frequency patterns if we did a scheduled search, so that we explore them again;
+            // they may be reached at the second, third or later round by a scheduled trips
+            if (data.hasSchedules) {
+                for (int p = 0; p < data.tripPatterns.size(); p++) {
+                    TripPattern pat = data.tripPatterns.get(p);
+                    if (pat.hasFrequencies) {
+                        patternsTouched.set(p);
+                    }
+                }
+            }
         }
         
         return currentRound;
@@ -740,10 +776,13 @@ public class RaptorWorker {
     }
 
     /** Mark all the patterns passing through the given stop. */
-    private void markPatternsForStop(int stop) {
+    private void markPatternsForStop (int stop) { this.markPatternsForStop(stop, false); }
+
+    private void markPatternsForStop(int stop, boolean useFrequencies) {
         TIntList patterns = data.patternsForStop.get(stop);
         for (TIntIterator it = patterns.iterator(); it.hasNext();) {
-            patternsTouched.set(it.next());
+            int pattern = it.next();
+            patternsTouched.set(pattern);
         }
     }
 }

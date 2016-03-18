@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.common.SphericalDistanceLibrary;
+import com.conveyal.r5.profile.Mode;
 import com.csvreader.CsvReader;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerationException;
@@ -24,6 +25,7 @@ import org.geotools.data.simple.SimpleFeatureCollection;
 import org.geotools.data.simple.SimpleFeatureIterator;
 import org.geotools.data.simple.SimpleFeatureSource;
 import org.geotools.referencing.CRS;
+import org.mapdb.Fun;
 import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.referencing.FactoryException;
@@ -79,7 +81,7 @@ public class FreeFormPointSet implements Serializable, PointSet {
 
 
     // For TransportNetworks
-    Map<StreetLayer, LinkedPointSet> linkageCache = new HashMap<>();
+    Map<Fun.Tuple2<StreetLayer, Mode>, LinkedPointSet> linkageCache = new HashMap<>();
 
     /**
      * Map from string IDs to their array indices. This is a view into FreeFormPointSet.ids, namely its reverse mapping.
@@ -831,11 +833,11 @@ public class FreeFormPointSet implements Serializable, PointSet {
      * repeatedly do a lot of geometry calculations to temporarily connect the points to the streets.
      */
     @Override
-    public LinkedPointSet link(StreetLayer streetLayer) {
-        LinkedPointSet linkedPointSet = linkageCache.get(streetLayer);
+    public LinkedPointSet link(StreetLayer streetLayer, Mode mode) {
+        LinkedPointSet linkedPointSet = linkageCache.get(Fun.t2(streetLayer, mode));
         if (linkedPointSet == null) {
-            linkedPointSet = new LinkedPointSet(this, streetLayer);
-            linkageCache.put(streetLayer, linkedPointSet);
+            linkedPointSet = new LinkedPointSet(this, streetLayer, mode);
+            linkageCache.put(Fun.t2(streetLayer, mode), linkedPointSet);
         }
         return linkedPointSet;
     }

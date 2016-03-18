@@ -217,6 +217,7 @@ public class PointToPointQuery {
                     streetRouter.mode = Mode.valueOf(mode.toString());
                     streetRouter.distanceLimitMeters = 100_000; // FIXME arbitrary, and account for bike or car access mode
                     if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
+                        streetRouter.setDestination(split);
                         streetRouter.route();
                         StreetRouter.State lastState = streetRouter.getState(split);
                         streetPath = new StreetPath(lastState, transportNetwork);
@@ -516,7 +517,8 @@ public class PointToPointQuery {
 
             timeList.sort();
 
-            int cutoff = timeList.get(201);
+            //This gets last time in timeList
+            int cutoff = timeList.get(200); //it needs to be 200 since if there are minimally 201 stops the indexes are from 0-200
 
             for (TIntIntIterator it = times.iterator(); it.hasNext();) {
                 it.advance();

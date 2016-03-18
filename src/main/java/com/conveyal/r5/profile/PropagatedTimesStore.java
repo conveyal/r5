@@ -8,10 +8,7 @@ import com.conveyal.r5.analyst.cluster.ResultEnvelope;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 import static org.apache.commons.math3.util.FastMath.toRadians;
 
@@ -69,8 +66,10 @@ public class PropagatedTimesStore {
 
     /**
      * @param times for search (varying departure time), an array of travel times to each transit stop.
+     * @param includeInAverages if includeInAverages[i] is true, include iteration i in averages. We calculate extrema
+     *                          as well as samples when doing monte carlo, and extrema should not be included in averages.
      */
-    public void setFromArray(int[][] times, ConfidenceCalculationMethod confidenceCalculationMethod) {
+    public void setFromArray(int[][] times, BitSet includeInAverages, ConfidenceCalculationMethod confidenceCalculationMethod) {
         if (times.length == 0)
             // nothing to do
             return;
@@ -100,9 +99,16 @@ public class PropagatedTimesStore {
                 if (times[i][stop] == RaptorWorker.UNREACHED)
                     continue ITERATIONS;
 
-                sum += times[i][stop];
-                count++;
-                timeList.add(times[i][stop]);
+                // don't include extrema in averages
+                if (includeInAverages.get(i)) {
+                    sum += times[i][stop];
+                    count++;
+                }
+
+                // only include extrema in the list of times if we are doing min-max, they're not relevant for percentages
+                if (includeInAverages.get(i) || confidenceCalculationMethod == ConfidenceCalculationMethod.MIN_MAX) {
+                    timeList.add(times[i][stop]);
+                }
             }
 
             if (count == 0)

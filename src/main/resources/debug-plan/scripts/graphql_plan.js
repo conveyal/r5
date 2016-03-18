@@ -413,16 +413,16 @@ function makeTextResponse(data) {
     if (layer != null) {
         layer.clearLayers();
     }
-    var infos = "<ul>";
+    var infos = "";
     for(var i=0; i < options.length; i++) {
         var option = options[i];
-        var item = "<li>"+option.summary;
+        var item = "<details><summary>"+option.summary+"</summary>";
         var access = option.access;
         var egress = option.egress;
         var transit = option.transit;
         console.log("Summary:", option.summary);
         for(var j=0; j < option.itinerary.length; j++) {
-            item+="<br /><a href=\"#\" class=\"itinerary\" data-option=\""+i+"\" data-itinerary=\""+j+"\">Itinerary:</a>";
+            item+="<p><a href=\"#\" class=\"itinerary\" data-option=\""+i+"\" data-itinerary=\""+j+"\">Itinerary:</a></p>";
             item+="<ul>";
             var itinerary=option.itinerary[j];
             item+="<li>waitingTime: "+secondsToTime(itinerary.waitingTime)+"</li>";
@@ -471,8 +471,26 @@ function makeTextResponse(data) {
 
             item+="</ul>";
         }
+        if (option.fares) {
+            item+="<p>Fares:</p>";
+            for(var j=0; j < option.fares.length; j++) {
+                var fare = option.fares[j];
+                var unit = "";
+                //TODO: use https://gist.github.com/Fluidbyte/2973986 for this
+                if (fare.currency == "USD") {
+                    var symbol = " $";
+                }
+                item+="<ul>";
+                item+="<li>type: "+fare.type+"</li>";
+                item+="<li>low: "+fare.low.toFixed(2)+symbol+"</li>";
+                item+="<li>peak: "+fare.peak.toFixed(2)+symbol+"</li>";
+                item+="<li>senior: "+fare.senior.toFixed(2)+symbol+"</li>";
+                item+="<li>transferReduction: "+fare.transferReduction+"</li>";
+                item+="</ul>";
+            }
+        }
 
-        item+="</li>";
+        item+="</details>";
         infos+=item;
     }
     $(".response").append(infos+"</ul>");
@@ -485,6 +503,7 @@ function makeTextResponse(data) {
 }
 
 function requestPlan() {
+    $('#resultTab').removeClass("status-ok status-error").addClass("status-waiting");
     var request = template
                 .replace("DIRECTMODES", planConfig.directModes)
                 .replace("ACCESSMODES", planConfig.accessModes)
@@ -512,19 +531,43 @@ function requestPlan() {
         url: hostname + "/otp/routers/default/index/graphql",
         success: function (data) {
             console.log(data);
+            $('#resultTab').removeClass("status-waiting status-error").addClass("status-ok");
             graphqlResponse=data;
-            makeTextResponse(data);
-            /*
+
             if (data.errors) {
-                alert(data.errors);
+                showDataErrors(data);
+            } else {
+                makeTextResponse(data);
+            }
+            /*
             }
             if (data.data) {
                 layer = L.geoJson(data.data, {style: styleMode, onEachFeature:onEachFeature});
                 layer.addTo(window.my_map);
             }
             */
+        },
+        error:function (jqXHR) {
+            var data = jqXHR.responseJSON;
+            showDataErrors(data);
         }
     });
+}
+
+function showDataErrors(data) {
+    if (data.errors) {
+        $('#resultTab').removeClass("status-waiting status-ok").addClass("status-error");
+        var msg = "";
+        if ($.isArray(data.errors)) {
+            for(var i=0; i < data.errors.length; i++) {
+                msg+= data.errors[i].message + "\n";
+            }
+        } else {
+            msg = data.errors;
+        }
+        alert(msg);
+        $('#resultTab').removeClass("status-waiting status-ok status-error");
+    }
 }
 
 var osmLayer = L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
@@ -576,6 +619,10 @@ $(document).ready(function() {
     gui.add(planConfig, "plan");
     /*gui.add(planConfig, "showReachedStops");*/
 var sidebar = L.control.sidebar('sidebar').addTo(my_map);
+    $('#resultTab').click(function (){
+        $('#resultTab').removeClass("status-waiting status-ok status-error");
+
+    })
 
 });
 

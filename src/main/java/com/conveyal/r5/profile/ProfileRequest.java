@@ -193,6 +193,10 @@ public class ProfileRequest implements Serializable, Cloneable {
     //If this is profile or point to point route request
     private boolean profile = false;
 
+    public boolean isProfile() {
+        return profile;
+    }
+
     public ProfileRequest clone () {
         try {
             return (ProfileRequest) super.clone();

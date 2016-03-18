@@ -10,7 +10,7 @@ import com.conveyal.r5.util.TIntIntMultimap;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.LineString;
-import gnu.trove.TIntCollection;
+import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.TLongList;
 import gnu.trove.list.TShortList;
@@ -19,6 +19,7 @@ import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.list.array.TShortArrayList;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
+import gnu.trove.map.hash.TIntIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -491,7 +492,7 @@ public class EdgeStore implements Serializable {
          *
          * Otherwise speed is based on wanted walking, cycling speed provided in ProfileRequest.
          */
-        private float calculateSpeed(ProfileRequest options, Mode traverseMode, long time) {
+        public float calculateSpeed(ProfileRequest options, Mode traverseMode) {
             if (traverseMode == null) {
                 return Float.NaN;
             } else if (traverseMode == Mode.CAR) {
@@ -503,43 +504,28 @@ public class EdgeStore implements Serializable {
             return options.getSpeed(traverseMode);
         }
 
-        public StreetRouter.State traverse (StreetRouter.State s0, Mode mode, ProfileRequest req) {
-            StreetRouter.State s1 = new StreetRouter.State(getToVertex(), edgeIndex,
-                s0.getTime(), s0);
-            s1.weight = s0.weight;
-            float speedms = calculateSpeed(req, mode, s0.getTime());
+        public StreetRouter.State traverse (StreetRouter.State s0, Mode mode, ProfileRequest req, TurnCostCalculator turnCostCalculator) {
+            StreetRouter.State s1 = new StreetRouter.State(getToVertex(), edgeIndex, s0);
+            float speedms = calculateSpeed(req, mode);
             float time = (float) (getLengthM() / speedms);
             float weight = 0;
 
+            if (!canTurnFrom(s0, s1)) return null;
+
+            // clear out turn restrictions if they're empty
+            if (s1.turnRestrictions != null && s1.turnRestrictions.isEmpty()) s1.turnRestrictions = null;
+
+            // figure out which turn res
+
             // add turn restrictions that start on this edge
-            if (turnRestrictions.containsKey(getEdgeIndex())) {
-                s1.inTurnRestriction = true;
-            }
-
-            if (s0.inTurnRestriction) {
-                // check if we have exited any turn restrictions, and make sure the movement is not restricted
-                TIntCollection currentRestrictions = turnRestrictions.get(getEdgeIndex());
-
-                // array to dodge effectively final nonsense
-                boolean[] blockTraversal = new boolean[] { false };
-                turnRestrictions.get(s0.backEdge).forEach(ridx -> {
-                    if (currentRestrictions.contains(ridx)) return true; // we have not exited this restriction, but continue iteration
-
-                    // we have exited this restriction, check to see if we should block traversal
-                    TurnRestriction restriction = layer.turnRestrictions.get(ridx);
-
-                    // first check if the restriction applies to this traversal
-                    // we don't need to check via here, as if we ever left the via edges we would have terminated the restriction then.
-                    boolean applies = restriction.toEdge == getEdgeIndex();
-
-                    if (applies && !restriction.only || !applies && restriction.only) blockTraversal[0] = true;
-
-                    // only continue iteration if we're not already blocking traversal
-                    return !blockTraversal[0];
+            // Turn restrictions only apply to cars for now. This is also coded in canTurnFrom, so change it both places
+            // if/when it gets changed.
+            if (s0.mode == Mode.CAR && turnRestrictions.containsKey(getEdgeIndex())) {
+                if (s1.turnRestrictions == null) s1.turnRestrictions = new TIntIntHashMap();
+                turnRestrictions.get(getEdgeIndex()).forEach(r -> {
+                    s1.turnRestrictions.put(r, 1); // we have traversed one edge
+                    return true; // continue iteration
                 });
-
-                if (blockTraversal[0])
-                    return null;
             }
 
             if (s0.backEdge != -1 && getFlag(EdgeFlag.LINK) && getCursor(s0.backEdge).getFlag(EdgeFlag.LINK))
@@ -592,14 +578,77 @@ public class EdgeStore implements Serializable {
                 weight*=2.0; //walk reluctance
             }
 
-            //TODO: turn costs
 
 
             int roundedTime = (int) Math.ceil(time);
-            s1.incrementTimeInSeconds(roundedTime);
-            s1.incrementWeight(weight);
+
+            // negative backedge is start of search.
+            int turnCost = s0.backEdge >= 0 ? turnCostCalculator.computeTurnCost(s0.backEdge, getEdgeIndex(), mode) : 0;
+
+            s1.incrementTimeInSeconds(roundedTime + turnCost);
+            s1.incrementWeight(weight + turnCost);
             s1.distance += getLengthMm();
+
+            // make sure we don't have states that don't increment weight/time, otherwise we can get weird loops
+            if (s1.weight == s0.weight) s1.weight += 1;
+            if (s1.durationSeconds == s0.durationSeconds) s1.durationSeconds += 1;
+            //if (s1.time.equals(s0.time)) s1.time = s1.time.plus(1, ChronoUnit.MILLIS);
+
             return s1;
+        }
+
+        /** Can we turn onto this edge from this state? Also copies still-applicable restrictions forward. */
+        public boolean canTurnFrom (StreetRouter.State s0, StreetRouter.State s1) {
+            // Turn restrictions only apply to cars for now. This is also coded in traverse, so change it both places
+            // if/when it gets changed.
+            if (s0.turnRestrictions != null && s0.mode == Mode.CAR) {
+                // clone turn restrictions
+                s1.turnRestrictions = new TIntIntHashMap(s0.turnRestrictions);
+
+                RESTRICTIONS: for (TIntIntIterator it = s1.turnRestrictions.iterator(); it.hasNext();) {
+                    it.advance();
+                    int ridx = it.key();
+                    TurnRestriction restriction = layer.turnRestrictions.get(ridx);
+
+                    // check via ways if applicable
+                    // subtract 1 because the first (fromEdge) is not a via edge
+                    int posInRestriction = it.value() - 1;
+
+                    if (posInRestriction < restriction.viaEdges.length) {
+                        if (getEdgeIndex() != restriction.viaEdges[posInRestriction]) {
+                            // we have exited the restriction
+                            if (restriction.only) return false;
+                            else {
+                                it.remove(); // no need to worry about this one anymore
+                                continue RESTRICTIONS;
+                            }
+                        }
+                        else {
+                            // increment position
+                            it.setValue(it.value() + 1);
+                        }
+                    }
+                    else {
+                        if (restriction.toEdge != getEdgeIndex()) {
+                            // we have exited the restriction
+                            if (restriction.only)
+                                return false;
+                            else {
+                                it.remove();
+                                continue RESTRICTIONS;
+                            }
+                        } else {
+                            if (!restriction.only)
+                                return false;
+                            else {
+                                it.remove(); // done with this restriction
+                                continue RESTRICTIONS;
+                            }
+                        }
+                    }
+                }
+            }
+            return true;
         }
 
         public void setGeometry (List<Node> nodes) {
@@ -652,6 +701,9 @@ public class EdgeStore implements Serializable {
             double firstCoorLat = reverse ? toVertexLat : fromVertexLat;
             double lastCoorLon = reverse ? fromVertexLon : toVertexLon;
             double lastCoorLat = reverse ? fromVertexLat : toVertexLat;
+
+            // NB it initially appears that we are reversing the from and to vertex twice, but keep in mind that getFromVertex
+            // returns the from vertex when on a forward edge, or the to vertex on a back edge.
             c[0] = new Coordinate(firstCoorLon, firstCoorLat);
             if (coords != null) {
                 for (int i = 1; i < c.length - 1; i++) {

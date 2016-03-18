@@ -181,13 +181,36 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
 
     /**
      * I can't think of any reason we need to use the first arrivals and last departure,
-     * rather than the first departure and last arrival.
+     * rather than the first departure and last arrival, given that we don't currently support interlining.
+     * Once we support interlining, this will matter, as you might arrive at the first stop on an interline just inside the time window.
+     *
      * @return whether any part of this occurs during the given time range (expressed in seconds after midnight).
      * TODO --> frequencies <--
      */
     public boolean overlapsTimeRange (int fromTime, int toTime) {
-        int firstStopTime = departures[0];
-        int lastStopTime = arrivals[arrivals.length - 1];
+        int firstStopTime, lastStopTime;
+
+        if (this.headwaySeconds != null) {
+            firstStopTime = Integer.MAX_VALUE;
+            lastStopTime = Integer.MIN_VALUE;
+
+            if (this.headwaySeconds.length == 0) {
+                LOG.warn("Frequency trip has no frequency entries!");
+                return false;
+            }
+
+            for (int i = 0; i < this.headwaySeconds.length; i++) {
+                firstStopTime = Math.min(firstStopTime, this.startTimes[i]);
+                // NB the last stop time on a frequency entry is the end time plus the travel time, as start/end times
+                // represent the behavior at the first stop.
+                lastStopTime = Math.max(lastStopTime, this.endTimes[i] + this.arrivals[this.arrivals.length - 1]);
+            }
+        }
+        else {
+            firstStopTime = departures[0];
+            lastStopTime = arrivals[arrivals.length - 1];
+        }
+
         return firstStopTime <= toTime && lastStopTime >= fromTime;
     }
 

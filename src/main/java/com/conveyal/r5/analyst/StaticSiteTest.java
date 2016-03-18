@@ -15,6 +15,7 @@ import org.apache.commons.math3.random.MersenneTwister;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.util.BitSet;
 import java.util.stream.IntStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -69,8 +70,8 @@ public class StaticSiteTest {
 
             worker.propagatedTimesStore = new PropagatedTimesStore(lpset.size()) {
                 @Override
-                public void setFromArray(int[][] times, ConfidenceCalculationMethod confidenceCalculationMethod) {
-                    super.setFromArray(times, confidenceCalculationMethod);
+                public void setFromArray(int[][] times, BitSet includeInAverages, ConfidenceCalculationMethod confidenceCalculationMethod) {
+                    super.setFromArray(times, includeInAverages, confidenceCalculationMethod);
                     // dodge stupid effectively final nonsense
                     fullTimes[0] = times;
                 }

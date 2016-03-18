@@ -332,7 +332,13 @@ public class ProfileRequest implements Serializable, Cloneable {
         //Transit modes can be empty if searching for path without transit is requested
         Collection<TransitModes> transitModes = environment.getArgument("transitModes");
         if (transitModes.size() > 0) {
-            profileRequest.transitModes = EnumSet.copyOf(transitModes);
+            //If there is TRANSIT mode in transit modes all of transit modes need to be added.
+            if (transitModes.contains(TransitModes.TRANSIT)) {
+                profileRequest.transitModes = EnumSet.allOf(TransitModes.class);
+            } else {
+                //Otherwise only requested modes are copied
+                profileRequest.transitModes = EnumSet.copyOf(transitModes);
+            }
         }
         profileRequest.accessModes = EnumSet.copyOf((Collection<LegMode>) environment.getArgument("accessModes"));
         profileRequest.egressModes = EnumSet.copyOf((Collection<LegMode>)environment.getArgument("egressModes"));

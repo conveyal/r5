@@ -5,11 +5,13 @@ import com.conveyal.r5.api.ProfileResponse;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.ProfileOption;
 import com.conveyal.r5.api.util.StreetSegment;
+import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.profile.*;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
+import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import gnu.trove.iterator.TIntIntIterator;
@@ -24,6 +26,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.ZoneId;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Class which will make point to point or profile queries on Transport network based on profileRequest
@@ -268,7 +271,21 @@ public class PointToPointQuery {
 
             // getPaths actually returns a set, which is important so that things are deduplicated. However we need a list
             // so we can sort it below.
-            usefullpathList.addAll(router.getPaths());
+            usefullpathList.addAll(router.getPaths().stream().filter(pathWithTimes -> {
+                //This filters all transit paths and keeps only those paths
+                // that have all of transit modes in requested transitModes
+                for (int i = 0; i < pathWithTimes.patterns.length; i++) {
+                    TripPattern pattern = pathWithTimes.getPattern(transportNetwork.transitLayer, i);
+                    if (pattern.routeIndex >= 0) {
+                        RouteInfo routeInfo = transportNetwork.transitLayer.routes.get(pattern.routeIndex);
+                        TransitModes mode = TransitLayer.getTransitModes(routeInfo.route_type);
+                        if (!request.transitModes.contains(mode)) {
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            }).collect(Collectors.toList()));
 
             //This sort is necessary only for text debug output so it will be disabled when it is finished
 

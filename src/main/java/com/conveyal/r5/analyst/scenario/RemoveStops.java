@@ -10,16 +10,22 @@ import gnu.trove.set.hash.TIntHashSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
-import java.util.Collection;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * Skip stops and associated dwell times.
- *
+ * Remove stops and the associated dwell times from trips.
  * Skipped stops are no longer served by the matched trips, and and dwell time at a skipped stop is removed from the schedule.
  * If stops are skipped at the start of a trip, the start of the trip is simply removed; the remaining times are not shifted.
+ *
+ * If you remove stops from some but not all trips on a pattern, you've created another possibly new pattern.
+ * Therefore we don't provide any way to remove stops from individual trips. You can only remove them from entire routes
+ * and if you remove stops from an entire route, you automatically remove them from every trip in every pattern.
+ *
+ * Also, there's no way to remove only one instance of a stop that occurs multiple times (e.g. in a loop route).
+ * This is a known and accepted limitation.
  */
 public class RemoveStops extends Modification {
 
@@ -28,13 +34,19 @@ public class RemoveStops extends Modification {
     private static final Logger LOG = LoggerFactory.getLogger(RemoveStops.class);
 
     /** On which route the stops should be skipped. */
-    public String routeId;
+    public String routes;
 
     /** Stops to skip. Note that setting this to null as a wildcard is not supported, obviously. */
-    public Collection<String> stopId;
+    public Set<String> stops;
 
     /** Internal integer IDs for a specific transit network, converted from the string IDs. */
-    private transient TIntSet stopsToRemove;
+    private transient TIntSet intStopIds;
+
+    /** This will be set to true if any errors occur while resolving String-based IDs against the network. */
+    private boolean errorsResolving = false;
+
+    /** This will be set to true if any errors occur while applying the modification to a network. */
+    private boolean errorsApplying = false;
 
     @Override
     public String getType() {
@@ -42,42 +54,35 @@ public class RemoveStops extends Modification {
     }
 
     @Override
-    public boolean apply(TransportNetwork network) {
-        return false;
-    }
-
-    @Override
     public boolean resolve (TransportNetwork network) {
-        boolean foundErrors = false;
-        stopsToRemove = new TIntHashSet();
-        for (String stringStopId : stopId) {
+        intStopIds = new TIntHashSet();
+        for (String stringStopId : stops) {
             int intStopId = network.transitLayer.indexForStopId.get(stringStopId);
             if (intStopId == 0) { // FIXME should be -1 not 0
                 warnings.add("Could not find a stop with GTFS ID " + stringStopId);
-                foundErrors = true;
+                errorsResolving = true;
             } else {
-                stopsToRemove.add(intStopId);
+                intStopIds.add(intStopId);
+                // LOG.debug("Stop selected for removal: {}", network.transitLayer.stopNames.get(intStopId));
             }
         }
-        LOG.debug("Resolved stop IDs for removal. Strings {} resolved to integers {}.", stopId, stopsToRemove);
-        // For debugging.
-//        Set<String> names = new HashSet<>();
-//        stopsToRemove.forEach(intStopId -> {
-//            names.add(network.transitLayer.stopNames.get(intStopId));
-//            return true; // Continue iteration.
-//        });
-//        names.stream().forEach(name -> {
-//            LOG.info("Stop selected for removal: {}", name);
-//        });
-        return foundErrors;
+        LOG.debug("Resolved stop IDs for removal. Strings {} resolved to integers {}.", stops, intStopIds);
+        return errorsResolving;
+    }
+
+    @Override
+    public boolean apply(TransportNetwork network) {
+        network.transitLayer.tripPatterns = network.transitLayer.tripPatterns.stream()
+                .map(tp -> this.applyToTripPattern(tp))
+                .collect(Collectors.toList());
+        return errorsApplying;
     }
 
     public TripPattern applyToTripPattern(TripPattern originalTripPattern) {
-        // TODO filter by trip IDs too
-        if (!routeId.contains(originalTripPattern.routeId)) {
+        if (!routes.contains(originalTripPattern.routeId)) {
             return originalTripPattern;
         }
-        int nToRemove = (int) Arrays.stream(originalTripPattern.stops).filter(stopsToRemove::contains).count();
+        int nToRemove = (int) Arrays.stream(originalTripPattern.stops).filter(intStopIds::contains).count();
         if (nToRemove == 0) {
             return originalTripPattern;
         }
@@ -93,7 +98,7 @@ public class RemoveStops extends Modification {
         // First, copy pattern-wide information for the stops to be retained, and record which stops are to be removed.
         boolean removeStop[] = new boolean[oldLength];
         for (int i = 0, j = 0; i < oldLength; i++) {
-            if (stopsToRemove.contains(originalTripPattern.stops[i])) {
+            if (intStopIds.contains(originalTripPattern.stops[i])) {
                 removeStop[i] = true;
             } else {
                 removeStop[i] = false;
@@ -105,10 +110,9 @@ public class RemoveStops extends Modification {
             }
         }
         // Next, remove the same stops from every trip on this pattern.
-        pattern.tripSchedules = new ArrayList<>();
-        for (TripSchedule schedule : originalTripPattern.tripSchedules) {
-            pattern.tripSchedules.add(filterSchedule(schedule, removeStop));
-        }
+        pattern.tripSchedules = originalTripPattern.tripSchedules.stream()
+                .map(schedule -> filterSchedule(schedule, removeStop))
+                .collect(Collectors.toList());
         return pattern;
     }
 
@@ -125,10 +129,10 @@ public class RemoveStops extends Modification {
             throw new AssertionError("Stop removal boolean array should be the same length as the affected pattern.");
         }
         // Make a protective copy of this schedule, so we can modify it without affecting the original.
-        TripSchedule schedule = originalSchedule.clone();
+        TripSchedule newSchedule = originalSchedule.clone();
         int newLength = removeStop.length - Booleans.countTrue(removeStop);
-        schedule.arrivals = new int[newLength];
-        schedule.departures = new int[newLength];
+        newSchedule.arrivals = new int[newLength];
+        newSchedule.departures = new int[newLength];
         int accumulatedRideTime = 0;
         int prevInputDeparture = 0;
         int prevOutputDeparture = 0;
@@ -145,14 +149,14 @@ public class RemoveStops extends Modification {
                     accumulatedRideTime += dwellTime;
                 }
             } else {
-                schedule.arrivals[j] = prevOutputDeparture + accumulatedRideTime + rideTime;
-                schedule.departures[j] = schedule.arrivals[j] + dwellTime;
-                prevOutputDeparture = schedule.departures[j];
+                newSchedule.arrivals[j] = prevOutputDeparture + accumulatedRideTime + rideTime;
+                newSchedule.departures[j] = newSchedule.arrivals[j] + dwellTime;
+                prevOutputDeparture = newSchedule.departures[j];
                 accumulatedRideTime = 0;
                 j++;
             }
         }
-        return schedule;
+        return newSchedule;
     }
 
 }

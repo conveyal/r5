@@ -1,7 +1,5 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.r5.streets.StreetLayer;
-import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -24,16 +22,15 @@ import java.util.Set;
 // Each class's getType should return the same value.
 @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property="type")
 @JsonSubTypes({
-        @JsonSubTypes.Type(name = "create-stops", value = CreateStops.class),
-        @JsonSubTypes.Type(name = "remove-trip", value = RemoveTrip.class),
-        @JsonSubTypes.Type(name = "adjust-headway", value = AdjustHeadway.class),
+        @JsonSubTypes.Type(name = "adjust-speed", value = AdjustSpeed.class),
+        @JsonSubTypes.Type(name = "adjust-frequency", value = AdjustFrequency.class),
         @JsonSubTypes.Type(name = "adjust-dwell-time", value = AdjustDwellTime.class),
-        @JsonSubTypes.Type(name = "skip-stop", value = SkipStop.class),
-        @JsonSubTypes.Type(name = "add-trip-pattern", value = AddTripPattern.class),
-        @JsonSubTypes.Type(name = "convert-to-frequency", value = ConvertToFrequency.class),
+        @JsonSubTypes.Type(name = "add-trips", value = AddTrips.class),
+        @JsonSubTypes.Type(name = "remove-trips", value = RemoveTrips.class),
+        @JsonSubTypes.Type(name = "add-stops", value = AddStops.class),
+        @JsonSubTypes.Type(name = "remove-stops", value = RemoveStops.class),
+        @JsonSubTypes.Type(name = "create-stops", value = CreateStops.class),
         @JsonSubTypes.Type(name = "transfer-rule", value = TransferRule.class),
-        @JsonSubTypes.Type(name = "scale-speed", value = ScaleSpeed.class),
-        @JsonSubTypes.Type(name = "insert-stop", value = InsertStop.class),
         @JsonSubTypes.Type(name = "set-trip-phasing", value = SetTripPhasing.class),
         // HACK: this modification type should only be instantiated as a member of SetTripPhasing, and Jackson shouldn't
         // need type info because there is no polymorphism where it is used. Why, one might ask, is the class that selects

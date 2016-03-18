@@ -10,7 +10,7 @@ import gnu.trove.set.TIntSet;
  * Currently this can only remove all trips on an entire route.
  * In order to remove certain patterns we may want to support removing trips individually by tripId.
  */
-public class RemoveTrip extends Modification {
+public class RemoveTrips extends Modification {
 
     public static final long serialVersionUID = 1L;
 
@@ -23,7 +23,7 @@ public class RemoveTrip extends Modification {
 
     @Override
     public String getType() {
-        return "remove-trip";
+        return "remove-trips";
     }
 
     @Override

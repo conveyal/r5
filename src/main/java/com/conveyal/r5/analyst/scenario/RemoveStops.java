@@ -1,14 +1,10 @@
 package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.r5.transit.PickDropType;
-import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
-import com.google.common.collect.Lists;
 import com.google.common.primitives.Booleans;
-import gnu.trove.list.TIntList;
-import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.slf4j.Logger;
@@ -18,8 +14,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Collection;
-import java.util.HashSet;
-import java.util.Set;
 
 /**
  * Skip stops and associated dwell times.
@@ -27,11 +21,11 @@ import java.util.Set;
  * Skipped stops are no longer served by the matched trips, and and dwell time at a skipped stop is removed from the schedule.
  * If stops are skipped at the start of a trip, the start of the trip is simply removed; the remaining times are not shifted.
  */
-public class SkipStop extends Modification {
+public class RemoveStops extends Modification {
 
     public static final long serialVersionUID = 1L;
 
-    private static final Logger LOG = LoggerFactory.getLogger(SkipStop.class);
+    private static final Logger LOG = LoggerFactory.getLogger(RemoveStops.class);
 
     /** On which route the stops should be skipped. */
     public String routeId;
@@ -44,7 +38,7 @@ public class SkipStop extends Modification {
 
     @Override
     public String getType() {
-        return "skip-stop";
+        return "remove-stops";
     }
 
     @Override

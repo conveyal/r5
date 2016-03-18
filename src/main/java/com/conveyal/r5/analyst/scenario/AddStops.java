@@ -5,7 +5,6 @@ import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
-import com.google.common.primitives.Booleans;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,11 +19,11 @@ import java.util.Set;
  * afterStopId encountered. This allows inserting the same stop into multiple patterns on the same route,
  * such as branches converging on a common trunk or opposite directions of the same route.
  */
-public class InsertStop extends Modification {
+public class AddStops extends Modification {
 
     public static final long serialVersionUID = 1L;
 
-    private static final Logger LOG = LoggerFactory.getLogger(InsertStop.class);
+    private static final Logger LOG = LoggerFactory.getLogger(AddStops.class);
 
     /** On which routes the stop should be inserted. */
     public Set<String> routeId;
@@ -48,7 +47,7 @@ public class InsertStop extends Modification {
 
     @Override
     public String getType() {
-        return "insert-stop";
+        return "add-stops";
     }
 
     @Override

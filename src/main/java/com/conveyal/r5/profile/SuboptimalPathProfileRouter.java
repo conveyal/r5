@@ -1,16 +1,14 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
-import com.conveyal.r5.analyst.scenario.RemoveTrip;
+import com.conveyal.r5.analyst.scenario.RemoveTrips;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.publish.StaticPropagatedTimesStore;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.map.TIntIntMap;
-import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
-import gnu.trove.map.hash.TObjectIntHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.slf4j.Logger;
@@ -157,7 +155,7 @@ public class SuboptimalPathProfileRouter {
 
         // remove appropriate trips
         if (bannedPatterns != null && !bannedPatterns.isEmpty()) {
-            RemoveTrip rt = new RemoveTrip();
+            RemoveTrips rt = new RemoveTrips();
             // FIXME how do patterns have IDs, and why is this being done with Modifications not a simple set?
             rt.patternIds = bannedPatterns;
             req.scenario.modifications.add(rt);

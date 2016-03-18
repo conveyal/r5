@@ -1,20 +1,11 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.r5.transit.PickDropType;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
-import com.google.common.primitives.Booleans;
-import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.Collection;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -22,11 +13,11 @@ import java.util.stream.Collectors;
  * Scale travel times by a constant factor over the whole length of trips.
  * That is, uniformly speed trips up or slow them down.
  */
-public class ScaleSpeed extends Modification {
+public class AdjustSpeed extends Modification {
 
     public static final long serialVersionUID = 1L;
 
-    private static final Logger LOG = LoggerFactory.getLogger(ScaleSpeed.class);
+    private static final Logger LOG = LoggerFactory.getLogger(AdjustSpeed.class);
 
     /** The route which should be sped up or slowed down. */
     public Set<String> routeId;
@@ -39,7 +30,7 @@ public class ScaleSpeed extends Modification {
 
     @Override
     public String getType() {
-        return "scale-speed";
+        return "adjust-speed";
     }
 
     @Override

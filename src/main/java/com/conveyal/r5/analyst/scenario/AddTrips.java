@@ -41,10 +41,10 @@ import java.util.stream.IntStream;
  * May add new stops or reuse existing stops.
  * Can include a full timetable of trips or be a frequency-based pattern.
  */
-public class AddTripPattern extends Modification {
+public class AddTrips extends Modification {
 
     public static final long serialVersionUID = 1L;
-    public static final Logger LOG = LoggerFactory.getLogger(AddTripPattern.class);
+    public static final Logger LOG = LoggerFactory.getLogger(AddTrips.class);
 
     /** The name of this pattern */
     public String name;
@@ -78,7 +78,7 @@ public class AddTripPattern extends Modification {
 
     @Override
     public String getType() {
-        return "add-trip-pattern";
+        return "add-trips";
     }
 
     @Override

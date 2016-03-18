@@ -503,6 +503,7 @@ function makeTextResponse(data) {
 }
 
 function requestPlan() {
+    $('#resultTab').removeClass("status-ok status-error").addClass("status-waiting");
     var request = template
                 .replace("DIRECTMODES", planConfig.directModes)
                 .replace("ACCESSMODES", planConfig.accessModes)
@@ -530,19 +531,43 @@ function requestPlan() {
         url: hostname + "/otp/routers/default/index/graphql",
         success: function (data) {
             console.log(data);
+            $('#resultTab').removeClass("status-waiting status-error").addClass("status-ok");
             graphqlResponse=data;
-            makeTextResponse(data);
-            /*
+
             if (data.errors) {
-                alert(data.errors);
+                showDataErrors(data);
+            } else {
+                makeTextResponse(data);
+            }
+            /*
             }
             if (data.data) {
                 layer = L.geoJson(data.data, {style: styleMode, onEachFeature:onEachFeature});
                 layer.addTo(window.my_map);
             }
             */
+        },
+        error:function (jqXHR) {
+            var data = jqXHR.responseJSON;
+            showDataErrors(data);
         }
     });
+}
+
+function showDataErrors(data) {
+    if (data.errors) {
+        $('#resultTab').removeClass("status-waiting status-ok").addClass("status-error");
+        var msg = "";
+        if ($.isArray(data.errors)) {
+            for(var i=0; i < data.errors.length; i++) {
+                msg+= data.errors[i].message + "\n";
+            }
+        } else {
+            msg = data.errors;
+        }
+        alert(msg);
+        $('#resultTab').removeClass("status-waiting status-ok status-error");
+    }
 }
 
 var osmLayer = L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
@@ -594,6 +619,10 @@ $(document).ready(function() {
     gui.add(planConfig, "plan");
     /*gui.add(planConfig, "showReachedStops");*/
 var sidebar = L.control.sidebar('sidebar').addTo(my_map);
+    $('#resultTab').click(function (){
+        $('#resultTab').removeClass("status-waiting status-ok status-error");
+
+    })
 
 });
 

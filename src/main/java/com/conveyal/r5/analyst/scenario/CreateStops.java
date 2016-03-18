@@ -30,28 +30,19 @@ public class CreateStops extends Modification {
     @Override
     public boolean resolve (TransportNetwork network) {
         // TODO Check for stop ID collisions.
-        return false;
+        return false; // No errors occurred.
     }
 
     @Override
     public boolean apply (TransportNetwork network) {
-        TransitLayer transitLayer = network.transitLayer.clone();
-        // Pull the following out into a method on TransportNetwork
-        StreetLayer streetLayer = network.streetLayer;
-        if (!streetLayer.edgeStore.isProtectiveCopy()) {
-            streetLayer = streetLayer.extendOnlyCopy();
-        }
-        // This bidirectional reference is not going to work right unless transitlayer or both are always cloned.
-        streetLayer.linkedTransitLayer = transitLayer;
-        transitLayer.linkedStreetLayer = streetLayer;
+        TransitLayer transitLayer = network.transitLayer;
         for (StopSpec stopSpec : stops) {
-            int newVertexIndex = streetLayer.getOrCreateVertexNear(stopSpec.lat, stopSpec.lon);
+            int newVertexIndex = network.streetLayer.getOrCreateVertexNear(stopSpec.lat, stopSpec.lon);
             transitLayer.stopIdForIndex.add(stopSpec.id); // indexForStopId will be derived from this
             transitLayer.stopNames.add(stopSpec.name);
             transitLayer.streetVertexForStop.add(newVertexIndex); // stopForStreetVertex will be derived from this
         }
-        network.streetLayer = streetLayer;
-        return true;
+        return false; // No errors occurred.
     }
 
     public static class StopSpec {

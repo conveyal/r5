@@ -27,7 +27,7 @@ import java.util.zip.ZipFile;
  * It uses a lot less object pointers and can be built, read, and written orders of magnitude faster.
  * @author abyrd
  */
-public class TransportNetwork implements Serializable, Cloneable {
+public class TransportNetwork implements Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransportNetwork.class);
 
@@ -52,12 +52,16 @@ public class TransportNetwork implements Serializable, Cloneable {
         FSTObjectInput in = new FSTObjectInput(stream);
         TransportNetwork result = (TransportNetwork) in.readObject(TransportNetwork.class);
         in.close();
-        result.streetLayer.buildEdgeLists();
-        result.streetLayer.indexStreets();
-        result.transitLayer.rebuildTransientIndexes();
-        result.transitLayer.buildStopTree();
+        result.rebuildTransientIndexes();
         LOG.info("Done reading.");
         return result;
+    }
+
+    public void rebuildTransientIndexes() {
+        streetLayer.buildEdgeLists();
+        streetLayer.indexStreets();
+        transitLayer.rebuildTransientIndexes();
+        transitLayer.buildStopTree();
     }
 
     public static void main (String[] args) {
@@ -290,15 +294,6 @@ public class TransportNetwork implements Serializable, Cloneable {
         return getGridPointSet().link(streetLayer, Mode.WALK);
     }
 
-    public TransportNetwork clone() {
-        try {
-            return (TransportNetwork) super.clone();
-        } catch (CloneNotSupportedException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-
     //TODO: add transit stops to envelope
     public Envelope getEnvelope() {
         return streetLayer.getEnvelope();
@@ -355,14 +350,41 @@ public class TransportNetwork implements Serializable, Cloneable {
     /**
      * When applying a Modification that will change the street network as part of a Scenario, call this method to
      * make sure that the StreetLayer has been duplicated in such a way that it can be modified without affecting the
-     * original base TransportNetwork.
+     * original base StreetLayer. Duplication adds an extra layer of indirection to most edge accesses.
      *
-     * We don't want to always do this because it adds an extra layer of indirection to most edge accesses.
+     * NOTE we should no longer need this because the TransportNetwork is cloned only once per Scenario, rather than
+     * once per Modification. We should only revert to this method if it turns out that the extend-only copy of the
+     * street network adds significant speed overhead. And even then, we might just accept that.
      */
-    public void ensureExtendOnlyStreetLayer () {
+    @Deprecated
+    public void ensureExtendOnlyStreetLayer() {
         if (!streetLayer.isExtendOnlyCopy()) {
             streetLayer = streetLayer.extendOnlyCopy();
         }
+    }
+
+    /**
+     * We want to apply Scenarios to TransportNetworks, yielding a new TransportNetwork without disrupting the original
+     * one. The approach is to make a copy of the TransportNetwork, then apply all the Modifications in the Scenario
+     * one by one to that same copy. Two very different modification strategies are used for the TransitLayer and the
+     * StreetLayer. The StreetLayer stores a few very large arrays
+     * On the other hand, the TransitLayer has a hierarchy of collections, from patterns to trips to stoptimes. We can
+     * selectively copy-on-modify these collections without much impact on performance as long as they don't become too
+     * large. This is somewhat inefficient but easy to reason about, considering we allow both additions and deletions.
+     * We don't use clone() here with the expectation that it will be more clear and maintainable to show exactly
+     * how each field is being copied.
+     * @return a semi-shallow copy of this TransportNetwork, the TransitLayer recursively shallow-copied and the
+     * StreetLayer duplicated in such a way that it wraps the original, allowing it to be non-destructively extended.
+     */
+    public TransportNetwork scenarioCopy() {
+        TransportNetwork copy = new TransportNetwork();
+        copy.gridPointSet = gridPointSet;
+        copy.transitLayer = transitLayer.clone();
+        copy.streetLayer = streetLayer.extendOnlyCopy();
+        // Update bidirectional reference between StreetLayer and TransitLayer
+        copy.streetLayer.linkedTransitLayer = copy.transitLayer;
+        copy.transitLayer.linkedStreetLayer = copy.streetLayer;
+        return copy;
     }
 
 }

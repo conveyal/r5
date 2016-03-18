@@ -34,7 +34,7 @@ public class Scenario implements Serializable {
     }
 
     /**
-     * @return a copy of the supplied network with the modifications in this scenario applied.
+     * @return a copy of the supplied network with the modifications in this scenario non-destructively applied.
      */
     public TransportNetwork applyToTransportNetwork (TransportNetwork originalNetwork) {
         LOG.info("Applying scenario {}", this);
@@ -49,30 +49,32 @@ public class Scenario implements Serializable {
                 .filter(m -> m.isActiveInVariant(useVariant)).collect(Collectors.toList());
         LOG.info("Variant '{}' selected, with {} modifications active out of {} total.",
                 useVariant, filteredModifications.size(), modifications.size());
-        TransportNetwork copiedNetwork = originalNetwork.clone();
+        TransportNetwork copiedNetwork = originalNetwork.scenarioCopy();
         LOG.info("Resolving modifications against TransportNetwork and sanity checking.");
-        // FIXME actually we don't want to check all the parameters before applying any modifications.
-        // Some parameters may become valid/invalid because of previous modifications.
+        // Check all the parameters before applying any modifications.
+        // FIXME might some parameters may become valid/invalid because of previous modifications in the list?
         boolean errorsInScenario = false;
         for (Modification modification : filteredModifications) {
             boolean errorsInModification = modification.resolve(originalNetwork);
             if (errorsInModification) {
-                errorsInScenario = true;
                 LOG.error("Errors were detected in a scenario modification of type {}:", modification.getType());
                 for (String warning : modification.warnings) {
                     LOG.error(warning);
                 }
+                errorsInScenario = true;
             }
         }
-        // Each modification is applied in isolation, creating a new copy.
-        // This is somewhat inefficient but easy to reason about.
+        if (errorsInScenario) {
+            throw new RuntimeException("Errors were found in the Scenario, bailing out.");
+        }
+        // Apply each modification in turn to the same extensible copy of the TransitNetwork.
         LOG.info("Applying modifications to TransportNetwork.");
         for (Modification modification : filteredModifications) {
             LOG.info("Applying modification of type {}", modification.getType());
             boolean errors = modification.apply(copiedNetwork);
             if (errors) {
                 LOG.error("Error while applying modification {}", modification);
-                break;
+                throw new RuntimeException("Errors occured while applying the Scenario to the TransportNetwork, bailing out.");
             }
         }
         return copiedNetwork;

@@ -1,19 +1,28 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.gtfs.model.Stop;
-import com.conveyal.osmlib.*;
+import com.conveyal.osmlib.Node;
+import com.conveyal.osmlib.OSM;
+import com.conveyal.osmlib.OSMEntity;
+import com.conveyal.osmlib.Relation;
+import com.conveyal.osmlib.Way;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.common.GeometryUtils;
-import com.conveyal.r5.labeling.*;
+import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
+import com.conveyal.r5.labeling.RoadPermission;
+import com.conveyal.r5.labeling.SpeedConfigurator;
+import com.conveyal.r5.labeling.TraversalPermissionLabeler;
+import com.conveyal.r5.labeling.TypeOfEdgeLabeler;
+import com.conveyal.r5.labeling.USTraversalPermissionLabeler;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.streets.EdgeStore.Edge;
+import com.conveyal.r5.transit.TransitLayer;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.LineString;
 import com.vividsolutions.jts.geom.Point;
-import com.conveyal.r5.profile.Mode;
-import com.vividsolutions.jts.geom.*;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -23,17 +32,20 @@ import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.set.TIntSet;
-import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TIntHashSet;
-import com.conveyal.r5.transit.TransitLayer;
-import gnu.trove.set.hash.TLongHashSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.Serializable;
-import java.util.*;
-import java.util.stream.IntStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Random;
 import java.util.stream.LongStream;
 
 /**
@@ -1014,7 +1026,7 @@ public class StreetLayer implements Serializable, Cloneable {
         EdgeStore.Edge newEdge1 = edgeStore.addStreetPair(newVertexIndex, oldToVertex, split.distance1_mm, edge.getOSMID());
         // Copy the flags and speeds for both directions, making the new edge1 like the existing edge.
         newEdge1.copyPairFlagsAndSpeeds(edge);
-        if (!edgeStore.isProtectiveCopy()) {
+        if (!edgeStore.isExtendOnlyCopy()) {
             spatialIndex.insert(newEdge1.getEnvelope(), newEdge1.edgeIndex);
         }
 
@@ -1112,14 +1124,13 @@ public class StreetLayer implements Serializable, Cloneable {
      * Find a location on an existing street near the given point, without actually creating any vertices or edges.
      * The search radius can be specified freely here because we use this function to link transit stops to streets but
      * also to link pointsets to streets, and currently we use different distances for these two things.
-     * Non-destructively find a location on an existing street near the given point.
      * TODO favor platforms and pedestrian paths when requested
      * @param lat latitude in floating point geographic coordinates (not fixed point int coordinates)
      * @param lon longitude in floating point geographic coordinates (not fixed point int coordinates)
      * @return a Split object representing a point along a sub-segment of a specific edge, or null if there are no streets nearby.
      */
-    public Split findSplit(double lat, double lon, double searchRadiusMeters, Mode mode) {
-        return Split.find(lat, lon, searchRadiusMeters, this, mode);
+    public Split findSplit(double lat, double lon, double radiusMeters, Mode mode) {
+        return Split.find(lat, lon, radiusMeters, this, mode);
     }
 
     /**
@@ -1255,7 +1266,7 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     public boolean isExtendOnlyCopy() {
-        return this.edgeStore.isProtectiveCopy();
+        return this.edgeStore.isExtendOnlyCopy();
     }
 
     // FIXME radiusMeters is now set project-wide

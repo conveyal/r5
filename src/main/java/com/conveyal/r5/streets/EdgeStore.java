@@ -120,7 +120,7 @@ public class EdgeStore implements Serializable {
      * @return true if this EdgeStore has already been extended,
      * and can therefore be modified without affecting the baseline graph shared between all threads.
      */
-    public boolean isProtectiveCopy() {
+    public boolean isExtendOnlyCopy() {
         return firstModifiableEdge > 0;
     }
 
@@ -315,7 +315,7 @@ public class EdgeStore implements Serializable {
         speeds.add(DEFAULT_SPEED_KPH);
         flags.add(0);
 
-        if (isProtectiveCopy()) {
+        if (isExtendOnlyCopy()) {
             // If we're working on a copy made for a Scenario the edges will not be spatially indexed, so record them.
             temporarilyAddedEdges.add(forwardEdgeIndex);
             temporarilyAddedEdges.add(forwardEdgeIndex + 1);

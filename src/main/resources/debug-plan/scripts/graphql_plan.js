@@ -502,6 +502,13 @@ function makeTextResponse(data) {
 
 }
 
+function makeModes(modeName, javaModeName) {
+    var modes = planConfig[modeName].split(",");
+    var niceModes = modes.map(function(mode) { return javaModeName+"."+mode});
+
+    return niceModes.join(",");
+}
+
 function requestPlan() {
     $('#resultTab').removeClass("status-ok status-error").addClass("status-waiting");
     var request = template
@@ -528,6 +535,41 @@ function requestPlan() {
 
     $(".query").html("<p>This can be copied into GraphiQL and played with</p><pre>"+request + "\n\nQuery Variables:\n" + JSON.stringify(variables, null, "  ") + "</pre>");
     $(".curl").html("<p>This can be used in CURL: <samp> curl 'http://localhost:8080/otp/routers/default/index/graphql'  -H 'Accept-Encoding: gzip, deflate' -H 'Content-Type: application/json; charset=UTF-8' --data-binary '" + compactedParams + "' --compressed </samp></p>");
+
+    var java = "<p>This can be used to write tests because it sets ProfileRequest</p><pre class=\"pre-wrap\">";
+
+    java += "//Loading graph\n" +
+	 'String dir = "path to folder with graph";\nInputStream inputStream = new BufferedInputStream(new FileInputStream(new File(dir, "network.dat")));\ntransportNetwork = TransportNetwork.read(inputStream);\n//Optional used to get street names:\ntransportNetwork.readOSM(new File(dir, "osm.mapdb"));\npointToPointQuery = new PointToPointQuery(transportNetwork);\n\n';
+
+    java += "ProfileRequest profileRequest = new ProfileRequest();\n";
+    java +="//Set timezone to timezone of transport network\nprofileRequest.zoneId = transportNetwork.getTimeZone();\n";
+    for (var varname in variables) {
+        if (varname.indexOf("Time") == -1) {
+            java+="profileRequest." + varname+" = " + variables[varname] + ";\n";
+        }
+    }
+
+    java+="profileRequest.setTime(\"" + variables.fromTime + "\", \"" + variables.toTime + "\");\n\n";
+
+    if (planConfig.transitModes != null && planConfig.transitModes.length > 2) {
+        java+="profileRequest.transitModes = EnumSet.of(" + makeModes("transitModes", "TransitModes") + ");\n";
+    }
+    if (planConfig.accessModes != null && planConfig.accessModes.length > 2) {
+        java+="profileRequest.accessModes = EnumSet.of(" + makeModes("accessModes", "LegMode") + ");\n";
+    }
+    if (planConfig.egressModes != null && planConfig.egressModes.length > 2) {
+        java+="profileRequest.egressModes = EnumSet.of(" + makeModes("egressModes", "LegMode") + ");\n";
+    }
+    if (planConfig.directModes != null && planConfig.directModes.length > 2) {
+        java+="profileRequest.directModes = EnumSet.of(" + makeModes("directModes", "LegMode") + ");\n";
+    }
+
+
+    java +="//Gets a response:\n";
+    java +="ProfileResponse ProfileResponse = pointToPointQuery.getPlan(profileRequest);";
+    java+= "</pre>";
+
+    $(".java").html(java);
 
     /*console.log(request);*/
 

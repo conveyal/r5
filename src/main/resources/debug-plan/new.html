@@ -15,6 +15,13 @@
             .status-waiting {
                 background-color:orange;
             }
+            .pre-wrap {
+                white-space: pre-wrap;       /* CSS 3 */
+                white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+                white-space: -pre-wrap;      /* Opera 4-6 */
+                white-space: -o-pre-wrap;    /* Opera 7 */
+                word-wrap: break-word;       /* Internet Explorer 5.5+ */
+            }
         </style>
 
     </head>
@@ -34,6 +41,7 @@
 					<li><a href="#result" id="resultTab" role="tab">Results</a></li>
 					<li><a href="#query" id="queryTab" role="tab">Query</a></li>
 					<li><a href="#curl" id="curlTab" role="tab">Curl</a></li>
+					<li><a href="#java" id="javaTab" role="tab">Java</a></li>
 				</ul>
 
 			</div>
@@ -64,6 +72,15 @@
 						<span class="sidebar-close">X</span>
 					</h1>
 					<div class="curl">
+					</div>
+
+				</div>
+				<div class="sidebar-pane" id="java">
+					<h1 class="sidebar-header">
+						Java
+						<span class="sidebar-close">X</span>
+					</h1>
+					<div class="java">
 					</div>
 
 				</div>

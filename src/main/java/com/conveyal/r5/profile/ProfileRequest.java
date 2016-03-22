@@ -365,4 +365,18 @@ public class ProfileRequest implements Serializable, Cloneable {
             date = toZonedDateTime.toLocalDate();
         }
     }
+
+    /**
+     * Sets time and date from fromTime and toTime
+     *
+     * It is used in tests
+     *
+     * @param fromTime The beginning of the departure window, in ISO 8061 YYYY-MM-DDTHH:MM:SS+HH:MM
+     * @param toTime The end of the departure window, in ISO 8061 YYYY-MM-DDTHH:MM:SS+HH:MM
+     */
+    public void setTime(String fromTime, String toTime) {
+        fromZonedDateTime = ZonedDateTime.parse(fromTime);
+        toZonedDateTime = ZonedDateTime.parse(toTime);
+        setTime();
+    }
 }

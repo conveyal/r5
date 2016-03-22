@@ -223,9 +223,13 @@ public class PointToPointQuery {
                         streetRouter.setDestination(split);
                         streetRouter.route();
                         StreetRouter.State lastState = streetRouter.getState(split);
+                        if (lastState == null) {
+                            LOG.warn("Direct mode {} last state wasn't found", mode);
+                            continue;
+                        }
                         streetPath = new StreetPath(lastState, transportNetwork);
                     } else {
-                        LOG.warn("Direct mode last state wasn't found!");
+                        LOG.warn("Direct mode {} origin wasn't found!", mode);
                         continue;
                     }
                 }

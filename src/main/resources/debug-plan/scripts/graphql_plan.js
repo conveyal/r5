@@ -509,17 +509,25 @@ function requestPlan() {
                 .replace("ACCESSMODES", planConfig.accessModes)
                 .replace("EGRESSMODES", planConfig.egressModes)
                 .replace("TRANSITMODES", planConfig.transitModes);
-    var params = {
-        'query': request,
-        'variables': JSON.stringify({
+    var variables ={
             'fromLat':planConfig.fromLat,
             'fromLon':planConfig.fromLon,
             'toLat': planConfig.toLat,
             'toLon':planConfig.toLon,
             'fromTime':planConfig.date+"T"+planConfig.fromTime+planConfig.offset,
             'toTime':planConfig.date+"T"+planConfig.toTime+planConfig.offset
-        })
+        };
+    var params = {
+        'query': request,
+        'variables': JSON.stringify(variables)
     };
+
+    var compactedParams = JSON.stringify(params);
+    //Removes useless spaces so that CURL CLI line is more compact
+    compactedParams = compactedParams.replace(/\s{2,}/g, ' ');
+
+    $(".query").html("<p>This can be copied into GraphiQL and played with</p><pre>"+request + "\n\nQuery Variables:\n" + JSON.stringify(variables, null, "  ") + "</pre>");
+    $(".curl").html("<p>This can be used in CURL: <samp> curl 'http://localhost:8080/otp/routers/default/index/graphql'  -H 'Accept-Encoding: gzip, deflate' -H 'Content-Type: application/json; charset=UTF-8' --data-binary '" + compactedParams + "' --compressed </samp></p>");
 
     /*console.log(request);*/
 

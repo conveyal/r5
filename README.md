@@ -7,6 +7,8 @@ use the transportation system than planning a single trip at an exact departure 
 7:53 AM every morning, and even fewer leave at a precise time when going to a non-work event. There's more information on our thinking
 on this particular point [here](http://conveyal.com/blog/2015/05/04/variation-in-accessibility-measures/).
 
+Please follow the Conveyal Java style guide at https://github.com/conveyal/JavaStyle/
+
 ## History
 
 R<sup>5</sup> grew out of several open-source projects. The focus on analytic applications, and the core development team behind R<sup>5</sup>,

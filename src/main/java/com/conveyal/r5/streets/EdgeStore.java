@@ -2,7 +2,7 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.osmlib.Node;
 import com.conveyal.r5.common.GeometryUtils;
-import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.util.TIntIntHashMultimap;
 import com.conveyal.r5.util.TIntIntMultimap;
@@ -440,21 +440,21 @@ public class EdgeStore implements Serializable {
          *
          * Otherwise speed is based on wanted walking, cycling speed provided in ProfileRequest.
          */
-        public float calculateSpeed(ProfileRequest options, Mode traverseMode) {
-            if (traverseMode == null) {
+        public float calculateSpeed(ProfileRequest options, StreetMode traverseStreetMode) {
+            if (traverseStreetMode == null) {
                 return Float.NaN;
-            } else if (traverseMode == Mode.CAR) {
+            } else if (traverseStreetMode == StreetMode.CAR) {
                 /*if (options.useTraffic) {
                     //TODO: speed based on traffic information
                 }*/
                 return getSpeedMs();
             }
-            return options.getSpeed(traverseMode);
+            return options.getSpeed(traverseStreetMode);
         }
 
-        public StreetRouter.State traverse (StreetRouter.State s0, Mode mode, ProfileRequest req, TurnCostCalculator turnCostCalculator) {
+        public StreetRouter.State traverse (StreetRouter.State s0, StreetMode streetMode, ProfileRequest req, TurnCostCalculator turnCostCalculator) {
             StreetRouter.State s1 = new StreetRouter.State(getToVertex(), edgeIndex, s0);
-            float speedms = calculateSpeed(req, mode);
+            float speedms = calculateSpeed(req, streetMode);
             float time = (float) (getLengthM() / speedms);
             float weight = 0;
 
@@ -468,7 +468,7 @@ public class EdgeStore implements Serializable {
             // add turn restrictions that start on this edge
             // Turn restrictions only apply to cars for now. This is also coded in canTurnFrom, so change it both places
             // if/when it gets changed.
-            if (s0.mode == Mode.CAR && turnRestrictions.containsKey(getEdgeIndex())) {
+            if (s0.streetMode == StreetMode.CAR && turnRestrictions.containsKey(getEdgeIndex())) {
                 if (s1.turnRestrictions == null) s1.turnRestrictions = new TIntIntHashMap();
                 turnRestrictions.get(getEdgeIndex()).forEach(r -> {
                     s1.turnRestrictions.put(r, 1); // we have traversed one edge
@@ -482,11 +482,11 @@ public class EdgeStore implements Serializable {
 
             //Currently weigh is basically the same as weight. It differs only on stairs and when walking.
 
-            s1.mode = mode;
-            if (mode == Mode.WALK && getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) {
+            s1.streetMode = streetMode;
+            if (streetMode == StreetMode.WALK && getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) {
                 weight = time;
                 //elevation which changes weight
-            } else if (mode == Mode.BICYCLE) {
+            } else if (streetMode == StreetMode.BICYCLE) {
                 // walk a bike if biking is not allowed on this edge, or if the traffic stress is too high
                 boolean walking = !getFlag(EdgeFlag.ALLOWS_BIKE);
 
@@ -507,14 +507,14 @@ public class EdgeStore implements Serializable {
 
                 if (walking) {
                     //TODO: set bike walking in state
-                    s1.mode = Mode.WALK;
+                    s1.streetMode = StreetMode.WALK;
                     // * 1.5 to account for time to get off bike and slower walk speed once off
                     // this will tend to prefer to bike a slightly longer route than walk a long way,
                     // but will allow walking to cross a busy street, etc.
                     weight *=1.5;
                 }
 
-            } else if (mode == Mode.CAR && getFlag(EdgeFlag.ALLOWS_CAR)) {
+            } else if (streetMode == StreetMode.CAR && getFlag(EdgeFlag.ALLOWS_CAR)) {
                 weight = time;
             } else
                 return null; // this mode cannot traverse this edge
@@ -522,7 +522,7 @@ public class EdgeStore implements Serializable {
 
             if(getFlag(EdgeFlag.STAIRS)) {
                 weight*=3.0; //stair reluctance
-            } else if (mode == Mode.WALK) {
+            } else if (streetMode == StreetMode.WALK) {
                 weight*=2.0; //walk reluctance
             }
 
@@ -531,7 +531,8 @@ public class EdgeStore implements Serializable {
             int roundedTime = (int) Math.ceil(time);
 
             // negative backedge is start of search.
-            int turnCost = s0.backEdge >= 0 ? turnCostCalculator.computeTurnCost(s0.backEdge, getEdgeIndex(), mode) : 0;
+            int turnCost = s0.backEdge >= 0 ? turnCostCalculator.computeTurnCost(s0.backEdge, getEdgeIndex(),
+                streetMode) : 0;
 
             s1.incrementTimeInSeconds(roundedTime + turnCost);
             s1.incrementWeight(weight + turnCost);
@@ -549,7 +550,7 @@ public class EdgeStore implements Serializable {
         public boolean canTurnFrom (StreetRouter.State s0, StreetRouter.State s1) {
             // Turn restrictions only apply to cars for now. This is also coded in traverse, so change it both places
             // if/when it gets changed.
-            if (s0.turnRestrictions != null && s0.mode == Mode.CAR) {
+            if (s0.turnRestrictions != null && s0.streetMode == StreetMode.CAR) {
                 // clone turn restrictions
                 s1.turnRestrictions = new TIntIntHashMap(s0.turnRestrictions);
 

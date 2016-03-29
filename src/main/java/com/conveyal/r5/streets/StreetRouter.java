@@ -1,6 +1,6 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.util.TIntObjectHashMultimap;
 import com.conveyal.r5.util.TIntObjectMultimap;
@@ -84,7 +84,7 @@ public class StreetRouter {
     public ProfileRequest profileRequest = new ProfileRequest();
 
     /** Search mode: we need a single mode, it is up to the caller to disentagle the modes set in the profile request */
-    public Mode mode = Mode.WALK;
+    public StreetMode streetMode = StreetMode.WALK;
 
     private RoutingVisitor routingVisitor;
 
@@ -220,8 +220,8 @@ public class StreetRouter {
         queue.clear();
         // from vertex is at end of back edge. Set edge correctly so that turn restrictions/costs are applied correctly
         // at the origin.
-        State startState0 = new State(split.vertex0, split.edge + 1, mode);
-        State startState1 = new State(split.vertex1, split.edge, mode);
+        State startState0 = new State(split.vertex0, split.edge + 1, streetMode);
+        State startState1 = new State(split.vertex1, split.edge, streetMode);
         // TODO walk speed, assuming 1 m/sec currently.
         startState0.weight = split.distance0_mm / 1000;
         startState1.weight = split.distance1_mm / 1000;
@@ -236,7 +236,7 @@ public class StreetRouter {
         queue.clear();
 
         // NB backEdge of -1 is no problem as it is a special case that indicates that the origin was a vertex.
-        State startState = new State(fromVertex, -1, mode);
+        State startState = new State(fromVertex, -1, streetMode);
         queue.add(startState);
     }
 
@@ -255,7 +255,7 @@ public class StreetRouter {
         bikeStations.forEachEntry((vertexIdx, bikeStationState) -> {
             // backEdge needs to be unique for each start state or they will wind up dominating each other.
             // subtract 1 from -vertexIdx because -0 == 0
-            State state = new State(vertexIdx, -vertexIdx - 1, mode);
+            State state = new State(vertexIdx, -vertexIdx - 1, streetMode);
             state.weight = bikeStationState.weight+switchCost;
             state.durationSeconds = bikeStationState.durationSeconds+switchTime;
             state.isBikeShare = true;
@@ -413,7 +413,7 @@ public class StreetRouter {
             streetLayer.outgoingEdges.get(s0.vertex).forEach(eidx -> {
                 edge.seek(eidx);
 
-                State s1 = edge.traverse(s0, mode, profileRequest, turnCostCalculator);
+                State s1 = edge.traverse(s0, streetMode, profileRequest, turnCostCalculator);
 
                 if (s1 != null && s1.distance <= distanceLimitMm && s1.getDurationSeconds() < tmpTimeLimitSeconds) {
                     queue.add(s1);
@@ -483,11 +483,11 @@ public class StreetRouter {
             states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge, s)))
                     .map(s -> {
                         State ret = new State(-1, split.edge, s);
-                        ret.mode = s.mode;
+                        ret.streetMode = s.streetMode;
 
                         // figure out the turn cost
-                        int turnCost = this.turnCostCalculator.computeTurnCost(s.backEdge, split.edge, s.mode);
-                        int traversalCost = (int) Math.round(split.distance0_mm / 1000d / e.calculateSpeed(profileRequest, s.mode));
+                        int turnCost = this.turnCostCalculator.computeTurnCost(s.backEdge, split.edge, s.streetMode);
+                        int traversalCost = (int) Math.round(split.distance0_mm / 1000d / e.calculateSpeed(profileRequest, s.streetMode));
 
                         // TODO length of perpendicular
                         ret.incrementWeight(turnCost + traversalCost);
@@ -506,11 +506,11 @@ public class StreetRouter {
             states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge + 1, s)))
                     .map(s -> {
                         State ret = new State(-1, split.edge + 1, s);
-                        ret.mode = s.mode;
+                        ret.streetMode = s.streetMode;
 
                         // figure out the turn cost
-                        int turnCost = this.turnCostCalculator.computeTurnCost(s.backEdge, split.edge + 1, s.mode);
-                        int traversalCost = (int) Math.round(split.distance1_mm / 1000d / e.calculateSpeed(profileRequest, s.mode));
+                        int turnCost = this.turnCostCalculator.computeTurnCost(s.backEdge, split.edge + 1, s.streetMode);
+                        int traversalCost = (int) Math.round(split.distance1_mm / 1000d / e.calculateSpeed(profileRequest, s.streetMode));
 
                         // TODO length of perpendicular
                         ret.incrementWeight(turnCost + traversalCost);
@@ -536,7 +536,7 @@ public class StreetRouter {
         protected int durationSeconds;
         //Distance in mm
         public int distance;
-        public Mode mode;
+        public StreetMode streetMode;
         public State backState; // previous state in the path chain
         public boolean isBikeShare = false; //is true if vertex in this state is Bike sharing station where mode switching occurs
 
@@ -555,12 +555,12 @@ public class StreetRouter {
             this.weight = backState.weight;
         }
 
-        public State(int atVertex, int viaEdge, Mode mode) {
+        public State(int atVertex, int viaEdge, StreetMode streetMode) {
             this.vertex = atVertex;
             this.backEdge = viaEdge;
             this.backState = null;
             this.distance = 0;
-            this.mode = mode;
+            this.streetMode = streetMode;
             this.durationSeconds = 0;
         }
 

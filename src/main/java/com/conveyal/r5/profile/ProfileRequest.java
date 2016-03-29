@@ -11,14 +11,12 @@ import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.model.json_serialization.*;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import graphql.GraphQLException;
 import graphql.schema.DataFetchingEnvironment;
 
 import java.io.Serializable;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.EnumSet;
-import java.util.HashMap;
 
 /**
  * All the modifiable parameters for profile routing.
@@ -243,8 +241,8 @@ public class ProfileRequest implements Serializable, Cloneable {
         return  currentDateTime.plusSeconds(fromTime);
     }
 
-    public float getSpeed(Mode mode) {
-        switch (mode) {
+    public float getSpeed(StreetMode streetMode) {
+        switch (streetMode) {
         case WALK:
             return walkSpeed;
         case BICYCLE:
@@ -254,7 +252,7 @@ public class ProfileRequest implements Serializable, Cloneable {
         default:
             break;
         }
-        throw new IllegalArgumentException("getSpeed(): Invalid mode " + mode);
+        throw new IllegalArgumentException("getSpeed(): Invalid mode " + streetMode);
     }
 
     /**

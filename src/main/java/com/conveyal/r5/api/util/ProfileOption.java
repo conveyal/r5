@@ -1,7 +1,5 @@
 package com.conveyal.r5.api.util;
 
-import com.conveyal.r5.profile.Mode;
-import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.PathWithTimes;
 import com.conveyal.r5.transit.TransitLayer;
 import com.google.common.base.Joiner;

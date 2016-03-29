@@ -7,7 +7,7 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.point_to_point.builder.RouterInfo;
-import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.streets.*;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -25,7 +25,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.time.Instant;
 import java.util.*;
 
 import java.io.File;
@@ -158,8 +157,8 @@ public class PointToPointRouterServer {
             Map<String, Object> content = new HashMap<>(2);
             String queryMode = request.queryParams("mode");
 
-            Mode mode = Mode.valueOf(queryMode);
-            if (mode == null) {
+            StreetMode streetMode = StreetMode.valueOf(queryMode);
+            if (streetMode == null) {
                 content.put("errors", "Mode is wrong");
                 return content;
             }
@@ -177,7 +176,7 @@ public class PointToPointRouterServer {
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
 
             streetRouter.profileRequest = profileRequest;
-            streetRouter.mode = mode;
+            streetRouter.streetMode = streetMode;
             streetRouter.distanceLimitMeters = 2000;
             if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
                 streetRouter.route();
@@ -189,7 +188,7 @@ public class PointToPointRouterServer {
                     feature.addProperty("weight", weight);
                     feature.addProperty("name", transportNetwork.transitLayer.stopNames.get(stopIdx));
                     feature.addProperty("type", "stop");
-                    feature.addProperty("mode", mode.toString());
+                    feature.addProperty("mode", streetMode.toString());
                     if (state != null) {
                         feature.addProperty("distance_m", state.distance/1000);
                         feature.addProperty("duration_s", state.getDurationSeconds());
@@ -214,8 +213,8 @@ public class PointToPointRouterServer {
             Map<String, Object> content = new HashMap<>(2);
             String queryMode = request.queryParams("mode");
 
-            Mode mode = Mode.valueOf(queryMode);
-            if (mode == null) {
+            StreetMode streetMode = StreetMode.valueOf(queryMode);
+            if (streetMode == null) {
                 content.put("errors", "Mode is wrong");
                 return content;
             }
@@ -233,7 +232,7 @@ public class PointToPointRouterServer {
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
 
             streetRouter.profileRequest = profileRequest;
-            streetRouter.mode = mode;
+            streetRouter.streetMode = streetMode;
             streetRouter.distanceLimitMeters = 2000;
             if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
                 streetRouter.route();
@@ -249,7 +248,7 @@ public class PointToPointRouterServer {
                         feature.addProperty("places", bikeRentalStation.spacesAvailable);
                     }
                     feature.addProperty("type", "stop");
-                    feature.addProperty("mode", mode.toString());
+                    feature.addProperty("mode", streetMode.toString());
                     if (state != null) {
                         feature.addProperty("distance_m", state.distance/1000);
                     }
@@ -272,8 +271,8 @@ public class PointToPointRouterServer {
             Map<String, Object> content = new HashMap<>();
             String queryMode = request.queryParams("mode");
 
-            Mode mode = Mode.valueOf(queryMode);
-            if (mode == null) {
+            StreetMode streetMode = StreetMode.valueOf(queryMode);
+            if (streetMode == null) {
                 content.put("errors", "Mode is wrong");
                 return content;
             }
@@ -285,7 +284,8 @@ public class PointToPointRouterServer {
             //TODO errorchecks
 
             Boolean fullStateList = request.queryMap("full").booleanValue();
-            RoutingVisitor routingVisitor = new RoutingVisitor(transportNetwork.streetLayer.edgeStore, mode);
+            RoutingVisitor routingVisitor = new RoutingVisitor(transportNetwork.streetLayer.edgeStore,
+                streetMode);
 
             if (fullStateList == null) {
                 fullStateList = false;
@@ -300,7 +300,7 @@ public class PointToPointRouterServer {
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
 
             streetRouter.profileRequest = profileRequest;
-            streetRouter.mode = mode;
+            streetRouter.streetMode = streetMode;
 
             // TODO use target pruning instead of a distance limit
             streetRouter.distanceLimitMeters = 100_000;
@@ -810,7 +810,7 @@ public class PointToPointRouterServer {
                     .getCursor(edgeIdx);
                 GeoJsonFeature feature = new GeoJsonFeature(edge.getGeometry());
                 feature.addProperty("weight", state.weight);
-                feature.addProperty("mode", state.mode);
+                feature.addProperty("mode", state.streetMode);
                 features.add(feature);
             }
         }

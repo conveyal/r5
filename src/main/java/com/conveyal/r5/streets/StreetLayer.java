@@ -6,7 +6,7 @@ import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.*;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
-import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.geom.*;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -17,17 +17,14 @@ import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.set.TIntSet;
-import gnu.trove.set.TLongSet;
 import gnu.trove.set.hash.TIntHashSet;
 import com.conveyal.r5.transit.TransitLayer;
-import gnu.trove.set.hash.TLongHashSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.Serializable;
 import java.util.*;
-import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
 /**
@@ -1090,8 +1087,8 @@ public class StreetLayer implements Serializable {
      * @param lon longitude in floating point geographic coordinates (not fixed point int coordinates)
      * @return a Split object representing a point along a sub-segment of a specific edge, or null if there are no streets nearby.
      */
-    public Split findSplit(double lat, double lon, double radiusMeters, Mode mode) {
-        return Split.find (lat, lon, radiusMeters, this, mode);
+    public Split findSplit(double lat, double lon, double radiusMeters, StreetMode streetMode) {
+        return Split.find (lat, lon, radiusMeters, this, streetMode);
     }
 
     /**
@@ -1141,7 +1138,7 @@ public class StreetLayer implements Serializable {
             if (vertexLabels.containsKey(vertex))
                 continue;
             StreetRouter r = new StreetRouter(this);
-            r.mode = Mode.WALK;
+            r.streetMode = StreetMode.WALK;
             r.setOrigin(vertex);
             // walk to the end of the graph
             r.distanceLimitMeters = Integer.MAX_VALUE;

@@ -111,11 +111,11 @@ public class RepeatedRaptorProfileRouter {
         // FIXME what does WALK,CAR even mean in this context
         EnumSet<LegMode> modes = transit ? request.accessModes : request.directModes;
         if (modes.contains(LegMode.CAR))
-            streetRouter.mode = Mode.CAR;
+            streetRouter.streetMode = StreetMode.CAR;
         else if (modes.contains(LegMode.BICYCLE))
-            streetRouter.mode = Mode.BICYCLE;
+            streetRouter.streetMode = StreetMode.BICYCLE;
         else
-            streetRouter.mode = Mode.WALK;
+            streetRouter.streetMode = StreetMode.WALK;
 
         streetRouter.profileRequest = request;
 

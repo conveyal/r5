@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
 import com.vividsolutions.jts.geom.Coordinate;
@@ -13,7 +13,7 @@ public interface PointSet {
 
     Coordinate getCoordinate(int index);
 
-    LinkedPointSet link (StreetLayer streetLayer, Mode mode);
+    LinkedPointSet link (StreetLayer streetLayer, StreetMode streetMode);
 
     double getLat(int i);
 

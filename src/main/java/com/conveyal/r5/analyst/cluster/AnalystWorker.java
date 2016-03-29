@@ -8,7 +8,7 @@ import com.conveyal.r5.analyst.scenario.InactiveTripsFilter;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.JsonUtilities;
-import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.publish.StaticComputer;
 import com.conveyal.r5.publish.StaticSiteRequest;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -405,11 +405,11 @@ public class AnalystWorker implements Runnable {
         // TODO this breaks if transportNetwork has been rebuilt ?
         // TODO We should link after applying the scenario once we allow street modifications.
         // linkages are cached in the street layer
-        Mode mode;
-        if (clusterRequest.profileRequest.accessModes.contains(LegMode.CAR)) mode = Mode.CAR;
-        else if (clusterRequest.profileRequest.accessModes.contains(LegMode.BICYCLE)) mode = Mode.BICYCLE;
-        else mode = Mode.WALK;
-        linkedTargets = targets.link(transportNetwork.streetLayer, mode);
+        StreetMode streetMode;
+        if (clusterRequest.profileRequest.accessModes.contains(LegMode.CAR)) streetMode = StreetMode.CAR;
+        else if (clusterRequest.profileRequest.accessModes.contains(LegMode.BICYCLE)) streetMode = StreetMode.BICYCLE;
+        else streetMode = StreetMode.WALK;
+        linkedTargets = targets.link(transportNetwork.streetLayer, streetMode);
 
         LOG.info("Applying scenario...");
         // Get the supplied scenario or create an empty one if no scenario was supplied.

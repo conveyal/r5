@@ -4,7 +4,26 @@
         <title>GraphQL API</title>
         <link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css"/>
         <link rel="stylesheet" href="/leaflet_context/leaflet.contextmenu.css"/>
-		<link rel="stylesheet" href="leaflet-sidebar.css"/>
+        <link rel="stylesheet" href="leaflet-sidebar.css"/>
+        <style type="text/css">
+            .status-ok {
+                background-color:green;
+            }
+            .status-error {
+                background-color:red;
+            }
+            .status-waiting {
+                background-color:orange;
+            }
+            .pre-wrap {
+                white-space: pre-wrap;       /* CSS 3 */
+                white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+                white-space: -pre-wrap;      /* Opera 4-6 */
+                white-space: -o-pre-wrap;    /* Opera 7 */
+                word-wrap: break-word;       /* Internet Explorer 5.5+ */
+            }
+        </style>
+
     </head>
     <body>
         <div id="map" style="position: absolute; top: 0px; left: 0; width: 100%; height: 100%;"></div>
@@ -19,19 +38,49 @@
 			<!-- Nav tabs -->
 			<div class="sidebar-tabs">
 				<ul role="tablist">
-					<li><a href="#home" role="tab">Home</a></li>
+					<li><a href="#result" id="resultTab" role="tab">Results</a></li>
+					<li><a href="#query" id="queryTab" role="tab">Query</a></li>
+					<li><a href="#curl" id="curlTab" role="tab">Curl</a></li>
+					<li><a href="#java" id="javaTab" role="tab">Java</a></li>
 				</ul>
 
 			</div>
 
 			<!-- Tab panes -->
 			<div class="sidebar-content">
-				<div class="sidebar-pane" id="home">
+				<div class="sidebar-pane" id="result">
 					<h1 class="sidebar-header">
-						Home
+						Results
 						<span class="sidebar-close">X</span>
 					</h1>
 					<div class="response">
+					</div>
+
+				</div>
+				<div class="sidebar-pane" id="query">
+					<h1 class="sidebar-header">
+						Query
+						<span class="sidebar-close">X</span>
+					</h1>
+					<div class="query">
+					</div>
+
+				</div>
+				<div class="sidebar-pane" id="curl">
+					<h1 class="sidebar-header">
+						Curl
+						<span class="sidebar-close">X</span>
+					</h1>
+					<div class="curl">
+					</div>
+
+				</div>
+				<div class="sidebar-pane" id="java">
+					<h1 class="sidebar-header">
+						Java
+						<span class="sidebar-close">X</span>
+					</h1>
+					<div class="java">
 					</div>
 
 				</div>

@@ -21,7 +21,7 @@ var PlanConfig = function() {
     this.accessModes="WALK";
     this.egressModes="WALK";
     this.directModes="WALK,BICYCLE";
-    this.transitModes="BUS";
+    this.transitModes="TRANSIT";
     this.date="2015-02-05";
     this.fromTime="07:30";
     this.toTime="10:30";
@@ -419,16 +419,16 @@ function makeTextResponse(data) {
     if (layer != null) {
         layer.clearLayers();
     }
-    var infos = "<ul>";
+    var infos = "";
     for(var i=0; i < options.length; i++) {
         var option = options[i];
-        var item = "<li>"+option.summary;
+        var item = "<details><summary>"+option.summary+"</summary>";
         var access = option.access;
         var egress = option.egress;
         var transit = option.transit;
         console.log("Summary:", option.summary);
         for(var j=0; j < option.itinerary.length; j++) {
-            item+="<br /><a href=\"#\" class=\"itinerary\" data-option=\""+i+"\" data-itinerary=\""+j+"\">Itinerary:</a>";
+            item+="<p><a href=\"#\" class=\"itinerary\" data-option=\""+i+"\" data-itinerary=\""+j+"\">Itinerary:</a></p>";
             item+="<ul>";
             var itinerary=option.itinerary[j];
             item+="<li>waitingTime: "+secondsToTime(itinerary.waitingTime)+"</li>";
@@ -478,7 +478,7 @@ function makeTextResponse(data) {
             item+="</ul>";
         }
         if (option.fares) {
-            item+="<br /><a>Fares:</a>";
+            item+="<p>Fares:</p>";
             for(var j=0; j < option.fares.length; j++) {
                 var fare = option.fares[j];
                 var unit = "";
@@ -486,7 +486,7 @@ function makeTextResponse(data) {
                 if (fare.currency == "USD") {
                     var symbol = " $";
                 }
-                item+="<br /><ul>";
+                item+="<ul>";
                 item+="<li>type: "+fare.type+"</li>";
                 item+="<li>low: "+fare.low.toFixed(2)+symbol+"</li>";
                 item+="<li>peak: "+fare.peak.toFixed(2)+symbol+"</li>";
@@ -496,7 +496,7 @@ function makeTextResponse(data) {
             }
         }
 
-        item+="</li>";
+        item+="</details>";
         infos+=item;
     }
     $(".response").append(infos+"</ul>");
@@ -508,23 +508,74 @@ function makeTextResponse(data) {
 
 }
 
+function makeModes(modeName, javaModeName) {
+    var modes = planConfig[modeName].split(",");
+    var niceModes = modes.map(function(mode) { return javaModeName+"."+mode});
+
+    return niceModes.join(",");
+}
+
 function requestPlan() {
+    $('#resultTab').removeClass("status-ok status-error").addClass("status-waiting");
     var request = template
                 .replace("DIRECTMODES", planConfig.directModes)
                 .replace("ACCESSMODES", planConfig.accessModes)
                 .replace("EGRESSMODES", planConfig.egressModes)
                 .replace("TRANSITMODES", planConfig.transitModes);
-    var params = {
-        'query': request,
-        'variables': JSON.stringify({
+    var variables ={
             'fromLat':planConfig.fromLat,
             'fromLon':planConfig.fromLon,
             'toLat': planConfig.toLat,
             'toLon':planConfig.toLon,
             'fromTime':planConfig.date+"T"+planConfig.fromTime+planConfig.offset,
             'toTime':planConfig.date+"T"+planConfig.toTime+planConfig.offset
-        })
+        };
+    var params = {
+        'query': request,
+        'variables': JSON.stringify(variables)
     };
+
+    var compactedParams = JSON.stringify(params);
+    //Removes useless spaces so that CURL CLI line is more compact
+    compactedParams = compactedParams.replace(/\s{2,}/g, ' ');
+
+    $(".query").html("<p>This can be copied into GraphiQL and played with</p><pre>"+request + "\n\nQuery Variables:\n" + JSON.stringify(variables, null, "  ") + "</pre>");
+    $(".curl").html("<p>This can be used in CURL: <samp> curl 'http://localhost:8080/otp/routers/default/index/graphql'  -H 'Accept-Encoding: gzip, deflate' -H 'Content-Type: application/json; charset=UTF-8' --data-binary '" + compactedParams + "' --compressed </samp></p>");
+
+    var java = "<p>This can be used to write tests because it sets ProfileRequest</p><pre class=\"pre-wrap\">";
+
+    java += "//Loading graph\n" +
+	 'String dir = "path to folder with graph";\nInputStream inputStream = new BufferedInputStream(new FileInputStream(new File(dir, "network.dat")));\ntransportNetwork = TransportNetwork.read(inputStream);\n//Optional used to get street names:\ntransportNetwork.readOSM(new File(dir, "osm.mapdb"));\npointToPointQuery = new PointToPointQuery(transportNetwork);\n\n';
+
+    java += "ProfileRequest profileRequest = new ProfileRequest();\n";
+    java +="//Set timezone to timezone of transport network\nprofileRequest.zoneId = transportNetwork.getTimeZone();\n";
+    for (var varname in variables) {
+        if (varname.indexOf("Time") == -1) {
+            java+="profileRequest." + varname+" = " + variables[varname] + ";\n";
+        }
+    }
+
+    java+="profileRequest.setTime(\"" + variables.fromTime + "\", \"" + variables.toTime + "\");\n\n";
+
+    if (planConfig.transitModes != null && planConfig.transitModes.length > 2) {
+        java+="profileRequest.transitModes = EnumSet.of(" + makeModes("transitModes", "TransitModes") + ");\n";
+    }
+    if (planConfig.accessModes != null && planConfig.accessModes.length > 2) {
+        java+="profileRequest.accessModes = EnumSet.of(" + makeModes("accessModes", "LegMode") + ");\n";
+    }
+    if (planConfig.egressModes != null && planConfig.egressModes.length > 2) {
+        java+="profileRequest.egressModes = EnumSet.of(" + makeModes("egressModes", "LegMode") + ");\n";
+    }
+    if (planConfig.directModes != null && planConfig.directModes.length > 2) {
+        java+="profileRequest.directModes = EnumSet.of(" + makeModes("directModes", "LegMode") + ");\n";
+    }
+
+
+    java +="//Gets a response:\n";
+    java +="ProfileResponse ProfileResponse = pointToPointQuery.getPlan(profileRequest);";
+    java+= "</pre>";
+
+    $(".java").html(java);
 
     /*console.log(request);*/
 
@@ -536,19 +587,43 @@ function requestPlan() {
         url: hostname + "/otp/routers/default/index/graphql",
         success: function (data) {
             console.log(data);
+            $('#resultTab').removeClass("status-waiting status-error").addClass("status-ok");
             graphqlResponse=data;
-            makeTextResponse(data);
-            /*
+
             if (data.errors) {
-                alert(data.errors);
+                showDataErrors(data);
+            } else {
+                makeTextResponse(data);
+            }
+            /*
             }
             if (data.data) {
                 layer = L.geoJson(data.data, {style: styleMode, onEachFeature:onEachFeature});
                 layer.addTo(window.my_map);
             }
             */
+        },
+        error:function (jqXHR) {
+            var data = jqXHR.responseJSON;
+            showDataErrors(data);
         }
     });
+}
+
+function showDataErrors(data) {
+    if (data.errors) {
+        $('#resultTab').removeClass("status-waiting status-ok").addClass("status-error");
+        var msg = "";
+        if ($.isArray(data.errors)) {
+            for(var i=0; i < data.errors.length; i++) {
+                msg+= data.errors[i].message + "\n";
+            }
+        } else {
+            msg = data.errors;
+        }
+        alert(msg);
+        $('#resultTab').removeClass("status-waiting status-ok status-error");
+    }
 }
 
 var osmLayer = L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
@@ -600,6 +675,10 @@ $(document).ready(function() {
     gui.add(planConfig, "plan");
     /*gui.add(planConfig, "showReachedStops");*/
 var sidebar = L.control.sidebar('sidebar').addTo(my_map);
+    $('#resultTab').click(function (){
+        $('#resultTab').removeClass("status-waiting status-ok status-error");
+
+    })
 
 });
 

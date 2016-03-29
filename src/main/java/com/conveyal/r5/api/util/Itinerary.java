@@ -65,4 +65,13 @@ public class Itinerary {
     public void addConnection(PointToPointConnection pointToPointConnection) {
         connection = pointToPointConnection;
     }
+
+    /**
+     * Adds durationSeconds to walkTime and updates waitingTime
+     */
+    public void addWalkTime(int durationSeconds) {
+        walkTime+=durationSeconds;
+        //Updates waiting time
+        waitingTime=duration-(transitTime+walkTime);
+    }
 }

@@ -210,8 +210,6 @@ public class ProfileOption {
         Itinerary itinerary = new Itinerary();
         itinerary.transfers = transitJourneyIDs.size() - 1;
 
-        //FIXME: actual waiting time
-        itinerary.waitingTime = 0;
         itinerary.walkTime = access.get(accessIdx).duration+egress.get(egressIdx).duration;
         itinerary.distance = access.get(accessIdx).distance+egress.get(egressIdx).distance;
         ZonedDateTime transitStart = transit.get(0).segmentPatterns.get(transitJourneyIDs.get(0).pattern).fromDepartureTime.get(transitJourneyIDs.get(0).time);
@@ -227,6 +225,7 @@ public class ProfileOption {
             itinerary.transitTime += transit.get(transitJourneyIDIdx).getTransitTime(transitJourneyID);
             transitJourneyIDIdx++;
         }
+        itinerary.waitingTime=itinerary.duration-(itinerary.transitTime+itinerary.walkTime);
         PointToPointConnection pointToPointConnection = new PointToPointConnection(accessIdx, egressIdx, transitJourneyIDs);
         itinerary.addConnection(pointToPointConnection);
         this.itinerary.add(itinerary);
@@ -277,7 +276,9 @@ public class ProfileOption {
         TransitSegment transitSegment = transit.get(transfer.transitSegmentIndex);
         transitSegment.addMiddle(streetSegment);
         for(Itinerary currentItinerary: this.itinerary) {
-            currentItinerary.walkTime += streetSegment.duration;
+            //Call to function is needed because we also need to update waitingTime
+            // which is easier if everything is at one place
+            currentItinerary.addWalkTime(streetSegment.duration);
             currentItinerary.distance += streetSegment.distance;
         }
     }

@@ -1,6 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.profile.Mode;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -75,12 +76,18 @@ public class LinkedPointSet {
     public transient List<int[]> stopTrees;
 
 
+    /** it is preferred to specify a mode when linking */
+    @Deprecated
+    public LinkedPointSet(PointSet pointSet, StreetLayer streetLayer) {
+        this(pointSet, streetLayer, null);
+    }
+
     /**
      * A LinkedPointSet is a PointSet that has been pre-connected to a StreetLayer in a non-destructive, reversible way.
      * These objects are long-lived and not extremely numerous, so we keep references to the objects it was built from.
      * Besides they are useful for later processing of LinkedPointSets.
      */
-    public LinkedPointSet(PointSet pointSet, StreetLayer streetLayer) {
+    public LinkedPointSet(PointSet pointSet, StreetLayer streetLayer, Mode mode) {
         LOG.info("Linking pointset to street network...");
         this.pointSet = pointSet;
         this.streetLayer = streetLayer;
@@ -89,7 +96,7 @@ public class LinkedPointSet {
         distances1_mm = new int[pointSet.featureCount()];
         int unlinked = 0;
         for (int i = 0; i < pointSet.featureCount(); i++) {
-            Split split = streetLayer.findSplit(pointSet.getLat(i), pointSet.getLon(i), 1000);
+            Split split = streetLayer.findSplit(pointSet.getLat(i), pointSet.getLon(i), 1000, mode);
             if (split == null) {
                 unlinked++;
                 edges[i] = -1;

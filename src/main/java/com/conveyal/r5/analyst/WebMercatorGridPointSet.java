@@ -1,9 +1,11 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.vividsolutions.jts.geom.Coordinate;
+import org.mapdb.Fun;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +39,7 @@ public class WebMercatorGridPointSet implements PointSet {
     private int[] distances0_mm;
     private int[] distances1_mm;
 
-    private Map<StreetLayer, LinkedPointSet> linkageCache = new HashMap<>();
+    private Map<Fun.Tuple2<StreetLayer, Mode>, LinkedPointSet> linkageCache = new HashMap<>();
 
     public WebMercatorGridPointSet(int zoom, long west, long north, long width, long height) {
         this.zoom = zoom;
@@ -81,11 +83,11 @@ public class WebMercatorGridPointSet implements PointSet {
      * repeatedly do a lot of geometry calculations to temporarily connect the points to the streets.
      */
     @Override
-    public LinkedPointSet link(StreetLayer streetLayer) {
-        LinkedPointSet linkedPointSet = linkageCache.get(streetLayer);
+    public LinkedPointSet link(StreetLayer streetLayer, Mode mode) {
+        LinkedPointSet linkedPointSet = linkageCache.get(Fun.t2(streetLayer, mode));
         if (linkedPointSet == null) {
-            linkedPointSet = new LinkedPointSet(this, streetLayer);
-            linkageCache.put(streetLayer, linkedPointSet);
+            linkedPointSet = new LinkedPointSet(this, streetLayer, mode);
+            linkageCache.put(Fun.t2(streetLayer, mode), linkedPointSet);
         }
         return linkedPointSet;
     }

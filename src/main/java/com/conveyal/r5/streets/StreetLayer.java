@@ -1076,14 +1076,22 @@ public class StreetLayer implements Serializable {
     }
 
     /**
+     * Find a split. Deprecated in favor of finding a split for a particular mode, below.
+     */
+    @Deprecated
+    public Split findSplit (double lat, double lon, double radiusMeters) {
+        return findSplit(lat, lon, radiusMeters, null);
+    }
+
+    /**
      * Non-destructively find a location on an existing street near the given point.
      * TODO favor platforms and pedestrian paths when requested
      * @param lat latitude in floating point geographic coordinates (not fixed point int coordinates)
      * @param lon longitude in floating point geographic coordinates (not fixed point int coordinates)
      * @return a Split object representing a point along a sub-segment of a specific edge, or null if there are no streets nearby.
      */
-    public Split findSplit(double lat, double lon, double radiusMeters) {
-        return Split.find (lat, lon, radiusMeters, this);
+    public Split findSplit(double lat, double lon, double radiusMeters, Mode mode) {
+        return Split.find (lat, lon, radiusMeters, this, mode);
     }
 
     /**

@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.Serializable;
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
 /**
@@ -311,6 +312,30 @@ public class StreetLayer implements Serializable {
             name = way.getTag("name");
         }
         return name;
+    }
+
+    /**
+     * Gets all the OSM tags of specified OSM way
+     *
+     * Tags are returned as tag=value separated with ;
+     *
+     * AKA same format that {@link Way#setTagsFromString(String)} accepts
+     *
+     * @param edge for which to get tags
+     * @return String with all the tags or null
+     */
+    public String getWayTags(EdgeStore.Edge edge) {
+        if (osm == null) {
+            return null;
+        }
+        Way way = osm.ways.get(edge.getOSMID());
+        if (way != null && !way.hasNoTags()) {
+            return way.tags.stream()
+                .map(OSMEntity.Tag::toString)
+                .collect(Collectors.joining(";"));
+        }
+        return null;
+
     }
 
     /** Connect areal park and rides to the graph */

@@ -643,6 +643,9 @@ public class PointToPointRouterServer {
 
             Integer edgeID = request.queryMap("edgeID").integerValue();
 
+            //If true returns all the OSM tags of this edge
+            Boolean wantTags = request.queryMap("tags").booleanValue();
+
             if (edgeID == null) {
                 content.put("errors", "edgeID is empty!");
             } else {
@@ -650,6 +653,13 @@ public class PointToPointRouterServer {
                 try {
                     edge.seek(edgeID);
                     content.put("data", edge.getGeometry().getEnvelopeInternal());
+
+                    if (wantTags != null && wantTags) {
+                        String osmTags = transportNetwork.streetLayer.getWayTags(edge);
+                        if (osmTags != null) {
+                            content.put("tags", osmTags);
+                        }
+                    }
                 } catch (Exception ex) {
                     content.put("errors", ex.getMessage());
                     LOG.error("Error getting edge:{}", ex);

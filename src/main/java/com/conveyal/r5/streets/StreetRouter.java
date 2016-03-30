@@ -205,12 +205,14 @@ public class StreetRouter {
     }
 
     /**
+     * Finds closest vertex which has streetMode permissions
+     *
      * @param lat Latitude in floating point (not fixed int) degrees.
      * @param lon Longitude in flating point (not fixed int) degrees.
      * @return true if edge was found near wanted coordinate
      */
     public boolean setOrigin (double lat, double lon) {
-        Split split = streetLayer.findSplit(lat, lon, 300);
+        Split split = streetLayer.findSplit(lat, lon, 300, streetMode);
         if (split == null) {
             LOG.info("No street was found near the specified origin point of {}, {}.", lat, lon);
             return false;
@@ -265,8 +267,15 @@ public class StreetRouter {
 
     }
 
+    /**
+     * Finds closest vertex which has streetMode permissions
+     *
+     * @param lat Latitude in floating point (not fixed int) degrees.
+     * @param lon Longitude in flating point (not fixed int) degrees.
+     * @return true if edge was found near wanted coordinate
+     */
     public boolean setDestination (double lat, double lon) {
-        this.destinationSplit = streetLayer.findSplit(lat, lon, 300);
+        this.destinationSplit = streetLayer.findSplit(lat, lon, 300, streetMode);
         return this.destinationSplit != null;
     }
 
@@ -526,6 +535,24 @@ public class StreetRouter {
 
     public Split getDestinationSplit() {
         return destinationSplit;
+    }
+
+    /**
+     * Returns state with smaller weight to vertex0 or vertex1
+     *
+     * First split is called with streetMode Mode
+     *
+     * If state to only one vertex exists return that vertex.
+     * If state to none of the vertices exists returns null
+     * @return
+     */
+    public State getState(double lat, double lon) {
+        Split split = streetLayer.findSplit(lat, lon, 300, streetMode);
+        if (split == null) {
+            LOG.info("No street was found near the specified origin point of {}, {}.", lat, lon);
+            return null;
+        }
+        return getState(split);
     }
 
     public static class State implements Cloneable {

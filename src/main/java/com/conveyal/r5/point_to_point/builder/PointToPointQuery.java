@@ -87,13 +87,6 @@ public class PointToPointQuery {
         //Do the query and return result
         ProfileResponse profileResponse = new ProfileResponse();
 
-        //Split for end coordinate
-        Split split = transportNetwork.streetLayer.findSplit(request.toLat, request.toLon,
-            RADIUS_METERS);
-        if (split == null) {
-            throw new RuntimeException("Edge near the end coordinate wasn't found. Routing didn't start!");
-        }
-
         boolean transit = request.useTransit();
 
         TaskStatistics ts = new TaskStatistics();
@@ -141,7 +134,7 @@ public class PointToPointQuery {
                         accessRouter.put(LegMode.BICYCLE_RENT, streetRouter);
                         continue;
                     } else {
-                        StreetRouter.State lastState = streetRouter.getState(split);
+                        StreetRouter.State lastState = streetRouter.getState(request.toLat, request.toLon);
                         if (lastState != null) {
                             streetPath = new StreetPath(lastState, streetRouter, LegMode.BICYCLE_RENT, transportNetwork);
 
@@ -172,7 +165,7 @@ public class PointToPointQuery {
                         continue;
                     //Searching for direct paths
                     } else{
-                        StreetRouter.State lastState = streetRouter.getState(split);
+                        StreetRouter.State lastState = streetRouter.getState(request.toLat, request.toLon);
                         if (lastState != null) {
                             streetPath = new StreetPath(lastState, transportNetwork);
                         } else {
@@ -204,7 +197,7 @@ public class PointToPointQuery {
                     }
                     streetRouter = findBikeRentalPath(request, streetRouter);
                     if (streetRouter != null) {
-                        StreetRouter.State lastState = streetRouter.getState(split);
+                        StreetRouter.State lastState = streetRouter.getState(request.toLat, request.toLon);
                         if (lastState != null) {
                             streetPath = new StreetPath(lastState, streetRouter, LegMode.BICYCLE_RENT, transportNetwork);
 
@@ -220,9 +213,9 @@ public class PointToPointQuery {
                     streetRouter.streetMode = StreetMode.valueOf(mode.toString());
                     streetRouter.distanceLimitMeters = 100_000; // FIXME arbitrary, and account for bike or car access mode
                     if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
-                        streetRouter.setDestination(split);
+                        streetRouter.setDestination(request.toLat, request.toLon);
                         streetRouter.route();
-                        StreetRouter.State lastState = streetRouter.getState(split);
+                        StreetRouter.State lastState = streetRouter.getState(streetRouter.getDestinationSplit());
                         if (lastState == null) {
                             LOG.warn("Direct mode {} last state wasn't found", mode);
                             continue;

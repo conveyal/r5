@@ -206,7 +206,14 @@ public abstract class TraversalPermissionLabeler {
         if (way.hasTag("foot")) applyLabel(Node.FOOT, Label.fromTag(way.getTag("foot")), tree);
         if (way.hasTag("vehicle")) applyLabel(Node.VEHICLE, Label.fromTag(way.getTag("vehicle")), tree);
         if (way.hasTag("bicycle")) applyLabel(Node.BICYCLE, Label.fromTag(way.getTag("bicycle")), tree);
-        if (way.hasTag("cycleway")) applyLabel(Node.BICYCLE, Label.fromTag(way.getTag("cycleway")), tree);
+        if (way.hasTag("cycleway")) {
+            Label label = Label.fromTag(way.getTag("cycleway"));
+            //cycleway:no just means that there is no
+            // cycleway on this road it doesn't mean it is forbidden to cycle there
+            if (label != Label.NO) {
+                applyLabel(Node.BICYCLE, label, tree);
+            }
+        }
         if (way.hasTag("cycleway:both")) applyLabel(Node.BICYCLE, Label.fromTag(way.getTag("cycleway:both")), tree);
         if (way.hasTag("motor_vehicle")) applyLabel(Node.CAR, Label.fromTag(way.getTag("motor_vehicle")), tree);
         // motorcar takes precedence over motor_vehicle

@@ -165,6 +165,14 @@ public class TraversalPermissionLabelerTest {
         roadFlagComparision(osmWay, "sidewalk", "right", PEDESTRIAN_AND_CAR, CAR);
         roadFlagComparision(osmWay, "sidewalk", "left", CAR, PEDESTRIAN_AND_CAR);
         roadFlagComparision(osmWay, "sidewalk", "both", PEDESTRIAN_AND_CAR, PEDESTRIAN_AND_CAR);
+        roadFlagComparision(osmWay, "sidewalk", "none", CAR, CAR);
+        roadFlagComparision(osmWay, "sidewalk", "no", CAR, CAR);
+        osmWay = makeOSMWayFromTags("highway=residential");
+        roadFlagComparision(osmWay, ALL, ALL);
+
+        //This shouldn't remove WALK permissions
+        roadFlagComparision(osmWay, "sidewalk", "no", ALL, ALL);
+        roadFlagComparision(osmWay, "sidewalk", "none", ALL, ALL);
     }
 
 
@@ -244,6 +252,13 @@ public class TraversalPermissionLabelerTest {
 
         osmWay = makeOSMWayFromTags("highway=nobikenoped;foot=yes;oneway=-1;cycleway:left=opposite_lane");
         roadFlagComparision(osmWay, PEDESTRIAN_AND_BICYCLE, PEDESTRIAN_AND_CAR);
+    }
+
+    @Test
+    public void testCyclewayNo() throws Exception {
+        Way osmWay = makeOSMWayFromTags("oneway=no;highway=residential;cycleway=no");
+        roadFlagComparision(osmWay, ALL, ALL);
+
     }
 
     private RoadPermission roadFlagComparision(Way osmWay, EnumSet<EdgeStore.EdgeFlag> forwardExpected,

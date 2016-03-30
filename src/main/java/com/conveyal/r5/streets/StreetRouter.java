@@ -32,6 +32,12 @@ public class StreetRouter {
 
     public final StreetLayer streetLayer;
 
+    /**
+     *  What search radius is used in {@link Split#find(double, double, double, StreetLayer, StreetMode)}
+     *  @default: 300 m
+     */
+    public int searchRadius = 300;
+
     // TODO don't hardwire drive-on-right
     private TurnCostCalculator turnCostCalculator;
 
@@ -212,7 +218,7 @@ public class StreetRouter {
      * @return true if edge was found near wanted coordinate
      */
     public boolean setOrigin (double lat, double lon) {
-        Split split = streetLayer.findSplit(lat, lon, 300, streetMode);
+        Split split = streetLayer.findSplit(lat, lon, searchRadius, streetMode);
         if (split == null) {
             LOG.info("No street was found near the specified origin point of {}, {}.", lat, lon);
             return false;
@@ -275,7 +281,7 @@ public class StreetRouter {
      * @return true if edge was found near wanted coordinate
      */
     public boolean setDestination (double lat, double lon) {
-        this.destinationSplit = streetLayer.findSplit(lat, lon, 300, streetMode);
+        this.destinationSplit = streetLayer.findSplit(lat, lon, searchRadius, streetMode);
         return this.destinationSplit != null;
     }
 
@@ -547,7 +553,7 @@ public class StreetRouter {
      * @return
      */
     public State getState(double lat, double lon) {
-        Split split = streetLayer.findSplit(lat, lon, 300, streetMode);
+        Split split = streetLayer.findSplit(lat, lon, searchRadius, streetMode);
         if (split == null) {
             LOG.info("No street was found near the specified origin point of {}, {}.", lat, lon);
             return null;

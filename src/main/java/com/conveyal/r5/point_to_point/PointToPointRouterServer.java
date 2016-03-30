@@ -846,6 +846,7 @@ public class PointToPointRouterServer {
             VertexStore.Vertex v = network.streetLayer.vertexStore.getCursor(cursor.getToVertex());
             coords[coords.length - 1] = jitter(v);
         }
+        geometry = GeometryUtils.geometryFactory.createLineString(coords);
 
         GeoJsonFeature feature = new GeoJsonFeature(geometry);
         feature.addProperty("permission", cursor.getPermissionsAsString());

@@ -204,6 +204,14 @@ public abstract class TraversalPermissionLabeler {
         // start from the root of the tree
         if (way.hasTag("access")) applyLabel(Node.ACCESS, Label.fromTag(way.getTag("access")), tree);
         if (way.hasTag("foot")) applyLabel(Node.FOOT, Label.fromTag(way.getTag("foot")), tree);
+        //Adds Walking permissions if street has any type of sidewalk (left,right,both)
+        if (way.hasTag("sidewalk")) {
+            String sidewalk = way.getTag("sidewalk");
+            //For sidewalk direction doesn't matter since pedestrians can walk in both directions on sidewalk
+            if ("both".equalsIgnoreCase(sidewalk) || "left".equalsIgnoreCase(sidewalk) || "right".equalsIgnoreCase(sidewalk)) {
+                applyLabel(Node.FOOT, Label.YES, tree);
+            }
+        }
         if (way.hasTag("vehicle")) applyLabel(Node.VEHICLE, Label.fromTag(way.getTag("vehicle")), tree);
         if (way.hasTag("bicycle")) applyLabel(Node.BICYCLE, Label.fromTag(way.getTag("bicycle")), tree);
         if (way.hasTag("cycleway")) {

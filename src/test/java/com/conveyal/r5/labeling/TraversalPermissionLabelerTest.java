@@ -153,8 +153,7 @@ public class TraversalPermissionLabelerTest {
         assertEquals(PEDESTRIAN, backwardFiltered);
     }
 
-    //TODO: is sidewalk:right onedirectional or bidirectional
-    @Ignore("Sidewalks aren't supported yet")
+    //Sidewalks are assumed to be bidirectional so it shouldn't matter on which side of the street they are
     @Test
     public void testRoadWithSidewalk() {
 
@@ -162,8 +161,8 @@ public class TraversalPermissionLabelerTest {
 
         roadFlagComparision(osmWay, CAR, CAR);
 
-        roadFlagComparision(osmWay, "sidewalk", "right", PEDESTRIAN_AND_CAR, CAR);
-        roadFlagComparision(osmWay, "sidewalk", "left", CAR, PEDESTRIAN_AND_CAR);
+        roadFlagComparision(osmWay, "sidewalk", "right", PEDESTRIAN_AND_CAR, PEDESTRIAN_AND_CAR);
+        roadFlagComparision(osmWay, "sidewalk", "left", PEDESTRIAN_AND_CAR, PEDESTRIAN_AND_CAR);
         roadFlagComparision(osmWay, "sidewalk", "both", PEDESTRIAN_AND_CAR, PEDESTRIAN_AND_CAR);
         roadFlagComparision(osmWay, "sidewalk", "none", CAR, CAR);
         roadFlagComparision(osmWay, "sidewalk", "no", CAR, CAR);

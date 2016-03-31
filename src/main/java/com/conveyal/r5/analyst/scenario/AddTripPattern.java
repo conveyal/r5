@@ -10,6 +10,7 @@ import com.conveyal.r5.model.json_serialization.BitSetDeserializer;
 import com.conveyal.r5.model.json_serialization.BitSetSerializer;
 import com.conveyal.r5.model.json_serialization.LineStringDeserializer;
 import com.conveyal.r5.model.json_serialization.LineStringSerializer;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.transit.TransitLayer;
@@ -216,7 +217,7 @@ public class AddTripPattern extends TransitLayerModification {
             this.lat = lat;
             this.lon = lon;
             this.index = nextId.decrementAndGet();
-            this.split = streetLayer.findSplit(this.lat, this.lon, 200);
+            this.split = streetLayer.findSplit(this.lat, this.lon, 200, StreetMode.WALK);
             if (this.split == null) {
                 LOG.warn("Temporary stop unlinked: {}", this);
             }

@@ -5,19 +5,29 @@ import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * Insert a new stop into some trip patterns, adjusting travel times to account for dwell times at the stop.
- * For each stop pattern on the specified route(s), a single insertion point is identified.
- * The list of existing stops is scanned, and the new stop is inserted immediately after the first
- * afterStopId encountered. This allows inserting the same stop into multiple patterns on the same route,
- * such as branches converging on a common trunk or opposite directions of the same route.
+ * Insert one or more stops into some trip patterns.
+ * This splices a new chunk of timetable into an existing route.
+ * If both fromStop and toStop are specified, the part of the timetable in between those stops is replaced.
+ * If fromStop is null, then the whole timetable is replaced up to the toStop.
+ * If toStop in null, then the whole timetable is replaced after fromStop.
+ * One dwell time should be supplied for each new stop.
+ * When both fromStop and toStop are specified, there should be one more hop time than there are new stops.
+ * If one of fromStop or toStop is not specified, then there should be the same number of hop times as stops.
+ * Inserting stops into some trips but not others on a pattern could create new patterns. Therefore we only allow
+ * applying this modification to entire routes, which ensures that it is applied to entire patterns.
  */
 public class AddStops extends Modification {
 
@@ -26,24 +36,37 @@ public class AddStops extends Modification {
     private static final Logger LOG = LoggerFactory.getLogger(AddStops.class);
 
     /** On which routes the stop should be inserted. */
-    public Set<String> routeId;
+    public Set<String> routes;
 
-    /** Stop to insert. */
-    public String insertStop;
+    /** Stop after which to insert the new stops. */
+    public String fromStop;
+
+    /** Stop before which to insert the new stops. */
+    public String toStop;
+
+    /** Stops to insert, replacing everything between fromStop and toStop in the given routes. */
+    public List<StopSpec> stops;
+
+    /** Number of seconds the vehicle will remain immobile at each of the new stops. */
+    public int[] dwellTimes;
 
     /**
-     * After which existing stop should it be inserted? Several values can be provided to allow inserting in both
-     * directions or on different branches converging on a common trunk.
+     * Number of seconds the vehicle will spend traveling between each of the new stops.
+     * There should be one more hop time than dwell times if both of fromStop and toStop are specified.
      */
-    public Set<String> afterStop;
+    public int[] hopTimes;
 
-    /** Number of seconds the vehicle will remain immobile at the new stop. */
-    public int dwellTime;
+    /* The internal integer ID of the stop is looked up only once and cached before the modification is applied. */
+    private int intFromStop = -1;
 
-    /** Seconds of deceleration, acceleration, and detour required by the new stop, not including dwell time. */
-    public int extraTravelTime;
+    /* The internal integer ID of the stop is looked up only once and cached before the modification is applied. */
+    private int intToStop = -1;
 
-    private transient TransitLayer transitLayer;
+    /**
+     * The internal integer IDs of all the new stops to be added.
+     * These are looked up or created and cached before the modification is applied.
+     */
+    private TIntList intNewStops = new TIntArrayList();
 
     @Override
     public String getType() {
@@ -51,102 +74,168 @@ public class AddStops extends Modification {
     }
 
     @Override
-    public boolean apply(TransportNetwork network) {
+    public boolean resolve (TransportNetwork network) {
+        if (fromStop == null && toStop == null) {
+            warnings.add("At least one of from and to stop must be supplied.");
+        }
+        if (fromStop != null) {
+            intFromStop = network.transitLayer.indexForStopId.get(fromStop);
+            if (intFromStop == 0) { // FIXME missing value should be -1 instead of 0
+                warnings.add("Could not find fromStop with GTFS ID " + fromStop);
+            }
+        }
+        if (toStop != null) {
+            intToStop = network.transitLayer.indexForStopId.get(toStop);
+            if (intToStop == 0) { // FIXME missing value should be -1 instead of 0
+                warnings.add("Could not find toStop with GTFS ID " + toStop);
+            }
+        }
+        if (stops == null) {
+            // It is fine to add no new stops,
+            // as long as there is a single hop expressing the travel time from fromStop to toStop.
+            stops = new ArrayList<>();
+        }
+        for (StopSpec stopSpec : stops) {
+            // TODO we need some kind of StopSpec resolve function that can add new stops.
+            int intStopId = network.transitLayer.indexForStopId.get(stopSpec.id);
+            if (intStopId == 0) { // FIXME missing value should be -1 instead of 0
+                warnings.add("Could not find or create rerouting stop with GTFS ID " + stopSpec.id);
+            }
+            intNewStops.add(intStopId);
+        }
+        int nNewStops = intNewStops.size();
+        if (dwellTimes == null) {
+            dwellTimes = new int[0];
+        }
+        if (dwellTimes == null || dwellTimes.length != nNewStops) {
+            warnings.add("The number of dwell times must exactly match the number of new stops.");
+        }
+        if (hopTimes == null) {
+            warnings.add("You must always supply some hop times.");
+            // TODO check hop times length, considering presence or absence of from and to stop.
+        }
+        if (warnings.size() > 0) {
+            return true;
+        }
         return false;
     }
 
     @Override
-    public boolean resolve (TransportNetwork network) {
-        boolean errorsFound = false;
-        // This is silly. We should find a better way to make this information always available.
-        this.transitLayer = network.transitLayer;
-        int intStopId = transitLayer.indexForStopId.get(insertStop);
-        if (intStopId == 0) { // FIXME missing value should be -1 instead of 0
-            warnings.add("Could not find a stop to insert having GTFS ID " + insertStop);
-            errorsFound = true;
-        }
-        for (String stringStopId : afterStop) {
-            intStopId = transitLayer.indexForStopId.get(stringStopId);
-            if (intStopId == 0) { // FIXME missing value should be -1 instead of 0
-                warnings.add("Could not find insert-after stop having GTFS ID " + insertStop);
-                errorsFound = true;
-            }
-        }
-        return errorsFound;
+    public boolean apply(TransportNetwork network) {
+        network.transitLayer.tripPatterns = network.transitLayer.tripPatterns.stream()
+                .map(this::processTripPattern)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+        return warnings.size() > 0;
     }
 
-    private TripPattern applyToTripPattern(TripPattern originalTripPattern) {
-        // TODO match individual trips. For now this can only handle entire routes.
-        if (!routeId.contains(originalTripPattern.routeId)) {
+    private TripPattern processTripPattern (TripPattern originalTripPattern) {
+        if (!routes.contains(originalTripPattern.routeId)) {
+            // This pattern is not on one of the specified routes. The trip pattern should remain unchanged.
             return originalTripPattern;
         }
-        // Find an insertion point
-        boolean found = false;
-        int insertionPoint = 0;
-        for (int stop : originalTripPattern.stops) {
-            if (afterStop.contains(transitLayer.stopIdForIndex.get(stop))) {
-                found = true;
-                break;
+        // The number of elements to copy from the original stops array before the new segment is spliced in.
+        int insertBeginIndex = -1;
+        // The element of the original stops array at which copying resumes after the new segment is spliced in.
+        int insertEndIndex = -1;
+        for (int s = 0; s < originalTripPattern.stops.length; s++) {
+            if (originalTripPattern.stops[s] == intFromStop) {
+                insertBeginIndex = s + 1;
             }
-            insertionPoint += 1;
+            if (originalTripPattern.stops[s] == intToStop) {
+                insertEndIndex = s;
+            }
         }
-        if (!found) {
-            LOG.info("No insertion point found on {}", originalTripPattern);
+        if (intFromStop == -1) {
+            insertBeginIndex = 0;
+        }
+        if (intToStop == -1) {
+            insertEndIndex = originalTripPattern.stops.length;
+        }
+        if (insertBeginIndex == -1 || insertEndIndex == -1) {
+            // We are missing either the beginning or the end of the insertion slice. This TripPattern does not match.
             return originalTripPattern;
         }
-        // We have an insertion point. Make a protective copy and modify the trip pattern.
-        LOG.info("Inserting stop {} at position {} of {}", insertStop, insertionPoint, originalTripPattern);
+        if (insertEndIndex < insertBeginIndex) {
+            warnings.add("The end of the insertion region must be at or after its beginning.");
+            return originalTripPattern;
+        }
         TripPattern pattern = originalTripPattern.clone();
+        int nStopsToRemove = insertEndIndex - insertBeginIndex;
         int oldLength = pattern.stops.length;
-        int newLength = oldLength + 1;
+        int newLength = (oldLength + intNewStops.size()) - nStopsToRemove;
         pattern.stops = new int[newLength];
         pattern.pickups = new PickDropType[newLength];
         pattern.dropoffs = new PickDropType[newLength];
         pattern.wheelchairAccessible = new BitSet(newLength);
-        for (int i = 0, j = 0; i < oldLength; i++, j++) {
+        // Copy the original pattern to the new one, inserting or leaving out stops as necessary.
+        // i is the index within the source (original) pattern, j is the index within the target (new) pattern.
+        for (int i = 0, j = 0; i < oldLength; i++) {
+            if (i == insertBeginIndex) {
+                // Splice in the new schedule fragment here.
+                for (int ns = 0; ns < intNewStops.size(); ns++) {
+                    pattern.stops[j] = intNewStops.get(ns);
+                    pattern.pickups[j] = PickDropType.SCHEDULED;
+                    pattern.dropoffs[j] = PickDropType.SCHEDULED;
+                    pattern.wheelchairAccessible.set(j, pattern.wheelchairAccessible.get(0));
+                    j++;
+                }
+            }
+            if (i >= insertBeginIndex && i < insertEndIndex) {
+                // Skip over some stops in the original (source) trip pattern.
+                continue;
+            }
             pattern.stops[j] = originalTripPattern.stops[i];
             pattern.pickups[j] = originalTripPattern.pickups[i];
             pattern.dropoffs[j] = originalTripPattern.dropoffs[i];
             pattern.wheelchairAccessible.set(j, originalTripPattern.wheelchairAccessible.get(i));
-            if (i == insertionPoint) {
-                j++;
-                pattern.stops[j] = transitLayer.indexForStopId.get(insertStop); // TODO check that lookup succeeded
-                pattern.pickups[j] = PickDropType.SCHEDULED;
-                pattern.dropoffs[j] = PickDropType.SCHEDULED;
-                pattern.wheelchairAccessible.set(j, pattern.wheelchairAccessible.get(0));
-            }
+            j++;
         }
-        // Next, insert the stop into a copy of every trip on this pattern.
+        // TODO Next, perform the same splicing operation for every trip on this pattern.
         pattern.tripSchedules = new ArrayList<>();
         for (TripSchedule originalSchedule : originalTripPattern.tripSchedules) {
-            // TODO factor out into another function?
             TripSchedule schedule = originalSchedule.clone();
+            pattern.tripSchedules.add(schedule);
             schedule.arrivals = new int[newLength];
             schedule.departures = new int[newLength];
-            int prevInputDeparture = 0;
             int prevOutputDeparture = 0;
-            for (int i = 0, j = 0; i < oldLength; i++, j++) {
-                int rideTime = originalSchedule.arrivals[i] - prevInputDeparture;
-                int dwellTime = originalSchedule.departures[i] - originalSchedule.arrivals[i];
-                prevInputDeparture = originalSchedule.departures[i];
-                if (i == insertionPoint + 1) {
-                    rideTime += extraTravelTime;
-                    int rideTimeBefore = rideTime / 2; // TODO calculate real distance proportions
-                    int rideTimeAfter = rideTime - rideTimeBefore;
-                    schedule.arrivals[j] = prevOutputDeparture + rideTimeBefore;
-                    // Add the dwell time specified for the new stop, not the dwell time derived from the input pattern.
-                    schedule.departures[j] = schedule.arrivals[j] + this.dwellTime;
-                    prevOutputDeparture = schedule.departures[j];
-                    rideTime = rideTimeAfter;
-                    j++;
+            // Iterate over all stops in the source pattern. We have an arrival and a departure for each of these stops.
+            for (int s = 0, j = 0; s < oldLength; s++) {
+                if (s == insertBeginIndex) {
+                    // Splice in the new schedule fragment here.
+                    // FIXME this is not going to work replacing the end of a route.
+                    for (int hop = 0; hop < hopTimes.length; hop++) {
+                        schedule.arrivals[j] = prevOutputDeparture + hopTimes[hop];
+                        if (hop < dwellTimes.length) {
+                            schedule.departures[j] = schedule.arrivals[j] + dwellTimes[hop];
+                        } else {
+                            schedule.departures[j] = schedule.arrivals[j] + dwellTimes[hop];
+                        }
+                        prevOutputDeparture = schedule.departures[j];
+                        j++;
+                    }
+                } else {
+                    int rideTime = originalSchedule.arrivals[s] - originalSchedule.departures[s -1];
+                    schedule.arrivals[j] = prevOutputDeparture + rideTime;
                 }
-                schedule.arrivals[j] = prevOutputDeparture + rideTime;
+                int dwellTime = originalSchedule.departures[s] - originalSchedule.arrivals[s];
                 schedule.departures[j] = schedule.arrivals[j] + dwellTime;
                 prevOutputDeparture = schedule.departures[j];
             }
-            pattern.tripSchedules.add(schedule);
         }
         return pattern;
+    }
+
+    // TO BE MOVED / REWRITTEN
+    public boolean createNewStops (TransportNetwork network) {
+        TransitLayer transitLayer = network.transitLayer;
+        for (StopSpec stopSpec : stops) {
+            int newVertexIndex = network.streetLayer.getOrCreateVertexNear(stopSpec.lat, stopSpec.lon);
+            transitLayer.stopIdForIndex.add(stopSpec.id); // indexForStopId will be derived from this
+            transitLayer.stopNames.add(stopSpec.name);
+            transitLayer.streetVertexForStop.add(newVertexIndex); // stopForStreetVertex will be derived from this
+        }
+        return false; // No errors occurred.
     }
 
 }

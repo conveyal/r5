@@ -1,6 +1,8 @@
 package com.conveyal.r5.analyst.scenario;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
+
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -8,9 +10,7 @@ import com.conveyal.r5.transit.TripPattern;
 import gnu.trove.set.TIntSet;
 
 /**
- * Remove trips from a scenario.
- * Currently this can only remove all trips on an entire route.
- * In order to remove certain patterns we may want to support removing trips individually by tripId.
+ * Remove individual trips by ID, or remove all trips from an entire route.
  */
 public class RemoveTrips extends Modification {
 
@@ -33,31 +33,33 @@ public class RemoveTrips extends Modification {
 
     @Override
     public boolean resolve (TransportNetwork network) {
-        boolean errorsResolving = false;
         boolean onlyOneDefined = (routes != null) ^ (trips != null); // Not bitwise, non-short-circuit logical XOR.
         if (!onlyOneDefined) {
             warnings.add("On RemoveTrips modifications, exactly one of routes or trips must be defined.");
-            errorsResolving = true;
         }
-        return errorsResolving;
+        return warnings.size() > 0;
     }
 
     @Override
     public boolean apply(TransportNetwork network) {
         TransitLayer transitLayer = network.transitLayer;
         if (routes != null) {
+            // Remove entire routes, not specific trips.
             transitLayer.tripPatterns = transitLayer.tripPatterns.stream()
                     .filter(pattern -> !routes.contains(pattern.routeId))
                     .collect(Collectors.toList());
         } else {
+            // Remove specific trips, not entire routes.
             transitLayer.tripPatterns = transitLayer.tripPatterns.stream()
-                    .map(pattern -> filterPattern(pattern))
+                    .map(pattern -> processPattern(pattern))
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toList());
         }
         return false;
     }
 
-    private TripPattern filterPattern(TripPattern originalTripPattern) {
+    private TripPattern processPattern (TripPattern originalTripPattern) {
+        // This causes an additional loop over every pattern's contents, but avoids a clone.
         if (originalTripPattern.tripSchedules.stream().noneMatch(schedule -> trips.contains(schedule.tripId))) {
             return originalTripPattern;
         }
@@ -65,7 +67,11 @@ public class RemoveTrips extends Modification {
         newTripPattern.tripSchedules = originalTripPattern.tripSchedules.stream()
                 .filter(schedule -> trips.contains(schedule.tripId))
                 .collect(Collectors.toList());
-        return newTripPattern;
+        if (newTripPattern.tripSchedules.isEmpty()) {
+            return null;
+        } else {
+            return newTripPattern;
+        }
     }
 
 }

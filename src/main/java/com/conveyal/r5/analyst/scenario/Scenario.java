@@ -77,6 +77,8 @@ public class Scenario implements Serializable {
                 throw new RuntimeException("Errors occured while applying the Scenario to the TransportNetwork, bailing out.");
             }
         }
+        // FIXME can we do this once after all modifications are applied, or do we need to do it after every mod?
+        copiedNetwork.transitLayer.rebuildTransientIndexes();
         return copiedNetwork;
     }
 

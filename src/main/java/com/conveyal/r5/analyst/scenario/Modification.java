@@ -29,7 +29,6 @@ import java.util.Set;
         @JsonSubTypes.Type(name = "remove-trips", value = RemoveTrips.class),
         @JsonSubTypes.Type(name = "add-stops", value = AddStops.class),
         @JsonSubTypes.Type(name = "remove-stops", value = RemoveStops.class),
-        @JsonSubTypes.Type(name = "create-stops", value = CreateStops.class),
         @JsonSubTypes.Type(name = "transfer-rule", value = TransferRule.class),
         @JsonSubTypes.Type(name = "set-trip-phasing", value = SetTripPhasing.class),
         // HACK: this modification type should only be instantiated as a member of SetTripPhasing, and Jackson shouldn't

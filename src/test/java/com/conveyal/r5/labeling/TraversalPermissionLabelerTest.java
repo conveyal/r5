@@ -52,30 +52,13 @@ public class TraversalPermissionLabelerTest {
 
     @Test
     public void testCyclewayPermissions() throws Exception {
-        Way osmWay = new Way();
-        osmWay.addTag("highway", "cycleway");
-        EnumSet<EdgeStore.EdgeFlag> forwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, false);
-        EnumSet<EdgeStore.EdgeFlag> backwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, true);
-
-        Set<EdgeStore.EdgeFlag> forwardFiltered = filterFlags(forwardPermissions);
-        Set<EdgeStore.EdgeFlag> backwardFiltered = filterFlags(backwardPermissions);
-
-        assertEquals(PEDESTRIAN_AND_BICYCLE, forwardFiltered);
-        assertEquals(PEDESTRIAN_AND_BICYCLE, backwardFiltered);
-
-
-        osmWay.addTag("access", "destination");
-        forwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, false);
-        backwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, true);
-
-        forwardFiltered = filterFlags(forwardPermissions);
-        backwardFiltered = filterFlags(backwardPermissions);
-
-        //CAR is destination
-        assertEquals(EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_BIKE,
-            EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR), forwardFiltered);
-        assertEquals(EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_BIKE,
-            EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR), backwardFiltered);
+        Way osmWay = makeOSMWayFromTags("highway=cycleway");
+        roadFlagComparision(osmWay, PEDESTRIAN_AND_BICYCLE, PEDESTRIAN_AND_BICYCLE);
+        roadFlagComparision(osmWay, "access", "destination",
+            EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_BIKE,
+                EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR),
+            EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_BIKE,
+                EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR));
 
     }
 
@@ -85,45 +68,22 @@ public class TraversalPermissionLabelerTest {
         osmWay.addTag("highway", "residential");
         osmWay.addTag("oneway", "true");
         osmWay.addTag("oneway:bicycle", "no");
-
-        EnumSet<EdgeStore.EdgeFlag> forwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, false);
-        EnumSet<EdgeStore.EdgeFlag> backwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, true);
-
-        Set<EdgeStore.EdgeFlag> forwardFiltered = filterFlags(forwardPermissions);
-        Set<EdgeStore.EdgeFlag> backwardFiltered = filterFlags(backwardPermissions);
-
-        assertEquals(ALL, forwardFiltered);
-        assertEquals(PEDESTRIAN_AND_BICYCLE, backwardFiltered);
+        roadFlagComparision(osmWay, ALL, PEDESTRIAN_AND_BICYCLE);
     }
 
     @Test
     public void testPath() throws Exception {
         Way osmWay = makeOSMWayFromTags("highway=path;access=private");
-
-        EnumSet<EdgeStore.EdgeFlag> forwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, false);
-        EnumSet<EdgeStore.EdgeFlag> backwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, true);
-
-        Set<EdgeStore.EdgeFlag> forwardFiltered = filterFlags(forwardPermissions);
-        Set<EdgeStore.EdgeFlag> backwardFiltered = filterFlags(backwardPermissions);
-
         EnumSet<EdgeStore.EdgeFlag> expectedPermissions = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_BIKE,
             EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
-        assertEquals(expectedPermissions, forwardFiltered);
-        assertEquals(expectedPermissions, backwardFiltered);
+        roadFlagComparision(osmWay, expectedPermissions, expectedPermissions);
     }
 
     @Test
     public void testPlatform() throws Exception {
         Way osmWay = makeOSMWayFromTags("highway=platform;public_transport=platform");
 
-        EnumSet<EdgeStore.EdgeFlag> forwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, false);
-        EnumSet<EdgeStore.EdgeFlag> backwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, true);
-
-        Set<EdgeStore.EdgeFlag> forwardFiltered = filterFlags(forwardPermissions);
-        Set<EdgeStore.EdgeFlag> backwardFiltered = filterFlags(backwardPermissions);
-
-        assertEquals(PEDESTRIAN, forwardFiltered);
-        assertEquals(PEDESTRIAN, backwardFiltered);
+        roadFlagComparision(osmWay, PEDESTRIAN, PEDESTRIAN);
     }
 
     @Ignore("specific tagging isn't supported yet in specific permissions")
@@ -131,26 +91,12 @@ public class TraversalPermissionLabelerTest {
     public void testSidewalk() throws Exception {
         Way osmWay = new Way();
         osmWay.addTag("highway", "footway");
-        EnumSet<EdgeStore.EdgeFlag> forwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, false);
-        EnumSet<EdgeStore.EdgeFlag> backwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, true);
-
-        Set<EdgeStore.EdgeFlag> forwardFiltered = filterFlags(forwardPermissions);
-        Set<EdgeStore.EdgeFlag> backwardFiltered = filterFlags(backwardPermissions);
-
-        assertEquals(PEDESTRIAN_AND_BICYCLE, forwardFiltered);
-        assertEquals(PEDESTRIAN_AND_BICYCLE, backwardFiltered);
+        roadFlagComparision(osmWay, PEDESTRIAN_AND_BICYCLE, PEDESTRIAN_AND_BICYCLE);
 
         //TODO: this had special permissions in OTP
         osmWay = makeOSMWayFromTags("footway=sidewalk;highway=footway");
 
-        forwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, false);
-        backwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, true);
-
-        forwardFiltered = filterFlags(forwardPermissions);
-        backwardFiltered = filterFlags(backwardPermissions);
-
-        assertEquals(PEDESTRIAN, forwardFiltered);
-        assertEquals(PEDESTRIAN, backwardFiltered);
+        roadFlagComparision(osmWay, PEDESTRIAN, PEDESTRIAN);
     }
 
     //Sidewalks are assumed to be bidirectional so it shouldn't matter on which side of the street they are
@@ -306,42 +252,22 @@ public class TraversalPermissionLabelerTest {
     @Test
     public void testSteps() throws Exception {
         Way osmWay = makeOSMWayFromTags("highway=steps");
-        EnumSet<EdgeStore.EdgeFlag> forwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, false);
-        EnumSet<EdgeStore.EdgeFlag> backwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, true);
 
-        Set<EdgeStore.EdgeFlag> forwardFiltered = filterFlags(forwardPermissions);
-        Set<EdgeStore.EdgeFlag> backwardFiltered = filterFlags(backwardPermissions);
-
-        assertEquals(PEDESTRIAN, forwardFiltered);
-        assertEquals(PEDESTRIAN, backwardFiltered);
+        roadFlagComparision(osmWay, PEDESTRIAN, PEDESTRIAN);
     }
 
     @Test
     public void testSidepath() throws Exception {
         Way osmWay = makeOSMWayFromTags("highway=tertiary;bicycle=use_sidepath");
 
-        EnumSet<EdgeStore.EdgeFlag> forwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, false);
-        EnumSet<EdgeStore.EdgeFlag> backwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, true);
-
-        Set<EdgeStore.EdgeFlag> forwardFiltered = filterFlags(forwardPermissions);
-        Set<EdgeStore.EdgeFlag> backwardFiltered = filterFlags(backwardPermissions);
-
-        assertEquals(PEDESTRIAN_AND_CAR, forwardFiltered);
-        assertEquals(PEDESTRIAN_AND_CAR, backwardFiltered);
+        roadFlagComparision(osmWay, PEDESTRIAN_AND_CAR, PEDESTRIAN_AND_CAR);
     }
 
     @Test
     public void testSpecificPermission() throws Exception {
         Way osmWay = makeOSMWayFromTags("highway=primary;bicycle=use_sidepath;foot=no;junction=roundabout");
 
-        EnumSet<EdgeStore.EdgeFlag> forwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, false);
-        EnumSet<EdgeStore.EdgeFlag> backwardPermissions = traversalPermissionLabeler.getPermissions(osmWay, true);
-
-        Set<EdgeStore.EdgeFlag> forwardFiltered = filterFlags(forwardPermissions);
-        Set<EdgeStore.EdgeFlag> backwardFiltered = filterFlags(backwardPermissions);
-
-        assertEquals(CAR, forwardFiltered);
-        assertEquals(NONE, backwardFiltered);
+        roadFlagComparision(osmWay, CAR, NONE);
     }
 
     /**

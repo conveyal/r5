@@ -511,6 +511,10 @@ public class PointToPointQuery {
             StreetRouter router = entry.getValue();
             router.getReachedStops().forEachEntry((stop, time) -> {
                 if (time > maxTimeFinal || time < minTimeFinal) return true;
+                //Skip stops that can't be used with wheelchairs if wheelchair routing is requested
+                if (request.wheelchair && !transportNetwork.transitLayer.stopsWheelchair.get(stop)) {
+                    return true;
+                }
 
                 int weight = time + penaltyFinal;
 

@@ -60,15 +60,21 @@ public abstract class TraversalPermissionLabeler {
 
         applySpecificPermissions(tree, way);
 
+        applyWheelchairPermissions(tree, way);
+
         EnumSet<EdgeStore.EdgeFlag> ret = EnumSet.noneOf(EdgeStore.EdgeFlag.class);
 
         Label walk = walk(tree, Node.FOOT);
         Label bicycle = walk(tree, Node.BICYCLE);
         Label car = walk(tree, Node.CAR);
+        Label wheelchair = walk(tree, Node.WHEELCHAIR);
         if (walk == Label.YES) {
             ret.add(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
         } else if (walk == Label.NO_THRU_TRAFFIC) {
             ret.add(EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_PEDESTRIAN);
+        }
+        if (wheelchair == Label.YES) {
+            ret.add(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
         }
         if (bicycle == Label.YES) {
             ret.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
@@ -116,6 +122,28 @@ public abstract class TraversalPermissionLabeler {
 
 
         return new RoadPermission(forward, backward);
+    }
+
+    /**
+     * Applies wheelchair permissions
+     *
+     * Removes wheelchair permissions on steps
+     * and adds it on wheelchair=yes/limited or ramp:wheelchair
+     * @param tree
+     * @param way
+     */
+    private void applyWheelchairPermissions(EnumMap<Node, Label> tree, Way way) {
+        if (way.hasTag("highway", "steps")) {
+            applyLabel(Node.WHEELCHAIR, Label.NO, tree);
+        }
+
+        //TODO: what to do with wheelchair:limited currently it is routable for wheelchairs
+        if (way.hasTag("wheelchair")) {
+            applyLabel(Node.WHEELCHAIR, Label.fromTag(way.getTag("wheelchair")), tree);
+        }
+        if (way.hasTag("ramp:wheelchair")) {
+            applyLabel(Node.WHEELCHAIR, Label.fromTag(way.getTag("ramp:wheelchair")), tree);
+        }
     }
 
     /**
@@ -407,6 +435,7 @@ public abstract class TraversalPermissionLabeler {
     protected enum Node {
         ACCESS, // root
         FOOT, VEHICLE, // level 1
+        WHEELCHAIR, //child of foot
         BICYCLE, CAR; // children of VEHICLE. CAR is shorthand for MOTOR_VEHICLE as we don't separately support hazmat carriers, mopeds, etc.
 
         public Node getParent () {
@@ -417,6 +446,8 @@ public abstract class TraversalPermissionLabeler {
                 case BICYCLE:
                 case CAR:
                     return VEHICLE;
+                case WHEELCHAIR:
+                    return FOOT;
                 default:
                     return null;
             }
@@ -428,6 +459,8 @@ public abstract class TraversalPermissionLabeler {
                     return new Node[] { FOOT, VEHICLE };
                 case VEHICLE:
                     return new Node[] { BICYCLE, CAR };
+                case FOOT:
+                    return new Node[] { WHEELCHAIR };
                 default:
                     return null;
             }
@@ -474,6 +507,8 @@ public abstract class TraversalPermissionLabeler {
                 || "share_busway".equals(tag)
                 //cycleway=crossing it should already have bicycle=yes from highway=cycleway or bicycle=yes
                 || "crossing".equals(tag)
+                //wheelchair=limited is currently routable for wheelchairs
+                || "limited".equals(tag)
                 ) {
                 return YES;
             } else if (isTagFalse(tag) || tag.equals("license")

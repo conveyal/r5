@@ -22,7 +22,7 @@ import static org.junit.Assert.*;
 public class TypeOfEdgeLabelerTest {
 
     public static final EnumSet<EdgeStore.EdgeFlag> PLATFORM = EnumSet
-        .of(EdgeStore.EdgeFlag.PLATFORM, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+        .of(EdgeStore.EdgeFlag.PLATFORM, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
 
     static TypeOfEdgeLabeler typeOfEdgeLabeler;
     static TraversalPermissionLabeler traversalPermissionLabeler;
@@ -57,12 +57,14 @@ public class TypeOfEdgeLabelerTest {
         PEDESTRIAN_BIKE_CYCLEWAY.add(EdgeStore.EdgeFlag.BIKE_PATH);
         return Arrays.asList(new Object[][] {
             {"sidewalk", "highway=cycleway;foot=designated;oneway=yes", EnumSet.of(EdgeStore.EdgeFlag.SIDEWALK,
-                EdgeStore.EdgeFlag.BIKE_PATH, EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN),
-                EnumSet.of(EdgeStore.EdgeFlag.SIDEWALK,  EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)
+                EdgeStore.EdgeFlag.BIKE_PATH, EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
+                EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR),
+                EnumSet.of(EdgeStore.EdgeFlag.SIDEWALK,  EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
+                    EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR)
             },
             {"sidewalk", "highway=footway;footway=sidewalk", EnumSet.of(EdgeStore.EdgeFlag.SIDEWALK,
-                EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN), EnumSet.of(EdgeStore.EdgeFlag.SIDEWALK,
-                EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)},
+                EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR), EnumSet.of(EdgeStore.EdgeFlag.SIDEWALK,
+                EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR)},
             {"platform", "highway=platform", PLATFORM, PLATFORM},
             {"platform", "public_transport=platform", PLATFORM, PLATFORM},
             {"platform", "railway=platform", PLATFORM, PLATFORM},

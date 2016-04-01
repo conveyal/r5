@@ -25,21 +25,25 @@ public class TraversalPermissionLabelerTest {
 
     public static final EnumSet<EdgeStore.EdgeFlag> ALL = EnumSet
         .of(EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR,
-            EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+            EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
     public static final EnumSet<EdgeStore.EdgeFlag> ALLPERMISSIONS = EnumSet
         .of(EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR,
-            EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC,
+            EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR,
+            EdgeStore.EdgeFlag.NO_THRU_TRAFFIC,
             EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_BIKE, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_PEDESTRIAN,
             EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
     public static final EnumSet<EdgeStore.EdgeFlag> PEDESTRIAN_AND_BICYCLE = EnumSet.of(
-        EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_BIKE);
+        EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR, EdgeStore.EdgeFlag.ALLOWS_BIKE);
     public static final EnumSet<EdgeStore.EdgeFlag> PEDESTRIAN_AND_CAR = EnumSet.of(
-        EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_CAR );
+        EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR, EdgeStore.EdgeFlag.ALLOWS_CAR );
     public static final EnumSet<EdgeStore.EdgeFlag> BICYCLE_AND_CAR = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_BIKE,
         EdgeStore.EdgeFlag.ALLOWS_CAR);
     public static final EnumSet<EdgeStore.EdgeFlag> NONE = EnumSet.noneOf(EdgeStore.EdgeFlag.class);
 
-    public static final EnumSet<EdgeStore.EdgeFlag> PEDESTRIAN = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+    public static final EnumSet<EdgeStore.EdgeFlag> PEDESTRIAN = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
+        EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+
+    public static final EnumSet<EdgeStore.EdgeFlag> PEDESTRIAN_ONLY = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
 
     public static final EnumSet<EdgeStore.EdgeFlag> BICYCLE = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_BIKE);
 
@@ -56,9 +60,9 @@ public class TraversalPermissionLabelerTest {
         roadFlagComparision(osmWay, PEDESTRIAN_AND_BICYCLE, PEDESTRIAN_AND_BICYCLE);
         roadFlagComparision(osmWay, "access", "destination",
             EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_BIKE,
-                EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR),
+                EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR),
             EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_BIKE,
-                EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR));
+                EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR));
 
     }
 
@@ -75,7 +79,8 @@ public class TraversalPermissionLabelerTest {
     public void testPath() throws Exception {
         Way osmWay = makeOSMWayFromTags("highway=path;access=private");
         EnumSet<EdgeStore.EdgeFlag> expectedPermissions = EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_BIKE,
-            EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
+            EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR,
+            EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
         roadFlagComparision(osmWay, expectedPermissions, expectedPermissions);
     }
 
@@ -84,6 +89,8 @@ public class TraversalPermissionLabelerTest {
         Way osmWay = makeOSMWayFromTags("highway=platform;public_transport=platform");
 
         roadFlagComparision(osmWay, PEDESTRIAN, PEDESTRIAN);
+
+        roadFlagComparision(osmWay, "wheelchair", "no", PEDESTRIAN_ONLY, PEDESTRIAN_ONLY);
     }
 
     @Ignore("specific tagging isn't supported yet in specific permissions")
@@ -253,7 +260,13 @@ public class TraversalPermissionLabelerTest {
     public void testSteps() throws Exception {
         Way osmWay = makeOSMWayFromTags("highway=steps");
 
-        roadFlagComparision(osmWay, PEDESTRIAN, PEDESTRIAN);
+        roadFlagComparision(osmWay, PEDESTRIAN_ONLY, PEDESTRIAN_ONLY);
+
+        roadFlagComparision(osmWay, "wheelchair", "yes", PEDESTRIAN, PEDESTRIAN);
+
+        roadFlagComparision(osmWay, "wheelchair", "limited", PEDESTRIAN, PEDESTRIAN);
+
+        roadFlagComparision(osmWay, "ramp:wheelchair", "yes", PEDESTRIAN, PEDESTRIAN);
     }
 
     @Test

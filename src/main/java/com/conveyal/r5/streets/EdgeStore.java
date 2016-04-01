@@ -485,6 +485,10 @@ public class EdgeStore implements Serializable {
             s1.streetMode = streetMode;
             if (streetMode == StreetMode.WALK && getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) {
                 weight = time;
+                //If wheelchair path is requested and this edge doesn't allow wheelchairs we need to find another edge
+                if (req.wheelchair && !getFlag(EdgeFlag.ALLOWS_WHEELCHAIR)) {
+                    return null;
+                }
                 //elevation which changes weight
             } else if (streetMode == StreetMode.BICYCLE) {
                 // walk a bike if biking is not allowed on this edge, or if the traffic stress is too high

@@ -29,6 +29,7 @@ var PlanConfig = function() {
     this.fromLon = "";
     this.toLat = "";
     this.toLon = "";
+    this.wheelchair = false;
     this.offset = offset;
     this.plan = requestPlan;
     this.showReachedStops = requestStops;
@@ -521,6 +522,7 @@ function requestPlan() {
             'fromLon':planConfig.fromLon,
             'toLat': planConfig.toLat,
             'toLon':planConfig.toLon,
+            'wheelchair':planConfig.wheelchair,
             'fromTime':planConfig.date+"T"+planConfig.fromTime+planConfig.offset,
             'toTime':planConfig.date+"T"+planConfig.toTime+planConfig.offset
         };
@@ -658,6 +660,7 @@ $(document).ready(function() {
     gui.add(planConfig, "egressModes");
     gui.add(planConfig, "directModes");
     gui.add(planConfig, "transitModes");
+    gui.add(planConfig, "wheelchair");
     gui.add(planConfig, "date");
     gui.add(planConfig, "fromTime");
     gui.add(planConfig, "toTime");

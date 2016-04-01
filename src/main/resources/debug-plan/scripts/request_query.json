@@ -1,7 +1,7 @@
 query requestPlan($fromLat:Float!, $fromLon:Float!,
-	  $toLat:Float!, $toLon:Float!,
-	  $fromTime: ZonedDateTime!, $toTime:ZonedDateTime!) {
-plan(fromLat:$fromLat, fromLon:$fromLon, toLat:$toLat,toLon:$toLon, fromTime:$fromTime, toTime:$toTime, 
+  $toLat:Float!, $toLon:Float!, $wheelchair:Boolean
+  $fromTime: ZonedDateTime!, $toTime:ZonedDateTime!) {
+plan(fromLat:$fromLat, fromLon:$fromLon, toLat:$toLat,toLon:$toLon, wheelchair:$wheelchair, fromTime:$fromTime, toTime:$toTime, 
  
   directModes:[DIRECTMODES],
   accessModes:[ACCESSMODES], egressModes:[EGRESSMODES],

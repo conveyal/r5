@@ -184,7 +184,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     public ZoneId zoneId = ZoneOffset.UTC;
 
     //If routing with wheelchair is needed
-    private boolean wheelchair;
+    public boolean wheelchair;
 
     private SearchType searchType;
 

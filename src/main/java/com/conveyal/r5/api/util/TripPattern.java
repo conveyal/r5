@@ -1,6 +1,7 @@
 package com.conveyal.r5.api.util;
 
 import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TripFlag;
 import com.conveyal.r5.transit.TripSchedule;
 
 import java.util.ArrayList;
@@ -68,6 +69,8 @@ public class TripPattern {
             Trip trip = new Trip();
             trip.tripId = tripSchedule.tripId;
             trip.serviceId = transitLayer.services.get(tripSchedule.serviceCode).service_id;
+            trip.bikesAllowed = tripSchedule.getFlag(TripFlag.BICYCLE);
+            trip.wheelchairAccessible = tripSchedule.getFlag(TripFlag.WHEELCHAIR);
             trips.add(trip);
         }
         return trips;

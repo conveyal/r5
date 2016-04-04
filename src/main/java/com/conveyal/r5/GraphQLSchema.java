@@ -641,6 +641,18 @@ public class GraphQLSchema {
                 .description("Generated Service ID")
                 .dataFetcher(environment -> ((Trip) environment.getSource()).serviceId)
                 .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("wheelchairAccessible")
+                .type(new GraphQLNonNull(Scalars.GraphQLBoolean))
+                .description("If this trip can be used with wheelchair")
+                .dataFetcher(environment -> ((Trip) environment.getSource()).wheelchairAccessible)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("bikesAllowed")
+                .type(new GraphQLNonNull(Scalars.GraphQLBoolean))
+                .description("If it is allowed to take bicycle on this trip")
+                .dataFetcher(environment -> ((Trip) environment.getSource()).bikesAllowed)
+                .build())
             .build();
 
         tripPatternType = GraphQLObjectType.newObject()

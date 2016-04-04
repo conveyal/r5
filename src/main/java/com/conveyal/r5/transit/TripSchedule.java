@@ -79,10 +79,10 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
     // Maybe make a TripSchedule.Factory so we don't have to pass in serviceCode or map.
     private TripSchedule(Trip trip, int[] arrivals, int[] departures, int[] stopSequences, int serviceCode) {
         this.tripId = trip.trip_id;
-        if (trip.bikes_allowed > 0) {
+        if (trip.bikes_allowed == 1) {
             setFlag(TripFlag.BICYCLE);
         }
-        if (trip.wheelchair_accessible > 0) {
+        if (trip.wheelchair_accessible == 1) {
             setFlag(TripFlag.WHEELCHAIR);
         }
         this.arrivals = arrivals;

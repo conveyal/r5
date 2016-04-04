@@ -1,7 +1,5 @@
 package com.conveyal.r5.api.util;
 
-import com.conveyal.r5.streets.StreetLayer;
-import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripSchedule;
 
@@ -55,14 +53,9 @@ public class TripPattern {
 
     public List<Stop> getStops() {
         List<Stop> stops = new ArrayList<>(tripPattern.stops.length);
-        StreetLayer streetLayer = transitLayer.linkedStreetLayer;
-        VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor();
         for(int i=0; i< tripPattern.stops.length; i++) {
             int stopIdx = tripPattern.stops[i];
-            Stop stop = new Stop(transitLayer.stopIdForIndex.get(stopIdx), transitLayer.stopNames.get(stopIdx));
-            vertex.seek(transitLayer.streetVertexForStop.get(stopIdx));
-            stop.lon = (float) vertex.getLon();
-            stop.lat = (float) vertex.getLat();
+            Stop stop = new Stop(stopIdx, transitLayer);
             stops.add(stop);
         }
 

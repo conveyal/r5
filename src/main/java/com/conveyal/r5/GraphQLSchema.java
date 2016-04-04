@@ -407,7 +407,7 @@ public class GraphQLSchema {
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
                 .name("wheelchairBoarding")
-                .type(wheelchairBoardingEnum)
+                .type(Scalars.GraphQLBoolean)
                 .dataFetcher(environment -> ((Stop) environment.getSource()).wheelchairBoarding)
                 .build())
             .build();

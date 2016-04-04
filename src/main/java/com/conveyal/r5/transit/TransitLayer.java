@@ -118,15 +118,13 @@ public class TransitLayer implements Serializable, Cloneable {
             indexForStopId.put(stop.stop_id, stopIndex);
             stopIdForIndex.add(stop.stop_id);
             stopForIndex.add(stop);
-            if (stop.wheelchair_boarding.trim().equals("1")) {
+            if (stop.wheelchair_boarding != null && stop.wheelchair_boarding.trim().equals("1")) {
                 stopsWheelchair.set(stopIndex);
             }
-
             if (level == LoadLevel.FULL) {
                 stopNames.add(stop.stop_name);
             }
         }
-
 
         // Load service periods, assigning integer codes which will be referenced by trips and patterns.
         TObjectIntMap<String> serviceCodeNumber = new TObjectIntHashMap<>(20, 0.5f, -1);

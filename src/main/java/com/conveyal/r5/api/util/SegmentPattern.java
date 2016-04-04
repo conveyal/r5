@@ -57,6 +57,9 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
     final public int patternIdx;
     final public int routeIndex;
 
+    //List of tripIDs with trips whose times are used
+    public List<String> tripIds;
+
 
 
 
@@ -68,6 +71,7 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
         toArrivalTime = new ArrayList<>();
         toDepartureTime = new ArrayList<>();
         alightTimes = new ArrayList<>();
+        tripIds = new ArrayList<>();
         realTime = false;
         patternId = Integer.toString(patternIdx);
         this.patternIdx = patternIdx;
@@ -132,6 +136,7 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
                 fromArrivalTime.add(createTime(schedule.arrivals[fromIndex], fromTimeDateZD));
                 fromDepartureTime.add(createTime(schedule.departures[fromIndex], fromTimeDateZD));
                 alightTimes.add(alightTime);
+                tripIds.add(schedule.tripId);
                 break;
             }
         }

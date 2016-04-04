@@ -971,6 +971,12 @@ public class GraphQLSchema {
                 .description("departure times of to stop in this pattern")
                 .dataFetcher(environment -> ((SegmentPattern) environment.getSource()).toDepartureTime)
                 .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("tripId")
+                .type(new GraphQLList(Scalars.GraphQLString))
+                .description("Trip ID of trip with same index as from/to arrival/departure times")
+                .dataFetcher(environment -> ((SegmentPattern) environment.getSource()).tripIds)
+                .build())
             .build();
 
         transitSegmentType = GraphQLObjectType.newObject()

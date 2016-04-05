@@ -1,10 +1,14 @@
 package com.conveyal.r5.api.util;
 
+import com.conveyal.gtfs.model.Service;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
 import com.vividsolutions.jts.util.Assert;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -15,6 +19,9 @@ import java.util.List;
  * Created by mabu on 2.11.2015.
  */
 public  class SegmentPattern implements Comparable<SegmentPattern> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(SegmentPattern.class);
+
     /**
      * Trip Pattern id TODO: trippattern?
      * @notnull
@@ -60,9 +67,7 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
     //List of tripIDs with trips whose times are used
     public List<String> tripIds;
 
-
-
-
+    private TransitLayer transitLayer;
 
     public SegmentPattern(TransitLayer transitLayer, TripPattern pattern, int patternIdx, int boardStopIdx,
         int alightStopIdx, int alightTime, ZonedDateTime fromTimeDateZD) {
@@ -78,6 +83,7 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
         fromIndex = -1;
         toIndex = -1;
         routeIndex = pattern.routeIndex;
+        this.transitLayer = transitLayer;
 
         //Finds at which indexes are board and alight stops in wanted trippattern
         //This is used in response and we need indexes to find used trip
@@ -128,8 +134,22 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
     private int addTime(TripPattern pattern, int alightTime, ZonedDateTime fromTimeDateZD) {
         //We search for a trip based on provided tripPattern board, alight stop and alightTime
         //TODO: this will be removed when support for tripIDs is added into Path
+        boolean added = false;
+        final LocalDate localDate = fromTimeDateZD.toLocalDate();
         for (TripSchedule schedule: pattern.tripSchedules) {
             if (schedule.arrivals[toIndex] == alightTime) {
+                Service service = transitLayer.services.get(schedule.serviceCode);
+                /*Skips over trips that run during different service periods but have same times
+                 *It's rare but it could happen
+                 * For example we are searching for a trip on sunday but get trippattern with trips
+                 * during week and sunday and found a trip that has same arrival time as trip on sunday
+                 * but is on week service.
+                 */
+                if (!service.activeOn(localDate)) {
+                    LOG.warn("Time matches but service doesn't run on wanted date! {}", service.service_id);
+                    continue;
+                }
+                added = true;
                 toArrivalTime.add(createTime(alightTime, fromTimeDateZD));
                 toDepartureTime.add(createTime(schedule.departures[toIndex], fromTimeDateZD));
 
@@ -139,6 +159,9 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
                 tripIds.add(schedule.tripId);
                 break;
             }
+        }
+        if (!added) {
+            LOG.error("Trip with wanted time wasn't found!");
         }
         return (fromDepartureTime.size() -1);
     }

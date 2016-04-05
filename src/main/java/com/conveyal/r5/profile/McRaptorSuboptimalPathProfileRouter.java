@@ -67,6 +67,7 @@ public class McRaptorSuboptimalPathProfileRouter {
     private BitSet touchedStops;
     private BitSet touchedPatterns;
     private BitSet patternsNearDestination;
+    private BitSet servicesActive;
 
     public McRaptorSuboptimalPathProfileRouter (TransportNetwork network, ProfileRequest req, TIntIntMap accessTimes, TIntIntMap egressTimes) {
         this.network = network;
@@ -76,6 +77,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         this.touchedStops = new BitSet(network.transitLayer.getStopCount());
         this.touchedPatterns = new BitSet(network.transitLayer.tripPatterns.size());
         this.patternsNearDestination = new BitSet(network.transitLayer.tripPatterns.size());
+        this.servicesActive = network.transitLayer.getActiveServicesForDate(req.date);
     }
 
     /** Get a McRAPTOR state bag for every departure minute */
@@ -195,6 +197,10 @@ public class McRaptorSuboptimalPathProfileRouter {
             TObjectIntMap<StatePatternKey> tripsPerPatternSequence = new TObjectIntHashMap<>();
 
             TripPattern pattern = network.transitLayer.tripPatterns.get(patIdx);
+            //skips trip patterns with trips which don't run on wanted date
+            if (!pattern.servicesActive.intersects(servicesActive)) {
+                continue;
+            }
 
             for (int stopPositionInPattern = 0; stopPositionInPattern < pattern.stops.length; stopPositionInPattern++) {
                 int stop = pattern.stops[stopPositionInPattern];
@@ -207,6 +213,10 @@ public class McRaptorSuboptimalPathProfileRouter {
                 for (Map.Entry<StatePatternKey, McRaptorState> e : statesPerPatternSequence.entrySet()) {
                     int trip = tripsPerPatternSequence.get(e.getKey());
                     TripSchedule sched = pattern.tripSchedules.get(trip);
+                    //Skips trips which don't run on wanted date
+                    if(!servicesActive.get(sched.serviceCode)) {
+                        continue;
+                    }
 
                     if (addState(stop, sched.arrivals[stopPositionInPattern], patIdx, trip, e.getValue()))
                         touchedStops.set(stop);
@@ -235,6 +245,10 @@ public class McRaptorSuboptimalPathProfileRouter {
 
                         for (TripSchedule tripSchedule : pattern.tripSchedules) {
                             currentTrip++;
+                            //Skips trips which don't run on wanted date
+                            if(!servicesActive.get(tripSchedule.serviceCode)) {
+                                continue;
+                            }
 
                             int departure = tripSchedule.departures[stopPositionInPattern];
                             if (departure > state.time + BOARD_SLACK) {

@@ -13,6 +13,7 @@ import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TripFlag;
 import com.conveyal.r5.transit.TripPattern;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.list.TIntList;
@@ -281,6 +282,13 @@ public class PointToPointQuery {
                         TransitModes mode = TransitLayer.getTransitModes(routeInfo.route_type);
                         if (!request.transitModes.contains(mode)) {
                             return false;
+                            //If trip with wheelchair is requested filters out trips where boarding/arrival stop or trip doesn't allow a wheelchair
+                        } else if(request.wheelchair) {
+                            if (!(transportNetwork.transitLayer.stopsWheelchair.get(pathWithTimes.boardStops[i]) &&
+                                transportNetwork.transitLayer.stopsWheelchair.get(pathWithTimes.alightStops[i]) &&
+                                pattern.tripSchedules.get(pathWithTimes.trips[i]).getFlag(TripFlag.WHEELCHAIR))) {
+                                return false;
+                            }
                         }
                     }
                 }

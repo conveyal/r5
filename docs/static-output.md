@@ -79,6 +79,19 @@ This contains the connection from Web Mercator pixels to transit stops. It is a 
 This file does not obviously have constant offsets. It is assumed that the client will build an index for the file when it is loaded. If this proves
 to be too slow, we can pregenerate an index for the file.
 
+#### Destination grids
+
+Strictly speaking these are not outputs of the analysis. They are produced by other tooling but are necessary for computing the final accessibility indicators from the travel times that come out of our analysis. All numbers in this format are little-endian.
+
+Header (five 32-bit ints):
+ - (4 byte int) Web mercator zoom level
+ - (4 byte int) west (x) edge of the grid, i.e. how many pixels this grid is east of the left edge of the world
+ - (4 byte int) north (y) edge of the grid, i.e. how many pixels this grid is south of the top edge of the world
+ - (4 byte int) width of the grid in pixels
+ - (4 byte int) height of the grid in pixels
+
+The rest of the file is repeated 4-byte int values, one for each pixel in row-major order (i.e. x changes faster than y), delta coded.
+
 ### Per-origin file
 
 #### `{x}/{y}.dat`

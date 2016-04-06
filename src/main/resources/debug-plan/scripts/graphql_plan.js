@@ -408,7 +408,23 @@ function secondsToTime(seconds) {
 
 function makeTextResponse(data) {
     var options = data.data.plan.options;
-    console.info("Options:", options.length);
+    var jsonPatterns = data.data.plan.patterns;
+    //This is currently used to get WheelchairAccessibility information for each used trip
+    //Transforms list of patterns to map where key is tripPatternIdx and value are tripPatternIdx
+    // and map of trips
+    var patterns = jsonPatterns.reduce(function(total, current) {
+        //Transforms list of trips wih map where key is tripId
+        // and value is tripInfo(tripId, serviceId,  wheelchairAccessible, bikesAllowed)
+        var trips = current.trips.reduce(function(totalTrips, currentTrip) {
+            totalTrips[currentTrip.tripId] = currentTrip;
+            return totalTrips;
+        }, {});
+        current.trips = trips;
+        total[current.tripPatternIdx] = current;
+        return total;
+    }, {});
+    //console.info("Patterns:", patterns);
+    //console.info("Options:", options.length);
     $(".response").html("");
     //Removes line from previous request
     if (layer != null) {
@@ -453,8 +469,13 @@ function makeTextResponse(data) {
                     }
                     var fromTime = patternInfo.fromDepartureTime[transitInfo.time];
                     var toTime = patternInfo.toArrivalTime[transitInfo.time];
-                    item+="<li>Mode: " + route.mode + "<br />From:"+transitData.from.name+" --> "+transitData.to.name+ "<br /> Pattern:";
-                    item+=patternInfo.patternId+ " Line:" + route.shortName + " " +fromTime+" --> " +toTime+ "</li>";
+                    var tripId = patternInfo.tripId[transitInfo.time];
+                    var pPatternInfo = patterns[patternInfo.patternIdx];
+                    var ptripInfo = pPatternInfo.trips[tripId];
+                    item+="<li>Mode: " + route.mode + "<br />From:"+transitData.from.name+" (<abbr title=\"Wheelchair accessible\">WA</abbr>: " + transitData.from.wheelchairBoarding +") --> ";
+                    item+=transitData.to.name+ " (<abbr title=\"Wheelchair accessible\">WA</abbr>: " + transitData.to.wheelchairBoarding +") <br /> Pattern:";
+                    item+=patternInfo.patternId+ " Line:" + route.shortName + " " +fromTime+" --> " +toTime + "<br />";
+                    item+= "<abbr title=\"Bikes Allowed\">BA</abbr>:" + ptripInfo.bikesAllowed + " <abbr title=\"Wheelchair accessible\">WA</abbr>:" + ptripInfo.wheelchairAccessible + " <abbr title=\"Service ID\">SID</abbr>:" + ptripInfo.serviceId + "</li>";
                     if (transitData["middle"] != null) {
                         var middleData = transitData["middle"]
                         item+="<li>Mode:"+middleData.mode+" Duration: " + secondsToTime(middleData.duration) + "Distance: "+middleData.distance/1000 + "m</li>";

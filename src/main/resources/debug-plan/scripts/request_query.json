@@ -6,6 +6,15 @@ plan(fromLat:$fromLat, fromLon:$fromLon, toLat:$toLat,toLon:$toLon, wheelchair:$
   directModes:[DIRECTMODES],
   accessModes:[ACCESSMODES], egressModes:[EGRESSMODES],
 transitModes:[TRANSITMODES]) {
+    patterns {
+      tripPatternIdx
+      trips {
+        tripId
+        serviceId
+        wheelchairAccessible
+        bikesAllowed
+      }
+    }
   options {
     summary,
     fares {
@@ -38,22 +47,25 @@ transitModes:[TRANSITMODES]) {
         stopId,
         lon,
         lat,
+        wheelchairBoarding
       },
        to {
         name,
         stopId,
         lon,
         lat,
+        wheelchairBoarding
       },
       mode,
       routes {id, routeIdx shortName, mode, agencyName},
       segmentPatterns {
-        patternId
+        patternId, patternIdx,
 	routeIdx
         fromIndex
         toIndex,
         fromDepartureTime
-        toArrivalTime
+        toArrivalTime,
+        tripId
         
      
       },

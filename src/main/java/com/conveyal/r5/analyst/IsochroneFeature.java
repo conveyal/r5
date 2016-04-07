@@ -34,7 +34,7 @@ public class IsochroneFeature implements Serializable {
     // is just a bit shift (but who knows what the JVM will decide to optimize)
     public static final int SCALE_FACTOR = 4;
 
-    public Geometry geometry;
+    public MultiPolygon geometry;
     public int cutoffSec;
 
     public IsochroneFeature () { /* deserialization */ }

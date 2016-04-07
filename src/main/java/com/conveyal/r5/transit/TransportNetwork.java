@@ -342,7 +342,8 @@ public class TransportNetwork implements Serializable, Cloneable {
      */
     public int addStop (String id, double lat, double lon, double radiusMeters) {
         int newStopIndex = transitLayer.getStopCount();
-        int newStreetVertexIndex = streetLayer.getOrCreateVertexNear(lat, lon, radiusMeters, false);
+        int newStreetVertexIndex = streetLayer.getOrCreateVertexNear(lat, lon, radiusMeters, false,
+            StreetMode.WALK);
         transitLayer.stopIdForIndex.add(id); // TODO check for uniqueness
         transitLayer.streetVertexForStop.add(newStreetVertexIndex);
         // TODO stop tree, any other stop-indexed arrays or lists

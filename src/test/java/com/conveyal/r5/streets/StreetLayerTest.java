@@ -2,9 +2,9 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+import com.conveyal.r5.profile.StreetMode;
 import gnu.trove.TIntCollection;
 import gnu.trove.iterator.TIntIterator;
-import gnu.trove.list.TIntList;
 import junit.framework.TestCase;
 import org.junit.Test;
 
@@ -91,7 +91,7 @@ public class StreetLayerTest extends TestCase {
 
         //This inserts vertex around the middle of the way.
         //Vertices are A->B->C B is new vertex
-        int vertexId = streetLayer.getOrCreateVertexNear(lat, lon, 500, true);
+        int vertexId = streetLayer.getOrCreateVertexNear(lat, lon, 500, true, StreetMode.WALK);
         //Edge from A to B
         EdgeStore.Edge oldForwardEdge = streetLayer.edgeStore.getCursor(0);
         //This should always work since in existing edges only length and toVertex changes

@@ -409,7 +409,7 @@ public class StreetLayer implements Serializable {
             v.seek(vidx);
             v.setFlag(VertexStore.VertexFlag.PARK_AND_RIDE);
 
-            int target = getOrCreateVertexNear(node.getLat(), node.getLon(), 500, true);
+            int target = getOrCreateVertexNear(node.getLat(), node.getLon(), 500, true, null);
             EdgeStore.Edge created = edgeStore.addStreetPair(vidx, target, 1, -1);
 
             // allow link edges to be traversed by all, access is controlled by connected edges
@@ -945,7 +945,7 @@ public class StreetLayer implements Serializable {
     /**
      * Find an existing street vertex near the supplied coordinates, or create a new one if there are no vertices
      * near enough.
-     * This uses {@link #findSplit(double, double, double)} and {@link Split} which need filled spatialIndex
+     * This uses {@link #findSplit(double, double, double, StreetMode)} and {@link Split} which need filled spatialIndex
      * In other works {@link #indexStreets()} needs to be called before this is used. Otherwise no near vertex is found.
      *
      * TODO maybe use X and Y everywhere for fixed point, and lat/lon for double precision degrees.
@@ -955,11 +955,13 @@ public class StreetLayer implements Serializable {
      * @param radiusMeters the radius of a circle in meters within which to search for nearby streets.
      * @param destructive if this is true, allow the street splitting process to change existing edge geometries.
      *                    Set to false when performing a temporary modification that must be reversible.
+     * @param streetMode Link to edges which have permission for StreetMode
      * @return the index of a street vertex very close to the supplied location,
      *         or -1 if no such vertex could be found or created.
      */
-    public int getOrCreateVertexNear (double lat, double lon, double radiusMeters, boolean destructive) {
-        Split split = findSplit(lat, lon, radiusMeters);
+    public int getOrCreateVertexNear(double lat, double lon, double radiusMeters,
+        boolean destructive, StreetMode streetMode) {
+        Split split = findSplit(lat, lon, radiusMeters, streetMode);
         if (split == null) {
             // No linking site was found within range.
             return -1;
@@ -1075,7 +1077,8 @@ public class StreetLayer implements Serializable {
      */
     public int createAndLinkVertex (double lat, double lon, double radiusMeters, boolean destructive) {
         int stopVertex = vertexStore.addVertex(lat, lon);
-        int streetVertex = getOrCreateVertexNear(lat, lon, radiusMeters, destructive);
+        int streetVertex = getOrCreateVertexNear(lat, lon, radiusMeters, destructive,
+            StreetMode.WALK);
 
         // unlinked
         if (streetVertex == -1) return -1;
@@ -1243,7 +1246,8 @@ public class StreetLayer implements Serializable {
         LOG.info("Bike rental stations:{}", bikeRentalStations.size());
         int numAddedStations = 0;
         for (BikeRentalStation bikeRentalStation: bikeRentalStations) {
-            int streetVertexIndex = getOrCreateVertexNear(bikeRentalStation.lat, bikeRentalStation.lon, radiusMeters, true);
+            int streetVertexIndex = getOrCreateVertexNear(bikeRentalStation.lat, bikeRentalStation.lon, radiusMeters, true,
+                StreetMode.WALK);
             if (streetVertexIndex > -1) {
                 numAddedStations++;
                 VertexStore.Vertex vertex = vertexStore.getCursor(streetVertexIndex);

@@ -155,7 +155,7 @@ var traffic_lights_layer = {
         "circle-blur":0.8
     },
     "layout": {},
-    "filter": ["==", "flags", "TRAFFIC_SIGNAL"]
+    "filter": ["==", "TRAFFIC_SIGNAL", true]
 };
 
 $.ajax(url + "/speeds", {

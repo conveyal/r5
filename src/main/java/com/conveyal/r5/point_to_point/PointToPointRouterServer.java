@@ -759,30 +759,24 @@ public class PointToPointRouterServer {
      * @return
      */
     private static GeoJsonFeature getVertexFeature(VertexStore.Vertex vertex, TransportNetwork network) {
+        GeoJsonFeature feature = null;
         if (network.transitLayer.stopForStreetVertex.containsKey(vertex.index)) {
             // jitter transit stops slightly, in a deterministic way, so we can see if they're linked correctly
-            GeoJsonFeature feature = new GeoJsonFeature(GeometryUtils.geometryFactory.createPoint(jitter(vertex)));
-            feature.addProperty("vertex_id", vertex.index);
-            //TODO: add all flags (when there is more)
-            feature.addProperty("flags", VertexStore.VertexFlag.TRAFFIC_SIGNAL.toString());
-            return feature;
+            feature = new GeoJsonFeature(GeometryUtils.geometryFactory.createPoint(jitter(vertex)));
+        } else {
+            feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
         }
 
-        if (vertex.getFlag(VertexStore.VertexFlag.TRAFFIC_SIGNAL)) {
-            GeoJsonFeature feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
-            feature.addProperty("vertex_id", vertex.index);
-            //TODO: add all flags (when there is more)
-            feature.addProperty("flags", VertexStore.VertexFlag.TRAFFIC_SIGNAL.toString());
-            return feature;
+        feature.addProperty("vertex_id", vertex.index);
+        //Needed for filtering flags
+        for (VertexStore.VertexFlag flag: VertexStore.VertexFlag.values()) {
+            if (vertex.getFlag(flag)) {
+                feature.addProperty(flag.toString(), true);
+            }
         }
-        if (vertex.getFlag(VertexStore.VertexFlag.BIKE_SHARING)) {
-            GeoJsonFeature feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
-            feature.addProperty("vertex_id", vertex.index);
-            //TODO: add all flags (when there is more)
-            feature.addProperty("flags", VertexStore.VertexFlag.BIKE_SHARING.toString());
-            return feature;
-        }
-        return null;
+        //feature.addProperty("flags", cursor.getFlagsAsString());
+
+        return feature;
     }
 
     /**

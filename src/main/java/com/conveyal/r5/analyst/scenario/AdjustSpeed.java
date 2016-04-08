@@ -49,7 +49,7 @@ public class AdjustSpeed extends Modification {
      * Hops which should have their speed set or scaled. If not supplied, all hops should be modified.
      * Each hop is a pair of adjacent stop IDs (from/to) and the hop specification is directional.
      */
-    public List<int[]> hops;
+    public List<String[]> hops;
 
     /**
      * If true, the scale factor applies to both dwells and inter-stop rides. If false, dwells remain the
@@ -74,15 +74,23 @@ public class AdjustSpeed extends Modification {
         }
         hopFromStops = new TIntArrayList(hops.size());
         hopToStops = new TIntArrayList(hops.size());
-        for (int[] pair: hops) {
+        for (String[] pair: hops) {
+            if (pair.length != 2) {
+                warnings.add("Hops must all have exactly two stops.");
+                continue;
+            }
             int intFromId = network.transitLayer.indexForStopId.get(pair[0]);
             int intToId = network.transitLayer.indexForStopId.get(pair[1]);
-            if (intFromId == 0 || intToId == 0) { // FIXME should be -1 not 0
-                warnings.add("Could not find stop for ID in " + pair);
-            } else {
-                hopFromStops.add(intFromId);
-                hopToStops.add(intToId);
+            if (intFromId == 0) { // FIXME should be -1 not 0
+                warnings.add("Could not find hop origin stop " + pair[0]);
+                continue;
             }
+            if (intToId == 0) { // FIXME should be -1 not 0
+                warnings.add("Could not find hop destination stop " + pair[1]);
+                continue;
+            }
+            hopFromStops.add(intFromId);
+            hopToStops.add(intToId);
         }
         // Not bitwise operator: non-short-circuit logical XOR.
         boolean onlyOneDefined = (routes != null) ^ (trips != null);

@@ -79,8 +79,6 @@ public class TransitLayer implements Serializable, Cloneable {
     /** Does this TransitLayer have any schedules */
     public boolean hasSchedules = false;
 
-    public int nTrips = 0;
-
     /**
      * This is the result of running a search from every stop in the graph.
      * It is an array of maps (one for each of these origin stops). Each array entry is a map from all reachable

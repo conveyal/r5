@@ -5,7 +5,7 @@ package com.conveyal.r5.analyst.scenario;
  * If the id already exists, the existing stop is used. If not, a new stop is created.
 */
 public class StopSpec {
-    public String id;
+    public String stopId;
     public String name;
     public double lat;
     public double lon;

@@ -97,9 +97,9 @@ public class AddStops extends Modification {
         }
         for (StopSpec stopSpec : stops) {
             // TODO we need some kind of StopSpec resolve function that can add new stops.
-            int intStopId = network.transitLayer.indexForStopId.get(stopSpec.id);
+            int intStopId = network.transitLayer.indexForStopId.get(stopSpec.stopId);
             if (intStopId == 0) { // FIXME missing value should be -1 instead of 0
-                warnings.add("Could not find or create rerouting stop with GTFS ID " + stopSpec.id);
+                warnings.add("Could not find or create rerouting stop with GTFS ID " + stopSpec.stopId);
             }
             intNewStops.add(intStopId);
         }
@@ -231,7 +231,7 @@ public class AddStops extends Modification {
         TransitLayer transitLayer = network.transitLayer;
         for (StopSpec stopSpec : stops) {
             int newVertexIndex = network.streetLayer.getOrCreateVertexNear(stopSpec.lat, stopSpec.lon);
-            transitLayer.stopIdForIndex.add(stopSpec.id); // indexForStopId will be derived from this
+            transitLayer.stopIdForIndex.add(stopSpec.stopId); // indexForStopId will be derived from this
             transitLayer.stopNames.add(stopSpec.name);
             transitLayer.streetVertexForStop.add(newVertexIndex); // stopForStreetVertex will be derived from this
         }

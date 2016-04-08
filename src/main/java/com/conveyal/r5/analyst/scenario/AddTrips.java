@@ -76,9 +76,9 @@ public class AddTrips extends Modification {
         for (StopSpec stop : stops) {
             // FIXME handle missing value (which is currently 0, a real stop index, rather than -1).
             // TODO add new stops, currently you can only reference existing ones.
-            int stopIndex = network.transitLayer.indexForStopId.get(stop.id);
+            int stopIndex = network.transitLayer.indexForStopId.get(stop.stopId);
             if (stopIndex == 0) {
-                warnings.add("Could not find a stop for GTFS ID " + stop.id);
+                warnings.add("Could not find a stop for GTFS ID " + stop.stopId);
             }
         }
         return warnings.size() > 0;
@@ -127,11 +127,11 @@ public class AddTrips extends Modification {
         StopTime stopTime = new StopTime();
         TripPatternKey tripPatternKey = new TripPatternKey("SCENARIO_MODIFICATION");
         for (StopSpec stop : stops) {
-            stopTime.stop_id = stop.id;
+            stopTime.stop_id = stop.stopId;
             tripPatternKey.addStopTime(stopTime, transitLayer.indexForStopId);
         }
         TripPattern pattern = new TripPattern(tripPatternKey);
-        LOG.info("Converted stop ID sequence {} to trip pattern {}.", stops, pattern);
+        LOG.info("Created {}.", pattern);
         for (PatternTimetable timetable : frequencies) {
             // CreateSchedules may create more than one if we're in non-frequency ("exact-times") mode.
             for (TripSchedule schedule : createSchedules(timetable, transitLayer.services)) {

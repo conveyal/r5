@@ -71,7 +71,6 @@ public class AdjustFrequency extends Modification {
             // This pattern is not on the route to be frequency-adjusted.
             return originalPattern;
         }
-        // This pattern contains at least one trip that appears in a frequency entry.
         // Retain clones of the TripSchedules for those trips, dropping all others, and then update the retained
         // TripSchedules to be frequency entries.
         TripPattern newPattern = originalPattern.clone();

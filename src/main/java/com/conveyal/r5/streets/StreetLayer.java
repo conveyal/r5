@@ -409,8 +409,33 @@ public class StreetLayer implements Serializable {
             v.seek(vidx);
             v.setFlag(VertexStore.VertexFlag.PARK_AND_RIDE);
 
-            int target = getOrCreateVertexNear(node.getLat(), node.getLon(), 500, true, null);
-            EdgeStore.Edge created = edgeStore.addStreetPair(vidx, target, 1, -1);
+
+            int targetWalking = getOrCreateVertexNear(node.getLat(), node.getLon(), 500, true,
+                StreetMode.WALK);
+            EdgeStore.Edge created = edgeStore.addStreetPair(vidx, targetWalking, 1, -1);
+
+            // allow link edges to be traversed by all, access is controlled by connected edges
+            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+            created.setFlag(EdgeStore.EdgeFlag.LINK);
+
+            // and the back edge
+            created.advance();
+            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+            created.setFlag(EdgeStore.EdgeFlag.LINK);
+
+            int targetDriving = getOrCreateVertexNear(node.getLat(), node.getLon(), 500, true,
+                StreetMode.CAR);
+            //If both CAR and WALK links would connect to the same edge we can skip new useless edge
+            if (targetDriving == targetWalking) {
+                continue;
+            }
+            created = edgeStore.addStreetPair(vidx, targetDriving, 1, -1);
 
             // allow link edges to be traversed by all, access is controlled by connected edges
             created.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);

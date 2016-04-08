@@ -108,11 +108,13 @@ public class TransitLayer implements Serializable, Cloneable {
 
         // Load stops.
         // ID is the GTFS string ID, stopIndex is the zero-based index, stopVertexIndex is the index in the street layer.
-        TObjectIntMap<String> indexForStopId = new TObjectIntHashMap<>();
+        TObjectIntMap<String> indexForUnscopedStopId = new TObjectIntHashMap<>();
         for (Stop stop : gtfs.stops.values()) {
             int stopIndex = stopIdForIndex.size();
-            indexForStopId.put(stop.stop_id, stopIndex);
-            stopIdForIndex.add(stop.stop_id);
+            String scopedStopId = String.join(":", stop.feed_id, stop.stop_id);
+            // This is only used while building the TransitNetwork to look up StopTimes from the same feed.
+            indexForUnscopedStopId.put(stop.stop_id, stopIndex);
+            stopIdForIndex.add(scopedStopId);
             stopForIndex.add(stop);
 
             if (level == LoadLevel.FULL) {
@@ -144,7 +146,8 @@ public class TransitLayer implements Serializable, Cloneable {
             // Construct the stop pattern and schedule for this trip
             // Should we really be resolving to an object reference for Route?
             // That gets in the way of GFTS persistence.
-            TripPatternKey tripPatternKey = new TripPatternKey(trip.route.route_id);
+            String scopedRouteId = String.join(":", trip.route.feed_id, trip.route.route_id);
+            TripPatternKey tripPatternKey = new TripPatternKey(scopedRouteId);
             TIntList arrivals = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
             TIntList departures = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
             TIntList stopSequences = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
@@ -163,7 +166,7 @@ public class TransitLayer implements Serializable, Cloneable {
             }
 
             for (StopTime st : stopTimes) {
-                tripPatternKey.addStopTime(st, indexForStopId);
+                tripPatternKey.addStopTime(st, indexForUnscopedStopId);
                 arrivals.add(st.arrival_time);
                 departures.add(st.departure_time);
                 stopSequences.add(st.stop_sequence);

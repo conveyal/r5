@@ -78,7 +78,8 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
 
     // Maybe make a TripSchedule.Factory so we don't have to pass in serviceCode or map.
     private TripSchedule(Trip trip, int[] arrivals, int[] departures, int[] stopSequences, int serviceCode) {
-        this.tripId = trip.trip_id;
+        String scopedTripId = String.join(":", trip.feed_id, trip.trip_id);
+        this.tripId = scopedTripId;
         if (trip.bikes_allowed > 0) {
             setFlag(TripFlag.BICYCLE);
         }

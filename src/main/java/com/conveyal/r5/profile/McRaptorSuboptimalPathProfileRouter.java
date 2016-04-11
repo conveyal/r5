@@ -452,7 +452,7 @@ public class McRaptorSuboptimalPathProfileRouter {
     }
 
     /** Add a state */
-    private boolean addState (int stop, int boardStopIndex, int alightStopIndex, int time, int pattern, int trip, McRaptorState back) {
+    private boolean addState (int stop, int boardStopPosition, int alightStopPosition, int time, int pattern, int trip, McRaptorState back) {
         /**
          * local pruning, and cutting off of excessively long searches
          * NB need to have cutoff be relative to toTime because otherwise when we do range-RAPTOR we'll have left over states
@@ -466,8 +466,8 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         McRaptorState state = new McRaptorState();
         state.stop = stop;
-        state.boardStopIndex = boardStopIndex;
-        state.alightStopIndex = alightStopIndex;
+        state.boardStopPosition = boardStopPosition;
+        state.alightStopPosition = alightStopPosition;
         state.time = time;
         state.pattern = pattern;
         state.trip = trip;
@@ -558,16 +558,16 @@ public class McRaptorSuboptimalPathProfileRouter {
         public int stop;
 
         /**
-         * What stop index are we at in the pattern?
+         * What stop position are we at in the pattern?
          *
          * This is needed because the same stop can appear twice in a pattern, see #116.
          */
-        public int boardStopIndex;
+        public int boardStopPosition;
 
         /**
-         * What stop index did we board at.
+         * What stop position in this pattern did we board at?
          */
-        public int alightStopIndex;
+        public int alightStopPosition;
 
         /** the patterns used in this state */
         public int[] patterns = EMPTY_INT_ARRAY;

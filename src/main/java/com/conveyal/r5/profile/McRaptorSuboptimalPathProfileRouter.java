@@ -148,7 +148,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
             // enqueue/relax access times
             accessTimes.forEachEntry((stop, accessTime) -> {
-                if (addState(stop, finalDepartureTime + accessTime, -1, -1, null))
+                if (addState(stop, -1, -1, finalDepartureTime + accessTime, -1, -1, null))
                     touchedStops.set(stop);
 
                 return true;
@@ -268,7 +268,7 @@ public class McRaptorSuboptimalPathProfileRouter {
                 continue;
             }
 
-            for (int stopPositionInPattern = 0; stopPositionInPattern < pattern.stops.length; stopPositionInPattern++) {
+            for (int stopPositionInPattern = 0, boardStopPositionInPattern = -1; stopPositionInPattern < pattern.stops.length; stopPositionInPattern++) {
                 int stop = pattern.stops[stopPositionInPattern];
 
                 // perform this check here so we don't needlessly loop over states at a stop that are all created by
@@ -280,7 +280,7 @@ public class McRaptorSuboptimalPathProfileRouter {
                     int trip = tripsPerPatternSequence.get(e.getKey());
                     TripSchedule sched = pattern.tripSchedules.get(trip);
 
-                    if (addState(stop, sched.arrivals[stopPositionInPattern], patIdx, trip, e.getValue()))
+                    if (addState(stop, boardStopPositionInPattern, stopPositionInPattern, sched.arrivals[stopPositionInPattern], patIdx, trip, e.getValue()))
                         touchedStops.set(stop);
                 }
 
@@ -320,8 +320,11 @@ public class McRaptorSuboptimalPathProfileRouter {
                                 if (!statesPerPatternSequence.containsKey(spk) || tripsPerPatternSequence.get(spk) > currentTrip) {
                                     statesPerPatternSequence.put(spk, state);
                                     tripsPerPatternSequence.put(spk, currentTrip);
+                                    boardStopPositionInPattern = stopPositionInPattern;
                                 }
 
+                                // we found the best trip we can board at this stop, break loop regardless of whether
+                                // we decided to board it or continue on a trip coming from a previous stop.
                                 break;
                             }
                         }
@@ -347,7 +350,7 @@ public class McRaptorSuboptimalPathProfileRouter {
             for (McRaptorState state : bestStates.get(stop).getNonTransferStates()) {
                 for (int transfer = 0; transfer < transfers.size(); transfer += 2) {
                     int toStop = transfers.get(transfer);
-                    if (addState(toStop, state.time + transfers.get(transfer + 1), -1, -1, state)) {
+                    if (addState(toStop, -1, -1, state.time + transfers.get(transfer + 1), -1, -1, state)) {
                         String to = network.transitLayer.stopNames.get(transfers.get(transfer));
                         //LOG.info("Transfer from {} to {} is optimal", from, to);
 
@@ -449,7 +452,7 @@ public class McRaptorSuboptimalPathProfileRouter {
     }
 
     /** Add a state */
-    private boolean addState (int stop, int time, int pattern, int trip, McRaptorState back) {
+    private boolean addState (int stop, int boardStopIndex, int alightStopIndex, int time, int pattern, int trip, McRaptorState back) {
         /**
          * local pruning, and cutting off of excessively long searches
          * NB need to have cutoff be relative to toTime because otherwise when we do range-RAPTOR we'll have left over states
@@ -463,6 +466,8 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         McRaptorState state = new McRaptorState();
         state.stop = stop;
+        state.boardStopIndex = boardStopIndex;
+        state.alightStopIndex = alightStopIndex;
         state.time = time;
         state.pattern = pattern;
         state.trip = trip;
@@ -551,6 +556,18 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         /** What stop are we at */
         public int stop;
+
+        /**
+         * What stop index are we at in the pattern?
+         *
+         * This is needed because the same stop can appear twice in a pattern, see #116.
+         */
+        public int boardStopIndex;
+
+        /**
+         * What stop index did we board at.
+         */
+        public int alightStopIndex;
 
         /** the patterns used in this state */
         public int[] patterns = EMPTY_INT_ARRAY;

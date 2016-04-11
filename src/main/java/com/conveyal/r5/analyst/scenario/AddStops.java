@@ -231,6 +231,8 @@ public class AddStops extends Modification {
         TransitLayer transitLayer = network.transitLayer;
         for (StopSpec stopSpec : stops) {
             int newVertexIndex = network.streetLayer.getOrCreateVertexNear(stopSpec.lat, stopSpec.lon);
+            // TODO we actually want to create a new vertex exactly at the supplied coordinate and make new edges that connect it to the splitter.
+            // We should reuse the method that is employed when the graph is first built.
             transitLayer.stopIdForIndex.add(stopSpec.stopId); // indexForStopId will be derived from this
             transitLayer.stopNames.add(stopSpec.name);
             transitLayer.streetVertexForStop.add(newVertexIndex); // stopForStreetVertex will be derived from this

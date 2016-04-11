@@ -1,5 +1,6 @@
 package com.conveyal.r5.point_to_point.builder;
 
+import com.conveyal.r5.profile.GreedyFareCalculator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -121,6 +122,9 @@ public class TNBuilderConfig {
      */
     public String bikeRentalFile;
 
+    /** The fare calculator for analysis */
+    public GreedyFareCalculator analysisFareCalculator;
+
     public TNBuilderConfig() {
         htmlAnnotations = false;
         maxHtmlAnnotationsPerFile = 1000;
@@ -139,6 +143,7 @@ public class TNBuilderConfig {
         staticBikeParkAndRide = false;
         bikeRentalFile = null;
         speeds = SpeedConfig.defaultConfig();
+        analysisFareCalculator = null;
     }
 
     public static TNBuilderConfig defaultConfig() {

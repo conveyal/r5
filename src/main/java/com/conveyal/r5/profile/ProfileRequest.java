@@ -191,6 +191,9 @@ public class ProfileRequest implements Serializable, Cloneable {
     //If this is profile or point to point route request
     private boolean profile = false;
 
+    /** maximum fare. If nonnegative, fares will be used in routing. */
+    public int maxFare = -1;
+
     public boolean isProfile() {
         return profile;
     }

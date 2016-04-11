@@ -8,6 +8,7 @@ import com.conveyal.r5.analyst.scenario.InactiveTripsFilter;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.publish.StaticComputer;
 import com.conveyal.r5.publish.StaticSiteRequest;
@@ -422,17 +423,34 @@ public class AnalystWorker implements Runnable {
         TransportNetwork modifiedNetwork = transportNetwork.applyScenario(scenario);
         LOG.info("Done applying scenario.");
 
-        // Run the core repeated-raptor analysis.
-        RepeatedRaptorProfileRouter router =
-                new RepeatedRaptorProfileRouter(modifiedNetwork, clusterRequest, linkedTargets, ts); // TODO transportNetwork is implied by linkedTargets.
         ResultEnvelope envelope = new ResultEnvelope();
-        try {
-            envelope = router.route();
-            ts.success = true;
-        } catch (Exception ex) {
-            // An error occurred. Keep the empty envelope empty and TODO include error information.
-            LOG.error("Error occurred in profile request", ex);
-            ts.success = false;
+
+        // Run the core repeated-raptor analysis.
+
+        if (clusterRequest.profileRequest.maxFare < 0) {
+            RepeatedRaptorProfileRouter router =
+                    new RepeatedRaptorProfileRouter(modifiedNetwork, clusterRequest, linkedTargets, ts); // TODO transportNetwork is implied by linkedTargets.
+            try {
+                envelope = router.route();
+                ts.success = true;
+            } catch (Exception ex) {
+                // An error occurred. Keep the empty envelope empty and TODO include error information.
+                LOG.error("Error occurred in profile request", ex);
+                ts.success = false;
+            }
+        } else {
+            // pareto-optimal search on fares
+
+            McRaptorSuboptimalPathProfileRouter router = new McRaptorSuboptimalPathProfileRouter(modifiedNetwork, clusterRequest, linkedTargets);
+
+            try {
+                envelope = router.routeEnvelope();
+                ts.success = true;
+            } catch (Exception ex) {
+                // An error occurred. Keep the empty envelope empty and TODO include error information.
+                LOG.error("Error occurred in profile request", ex);
+                ts.success = false;
+            }
         }
 
         // Send the ResultEnvelope back to the user.

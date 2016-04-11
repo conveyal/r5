@@ -5,6 +5,7 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+import com.conveyal.r5.profile.GreedyFareCalculator;
 import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.geom.Envelope;
 import org.nustaq.serialization.FSTObjectInput;
@@ -36,7 +37,9 @@ public class TransportNetwork implements Serializable, Cloneable {
 
     private WebMercatorGridPointSet gridPointSet;
 
-    static final String BUILDER_CONFIG_FILENAME = "build-config.json";
+    public static final String BUILDER_CONFIG_FILENAME = "build-config.json";
+
+    public GreedyFareCalculator fareCalculator;
 
     public void write (OutputStream stream) throws IOException {
         LOG.info("Writing transport network...");
@@ -55,6 +58,9 @@ public class TransportNetwork implements Serializable, Cloneable {
         result.streetLayer.indexStreets();
         result.transitLayer.rebuildTransientIndexes();
         result.transitLayer.buildStopTree();
+
+        if (result.fareCalculator != null) result.fareCalculator.transitLayer = result.transitLayer;
+
         LOG.info("Done reading.");
         return result;
     }
@@ -134,6 +140,10 @@ public class TransportNetwork implements Serializable, Cloneable {
         TransportNetwork transportNetwork = new TransportNetwork();
         transportNetwork.streetLayer = streetLayer;
         transportNetwork.transitLayer = transitLayer;
+
+        transportNetwork.fareCalculator = tnBuilderConfig.analysisFareCalculator;
+
+        if (transportNetwork.fareCalculator != null) transportNetwork.fareCalculator.transitLayer = transitLayer;
 
         return transportNetwork;
     }

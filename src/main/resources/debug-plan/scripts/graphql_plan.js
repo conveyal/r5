@@ -475,7 +475,7 @@ function makeTextResponse(data) {
                     item+="<li>Mode: " + route.mode + "<br />From:"+transitData.from.name+" (<abbr title=\"Wheelchair accessible\">WA</abbr>: " + transitData.from.wheelchairBoarding +") --> ";
                     item+=transitData.to.name+ " (<abbr title=\"Wheelchair accessible\">WA</abbr>: " + transitData.to.wheelchairBoarding +") <br /> Pattern:";
                     item+=patternInfo.patternId+ " Line:" + route.shortName + " " +fromTime+" --> " +toTime + "<br />";
-                    item+= "<abbr title=\"Bikes Allowed\">BA</abbr>:" + ptripInfo.bikesAllowed + " <abbr title=\"Wheelchair accessible\">WA</abbr>:" + ptripInfo.wheelchairAccessible + " <abbr title=\"Service ID\">SID</abbr>:" + ptripInfo.serviceId + "</li>";
+                    item+= "<abbr title=\"Bikes Allowed\">BA</abbr>:" + ptripInfo.bikesAllowed + " <abbr title=\"Wheelchair accessible\">WA</abbr>:" + ptripInfo.wheelchairAccessible + " <abbr title=\"Service ID\">SID</abbr>:" + ptripInfo.serviceId + " Trip ID: " + ptripInfo.tripId +"</li>";
                     if (transitData["middle"] != null) {
                         var middleData = transitData["middle"]
                         item+="<li>Mode:"+middleData.mode+" Duration: " + secondsToTime(middleData.duration) + "Distance: "+middleData.distance/1000 + "m</li>";

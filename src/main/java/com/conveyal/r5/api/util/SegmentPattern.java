@@ -120,6 +120,19 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
                 }
             }
         }
+        TripSchedule schedule = pattern.tripSchedules.get(tripIndex);
+        if (fromIndex != currentPath.boardStopPositions[pathIndex]) {
+            LOG.error("PathIndex: {}/{}", pathIndex, currentPath.length);
+            int stopPositionIndex = pattern.stops[currentPath.boardStopPositions[pathIndex]];
+            LOG.error("FrontIndex i{} ({}) (SID:{} {}) != i{} ({}) (SID:{} {}) Trip:{}", fromIndex, boardStopIdx, transitLayer.stopIdForIndex.get(boardStopIdx), transitLayer.stopNames.get(boardStopIdx),
+                currentPath.boardStopPositions[pathIndex], stopPositionIndex, transitLayer.stopIdForIndex.get(stopPositionIndex), transitLayer.stopNames.get(stopPositionIndex),  schedule.tripId);
+        }
+        if (toIndex != currentPath.alightStopPositions[pathIndex]) {
+            int stopPositionIndex = pattern.stops[currentPath.alightStopPositions[pathIndex]];
+            LOG.error("ToIndex  i{} ({}) (SID:{} {}) != i{} ({}) (SID:{} {}) Trip:{}", toIndex, alightStopIdx, transitLayer.stopIdForIndex.get(alightStopIdx), transitLayer.stopNames.get(alightStopIdx),
+                currentPath.alightStopPositions[pathIndex], stopPositionIndex, transitLayer.stopIdForIndex.get(stopPositionIndex), transitLayer.stopNames.get(stopPositionIndex), schedule.tripId);
+            toIndex = currentPath.alightStopPositions[pathIndex];
+        }
         Assert.isTrue(fromIndex != -1);
         Assert.isTrue(toIndex != -1);
         addTime(pattern, alightTime, fromTimeDateZD, tripIndex);

@@ -1,6 +1,7 @@
 package com.conveyal.r5.api.util;
 
 import com.conveyal.gtfs.model.Service;
+import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
@@ -12,7 +13,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -69,8 +69,8 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
 
     private TransitLayer transitLayer;
 
-    public SegmentPattern(TransitLayer transitLayer, TripPattern pattern, int patternIdx, int boardStopIdx,
-        int alightStopIdx, int alightTime, ZonedDateTime fromTimeDateZD) {
+    public SegmentPattern(TransitLayer transitLayer, TripPattern pattern, Path currentPath,
+        int pathIndex, ZonedDateTime fromTimeDateZD) {
         fromArrivalTime = new ArrayList<>();
         fromDepartureTime = new ArrayList<>();
         toArrivalTime = new ArrayList<>();
@@ -78,6 +78,11 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
         alightTimes = new ArrayList<>();
         tripIds = new ArrayList<>();
         realTime = false;
+        int patternIdx = currentPath.patterns[pathIndex];
+        int boardStopIdx = currentPath.boardStops[pathIndex];
+        int alightStopIdx = currentPath.alightStops[pathIndex];
+        int alightTime = currentPath.alightTimes[pathIndex];
+        int tripIndex = currentPath.trips[pathIndex];
         patternId = Integer.toString(patternIdx);
         this.patternIdx = patternIdx;
         fromIndex = -1;
@@ -117,7 +122,7 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
         }
         Assert.isTrue(fromIndex != -1);
         Assert.isTrue(toIndex != -1);
-        addTime(pattern, alightTime, fromTimeDateZD);
+        addTime(pattern, alightTime, fromTimeDateZD, tripIndex);
 
     }
 
@@ -129,11 +134,14 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
      * @param pattern TripPattern for current trip
      * @param alightTime seconds from midnight time for trip we are searching for
      * @param fromTimeDateZD time/date object from which date and timezone is read
+     * @param tripIndex inside pattern
      * @return index of created time
      */
-    private int addTime(TripPattern pattern, int alightTime, ZonedDateTime fromTimeDateZD) {
+    private int addTime(TripPattern pattern, int alightTime, ZonedDateTime fromTimeDateZD,
+        int tripIndex) {
         //We search for a trip based on provided tripPattern board, alight stop and alightTime
         //TODO: this will be removed when support for tripIDs is added into Path
+        TripSchedule foundSchedule = pattern.tripSchedules.get(tripIndex);
         boolean added = false;
         final LocalDate localDate = fromTimeDateZD.toLocalDate();
         for (TripSchedule schedule: pattern.tripSchedules) {
@@ -157,11 +165,17 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
                 fromDepartureTime.add(createTime(schedule.departures[fromIndex], fromTimeDateZD));
                 alightTimes.add(alightTime);
                 tripIds.add(schedule.tripId);
+                if (!foundSchedule.tripId.equals(schedule.tripId)) {
+                    LOG.error("Trip ID is not the same: {} != {}", foundSchedule.tripId, schedule.tripId);
+                }
+                //TODO: here is a problem if route has stop twice as start and end
                 break;
             }
         }
         if (!added) {
-            LOG.error("Trip with wanted time wasn't found!");
+            LOG.error("Trip with wanted time wasn't found!"
+                + " Trip Id:{} Alight time:{} ({}) {} ({})",
+                foundSchedule.tripId, alightTime, createTime(alightTime, fromTimeDateZD), foundSchedule.arrivals[toIndex], createTime(foundSchedule.arrivals[toIndex], fromTimeDateZD));
         }
         return (fromDepartureTime.size() -1);
     }
@@ -173,11 +187,12 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
      * @param currentPatternIdx index of current trip pattern
      * @param alightTime seconds from midnight alight time for trip we are searching for
      * @param fromTimeDateZD time and date object which is used to get date and timezone
-     * @see #addTime(TripPattern, int, ZonedDateTime)
+     * @param tripIndex inside pattern
+     * @see #addTime(TripPattern, int, ZonedDateTime, int)
      * @return index of time that is added or found (This is used in TransitJourneyID)
      */
     public int addTime(TransitLayer transitLayer, int currentPatternIdx, int alightTime,
-        ZonedDateTime fromTimeDateZD) {
+        ZonedDateTime fromTimeDateZD, int tripIndex) {
         int timeIndex = 0;
         for (int patternAlightTime : alightTimes) {
             //If there already exists same pattern with same time we don't need to insert it again
@@ -188,7 +203,7 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
             timeIndex++;
         }
         TripPattern pattern = transitLayer.tripPatterns.get(currentPatternIdx);
-        return addTime(pattern, alightTime, fromTimeDateZD);
+        return addTime(pattern, alightTime, fromTimeDateZD, tripIndex);
 
     }
 

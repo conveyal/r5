@@ -177,12 +177,14 @@ public class McRaptorSuboptimalPathProfileRouter {
 //        LOG.info("Hash performance: {} hashes, {} states", hashes.size(), keys.size());
 
         // analyst request, create a propagated times store
-        propagatedTimesStore = new PropagatedTimesStore(pointSet.size());
-        BitSet includeInAverages = new BitSet();
-        includeInAverages.set(0, timesAtTargetsEachIteration.size());
-        // TODO min/max not appropriate without explicitly calculated extrema in frequency search
-        propagatedTimesStore.setFromArray(timesAtTargetsEachIteration.toArray(new int[timesAtTargetsEachIteration.size()][]),
-                includeInAverages, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX);
+        if (egressTimes == null) {
+            propagatedTimesStore = new PropagatedTimesStore(pointSet.size());
+            BitSet includeInAverages = new BitSet();
+            includeInAverages.set(0, timesAtTargetsEachIteration.size());
+            // TODO min/max not appropriate without explicitly calculated extrema in frequency search
+            propagatedTimesStore.setFromArray(timesAtTargetsEachIteration.toArray(new int[timesAtTargetsEachIteration.size()][]),
+                    includeInAverages, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX);
+        }
 
         LOG.info("McRAPTOR took {}ms", System.currentTimeMillis() - startTime);
 

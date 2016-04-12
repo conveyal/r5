@@ -297,10 +297,15 @@ public class McRaptorSuboptimalPathProfileRouter {
 
                     int boardStopPositionInPattern = boardStopsPositionsPerPatternSequence.get(e.getKey());
 
-                    int arrival = sched.arrivals[stopPositionInPattern];
+                    int arrival;
 
                     // we know we have no mixed schedule/frequency patterns, see check on boarding
-                    if (sched.headwaySeconds != null) arrival += boardTimesPerPatternSequence.get(e.getKey());
+                    if (sched.headwaySeconds != null) {
+                        int travelTimeToStop = sched.arrivals[stopPositionInPattern] - sched.departures[boardStopPositionInPattern];
+                        arrival = boardTimesPerPatternSequence.get(e.getKey()) + travelTimeToStop;
+                    } else {
+                        arrival = sched.arrivals[stopPositionInPattern];
+                    }
 
                     if (addState(stop, boardStopPositionInPattern, stopPositionInPattern, arrival, patIdx, trip, e.getValue()))
                         touchedStops.set(stop);

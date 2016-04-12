@@ -1,8 +1,6 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.transit.RouteInfo;
-import com.conveyal.r5.transit.TransitLayer;
-import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -32,6 +30,10 @@ public class BogotaGreedyFareCalculator extends GreedyFareCalculator {
     /** fare when transferring between TransMilenio lines (TransMilenio has free transfers) */
     public int tmToTmFare = 0;
 
+    public String tpcAgencyName;
+
+    public String tmAgencyName;
+
     // There is some additional complexity which we're not representing here.
     // There is a maximum of four transfers but we're limiting the analysis to four rides, so that doesn't apply
     // There is also a maximum transfer window of 75 minutes but our analysis window is 60 minutes so it's non-binding
@@ -57,7 +59,7 @@ public class BogotaGreedyFareCalculator extends GreedyFareCalculator {
 
             RouteInfo ri = transitLayer.routes.get(transitLayer.tripPatterns.get(pattern).routeIndex);
 
-            RouteType routeType = RouteType.valueOf(ri.agency_name);
+            RouteType routeType = RouteType.fromAgencyName(ri.agency_name, this);
 
             if (prevRouteType == null) {
                 // not a transfer
@@ -84,7 +86,13 @@ public class BogotaGreedyFareCalculator extends GreedyFareCalculator {
         return "bogota";
     }
 
-    private static enum RouteType {
+    private enum RouteType {
         TPC, TRANSMILENIO;
+
+        public static RouteType fromAgencyName (String agencyName, BogotaGreedyFareCalculator calculator) {
+            if (calculator.tpcAgencyName.equals(agencyName)) return TPC;
+            else if (calculator.tmAgencyName.equals(agencyName)) return TRANSMILENIO;
+            else return null;
+        }
     }
 }

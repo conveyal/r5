@@ -263,6 +263,7 @@ public class McRaptorSuboptimalPathProfileRouter {
             // came from the red line).
             Map<StatePatternKey, McRaptorState> statesPerPatternSequence = new HashMap<>();
             TObjectIntMap<StatePatternKey> tripsPerPatternSequence = new TObjectIntHashMap<>();
+            TObjectIntMap<StatePatternKey> boardStopsPositionsPerPatternSequence = new TObjectIntHashMap<>();
 
             TripPattern pattern = network.transitLayer.tripPatterns.get(patIdx);
             //skips trip patterns with trips which don't run on wanted date
@@ -270,7 +271,7 @@ public class McRaptorSuboptimalPathProfileRouter {
                 continue;
             }
 
-            for (int stopPositionInPattern = 0, boardStopPositionInPattern = -1; stopPositionInPattern < pattern.stops.length; stopPositionInPattern++) {
+            for (int stopPositionInPattern = 0; stopPositionInPattern < pattern.stops.length; stopPositionInPattern++) {
                 int stop = pattern.stops[stopPositionInPattern];
 
                 // perform this check here so we don't needlessly loop over states at a stop that are all created by
@@ -281,6 +282,8 @@ public class McRaptorSuboptimalPathProfileRouter {
                 for (Map.Entry<StatePatternKey, McRaptorState> e : statesPerPatternSequence.entrySet()) {
                     int trip = tripsPerPatternSequence.get(e.getKey());
                     TripSchedule sched = pattern.tripSchedules.get(trip);
+
+                    int boardStopPositionInPattern = boardStopsPositionsPerPatternSequence.get(e.getKey());
 
                     if (addState(stop, boardStopPositionInPattern, stopPositionInPattern, sched.arrivals[stopPositionInPattern], patIdx, trip, e.getValue()))
                         touchedStops.set(stop);
@@ -322,7 +325,7 @@ public class McRaptorSuboptimalPathProfileRouter {
                                 if (!statesPerPatternSequence.containsKey(spk) || tripsPerPatternSequence.get(spk) > currentTrip) {
                                     statesPerPatternSequence.put(spk, state);
                                     tripsPerPatternSequence.put(spk, currentTrip);
-                                    boardStopPositionInPattern = stopPositionInPattern;
+                                    boardStopsPositionsPerPatternSequence.put(spk, stopPositionInPattern);
                                 }
 
                                 // we found the best trip we can board at this stop, break loop regardless of whether
@@ -475,6 +478,20 @@ public class McRaptorSuboptimalPathProfileRouter {
         state.trip = trip;
         state.back = back;
         state.round = round;
+
+        // sanity check (anecdotally, this has no noticeable effect on speed)
+        if (boardStopPosition >= 0) {
+            TripPattern patt = network.transitLayer.tripPatterns.get(pattern);
+            int boardStop = patt.stops[boardStopPosition];
+
+            if (boardStop != back.stop) {
+                LOG.error("Board stop position does not match board stop!");
+            }
+
+            if (stop != patt.stops[alightStopPosition]) {
+                LOG.error("Alight stop position does not match alight stop!");
+            }
+        }
 
         if (pattern != -1) {
             if (state.back != null) {

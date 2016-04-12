@@ -138,6 +138,8 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
                     this.headwaySeconds[fidx] = f.headway_secs;
                     this.endTimes[fidx] = f.end_time;
                     this.startTimes[fidx] = f.start_time;
+
+                    fidx++;
                 }
             }
         }

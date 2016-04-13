@@ -79,7 +79,7 @@ public class ProfileResponse {
 
 
         if (profileOption.isEmpty()) {
-            LOG.info("Creating new profile option");
+            LOG.debug("Creating new profile option");
             options.add(profileOption);
         }
 

@@ -345,26 +345,28 @@ public class PointToPointQuery {
                     break;
                 }*/
 
-                LOG.info(" ");
-                for (int i = 0; i < path.patterns.length; i++) {
-                    //TransitSegment transitSegment = new TransitSegment(transportNetwork.transitLayer, path.boardStops[i], path.alightStops[i], path.patterns[i]);
-                    if (!(((boardStop == path.boardStops[i] && alightStop == path.alightStops[i]) ))) {
-                        LOG.info("   BoardStop: {} pattern: {} allightStop: {}", path.boardStops[i],
-                            path.patterns[i], path.alightStops[i]);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug(" ");
+                    for (int i = 0; i < path.patterns.length; i++) {
+                        //TransitSegment transitSegment = new TransitSegment(transportNetwork.transitLayer, path.boardStops[i], path.alightStops[i], path.patterns[i]);
+                        if (!(((boardStop == path.boardStops[i] && alightStop == path.alightStops[i])))) {
+                            LOG.debug("   BoardStop: {} pattern: {} allightStop: {}", path.boardStops[i],
+                                path.patterns[i], path.alightStops[i]);
+                        }
+                        TripPattern pattern = transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]);
+                        if (pattern.routeIndex >= 0) {
+                            RouteInfo routeInfo = transportNetwork.transitLayer.routes.get(pattern.routeIndex);
+                            LOG.debug("     Pattern:{} on route:{} ({}) with {} stops", path.patterns[i],
+                                routeInfo.route_long_name, routeInfo.route_short_name, pattern.stops.length);
+                        }
+                        LOG.debug("     {}->{} ({}:{})", transportNetwork.transitLayer.stopNames.get(path.boardStops[i]),
+                            transportNetwork.transitLayer.stopNames.get(path.alightStops[i]),
+                            path.alightTimes[i] / 3600, path.alightTimes[i] % 3600 / 60);
+                        //transit_option.addTransit(transitSegment);
                     }
-                    TripPattern pattern =transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]);
-                    if (pattern.routeIndex >= 0) {
-                        RouteInfo routeInfo = transportNetwork.transitLayer.routes.get(pattern.routeIndex);
-                        LOG.info("     Pattern:{} on route:{} ({}) with {} stops", path.patterns[i],routeInfo.route_long_name, routeInfo.route_short_name,
-                            pattern.stops.length);
-                    }
-                    LOG.info("     {}->{} ({}:{})", transportNetwork.transitLayer.stopNames.get(path.boardStops[i]),
-                        transportNetwork.transitLayer.stopNames.get(path.alightStops[i]),
-                        path.alightTimes[i]/3600, path.alightTimes[i]%3600/60);
-                    //transit_option.addTransit(transitSegment);
+                    boardStop = path.boardStops[0];
+                    alightStop = path.alightStops[0];
                 }
-                boardStop = path.boardStops[0];
-                alightStop = path.alightStops[0];
                 seen_paths++;
             }
             profileResponse.generateStreetTransfers(transportNetwork, request);

@@ -65,7 +65,7 @@ public class RemoveTrips extends Modification {
         }
         TripPattern newTripPattern = originalTripPattern.clone();
         newTripPattern.tripSchedules = originalTripPattern.tripSchedules.stream()
-                .filter(schedule -> trips.contains(schedule.tripId))
+                .filter(schedule -> !trips.contains(schedule.tripId))
                 .collect(Collectors.toList());
         if (newTripPattern.tripSchedules.isEmpty()) {
             return null;

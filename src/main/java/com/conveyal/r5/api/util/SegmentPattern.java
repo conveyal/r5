@@ -1,15 +1,12 @@
 package com.conveyal.r5.api.util;
 
-import com.conveyal.gtfs.model.Service;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
-import com.vividsolutions.jts.util.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -59,8 +56,9 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
     //departure times of to stop in this pattern
     public List<ZonedDateTime> toDepartureTime;
 
-    //TOOD: check if we really need this
-    private List<Integer> alightTimes;
+    //This is used to find if there already exist same alight time in SegmentPattern
+    //So that each time is only inserted once
+    private List<Integer> alightTimesCache;
     final public int patternIdx;
     final public int routeIndex;
 
@@ -75,7 +73,7 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
         fromDepartureTime = new ArrayList<>();
         toArrivalTime = new ArrayList<>();
         toDepartureTime = new ArrayList<>();
-        alightTimes = new ArrayList<>();
+        alightTimesCache = new ArrayList<>();
         tripIds = new ArrayList<>();
         realTime = false;
         int patternIdx = currentPath.patterns[pathIndex];
@@ -116,7 +114,7 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
 
         fromArrivalTime.add(createTime(schedule.arrivals[fromIndex], fromTimeDateZD));
         fromDepartureTime.add(createTime(schedule.departures[fromIndex], fromTimeDateZD));
-        alightTimes.add(alightTime);
+        alightTimesCache.add(alightTime);
         tripIds.add(schedule.tripId);
 
         return (fromDepartureTime.size() -1);
@@ -136,7 +134,7 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
     public int addTime(TransitLayer transitLayer, int currentPatternIdx, int alightTime,
         ZonedDateTime fromTimeDateZD, int tripIndex) {
         int timeIndex = 0;
-        for (int patternAlightTime : alightTimes) {
+        for (int patternAlightTime : alightTimesCache) {
             //If there already exists same pattern with same time we don't need to insert it again
             //We know that it is a same pattern
             if (patternAlightTime == alightTime) {

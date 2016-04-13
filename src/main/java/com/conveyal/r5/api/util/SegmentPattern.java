@@ -79,56 +79,25 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
         tripIds = new ArrayList<>();
         realTime = false;
         int patternIdx = currentPath.patterns[pathIndex];
-        int boardStopIdx = currentPath.boardStops[pathIndex];
-        int alightStopIdx = currentPath.alightStops[pathIndex];
         int alightTime = currentPath.alightTimes[pathIndex];
         int tripIndex = currentPath.trips[pathIndex];
+        int boardStopPosition = currentPath.boardStopPositions[pathIndex];
+        int alightStopPosition = currentPath.alightStopPositions[pathIndex];
         patternId = Integer.toString(patternIdx);
         this.patternIdx = patternIdx;
-        fromIndex = -1;
-        toIndex = -1;
+        fromIndex = boardStopPosition;
+        toIndex = alightStopPosition;
         routeIndex = pattern.routeIndex;
         this.transitLayer = transitLayer;
 
-        //Finds at which indexes are board and alight stops in wanted trippattern
-        //This is used in response and we need indexes to find used trip
-        //it stops searching as soon as it founds both
-        for(int i=0; i < pattern.stops.length; i++) {
-            int currentStopIdx = pattern.stops[i];
-            //From stop index wasn't found yet
-            if (fromIndex == -1) {
-                //Found from Stop
-                if (boardStopIdx == currentStopIdx) {
-                    fromIndex = i;
-                    //If to stop was also found we can stop the search
-                    if (toIndex != -1) {
-                        break;
-                    } else {
-                        //Assumes that fromIndex and toIndex are not the same stops
-                        continue;
-                    }
-                }
-            }
-            //To stop index wasn't found yet
-            if (toIndex == -1) {
-                //Found to stop index
-                if (alightStopIdx == currentStopIdx) {
-                    toIndex = i;
-                    if (fromIndex != -1) {
-                        break;
-                    }
-                }
-            }
-        }
-        Assert.isTrue(fromIndex != -1);
-        Assert.isTrue(toIndex != -1);
         addTime(pattern, alightTime, fromTimeDateZD, tripIndex);
 
     }
 
     /**
-     * Found a trip in tripPattern based on from/to indexes and alight time
-     * and fills to/from arrival/Departure time arrays with time information for found trip.
+     * Fills to/from arrival/Departure time arrays with time information for trip.
+     *
+     * Trip schedule is read from pattern trip schedules and Raptor algorithm tripIndex
      *
      * Time is created based on seconds from midnight and date and timezone from fromTimeDateZD with help of {@link #createTime(int, ZonedDateTime)}.
      * @param pattern TripPattern for current trip
@@ -139,44 +108,17 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
      */
     private int addTime(TripPattern pattern, int alightTime, ZonedDateTime fromTimeDateZD,
         int tripIndex) {
-        //We search for a trip based on provided tripPattern board, alight stop and alightTime
-        //TODO: this will be removed when support for tripIDs is added into Path
-        TripSchedule foundSchedule = pattern.tripSchedules.get(tripIndex);
-        boolean added = false;
-        final LocalDate localDate = fromTimeDateZD.toLocalDate();
-        for (TripSchedule schedule: pattern.tripSchedules) {
-            if (schedule.arrivals[toIndex] == alightTime) {
-                Service service = transitLayer.services.get(schedule.serviceCode);
-                /*Skips over trips that run during different service periods but have same times
-                 *It's rare but it could happen
-                 * For example we are searching for a trip on sunday but get trippattern with trips
-                 * during week and sunday and found a trip that has same arrival time as trip on sunday
-                 * but is on week service.
-                 */
-                if (!service.activeOn(localDate)) {
-                    LOG.warn("Time matches but service doesn't run on wanted date! {}", service.service_id);
-                    continue;
-                }
-                added = true;
-                toArrivalTime.add(createTime(alightTime, fromTimeDateZD));
-                toDepartureTime.add(createTime(schedule.departures[toIndex], fromTimeDateZD));
+        //From/to arrival/departure times are added based on trip times
+        TripSchedule schedule = pattern.tripSchedules.get(tripIndex);
 
-                fromArrivalTime.add(createTime(schedule.arrivals[fromIndex], fromTimeDateZD));
-                fromDepartureTime.add(createTime(schedule.departures[fromIndex], fromTimeDateZD));
-                alightTimes.add(alightTime);
-                tripIds.add(schedule.tripId);
-                if (!foundSchedule.tripId.equals(schedule.tripId)) {
-                    LOG.error("Trip ID is not the same: {} != {}", foundSchedule.tripId, schedule.tripId);
-                }
-                //TODO: here is a problem if route has stop twice as start and end
-                break;
-            }
-        }
-        if (!added) {
-            LOG.error("Trip with wanted time wasn't found!"
-                + " Trip Id:{} Alight time:{} ({}) {} ({})",
-                foundSchedule.tripId, alightTime, createTime(alightTime, fromTimeDateZD), foundSchedule.arrivals[toIndex], createTime(foundSchedule.arrivals[toIndex], fromTimeDateZD));
-        }
+        toArrivalTime.add(createTime(alightTime, fromTimeDateZD));
+        toDepartureTime.add(createTime(schedule.departures[toIndex], fromTimeDateZD));
+
+        fromArrivalTime.add(createTime(schedule.arrivals[fromIndex], fromTimeDateZD));
+        fromDepartureTime.add(createTime(schedule.departures[fromIndex], fromTimeDateZD));
+        alightTimes.add(alightTime);
+        tripIds.add(schedule.tripId);
+
         return (fromDepartureTime.size() -1);
     }
 

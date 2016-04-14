@@ -809,6 +809,8 @@ public class PointToPointRouterServer {
         if (network.transitLayer.stopForStreetVertex.containsKey(vertex.index)) {
             // jitter transit stops slightly, in a deterministic way, so we can see if they're linked correctly
             feature = new GeoJsonFeature(GeometryUtils.geometryFactory.createPoint(jitter(vertex)));
+            //Used for showing stop vertices in debug client
+            feature.addProperty("STOP", true);
         } else {
             feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
         }

@@ -247,8 +247,7 @@ public class PointToPointRouterServer {
                         feature.addProperty("bikes", bikeRentalStation.bikesAvailable);
                         feature.addProperty("places", bikeRentalStation.spacesAvailable);
                     }
-                    feature.addProperty("type", "stop");
-                    feature.addProperty("mode", streetMode.toString());
+                    feature.addProperty("type", "bike_share");
                     if (state != null) {
                         feature.addProperty("distance_m", state.distance/1000);
                     }

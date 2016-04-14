@@ -52,6 +52,7 @@ function enable_button() {
     if (m1 != undefined) {
         $("#stopButton").prop('disabled', false);
         $("#bikeShareButton").prop('disabled', false);
+        $("#prButton").prop('disabled', false);
     }
 }
 
@@ -246,6 +247,42 @@ function requestBikeShares() {
 
 }
 
+function requestParkRide() {
+    var params = {
+        fromLat: m1.getLatLng().lat,
+        fromLon: m1.getLatLng().lng,
+        mode: $("#mode").val(),
+    }
+    console.log(params);
+    //make a request
+    $.ajax({
+        data: params,
+        url: hostname + "/reachedParkRide",
+        success: function (data) {
+            console.log(data);
+            //Removes line from previous request
+            if (layer != null) {
+                layer.clearLayers();
+            }
+            if (data.errors) {
+                alert(data.errors);
+            }
+            if (data.data) {
+                //scales point size radius from 4-20 based on min max of point weight
+                weightSize = d3.scale.linear()
+                .domain(d3.extent(data.data.features, function(feature) { return feature.properties.weight;}))
+                .range([4, 20]);
+                layer = L.geoJson(data.data, {pointToLayer:function(feature, latlng) {
+                    return L.circleMarker(latlng, { filColor:getModeColor(feature.properties.mode), weight:1});
+                },
+                    style: styleBikeShare, onEachFeature:onEachFeature});
+                layer.addTo(window.my_map);
+            }
+        }
+    });
+
+}
+
 function requestPlan() {
     var params = {
         fromLat: m1.getLatLng().lat,
@@ -312,6 +349,7 @@ $(document).ready(function() {
     $("#planButton").click(requestPlan);
     $("#stopButton").click(requestStops);
     $("#bikeShareButton").click(requestBikeShares);
+    $("#prButton").click(requestParkRide);
     $("#full").change(requestPlan);
     $("#fromLat").keyup(function(e) {
         //Enter pressed

@@ -265,6 +265,53 @@ public class PointToPointRouterServer {
             return content;
         }, JsonUtilities.objectMapper::writeValueAsString);
 
+
+        get("/reachedParkRide", (request, response) -> {
+            response.header("Content-Type", "application/json");
+
+            StreetMode streetMode = StreetMode.CAR;
+            Map<String, Object> content = new HashMap<>(2);
+            Float fromLat = request.queryMap("fromLat").floatValue();
+
+            Float fromLon = request.queryMap("fromLon").floatValue();
+
+            Map<String, Object> featureCollection = new HashMap<>(2);
+            featureCollection.put("type", "FeatureCollection");
+            List<GeoJsonFeature> features = new ArrayList<>();
+            ProfileRequest profileRequest = new ProfileRequest();
+            profileRequest.zoneId = transportNetwork.getTimeZone();
+            profileRequest.fromLat = fromLat;
+            profileRequest.fromLon = fromLon;
+            StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+
+            streetRouter.profileRequest = profileRequest;
+            streetRouter.streetMode = streetMode;
+            streetRouter.distanceLimitMeters = 10_000;
+            if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
+                streetRouter.route();
+                streetRouter.getReachedVertices(VertexStore.VertexFlag.PARK_AND_RIDE).forEachEntry((vertexIdx, state) -> {
+                    VertexStore.Vertex stopVertex = transportNetwork.streetLayer.vertexStore.getCursor(vertexIdx);
+                    GeoJsonFeature feature = new GeoJsonFeature(stopVertex.getLon(), stopVertex.getLat());
+                    feature.addProperty("weight", state.weight);
+                    //feature.addProperty("name", transportNetwork.transitLayer.stopNames.get(stopIdx));
+                    feature.addProperty("type", "park_ride");
+                    feature.addProperty("mode", "CAR");
+                    feature.addProperty("distance_m", state.distance/1000);
+                    feature.addProperty("duration_s", state.getDurationSeconds());
+                    features.add(feature);
+                    return true;
+                });
+            } else {
+                content.put("errors", "Start point isn't found!");
+            }
+
+            LOG.info("Num features:{}", features.size());
+            featureCollection.put("features", features);
+            content.put("data", featureCollection);
+
+            return content;
+        }, JsonUtilities.objectMapper::writeValueAsString);
+
         get("/plan", (request, response) -> {
             response.header("Content-Type", "application/json");
             Map<String, Object> content = new HashMap<>();

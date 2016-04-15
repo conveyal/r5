@@ -5,10 +5,13 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
 import com.conveyal.r5.analyst.cluster.ResultEnvelope;
 import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.RouteInfo;
+import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TripFlag;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
 import gnu.trove.list.TIntList;
@@ -278,13 +281,23 @@ public class McRaptorSuboptimalPathProfileRouter {
             TObjectIntMap<StatePatternKey> boardStopsPositionsPerPatternSequence = new TObjectIntHashMap<>();
 
             TripPattern pattern = network.transitLayer.tripPatterns.get(patIdx);
+            RouteInfo routeInfo = network.transitLayer.routes.get(pattern.routeIndex);
+            TransitModes mode = TransitLayer.getTransitModes(routeInfo.route_type);
             //skips trip patterns with trips which don't run on wanted date
-            if (!pattern.servicesActive.intersects(servicesActive)) {
+            if (!pattern.servicesActive.intersects(servicesActive) ||
+                //skips pattern with Transit mode which isn't wanted by profileRequest
+                !request.transitModes.contains(mode)) {
                 continue;
             }
 
             for (int stopPositionInPattern = 0; stopPositionInPattern < pattern.stops.length; stopPositionInPattern++) {
                 int stop = pattern.stops[stopPositionInPattern];
+                //Skips stops that don't allow wheelchair users if this is wanted in request
+                if (request.wheelchair) {
+                    if (!network.transitLayer.stopsWheelchair.get(stop)) {
+                        continue;
+                    }
+                }
 
                 // perform this check here so we don't needlessly loop over states at a stop that are all created by
                 // getting off this pattern.
@@ -342,7 +355,9 @@ public class McRaptorSuboptimalPathProfileRouter {
                             for (TripSchedule tripSchedule : pattern.tripSchedules) {
                                 currentTrip++;
                                 //Skips trips which don't run on wanted date
-                                if (!servicesActive.get(tripSchedule.serviceCode)) {
+                                if (!servicesActive.get(tripSchedule.serviceCode) ||
+                                    //Skip trips that can't be used with wheelchairs when wheelchair trip is requested
+                                    (request.wheelchair && !tripSchedule.getFlag(TripFlag.WHEELCHAIR))) {
                                     continue;
                                 }
 
@@ -363,7 +378,11 @@ public class McRaptorSuboptimalPathProfileRouter {
                         } else if (pattern.hasFrequencies) {
                             currentTrip++;
                             for (TripSchedule tripSchedule : pattern.tripSchedules) {
-                                if (!servicesActive.get(tripSchedule.serviceCode)) continue;
+                                if (!servicesActive.get(tripSchedule.serviceCode) ||
+                                    //Skip trips that can't be used with wheelchairs when wheelchair trip is requested
+                                    (request.wheelchair && !tripSchedule.getFlag(TripFlag.WHEELCHAIR))) {
+                                    continue;
+                                }
 
                                 int earliestPossibleBoardTime = state.time + BOARD_SLACK;
 

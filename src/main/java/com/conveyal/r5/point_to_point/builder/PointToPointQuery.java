@@ -281,12 +281,15 @@ public class PointToPointQuery {
                         RouteInfo routeInfo = transportNetwork.transitLayer.routes.get(pattern.routeIndex);
                         TransitModes mode = TransitLayer.getTransitModes(routeInfo.route_type);
                         if (!request.transitModes.contains(mode)) {
+                            LOG.error("Route with unwanted transit mode found!!");
                             return false;
+
                             //If trip with wheelchair is requested filters out trips where boarding/arrival stop or trip doesn't allow a wheelchair
                         } else if(request.wheelchair) {
                             if (!(transportNetwork.transitLayer.stopsWheelchair.get(pathWithTimes.boardStops[i]) &&
                                 transportNetwork.transitLayer.stopsWheelchair.get(pathWithTimes.alightStops[i]) &&
                                 pattern.tripSchedules.get(pathWithTimes.trips[i]).getFlag(TripFlag.WHEELCHAIR))) {
+                                LOG.error("Trip that doesn't allow wheelchairs found!!");
                                 return false;
                             }
                         }

@@ -165,7 +165,7 @@ var park_ride_layer = {
     "minzoom":13,
     "maxzoom":22,
     "paint":{
-        "circle-color":"#FF0FF",
+        "circle-color":"#FF00FF",
         "circle-blur":0.5
     },
     "layout": {},

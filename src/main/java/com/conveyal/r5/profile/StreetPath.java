@@ -86,7 +86,6 @@ public class StreetPath {
             StreetRouter.State carPark = getStates().getFirst();
             //So we need to search for driving part in previous streetRouter
             StreetRouter.State carState = streetRouter.previous.getStateAtVertex(carPark.vertex);
-            //TODO: add car park info (name, etc)
             if (carState != null) {
                 add(carState);
             } else {

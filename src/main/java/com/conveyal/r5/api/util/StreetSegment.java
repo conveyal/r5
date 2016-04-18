@@ -94,6 +94,10 @@ public class StreetSegment {
                         }
                     }
                 }
+                if (mode == LegMode.CAR_PARK && streetLayer.parkRideLocationsMap != null &&
+                    streetLayer.parkRideLocationsMap.get(state.vertex) != null) {
+                    streetEdgeInfo.parkRide = streetLayer.parkRideLocationsMap.get(state.vertex);
+                }
 
                 double thisAngle = DirectionUtils.getFirstAngle(streetEdgeInfo.geometry);
                 if (streetEdges.isEmpty()) {

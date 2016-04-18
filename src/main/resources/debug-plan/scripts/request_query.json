@@ -116,6 +116,11 @@ transitModes:[TRANSITMODES]) {
           name,
           lat,lon
         }
+        parkRide {
+          id,
+          name,
+          lat,lon
+        }
       }
     },
      egress {

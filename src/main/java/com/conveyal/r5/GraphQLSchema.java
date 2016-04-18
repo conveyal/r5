@@ -465,6 +465,16 @@ public class GraphQLSchema {
                 .description("Number of all spaces")
                 .dataFetcher(environment -> ((ParkRideParking) environment.getSource()).capacity)
                 .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("lon")
+                .type(Scalars.GraphQLFloat)
+                .dataFetcher(environment -> ((ParkRideParking) environment.getSource()).lon)
+                .build())
+            .field(GraphQLFieldDefinition.newFieldDefinition()
+                .name("lat")
+                .type(Scalars.GraphQLFloat)
+                .dataFetcher(environment -> ((ParkRideParking) environment.getSource()).lat)
+                .build())
             .build();
 
         statsType = GraphQLObjectType.newObject()
@@ -779,14 +789,9 @@ public class GraphQLSchema {
                 .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).bikeRentalOffStation)
                 .build())
             .field(GraphQLFieldDefinition.newFieldDefinition()
-                .name("parkRideOn")
+                .name("parkRide")
                 .type(parkRideParkingType)
-                .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).parkRideOn)
-                .build())
-            .field(GraphQLFieldDefinition.newFieldDefinition()
-                .name("parkRideOff")
-                .type(parkRideParkingType)
-                .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).parkRideOff)
+                .dataFetcher(environment -> ((StreetEdgeInfo) environment.getSource()).parkRide)
                 .build())
             .build();
 

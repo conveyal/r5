@@ -362,7 +362,7 @@ public class StreetLayer implements Serializable {
             v.seek(centerVertex);
             v.setFlag(VertexStore.VertexFlag.PARK_AND_RIDE);
 
-            ParkRideParking parkRideParking = new ParkRideParking(centerVertex, way);
+            ParkRideParking parkRideParking = new ParkRideParking(centerVertex, centroid.y, centroid.x, way);
             parkRideLocationsMap.put(centerVertex, parkRideParking);
 
             // find nearby edges
@@ -415,7 +415,7 @@ public class StreetLayer implements Serializable {
             v.seek(vidx);
             v.setFlag(VertexStore.VertexFlag.PARK_AND_RIDE);
 
-            ParkRideParking parkRideParking = new ParkRideParking(vidx, node);
+            ParkRideParking parkRideParking = new ParkRideParking(vidx, node.getLat(), node.getLon(), node);
             parkRideLocationsMap.put(vidx, parkRideParking);
 
             int targetWalking = getOrCreateVertexNear(node.getLat(), node.getLon(), 500, true,

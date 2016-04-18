@@ -19,7 +19,10 @@ public class ParkRideParking implements Serializable {
     //Number of all spaces
     public Integer capacity;
 
-    public ParkRideParking(int vertexIdx, OSMEntity way) {
+    public float lat;
+    public float lon;
+
+    public ParkRideParking(int vertexIdx, double lat, double lon, OSMEntity way) {
         id = vertexIdx;
         if (way.hasTag("name")) {
             name = way.getTag("name");
@@ -33,6 +36,8 @@ public class ParkRideParking implements Serializable {
                 LOG.info("Capacity in osm node/way:{} is {} instead of a number!", way.getTag("id"), way.getTag("capacity"));
             }
         }
+        this.lat = (float) lat;
+        this.lon = (float) lon;
     }
 
     @Override

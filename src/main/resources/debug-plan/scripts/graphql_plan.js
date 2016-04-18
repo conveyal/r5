@@ -344,6 +344,12 @@ function showItinerary(optionIdx, itineraryIdx) {
             features.features.push(bikeFeature);
             rentedBike = false;
         }
+        if (curStreetEdge.parkRide != null) {
+            /*console.log("Off: ", curStreetEdge.bikeRentalOffStation);*/
+            var parkRideFeature = getStopFeature(curStreetEdge.parkRide);
+            //parkRideFeature.properties.which = "OFF";
+            features.features.push(parkRideFeature);
+        }
         if (accessData.mode == "BICYCLE" && curStreetEdge.mode == "WALK") {
             curStreetEdgeFeature.properties.info = "WALK_BICYCLE";
         }

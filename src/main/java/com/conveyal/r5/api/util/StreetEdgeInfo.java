@@ -52,8 +52,7 @@ public class StreetEdgeInfo {
     public BikeRentalStation bikeRentalOnStation;
     public BikeRentalStation bikeRentalOffStation;
 
-    public ParkRideParking parkRideOn;
-    public ParkRideParking parkRideOff;
+    public ParkRideParking parkRide;
 
     public void setDirections(double lastAngle, double thisAngle, boolean roundabout) {
         relativeDirection = RelativeDirection.setRelativeDirection(lastAngle, thisAngle, roundabout);

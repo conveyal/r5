@@ -3,6 +3,7 @@ package com.conveyal.r5.streets;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.osmlib.*;
 import com.conveyal.r5.api.util.BikeRentalStation;
+import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.*;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
@@ -67,6 +68,7 @@ public class StreetLayer implements Serializable {
     public transient IntHashGrid spatialIndex = new IntHashGrid();
     //Key is street vertex ID value is BikeRentalStation (with name, number of bikes, spaces id etc.)
     public TIntObjectMap<BikeRentalStation> bikeRentalStationMap;
+    public TIntObjectMap<ParkRideParking> parkRideLocationsMap;
 
     private transient TraversalPermissionLabeler permissions = new USTraversalPermissionLabeler(); // TODO don't hardwire to US
     private transient LevelOfTrafficStressLabeler stressLabeler = new LevelOfTrafficStressLabeler();
@@ -342,6 +344,7 @@ public class StreetLayer implements Serializable {
     private void buildParkAndRideAreas(List<Way> parkAndRideWays) {
         VertexStore.Vertex v = this.vertexStore.getCursor();
         EdgeStore.Edge e = this.edgeStore.getCursor();
+        parkRideLocationsMap = new TIntObjectHashMap<>();
 
         for (Way way : parkAndRideWays) {
 
@@ -358,6 +361,9 @@ public class StreetLayer implements Serializable {
             int centerVertex = vertexStore.addVertex(centroid.y, centroid.x);
             v.seek(centerVertex);
             v.setFlag(VertexStore.VertexFlag.PARK_AND_RIDE);
+
+            ParkRideParking parkRideParking = new ParkRideParking(centerVertex, way);
+            parkRideLocationsMap.put(centerVertex, parkRideParking);
 
             // find nearby edges
             Envelope env = g.getEnvelopeInternal();
@@ -409,6 +415,8 @@ public class StreetLayer implements Serializable {
             v.seek(vidx);
             v.setFlag(VertexStore.VertexFlag.PARK_AND_RIDE);
 
+            ParkRideParking parkRideParking = new ParkRideParking(vidx, node);
+            parkRideLocationsMap.put(vidx, parkRideParking);
 
             int targetWalking = getOrCreateVertexNear(node.getLat(), node.getLon(), 500, true,
                 StreetMode.WALK);

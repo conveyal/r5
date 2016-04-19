@@ -184,42 +184,6 @@ public class AddTrips extends Modification {
         public boolean sunday;
     }
 
-    /** A class representing a stop temporarily in the graph */
-    public static class TemporaryStop {
-        /** The indices of temporary stops are negative numbers to avoid clashes with the positive (vertex) indices of permanent stops. Note that code in RaptorWorkerData depends on these being negative. */
-        private static AtomicInteger nextId = new AtomicInteger(-1);
-
-        /** the index of this stop in the graph */
-        public final int index;
-
-        /** The latitude of this stop */
-        public final double lat;
-
-        /** The longitude of this stop */
-        public final double lon;
-
-        /** how this vertex is connected to the graph */
-        public final Split split;
-
-        public TemporaryStop (Coordinate c, StreetLayer streetLayer) {
-            this(c.y, c.x, streetLayer);
-        }
-
-        public TemporaryStop (double lat, double lon, StreetLayer streetLayer) {
-            this.lat = lat;
-            this.lon = lon;
-            this.index = nextId.decrementAndGet();
-            this.split = streetLayer.findSplit(this.lat, this.lon, 200);
-            if (this.split == null) {
-                LOG.warn("Temporary stop unlinked: {}", this);
-            }
-        }
-
-        public String toString () {
-            return "Temporary stop at " + this.lat + ", " + this.lon;
-        }
-    }
-
     /**
      * Creates a gtfs-lib Service object based on the information in the given PatternTimetable, which is usually
      * part of a Modification deserialized from JSON.

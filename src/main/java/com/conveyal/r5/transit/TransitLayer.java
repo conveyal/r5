@@ -39,7 +39,7 @@ public class TransitLayer implements Serializable, Cloneable {
     // It contains information that is temporarily also held in stopForIndex.
     public List<String> stopIdForIndex = new ArrayList<>();
 
-    // Inverse map of stopIdForIndex, reconstructed from that list (not serialized).
+    // Inverse map of stopIdForIndex, reconstructed from that list (not serialized). No-entry value is -1.
     public transient TObjectIntMap<String> indexForStopId;
 
     // This is used as an initial size estimate for many lists.
@@ -347,7 +347,7 @@ public class TransitLayer implements Serializable, Cloneable {
         }
 
         // 3. What is the integer index for each GTFS stop ID?
-        indexForStopId = new TObjectIntHashMap<>();
+        indexForStopId = new TObjectIntHashMap<>(stopIdForIndex.size(), 0.5f, -1);
         for (int s = 0; s < stopIdForIndex.size(); s++) {
             indexForStopId.put(stopIdForIndex.get(s), s);
         }

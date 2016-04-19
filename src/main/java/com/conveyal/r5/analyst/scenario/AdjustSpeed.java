@@ -83,11 +83,11 @@ public class AdjustSpeed extends Modification {
                 }
                 int intFromId = network.transitLayer.indexForStopId.get(pair[0]);
                 int intToId = network.transitLayer.indexForStopId.get(pair[1]);
-                if (intFromId == 0) { // FIXME should be -1 not 0
+                if (intFromId == -1) {
                     warnings.add("Could not find hop origin stop " + pair[0]);
                     continue;
                 }
-                if (intToId == 0) { // FIXME should be -1 not 0
+                if (intToId == -1) {
                     warnings.add("Could not find hop destination stop " + pair[1]);
                     continue;
                 }

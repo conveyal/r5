@@ -46,7 +46,7 @@ public class AddTrips extends Modification {
     public static final long serialVersionUID = 1L;
     public static final Logger LOG = LoggerFactory.getLogger(AddTrips.class);
 
-    /** New way of using this modification: just supply existing stop IDs. */
+    /** A list of stops on the new trip pattern. These may be existing or completely new stops. */
     public List<StopSpec> stops;
 
     /** The timetables for this trip pattern */

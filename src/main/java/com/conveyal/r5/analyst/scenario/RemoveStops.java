@@ -57,7 +57,7 @@ public class RemoveStops extends Modification {
         intStops = new TIntHashSet();
         for (String stringStopId : stops) {
             int intStopId = network.transitLayer.indexForStopId.get(stringStopId);
-            if (intStopId == 0) { // FIXME should be -1 not 0
+            if (intStopId == -1) {
                 warnings.add("Could not find a stop with GTFS ID " + stringStopId);
             } else {
                 intStops.add(intStopId);

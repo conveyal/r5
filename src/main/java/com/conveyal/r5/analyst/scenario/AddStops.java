@@ -80,13 +80,13 @@ public class AddStops extends Modification {
         }
         if (fromStop != null) {
             intFromStop = network.transitLayer.indexForStopId.get(fromStop);
-            if (intFromStop == 0) { // FIXME missing value should be -1 instead of 0
+            if (intFromStop == -1) {
                 warnings.add("Could not find fromStop with GTFS ID " + fromStop);
             }
         }
         if (toStop != null) {
             intToStop = network.transitLayer.indexForStopId.get(toStop);
-            if (intToStop == 0) { // FIXME missing value should be -1 instead of 0
+            if (intToStop == -1) {
                 warnings.add("Could not find toStop with GTFS ID " + toStop);
             }
         }
@@ -95,10 +95,10 @@ public class AddStops extends Modification {
             // as long as there is a single hop expressing the travel time from fromStop to toStop.
             stops = new ArrayList<>();
         }
+        // TODO we need some kind of StopSpec resolve function that can add new stops.
         for (StopSpec stopSpec : stops) {
-            // TODO we need some kind of StopSpec resolve function that can add new stops.
             int intStopId = network.transitLayer.indexForStopId.get(stopSpec.stopId);
-            if (intStopId == 0) { // FIXME missing value should be -1 instead of 0
+            if (intStopId == -1) {
                 warnings.add("Could not find or create rerouting stop with GTFS ID " + stopSpec.stopId);
             }
             intNewStops.add(intStopId);

@@ -64,11 +64,12 @@ public class TransportNetwork implements Serializable {
         transitLayer.buildStopTree();
     }
 
+    /**
+     * Test main method: Round-trip serialize the transit layer and test its speed after deserialization.
+     */
     public static void main (String[] args) {
-        // Round-trip serialize the transit layer and test its speed after deserialization.
         // TransportNetwork transportNetwork = TransportNetwork.fromFiles(args[0], args[1]);
         TransportNetwork transportNetwork = TransportNetwork.fromDirectory(new File("."));
-
         try {
             OutputStream outputStream = new BufferedOutputStream(new FileOutputStream("network.dat"));
             transportNetwork.write(outputStream);

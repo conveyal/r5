@@ -95,12 +95,8 @@ public class AddStops extends Modification {
             // as long as there is a single hop expressing the travel time from fromStop to toStop.
             stops = new ArrayList<>();
         }
-        // TODO we need some kind of StopSpec resolve function that can add new stops.
         for (StopSpec stopSpec : stops) {
-            int intStopId = network.transitLayer.indexForStopId.get(stopSpec.stopId);
-            if (intStopId == -1) {
-                warnings.add("Could not find or create rerouting stop with GTFS ID " + stopSpec.stopId);
-            }
+            int intStopId = stopSpec.resolve(network, warnings);
             intNewStops.add(intStopId);
         }
         int nNewStops = intNewStops.size();

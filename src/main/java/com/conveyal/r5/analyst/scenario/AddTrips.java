@@ -58,6 +58,9 @@ public class AddTrips extends Modification {
     /** If set to true, create both the forward pattern and a derived backward pattern as a matching set. */
     public boolean bidirectional = true;
 
+    /** A list of the internal integer IDs for the existing or newly created stops. */
+    private TIntList intStopIds;
+
     @Override
     public String getType() {
         return "add-trips";
@@ -73,13 +76,11 @@ public class AddTrips extends Modification {
                 warnings.add("Headway is not greater than zero.");
             }
         }
-        for (StopSpec stop : stops) {
-            // FIXME handle missing value (which is currently 0, a real stop index, rather than -1).
-            // TODO add new stops, currently you can only reference existing ones.
-            int stopIndex = network.transitLayer.indexForStopId.get(stop.stopId);
-            if (stopIndex == 0) {
-                warnings.add("Could not find a stop for GTFS ID " + stop.stopId);
-            }
+        // Create or find the stops referenced by the new trips.
+        intStopIds = new TIntArrayList();
+        for (StopSpec stopSpec : stops) {
+            int intStopId = stopSpec.resolve(network, warnings);
+            intStopIds.add(intStopId);
         }
         return warnings.size() > 0;
     }
@@ -95,9 +96,9 @@ public class AddTrips extends Modification {
         transitLayer.services = new ArrayList<>(transitLayer.services);
         generatePattern(transitLayer);
         if (bidirectional) {
-            // Reverse the stopIds in place. Not sure how wise this is but it works.
-            // Guava Lists.reverse would return a view / copy.
-            Collections.reverse(stops);
+            // We want to call generatePattern again, but with all stops and stoptimes reversed.
+            // Reverse the intStopIds in place. The string stopIds should not be used anymore at this point.
+            intStopIds.reverse();
             for (PatternTimetable ptt : frequencies) {
                 // Reverse all the pattern timetables in place. Not sure how wise this is but it works.
                 // Amazingly, there is no Arrays.reverse() or Ints.reverse().
@@ -110,7 +111,6 @@ public class AddTrips extends Modification {
                 dwellList.reverse();
                 ptt.dwellTimes = dwellList.toArray();
             }
-            // TODO the transitlayer wouldn't really need to be passed around, it could be in a field.
             generatePattern(transitLayer);
         }
         return false;
@@ -122,15 +122,7 @@ public class AddTrips extends Modification {
      * @param transitLayer a protective copy of a transit layer whose existing tripPatterns list will be extended.
      */
     private void generatePattern (TransitLayer transitLayer) {
-        // Convert the supplied stop IDs into internal integer indexes for this TransportNetwork.
-        // Pickup and drop off type default to 0, which means "scheduled".
-        StopTime stopTime = new StopTime();
-        TripPatternKey tripPatternKey = new TripPatternKey("SCENARIO_MODIFICATION");
-        for (StopSpec stop : stops) {
-            stopTime.stop_id = stop.stopId;
-            tripPatternKey.addStopTime(stopTime, transitLayer.indexForStopId);
-        }
-        TripPattern pattern = new TripPattern(tripPatternKey);
+        TripPattern pattern = new TripPattern(intStopIds);
         LOG.info("Created {}.", pattern);
         for (PatternTimetable timetable : frequencies) {
             // CreateSchedules may create more than one if we're in non-frequency ("exact-times") mode.
@@ -148,7 +140,7 @@ public class AddTrips extends Modification {
     }
 
     /**
-     * a class representing a minimal timetable
+     * A class representing a timetable from the incoming modification deserialized from JSON.
      * TODO rename to reflect usage in both AddTrips and AdjustFrequency.
      */
     public static class PatternTimetable implements Serializable {

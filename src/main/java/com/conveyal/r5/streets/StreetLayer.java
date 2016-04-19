@@ -1101,7 +1101,7 @@ public class StreetLayer implements Serializable, Cloneable {
         if (streetVertex == -1) {
             return -1; // Unlinked
         }
-        // TODO maybe link edges should have a length.
+        // TODO give link edges a length.
         // Set OSM way ID is -1 because this edge is not derived from any OSM way.
         Edge e = edgeStore.addStreetPair(stopVertex, streetVertex, 1, -1);
         // Allow all modes to traverse street-to-transit link edges.

@@ -1,5 +1,7 @@
 package com.conveyal.r5.transit;
 
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,6 +59,25 @@ public class TripPattern implements Serializable, Cloneable {
             dropoffs[s] = PickDropType.forGtfsCode(tripPatternKey.dropoffTypes.get(s));
         }
         routeId = tripPatternKey.routeId;
+    }
+
+    /**
+     * Create a TripPattern based only on a list of internal integer stop IDs.
+     * This is used when creating brand new patterns in scenario modifications, rather than from GTFS.
+     * Pick up and drop off will be allowed at all stops.
+     */
+    public TripPattern (TIntList intStopIds) {
+        stops = intStopIds.toArray(); // Copy.
+        int nStops = stops.length;
+        pickups = new PickDropType[nStops];
+        dropoffs = new PickDropType[nStops];
+        wheelchairAccessible = new BitSet(nStops);
+        for (int s = 0; s < nStops; s++) {
+            pickups[s] = PickDropType.SCHEDULED;
+            dropoffs[s] = PickDropType.SCHEDULED;
+            wheelchairAccessible.set(s);
+        }
+        routeId = "SCENARIO_MODIFICATION";
     }
 
     public void addTrip (TripSchedule tripSchedule) {

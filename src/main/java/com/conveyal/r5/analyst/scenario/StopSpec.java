@@ -1,12 +1,68 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TransportNetwork;
+import com.sun.jdi.connect.Transport;
+import com.sun.tools.javac.util.List;
+
+import java.util.Set;
+
 /**
 * This represents either an existing or a new stop in Modifications when creating or inserting stops into routes.
  * If the id already exists, the existing stop is used. If not, a new stop is created.
 */
 public class StopSpec {
+
     public String stopId;
     public String name;
     public double lat;
     public double lon;
+
+    /**
+     * Given a specification for a transit stop, which can be a reference to an existing stop or the location and
+     * name of a new stop, find or create the stop in the given network. This should in fact be a protective scenario
+     * copy of the network to avoid trashing the original baseline network.
+     * TODO maybe make protective copies a subclass of Networks to enforce this typing.
+     *
+     * @param network the transit network in which to find or create the specified transit stops.
+     * @return the integer index of the new stop within the given network, or -1 if it could not be created.
+     */
+    public int resolve (TransportNetwork network, Set<String> warnings) {
+        if (stopId == null) {
+            // No stop ID supplied, this is a new stop rather than a reference to an existing one.
+            if (lat == 0 || lon == 0) {
+                warnings.add("When no stop ID is supplied, nonzero coordinates must be supplied.");
+            }
+            int newVertexId = materializeOne(network);
+            return newVertexId;
+        } else {
+            // Stop ID supplied, this is a reference to an existing stop rather than a new stop.
+            if (lat != 0 || lon != 0 || name != null) {
+                warnings.add("A reference to an existing stopId should not include coordinates or a name.");
+            }
+            int intStopId = network.transitLayer.indexForStopId.get(stopId);
+            if (intStopId == -1) {
+                warnings.add("Could not find existing stop with GTFS ID " + stopId);
+            }
+            return intStopId;
+        }
+    }
+
+    /**
+     *  This follows the model of com.conveyal.r5.streets.StreetLayer.associateStops()
+     *  We reuse the method that is employed when the graph is first built, because we actually want to create
+     *  a new unique street vertex exactly at the supplied coordinate (which represents the stop iteself) then
+     *  make edges that connect that stop to a splitter vertex on the street (which is potentially shared/reused).
+     *  @return a valid, unique new vertex index.
+     */
+    private int materializeOne (TransportNetwork network) {
+        int stopVertex = network.streetLayer.createAndLinkVertex(lat, lon); // This is always a valid, unique vertex index.
+        TransitLayer transitLayer = network.transitLayer;
+        transitLayer.streetVertexForStop.add(stopVertex);
+        transitLayer.stopIdForIndex.add(this.stopId); // indexForStopId will be derived from this
+        transitLayer.stopNames.add(this.name);
+        transitLayer.streetVertexForStop.add(stopVertex); // stopForStreetVertex will be derived from this
+        return stopVertex;
+    }
+
 }

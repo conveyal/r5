@@ -2,8 +2,6 @@ package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.sun.jdi.connect.Transport;
-import com.sun.tools.javac.util.List;
 
 import java.util.Set;
 

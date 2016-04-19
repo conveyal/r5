@@ -228,8 +228,8 @@ public class StreetRouter {
         queue.clear();
         // from vertex is at end of back edge. Set edge correctly so that turn restrictions/costs are applied correctly
         // at the origin.
-        State startState0 = new State(split.vertex0, split.edge + 1, streetMode);
-        State startState1 = new State(split.vertex1, split.edge, streetMode);
+        State startState0 = new State(split.vertex0, -1, streetMode);
+        State startState1 = new State(split.vertex1, -1, streetMode);
         // TODO walk speed, assuming 1 m/sec currently.
         startState0.weight = split.distance0_mm / 1000;
         startState1.weight = split.distance1_mm / 1000;
@@ -261,9 +261,7 @@ public class StreetRouter {
         queue.clear();
 
         bikeStations.forEachEntry((vertexIdx, bikeStationState) -> {
-            // backEdge needs to be unique for each start state or they will wind up dominating each other.
-            // subtract 1 from -vertexIdx because -0 == 0
-            State state = new State(vertexIdx, -vertexIdx - 1, streetMode);
+            State state = new State(vertexIdx, - 1, streetMode);
             state.weight = bikeStationState.weight+switchCost;
             state.durationSeconds = bikeStationState.durationSeconds+switchTime;
             state.isBikeShare = true;

@@ -13,7 +13,7 @@ import java.util.Set;
 public class StopSpec implements Serializable {
     public static final long serialVersionUID = 1L;
 
-    public String stopId;
+    public String id;
     public String name;
     public double lat;
     public double lon;
@@ -28,7 +28,7 @@ public class StopSpec implements Serializable {
      * @return the integer index of the new stop within the given network, or -1 if it could not be created.
      */
     public int resolve (TransportNetwork network, Set<String> warnings) {
-        if (stopId == null) {
+        if (id == null) {
             // No stop ID supplied, this is a new stop rather than a reference to an existing one.
             if (lat == 0 || lon == 0) {
                 warnings.add("When no stop ID is supplied, nonzero coordinates must be supplied.");
@@ -38,11 +38,11 @@ public class StopSpec implements Serializable {
         } else {
             // Stop ID supplied, this is a reference to an existing stop rather than a new stop.
             if (lat != 0 || lon != 0 || name != null) {
-                warnings.add("A reference to an existing stopId should not include coordinates or a name.");
+                warnings.add("A reference to an existing id should not include coordinates or a name.");
             }
-            int intStopId = network.transitLayer.indexForStopId.get(stopId);
+            int intStopId = network.transitLayer.indexForStopId.get(id);
             if (intStopId == -1) {
-                warnings.add("Could not find existing stop with GTFS ID " + stopId);
+                warnings.add("Could not find existing stop with GTFS ID " + id);
             }
             return intStopId;
         }
@@ -59,7 +59,7 @@ public class StopSpec implements Serializable {
         int stopVertex = network.streetLayer.createAndLinkVertex(lat, lon); // This is always a valid, unique vertex index.
         TransitLayer transitLayer = network.transitLayer;
         transitLayer.streetVertexForStop.add(stopVertex);
-        transitLayer.stopIdForIndex.add(this.stopId); // indexForStopId will be derived from this
+        transitLayer.stopIdForIndex.add(this.id); // indexForStopId will be derived from this
         transitLayer.stopNames.add(this.name);
         transitLayer.streetVertexForStop.add(stopVertex); // stopForStreetVertex will be derived from this
         return stopVertex;

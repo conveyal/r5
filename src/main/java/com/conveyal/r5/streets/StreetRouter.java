@@ -1,5 +1,6 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.util.TIntObjectHashMultimap;
@@ -251,22 +252,28 @@ public class StreetRouter {
     /**
      * Adds multiple origins.
      *
-     * Each bike Station is one origin. Weight is copied from state.
-     * @param bikeStations map of bikeStation vertexIndexes and states Return of {@link #getReachedVertices(VertexStore.VertexFlag)}}
+     * Each state is one origin. Weight, durationSeconds and distance is copied from state.
+     * If legMode is LegMode.BICYCLE_RENT state.isBikeShare is set to true
+     *
+     * @param previousStates map of bikeshares/P+Rs vertexIndexes and states Return of {@link #getReachedVertices(VertexStore.VertexFlag)}}
      * @param switchTime How many ms is added to state time (this is used when switching modes, renting bike, parking a car etc.)
      * @param switchCost This is added to the weight and is a cost of switching modes
+     * @param legMode What origin search is this bike share or P+R
      */
-    public void setOrigin(TIntObjectMap<State> bikeStations, int switchTime, int switchCost) {
+    public void setOrigin(TIntObjectMap<State> previousStates, int switchTime, int switchCost, LegMode legMode) {
         bestStatesAtEdge.clear();
         queue.clear();
 
-        bikeStations.forEachEntry((vertexIdx, bikeStationState) -> {
+        previousStates.forEachEntry((vertexIdx, previousState) -> {
             // backEdge needs to be unique for each start state or they will wind up dominating each other.
             // subtract 1 from -vertexIdx because -0 == 0
             State state = new State(vertexIdx, -vertexIdx - 1, streetMode);
-            state.weight = bikeStationState.weight+switchCost;
-            state.durationSeconds = bikeStationState.durationSeconds+switchTime;
-            state.isBikeShare = true;
+            state.weight = previousState.weight+switchCost;
+            state.durationSeconds = previousState.durationSeconds+switchTime;
+            if (legMode == LegMode.BICYCLE_RENT) {
+                state.isBikeShare = true;
+            }
+            state.distance = previousState.distance;
             queue.add(state);
             return true;
         });

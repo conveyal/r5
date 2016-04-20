@@ -3,13 +3,15 @@ package com.conveyal.r5.analyst.scenario;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 
+import java.io.Serializable;
 import java.util.Set;
 
 /**
 * This represents either an existing or a new stop in Modifications when creating or inserting stops into routes.
  * If the id already exists, the existing stop is used. If not, a new stop is created.
 */
-public class StopSpec {
+public class StopSpec implements Serializable {
+    public static final long serialVersionUID = 1L;
 
     public String stopId;
     public String name;

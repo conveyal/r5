@@ -445,7 +445,7 @@ public class PointToPointQuery {
             bicycle.previous = streetRouter;
             bicycle.streetMode = StreetMode.BICYCLE;
             bicycle.profileRequest = request;
-            bicycle.distanceLimitMeters = 15_000;
+            bicycle.distanceLimitMeters = 15_000 + streetRouter.distanceLimitMeters;
             bicycle.setOrigin(bikeStations, BIKE_RENTAL_PICKUP_TIMEMS, BIKE_RENTAL_PICKUP_COST);
             bicycle.route();
             TIntObjectMap<StreetRouter.State> cycledStations = bicycle.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
@@ -460,7 +460,7 @@ public class PointToPointQuery {
             end.searchRadius = RADIUS_METERS;
             end.streetMode = StreetMode.WALK;
             end.profileRequest = request;
-            end.distanceLimitMeters = 2_000 + 15_000;
+            end.distanceLimitMeters = 2_000 + bicycle.distanceLimitMeters;
             end.setOrigin(cycledStations, BIKE_RENTAL_DROPOFF_TIMEMS, BIKE_RENTAL_DROPOFF_COST);
             end.route();
             end.previous = bicycle;

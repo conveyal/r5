@@ -73,4 +73,57 @@ public class RemoveTripsTest {
         // but should have caused checksum change to modified network
         assertNotEquals(checksum, checksum(mod));
     }
+
+    @Test
+    public void testRemoveSpecificTrips () {
+        // there should be 78 trips on each route (6 per hour from 7 am to 8 pm)
+        assertEquals(78, network.transitLayer.tripPatterns.stream()
+                .filter(p -> "MULTIPLE_LINES:route".equals(p.routeId))
+                .mapToInt(p -> p.tripSchedules.size())
+                .sum());
+
+        assertEquals(78, network.transitLayer.tripPatterns.stream()
+                .filter(p -> "MULTIPLE_LINES:route2".equals(p.routeId))
+                .mapToInt(p -> p.tripSchedules.size())
+                .sum());
+
+        RemoveTrips rt = new RemoveTrips();
+        rt.trips = set("MULTIPLE_LINES:tripb25200"); // 7am trip on route2
+
+        // make sure it applies cleanly
+        Scenario scenario = new Scenario(0);
+        scenario.modifications = Arrays.asList(rt);
+
+        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+
+        assertEquals(78, mod.transitLayer.tripPatterns.stream()
+                .filter(p -> "MULTIPLE_LINES:route".equals(p.routeId))
+                .mapToInt(p -> p.tripSchedules.size())
+                .sum());
+
+        // we removed one trip here
+        assertEquals(77, mod.transitLayer.tripPatterns.stream()
+                .filter(p -> "MULTIPLE_LINES:route2".equals(p.routeId))
+                .mapToInt(p -> p.tripSchedules.size())
+                .sum());
+
+        // make sure the trip is gone
+        assertTrue(mod.transitLayer.tripPatterns.stream()
+                .filter(p -> "MULTIPLE_LINES:route2".equals(p.routeId))
+                .flatMap(p -> p.tripSchedules.stream())
+                .noneMatch(t -> "MULTIPLE_LINES:tripb25200".equals(t.tripId)));
+
+        // should not have affected original network
+        assertEquals(78, network.transitLayer.tripPatterns.stream()
+                .filter(p -> "MULTIPLE_LINES:route".equals(p.routeId))
+                .mapToInt(p -> p.tripSchedules.size())
+                .sum());
+
+        assertEquals(78, network.transitLayer.tripPatterns.stream()
+                .filter(p -> "MULTIPLE_LINES:route2".equals(p.routeId))
+                .mapToInt(p -> p.tripSchedules.size())
+                .sum());
+
+        assertEquals(checksum, checksum(network));
+    }
 }

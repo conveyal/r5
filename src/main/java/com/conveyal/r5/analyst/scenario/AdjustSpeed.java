@@ -126,7 +126,7 @@ public class AdjustSpeed extends Modification {
         if (hops == null) {
             Arrays.fill(shouldScaleHop, true);
         } else {
-            for (int i = 0; i < originalPattern.stops.length; i++) {
+            for (int i = 0; i < originalPattern.stops.length - 1; i++) {
                 for (int j = 0; j < hopFromStops.size(); j++) {
                     if (originalPattern.stops[i] == hopFromStops.get(j)
                             && originalPattern.stops[i + 1] == hopToStops.get(j)) {

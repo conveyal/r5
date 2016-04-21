@@ -7,10 +7,11 @@ import java.io.Serializable;
 import java.util.Set;
 
 /**
-* This represents either an existing or a new stop in Modifications when creating or inserting stops into routes.
+ * This represents either an existing or a new stop in Modifications when creating or inserting stops into routes.
  * If the id already exists, the existing stop is used. If not, a new stop is created.
 */
 public class StopSpec implements Serializable {
+
     public static final long serialVersionUID = 1L;
 
     public String id;
@@ -51,17 +52,20 @@ public class StopSpec implements Serializable {
     /**
      *  This follows the model of com.conveyal.r5.streets.StreetLayer.associateStops()
      *  We reuse the method that is employed when the graph is first built, because we actually want to create
-     *  a new unique street vertex exactly at the supplied coordinate (which represents the stop iteself) then
+     *  a new unique street vertex exactly at the supplied coordinate (which represents the stop itself) then
      *  make edges that connect that stop to a splitter vertex on the street (which is potentially shared/reused).
      *  @return a valid, unique new vertex index.
      */
     private int materializeOne (TransportNetwork network) {
+        // FIXME all below lists and layers must be protectively copied
+        // TransitLayer.ensureStopsExtensible()
         int stopVertex = network.streetLayer.createAndLinkVertex(lat, lon); // This is always a valid, unique vertex index.
         TransitLayer transitLayer = network.transitLayer;
         transitLayer.streetVertexForStop.add(stopVertex);
         transitLayer.stopIdForIndex.add(this.id); // indexForStopId will be derived from this
         transitLayer.stopNames.add(this.name);
         transitLayer.streetVertexForStop.add(stopVertex); // stopForStreetVertex will be derived from this
+        transitLayer.buildOneStopTree(stopVertex); // Requires the stop tree array to be pre-copied into a larger array.
         return stopVertex;
     }
 

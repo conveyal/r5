@@ -1252,7 +1252,7 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /**
-     * In EdgeStore and VertexStore we intentionally avoid using clone() so all field copying is explicit and we can
+     * We intentionally avoid using clone() on EdgeStore and VertexStore so all field copying is explicit and we can
      * clearly see whether we are accidentally shallow-copying any collections or data structures from the base graph.
      * StreetLayer has a lot more fields and most of them can be shallow-copied, so here we use clone() for convenience.
      * @return a copy of this StreetLayer to which Scenarios can be applied without affecting the original StreetLayer.

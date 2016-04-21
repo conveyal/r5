@@ -2,6 +2,7 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.*;
+import com.conveyal.r5.analyst.scenario.StopSpec;
 import com.conveyal.r5.api.util.TransitModes;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
@@ -80,11 +81,10 @@ public class TransitLayer implements Serializable, Cloneable {
     public boolean hasSchedules = false;
 
     /**
-     * This is the result of running a search from every stop in the graph.
-     * It is an array of maps (one for each of these origin stops). Each array entry is a map from all reachable
-     * destination street vertex indexes to their distances.
+     * For each transit stop, an int->int map giving the distance of every reachable street intersection from the
+     * origin stop. This is the result of running a distance-constrained street search from every stop in the graph.
      */
-    public transient TIntIntMap[] stopTree;
+    public transient List<TIntIntMap> stopTrees;
 
     /**
      * A transitLayer can only be linked to one StreetLayer, otherwise the street indexes for the transit stops would
@@ -353,35 +353,41 @@ public class TransitLayer implements Serializable, Cloneable {
         }
     }
 
-    public void buildStopTree () {
-
+    /**
+     * Run a distance-constrained street search from every transit stop in the graph.
+     * Store the distance to every reachable street vertex for each of these origin stops.
+     */
+    public void buildStopTrees() {
         LOG.info("Building stop trees (cached distances between transit stops and street intersections).");
         if (linkedStreetLayer == null) {
             throw new IllegalStateException("Attempt to build stop trees on a transit layer that is not linked to a street layer.");
         }
-
-        // For each transit stop, an int->int map giving the distance of every reached street intersection from the origin stop.
-        stopTree = new TIntIntMap[getStopCount()];
-
-        StreetRouter r = new StreetRouter(linkedStreetLayer);
-        r.distanceLimitMeters = 2000;
-
+        // Allocate a new empty array of stop trees, releasing any existing ones.
+        stopTrees = new ArrayList<TIntIntMap>(getStopCount());
         for (int stop = 0; stop < getStopCount(); stop++) {
-            int originVertex = streetVertexForStop.get(stop);
-
-            if (originVertex == -1) {
-                // -1 indicates that this stop is not linked to the street network.
-                LOG.info("Stop {} has not been linked to the street network.", stop);
-                stopTree[stop] = null;
-                continue;
-            }
-
-            r.setOrigin(originVertex);
-            r.route();
-
-            stopTree[stop] = r.getReachedVertices();
+            buildOneStopTree(stop);
         }
         LOG.info("Done building stop trees.");
+    }
+
+    /**
+     * Perform a single on-street search from the specified transit stop. Store the distance to every reached
+     * street vertex.
+     * @param stop the internal integer stop ID for which to build a stop tree.
+     */
+    public void buildOneStopTree(int stop) {
+        int originVertex = streetVertexForStop.get(stop);
+        if (originVertex == -1) {
+            // -1 indicates that this stop is not linked to the street network.
+            LOG.warn("Stop {} has not been linked to the street network, cannot build stop tree.", stop);
+            stopTrees.set(stop, null);
+            return;
+        }
+        StreetRouter router = new StreetRouter(linkedStreetLayer);
+        router.distanceLimitMeters = 2000;
+        router.setOrigin(originVertex);
+        router.route();
+        stopTrees.set(stop, router.getReachedVertices());
     }
 
     public static TransitLayer fromGtfs (List<String> files) {
@@ -485,6 +491,21 @@ public class TransitLayer implements Serializable, Cloneable {
         default:
             throw new IllegalArgumentException("unknown gtfs route type " + routeType);
         }
+    }
+
+    /**
+     * @return a semi-shallow copy of this transit layer for use when applying scenarios.
+     */
+    public TransitLayer scenarioCopy() {
+        TransitLayer copy = this.clone();
+        // Protectively copy all the lists that will be affected by adding new stops to the network
+        // See: StopSpec.materializeOne()
+        // We would really only need to do this for modifications that create new stops.
+        copy.stopIdForIndex = new ArrayList<>(this.stopIdForIndex);
+        copy.stopNames = new ArrayList<>(this.stopNames);
+        copy.streetVertexForStop = new TIntArrayList(this.streetVertexForStop);
+        copy.stopTrees = new ArrayList<>(this.stopTrees);
+        return copy;
     }
 
 }

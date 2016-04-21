@@ -6,7 +6,6 @@ import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
-import com.conveyal.r5.analyst.FreeFormPointSet;
 import com.conveyal.r5.streets.EdgeStore.Edge;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -229,7 +228,7 @@ public class LinkedPointSet {
         // create trees in parallel to make this fast, for interactive use
         IntStream.range(0, nStops).parallel().forEach(s -> {
             // the tree going as far as vertices
-            TIntIntMap stopTreeToVertices = streetLayer.linkedTransitLayer.stopTree[s];
+            TIntIntMap stopTreeToVertices = streetLayer.linkedTransitLayer.stopTrees.get(s);
 
             // maintain length
             if (stopTreeToVertices == null)

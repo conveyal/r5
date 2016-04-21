@@ -297,7 +297,7 @@ public class FakeGraph {
         // using conveyal GTFS lib to build GTFS so a lot of code does not have to be rewritten later
         // once we're using the conveyal GTFS lib for everything we ought to be able to do this
         // without even writing out the GTFS to a file.
-        GTFSFeed feed = new GTFSFeed();
+        GTFSFeed feed = TransitNetwork.MULTIPLE_PATTERNS.getBlankFeed();
         Agency a = new Agency();
         a.agency_id = "agency";
         a.agency_name = "Agency";

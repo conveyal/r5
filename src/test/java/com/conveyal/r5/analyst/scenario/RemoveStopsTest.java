@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.r5.transit.TransportNetwork;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -50,4 +51,8 @@ public class RemoveStopsTest {
         assertEquals(checksum, checksum(network));
     }
 
+    @After
+    public void tearDown () {
+        this.network = null;
+    }
 }

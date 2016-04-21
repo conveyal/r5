@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripSchedule;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -159,5 +160,10 @@ public class AdjustSpeedTest {
                 .anyMatch(schedule -> !"SINGLE_LINE:trip25200".equals(schedule.tripId)));
 
         assertEquals(checksum, checksum(network));
+    }
+
+    @After
+    public void tearDown () {
+        this.network = null;
     }
 }

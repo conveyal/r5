@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.r5.transit.TransportNetwork;
 import junit.framework.TestCase;
+import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
@@ -122,5 +123,12 @@ public class RemoveTripsTest {
                 .sum());
 
         assertEquals(checksum, checksum(network));
+    }
+
+    // don't keep bunches of copies of the network around, JUnit keeps references to all test classes
+    // http://blogs.atlassian.com/2005/12/reducing_junit_memory_usage/
+    @After
+    public void tearDown () {
+        this.network = null;
     }
 }

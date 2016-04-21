@@ -376,23 +376,24 @@ public class TransitLayer implements Serializable, Cloneable {
      * @param stop the internal integer stop ID for which to build a stop tree.
      */
     public void buildOneStopTree(int stop) {
-        int originVertex = streetVertexForStop.get(stop);
-        if (originVertex == -1) {
-            // -1 indicates that this stop is not linked to the street network.
-            LOG.warn("Stop {} has not been linked to the street network, cannot build stop tree.", stop);
-            stopTrees.set(stop, null);
-            return;
-        }
-        StreetRouter router = new StreetRouter(linkedStreetLayer);
-        router.distanceLimitMeters = 2000;
-        router.setOrigin(originVertex);
-        router.route();
         // Lists do not auto-grow if you try to add an element past their end.
         // So until we need different behavior, we only support adding a stop tree to the end of the list,
         // not updating an existing one or adding one out past the end of the list.
         if (stopTrees.size() != stop) {
             throw new RuntimeException("New stop trees can only be added to the end of the list.");
         }
+
+        int originVertex = streetVertexForStop.get(stop);
+        if (originVertex == -1) {
+            // -1 indicates that this stop is not linked to the street network.
+            LOG.warn("Stop {} has not been linked to the street network, cannot build stop tree.", stop);
+            stopTrees.add(null);
+            return;
+        }
+        StreetRouter router = new StreetRouter(linkedStreetLayer);
+        router.distanceLimitMeters = 2000;
+        router.setOrigin(originVertex);
+        router.route();
         stopTrees.add(router.getReachedVertices());
     }
 

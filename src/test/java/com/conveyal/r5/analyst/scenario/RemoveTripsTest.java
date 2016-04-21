@@ -69,9 +69,6 @@ public class RemoveTripsTest {
                 .sum());
 
         assertEquals(checksum, checksum(network));
-
-        // but should have caused checksum change to modified network
-        assertNotEquals(checksum, checksum(mod));
     }
 
     @Test

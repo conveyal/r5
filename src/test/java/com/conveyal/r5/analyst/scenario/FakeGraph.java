@@ -179,7 +179,7 @@ public class FakeGraph {
             st3.arrival_time = st2.departure_time + TRAVEL_TIME;
             st3.departure_time = st3.arrival_time + DWELL_TIME;
             st3.stop_sequence = 3;
-            st3.stop_id = s2.stop_id;
+            st3.stop_id = s3.stop_id;
             feed.stop_times.put(new Fun.Tuple2(st3.trip_id, st3.stop_sequence), st3);
 
             StopTime st4 = new StopTime();
@@ -187,7 +187,7 @@ public class FakeGraph {
             st4.arrival_time = st3.departure_time + TRAVEL_TIME;
             st4.departure_time = st4.arrival_time;
             st4.stop_sequence = 4;
-            st4.stop_id = s2.stop_id;
+            st4.stop_id = s4.stop_id;
             feed.stop_times.put(new Fun.Tuple2(st4.trip_id, st4.stop_sequence), st4);
         }
 

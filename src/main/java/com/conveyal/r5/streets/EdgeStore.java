@@ -4,7 +4,9 @@ import com.conveyal.osmlib.Node;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.trove.AugmentedList;
 import com.conveyal.r5.trove.TIntAugmentedList;
+import com.conveyal.r5.trove.TLongAugmentedList;
 import com.conveyal.r5.util.TIntIntHashMultimap;
 import com.conveyal.r5.util.TIntIntMultimap;
 import com.vividsolutions.jts.geom.Coordinate;
@@ -927,8 +929,7 @@ public class EdgeStore implements Serializable {
      * will be cloned, but their contents will not. The lists containing the edge characteristics will be copied
      * in such a way that all threads applying Scenarios will share the same baseline data, and only extend those
      * lists.
-     *
-     * We don't use clone() to make sure every field copy is explicit below, avoiding any unintentional shallow-copying
+     * We don't use clone() and make sure every field copy is explicit below, avoiding any unintentional shallow-copying
      * of collections or referenced data structures.
      */
     public EdgeStore extendOnlyCopy() {
@@ -943,13 +944,12 @@ public class EdgeStore implements Serializable {
         // Vertex indices, geometries, and lengths are shared between pairs of forward and backward edges.
         copy.fromVertices = new TIntAugmentedList(fromVertices);
         copy.toVertices = new TIntAugmentedList(toVertices);
-        // This is a deep copy, we should do an extend-copy but need a new class for List<Object>.
-        copy.geometries = new ArrayList<>(geometries);
+        copy.geometries = new AugmentedList<>(geometries);
         copy.lengths_mm = new TIntAugmentedList(lengths_mm);
+        copy.osmids = new TLongAugmentedList(this.osmids);
         copy.temporarilyDeletedEdges = new TIntHashSet();
         copy.temporarilyAddedEdges = new TIntArrayList();
-        // This is a deep copy, we should do an extend-copy but need a new class for longs.
-        copy.osmids = new TLongArrayList(this.osmids);
+        // We don't expect to add/change any turn restrictions.
         copy.turnRestrictions = turnRestrictions;
         return copy;
     }

@@ -128,19 +128,19 @@ public class FakeGraph {
 
         com.conveyal.gtfs.model.Stop s1 = new com.conveyal.gtfs.model.Stop();
         s1.stop_id = s1.stop_name = "s1";
-        s1.stop_lat = 40.2182;
+        s1.stop_lat = 40.0182;
         s1.stop_lon = -83.0889;
         feed.stops.put(s1.stop_id, s1);
 
         com.conveyal.gtfs.model.Stop s2 = new com.conveyal.gtfs.model.Stop();
         s2.stop_id = s2.stop_name = "s2";
-        s2.stop_lat = 40.1;
+        s2.stop_lat = 40.01;
         s2.stop_lon = -83.0007;
         feed.stops.put(s2.stop_id, s2);
 
         com.conveyal.gtfs.model.Stop s3 = new com.conveyal.gtfs.model.Stop();
         s3.stop_id = s3.stop_name = "s3";
-        s3.stop_lat = 39.9621;
+        s3.stop_lat = 39.969;
         s3.stop_lon = -83.0007;
         feed.stops.put(s3.stop_id, s3);
 
@@ -228,7 +228,7 @@ public class FakeGraph {
 
         com.conveyal.gtfs.model.Stop s1 = new com.conveyal.gtfs.model.Stop();
         s1.stop_id = s1.stop_name = "s1";
-        s1.stop_lat = 40.2182;
+        s1.stop_lat = 40.02182;
         s1.stop_lon = -83.0889;
         feed.stops.put(s1.stop_id, s1);
 
@@ -283,7 +283,7 @@ public class FakeGraph {
 
         s1 = new com.conveyal.gtfs.model.Stop();
         s1.stop_id = s1.stop_name = "s1b";
-        s1.stop_lat = 40.2184;
+        s1.stop_lat = 40.02184;
         s1.stop_lon = -83.0889;
         feed.stops.put(s1.stop_id, s1);
 
@@ -353,7 +353,7 @@ public class FakeGraph {
 
         com.conveyal.gtfs.model.Stop s1 = new com.conveyal.gtfs.model.Stop();
         s1.stop_id = s1.stop_name = "s1";
-        s1.stop_lat = 40.2182;
+        s1.stop_lat = 40.02182;
         s1.stop_lon = -83.0889;
         feed.stops.put(s1.stop_id, s1);
 
@@ -441,7 +441,7 @@ public class FakeGraph {
 
         com.conveyal.gtfs.model.Stop s1 = new com.conveyal.gtfs.model.Stop();
         s1.stop_id = s1.stop_name = "s1";
-        s1.stop_lat = 40.2182;
+        s1.stop_lat = 40.02182;
         s1.stop_lon = -83.0889;
         feed.stops.put(s1.stop_id, s1);
 

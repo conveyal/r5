@@ -4,6 +4,7 @@ import gnu.trove.TIntCollection;
 import gnu.trove.function.TIntFunction;
 import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.procedure.TIntProcedure;
 
 import java.util.Collection;
@@ -20,8 +21,8 @@ public class TIntAugmentedList implements TIntList {
     TIntList extension;
 
     public TIntAugmentedList(TIntList base) {
-        super();
         this.base = base;
+        this.extension = new TIntArrayList();
     }
 
     @Override

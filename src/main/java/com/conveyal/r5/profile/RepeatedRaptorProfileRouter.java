@@ -84,7 +84,7 @@ public class RepeatedRaptorProfileRouter {
 
         boolean isochrone = targets.pointSet instanceof WebMercatorGridPointSet;
         // Does the search involve transit at all?
-        boolean transit = (request.transitModes != null && !request.transitModes.isEmpty());
+        boolean transit = request.hasTransit();
 
         // Check that caller has supplied a LinkedPointSet and RaptorWorkerData when needed.
         // These are supplied by the caller because the caller maintains caches, and this router object is throw-away.

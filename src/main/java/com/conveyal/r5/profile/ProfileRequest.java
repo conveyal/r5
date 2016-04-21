@@ -262,7 +262,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      *
      * @return true if there is any transitMode in transitModes (Safe to call if transitModes is null)
      */
-    public boolean useTransit() {
+    public boolean hasTransit() {
         return this.transitModes != null && !this.transitModes.isEmpty();
     }
 

@@ -88,7 +88,7 @@ public class PointToPointQuery {
         //Do the query and return result
         ProfileResponse profileResponse = new ProfileResponse();
 
-        boolean transit = request.useTransit();
+        boolean transit = request.hasTransit();
 
         TaskStatistics ts = new TaskStatistics();
 

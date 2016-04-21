@@ -387,7 +387,13 @@ public class TransitLayer implements Serializable, Cloneable {
         router.distanceLimitMeters = 2000;
         router.setOrigin(originVertex);
         router.route();
-        stopTrees.set(stop, router.getReachedVertices());
+        // Lists do not auto-grow if you try to add an element past their end.
+        // So until we need different behavior, we only support adding a stop tree to the end of the list,
+        // not updating an existing one or adding one out past the end of the list.
+        if (stopTrees.size() != stop) {
+            throw new RuntimeException("New stop trees can only be added to the end of the list.");
+        }
+        stopTrees.add(router.getReachedVertices());
     }
 
     public static TransitLayer fromGtfs (List<String> files) {

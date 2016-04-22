@@ -33,18 +33,18 @@ public class Scenario implements Serializable {
         this.id = id;
     }
 
+    private static final boolean VERIFY_BASE_NETWORK_UNCHANGED = true;
+
     /**
      * @return a copy of the supplied network with the modifications in this scenario non-destructively applied.
      */
     public TransportNetwork applyToTransportNetwork (TransportNetwork originalNetwork) {
         LOG.info("Applying scenario {}", this);
-        useVariant = null;
-        // This is a kludge to select a variant by looking at the modification comments TODO replace this kludge
-        for (Modification modification : modifications) {
-            if (modification.comment != null && modification.comment.startsWith("useVariant: ")) {
-                useVariant = modification.comment.split(" ")[1];
-            }
+        long baseNetworkChecksum = 0;
+        if (VERIFY_BASE_NETWORK_UNCHANGED) {
+            baseNetworkChecksum = originalNetwork.checksum();
         }
+        useVariant = null;
         List<Modification> filteredModifications = modifications.stream()
                 .filter(m -> m.isActiveInVariant(useVariant)).collect(Collectors.toList());
         LOG.info("Variant '{}' selected, with {} modifications active out of {} total.",
@@ -79,6 +79,13 @@ public class Scenario implements Serializable {
         }
         // FIXME can we do this once after all modifications are applied, or do we need to do it after every mod?
         copiedNetwork.transitLayer.rebuildTransientIndexes();
+        if (VERIFY_BASE_NETWORK_UNCHANGED) {
+            if (originalNetwork.checksum() != baseNetworkChecksum) {
+                LOG.error("Applying a scenario mutated the base transportation network. THIS IS A BUG.");
+            } else {
+                LOG.info("Applying the scenario left the base transport network unchanged with high probability.");
+            }
+        }
         return copiedNetwork;
     }
 

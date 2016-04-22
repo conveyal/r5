@@ -37,7 +37,7 @@ public class AdjustDwellTime extends Modification {
     public int dwellSecs = -1;
 
     /** Multiplicative factor to stretch or shrink the dwell times. */
-    public int scale = -1;
+    public double scale = -1;
 
     /** The internal integer IDs for the stops to be adjusted, resolved once before the modification is applied. */
     private transient TIntSet intStops;
@@ -104,7 +104,10 @@ public class AdjustDwellTime extends Modification {
             double seconds = originalSchedule.arrivals[0];
             for (int s = 0; s < nStops; s++) {
                 newSchedule.arrivals[s] = (int) Math.round(seconds);
-                int dwellTime = originalSchedule.departures[s] - originalSchedule.arrivals[s];
+                // use double here as well, continue to avoid truncation error
+                // consider the case case where you're halving dwell times of 19 seconds; truncation error would build
+                // up half a second per stop.
+                double dwellTime = originalSchedule.departures[s] - originalSchedule.arrivals[s];
                 if (stops == null || intStops.contains(newPattern.stops[s])) {
                     if (dwellSecs >= 0) {
                         dwellTime = dwellSecs;

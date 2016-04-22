@@ -173,6 +173,8 @@ public class EdgeStore implements Serializable {
         ALLOWS_BIKE (16),
         ALLOWS_CAR (17),
         ALLOWS_WHEELCHAIR (18),
+        //Set when OSM tags are wheelchair==limited currently unroutable
+        LIMITED_WHEELCHAIR(19),
 
         // Bicycle level of traffic stress for this street.
         // See http://transweb.sjsu.edu/PDFs/research/1005-low-stress-bicycling-network-connectivity.pdf

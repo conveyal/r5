@@ -76,6 +76,10 @@ public abstract class TraversalPermissionLabeler {
         if (wheelchair == Label.YES) {
             ret.add(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
         }
+
+        if (wheelchair == Label.LIMITED) {
+                ret.add(EdgeStore.EdgeFlag.LIMITED_WHEELCHAIR);
+        }
         if (bicycle == Label.YES) {
             ret.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
         } else if (bicycle == Label.NO_THRU_TRAFFIC) {
@@ -128,7 +132,8 @@ public abstract class TraversalPermissionLabeler {
      * Applies wheelchair permissions
      *
      * Removes wheelchair permissions on steps
-     * and adds it on wheelchair=yes/limited or ramp:wheelchair
+     * and adds it on wheelchair=yes or ramp:wheelchair
+     * wheelchair=limited gets special tag LIMITED and is currently non routable for wheelchairs
      * @param tree
      * @param way
      */
@@ -469,7 +474,7 @@ public abstract class TraversalPermissionLabeler {
 
     /** What is the label of a particular node? */
     protected enum Label {
-        YES, NO, NO_THRU_TRAFFIC, UNKNOWN;
+        YES, NO, NO_THRU_TRAFFIC, UNKNOWN, LIMITED;
 
         private static boolean isTagTrue(String tagValue) {
             return ("yes".equals(tagValue) || "1".equals(tagValue) || "true".equals(tagValue));
@@ -507,8 +512,6 @@ public abstract class TraversalPermissionLabeler {
                 || "share_busway".equals(tag)
                 //cycleway=crossing it should already have bicycle=yes from highway=cycleway or bicycle=yes
                 || "crossing".equals(tag)
-                //wheelchair=limited is currently routable for wheelchairs
-                || "limited".equals(tag)
                 ) {
                 return YES;
             } else if (isTagFalse(tag) || tag.equals("license")
@@ -521,6 +524,8 @@ public abstract class TraversalPermissionLabeler {
                 //Used in setting opposite cycling permissions
             } else if (tag.startsWith("opposite")) {
                 return UNKNOWN;
+            } else if ("limited".equals(tag)) {
+                return LIMITED;
             } else {
                 LOG.debug("Unknown access tag:{}", tag);
                 return UNKNOWN;

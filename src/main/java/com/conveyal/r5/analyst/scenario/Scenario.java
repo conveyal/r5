@@ -55,7 +55,7 @@ public class Scenario implements Serializable {
         // FIXME might some parameters may become valid/invalid because of previous modifications in the list?
         boolean errorsInScenario = false;
         for (Modification modification : filteredModifications) {
-            boolean errorsInModification = modification.resolve(originalNetwork);
+            boolean errorsInModification = modification.resolve(copiedNetwork);
             if (errorsInModification) {
                 LOG.error("Errors were detected in a scenario modification of type {}:", modification.getType());
                 for (String warning : modification.warnings) {

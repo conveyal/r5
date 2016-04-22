@@ -57,15 +57,15 @@ public class StopSpec implements Serializable {
      *  @return a valid, unique new vertex index.
      */
     private int materializeOne (TransportNetwork network) {
-        // FIXME all below lists and layers must be protectively copied
-        // TransitLayer.ensureStopsExtensible()
-        int stopVertex = network.streetLayer.createAndLinkVertex(lat, lon); // This is always a valid, unique vertex index.
+        int stopVertex = network.streetLayer.createAndLinkVertex(lat, lon);
         TransitLayer transitLayer = network.transitLayer;
-        transitLayer.streetVertexForStop.add(stopVertex);
+        int newStopIndex = transitLayer.getStopCount();
         transitLayer.stopIdForIndex.add(this.id); // indexForStopId will be derived from this
         transitLayer.stopNames.add(this.name);
         transitLayer.streetVertexForStop.add(stopVertex); // stopForStreetVertex will be derived from this
-        transitLayer.buildOneStopTree(stopVertex); // Requires the stop tree array to be pre-copied into a larger array.
+        // Requires the stop tree array to be pre-copied into a larger array.
+        // FIXME edge lists are not updated yet!
+        transitLayer.buildOneStopTree(newStopIndex);
         return stopVertex;
     }
 

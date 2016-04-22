@@ -1,11 +1,13 @@
 package com.conveyal.r5.transit;
 
+import com.amazonaws.util.CRC32ChecksumCalculatingInputStream;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.Mode;
+import com.google.common.io.ByteStreams;
 import com.vividsolutions.jts.geom.Envelope;
 import org.nustaq.serialization.FSTObjectInput;
 import org.nustaq.serialization.FSTObjectOutput;
@@ -18,8 +20,7 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.time.ZoneId;
 import java.util.*;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
+import java.util.zip.*;
 
 /**
  * This is a completely new replacement for Graph, Router etc.
@@ -387,6 +388,24 @@ public class TransportNetwork implements Serializable {
         copy.streetLayer.linkedTransitLayer = copy.transitLayer;
         copy.transitLayer.linkedStreetLayer = copy.streetLayer;
         return copy;
+    }
+
+    /**
+     * @return a checksum of the graph, for use in verifying whether it changed or remained the same after
+     * some operation.
+     */
+    public long checksum () {
+        LOG.info("Calculating transport network checksum...");
+        Checksum crc32 = new CRC32();
+        OutputStream out = new CheckedOutputStream(ByteStreams.nullOutputStream(), crc32);
+        try {
+            this.write(out);
+            out.close();
+        } catch (IOException e) {
+            throw new RuntimeException();
+        }
+        LOG.info("Network CRC is {}", crc32.getValue());
+        return crc32.getValue();
     }
 
 }

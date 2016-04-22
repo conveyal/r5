@@ -35,6 +35,11 @@ public class AugmentedList<T> implements List<T> {
     }
 
     @Override
+    public boolean add(T t) {
+        return extension.add(t);
+    }
+
+    @Override
     public int size() {
         return base.size() + extension.size();
     }
@@ -98,11 +103,6 @@ public class AugmentedList<T> implements List<T> {
 
     @Override
     public <T1> T1[] toArray(T1[] a) {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean add(T t) {
         throw new UnsupportedOperationException();
     }
 

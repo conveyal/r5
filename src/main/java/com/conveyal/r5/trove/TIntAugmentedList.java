@@ -44,6 +44,11 @@ public class TIntAugmentedList implements TIntList {
     }
 
     @Override
+    public boolean add(int val) {
+        return extension.add(val);
+    }
+
+    @Override
     public int size() {
         return base.size() + extension.size();
     }
@@ -300,11 +305,6 @@ public class TIntAugmentedList implements TIntList {
 
     @Override
     public boolean isEmpty() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean add(int val) {
         throw new UnsupportedOperationException();
     }
 

@@ -50,6 +50,11 @@ public class TLongAugmentedList implements TLongList {
     }
 
     @Override
+    public boolean add(long val) {
+        return extension.add(val);
+    }
+
+    @Override
     public int size() {
         return base.size() + extension.size();
     }
@@ -307,11 +312,6 @@ public class TLongAugmentedList implements TLongList {
 
     @Override
     public boolean isEmpty() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public boolean add(long val) {
         throw new UnsupportedOperationException();
     }
 

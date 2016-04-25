@@ -22,7 +22,7 @@ public class RemoveTripsTest {
     @Before
     public void setUp () {
         network = buildNetwork(FakeGraph.TransitNetwork.MULTIPLE_LINES);
-        checksum = checksum(network);
+        checksum = network.checksum();
     }
 
     @Test
@@ -69,7 +69,7 @@ public class RemoveTripsTest {
                 .mapToInt(p -> p.tripSchedules.size())
                 .sum());
 
-        assertEquals(checksum, checksum(network));
+        assertEquals(checksum, network.checksum());
     }
 
     @Test
@@ -122,7 +122,7 @@ public class RemoveTripsTest {
                 .mapToInt(p -> p.tripSchedules.size())
                 .sum());
 
-        assertEquals(checksum, checksum(network));
+        assertEquals(checksum, network.checksum());
     }
 
     // don't keep bunches of copies of the network around, JUnit keeps references to all test classes

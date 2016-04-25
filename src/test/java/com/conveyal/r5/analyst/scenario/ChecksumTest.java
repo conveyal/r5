@@ -16,10 +16,10 @@ public class ChecksumTest {
     @Test
     public void testChecksumStability () {
         TransportNetwork network = FakeGraph.buildNetwork(FakeGraph.TransitNetwork.BIDIRECTIONAL);
-        long checksum = FakeGraph.checksum(network);
+        long checksum = network.checksum();
 
         // do a second checksum without doing anything to the network
-        long checksum2 = FakeGraph.checksum(network);
+        long checksum2 = network.checksum();
 
         assertEquals("checksum not stable under repeated serialization", checksum, checksum2);
 
@@ -32,13 +32,13 @@ public class ChecksumTest {
             return true;
         });
 
-        long checksumTraverse = FakeGraph.checksum(network);
+        long checksumTraverse = network.checksum();
         assertEquals("checksum not stable after traversing collections/maps", checksum, checksumTraverse);
 
         // change something
         network.transitLayer.tripPatterns.get(0).routeIndex = -153;
 
-        long changedChecksum = FakeGraph.checksum(network);
+        long changedChecksum = network.checksum();
 
         assertNotEquals("Changing network did not change checksum", checksum, changedChecksum);
     }

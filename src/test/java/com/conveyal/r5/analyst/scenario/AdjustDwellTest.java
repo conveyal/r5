@@ -10,7 +10,6 @@ import java.util.Arrays;
 import java.util.stream.IntStream;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
-import static com.conveyal.r5.analyst.scenario.FakeGraph.checksum;
 import static com.conveyal.r5.analyst.scenario.FakeGraph.set;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -26,7 +25,7 @@ public class AdjustDwellTest {
     @Before
     public void setUp () {
         network = buildNetwork(FakeGraph.TransitNetwork.SINGLE_LINE);
-        checksum = checksum(network);
+        checksum = network.checksum();
     }
 
     @Test
@@ -57,7 +56,7 @@ public class AdjustDwellTest {
                 .flatMap(t -> t.tripSchedules.stream())
                 .allMatch(ts -> IntStream.range(0, 4).allMatch(i -> ts.departures[i] - ts.arrivals[i] == adt.dwellSecs)));
 
-        assertEquals(checksum, checksum(network));
+        assertEquals(checksum, network.checksum());
     }
 
     /** Confirm that setting a dwell time of zero works (since zero is also Java's default value */
@@ -89,7 +88,7 @@ public class AdjustDwellTest {
                 .flatMap(t -> t.tripSchedules.stream())
                 .allMatch(ts -> IntStream.range(0, 4).allMatch(i -> ts.departures[i] - ts.arrivals[i] == adt.dwellSecs)));
 
-        assertEquals(checksum, checksum(network));
+        assertEquals(checksum, network.checksum());
     }
 
     /**
@@ -148,7 +147,7 @@ public class AdjustDwellTest {
                 .flatMap(t -> t.tripSchedules.stream())
                 .anyMatch(ts -> !"SINGLE_LINE:trip25200".equals(ts.tripId)));
         
-        assertEquals(checksum, checksum(network));
+        assertEquals(checksum, network.checksum());
     }
 
     @After

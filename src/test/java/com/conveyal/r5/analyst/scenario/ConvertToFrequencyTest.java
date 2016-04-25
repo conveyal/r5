@@ -12,7 +12,6 @@ import java.util.Arrays;
 
 import static org.junit.Assert.*;
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
-import static com.conveyal.r5.analyst.scenario.FakeGraph.checksum;
 
 /**
  * Test converting lines to a frequency representation.
@@ -24,7 +23,7 @@ public class ConvertToFrequencyTest {
     @Before
     public void setUp () {
         network = buildNetwork(FakeGraph.TransitNetwork.MULTIPLE_PATTERNS);
-        checksum = checksum(network);
+        checksum = network.checksum();
     }
 
     @Test
@@ -118,7 +117,7 @@ public class ConvertToFrequencyTest {
             assertFalse(tp.hasFrequencies);
         });
 
-        assertEquals(checksum, checksum(network));
+        assertEquals(checksum, network.checksum());
     }
 
     @After

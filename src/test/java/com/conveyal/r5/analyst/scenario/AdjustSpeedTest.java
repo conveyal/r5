@@ -9,7 +9,6 @@ import org.junit.Test;
 import java.util.Arrays;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
-import static com.conveyal.r5.analyst.scenario.FakeGraph.checksum;
 import static com.conveyal.r5.analyst.scenario.FakeGraph.set;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -24,7 +23,7 @@ public class AdjustSpeedTest {
     @Before
     public void setUp () {
         network = buildNetwork(FakeGraph.TransitNetwork.SINGLE_LINE);
-        checksum = checksum(network);
+        checksum = network.checksum();
     }
 
     /** Adjust speed on the entire route */
@@ -53,7 +52,7 @@ public class AdjustSpeedTest {
             assertEquals(baseTripLength / 2, newTripLength, 2); // epsilon of 2 seconds to account for rounding errors
         }
 
-        assertEquals(checksum, checksum(network));
+        assertEquals(checksum, network.checksum());
     }
 
     /** Adjust speed on the entire route */
@@ -81,7 +80,7 @@ public class AdjustSpeedTest {
             assertEquals(expectedTripLength, newTripLength, 2); // epsilon of 2 seconds to account for rounding errors
         }
 
-        assertEquals(checksum, checksum(network));
+        assertEquals(checksum, network.checksum());
     }
 
     /** Adjust speed on a segment of the route */
@@ -113,7 +112,7 @@ public class AdjustSpeedTest {
             assertEquals(expectedTripLength, newTripLength, 2); // epsilon of 2 seconds to account for rounding errors
         }
 
-        assertEquals(checksum, checksum(network));
+        assertEquals(checksum, network.checksum());
     }
 
     /** Adjust speed on just one trip */
@@ -159,7 +158,7 @@ public class AdjustSpeedTest {
         assertTrue(mod.transitLayer.tripPatterns.get(0).tripSchedules.stream()
                 .anyMatch(schedule -> !"SINGLE_LINE:trip25200".equals(schedule.tripId)));
 
-        assertEquals(checksum, checksum(network));
+        assertEquals(checksum, network.checksum());
     }
 
     @After

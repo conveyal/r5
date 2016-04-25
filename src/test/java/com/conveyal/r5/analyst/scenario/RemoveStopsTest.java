@@ -20,7 +20,7 @@ public class RemoveStopsTest {
     @Before
     public void setUp () {
         network = buildNetwork(FakeGraph.TransitNetwork.MULTIPLE_PATTERNS);
-        checksum = checksum(network);
+        checksum = network.checksum();
     }
 
     @Test
@@ -48,7 +48,7 @@ public class RemoveStopsTest {
                 .anyMatch(tp -> tp.stops.length == 3 && "MULTIPLE_PATTERNS:s2".equals(mod.transitLayer.stopIdForIndex.get(tp.stops[1]))));
 
         // network checksum should not change
-        assertEquals(checksum, checksum(network));
+        assertEquals(checksum, network.checksum());
     }
 
     @After

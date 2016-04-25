@@ -75,27 +75,6 @@ public class FakeGraph {
         }
     }
 
-    public static long checksum (TransportNetwork network) {
-        try {
-            long start = System.currentTimeMillis();
-
-            File temp = File.createTempFile("network", ".dat");
-            OutputStream os = new BufferedOutputStream(new FileOutputStream(temp));
-            network.write(os);
-            os.close();
-
-            long ret = FileUtils.checksumCRC32(temp);
-
-            temp.delete();
-
-            LOG.info("Computed transport network checksum of {} in {}ms", ret, System.currentTimeMillis() - start);
-
-            return ret;
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     /** Add transit (not just stops) to a Columbus graph */
     public static GTFSFeed getTransit () throws Exception {
         // using conveyal GTFS lib to build GTFS so a lot of code does not have to be rewritten later

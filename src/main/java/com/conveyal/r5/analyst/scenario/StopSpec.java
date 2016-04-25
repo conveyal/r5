@@ -14,6 +14,22 @@ public class StopSpec implements Serializable {
 
     public static final long serialVersionUID = 1L;
 
+    /** create a stop spec for a particular stop ID */
+    public StopSpec (String id) {
+        this.id = id;
+    }
+
+    /** Create a stop spec at a particular location */
+    public StopSpec (double lat, double lon) {
+        this.lat = lat;
+        this.lon = lon;
+    }
+
+    /** default constructor for deserialization */
+    public StopSpec () {
+        /* do nothing */
+    }
+
     public String id;
     public String name;
     public double lat;

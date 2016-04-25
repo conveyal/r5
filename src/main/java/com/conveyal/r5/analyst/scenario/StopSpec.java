@@ -20,7 +20,7 @@ public class StopSpec implements Serializable {
     }
 
     /** Create a stop spec at a particular location */
-    public StopSpec (double lat, double lon) {
+    public StopSpec (double lon, double lat) {
         this.lat = lat;
         this.lon = lon;
     }

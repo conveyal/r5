@@ -5,6 +5,9 @@ import com.conveyal.r5.analyst.scenario.AddTrips.PatternTimetable;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
+import org.eclipse.jetty.util.MultiMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,8 +43,12 @@ public class AdjustFrequency extends Modification {
      */
     public List<PatternTimetable> entries;
 
-    /** A map containing all the frequency entries, keyed on the source trip ID of the frequency entries. */
-    private transient Map<String, PatternTimetable> entriesByTrip;
+    /**
+     * A map containing all the frequency entries, keyed on the source trip ID of the frequency entries.
+     *
+     * It's a multimap because yoou can have more than entry per trip.
+     */
+    private transient Multimap<String, PatternTimetable> entriesByTrip;
 
     private transient List<Service> servicesCopy;
 
@@ -52,7 +59,7 @@ public class AdjustFrequency extends Modification {
 
     @Override
     public boolean apply(TransportNetwork network) {
-        entriesByTrip = new HashMap<>();
+        entriesByTrip = HashMultimap.create();
         for (PatternTimetable entry : entries) {
             entriesByTrip.put(entry.sourceTrip, entry);
         }
@@ -77,17 +84,22 @@ public class AdjustFrequency extends Modification {
         newPattern.tripSchedules = new ArrayList<>();
         newPattern.servicesActive = new BitSet();
         for (TripSchedule originalSchedule : originalPattern.tripSchedules) {
-            PatternTimetable entry = entriesByTrip.get(originalSchedule.tripId);
-            if (entry == null) continue;
-            TripSchedule newSchedule = originalSchedule.clone();
-            newSchedule.headwaySeconds = new int[] {entry.headwaySecs};
-            newSchedule.startTimes = new int[] {entry.startTime};
-            newSchedule.endTimes = new int[] {entry.endTime};
-            // New service's code will be the number of services already in the list.
-            newSchedule.serviceCode = servicesCopy.size();
-            servicesCopy.add(AddTrips.createService(entry));
-            newPattern.servicesActive.set(newSchedule.serviceCode);
-            newPattern.tripSchedules.add(newSchedule);
+            for (PatternTimetable entry : entriesByTrip.get(originalSchedule.tripId)) {
+                TripSchedule newSchedule = originalSchedule.clone();
+
+                // It would be theoretically possible to have a single trip schedule represent several
+                // frequency entries by having more entries in headway seconds, but then we would have to sort out
+                // whether they have service on the same day, &c., so we just create a new trip schedule for each
+                // entry
+                newSchedule.headwaySeconds = new int[]{entry.headwaySecs};
+                newSchedule.startTimes = new int[]{entry.startTime};
+                newSchedule.endTimes = new int[]{entry.endTime};
+                // New service's code will be the number of services already in the list.
+                newSchedule.serviceCode = servicesCopy.size();
+                servicesCopy.add(AddTrips.createService(entry));
+                newPattern.servicesActive.set(newSchedule.serviceCode);
+                newPattern.tripSchedules.add(newSchedule);
+            }
         }
         if (newPattern.tripSchedules.isEmpty()) {
             // None of the trips on this pattern appear in this Modification's frequency entries. Drop the pattern.

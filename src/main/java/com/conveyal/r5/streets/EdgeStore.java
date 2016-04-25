@@ -1,6 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.osmlib.Node;
+import com.conveyal.r5.common.DirectionUtils;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
@@ -10,9 +11,11 @@ import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.LineString;
 import gnu.trove.iterator.TIntIntIterator;
+import gnu.trove.list.TByteList;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.TLongList;
 import gnu.trove.list.TShortList;
+import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.list.array.TShortArrayList;
@@ -79,6 +82,20 @@ public class EdgeStore implements Serializable {
     /** Geometries. One entry for each edge pair */
     public List<int[]> geometries; // intermediate points along the edge, other than the intersection endpoints
 
+    /**
+     * The angle at the start of the edge geometry.
+     * Internal representation is -180 to +179 integer degrees mapped to -128 to +127 (brads)
+     * One entry for each edge pair.
+     */
+    public TByteList inAngles;
+
+    /**
+     * The angle at the end of the edge geometry
+     * Internal representation is -180 to +179 integer degrees mapped to -128 to +127 (brads)
+     * One entry for each edge pair.
+     */
+    public TByteList outAngles;
+
     /** Turn restrictions for turning _out of_ each edge */
     public TIntIntMultimap turnRestrictions;
 
@@ -103,6 +120,8 @@ public class EdgeStore implements Serializable {
         geometries = new ArrayList<>(initialEdgePairs);
         lengths_mm = new TIntArrayList(initialEdgePairs);
         osmids = new TLongArrayList(initialEdgePairs);
+        inAngles = new TByteArrayList(initialEdgePairs);
+        outAngles = new TByteArrayList(initialEdgePairs);
         turnRestrictions = new TIntIntHashMultimap();
     }
 
@@ -135,6 +154,8 @@ public class EdgeStore implements Serializable {
             toVertices.remove(edgePair, 1);
             lengths_mm.remove(edgePair, 1);
             osmids.remove(edgePair, 1);
+            inAngles.remove(edgePair, 1);
+            outAngles.remove(edgePair, 1);
             // This is not a TIntList, so use the 1-arg remove function to remove by index.
             geometries.remove(edgePair);
             nEdges -= 2;
@@ -256,6 +277,8 @@ public class EdgeStore implements Serializable {
         toVertices.add(endVertexIndex);
         geometries.add(EMPTY_INT_ARRAY);
         osmids.add(osmID);
+        inAngles.add((byte) 0);
+        outAngles.add((byte)0);
 
         // Forward edge.
         // No speed or flags are set, they must be set afterward using the edge cursor.
@@ -625,6 +648,19 @@ public class EdgeStore implements Serializable {
                 intermediateCoords[i++] = node.fixedLon;
             }
             geometries.set(pairIndex, intermediateCoords);
+
+            LineString geometry = getGeometry();
+
+            double inAngleRad = DirectionUtils.getFirstAngle(geometry);
+            inAngles.set(pairIndex, radiansToBrads(inAngleRad));
+
+            double outAngleRad = DirectionUtils.getLastAngle(geometry);
+            outAngles.set(pairIndex, radiansToBrads(outAngleRad));
+        }
+
+        /** Converts angle in radians to angle in binary radians **/
+        private byte radiansToBrads(double angleRadians) {
+            return (byte) Math.round(angleRadians * 128 / Math.PI + 128);
         }
 
         /**

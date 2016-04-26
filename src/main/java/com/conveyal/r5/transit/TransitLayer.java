@@ -512,6 +512,7 @@ public class TransitLayer implements Serializable, Cloneable {
         copy.stopNames = new ArrayList<>(this.stopNames);
         copy.streetVertexForStop = new TIntArrayList(this.streetVertexForStop);
         copy.stopTrees = new ArrayList<>(this.stopTrees);
+        copy.transfersForStop = new ArrayList<>(this.transfersForStop);
         return copy;
     }
 

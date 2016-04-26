@@ -100,6 +100,7 @@ public class AddTrips extends Modification {
         int firstNewStop = network.transitLayer.stopTrees.size();
         for (int intStopIndex = firstNewStop; intStopIndex < network.transitLayer.getStopCount(); intStopIndex++) {
             network.transitLayer.buildOneStopTree(intStopIndex);
+            network.transitLayer.transfersForStop.add(new TIntArrayList(0)); // FIXME actually calculate transfers
         }
         return warnings.size() > 0;
     }

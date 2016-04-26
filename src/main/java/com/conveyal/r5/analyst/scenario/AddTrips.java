@@ -76,6 +76,15 @@ public class AddTrips extends Modification {
             if (pt.headwaySecs <= 0) {
                 warnings.add("Headway is not greater than zero.");
             }
+            if (stops.size() < 2) {
+                warnings.add("You must specify at least two stops when creating new trips");
+            }
+            if (pt.dwellTimes == null || pt.dwellTimes.length != stops.size()) {
+                warnings.add("The number of dwell times must be equal to the number of stops");
+            }
+            if (pt.hopTimes == null || pt.hopTimes.length != stops.size() - 1) {
+                warnings.add("The number of hop times must be one less than the number of stops");
+            }
         }
         // Create or find the stops referenced by the new trips.
         intStopIds = new TIntArrayList();
@@ -238,9 +247,7 @@ public class AddTrips extends Modification {
         int[] departures = new int[nStops];
         for (int s = 0, t = 0; s < nStops; s++) {
             arrivals[s] = t;
-            if (s < timetable.dwellTimes.length) {
-                t += timetable.dwellTimes[s];
-            }
+            t += timetable.dwellTimes[s];
             departures[s] = t;
             if (s < timetable.hopTimes.length) {
                 t += timetable.hopTimes[s];

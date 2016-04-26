@@ -50,8 +50,8 @@ public class StopSpec implements Serializable {
             if (lat == 0 || lon == 0) {
                 warnings.add("When no stop ID is supplied, nonzero coordinates must be supplied.");
             }
-            int newVertexId = materializeOne(network);
-            return newVertexId;
+            int newStopId = materializeOne(network);
+            return newStopId;
         } else {
             // Stop ID supplied, this is a reference to an existing stop rather than a new stop.
             if (lat != 0 || lon != 0 || name != null) {
@@ -70,15 +70,16 @@ public class StopSpec implements Serializable {
      *  We reuse the method that is employed when the graph is first built, because we actually want to create
      *  a new unique street vertex exactly at the supplied coordinate (which represents the stop itself) then
      *  make edges that connect that stop to a splitter vertex on the street (which is potentially shared/reused).
-     *  @return a valid, unique new vertex index.
+     *  @return the integer ID of the newly created stop
      */
     private int materializeOne (TransportNetwork network) {
         int stopVertex = network.streetLayer.createAndLinkVertex(lat, lon);
         TransitLayer transitLayer = network.transitLayer;
+        int newStopId = transitLayer.getStopCount();
         transitLayer.stopIdForIndex.add(this.id); // indexForStopId will be derived from this
         transitLayer.stopNames.add(this.name);
         transitLayer.streetVertexForStop.add(stopVertex); // stopForStreetVertex will be derived from this
-        return stopVertex;
+        return newStopId;
     }
 
 }

@@ -17,7 +17,11 @@ public class Scenario implements Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(Scenario.class);
 
-    public final int id;
+    /**
+     * If this ID is non null, this scenario should be identical to all others with the same ID. This enables us to
+     * cache things like linked point sets and modified networks keyed on the scenario that has been applied.
+     */
+    public String id;
 
     public String description = "no description provided";
 
@@ -28,10 +32,6 @@ public class Scenario implements Serializable {
     public String useVariant;
 
     public List<Modification> modifications = Lists.newArrayList();
-
-    public Scenario (@JsonProperty("id") int id) {
-        this.id = id;
-    }
 
     private static final boolean VERIFY_BASE_NETWORK_UNCHANGED = true;
 

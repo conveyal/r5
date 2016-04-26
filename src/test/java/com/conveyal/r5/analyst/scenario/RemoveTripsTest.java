@@ -42,7 +42,7 @@ public class RemoveTripsTest {
         rt.routes = set("MULTIPLE_LINES:route"); // remove one of the routes
 
         // make sure it applies cleanly
-        Scenario scenario = new Scenario(0);
+        Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(rt);
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
@@ -89,7 +89,7 @@ public class RemoveTripsTest {
         rt.trips = set("MULTIPLE_LINES:tripb25200"); // 7am trip on route2
 
         // make sure it applies cleanly
-        Scenario scenario = new Scenario(0);
+        Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(rt);
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);

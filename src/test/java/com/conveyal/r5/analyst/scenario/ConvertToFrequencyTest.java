@@ -57,7 +57,7 @@ public class ConvertToFrequencyTest {
 
         af.entries = Arrays.asList(entry, entry2);
 
-        Scenario scenario = new Scenario(42);
+        Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(af);
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 

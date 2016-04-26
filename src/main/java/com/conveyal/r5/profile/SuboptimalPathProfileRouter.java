@@ -144,7 +144,7 @@ public class SuboptimalPathProfileRouter {
 
         // make defensive copy, eventually this may be called in parallel
         ProfileRequest req = this.req.clone();
-        req.scenario = new Scenario(0);
+        req.scenario = new Scenario();
         req.scenario.modifications = new ArrayList<>();
         if (this.req.scenario != null && this.req.scenario.modifications != null)
             req.scenario.modifications.addAll(this.req.scenario.modifications);

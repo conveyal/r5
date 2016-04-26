@@ -64,7 +64,7 @@ public class AddTripsTest {
 
         at.frequencies = Arrays.asList(entry);
 
-        Scenario scenario = new Scenario(42);
+        Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(at);
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
@@ -142,7 +142,7 @@ public class AddTripsTest {
 
         at.frequencies = Arrays.asList(entry);
 
-        Scenario scenario = new Scenario(42);
+        Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(at);
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
@@ -263,7 +263,7 @@ public class AddTripsTest {
 
         at.frequencies = Arrays.asList(entry);
 
-        Scenario scenario = new Scenario(42);
+        Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(at);
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);

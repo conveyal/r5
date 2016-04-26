@@ -42,7 +42,7 @@ public class AdjustDwellTest {
         // make sure it will have an effect
         assertNotEquals(FakeGraph.DWELL_TIME, adt.dwellSecs);
 
-        Scenario scenario = new Scenario(42);
+        Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(adt);
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
@@ -74,7 +74,7 @@ public class AdjustDwellTest {
         // make sure it will have an effect
         assertNotEquals(FakeGraph.DWELL_TIME, adt.dwellSecs);
 
-        Scenario scenario = new Scenario(42);
+        Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(adt);
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
@@ -118,7 +118,7 @@ public class AdjustDwellTest {
         // make sure it's not zero; scaling a zero dwell time will not prove anything
         assertNotEquals(0, FakeGraph.DWELL_TIME);
 
-        Scenario scenario = new Scenario(42);
+        Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(adt);
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 

@@ -34,7 +34,7 @@ public class RemoveStopsTest {
         rs.stops = set("MULTIPLE_PATTERNS:s2");
         rs.routes = set("MULTIPLE_PATTERNS:route");
 
-        Scenario scenario = new Scenario(42);
+        Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(rs);
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);

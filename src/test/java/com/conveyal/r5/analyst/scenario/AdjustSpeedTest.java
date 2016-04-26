@@ -40,7 +40,7 @@ public class AdjustSpeedTest {
         as.scale = 2;
         as.scaleDwells = true;
 
-        Scenario scenario = new Scenario(42);
+        Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(as);
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
@@ -65,7 +65,7 @@ public class AdjustSpeedTest {
         as.scale = 2;
         as.scaleDwells = false;
 
-        Scenario scenario = new Scenario(42);
+        Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(as);
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
@@ -97,7 +97,7 @@ public class AdjustSpeedTest {
                 new String[] {"SINGLE_LINE:s3", "SINGLE_LINE:s4"}
         );
 
-        Scenario scenario = new Scenario(42);
+        Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(as);
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
@@ -135,7 +135,7 @@ public class AdjustSpeedTest {
         as.scale = 2;
         as.scaleDwells = true;
 
-        Scenario scenario = new Scenario(42);
+        Scenario scenario = new Scenario();
         scenario.modifications = Arrays.asList(as);
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);

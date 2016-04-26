@@ -1,6 +1,5 @@
 package com.conveyal.r5.transit;
 
-import com.amazonaws.util.CRC32ChecksumCalculatingInputStream;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.scenario.Scenario;
@@ -360,7 +359,7 @@ public class TransportNetwork implements Serializable {
     @Deprecated
     public void ensureExtendOnlyStreetLayer() {
         if (!streetLayer.isExtendOnlyCopy()) {
-            streetLayer = streetLayer.extendOnlyCopy();
+            streetLayer = streetLayer.scenarioCopy();
         }
     }
 
@@ -382,8 +381,8 @@ public class TransportNetwork implements Serializable {
     public TransportNetwork scenarioCopy() {
         TransportNetwork copy = new TransportNetwork();
         copy.gridPointSet = gridPointSet;
-        copy.transitLayer = transitLayer.clone();
-        copy.streetLayer = streetLayer.extendOnlyCopy();
+        copy.transitLayer = transitLayer.scenarioCopy();
+        copy.streetLayer = streetLayer.scenarioCopy();
         // Update bidirectional reference between StreetLayer and TransitLayer
         copy.streetLayer.linkedTransitLayer = copy.transitLayer;
         copy.transitLayer.linkedStreetLayer = copy.streetLayer;

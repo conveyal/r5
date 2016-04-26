@@ -1257,7 +1257,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * StreetLayer has a lot more fields and most of them can be shallow-copied, so here we use clone() for convenience.
      * @return a copy of this StreetLayer to which Scenarios can be applied without affecting the original StreetLayer.
      */
-    public StreetLayer extendOnlyCopy () {
+    public StreetLayer scenarioCopy() {
         StreetLayer copy = this.clone();
         copy.edgeStore = edgeStore.extendOnlyCopy();
         // The extend-only copy of the EdgeStore also contains a new extend-only copy of the VertexStore.

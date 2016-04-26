@@ -25,7 +25,8 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * TODO what does this do? Does it really need to be a subclass?
+ * This is a loading cache for pointsets that falls back on the filesystem then on S3 storage.
+ * TODO Merge with the largely empty superclass.
  */
 public class PointSetDatastore extends PointSetCache {
 

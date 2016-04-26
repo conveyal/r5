@@ -99,6 +99,15 @@ public class AddStops extends Modification {
             int intStopId = stopSpec.resolve(network, warnings);
             intNewStops.add(intStopId);
         }
+        // Adding the stops changes the street network but does not rebuild the edge lists.
+        // We have to rebuild the edge lists after those changes but before we build the stop trees.
+        // Alternatively we could actually update the edge lists as edges are added and removed,
+        // and build the stop trees immediately in stopSpec::resolve.
+        network.streetLayer.buildEdgeLists();
+        intNewStops.forEach(intStopIndex -> {
+            network.transitLayer.buildOneStopTree(intStopIndex);
+            return true; // Continue iteration.
+        });
         int nNewStops = intNewStops.size();
         if (dwellTimes == null) {
             dwellTimes = new int[0];

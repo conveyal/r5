@@ -75,13 +75,9 @@ public class StopSpec implements Serializable {
     private int materializeOne (TransportNetwork network) {
         int stopVertex = network.streetLayer.createAndLinkVertex(lat, lon);
         TransitLayer transitLayer = network.transitLayer;
-        int newStopIndex = transitLayer.getStopCount();
         transitLayer.stopIdForIndex.add(this.id); // indexForStopId will be derived from this
         transitLayer.stopNames.add(this.name);
         transitLayer.streetVertexForStop.add(stopVertex); // stopForStreetVertex will be derived from this
-        // Requires the stop tree array to be pre-copied into a larger array.
-        // FIXME edge lists are not updated yet!
-        transitLayer.buildOneStopTree(newStopIndex);
         return stopVertex;
     }
 

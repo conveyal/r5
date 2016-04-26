@@ -17,6 +17,7 @@ import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripPatternKey;
 import com.conveyal.r5.transit.TripSchedule;
+import com.conveyal.r5.trove.AugmentedList;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.collect.Lists;
@@ -81,6 +82,15 @@ public class AddTrips extends Modification {
         for (StopSpec stopSpec : stops) {
             int intStopId = stopSpec.resolve(network, warnings);
             intStopIds.add(intStopId);
+        }
+        // Adding the stops changes the street network but does not rebuild the edge lists.
+        // We have to rebuild the edge lists after those changes but before we build the stop trees.
+        // Alternatively we could actually update the edge lists as edges are added and removed,
+        // and build the stop trees immediately in stopSpec::resolve.
+        network.streetLayer.buildEdgeLists();
+        int firstNewStop = network.transitLayer.stopTrees.size();
+        for (int intStopIndex = firstNewStop; intStopIndex < network.transitLayer.getStopCount(); intStopIndex++) {
+            network.transitLayer.buildOneStopTree(intStopIndex);
         }
         return warnings.size() > 0;
     }

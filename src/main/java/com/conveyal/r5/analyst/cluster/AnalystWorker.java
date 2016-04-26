@@ -390,26 +390,10 @@ public class AnalystWorker implements Runnable {
         ts.pointsetId = clusterRequest.destinationPointsetId;
         ts.single = singlePoint;
 
-        // If this one-to-many request is for accessibility information based on travel times to a pointset,
-        // fetch the set of points we will use as destinations.
-        final PointSet targets;
-        final LinkedPointSet linkedTargets;
-        if (isochrone) {
-            // This is an isochrone request, search to a regular grid of points.
-            targets = transportNetwork.getGridPointSet();
-        } else {
-            // This is a detailed accessibility request. There is necessarily a destination point set supplied.
-            targets = pointSetDatastore.get(clusterRequest.destinationPointsetId);
-        }
-
-        // TODO this breaks if transportNetwork has been rebuilt ?
-        // TODO We should link after applying the scenario once we allow street modifications.
-        // linkages are cached in the street layer
         Mode mode;
         if (clusterRequest.profileRequest.accessModes.contains(LegMode.CAR)) mode = Mode.CAR;
         else if (clusterRequest.profileRequest.accessModes.contains(LegMode.BICYCLE)) mode = Mode.BICYCLE;
         else mode = Mode.WALK;
-        linkedTargets = targets.link(transportNetwork.streetLayer, mode);
 
         LOG.info("Applying scenario...");
         // Get the supplied scenario or create an empty one if no scenario was supplied.
@@ -421,6 +405,23 @@ public class AnalystWorker implements Runnable {
         // Apply any scenario modifications to the network before use, performing protective copies where necessary.
         TransportNetwork modifiedNetwork = transportNetwork.applyScenario(scenario);
         LOG.info("Done applying scenario.");
+
+        // If this one-to-many request is for accessibility information based on travel times to a pointset,
+        // fetch the set of points we will use as destinations.
+        final PointSet targets;
+        final LinkedPointSet linkedTargets;
+        if (isochrone) {
+            // This is an isochrone request, search to a regular grid of points.
+            targets = modifiedNetwork.getGridPointSet();
+        } else {
+            // This is a detailed accessibility request. There is necessarily a destination point set supplied.
+            targets = pointSetDatastore.get(clusterRequest.destinationPointsetId);
+        }
+
+        // Linkage is performed after applying the scenario to account for street modifications.
+        // TODO this is megaslow and needs optimization.
+        // LinkedPointSets are lazy-linked and cached within the unlinked PointSet.
+        linkedTargets = targets.link(modifiedNetwork.streetLayer, mode);
 
         // Run the core repeated-raptor analysis.
         RepeatedRaptorProfileRouter router =

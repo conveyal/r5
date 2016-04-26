@@ -106,9 +106,7 @@ public class AddTrips extends Modification {
 
     @Override
     public boolean apply (TransportNetwork network) {
-        // Protective copy of original transit layer so we can make modifications without affecting the original.
-        TransitLayer transitLayer = network.transitLayer.clone();
-        network.transitLayer = transitLayer;
+        TransitLayer transitLayer = network.transitLayer;
         // We will be extending the list of TripPatterns, so make a protective copy of it.
         transitLayer.tripPatterns = new ArrayList<>(transitLayer.tripPatterns);
         // We will be creating a service for each supplied timetable, make a protective copy of the list of services.

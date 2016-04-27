@@ -21,6 +21,9 @@ public class TransferFinder {
 
     private static Logger LOG = LoggerFactory.getLogger(TransferFinder.class);
 
+    // Optimization: use the same empty list for all stops with no transfers
+    private static final TIntArrayList EMPTY_INT_LIST = new TIntArrayList();
+
     TransitLayer transitLayer;
 
     StreetLayer streetLayer;
@@ -42,11 +45,8 @@ public class TransferFinder {
     }
 
     public void findTransfers () {
-
         LOG.info("Finding transfers through the street network from all stops...");
-        final TIntArrayList EMPTY_INT_LIST = new TIntArrayList(); // Optimization: use the same empty list for all stops with no transfers
-
-        // For each stop, all transfers out of that stop packed as pairs of (toStopIndex, distance)
+        // For each stop, store all transfers out of that stop as packed pairs of (toStopIndex, distance)
         final List<TIntList> transfersForStop = transitLayer.transfersForStop;
         // When applying scenarios we want to find transfers for only the newly added stops.
         // We look at any existing list of transfers and do enough iterations to make it as long as the list of stops.
@@ -63,41 +63,16 @@ public class TransferFinder {
             streetRouter.setOrigin(originStreetVertex);
             streetRouter.route();
             TIntIntMap timesToReachedStops = streetRouter.getReachedStops();
-            // Filter down the list of target stops to only include those stops that are the closest on some pattern.
-            TIntIntMap bestStopOnPattern = new TIntIntHashMap(50, 0.5f, -1, -1);
-            // For every reached stop,
-            timesToReachedStops.forEachEntry((stopIndex, timeToStop) -> {
-                // For every pattern passing through that stop,
-                transitLayer.patternsForStop.get(stopIndex).forEach(patternIndex -> {
-                    int currentBestStop = bestStopOnPattern.get(patternIndex);
-                    // Record this stop if it's the closest one yet seen on that pattern.
-                    if (currentBestStop == -1) {
-                        bestStopOnPattern.put(patternIndex, stopIndex);
-                    } else {
-                        int currentBestTime = timesToReachedStops.get(currentBestStop);
-                        if (currentBestTime > timeToStop) {
-                            bestStopOnPattern.put(patternIndex, stopIndex);
-                        }
-                    }
-                    return true; // iteration should continue
-                });
-                return true; // iteration should continue
-            });
-
-            // At this point we have the indexes of all stops that are the closest one on some pattern.
-            // Make transfers to them.
-            TIntSet usefulTargetStops = new TIntHashSet();
-            usefulTargetStops.addAll(bestStopOnPattern.valueCollection());
-            // Pack transfers as pairs of (target stop index, distance)
+            retainClosestStopsOnPatterns(timesToReachedStops);
+            // At this point we have the distances to all stops that are the closest one on some pattern.
+            // Make transfers to them, packed as pairs of (target stop index, distance).
             TIntList packedTransfers = new TIntArrayList();
-            // LOG.info("From {}", transitLayer.stopForIndex.get(s).stop_code);
-            usefulTargetStops.forEach(targetStopIndex -> {
+            timesToReachedStops.forEachEntry((targetStopIndex, distance) -> {
                 packedTransfers.add(targetStopIndex);
-                packedTransfers.add(timesToReachedStops.get(targetStopIndex));
-                // LOG.info("{} at {}m", transitLayer.stopForIndex.get(targetStopIndex).stop_code, timegetReachedStops(targetStopIndex));
+                packedTransfers.add(distance);
                 return true;
             });
-            // Record this list of transfers as coming out of the stop with index s.
+            // Record this list of transfers as leading out of the stop with index s.
             if (packedTransfers.size() > 0) {
                 transfersForStop.add(packedTransfers);
             } else {
@@ -108,20 +83,51 @@ public class TransferFinder {
             // The original packed transfers list is copied on write to avoid perturbing the base network.
             if (firstStopIndex > 0) {
                 final int originStopIndex = s; // Why oh why, Java?
-                usefulTargetStops.forEach(targetStopIndex -> {
+                timesToReachedStops.forEachEntry((targetStopIndex, distance) -> {
                     TIntList packedTransfersCopy = new TIntArrayList(transfersForStop.get(targetStopIndex));
                     packedTransfersCopy.add(originStopIndex);
-                    packedTransfersCopy.add(timesToReachedStops.get(targetStopIndex));
+                    packedTransfersCopy.add(distance);
                     transfersForStop.set(targetStopIndex, packedTransfersCopy);
                     return true;
                 });
             }
+
         }
         // Store the transfers in the transit layer
         transitLayer.transfersForStop = transfersForStop;
         LOG.info("Done finding transfers.");
     }
 
+
+    /**
+     * Filter down a map from target stop indexes to distances so it only includes those stops that are the
+     * closest on some pattern. This is technically incorrect (think of transfers to a U shaped metro from a bus line
+     * running down the middle of the U vertically, a situation which actually exists in Washington, DC) but
+     * anecdotally it speeds up computation by up to 40 percent. We may want to look into other ways to optimize
+     * transfers (or why the transfers are making routing so much slower) if this turns out to affect results.
+     */
+    private void retainClosestStopsOnPatterns(TIntIntMap timesToReachedStops) {
+        TIntIntMap bestStopOnPattern = new TIntIntHashMap(50, 0.5f, -1, -1);
+        // For every reached stop,
+        timesToReachedStops.forEachEntry((stopIndex, timeToStop) -> {
+            // For every pattern passing through that stop,
+            transitLayer.patternsForStop.get(stopIndex).forEach(patternIndex -> {
+                int currentBestStop = bestStopOnPattern.get(patternIndex);
+                // Record this stop if it's the closest one yet seen on that pattern.
+                if (currentBestStop == -1) {
+                    bestStopOnPattern.put(patternIndex, stopIndex);
+                } else {
+                    int currentBestTime = timesToReachedStops.get(currentBestStop);
+                    if (currentBestTime > timeToStop) {
+                        bestStopOnPattern.put(patternIndex, stopIndex);
+                    }
+                }
+                return true; // iteration should continue
+            });
+            return true; // iteration should continue
+        });
+        timesToReachedStops.retainEntries((stop, time) -> bestStopOnPattern.containsValue(stop));
+    }
 
     /**
      * Return all stops within a certain radius of the given vertex, using straight-line distance independent of streets.

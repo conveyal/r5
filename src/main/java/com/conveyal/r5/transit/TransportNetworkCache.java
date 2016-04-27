@@ -3,6 +3,8 @@ package com.conveyal.r5.transit;
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.S3Object;
+import com.conveyal.r5.analyst.scenario.InactiveTripsFilter;
+import com.conveyal.r5.analyst.scenario.Scenario;
 import com.google.common.io.ByteStreams;
 import org.apache.commons.io.IOUtils;
 import com.conveyal.r5.common.MavenVersion;
@@ -10,6 +12,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -40,6 +44,9 @@ public class TransportNetworkCache {
     /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
     private boolean workOffline;
 
+    /** This stores any number of lightweight scenario networks built upon the current base network. */
+    private Map<String, TransportNetwork> scenarioNetworkCache = new HashMap<>();
+
     /**
      * Return the graph for the given unique identifier for graph builder inputs on S3.
      * If this is the same as the last graph built, just return the pre-built graph.
@@ -63,8 +70,39 @@ public class TransportNetworkCache {
 
         currentNetwork = network;
         currentNetworkId = networkId;
+        scenarioNetworkCache.clear(); // We cache only scenario graphs built upon the currently active base graph.
 
         return network;
+    }
+
+    /**
+     * Find or create a TransportNetwork for the given
+     * By design a particular scenario is always defined relative to a single base graph (it's never applied to multiple
+     * different base graphs). Therefore we can look up cached scenario networks based solely on their scenarioId
+     * rather than a compound key of (networkId, scenarioId).
+     *
+     * The fact that scenario networks are cached means that PointSet linkages will be automatically reused when
+     * the scenario is found by its ID and reused.
+     *
+     * TODO LinkedPointSets keep a reference back to a StreetLayer which means that the network will not be completely garbage collected upon network switch
+     */
+    public synchronized TransportNetwork getNetworkForScenario (String networkId, Scenario scenario) {
+        // The following call clears the scenarioNetworkCache if the current base graph changes.
+        TransportNetwork baseNetwork = this.getNetwork(networkId);
+        TransportNetwork scenarioNetwork = scenarioNetworkCache.get(scenario.id);
+        if (scenarioNetwork == null) {
+            LOG.info("Applying scenario to base network...");
+            // Apply any scenario modifications to the network before use, performing protective copies where necessary.
+            // Prepend a pre-filter that removes trips that are not running during the search time window.
+            // FIXME Caching transportNetworks with scenarios already applied means we can’t use the InactiveTripsFilter. Solution may be to cache linked point sets based on scenario ID but always apply scenarios every time.
+            // scenario.modifications.add(0, new InactiveTripsFilter(baseNetwork, clusterRequest.profileRequest));
+            scenarioNetwork = scenario.applyToTransportNetwork(baseNetwork);
+            LOG.info("Done applying scenario. Caching it.");
+            scenarioNetworkCache.put(scenario.id, scenarioNetwork);
+        } else {
+            LOG.info("Reusing cached TransportNetwork for scenario {}.", scenario.id);
+        }
+        return scenarioNetwork;
     }
 
     /** If this transport network is already built and cached, fetch it quick */
@@ -145,6 +183,10 @@ public class TransportNetworkCache {
 
         // Now we have a local copy of these graph inputs. Make a graph out of them.
         TransportNetwork network = TransportNetwork.fromDirectory(new File(CACHE_DIR, networkId));
+
+        // Set the ID on the network and its layers to allow caching linkages and analysis results.
+        network.networkId = networkId;
+        network.streetLayer.streetLayerId = networkId;
 
         // cache the network
         String filename = networkId + "_" + MavenVersion.commit + ".dat";

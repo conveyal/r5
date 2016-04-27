@@ -231,4 +231,9 @@ public class AddStops extends Modification {
         return pattern;
     }
 
+    @Override
+    public boolean affectsStreetLayer() {
+        return stops.stream().anyMatch(s -> s.id == null);
+    }
+
 }

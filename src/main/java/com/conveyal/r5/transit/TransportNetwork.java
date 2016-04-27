@@ -36,6 +36,15 @@ public class TransportNetwork implements Serializable {
 
     private WebMercatorGridPointSet gridPointSet;
 
+    /**
+     * A string uniquely identifying the contents of this TransportNetwork in the space of TransportNetwork objects.
+     * When a scenario has modified the base network to produce this layer, the networkId will be changed to the
+     * scenario ID. When no scenario has been applied, this field will contain the original base networkId.
+     * This allows proper caching of downstream data and results: we need a way to know what informatio is in the
+     * network independent of object identity.
+     */
+    public String networkId = null;
+
     static final String BUILDER_CONFIG_FILENAME = "build-config.json";
 
     public void write (OutputStream stream) throws IOException {
@@ -378,14 +387,23 @@ public class TransportNetwork implements Serializable {
      * There will be some performance hit from wrapping these lists, but it's probably completely negligible.
      * @return a semi-shallow copy of this TransportNetwork.
      */
-    public TransportNetwork scenarioCopy() {
+    public TransportNetwork scenarioCopy(Scenario scenario) {
         TransportNetwork copy = new TransportNetwork();
-        copy.gridPointSet = gridPointSet;
-        copy.transitLayer = transitLayer.scenarioCopy();
-        copy.streetLayer = streetLayer.scenarioCopy();
+        copy.networkId = scenario.id;
+        copy.gridPointSet = this.gridPointSet;
+        // Note that we must always duplicate both the TransitLayer and the StreetLayer because they contain
+        // bidirectional references to one another. TODO These should be replaced with references to the containing
+        // TransportNetwork and methods to fetch the other layer via the TransportNetwork.
+        copy.transitLayer = this.transitLayer.scenarioCopy();
+        copy.streetLayer = this.streetLayer.scenarioCopy();
         // Update bidirectional reference between StreetLayer and TransitLayer
         copy.streetLayer.linkedTransitLayer = copy.transitLayer;
         copy.transitLayer.linkedStreetLayer = copy.streetLayer;
+        if (scenario.affectsStreetLayer()) {
+            // Indicate that the new StreetLayer will differ from that of the base graph,
+            // allowing proper LinkedPointSet caching.
+            copy.streetLayer.streetLayerId = scenario.id;
+        }
         return copy;
     }
 

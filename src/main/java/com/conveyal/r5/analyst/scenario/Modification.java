@@ -38,6 +38,8 @@ import java.util.Set;
 })
 public abstract class Modification implements Serializable {
 
+    static final long serialVersionUID = 2111604049617395839L;
+
     private static final Logger LOG = LoggerFactory.getLogger(Modification.class);
 
     /** Distinguish between modification types when a list of Modifications are serialized out as JSON. */
@@ -107,6 +109,22 @@ public abstract class Modification implements Serializable {
         // If the specified scenario is one of these, then the modification is active.
         // If the specified scenario is null (no scenario is chosen) then this modification is not active.
         return activeInVariants.contains(variant);
+    }
+
+    /**
+     * See Scenario::affectsStreetLayer
+     * @return true if this modification will result in changes to the StreetLayer of the TransportNetwork.
+     */
+    public boolean affectsStreetLayer() {
+        return false;
+    }
+
+    /**
+     * See Scenario::affectsTransitLayer
+     * @return true if this modification will result in changes to the TransitLayer of the TransportNetwork.
+     */
+    public boolean affectsTransitLayer() {
+        return true;
     }
 
 }

@@ -276,4 +276,10 @@ public class AddTrips extends Modification {
         }
         return schedules;
     }
+
+    @Override
+    public boolean affectsStreetLayer() {
+        return stops.stream().anyMatch(s -> s.id == null);
+    }
+
 }

@@ -39,7 +39,7 @@ public class Scenario implements Serializable {
      * @return a copy of the supplied network with the modifications in this scenario non-destructively applied.
      */
     public TransportNetwork applyToTransportNetwork (TransportNetwork originalNetwork) {
-        LOG.info("Applying scenario {}", this);
+        LOG.info("Applying scenario {}", this.id);
         long baseNetworkChecksum = 0;
         if (VERIFY_BASE_NETWORK_UNCHANGED) {
             baseNetworkChecksum = originalNetwork.checksum();
@@ -49,7 +49,7 @@ public class Scenario implements Serializable {
                 .filter(m -> m.isActiveInVariant(useVariant)).collect(Collectors.toList());
         LOG.info("Variant '{}' selected, with {} modifications active out of {} total.",
                 useVariant, filteredModifications.size(), modifications.size());
-        TransportNetwork copiedNetwork = originalNetwork.scenarioCopy();
+        TransportNetwork copiedNetwork = originalNetwork.scenarioCopy(this);
         LOG.info("Resolving modifications against TransportNetwork and sanity checking.");
         // Check all the parameters before applying any modifications.
         // FIXME might some parameters may become valid/invalid because of previous modifications in the list?
@@ -87,6 +87,25 @@ public class Scenario implements Serializable {
             }
         }
         return copiedNetwork;
+    }
+
+    /**
+     * @return true if applying this scenario will cause changes to the StreetLayer of a TransportNetwork.
+     * This indicates whether a protective copy must be made of the StreetLayer, whether the resulting
+     * modified TransportNetwork must be re-linked to destination pointsets or the original linkage can be re-used,
+     * and whether transient indexes must be re-built on the StreetLayer.
+     */
+    public boolean affectsStreetLayer () {
+        return modifications.stream().anyMatch(Modification::affectsStreetLayer);
+    }
+
+    /**
+     * @return true if this scenario will result in changes to the TransitLayer of the TransportNetwork.
+     * This determines whether it is necessary to make a protective copy of the TransitLayer, and whether transient
+     * indexes, stop trees and transfers must be re-built on the TransitLayer.
+     */
+    public boolean affectsTransitLayer() {
+        return modifications.stream().anyMatch(Modification::affectsTransitLayer);
     }
 
 }

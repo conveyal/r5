@@ -39,7 +39,7 @@ public class WebMercatorGridPointSet implements PointSet {
     private int[] distances0_mm;
     private int[] distances1_mm;
 
-    private Map<Fun.Tuple2<StreetLayer, Mode>, LinkedPointSet> linkageCache = new HashMap<>();
+    private Map<Fun.Tuple2<String, Mode>, LinkedPointSet> linkageCache = new HashMap<>();
 
     public WebMercatorGridPointSet(int zoom, long west, long north, long width, long height) {
         this.zoom = zoom;
@@ -84,10 +84,10 @@ public class WebMercatorGridPointSet implements PointSet {
      */
     @Override
     public LinkedPointSet link(StreetLayer streetLayer, Mode mode) {
-        LinkedPointSet linkedPointSet = linkageCache.get(Fun.t2(streetLayer, mode));
+        LinkedPointSet linkedPointSet = linkageCache.get(Fun.t2(streetLayer.streetLayerId, mode));
         if (linkedPointSet == null) {
             linkedPointSet = new LinkedPointSet(this, streetLayer, mode);
-            linkageCache.put(Fun.t2(streetLayer, mode), linkedPointSet);
+            linkageCache.put(Fun.t2(streetLayer.streetLayerId, mode), linkedPointSet);
         }
         return linkedPointSet;
     }

@@ -333,21 +333,22 @@ public class AnalystWorker implements Runnable {
             ts.jobId = clusterRequest.jobId;
             ts.workerId = machineId;
 
+            long graphStartTime = System.currentTimeMillis();
             // Get the graph object for the ID given in the request, fetching inputs and building as needed.
             // All requests handled together are for the same graph, and this call is synchronized so the graph will
             // only be built once.
-            long graphStartTime = System.currentTimeMillis();
             TransportNetwork transportNetwork = transportNetworkCache.getNetwork(clusterRequest.graphId);
             // Record graphId so we "stick" to this same graph on subsequent polls.
             // TODO allow for a list of multiple cached TransitNetworks.
             graphIdAffinity = clusterRequest.graphId;
+            // FIXME this stats stuff needs to be moved to where the graph is actually built, or fetch the graph out here.
             ts.graphBuild = (int) (System.currentTimeMillis() - graphStartTime);
             // TODO lazy-initialize all additional indexes on transitLayer
             // ts.graphTripCount = transportNetwork.transitLayer...
             ts.graphStopCount = transportNetwork.transitLayer.getStopCount();
 
             if (clusterRequest instanceof AnalystClusterRequest)
-                this.handleAnalystRequest((AnalystClusterRequest) clusterRequest, transportNetwork, ts);
+                this.handleAnalystRequest((AnalystClusterRequest) clusterRequest, ts);
             else if (clusterRequest instanceof StaticSiteRequest.PointRequest)
                 this.handleStaticSiteRequest((StaticSiteRequest.PointRequest) clusterRequest, transportNetwork, ts);
             else
@@ -368,7 +369,7 @@ public class AnalystWorker implements Runnable {
     }
 
     /** Handle a stock Analyst request */
-    private void handleAnalystRequest (AnalystClusterRequest clusterRequest, TransportNetwork transportNetwork, TaskStatistics ts) {
+    private void handleAnalystRequest (AnalystClusterRequest clusterRequest, TaskStatistics ts) {
         long startTime = System.currentTimeMillis();
 
         // We need to distinguish between and handle four different types of requests here:
@@ -395,16 +396,8 @@ public class AnalystWorker implements Runnable {
         else if (clusterRequest.profileRequest.accessModes.contains(LegMode.BICYCLE)) mode = Mode.BICYCLE;
         else mode = Mode.WALK;
 
-        LOG.info("Applying scenario...");
-        // Get the supplied scenario or create an empty one if no scenario was supplied.
-        Scenario scenario = clusterRequest.profileRequest.scenario;
-        if (scenario != null) {
-            // Prepend a pre-filter that removes trips that are not running during the search time window.
-            scenario.modifications.add(0, new InactiveTripsFilter(transportNetwork, clusterRequest.profileRequest));
-        }
-        // Apply any scenario modifications to the network before use, performing protective copies where necessary.
-        TransportNetwork modifiedNetwork = transportNetwork.applyScenario(scenario);
-        LOG.info("Done applying scenario.");
+        TransportNetwork transportNetwork =
+                transportNetworkCache.getNetworkForScenario(clusterRequest.graphId, clusterRequest.profileRequest.scenario);
 
         // If this one-to-many request is for accessibility information based on travel times to a pointset,
         // fetch the set of points we will use as destinations.
@@ -412,7 +405,7 @@ public class AnalystWorker implements Runnable {
         final LinkedPointSet linkedTargets;
         if (isochrone) {
             // This is an isochrone request, search to a regular grid of points.
-            targets = modifiedNetwork.getGridPointSet();
+            targets = transportNetwork.getGridPointSet();
         } else {
             // This is a detailed accessibility request. There is necessarily a destination point set supplied.
             targets = pointSetDatastore.get(clusterRequest.destinationPointsetId);
@@ -421,11 +414,11 @@ public class AnalystWorker implements Runnable {
         // Linkage is performed after applying the scenario to account for street modifications.
         // TODO this is megaslow and needs optimization.
         // LinkedPointSets are lazy-linked and cached within the unlinked PointSet.
-        linkedTargets = targets.link(modifiedNetwork.streetLayer, mode);
+        linkedTargets = targets.link(transportNetwork.streetLayer, mode);
 
         // Run the core repeated-raptor analysis.
         RepeatedRaptorProfileRouter router =
-                new RepeatedRaptorProfileRouter(modifiedNetwork, clusterRequest, linkedTargets, ts); // TODO transportNetwork is implied by linkedTargets.
+                new RepeatedRaptorProfileRouter(transportNetwork, clusterRequest, linkedTargets, ts); // TODO transportNetwork is implied by linkedTargets.
         ResultEnvelope envelope = new ResultEnvelope();
         try {
             envelope = router.route();

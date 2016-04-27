@@ -378,15 +378,18 @@ public class TransportNetwork implements Serializable {
         TransportNetwork copy = new TransportNetwork();
         copy.networkId = scenario.id;
         copy.gridPointSet = this.gridPointSet;
-        // Note that we must always duplicate both the TransitLayer and the StreetLayer because they contain
-        // bidirectional references to one another. TODO These should be replaced with references to the containing
-        // TransportNetwork and methods to fetch the other layer via the TransportNetwork.
-        copy.transitLayer = this.transitLayer.scenarioCopy(copy);
-        copy.streetLayer = this.streetLayer.scenarioCopy(copy);
+        if (scenario.affectsTransitLayer()) {
+            copy.transitLayer = this.transitLayer.scenarioCopy(copy);
+        } else {
+            copy.transitLayer = this.transitLayer;
+        }
         if (scenario.affectsStreetLayer()) {
+            copy.streetLayer = this.streetLayer.scenarioCopy(copy);
             // Indicate that the new StreetLayer will differ from that of the base graph,
             // allowing proper LinkedPointSet caching.
             copy.streetLayer.streetLayerId = scenario.id;
+        } else {
+            copy.streetLayer = this.streetLayer;
         }
         return copy;
     }

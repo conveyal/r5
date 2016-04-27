@@ -159,7 +159,7 @@ public class PointSetDatastore extends PointSetCache {
 				cachedFile = new File(POINT_DIR, pointSetId + ".json");
 			}
 			// Pointset file was already in the cache, or it has now been downloaded into the cache. Grab it.
-			LOG.info("Loading PointSet into cache from local file {}", cachedFile);
+			LOG.info("Loading PointSet into memory cache from local file cache at {}", cachedFile);
 			return FreeFormPointSet.fromGeoJson(cachedFile);
 		}
 	}

@@ -114,6 +114,10 @@ public class TransportNetwork implements Serializable {
         System.out.println("Summarizing builder config: " + BUILDER_CONFIG_FILENAME);
         System.out.println(tnBuilderConfig);
         File dir = new File(osmSourceFile).getParentFile();
+
+        // Create a transport network to hold the street and transit layers
+        TransportNetwork transportNetwork = new TransportNetwork();
+
         // Load OSM data into MapDB
         OSM osm = new OSM(new File(dir,"osm.mapdb").getPath());
         osm.intersectionDetection = true;
@@ -121,6 +125,8 @@ public class TransportNetwork implements Serializable {
 
         // Make street layer from OSM data in MapDB
         StreetLayer streetLayer = new StreetLayer(tnBuilderConfig);
+        transportNetwork.streetLayer = streetLayer;
+        streetLayer.parentNetwork = transportNetwork;
         streetLayer.loadFromOsm(osm);
         osm.close();
 
@@ -134,6 +140,8 @@ public class TransportNetwork implements Serializable {
 
         // Load transit data TODO remove need to supply street layer at this stage
         TransitLayer transitLayer = TransitLayer.fromGtfs(gtfsSourceFiles);
+        transportNetwork.transitLayer = transitLayer;
+        transitLayer.parentNetwork = transportNetwork;
 
         // The street index is needed for associating transit stops with the street network.
         streetLayer.indexStreets();
@@ -145,11 +153,6 @@ public class TransportNetwork implements Serializable {
 
         // Create transfers
         new TransferFinder(transitLayer, streetLayer, 1000).findTransfers();
-
-        // Create and serialize a transport network
-        TransportNetwork transportNetwork = new TransportNetwork();
-        transportNetwork.streetLayer = streetLayer;
-        transportNetwork.transitLayer = transitLayer;
 
         return transportNetwork;
     }
@@ -357,22 +360,6 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * When applying a Modification that will change the street network as part of a Scenario, call this method to
-     * make sure that the StreetLayer has been duplicated in such a way that it can be modified without affecting the
-     * original base StreetLayer. Duplication adds an extra layer of indirection to most edge accesses.
-     *
-     * NOTE we should no longer need this because the TransportNetwork is cloned only once per Scenario, rather than
-     * once per Modification. We should only revert to this method if it turns out that the extend-only copy of the
-     * street network adds significant speed overhead. And even then, we might just accept that.
-     */
-    @Deprecated
-    public void ensureExtendOnlyStreetLayer() {
-        if (!streetLayer.isExtendOnlyCopy()) {
-            streetLayer = streetLayer.scenarioCopy();
-        }
-    }
-
-    /**
      * We want to apply Scenarios to TransportNetworks, yielding a new TransportNetwork without disrupting the original
      * one. The approach is to make a copy of the TransportNetwork, then apply all the Modifications in the Scenario
      * one by one to that same copy. Two very different modification strategies are used for the TransitLayer and the
@@ -394,11 +381,8 @@ public class TransportNetwork implements Serializable {
         // Note that we must always duplicate both the TransitLayer and the StreetLayer because they contain
         // bidirectional references to one another. TODO These should be replaced with references to the containing
         // TransportNetwork and methods to fetch the other layer via the TransportNetwork.
-        copy.transitLayer = this.transitLayer.scenarioCopy();
-        copy.streetLayer = this.streetLayer.scenarioCopy();
-        // Update bidirectional reference between StreetLayer and TransitLayer
-        copy.streetLayer.linkedTransitLayer = copy.transitLayer;
-        copy.transitLayer.linkedStreetLayer = copy.streetLayer;
+        copy.transitLayer = this.transitLayer.scenarioCopy(copy);
+        copy.streetLayer = this.streetLayer.scenarioCopy(copy);
         if (scenario.affectsStreetLayer()) {
             // Indicate that the new StreetLayer will differ from that of the base graph,
             // allowing proper LinkedPointSet caching.

@@ -18,6 +18,7 @@ import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.streets.EdgeStore.Edge;
 import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TransportNetwork;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
@@ -130,7 +131,12 @@ public class StreetLayer implements Serializable, Cloneable {
     transient Histogram edgesPerWayHistogram = new Histogram("Number of edges per way per direction");
     transient Histogram pointsPerEdgeHistogram = new Histogram("Number of geometry points per edge");
 
-    public TransitLayer linkedTransitLayer = null;
+    /**
+     * The TransportNetwork containing this StreetLayer. This link up the object tree also allows us to access the
+     * TransitLayer associated with this StreetLayer in the same TransportNetwork without maintaining bidirectional
+     * references between the two layers.
+     */
+    public TransportNetwork parentNetwork = null;
 
     public static final EnumSet<EdgeStore.EdgeFlag> ALL_PERMISSIONS = EnumSet
         .of(EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR,
@@ -1152,9 +1158,6 @@ public class StreetLayer implements Serializable, Cloneable {
             transitLayer.streetVertexForStop.add(stopVertex); // This is always a valid, unique vertex index.
             // The inverse stopForStreetVertex map is a transient, derived index and will be built later.
         }
-        // Establish bidirectional reference between the StreetLayer and the TransitLayer.
-        transitLayer.linkedStreetLayer = this;
-        this.linkedTransitLayer = transitLayer;
     }
 
     public int getVertexCount() {
@@ -1266,8 +1269,9 @@ public class StreetLayer implements Serializable, Cloneable {
      * StreetLayer has a lot more fields and most of them can be shallow-copied, so here we use clone() for convenience.
      * @return a copy of this StreetLayer to which Scenarios can be applied without affecting the original StreetLayer.
      */
-    public StreetLayer scenarioCopy() {
+    public StreetLayer scenarioCopy(TransportNetwork newScenarioNetwork) {
         StreetLayer copy = this.clone();
+        copy.parentNetwork = newScenarioNetwork;
         copy.edgeStore = edgeStore.extendOnlyCopy();
         // The extend-only copy of the EdgeStore also contains a new extend-only copy of the VertexStore.
         copy.vertexStore = copy.edgeStore.vertexStore;

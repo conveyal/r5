@@ -2,6 +2,7 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.util.TIntObjectHashMultimap;
 import com.conveyal.r5.util.TIntObjectMultimap;
 import gnu.trove.iterator.TIntIterator;
@@ -122,16 +123,14 @@ public class StreetRouter {
      */
     public TIntIntMap getReachedStops() {
         TIntIntMap result = new TIntIntHashMap();
-
-        streetLayer.linkedTransitLayer.stopForStreetVertex.forEachEntry((streetVertex, stop) -> {
+        TransitLayer transitLayer = streetLayer.parentNetwork.transitLayer;
+        transitLayer.stopForStreetVertex.forEachEntry((streetVertex, stop) -> {
             if (streetVertex == -1) return true;
-
             State state = getStateAtVertex(streetVertex);
             // TODO should this be time?
             if (state != null) result.put(stop, state.weight);
             return true; // continue iteration
         });
-
         return result;
     }
 

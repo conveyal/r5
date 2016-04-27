@@ -7,6 +7,7 @@ import com.conveyal.r5.api.util.TransitModes;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import com.sun.jdi.connect.Transport;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -87,12 +88,11 @@ public class TransitLayer implements Serializable, Cloneable {
     public transient List<TIntIntMap> stopTrees;
 
     /**
-     * A transitLayer can only be linked to one StreetLayer, otherwise the street indexes for the transit stops would
-     * be ambiguous. It can however be linked to no StreetLayer. So if this field is null there are no known streets,
-     * but if this field is set then this TransitLayer has already been linked to a StreetLayer.
-     * This field is only public because it has to be set from StreetLayer, which is in another package.
+     * The TransportNetwork containing this TransitLayer. This link up the object tree also allows us to access the
+     * StreetLayer associated with this TransitLayer in the same TransportNetwork without maintaining bidirectional
+     * references between the two layers.
      */
-    public StreetLayer linkedStreetLayer = null;
+    public TransportNetwork parentNetwork = null;
 
     /** Load a GTFS feed with full load level */
     public void loadFromGtfs (GTFSFeed gtfs) {
@@ -359,11 +359,8 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     public void buildStopTrees() {
         LOG.info("Building stop trees (cached distances between transit stops and street intersections).");
-        if (linkedStreetLayer == null) {
-            throw new IllegalStateException("Attempt to build stop trees on a transit layer that is not linked to a street layer.");
-        }
         // Allocate a new empty array of stop trees, releasing any existing ones.
-        stopTrees = new ArrayList<TIntIntMap>(getStopCount());
+        stopTrees = new ArrayList<>(getStopCount());
         for (int stop = 0; stop < getStopCount(); stop++) {
             buildOneStopTree(stop);
         }
@@ -390,7 +387,7 @@ public class TransitLayer implements Serializable, Cloneable {
             stopTrees.add(null);
             return;
         }
-        StreetRouter router = new StreetRouter(linkedStreetLayer);
+        StreetRouter router = new StreetRouter(parentNetwork.streetLayer);
         router.distanceLimitMeters = 2000;
         router.setOrigin(originVertex);
         router.route();
@@ -503,8 +500,9 @@ public class TransitLayer implements Serializable, Cloneable {
     /**
      * @return a semi-shallow copy of this transit layer for use when applying scenarios.
      */
-    public TransitLayer scenarioCopy() {
+    public TransitLayer scenarioCopy(TransportNetwork newScenarioNetwork) {
         TransitLayer copy = this.clone();
+        copy.parentNetwork = newScenarioNetwork;
         // Protectively copy all the lists that will be affected by adding new stops to the network
         // See: StopSpec.materializeOne()
         // We would really only need to do this for modifications that create new stops.

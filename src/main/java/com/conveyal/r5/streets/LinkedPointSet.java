@@ -2,6 +2,7 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.transit.TransitLayer;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -222,14 +223,14 @@ public class LinkedPointSet {
      */
     public void makeStopTrees () {
         LOG.info("Creating travel distance trees from each transit stop...");
-        int nStops = streetLayer.linkedTransitLayer.getStopCount();
+        TransitLayer transitLayer = streetLayer.parentNetwork.transitLayer;
+        int nStops = transitLayer.getStopCount();
         int[][] stopTrees = new int[nStops][];
 
         // create trees in parallel to make this fast, for interactive use
         IntStream.range(0, nStops).parallel().forEach(s -> {
             // the tree going as far as vertices
-            TIntIntMap stopTreeToVertices = streetLayer.linkedTransitLayer.stopTrees.get(s);
-
+            TIntIntMap stopTreeToVertices = transitLayer.stopTrees.get(s);
             // maintain length
             if (stopTreeToVertices == null)
                 stopTrees[s] = (null);

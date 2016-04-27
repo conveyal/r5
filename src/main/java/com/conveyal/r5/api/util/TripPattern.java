@@ -55,7 +55,7 @@ public class TripPattern {
 
     public List<Stop> getStops() {
         List<Stop> stops = new ArrayList<>(tripPattern.stops.length);
-        StreetLayer streetLayer = transitLayer.linkedStreetLayer;
+        StreetLayer streetLayer = transitLayer.parentNetwork.streetLayer;
         VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor();
         for(int i=0; i< tripPattern.stops.length; i++) {
             int stopIdx = tripPattern.stops[i];

@@ -68,7 +68,7 @@ public class TransitiveNetwork {
 
         this.routes.addAll(routes.valueCollection());
 
-        VertexStore.Vertex v = layer.linkedStreetLayer.vertexStore.getCursor();
+        VertexStore.Vertex v = layer.parentNetwork.streetLayer.vertexStore.getCursor();
 
         // write stops
         for (int sidx = 0; sidx < layer.getStopCount(); sidx++) {

@@ -35,7 +35,7 @@ public class TransitSegment {
     public TransitSegment(TransitLayer transitLayer, PathWithTimes currentTransitPath, int pathIndex,
         ZonedDateTime fromTimeDateZD, List<TransitJourneyID> transitJourneyIDs) {
         this.transitLayer = transitLayer;
-        StreetLayer streetLayer = transitLayer.linkedStreetLayer;
+        StreetLayer streetLayer = transitLayer.parentNetwork.streetLayer;
         routes = new HashMap<>();
         int boardStopIdx = currentTransitPath.boardStops[pathIndex];
         int alightStopIdx = currentTransitPath.alightStops[pathIndex];

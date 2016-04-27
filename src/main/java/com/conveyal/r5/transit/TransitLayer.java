@@ -56,7 +56,7 @@ public class TransitLayer implements Serializable, Cloneable {
     public transient TIntIntMap stopForStreetVertex;
 
     // For each stop, a packed list of transfers to other stops
-    public List<TIntList> transfersForStop;
+    public List<TIntList> transfersForStop = new ArrayList<>();
 
     /** Information about a route */
     public List<RouteInfo> routes = new ArrayList<>();

@@ -12,11 +12,7 @@ import com.conveyal.r5.model.json_serialization.LineStringDeserializer;
 import com.conveyal.r5.model.json_serialization.LineStringSerializer;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetLayer;
-import com.conveyal.r5.transit.TransitLayer;
-import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.transit.TripPattern;
-import com.conveyal.r5.transit.TripPatternKey;
-import com.conveyal.r5.transit.TripSchedule;
+import com.conveyal.r5.transit.*;
 import com.conveyal.r5.trove.AugmentedList;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -100,8 +96,8 @@ public class AddTrips extends Modification {
         int firstNewStop = network.transitLayer.stopTrees.size();
         for (int intStopIndex = firstNewStop; intStopIndex < network.transitLayer.getStopCount(); intStopIndex++) {
             network.transitLayer.buildOneStopTree(intStopIndex);
-            network.transitLayer.transfersForStop.add(new TIntArrayList(0)); // FIXME actually calculate transfers
         }
+        new TransferFinder(network).findTransfers();
         return warnings.size() > 0;
     }
 

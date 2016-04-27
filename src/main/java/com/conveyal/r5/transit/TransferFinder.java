@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- *
+ *     // TODO combine TransferFinder with stop tree builder.
  */
 public class TransferFinder {
 
@@ -27,14 +27,16 @@ public class TransferFinder {
 
     StreetRouter streetRouter;
 
+    public int radiusMeters = 1000;
+
     /**
      * Should chooses whether to search via the street network or straight line distance based on the presence of
      * OSM street data (whether the street layer is null). However the street layer will always contain transit
      * stop vertices so not sure that can work.
      */
-    public TransferFinder(TransitLayer transitLayer, StreetLayer streetLayer, int radiusMeters) {
-        this.transitLayer = transitLayer;
-        this.streetLayer = streetLayer;
+    public TransferFinder(TransportNetwork network) {
+        this.transitLayer = network.transitLayer;
+        this.streetLayer = network.streetLayer;
         streetRouter = new StreetRouter(streetLayer);
         streetRouter.distanceLimitMeters = radiusMeters;
     }
@@ -45,8 +47,11 @@ public class TransferFinder {
         final TIntArrayList EMPTY_INT_LIST = new TIntArrayList(); // Optimization: use the same empty list for all stops with no transfers
 
         // For each stop, all transfers out of that stop packed as pairs of (toStopIndex, distance)
-        List<TIntList> transfersForStop = new ArrayList<>(transitLayer.getStopCount());
-        for (int s = 0; s < transitLayer.getStopCount(); s++) {
+        final List<TIntList> transfersForStop = transitLayer.transfersForStop;
+        // When applying scenarios we want to find transfers for only the newly added stops.
+        // We look at any existing list of transfers and do enough iterations to make it as long as the list of stops.
+        int firstStopIndex = transfersForStop.size();
+        for (int s = firstStopIndex; s < transitLayer.getStopCount(); s++) {
             // From each stop, run a street search looking for other transit stops.
             int originStreetVertex = transitLayer.streetVertexForStop.get(s);
             if (originStreetVertex == -1) {
@@ -97,6 +102,19 @@ public class TransferFinder {
                 transfersForStop.add(packedTransfers);
             } else {
                 transfersForStop.add(EMPTY_INT_LIST);
+            }
+            // If we are applying a scenario (extending the transfers list rather than starting from scratch), for
+            // all transfers out of a scenario stop into a base network stop we must also create the reverse transfer.
+            // The original packed transfers list is copied on write to avoid perturbing the base network.
+            if (firstStopIndex > 0) {
+                final int originStopIndex = s; // Why oh why, Java?
+                usefulTargetStops.forEach(targetStopIndex -> {
+                    TIntList packedTransfersCopy = new TIntArrayList(transfersForStop.get(targetStopIndex));
+                    packedTransfersCopy.add(originStopIndex);
+                    packedTransfersCopy.add(timesToReachedStops.get(targetStopIndex));
+                    transfersForStop.set(targetStopIndex, packedTransfersCopy);
+                    return true;
+                });
             }
         }
         // Store the transfers in the transit layer

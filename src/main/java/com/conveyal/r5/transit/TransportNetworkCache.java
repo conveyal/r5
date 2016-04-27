@@ -97,7 +97,7 @@ public class TransportNetworkCache {
             // FIXME Caching transportNetworks with scenarios already applied means we can’t use the InactiveTripsFilter. Solution may be to cache linked point sets based on scenario ID but always apply scenarios every time.
             // scenario.modifications.add(0, new InactiveTripsFilter(baseNetwork, clusterRequest.profileRequest));
             scenarioNetwork = scenario.applyToTransportNetwork(baseNetwork);
-            LOG.info("Done applying scenario. Caching it.");
+            LOG.info("Done applying scenario. Caching the resulting network.");
             scenarioNetworkCache.put(scenario.id, scenarioNetwork);
         } else {
             LOG.info("Reusing cached TransportNetwork for scenario {}.", scenario.id);

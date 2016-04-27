@@ -152,7 +152,7 @@ public class TransportNetwork implements Serializable {
         transitLayer.buildStopTrees();
 
         // Create transfers
-        new TransferFinder(transitLayer, streetLayer, 1000).findTransfers();
+        new TransferFinder(transportNetwork).findTransfers();
 
         return transportNetwork;
     }

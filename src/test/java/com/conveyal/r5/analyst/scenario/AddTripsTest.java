@@ -237,7 +237,9 @@ public class AddTripsTest {
         assertEquals(checksum, network.checksum());
     }
 
-    /** simple test of adding a unidirectional trip with one frequency entry and no added stops */
+    /**
+     * Simple test of adding a unidirectional trip with one frequency entry and a newly created stop.
+     */
     @Test
     public void testAddUnidirectionalTripWithAddedStops () {
         assertEquals(1, network.transitLayer.tripPatterns.size());
@@ -293,6 +295,7 @@ public class AddTripsTest {
 
         // make sure it's linked to the street network
         StreetRouter r = new StreetRouter(mod.streetLayer);
+        r.setOrigin(createdVertex);
         r.distanceLimitMeters = 500;
         r.route();
 

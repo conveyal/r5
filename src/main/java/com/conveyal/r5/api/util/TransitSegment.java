@@ -3,8 +3,6 @@ package com.conveyal.r5.api.util;
 import com.beust.jcommander.internal.Lists;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.PathWithTimes;
-import com.conveyal.r5.streets.StreetLayer;
-import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
@@ -35,26 +33,18 @@ public class TransitSegment {
     public TransitSegment(TransitLayer transitLayer, PathWithTimes currentTransitPath, int pathIndex,
         ZonedDateTime fromTimeDateZD, List<TransitJourneyID> transitJourneyIDs) {
         this.transitLayer = transitLayer;
-        StreetLayer streetLayer = transitLayer.parentNetwork.streetLayer;
         routes = new HashMap<>();
         int boardStopIdx = currentTransitPath.boardStops[pathIndex];
         int alightStopIdx = currentTransitPath.alightStops[pathIndex];
         TripPattern pattern = currentTransitPath.getPattern(transitLayer, pathIndex);
         if (pattern.routeIndex >= 0) {
             RouteInfo routeInfo = transitLayer.routes.get(pattern.routeIndex);
-            from = new Stop(transitLayer.stopIdForIndex.get(boardStopIdx), transitLayer.stopNames.get(boardStopIdx));
-            to = new Stop(transitLayer.stopIdForIndex.get(alightStopIdx), transitLayer.stopNames.get(alightStopIdx));
-            VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor();
-            vertex.seek(transitLayer.streetVertexForStop.get(boardStopIdx));
-            from.lat = (float) vertex.getLat();
-            from.lon = (float) vertex.getLon();
+            from = new Stop(boardStopIdx, transitLayer);
+            to = new Stop(alightStopIdx, transitLayer);
 
-            vertex.seek(transitLayer.streetVertexForStop.get(alightStopIdx));
-            to.lat = (float) vertex.getLat();
-            to.lon = (float) vertex.getLon();
             routes.putIfAbsent(pattern.routeIndex, Route.from(routeInfo, pattern.routeIndex));
 
-            SegmentPattern segmentPattern = new SegmentPattern(transitLayer, pattern, currentTransitPath.patterns[pathIndex], boardStopIdx, alightStopIdx, currentTransitPath.alightTimes[pathIndex], fromTimeDateZD);
+            SegmentPattern segmentPattern = new SegmentPattern(transitLayer, pattern, currentTransitPath, pathIndex, fromTimeDateZD);
             segmentPatterns.add(segmentPattern);
             //FIXME: set pattern and time based on real values
             transitJourneyIDs.add(new TransitJourneyID(0,0));
@@ -111,7 +101,7 @@ public class TransitSegment {
         for (SegmentPattern segmentPattern : segmentPatterns) {
             if (currentPatternID == segmentPattern.patternIdx) {
                 int timeIndex = segmentPattern.addTime(transitLayer, currentPatternID,
-                    currentTransitPath.alightTimes[pathIndex], fromTimeDateZD);
+                    currentTransitPath.alightTimes[pathIndex], fromTimeDateZD, currentTransitPath.trips[pathIndex]);
                 transitJourneyIDs.add(new TransitJourneyID(segmentPatternIdx, timeIndex));
                 return;
             }
@@ -121,9 +111,7 @@ public class TransitSegment {
         //This pattern doesn't exist yet in this transitSegment we need to create it
         final TripPattern tripPattern = currentTransitPath.getPattern(transitLayer, pathIndex);
         SegmentPattern segmentPattern = new SegmentPattern(transitLayer, tripPattern,
-            currentTransitPath.patterns[pathIndex], currentTransitPath.boardStops[pathIndex],
-            currentTransitPath.alightStops[pathIndex], currentTransitPath.alightTimes[pathIndex],
-            fromTimeDateZD);
+            currentTransitPath, pathIndex, fromTimeDateZD);
         segmentPatterns.add(segmentPattern);
         //Time is always 0 here since we created new segmentPattern
         transitJourneyIDs.add(new TransitJourneyID(segmentPatterns.size() - 1, 0));

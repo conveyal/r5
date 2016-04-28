@@ -51,6 +51,8 @@ function enable_button() {
     }
     if (m1 != undefined) {
         $("#stopButton").prop('disabled', false);
+        $("#bikeShareButton").prop('disabled', false);
+        $("#prButton").prop('disabled', false);
     }
 }
 
@@ -135,6 +137,16 @@ function styleStop(feature) {
     };
 }
 
+function styleBikeShare(feature) {
+    return {
+        color: '#05684B',
+        //weight:speedWeight(feature.properties.speed_ms),
+        //radius:feature.properties.weight/10,
+        radius:weightSize(feature.properties.weight),
+        opacity: 0.8
+    };
+}
+
 function onEachFeature(feature, layer) {
     if (feature.properties) {
         var prop = feature.properties;
@@ -192,6 +204,78 @@ function requestStops() {
                     return L.circleMarker(latlng, { filColor:getModeColor(feature.properties.mode), weight:1});
                 },
                     style: styleStop, onEachFeature:onEachFeature});
+                layer.addTo(window.my_map);
+            }
+        }
+    });
+
+}
+
+function requestBikeShares() {
+    var params = {
+        fromLat: m1.getLatLng().lat,
+        fromLon: m1.getLatLng().lng,
+        mode: $("#mode").val(),
+    }
+    console.log(params);
+    //make a request
+    $.ajax({
+        data: params,
+        url: hostname + "/reachedBikeShares",
+        success: function (data) {
+            console.log(data);
+            //Removes line from previous request
+            if (layer != null) {
+                layer.clearLayers();
+            }
+            if (data.errors) {
+                alert(data.errors);
+            }
+            if (data.data) {
+                //scales point size radius from 4-20 based on min max of point weight
+                weightSize = d3.scale.linear()
+                .domain(d3.extent(data.data.features, function(feature) { return feature.properties.weight;}))
+                .range([4, 20]);
+                layer = L.geoJson(data.data, {pointToLayer:function(feature, latlng) {
+                    return L.circleMarker(latlng, { filColor:getModeColor(feature.properties.mode), weight:1});
+                },
+                    style: styleBikeShare, onEachFeature:onEachFeature});
+                layer.addTo(window.my_map);
+            }
+        }
+    });
+
+}
+
+function requestParkRide() {
+    var params = {
+        fromLat: m1.getLatLng().lat,
+        fromLon: m1.getLatLng().lng,
+        mode: $("#mode").val(),
+    }
+    console.log(params);
+    //make a request
+    $.ajax({
+        data: params,
+        url: hostname + "/reachedParkRide",
+        success: function (data) {
+            console.log(data);
+            //Removes line from previous request
+            if (layer != null) {
+                layer.clearLayers();
+            }
+            if (data.errors) {
+                alert(data.errors);
+            }
+            if (data.data) {
+                //scales point size radius from 4-20 based on min max of point weight
+                weightSize = d3.scale.linear()
+                .domain(d3.extent(data.data.features, function(feature) { return feature.properties.weight;}))
+                .range([4, 20]);
+                layer = L.geoJson(data.data, {pointToLayer:function(feature, latlng) {
+                    return L.circleMarker(latlng, { filColor:getModeColor(feature.properties.mode), weight:1});
+                },
+                    style: styleBikeShare, onEachFeature:onEachFeature});
                 layer.addTo(window.my_map);
             }
         }
@@ -264,6 +348,8 @@ $.ajax(hostname+"/metadata", {
 $(document).ready(function() {
     $("#planButton").click(requestPlan);
     $("#stopButton").click(requestStops);
+    $("#bikeShareButton").click(requestBikeShares);
+    $("#prButton").click(requestParkRide);
     $("#full").change(requestPlan);
     $("#fromLat").keyup(function(e) {
         //Enter pressed

@@ -84,7 +84,7 @@ public class RepeatedRaptorProfileRouter {
 
         boolean isochrone = targets.pointSet instanceof WebMercatorGridPointSet;
         // Does the search involve transit at all?
-        boolean transit = (request.transitModes != null && !request.transitModes.isEmpty());
+        boolean transit = request.hasTransit();
 
         // Check that caller has supplied a LinkedPointSet and RaptorWorkerData when needed.
         // These are supplied by the caller because the caller maintains caches, and this router object is throw-away.
@@ -111,11 +111,11 @@ public class RepeatedRaptorProfileRouter {
         // FIXME what does WALK,CAR even mean in this context
         EnumSet<LegMode> modes = transit ? request.accessModes : request.directModes;
         if (modes.contains(LegMode.CAR))
-            streetRouter.mode = Mode.CAR;
+            streetRouter.streetMode = StreetMode.CAR;
         else if (modes.contains(LegMode.BICYCLE))
-            streetRouter.mode = Mode.BICYCLE;
+            streetRouter.streetMode = StreetMode.BICYCLE;
         else
-            streetRouter.mode = Mode.WALK;
+            streetRouter.streetMode = StreetMode.WALK;
 
         streetRouter.profileRequest = request;
 

@@ -1,11 +1,20 @@
 query requestPlan($fromLat:Float!, $fromLon:Float!,
-	  $toLat:Float!, $toLon:Float!,
-	  $fromTime: ZonedDateTime!, $toTime:ZonedDateTime!) {
-plan(fromLat:$fromLat, fromLon:$fromLon, toLat:$toLat,toLon:$toLon, fromTime:$fromTime, toTime:$toTime, 
+  $toLat:Float!, $toLon:Float!, $wheelchair:Boolean
+  $fromTime: ZonedDateTime!, $toTime:ZonedDateTime!) {
+plan(fromLat:$fromLat, fromLon:$fromLon, toLat:$toLat,toLon:$toLon, wheelchair:$wheelchair, fromTime:$fromTime, toTime:$toTime, 
  
   directModes:[DIRECTMODES],
   accessModes:[ACCESSMODES], egressModes:[EGRESSMODES],
 transitModes:[TRANSITMODES]) {
+    patterns {
+      tripPatternIdx
+      trips {
+        tripId
+        serviceId
+        wheelchairAccessible
+        bikesAllowed
+      }
+    }
   options {
     summary,
     fares {
@@ -38,22 +47,25 @@ transitModes:[TRANSITMODES]) {
         stopId,
         lon,
         lat,
+        wheelchairBoarding
       },
        to {
         name,
         stopId,
         lon,
         lat,
+        wheelchairBoarding
       },
       mode,
       routes {id, routeIdx shortName, mode, agencyName},
       segmentPatterns {
-        patternId
+        patternId, patternIdx,
 	routeIdx
         fromIndex
         toIndex,
         fromDepartureTime
-        toArrivalTime
+        toArrivalTime,
+        tripId
         
      
       },
@@ -100,6 +112,11 @@ transitModes:[TRANSITMODES]) {
           lat,lon
         }
         bikeRentalOffStation {
+          id,
+          name,
+          lat,lon
+        }
+        parkRide {
           id,
           name,
           lat,lon

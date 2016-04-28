@@ -11,14 +11,12 @@ import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.model.json_serialization.*;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import graphql.GraphQLException;
 import graphql.schema.DataFetchingEnvironment;
 
 import java.io.Serializable;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.EnumSet;
-import java.util.HashMap;
 
 /**
  * All the modifiable parameters for profile routing.
@@ -186,12 +184,15 @@ public class ProfileRequest implements Serializable, Cloneable {
     public ZoneId zoneId = ZoneOffset.UTC;
 
     //If routing with wheelchair is needed
-    private boolean wheelchair;
+    public boolean wheelchair;
 
     private SearchType searchType;
 
     //If this is profile or point to point route request
     private boolean profile = false;
+
+    /** maximum fare. If nonnegative, fares will be used in routing. */
+    public int maxFare = -1;
 
     public boolean isProfile() {
         return profile;
@@ -243,8 +244,8 @@ public class ProfileRequest implements Serializable, Cloneable {
         return  currentDateTime.plusSeconds(fromTime);
     }
 
-    public float getSpeed(Mode mode) {
-        switch (mode) {
+    public float getSpeed(StreetMode streetMode) {
+        switch (streetMode) {
         case WALK:
             return walkSpeed;
         case BICYCLE:
@@ -254,14 +255,14 @@ public class ProfileRequest implements Serializable, Cloneable {
         default:
             break;
         }
-        throw new IllegalArgumentException("getSpeed(): Invalid mode " + mode);
+        throw new IllegalArgumentException("getSpeed(): Invalid mode " + streetMode);
     }
 
     /**
      *
      * @return true if there is any transitMode in transitModes (Safe to call if transitModes is null)
      */
-    public boolean useTransit() {
+    public boolean hasTransit() {
         return this.transitModes != null && !this.transitModes.isEmpty();
     }
 
@@ -331,7 +332,13 @@ public class ProfileRequest implements Serializable, Cloneable {
         //Transit modes can be empty if searching for path without transit is requested
         Collection<TransitModes> transitModes = environment.getArgument("transitModes");
         if (transitModes.size() > 0) {
-            profileRequest.transitModes = EnumSet.copyOf(transitModes);
+            //If there is TRANSIT mode in transit modes all of transit modes need to be added.
+            if (transitModes.contains(TransitModes.TRANSIT)) {
+                profileRequest.transitModes = EnumSet.allOf(TransitModes.class);
+            } else {
+                //Otherwise only requested modes are copied
+                profileRequest.transitModes = EnumSet.copyOf(transitModes);
+            }
         }
         profileRequest.accessModes = EnumSet.copyOf((Collection<LegMode>) environment.getArgument("accessModes"));
         profileRequest.egressModes = EnumSet.copyOf((Collection<LegMode>)environment.getArgument("egressModes"));
@@ -357,5 +364,19 @@ public class ProfileRequest implements Serializable, Cloneable {
                 + toZonedDateTime.getSecond();
             date = toZonedDateTime.toLocalDate();
         }
+    }
+
+    /**
+     * Sets time and date from fromTime and toTime
+     *
+     * It is used in tests
+     *
+     * @param fromTime The beginning of the departure window, in ISO 8061 YYYY-MM-DDTHH:MM:SS+HH:MM
+     * @param toTime The end of the departure window, in ISO 8061 YYYY-MM-DDTHH:MM:SS+HH:MM
+     */
+    public void setTime(String fromTime, String toTime) {
+        fromZonedDateTime = ZonedDateTime.parse(fromTime);
+        toZonedDateTime = ZonedDateTime.parse(toTime);
+        setTime();
     }
 }

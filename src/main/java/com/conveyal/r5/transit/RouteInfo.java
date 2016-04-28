@@ -12,6 +12,7 @@ public class RouteInfo implements Serializable {
     public static final long serialVersionUID = 1L;
 
     public String agency_id;
+    public String agency_name;
     public String route_id;
     public String route_short_name;
     public String route_long_name;
@@ -21,6 +22,7 @@ public class RouteInfo implements Serializable {
 
     public RouteInfo (Route route) {
         this.agency_id = route.agency.agency_id;
+        this.agency_name = route.agency.agency_name;
         this.route_id = route.route_id;
         this.route_short_name = route.route_short_name;
         this.route_long_name = route.route_long_name;

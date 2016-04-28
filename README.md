@@ -5,7 +5,9 @@ for analytic applications but there are plans to eventually have it support poin
 The routing is "realistic" because it works by planning many trips over a time window, which is more reflective of how people
 use the transportation system than planning a single trip at an exact departure time---very few people leave for work at precisely
 7:53 AM every morning, and even fewer leave at a precise time when going to a non-work event. There's more information on our thinking
-on this particular point [here](http://conveyal.com/blog/2015/05/04/variation-in-accessibility-measures/).
+on this particular point [here](http://conveyal.com/blog/2015/05/04/variation-in-accessibility-measures).
+
+Please follow the Conveyal Java style guide at https://github.com/conveyal/JavaStyle/
 
 ## History
 

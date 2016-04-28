@@ -1,8 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.common.SphericalDistanceLibrary;
-import com.conveyal.r5.profile.Mode;
-import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.profile.StreetMode;
 import com.csvreader.CsvReader;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerationException;
@@ -90,7 +89,7 @@ public class FreeFormPointSet implements Serializable, PointSet {
      * StreetNetwork. This ensures linkages are re-used for multiple scenarios that have different transit
      * characteristics but the same street network.
      */
-    Map<Fun.Tuple2<String, Mode>, LinkedPointSet> linkageCache = new HashMap<>();
+    Map<Fun.Tuple2<String, StreetMode>, LinkedPointSet> linkageCache = new HashMap<>();
 
     /**
      * Map from string IDs to their array indices. This is a view into FreeFormPointSet.ids, namely its reverse mapping.
@@ -842,11 +841,11 @@ public class FreeFormPointSet implements Serializable, PointSet {
      * TODO pull this code up to an abstract superclass, it's the same in WebMercator and FreeForm PointSets.
      */
     @Override
-    public LinkedPointSet link (StreetLayer streetLayer, Mode mode) {
-        LinkedPointSet linkedPointSet = linkageCache.get(Fun.t2(streetLayer.streetLayerId, mode));
+    public LinkedPointSet link (StreetLayer streetLayer, StreetMode streetMode) {
+        LinkedPointSet linkedPointSet = linkageCache.get(Fun.t2(streetLayer.streetLayerId, streetMode));
         if (linkedPointSet == null) {
-            linkedPointSet = new LinkedPointSet(this, streetLayer, mode);
-            linkageCache.put(Fun.t2(streetLayer.streetLayerId, mode), linkedPointSet);
+            linkedPointSet = new LinkedPointSet(this, streetLayer, streetMode);
+            linkageCache.put(Fun.t2(streetLayer.streetLayerId, streetMode), linkedPointSet);
         }
         return linkedPointSet;
     }

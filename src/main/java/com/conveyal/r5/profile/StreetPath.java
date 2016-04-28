@@ -65,15 +65,12 @@ public class StreetPath {
             StreetRouter bicycle = streetRouter.previous;
             lastState = bicycle.getStateAtVertex(endCycling.vertex);
             if (lastState != null) {
-                //Copies bikeshare setting
-                lastState.isBikeShare = endCycling.isBikeShare;
                 //Here part from first bikeshare to the last bikeshare on rented bike is created
                 add(lastState);
                 StreetRouter first = bicycle.previous;
                 StreetRouter.State startCycling = getStates().getFirst();
                 lastState = first.getStateAtVertex(startCycling.vertex);
                 if (lastState != null) {
-                    lastState.isBikeShare = startCycling.isBikeShare;
                     add(lastState);
                 } else {
                     LOG.warn("Start to cycle path missing");
@@ -86,7 +83,6 @@ public class StreetPath {
             StreetRouter.State carPark = getStates().getFirst();
             //So we need to search for driving part in previous streetRouter
             StreetRouter.State carState = streetRouter.previous.getStateAtVertex(carPark.vertex);
-            //TODO: add car park info (name, etc)
             if (carState != null) {
                 add(carState);
             } else {

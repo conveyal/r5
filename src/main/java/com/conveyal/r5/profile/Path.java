@@ -19,6 +19,9 @@ public class Path {
     public int[] boardStops;
     public int[] alightStops;
     public int[] alightTimes;
+    public int[] trips;
+    public int[] boardStopPositions;
+    public int[] alightStopPositions;
     public final int length;
 
     public Path(RaptorState state, int stop) {
@@ -84,6 +87,9 @@ public class Path {
         TIntList boardStops = new TIntArrayList();
         TIntList alightStops = new TIntArrayList();
         TIntList alightTimes = new TIntArrayList();
+        TIntList trips = new TIntArrayList();
+        TIntList boardStopPositions = new TIntArrayList();
+        TIntList alightStopPositions = new TIntArrayList();
 
         // trace path from this McRaptorState
         do {
@@ -94,6 +100,9 @@ public class Path {
             alightTimes.add(s.time);
             alightStops.add(s.stop);
             boardStops.add(s.back.stop);
+            trips.add(s.trip);
+            boardStopPositions.add(s.boardStopPosition);
+            alightStopPositions.add(s.alightStopPosition);
 
             s = s.back;
         } while (s.back != null);
@@ -102,11 +111,17 @@ public class Path {
         boardStops.reverse();
         alightStops.reverse();
         alightTimes.reverse();
+        trips.reverse();
+        boardStopPositions.reverse();
+        alightStopPositions.reverse();
 
         this.patterns = patterns.toArray();
         this.boardStops = boardStops.toArray();
         this.alightStops = alightStops.toArray();
         this.alightTimes = alightTimes.toArray();
+        this.trips = trips.toArray();
+        this.boardStopPositions = boardStopPositions.toArray();
+        this.alightStopPositions = alightStopPositions.toArray();
         this.length = this.patterns.length;
 
         if (this.patterns.length == 0)

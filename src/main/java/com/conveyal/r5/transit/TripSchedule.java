@@ -80,10 +80,10 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
     private TripSchedule(Trip trip, int[] arrivals, int[] departures, int[] stopSequences, int serviceCode) {
         String scopedTripId = String.join(":", trip.feed_id, trip.trip_id);
         this.tripId = scopedTripId;
-        if (trip.bikes_allowed > 0) {
+        if (trip.bikes_allowed == 1) {
             setFlag(TripFlag.BICYCLE);
         }
-        if (trip.wheelchair_accessible > 0) {
+        if (trip.wheelchair_accessible == 1) {
             setFlag(TripFlag.WHEELCHAIR);
         }
         this.arrivals = arrivals;
@@ -139,6 +139,8 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
                     this.headwaySeconds[fidx] = f.headway_secs;
                     this.endTimes[fidx] = f.end_time;
                     this.startTimes[fidx] = f.start_time;
+
+                    fidx++;
                 }
             }
         }

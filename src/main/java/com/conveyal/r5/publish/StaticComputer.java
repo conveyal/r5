@@ -2,8 +2,7 @@ package com.conveyal.r5.publish;
 
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
-import com.conveyal.r5.analyst.cluster.TaskStatisticsStore;
-import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.RaptorState;
 import com.conveyal.r5.profile.RaptorWorker;
@@ -74,7 +73,7 @@ public class StaticComputer implements Runnable {
         // pointset around the search origin.
         WebMercatorGridPointSet subPointSet =
                 new WebMercatorGridPointSet(WebMercatorGridPointSet.DEFAULT_ZOOM, points.west + req.x - 20, points.north + req.y - 20, 41, 41);
-        LinkedPointSet subLinked = subPointSet.link(network.streetLayer, Mode.WALK);
+        LinkedPointSet subLinked = subPointSet.link(network.streetLayer, StreetMode.WALK);
         PointSetTimes nonTransitTimes = subLinked.eval(sr::getTravelTimeToVertex);
 
         LittleEndianDataOutputStream out = new LittleEndianDataOutputStream(os);

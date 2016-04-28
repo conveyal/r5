@@ -152,10 +152,52 @@ var traffic_lights_layer = {
     "maxzoom":22,
     "paint":{
         "circle-color":"#C00000",
-        "circle-blur":0.8
+        "circle-blur":0.3
     },
     "layout": {},
-    "filter": ["==", "flags", "TRAFFIC_SIGNAL"]
+    "filter": ["==", "TRAFFIC_SIGNAL", true]
+};
+
+var park_ride_layer = {
+    'id': "perm-park_ride",
+    'type': "circle",
+    "source": "perm",
+    "minzoom":13,
+    "maxzoom":22,
+    "paint":{
+        "circle-color":"#FF00FF",
+        "circle-blur":0.5
+    },
+    "layout": {},
+    "filter": ["==", "PARK_AND_RIDE", true]
+};
+
+var bike_share_layer = {
+    'id': "perm-bike_share",
+    'type': "circle",
+    "source": "perm",
+    "minzoom":13,
+    "maxzoom":22,
+    "paint":{
+        "circle-color":"#00FFFF",
+        "circle-blur":0.5
+    },
+    "layout": {},
+    "filter": ["==", "BIKE_SHARING", true]
+};
+
+var transit_stop_layer = {
+    'id': "perm-transit_stop",
+    'type': "circle",
+    "source": "perm",
+    "minzoom":13,
+    "maxzoom":22,
+    "paint":{
+        "circle-color":"#FFFF00",
+        "circle-blur":0.5
+    },
+    "layout": {},
+    "filter": ["==", "STOP", true]
 };
 
 $.ajax(url + "/speeds", {

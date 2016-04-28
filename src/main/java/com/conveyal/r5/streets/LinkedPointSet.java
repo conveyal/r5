@@ -1,8 +1,8 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.profile.StreetMode;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -87,7 +87,7 @@ public class LinkedPointSet {
      * These objects are long-lived and not extremely numerous, so we keep references to the objects it was built from.
      * Besides they are useful for later processing of LinkedPointSets.
      */
-    public LinkedPointSet(PointSet pointSet, StreetLayer streetLayer, Mode mode) {
+    public LinkedPointSet(PointSet pointSet, StreetLayer streetLayer, StreetMode streetMode) {
         LOG.info("Linking pointset to street network...");
         this.pointSet = pointSet;
         this.streetLayer = streetLayer;
@@ -96,7 +96,8 @@ public class LinkedPointSet {
         distances1_mm = new int[pointSet.featureCount()];
         int unlinked = 0;
         for (int i = 0; i < pointSet.featureCount(); i++) {
-            Split split = streetLayer.findSplit(pointSet.getLat(i), pointSet.getLon(i), 1000, mode);
+            Split split = streetLayer.findSplit(pointSet.getLat(i), pointSet.getLon(i), 1000,
+                streetMode);
             if (split == null) {
                 unlinked++;
                 edges[i] = -1;

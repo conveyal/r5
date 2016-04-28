@@ -34,7 +34,8 @@ import static org.apache.commons.math3.util.FastMath.toRadians;
  *
  * We could also conceivably store travel time histograms per destination, but this entails a loss of information due
  * to binning into minutes. These binned times could not be used to apply a smooth sigmoid cutoff which we usually
- * do at one-second resolution.
+ * do at one-second resolution. However, the data in the seconds portion is mostly random, so we could achieve roughly
+ * the same effect by jittering the stored values when applying the cutoff.
  *
  * When exploring single-point (one-to-many) query results it would be great to have all these stored or produced on
  * demand for visualization.

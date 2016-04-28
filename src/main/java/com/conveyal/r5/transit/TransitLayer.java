@@ -65,6 +65,9 @@ public class TransitLayer implements Serializable, Cloneable {
 
     public List<Service> services = new ArrayList<>();
 
+    /** If true at index stop allows boarding with wheelchairs **/
+    public BitSet stopsWheelchair;
+
     // TODO there is probably a better way to do this, but for now we need to retain stop object for linking to streets
     public transient List<Stop> stopForIndex = new ArrayList<>();
 
@@ -104,6 +107,7 @@ public class TransitLayer implements Serializable, Cloneable {
         // Load stops.
         // ID is the GTFS string ID, stopIndex is the zero-based index, stopVertexIndex is the index in the street layer.
         TObjectIntMap<String> indexForUnscopedStopId = new TObjectIntHashMap<>();
+        stopsWheelchair = new BitSet(gtfs.stops.size());
         for (Stop stop : gtfs.stops.values()) {
             int stopIndex = stopIdForIndex.size();
             String scopedStopId = String.join(":", stop.feed_id, stop.stop_id);
@@ -111,7 +115,9 @@ public class TransitLayer implements Serializable, Cloneable {
             indexForUnscopedStopId.put(stop.stop_id, stopIndex);
             stopIdForIndex.add(scopedStopId);
             stopForIndex.add(stop);
-
+            if (stop.wheelchair_boarding != null && stop.wheelchair_boarding.trim().equals("1")) {
+                stopsWheelchair.set(stopIndex);
+            }
             if (level == LoadLevel.FULL) {
                 stopNames.add(stop.stop_name);
             }

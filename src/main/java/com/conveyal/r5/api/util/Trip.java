@@ -14,4 +14,9 @@ public class Trip {
      * Generated Service ID
      */
     public String serviceId;
+
+
+    public Boolean wheelchairAccessible = false;
+
+    public Boolean bikesAllowed = false;
 }

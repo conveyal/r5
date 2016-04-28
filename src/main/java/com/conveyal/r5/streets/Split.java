@@ -1,7 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.common.GeometryUtils;
-import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.iterator.TIntIterator;
 import org.apache.commons.math3.util.FastMath;
@@ -44,7 +44,7 @@ public class Split {
      * Find a location on an existing street near the given point, without actually creating any vertices or edges.
      * @return a new Split object, or null if no edge was found in range.
      */
-    public static Split find(double lat, double lon, double searchRadiusMeters, StreetLayer streetLayer, Mode mode) {
+    public static Split find(double lat, double lon, double searchRadiusMeters, StreetLayer streetLayer, StreetMode streetMode) {
         // NOTE THIS ENTIRE GEOMETRIC CALCULATION IS HAPPENING IN FIXED PRECISION INT DEGREES
         int fixLat = VertexStore.floatingDegreesToFixed(lat);
         int fixLon = VertexStore.floatingDegreesToFixed(lon);
@@ -69,9 +69,9 @@ public class Split {
             curr.edge = edgeIterator.next();
             edge.seek(curr.edge);
 
-            if (mode == Mode.WALK && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)) continue;
-            if (mode == Mode.BICYCLE && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE)) continue;
-            if (mode == Mode.CAR && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_CAR)) continue;
+            if (streetMode == StreetMode.WALK && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)) continue;
+            if (streetMode == StreetMode.BICYCLE && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE)) continue;
+            if (streetMode == StreetMode.CAR && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_CAR)) continue;
 
             edge.forEachSegment((seg, fLat0, fLon0, fLat1, fLon1) -> {
                 // Find the fraction along the current segment

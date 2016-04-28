@@ -79,7 +79,7 @@ public class ProfileResponse {
 
 
         if (profileOption.isEmpty()) {
-            LOG.info("Creating new profile option");
+            LOG.debug("Creating new profile option");
             options.add(profileOption);
         }
 
@@ -177,7 +177,7 @@ public class ProfileResponse {
             .collect(Collectors.groupingBy(Transfer::getAlightStop));
         for (Map.Entry<Integer, List<Transfer>> entry: transfersWithSameStart.entrySet()) {
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
-            streetRouter.mode = Mode.WALK;
+            streetRouter.streetMode = StreetMode.WALK;
             streetRouter.profileRequest = request;
             //TODO: make configurable distanceLimitMeters in middle
             streetRouter.distanceLimitMeters = 2000;

@@ -1,15 +1,10 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.GeometryUtils;
-import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.algorithm.Angle;
 import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.LineString;
-import com.vividsolutions.jts.linearref.LocationIndexedLine;
-
-import java.util.Arrays;
 
 /**
  * Compute turn costs.
@@ -30,8 +25,8 @@ public class TurnCostCalculator {
         this.driveOnRight = driveOnRight;
     }
 
-    public int computeTurnCost (int fromEdge, int toEdge, Mode mode) {
-        if (mode == Mode.CAR) {
+    public int computeTurnCost (int fromEdge, int toEdge, StreetMode streetMode) {
+        if (streetMode == StreetMode.CAR) {
             double angle = computeAngle(fromEdge, toEdge);
 
             if (angle < 0.15 * Math.PI)

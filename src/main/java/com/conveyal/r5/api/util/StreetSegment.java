@@ -80,7 +80,7 @@ public class StreetSegment {
                 streetEdgeInfo.geometry = edge.getGeometry();
                 streetEdgeInfo.streetName = streetLayer.getNameEdgeIdx(edgeIdx, Locale.ENGLISH);
                 //TODO: decide between NonTransitMode and mode
-                streetEdgeInfo.mode = NonTransitMode.valueOf(state.mode.toString());
+                streetEdgeInfo.mode = NonTransitMode.valueOf(state.streetMode.toString());
                 streetEdgeInfo.distance = edge.getLengthMm();
                 //Adds bikeRentalStation to streetEdgeInfo
                 if (state.isBikeShare && streetLayer != null && streetLayer.bikeRentalStationMap != null) {
@@ -93,6 +93,10 @@ public class StreetSegment {
                             streetEdgeInfo.bikeRentalOffStation = bikeRentalStation;
                         }
                     }
+                }
+                if (mode == LegMode.CAR_PARK && streetLayer.parkRideLocationsMap != null &&
+                    streetLayer.parkRideLocationsMap.get(state.vertex) != null) {
+                    streetEdgeInfo.parkRide = streetLayer.parkRideLocationsMap.get(state.vertex);
                 }
 
                 double thisAngle = DirectionUtils.getFirstAngle(streetEdgeInfo.geometry);

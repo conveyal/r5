@@ -5,12 +5,15 @@ import com.conveyal.r5.api.ProfileResponse;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.ProfileOption;
 import com.conveyal.r5.api.util.StreetSegment;
+import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.profile.*;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
+import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TripFlag;
 import com.conveyal.r5.transit.TripPattern;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.list.TIntList;
@@ -24,6 +27,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.ZoneId;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Class which will make point to point or profile queries on Transport network based on profileRequest
@@ -84,14 +88,7 @@ public class PointToPointQuery {
         //Do the query and return result
         ProfileResponse profileResponse = new ProfileResponse();
 
-        //Split for end coordinate
-        Split split = transportNetwork.streetLayer.findSplit(request.toLat, request.toLon,
-            RADIUS_METERS);
-        if (split == null) {
-            throw new RuntimeException("Edge near the end coordinate wasn't found. Routing didn't start!");
-        }
-
-        boolean transit = request.useTransit();
+        boolean transit = request.hasTransit();
 
         TaskStatistics ts = new TaskStatistics();
 
@@ -110,6 +107,7 @@ public class PointToPointQuery {
         for(LegMode mode: modes) {
             long initialStopStartTime = System.currentTimeMillis();
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+            streetRouter.searchRadius = RADIUS_METERS;
             StreetPath streetPath;
             streetRouter.profileRequest = request;
             if (mode == LegMode.CAR_PARK && !transit) {
@@ -138,7 +136,7 @@ public class PointToPointQuery {
                         accessRouter.put(LegMode.BICYCLE_RENT, streetRouter);
                         continue;
                     } else {
-                        StreetRouter.State lastState = streetRouter.getState(split);
+                        StreetRouter.State lastState = streetRouter.getState(request.toLat, request.toLon);
                         if (lastState != null) {
                             streetPath = new StreetPath(lastState, streetRouter, LegMode.BICYCLE_RENT, transportNetwork);
 
@@ -153,7 +151,7 @@ public class PointToPointQuery {
                 }
             } else {
                 //TODO: add support for bike sharing and park and ride
-                streetRouter.mode = Mode.valueOf(mode.toString());
+                streetRouter.streetMode = StreetMode.valueOf(mode.toString());
                 // TODO add time and distance limits to routing, not just weight.
                 // TODO apply walk and bike speeds and maxBike time.
                 streetRouter.distanceLimitMeters = transit ? 2000 : 100_000; // FIXME arbitrary, and account for bike or car access mode
@@ -169,7 +167,7 @@ public class PointToPointQuery {
                         continue;
                     //Searching for direct paths
                     } else{
-                        StreetRouter.State lastState = streetRouter.getState(split);
+                        StreetRouter.State lastState = streetRouter.getState(request.toLat, request.toLon);
                         if (lastState != null) {
                             streetPath = new StreetPath(lastState, transportNetwork);
                         } else {
@@ -194,6 +192,7 @@ public class PointToPointQuery {
                 StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
                 StreetPath streetPath;
                 streetRouter.profileRequest = request;
+                streetRouter.searchRadius = RADIUS_METERS;
                 if (mode == LegMode.BICYCLE_RENT) {
                     if (!transportNetwork.streetLayer.bikeSharing) {
                         LOG.warn("Bike sharing trip requested but no bike sharing stations in the streetlayer");
@@ -201,7 +200,7 @@ public class PointToPointQuery {
                     }
                     streetRouter = findBikeRentalPath(request, streetRouter);
                     if (streetRouter != null) {
-                        StreetRouter.State lastState = streetRouter.getState(split);
+                        StreetRouter.State lastState = streetRouter.getState(request.toLat, request.toLon);
                         if (lastState != null) {
                             streetPath = new StreetPath(lastState, streetRouter, LegMode.BICYCLE_RENT, transportNetwork);
 
@@ -214,15 +213,19 @@ public class PointToPointQuery {
                         continue;
                     }
                 } else {
-                    streetRouter.mode = Mode.valueOf(mode.toString());
+                    streetRouter.streetMode = StreetMode.valueOf(mode.toString());
                     streetRouter.distanceLimitMeters = 100_000; // FIXME arbitrary, and account for bike or car access mode
                     if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
-                        streetRouter.setDestination(split);
+                        streetRouter.setDestination(request.toLat, request.toLon);
                         streetRouter.route();
-                        StreetRouter.State lastState = streetRouter.getState(split);
+                        StreetRouter.State lastState = streetRouter.getState(streetRouter.getDestinationSplit());
+                        if (lastState == null) {
+                            LOG.warn("Direct mode {} last state wasn't found", mode);
+                            continue;
+                        }
                         streetPath = new StreetPath(lastState, transportNetwork);
                     } else {
-                        LOG.warn("Direct mode last state wasn't found!");
+                        LOG.warn("Direct mode {} origin wasn't found!", mode);
                         continue;
                     }
                 }
@@ -239,8 +242,9 @@ public class PointToPointQuery {
                 if (currentlyUnsupportedModes.contains(mode)) {
                     continue;
                 }
+                streetRouter.searchRadius = RADIUS_METERS;
                 //TODO: add support for bike sharing
-                streetRouter.mode = Mode.valueOf(mode.toString());
+                streetRouter.streetMode = StreetMode.valueOf(mode.toString());
                 streetRouter.profileRequest = request;
                 // TODO add time and distance limits to routing, not just weight.
                 // TODO apply walk and bike speeds and maxBike time.
@@ -268,7 +272,31 @@ public class PointToPointQuery {
 
             // getPaths actually returns a set, which is important so that things are deduplicated. However we need a list
             // so we can sort it below.
-            usefullpathList.addAll(router.getPaths());
+            usefullpathList.addAll(router.getPaths().stream().filter(pathWithTimes -> {
+                //This filters all transit paths and keeps only those paths
+                // that have all of transit modes in requested transitModes
+                for (int i = 0; i < pathWithTimes.patterns.length; i++) {
+                    TripPattern pattern = pathWithTimes.getPattern(transportNetwork.transitLayer, i);
+                    if (pattern.routeIndex >= 0) {
+                        RouteInfo routeInfo = transportNetwork.transitLayer.routes.get(pattern.routeIndex);
+                        TransitModes mode = TransitLayer.getTransitModes(routeInfo.route_type);
+                        if (!request.transitModes.contains(mode)) {
+                            LOG.error("Route with unwanted transit mode found!!");
+                            return false;
+
+                            //If trip with wheelchair is requested filters out trips where boarding/arrival stop or trip doesn't allow a wheelchair
+                        } else if(request.wheelchair) {
+                            if (!(transportNetwork.transitLayer.stopsWheelchair.get(pathWithTimes.boardStops[i]) &&
+                                transportNetwork.transitLayer.stopsWheelchair.get(pathWithTimes.alightStops[i]) &&
+                                pattern.tripSchedules.get(pathWithTimes.trips[i]).getFlag(TripFlag.WHEELCHAIR))) {
+                                LOG.error("Trip that doesn't allow wheelchairs found!!");
+                                return false;
+                            }
+                        }
+                    }
+                }
+                return true;
+            }).collect(Collectors.toList()));
 
             //This sort is necessary only for text debug output so it will be disabled when it is finished
 
@@ -320,26 +348,28 @@ public class PointToPointQuery {
                     break;
                 }*/
 
-                LOG.info(" ");
-                for (int i = 0; i < path.patterns.length; i++) {
-                    //TransitSegment transitSegment = new TransitSegment(transportNetwork.transitLayer, path.boardStops[i], path.alightStops[i], path.patterns[i]);
-                    if (!(((boardStop == path.boardStops[i] && alightStop == path.alightStops[i]) ))) {
-                        LOG.info("   BoardStop: {} pattern: {} allightStop: {}", path.boardStops[i],
-                            path.patterns[i], path.alightStops[i]);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug(" ");
+                    for (int i = 0; i < path.patterns.length; i++) {
+                        //TransitSegment transitSegment = new TransitSegment(transportNetwork.transitLayer, path.boardStops[i], path.alightStops[i], path.patterns[i]);
+                        if (!(((boardStop == path.boardStops[i] && alightStop == path.alightStops[i])))) {
+                            LOG.debug("   BoardStop: {} pattern: {} allightStop: {}", path.boardStops[i],
+                                path.patterns[i], path.alightStops[i]);
+                        }
+                        TripPattern pattern = transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]);
+                        if (pattern.routeIndex >= 0) {
+                            RouteInfo routeInfo = transportNetwork.transitLayer.routes.get(pattern.routeIndex);
+                            LOG.debug("     Pattern:{} on route:{} ({}) with {} stops", path.patterns[i],
+                                routeInfo.route_long_name, routeInfo.route_short_name, pattern.stops.length);
+                        }
+                        LOG.debug("     {}->{} ({}:{})", transportNetwork.transitLayer.stopNames.get(path.boardStops[i]),
+                            transportNetwork.transitLayer.stopNames.get(path.alightStops[i]),
+                            path.alightTimes[i] / 3600, path.alightTimes[i] % 3600 / 60);
+                        //transit_option.addTransit(transitSegment);
                     }
-                    TripPattern pattern =transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]);
-                    if (pattern.routeIndex >= 0) {
-                        RouteInfo routeInfo = transportNetwork.transitLayer.routes.get(pattern.routeIndex);
-                        LOG.info("     Pattern:{} on route:{} ({}) with {} stops", path.patterns[i],routeInfo.route_long_name, routeInfo.route_short_name,
-                            pattern.stops.length);
-                    }
-                    LOG.info("     {}->{} ({}:{})", transportNetwork.transitLayer.stopNames.get(path.boardStops[i]),
-                        transportNetwork.transitLayer.stopNames.get(path.alightStops[i]),
-                        path.alightTimes[i]/3600, path.alightTimes[i]%3600/60);
-                    //transit_option.addTransit(transitSegment);
+                    boardStop = path.boardStops[0];
+                    alightStop = path.alightStops[0];
                 }
-                boardStop = path.boardStops[0];
-                alightStop = path.alightStops[0];
                 seen_paths++;
             }
             profileResponse.generateStreetTransfers(transportNetwork, request);
@@ -364,17 +394,18 @@ public class PointToPointQuery {
      * @return null if path isn't found
      */
     private StreetRouter findParkRidePath(ProfileRequest request, StreetRouter streetRouter) {
-        streetRouter.mode = Mode.CAR;
+        streetRouter.streetMode = StreetMode.CAR;
         streetRouter.distanceLimitMeters = 15_000;
         if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
             streetRouter.route();
             TIntObjectMap<StreetRouter.State> carParks = streetRouter.getReachedVertices(VertexStore.VertexFlag.PARK_AND_RIDE);
             LOG.info("CAR PARK: Found {} car parks", carParks.size());
             StreetRouter walking = new StreetRouter(transportNetwork.streetLayer);
-            walking.mode = Mode.WALK;
+            walking.searchRadius = RADIUS_METERS;
+            walking.streetMode = StreetMode.WALK;
             walking.profileRequest = request;
             walking.distanceLimitMeters = 2_000 + streetRouter.distanceLimitMeters;
-            walking.setOrigin(carParks, CAR_PARK_DROPOFF_TIMEMS, CAR_PARK_DROPOFF_COST);
+            walking.setOrigin(carParks, CAR_PARK_DROPOFF_TIMEMS, CAR_PARK_DROPOFF_COST, LegMode.CAR_PARK);
             walking.route();
             walking.previous = streetRouter;
             return walking;
@@ -396,7 +427,7 @@ public class PointToPointQuery {
      * @return null if path isn't found
      */
     private StreetRouter findBikeRentalPath(ProfileRequest request, StreetRouter streetRouter) {
-        streetRouter.mode = Mode.WALK;
+        streetRouter.streetMode = StreetMode.WALK;
         // TODO add time and distance limits to routing, not just weight.
         // TODO apply walk and bike speeds and maxBike time.
         streetRouter.distanceLimitMeters = 2_000;
@@ -404,34 +435,42 @@ public class PointToPointQuery {
             streetRouter.route();
             //This finds all the nearest bicycle rent stations when walking
             TIntObjectMap<StreetRouter.State> bikeStations = streetRouter.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
-            LOG.info("BIKE RENT: Found {} bike stations", bikeStations.size());
+            LOG.info("BIKE RENT: Found {} bike stations in {}km walk distance", bikeStations.size(), streetRouter.distanceLimitMeters/1000);
                         /*LOG.info("Start to bike share:");
-                        bikeStations.forEachEntry((idx, weight) -> {
-                            LOG.info("   {} ({})", idx, weight);
+                        bikeStations.forEachEntry((idx, state) -> {
+                            LOG.info("   {} ({}m)", idx, state.distance);
                             return true;
                         });*/
 
             //This finds best cycling path from best start bicycle station to end bicycle station
             StreetRouter bicycle = new StreetRouter(transportNetwork.streetLayer);
+            bicycle.searchRadius = RADIUS_METERS;
             bicycle.previous = streetRouter;
-            bicycle.mode = Mode.BICYCLE;
+            bicycle.streetMode = StreetMode.BICYCLE;
             bicycle.profileRequest = request;
-            bicycle.distanceLimitMeters = 100_000;
-            bicycle.setOrigin(bikeStations, BIKE_RENTAL_PICKUP_TIMEMS, BIKE_RENTAL_PICKUP_COST);
+            bicycle.distanceLimitMeters = 15_000 + streetRouter.distanceLimitMeters;
+            bicycle.setOrigin(bikeStations, BIKE_RENTAL_PICKUP_TIMEMS, BIKE_RENTAL_PICKUP_COST, LegMode.BICYCLE_RENT);
             bicycle.route();
             TIntObjectMap<StreetRouter.State> cycledStations = bicycle.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
-            LOG.info("BIKE RENT: Found {} cycled stations", cycledStations.size());
+            LOG.info("BIKE RENT: Found {} cycled stations in {}km cycled distance", cycledStations.size(), bicycle.distanceLimitMeters/1000);
                         /*LOG.info("Bike share to bike share:");
-                        cycledStations.forEachEntry((idx, weight) -> {
-                            LOG.info("   {} ({})", idx, weight);
-                            return true;
+                        cycledStations.retainEntries((idx, state) -> {
+                            if (bikeStations.containsKey(idx)) {
+                                LOG.warn("  MM:{} ({}m)", idx, state.distance/1000);
+                                return false;
+                            } else {
+                                LOG.info("   {} ({}m)", idx, state.distance / 1000);
+                                return true;
+                            }
+
                         });*/
             //This searches for walking path from end bicycle station to end point
             StreetRouter end = new StreetRouter(transportNetwork.streetLayer);
-            end.mode = Mode.WALK;
+            end.searchRadius = RADIUS_METERS;
+            end.streetMode = StreetMode.WALK;
             end.profileRequest = request;
-            end.distanceLimitMeters = 2_000 + 100_000;
-            end.setOrigin(cycledStations, BIKE_RENTAL_DROPOFF_TIMEMS, BIKE_RENTAL_DROPOFF_COST);
+            end.distanceLimitMeters = 2_000 + bicycle.distanceLimitMeters;
+            end.setOrigin(cycledStations, BIKE_RENTAL_DROPOFF_TIMEMS, BIKE_RENTAL_DROPOFF_COST, LegMode.BICYCLE_RENT);
             end.route();
             end.previous = bicycle;
             return end;
@@ -491,6 +530,10 @@ public class PointToPointQuery {
             StreetRouter router = entry.getValue();
             router.getReachedStops().forEachEntry((stop, time) -> {
                 if (time > maxTimeFinal || time < minTimeFinal) return true;
+                //Skip stops that can't be used with wheelchairs if wheelchair routing is requested
+                if (request.wheelchair && !transportNetwork.transitLayer.stopsWheelchair.get(stop)) {
+                    return true;
+                }
 
                 int weight = time + penaltyFinal;
 
@@ -518,7 +561,7 @@ public class PointToPointQuery {
             timeList.sort();
 
             //This gets last time in timeList
-            int cutoff = timeList.get(200); //it needs to be 200 since if there are minimally 201 stops the indexes are from 0-200
+            int cutoff = timeList.get(MAX_ACCESS_STOPS); //it needs to be same as MAX_ACCESS_STOPS since if there are minimally MAX_ACCESS_STOPS + 1 stops the indexes are from 0-MAX_ACCESS_STOPS
 
             for (TIntIntIterator it = times.iterator(); it.hasNext();) {
                 it.advance();

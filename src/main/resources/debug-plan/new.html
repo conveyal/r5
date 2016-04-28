@@ -15,6 +15,16 @@
             .status-waiting {
                 background-color:orange;
             }
+            .pre-wrap {
+                white-space: pre-wrap;       /* CSS 3 */
+                white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+                white-space: -pre-wrap;      /* Opera 4-6 */
+                white-space: -o-pre-wrap;    /* Opera 7 */
+                word-wrap: break-word;       /* Internet Explorer 5.5+ */
+            }
+            abbr[title], acronym[title] {
+                 border-bottom: 1px dotted black;
+            }
         </style>
 
     </head>
@@ -31,19 +41,49 @@
 			<!-- Nav tabs -->
 			<div class="sidebar-tabs">
 				<ul role="tablist">
-					<li><a href="#home" id="resultTab" role="tab">Results</a></li>
+					<li><a href="#result" id="resultTab" role="tab">Results</a></li>
+					<li><a href="#query" id="queryTab" role="tab">Query</a></li>
+					<li><a href="#curl" id="curlTab" role="tab">Curl</a></li>
+					<li><a href="#java" id="javaTab" role="tab">Java</a></li>
 				</ul>
 
 			</div>
 
 			<!-- Tab panes -->
 			<div class="sidebar-content">
-				<div class="sidebar-pane" id="home">
+				<div class="sidebar-pane" id="result">
 					<h1 class="sidebar-header">
 						Results
 						<span class="sidebar-close">X</span>
 					</h1>
 					<div class="response">
+					</div>
+
+				</div>
+				<div class="sidebar-pane" id="query">
+					<h1 class="sidebar-header">
+						Query
+						<span class="sidebar-close">X</span>
+					</h1>
+					<div class="query">
+					</div>
+
+				</div>
+				<div class="sidebar-pane" id="curl">
+					<h1 class="sidebar-header">
+						Curl
+						<span class="sidebar-close">X</span>
+					</h1>
+					<div class="curl">
+					</div>
+
+				</div>
+				<div class="sidebar-pane" id="java">
+					<h1 class="sidebar-header">
+						Java
+						<span class="sidebar-close">X</span>
+					</h1>
+					<div class="java">
 					</div>
 
 				</div>

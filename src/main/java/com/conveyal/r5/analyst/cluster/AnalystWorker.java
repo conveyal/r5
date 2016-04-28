@@ -8,7 +8,8 @@ import com.conveyal.r5.analyst.scenario.InactiveTripsFilter;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.JsonUtilities;
-import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.publish.StaticComputer;
 import com.conveyal.r5.publish.StaticSiteRequest;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -391,10 +392,10 @@ public class AnalystWorker implements Runnable {
         ts.pointsetId = clusterRequest.destinationPointsetId;
         ts.single = singlePoint;
 
-        Mode mode;
-        if (clusterRequest.profileRequest.accessModes.contains(LegMode.CAR)) mode = Mode.CAR;
-        else if (clusterRequest.profileRequest.accessModes.contains(LegMode.BICYCLE)) mode = Mode.BICYCLE;
-        else mode = Mode.WALK;
+        StreetMode mode;
+        if (clusterRequest.profileRequest.accessModes.contains(LegMode.CAR)) mode = StreetMode.CAR;
+        else if (clusterRequest.profileRequest.accessModes.contains(LegMode.BICYCLE)) mode = StreetMode.BICYCLE;
+        else mode = StreetMode.WALK;
 
         TransportNetwork transportNetwork =
                 transportNetworkCache.getNetworkForScenario(clusterRequest.graphId, clusterRequest.profileRequest.scenario);
@@ -402,7 +403,6 @@ public class AnalystWorker implements Runnable {
         // If this one-to-many request is for accessibility information based on travel times to a pointset,
         // fetch the set of points we will use as destinations.
         final PointSet targets;
-        final LinkedPointSet linkedTargets;
         if (isochrone) {
             // This is an isochrone request, search to a regular grid of points.
             targets = transportNetwork.getGridPointSet();
@@ -412,21 +412,37 @@ public class AnalystWorker implements Runnable {
         }
 
         // Linkage is performed after applying the scenario to account for street modifications.
-        // TODO this is megaslow and needs optimization.
         // LinkedPointSets are lazy-linked and cached within the unlinked PointSet.
-        linkedTargets = targets.link(transportNetwork.streetLayer, mode);
+        final LinkedPointSet linkedTargets = targets.link(transportNetwork.streetLayer, mode);
 
         // Run the core repeated-raptor analysis.
-        RepeatedRaptorProfileRouter router =
-                new RepeatedRaptorProfileRouter(transportNetwork, clusterRequest, linkedTargets, ts); // TODO transportNetwork is implied by linkedTargets.
         ResultEnvelope envelope = new ResultEnvelope();
-        try {
-            envelope = router.route();
-            ts.success = true;
-        } catch (Exception ex) {
-            // An error occurred. Keep the empty envelope empty and TODO include error information.
-            LOG.error("Error occurred in profile request", ex);
-            ts.success = false;
+        if (clusterRequest.profileRequest.maxFare < 0) {
+            // TODO transportNetwork is implied by linkedTargets.
+            RepeatedRaptorProfileRouter router =
+                    new RepeatedRaptorProfileRouter(transportNetwork, clusterRequest, linkedTargets, ts);
+            try {
+                envelope = router.route();
+                ts.success = true;
+            } catch (Exception ex) {
+                // An error occurred. Keep the empty envelope empty and TODO include error information.
+                LOG.error("Error occurred in profile request", ex);
+                ts.success = false;
+            }
+        } else {
+            // pareto-optimal search on fares
+
+            McRaptorSuboptimalPathProfileRouter router =
+                    new McRaptorSuboptimalPathProfileRouter(transportNetwork, clusterRequest, linkedTargets);
+
+            try {
+                envelope = router.routeEnvelope();
+                ts.success = true;
+            } catch (Exception ex) {
+                // An error occurred. Keep the empty envelope empty and TODO include error information.
+                LOG.error("Error occurred in profile request", ex);
+                ts.success = false;
+            }
         }
 
         // Send the ResultEnvelope back to the user.

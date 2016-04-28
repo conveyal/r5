@@ -1,7 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.common.GeoJsonFeature;
-import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.StreetMode;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -13,7 +13,7 @@ import java.util.List;
  * Created by mabu on 10.12.2015.
  */
 public class RoutingVisitor {
-    private final Mode mode;
+    private final StreetMode streetMode;
 
     private List<GeoJsonFeature> features;
     private final EdgeStore edgeStore;
@@ -22,12 +22,12 @@ public class RoutingVisitor {
      * Mode should be in the state itself
      *
      * @param edgeStore streetLayer edgeStore
-     * @param mode of this routing
+     * @param streetMode of this routing
      */
-    public RoutingVisitor(EdgeStore edgeStore, Mode mode) {
+    public RoutingVisitor(EdgeStore edgeStore, StreetMode streetMode) {
         this.features = new ArrayList<>();
         this.edgeStore = edgeStore;
-        this.mode = mode;
+        this.streetMode = streetMode;
     }
 
     /**
@@ -43,7 +43,7 @@ public class RoutingVisitor {
             GeoJsonFeature feature = new GeoJsonFeature(edge.getGeometry());
             feature.addProperty("weight", state.weight);
             //FIXME: this is temporary until mode isn't in state itself
-            feature.addProperty("mode", mode);
+            feature.addProperty("mode", streetMode);
             features.add(feature);
         }
     }

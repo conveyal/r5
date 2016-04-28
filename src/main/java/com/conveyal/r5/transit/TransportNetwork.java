@@ -5,8 +5,9 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
-import com.conveyal.r5.profile.Mode;
 import com.google.common.io.ByteStreams;
+import com.conveyal.r5.profile.GreedyFareCalculator;
+import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.geom.Envelope;
 import org.nustaq.serialization.FSTObjectInput;
 import org.nustaq.serialization.FSTObjectOutput;
@@ -45,7 +46,9 @@ public class TransportNetwork implements Serializable {
      */
     public String networkId = null;
 
-    static final String BUILDER_CONFIG_FILENAME = "build-config.json";
+    public static final String BUILDER_CONFIG_FILENAME = "build-config.json";
+
+    public GreedyFareCalculator fareCalculator;
 
     public void write (OutputStream stream) throws IOException {
         LOG.info("Writing transport network...");
@@ -61,6 +64,9 @@ public class TransportNetwork implements Serializable {
         TransportNetwork result = (TransportNetwork) in.readObject(TransportNetwork.class);
         in.close();
         result.rebuildTransientIndexes();
+        if (result.fareCalculator != null) {
+            result.fareCalculator.transitLayer = result.transitLayer;
+        }
         LOG.info("Done reading.");
         return result;
     }
@@ -153,6 +159,10 @@ public class TransportNetwork implements Serializable {
 
         // Create transfers
         new TransferFinder(transportNetwork).findTransfers();
+
+        transportNetwork.fareCalculator = tnBuilderConfig.analysisFareCalculator;
+
+        if (transportNetwork.fareCalculator != null) transportNetwork.fareCalculator.transitLayer = transitLayer;
 
         return transportNetwork;
     }
@@ -303,7 +313,7 @@ public class TransportNetwork implements Serializable {
      */
     public LinkedPointSet getLinkedGridPointSet() {
         // TODO don't hardwire walk mode
-        return getGridPointSet().link(streetLayer, Mode.WALK);
+        return getGridPointSet().link(streetLayer, StreetMode.WALK);
     }
 
     //TODO: add transit stops to envelope
@@ -352,7 +362,7 @@ public class TransportNetwork implements Serializable {
      */
     public int addStop (String id, double lat, double lon) {
         int newStopIndex = transitLayer.getStopCount();
-        int newStreetVertexIndex = streetLayer.getOrCreateVertexNear(lat, lon);
+        int newStreetVertexIndex = streetLayer.getOrCreateVertexNear(lat, lon, StreetMode.WALK);
         transitLayer.stopIdForIndex.add(id); // TODO check for uniqueness
         transitLayer.streetVertexForStop.add(newStreetVertexIndex);
         // TODO stop tree, any other stop-indexed arrays or lists

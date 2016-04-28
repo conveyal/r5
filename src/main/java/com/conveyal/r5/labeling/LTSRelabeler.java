@@ -1,25 +1,19 @@
 package com.conveyal.r5.labeling;
 
 import com.conveyal.r5.api.util.LegMode;
-import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.EdgeStore;
-import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.queue.TIntQueue;
-import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
 import org.apache.commons.math3.random.MersenneTwister;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.util.ArrayList;
 import java.util.EnumSet;
-import java.util.List;
 import java.util.stream.IntStream;
 
 /**
@@ -127,7 +121,7 @@ public class LTSRelabeler {
                 StreetRouter router = new StreetRouter(network.streetLayer);
                 router.profileRequest.bikeTrafficStress = 2;
                 router.profileRequest.accessModes = router.profileRequest.egressModes = router.profileRequest.directModes = EnumSet.of(LegMode.BICYCLE);
-                router.mode = Mode.BICYCLE;
+                router.streetMode = StreetMode.BICYCLE;
                 router.setOrigin(origins[search]);
                 router.distanceLimitMeters = 10_000;
 
@@ -147,7 +141,7 @@ public class LTSRelabeler {
                 StreetRouter router = new StreetRouter(network.streetLayer);
                 router.profileRequest.bikeTrafficStress = 2;
                 router.profileRequest.accessModes = router.profileRequest.egressModes = router.profileRequest.directModes = EnumSet.of(LegMode.BICYCLE);
-                router.mode = Mode.BICYCLE;
+                router.streetMode = StreetMode.BICYCLE;
                 router.setOrigin(origins[search]);
                 router.distanceLimitMeters = 10_000;
 

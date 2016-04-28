@@ -129,6 +129,12 @@ public class FakeGraph {
         s4.stop_lon = -83.0007;
         feed.stops.put(s4.stop_id, s4);
 
+        com.conveyal.gtfs.model.Stop s5 = new com.conveyal.gtfs.model.Stop();
+        s5.stop_id = s5.stop_name = "s5";
+        s5.stop_lat = 39.9631;
+        s5.stop_lon = -83.0017;
+        feed.stops.put(s5.stop_id, s5);
+
         // make timetabled trips
         for (int departure = 7 * 3600; departure < 20 * 3600; departure += FREQUENCY) {
             Trip t = new Trip();

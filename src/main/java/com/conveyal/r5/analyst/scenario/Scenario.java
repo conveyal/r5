@@ -25,12 +25,6 @@ public class Scenario implements Serializable {
 
     public String description = "no description provided";
 
-    /**
-     * If non-null, only modifications whose activeInVariant list contain this string will be applied.
-     * If null, all modifications will be applied.
-     */
-    public String useVariant;
-
     public List<Modification> modifications = Lists.newArrayList();
 
     private static final boolean VERIFY_BASE_NETWORK_UNCHANGED = true;
@@ -44,17 +38,12 @@ public class Scenario implements Serializable {
         if (VERIFY_BASE_NETWORK_UNCHANGED) {
             baseNetworkChecksum = originalNetwork.checksum();
         }
-        useVariant = null;
-        List<Modification> filteredModifications = modifications.stream()
-                .filter(m -> m.isActiveInVariant(useVariant)).collect(Collectors.toList());
-        LOG.info("Variant '{}' selected, with {} modifications active out of {} total.",
-                useVariant, filteredModifications.size(), modifications.size());
         TransportNetwork copiedNetwork = originalNetwork.scenarioCopy(this);
         LOG.info("Resolving modifications against TransportNetwork and sanity checking.");
         // Check all the parameters before applying any modifications.
         // FIXME might some parameters may become valid/invalid because of previous modifications in the list?
         boolean errorsInScenario = false;
-        for (Modification modification : filteredModifications) {
+        for (Modification modification : modifications) {
             boolean errorsInModification = modification.resolve(copiedNetwork);
             if (errorsInModification) {
                 LOG.error("Errors were detected in a scenario modification of type {}:", modification.getType());
@@ -69,7 +58,7 @@ public class Scenario implements Serializable {
         }
         // Apply each modification in turn to the same extensible copy of the TransitNetwork.
         LOG.info("Applying modifications to TransportNetwork.");
-        for (Modification modification : filteredModifications) {
+        for (Modification modification : modifications) {
             LOG.info("Applying modification of type {}", modification.getType());
             boolean errors = modification.apply(copiedNetwork);
             if (errors) {

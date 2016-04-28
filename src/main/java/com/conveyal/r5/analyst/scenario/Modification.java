@@ -70,6 +70,8 @@ public abstract class Modification implements Serializable {
      * The TransportNetwork should be pre-cloned by the caller, but may still contain references to collections
      * or other deep objects from the original TransportNetwork. The Modification is responsible for ensuring that
      * no damage is done to the original TransportNetwork by making copies of referenced objects as necessary.
+     *
+     * TODO remove the network field, and use the network against which this Modification was resolved.
      * @return true if any errors happened while applying the modification.
      */
     public abstract boolean apply (TransportNetwork network);
@@ -86,29 +88,15 @@ public abstract class Modification implements Serializable {
      * accumulation of error messages, rather than reporting only the first error encountered. Messages describing
      * the errors encountered should be added to the list of Strings in the Modification field "warnings".
      *
+     * The resolve step could conceivably be folded into the actual application of the modification to the network,
+     * but by resolving all the modifications up front before applying any, we are able to accumulate multiple errors
+     * and return them to the user all at once, simplifying debugging.
+     *
      * @return true if an out of range, missing, or otherwise problematic parameter is encountered.
      */
     public boolean resolve (TransportNetwork network) {
         // Default implementation: do nothing and affirm that there are no known problems with the parameters.
         return false;
-    }
-
-    /**
-     * Scenarios can have variants, which allow switching on and off individual modifications within the scenario.
-     * This avoids cutting and pasting lots of modifications into separate scenarios to represent each variant, which is
-     * tedious and error prone. When scenario JSON is being written by hand, it also leads to more coherent, unified,
-     * and easily modifiable collections of variants.
-     *
-     * Modifications that are not declared to be part of any particular variant are always active.
-     * If no variant is chosen when the scenario is used, all modifications associated with variants are disabled.
-     */
-    public boolean isActiveInVariant (String variant) {
-        // If this modification is not associated with any variant, it is always used.
-        if (activeInVariants == null) return true;
-        // This modification is associated with a set of variants (possibly the empty set).
-        // If the specified scenario is one of these, then the modification is active.
-        // If the specified scenario is null (no scenario is chosen) then this modification is not active.
-        return activeInVariants.contains(variant);
     }
 
     /**

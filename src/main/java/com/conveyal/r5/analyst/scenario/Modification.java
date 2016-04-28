@@ -1,8 +1,11 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.r5.transit.TransferFinder;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -113,6 +116,33 @@ public abstract class Modification implements Serializable {
      */
     public boolean affectsTransitLayer() {
         return true;
+    }
+
+    /**
+     * For each StopSpec in the supplied list, find or create and link a stop in the given TransportNetwork.
+     * This method is shared by all modifications that need to find or create stops based on a list of StopSpecs.
+     * Any warnings or error messages are stored in the warnings list of this Modification.
+     * Any Modification that calls this method can potentially affect both the street and transit layers of the network.
+     * @return the integer stop IDs of all stops that were found or created
+     */
+    protected TIntList findOrCreateStops(List<StopSpec> stops, TransportNetwork network) {
+        // Create or find the stops referenced by the new trips.
+        TIntList intStopIds = new TIntArrayList();
+        for (StopSpec stopSpec : stops) {
+            int intStopId = stopSpec.resolve(network, warnings);
+            intStopIds.add(intStopId);
+        }
+        // Adding the stops changes the street network but does not rebuild the edge lists.
+        // We have to rebuild the edge lists after those changes but before we build the stop trees.
+        // Alternatively we could actually update the edge lists as edges are added and removed,
+        // and build the stop trees immediately in stopSpec::resolve.
+        network.streetLayer.buildEdgeLists();
+        int firstNewStop = network.transitLayer.stopTrees.size();
+        for (int intStopIndex = firstNewStop; intStopIndex < network.transitLayer.getStopCount(); intStopIndex++) {
+            network.transitLayer.buildOneStopTree(intStopIndex);
+        }
+        new TransferFinder(network).findTransfers();
+        return intStopIds;
     }
 
 }

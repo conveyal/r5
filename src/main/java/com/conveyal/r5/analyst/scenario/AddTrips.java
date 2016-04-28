@@ -82,22 +82,7 @@ public class AddTrips extends Modification {
                 warnings.add("The number of hop times must be one less than the number of stops");
             }
         }
-        // Create or find the stops referenced by the new trips.
-        intStopIds = new TIntArrayList();
-        for (StopSpec stopSpec : stops) {
-            int intStopId = stopSpec.resolve(network, warnings);
-            intStopIds.add(intStopId);
-        }
-        // Adding the stops changes the street network but does not rebuild the edge lists.
-        // We have to rebuild the edge lists after those changes but before we build the stop trees.
-        // Alternatively we could actually update the edge lists as edges are added and removed,
-        // and build the stop trees immediately in stopSpec::resolve.
-        network.streetLayer.buildEdgeLists();
-        int firstNewStop = network.transitLayer.stopTrees.size();
-        for (int intStopIndex = firstNewStop; intStopIndex < network.transitLayer.getStopCount(); intStopIndex++) {
-            network.transitLayer.buildOneStopTree(intStopIndex);
-        }
-        new TransferFinder(network).findTransfers();
+        intStopIds = findOrCreateStops(stops, network);
         return warnings.size() > 0;
     }
 

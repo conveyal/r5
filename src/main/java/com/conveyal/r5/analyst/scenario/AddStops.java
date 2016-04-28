@@ -95,34 +95,25 @@ public class AddStops extends Modification {
             // as long as there is a single hop expressing the travel time from fromStop to toStop.
             stops = new ArrayList<>();
         }
-        for (StopSpec stopSpec : stops) {
-            int intStopId = stopSpec.resolve(network, warnings);
-            intNewStops.add(intStopId);
-        }
-        // Adding the stops changes the street network but does not rebuild the edge lists.
-        // We have to rebuild the edge lists after those changes but before we build the stop trees.
-        // Alternatively we could actually update the edge lists as edges are added and removed,
-        // and build the stop trees immediately in stopSpec::resolve.
-        network.streetLayer.buildEdgeLists();
-        intNewStops.forEach(intStopIndex -> {
-            network.transitLayer.buildOneStopTree(intStopIndex);
-            return true; // Continue iteration.
-        });
-        int nNewStops = intNewStops.size();
         if (dwellTimes == null) {
             dwellTimes = new int[0];
         }
-        if (dwellTimes == null || dwellTimes.length != nNewStops) {
+        if (dwellTimes == null || dwellTimes.length != stops.size()) {
             warnings.add("The number of dwell times must exactly match the number of new stops.");
         }
         if (hopTimes == null) {
             warnings.add("You must always supply some hop times.");
-            // TODO check hop times length, considering presence or absence of from and to stop.
+        } else {
+            int expectedHops = stops.size();
+            if (fromStop != null && toStop != null) {
+                expectedHops += 1;
+            }
+            if (hopTimes.length != expectedHops) {
+                warnings.add("The number of hops must equal the number of new stops (one less if one endpoint is not specified).");
+            }
         }
-        if (warnings.size() > 0) {
-            return true;
-        }
-        return false;
+        intNewStops = findOrCreateStops(stops, network);
+        return  warnings.size() > 0;
     }
 
     @Override

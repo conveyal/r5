@@ -126,7 +126,7 @@ public class AddStops extends Modification {
     }
 
     private TripPattern processTripPattern (TripPattern originalTripPattern) {
-        if (!routes.contains(originalTripPattern.routeId)) {
+        if (routes != null && !routes.contains(originalTripPattern.routeId)) {
             // This pattern is not on one of the specified routes. The trip pattern should remain unchanged.
             return originalTripPattern;
         }

@@ -550,7 +550,7 @@ public class RaptorWorker {
                                     while (boardTimeThisEntry < inputState.bestTimes[stopIndex] + BOARD_SLACK) {
                                         boardTimeThisEntry += ts.headwaySeconds[freqEntryIdx];
 
-                                        if (boardTimeThisEntry > latestTerminalDeparture) {
+                                        if (boardTimeThisEntry > latestBoardTime) {
                                             // can't board this frequency entry
                                             continue FREQUENCY_ENTRIES;
                                         }

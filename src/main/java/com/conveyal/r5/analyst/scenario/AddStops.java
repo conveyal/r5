@@ -113,7 +113,7 @@ public class AddStops extends Modification {
             }
         }
         intNewStops = findOrCreateStops(stops, network);
-        return  warnings.size() > 0;
+        return warnings.size() > 0;
     }
 
     @Override
@@ -202,16 +202,18 @@ public class AddStops extends Modification {
                     // FIXME this is not going to work replacing the end of a route.
                     for (int hop = 0; hop < hopTimes.length; hop++) {
                         schedule.arrivals[j] = prevOutputDeparture + hopTimes[hop];
+                        schedule.departures[j] = schedule.arrivals[j];
                         if (hop < dwellTimes.length) {
-                            schedule.departures[j] = schedule.arrivals[j] + dwellTimes[hop];
-                        } else {
-                            schedule.departures[j] = schedule.arrivals[j] + dwellTimes[hop];
+                            schedule.departures[j] += dwellTimes[hop];
                         }
                         prevOutputDeparture = schedule.departures[j];
                         j++;
                     }
                 } else {
-                    int rideTime = originalSchedule.arrivals[s] - originalSchedule.departures[s -1];
+                    int rideTime = originalSchedule.arrivals[s];
+                    if (s > 0) {
+                        rideTime -= originalSchedule.departures[s - 1];
+                    }
                     schedule.arrivals[j] = prevOutputDeparture + rideTime;
                 }
                 int dwellTime = originalSchedule.departures[s] - originalSchedule.arrivals[s];

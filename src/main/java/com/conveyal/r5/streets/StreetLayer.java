@@ -132,9 +132,6 @@ public class StreetLayer implements Serializable, Cloneable {
     /** Turn restrictions can potentially have a large number of affected edges, so store them once and reference them */
     public List<TurnRestriction> turnRestrictions = new ArrayList<>();
 
-    transient Histogram edgesPerWayHistogram = new Histogram("Number of edges per way per direction");
-    transient Histogram pointsPerEdgeHistogram = new Histogram("Number of geometry points per edge");
-
     /**
      * The TransportNetwork containing this StreetLayer. This link up the object tree also allows us to access the
      * TransitLayer associated with this StreetLayer in the same TransportNetwork without maintaining bidirectional
@@ -255,7 +252,6 @@ public class StreetLayer implements Serializable, Cloneable {
                     beginIdx = n;
                 }
             }
-            edgesPerWayHistogram.add(nEdgesCreated);
         }
 
         List<Node> parkAndRideNodes = new ArrayList<>();
@@ -951,8 +947,6 @@ public class StreetLayer implements Serializable, Cloneable {
         newEdge.advance();
         newEdge.setFlags(backFlags);
         newEdge.setSpeed(backwardSpeed);
-
-        pointsPerEdgeHistogram.add(nNodes);
     }
 
     public void indexStreets () {
@@ -1025,15 +1019,6 @@ public class StreetLayer implements Serializable, Cloneable {
             incomingEdges.get(edge.getToVertex()).add(edge.edgeIndex);
         }
         LOG.info("Done building edge lists.");
-        // Display histogram of edge list sizes
-        Histogram edgesPerListHistogram = new Histogram("Number of edges per edge list");
-        for (TIntList edgeList : outgoingEdges) {
-            edgesPerListHistogram.add(edgeList.size());
-        }
-        for (TIntList edgeList : incomingEdges) {
-            edgesPerListHistogram.add(edgeList.size());
-        }
-        edgesPerListHistogram.display();
     }
 
     /**

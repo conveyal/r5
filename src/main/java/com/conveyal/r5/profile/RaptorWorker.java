@@ -57,10 +57,10 @@ public class RaptorWorker {
      * (i.e. many minutes look like each other), so several minutes' monte carlo draws are effectively
      * pooled.
      */
-    public static final int MONTE_CARLO_COUNT_PER_MINUTE = 1;
+    public int MONTE_CARLO_COUNT_PER_MINUTE = 1;
 
     /** If there are no schedules, the number of Monte Carlo draws to take */
-    public static final int TOTAL_MONTE_CARLO_COUNT = 99;
+    public int TOTAL_MONTE_CARLO_COUNT = 99;
 
     /** minimum slack time to board transit */
     public static final int BOARD_SLACK = 60;
@@ -96,6 +96,8 @@ public class RaptorWorker {
     public BitSet servicesActive;
 
     public List<RaptorState> statesEachIteration = new ArrayList<>();
+
+    public int[][] timesAtTargetsEachIteration;
 
     // should a particular iteration be included in averages?
     // extrema from the frequency search should not be.
@@ -192,7 +194,7 @@ public class RaptorWorker {
         ts.searchCount = iterations;
 
         // Iterate backward through minutes (range-raptor) taking a snapshot of router state after each call
-        int[][] timesAtTargetsEachIteration = new int[iterations][nTargets];
+        timesAtTargetsEachIteration = new int[iterations][nTargets];
 
         // TODO don't hardwire timestep below
         ts.timeStep = 60;

@@ -660,8 +660,36 @@ public class EdgeStore implements Serializable {
 
         /** Converts angle in radians to angle in binary radians **/
         private byte radiansToBrads(double angleRadians) {
-            return (byte) Math.round(angleRadians * 128 / Math.PI + 128);
+            return (byte) Math.round(angleRadians * 128 / Math.PI);
         }
+
+        /** Converts binary radians to angle in degrees **/
+        private int bradsToDegree(byte brad) {
+            return brad * 180 / 128;
+        }
+
+        public int getOutAngle() {
+            int angle;
+            if (isBackward()) {
+                angle  = bradsToDegree(inAngles.get(pairIndex));
+                return 180+angle;
+            } else {
+                angle  = bradsToDegree(outAngles.get(pairIndex));
+                return angle;
+            }
+        }
+
+        public int getInAngle() {
+            int angle;
+            if (isBackward()) {
+                angle = bradsToDegree(outAngles.get(pairIndex));
+                return 180+angle;
+            } else {
+                angle = bradsToDegree(inAngles.get(pairIndex));
+                return angle;
+            }
+        }
+
 
         /**
          * Returns LineString geometry of edge

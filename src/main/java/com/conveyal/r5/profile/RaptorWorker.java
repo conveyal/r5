@@ -77,8 +77,12 @@ public class RaptorWorker {
     /** stops touched this round */
     BitSet stopsTouched;
 
-    /** stops touched any round this minute */
-    // TODO do these need to be in RaptorState? I think not as they just track stuff for a single round at a time.
+    /**
+     * stops touched any round this minute.
+     *
+     * Technically this is slightly non-optimal, because if we run multiple frequency searches in a given minute it is possible
+     * that allStopsTouched will contain some stops that were touched this round but were not
+     */
     BitSet allStopsTouched;
 
     BitSet patternsTouched;
@@ -288,7 +292,7 @@ public class RaptorWorker {
         }
 
         // make sure we filled the array, otherwise results are garbage.
-        // This implies a bug in OTP, but it has happened in the past when we did
+        // This implies a bug in R5, but it has happened in the past when we did
         // not set the number of iterations correctly.
         // iteration should be incremented past end of array by ++ in assignment above
         if (iteration != iterations)
@@ -329,7 +333,6 @@ public class RaptorWorker {
 
     /** Run a raptor search not using frequencies */
     public void runRaptorScheduled (TIntIntMap initialStops, int departureTime) {
-        // Arrays.fill(bestTimes, UNREACHED); hold on to old state
         max_time = departureTime + MAX_DURATION;
         round = 0;
         patternsTouched.clear(); // clear patterns left over from previous calls.
@@ -429,6 +432,8 @@ public class RaptorWorker {
     /**
      * perform one round, possibly using frequencies with the defined boarding assumption
      * (which is ignored and may be set to null if useFrequencies == false)
+     *
+     * Note that schedules are always used. This is important,
      */
     public boolean doOneRound (RaptorState inputState, RaptorState outputState, boolean useFrequencies, BoardingAssumption boardingAssumption) {
         // We need to have a separate state we copy from to prevent ridiculous paths from being taken because multiple
@@ -609,6 +614,10 @@ public class RaptorWorker {
             }
 
             // perform scheduled search
+            // We always perform a scheduled search, even when we're doing a frequency search as well. This is important
+            // in mixed networks, because the frequency trips may allow you to reach scheduled trips more quickly. We perform
+            // an initial search with only schedules which serves as a bound, but we must finish with a search that includes
+            // _all_ transit service.
             TripSchedule onTrip = null;
             int onTripIdx = -1;
             int boardStopIndex = -1;
@@ -689,20 +698,21 @@ public class RaptorWorker {
         }
 
         doTransfers(outputState);
-        // doTransfers will have marked some patterns if it reached any stops.
+        // doTransfers will have marked some patterns if the search reached any stops.
         return !patternsTouched.isEmpty();
     }
 
     /**
      * Apply transfers.
-     * Mark all the patterns passing through these stops and any stops transferred to.
+     * This is also where patterns are marked for exploration on future rounds;
+     * all the patterns passing through these stops and any stops transferred to will be marked.
+     *
+     * This operates on a single round; we don't have separate rounds for transfers; see comments in RaptorState.
      */
     private void doTransfers(RaptorState state) {
         patternsTouched.clear();
         for (int stop = stopsTouched.nextSetBit(0); stop >= 0; stop = stopsTouched.nextSetBit(stop + 1)) {
             // First, mark all patterns at this stop (the trivial "stay at the stop where you are" loop transfer).
-            // TODO this is reboarding every trip at every stop.
-            // TODO ^^ what does that comment mean?
             markPatternsForStop(stop);
 
             // Then follow all transfers out of this stop, marking patterns that pass through those target stops.
@@ -776,9 +786,7 @@ public class RaptorWorker {
     }
 
     /** Mark all the patterns passing through the given stop. */
-    private void markPatternsForStop (int stop) { this.markPatternsForStop(stop, false); }
-
-    private void markPatternsForStop(int stop, boolean useFrequencies) {
+    private void markPatternsForStop(int stop) {
         TIntList patterns = data.patternsForStop.get(stop);
         for (TIntIterator it = patterns.iterator(); it.hasNext();) {
             int pattern = it.next();

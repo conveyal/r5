@@ -30,7 +30,7 @@ public class Stop {
     public Stop(int stopIdx, TransitLayer transitLayer) {
         stopId = transitLayer.stopIdForIndex.get(stopIdx);
         name = transitLayer.stopNames.get(stopIdx);
-        VertexStore.Vertex vertex = transitLayer.linkedStreetLayer.vertexStore.getCursor();
+        VertexStore.Vertex vertex = transitLayer.parentNetwork.streetLayer.vertexStore.getCursor();
         vertex.seek(transitLayer.streetVertexForStop.get(stopIdx));
         lat = (float) vertex.getLat();
         lon = (float) vertex.getLon();

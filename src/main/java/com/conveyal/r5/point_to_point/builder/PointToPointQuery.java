@@ -35,7 +35,6 @@ import java.util.stream.Collectors;
  */
 public class PointToPointQuery {
     private static final Logger LOG = LoggerFactory.getLogger(PointToPointQuery.class);
-    public static final int RADIUS_METERS = 200;
 
     /**
      * The largest number of stops to consider boarding at. If there are 1000 stops within 2km, only consider boarding at the closest 200.
@@ -107,7 +106,6 @@ public class PointToPointQuery {
         for(LegMode mode: modes) {
             long initialStopStartTime = System.currentTimeMillis();
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
-            streetRouter.searchRadius = RADIUS_METERS;
             StreetPath streetPath;
             streetRouter.profileRequest = request;
             if (mode == LegMode.CAR_PARK && !transit) {
@@ -192,7 +190,6 @@ public class PointToPointQuery {
                 StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
                 StreetPath streetPath;
                 streetRouter.profileRequest = request;
-                streetRouter.searchRadius = RADIUS_METERS;
                 if (mode == LegMode.BICYCLE_RENT) {
                     if (!transportNetwork.streetLayer.bikeSharing) {
                         LOG.warn("Bike sharing trip requested but no bike sharing stations in the streetlayer");
@@ -242,7 +239,6 @@ public class PointToPointQuery {
                 if (currentlyUnsupportedModes.contains(mode)) {
                     continue;
                 }
-                streetRouter.searchRadius = RADIUS_METERS;
                 //TODO: add support for bike sharing
                 streetRouter.streetMode = StreetMode.valueOf(mode.toString());
                 streetRouter.profileRequest = request;
@@ -401,7 +397,6 @@ public class PointToPointQuery {
             TIntObjectMap<StreetRouter.State> carParks = streetRouter.getReachedVertices(VertexStore.VertexFlag.PARK_AND_RIDE);
             LOG.info("CAR PARK: Found {} car parks", carParks.size());
             StreetRouter walking = new StreetRouter(transportNetwork.streetLayer);
-            walking.searchRadius = RADIUS_METERS;
             walking.streetMode = StreetMode.WALK;
             walking.profileRequest = request;
             walking.distanceLimitMeters = 2_000 + streetRouter.distanceLimitMeters;
@@ -444,7 +439,6 @@ public class PointToPointQuery {
 
             //This finds best cycling path from best start bicycle station to end bicycle station
             StreetRouter bicycle = new StreetRouter(transportNetwork.streetLayer);
-            bicycle.searchRadius = RADIUS_METERS;
             bicycle.previous = streetRouter;
             bicycle.streetMode = StreetMode.BICYCLE;
             bicycle.profileRequest = request;
@@ -466,7 +460,6 @@ public class PointToPointQuery {
                         });*/
             //This searches for walking path from end bicycle station to end point
             StreetRouter end = new StreetRouter(transportNetwork.streetLayer);
-            end.searchRadius = RADIUS_METERS;
             end.streetMode = StreetMode.WALK;
             end.profileRequest = request;
             end.distanceLimitMeters = 2_000 + bicycle.distanceLimitMeters;

@@ -72,7 +72,50 @@ public class AddStopsTest {
         }
     }
 
-    /** Test extending a route, not removing any stops */
+    /**
+     * Test extending a route by inserting stops at the beginning, without removing any stops.
+     * All stops are references to existing stops by ID, not newly created from coordinates.
+     */
+    @Test
+    public void testExtendRouteAtBeginning () {
+        AddStops as = new AddStops();
+        // add s5 at beginning
+        as.toStop = "SINGLE_LINE:s1";
+        as.stops = Arrays.asList(new StopSpec("SINGLE_LINE:s5"));
+        as.dwellTimes = new int[] { 40 };
+        as.hopTimes = new int[] { 60 };
+        as.routes = set("SINGLE_LINE:route");
+
+        Scenario scenario = new Scenario();
+        scenario.modifications = Arrays.asList(as);
+
+        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+
+        assertEquals(1, mod.transitLayer.tripPatterns.size());
+
+        TripPattern pattern = mod.transitLayer.tripPatterns.get(0);
+
+        // make sure the stops are in the right order
+        assertEquals(5, pattern.stops.length);
+        assertEquals("SINGLE_LINE:s5", mod.transitLayer.stopIdForIndex.get(pattern.stops[0]));
+        assertEquals("SINGLE_LINE:s1", mod.transitLayer.stopIdForIndex.get(pattern.stops[1]));
+        assertEquals("SINGLE_LINE:s2", mod.transitLayer.stopIdForIndex.get(pattern.stops[2]));
+        assertEquals("SINGLE_LINE:s3", mod.transitLayer.stopIdForIndex.get(pattern.stops[3]));
+        assertEquals("SINGLE_LINE:s4", mod.transitLayer.stopIdForIndex.get(pattern.stops[4]));
+
+        for (TripSchedule schedule : pattern.tripSchedules) {
+            // confirm the times are correct
+            int[] a = schedule.arrivals;
+            int[] d = schedule.departures;
+            assertEquals(d[0] - 40, a[0]);
+            assertEquals(a[1] - 60, d[0]);
+        }
+    }
+
+    /**
+     * Test extending a route, not removing any stops.
+     * All stops are references to existing stops by ID, not newly created from coordinates.
+     */
     @Test
     public void testExtendRouteAtEnd () {
         AddStops as = new AddStops();

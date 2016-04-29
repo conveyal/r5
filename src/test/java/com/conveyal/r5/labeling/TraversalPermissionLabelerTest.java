@@ -264,7 +264,7 @@ public class TraversalPermissionLabelerTest {
 
         roadFlagComparision(osmWay, "wheelchair", "yes", PEDESTRIAN, PEDESTRIAN);
 
-        roadFlagComparision(osmWay, "wheelchair", "limited", PEDESTRIAN, PEDESTRIAN);
+        roadFlagComparision(osmWay, "wheelchair", "limited", PEDESTRIAN_ONLY, PEDESTRIAN_ONLY);
 
         roadFlagComparision(osmWay, "ramp:wheelchair", "yes", PEDESTRIAN, PEDESTRIAN);
     }

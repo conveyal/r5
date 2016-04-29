@@ -534,31 +534,13 @@ public class RaptorWorker {
                                             ts.departures[stopPositionInPattern] +
                                             offset;
 
-                                    // we're treating this as a scheduled trip even though the schedule will change on the next
-                                    // iteration. Figure out when the last trip is, which is just the start time plus the headway multiplied
-                                    // number of trips.
-
-                                    // first figure out how many trips there are. note that this can change depending on the offset.
-                                    // int math, java will round down
-                                    int nTripsThisEntry = (ts.endTimes[freqEntryIdx] - (ts.startTimes[freqEntryIdx] + offset)) /
-                                            ts.headwaySeconds[freqEntryIdx];
-
-                                    // the is the last time a vehicle leaves the terminal
-                                    // first trip is offset seconds after start time, each subsequent trip is headway
-                                    // seconds after that.
-                                    int latestTerminalDeparture = ts.startTimes[freqEntryIdx] +
-                                            offset +
-                                            (nTripsThisEntry - 1) * ts.headwaySeconds[freqEntryIdx];
-
-                                    if (latestTerminalDeparture > ts.endTimes[freqEntryIdx])
-                                        LOG.error("latest terminal departure is after end of frequency entry. this is a bug.");
-
-                                    int latestBoardTime = latestTerminalDeparture + ts.departures[stopPositionInPattern];
-
                                     while (boardTimeThisEntry < inputState.bestTimes[stopIndex] + BOARD_SLACK) {
                                         boardTimeThisEntry += ts.headwaySeconds[freqEntryIdx];
 
-                                        if (boardTimeThisEntry > latestBoardTime) {
+                                        // subtract the travel time to this stop from the board time at this stop, this gives
+                                        // us the terminal departure. If the terminal departure is after the end time, the vehicle
+                                        // is not running.
+                                        if (boardTimeThisEntry - ts.departures[stopPositionInPattern] > ts.endTimes[freqEntryIdx]) {
                                             // can't board this frequency entry
                                             continue FREQUENCY_ENTRIES;
                                         }

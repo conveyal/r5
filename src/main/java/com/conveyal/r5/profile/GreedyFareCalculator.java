@@ -17,7 +17,8 @@ import java.io.Serializable;
 @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property="type")
 @JsonSubTypes({
         @JsonSubTypes.Type(name = "bogota", value = BogotaGreedyFareCalculator.class),
-        @JsonSubTypes.Type(name = "chicago", value = ChicagoGreedyFareCalculator.class)
+        @JsonSubTypes.Type(name = "chicago", value = ChicagoGreedyFareCalculator.class),
+        @JsonSubTypes.Type(name = "simple", value = SimpleGreedyFareCalculator.class)
 })
 public abstract class GreedyFareCalculator implements Serializable {
     public abstract int calculateFare (McRaptorSuboptimalPathProfileRouter.McRaptorState state);

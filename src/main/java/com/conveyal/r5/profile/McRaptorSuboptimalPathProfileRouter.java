@@ -56,12 +56,12 @@ public class McRaptorSuboptimalPathProfileRouter {
     /**
      * the number of searches to run (approximately). We use a constrained random walk to get about this many searches.
      */
-    public static final int NUMBER_OF_SEARCHES = 20;
+    public int NUMBER_OF_SEARCHES = 20;
 
     private LinkedPointSet pointSet = null;
 
     /** Use a list for the iterations since we aren't sure how many there will be (we're using random sampling over the departure minutes) */
-    private List<int[]> timesAtTargetsEachIteration = null;
+    public List<int[]> timesAtTargetsEachIteration = null;
 
     private TransportNetwork network;
     private ProfileRequest request;
@@ -115,6 +115,11 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     /** Get a McRAPTOR state bag for every departure minute */
     public Collection<McRaptorState> route () {
+        // TODO hack changing original request!
+        if (request.transitModes == null || request.transitModes.isEmpty() || request.transitModes.contains(TransitModes.TRANSIT)) {
+            request.transitModes = EnumSet.allOf(TransitModes.class);
+        }
+
         if (accessTimes == null) computeAccessTimes();
 
         LOG.info("Found {} access stops:\n{}", accessTimes.size(), dumpStops(accessTimes));

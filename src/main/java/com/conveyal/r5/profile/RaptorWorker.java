@@ -441,7 +441,11 @@ public class RaptorWorker {
      * perform one round, possibly using frequencies with the defined boarding assumption
      * (which is ignored and may be set to null if useFrequencies == false)
      *
-     * Note that schedules are always used. This is important,
+     * Note that schedules are always used. This is important, because it is possible to transfer between frequency and
+     * scheduled service an arbitrary number of times. So we can run the scheduled search and get a certain output, but
+     * when we run a frequency search on top of that, we may be able to catch a scheduled vehicle earlier by transferring
+     * from the frequency vehicle. So when we run the frequency search we also include any scheduled patterns touched
+     * during the frequency search.
      */
     public boolean doOneRound (RaptorState inputState, RaptorState outputState, boolean useFrequencies, BoardingAssumption boardingAssumption) {
         // We need to have a separate state we copy from to prevent ridiculous paths from being taken because multiple
@@ -511,7 +515,8 @@ public class RaptorWorker {
                                     if (inputState.bestTimes[stopIndex] + BOARD_SLACK > ts.endTimes[freqEntryIdx] + ts.departures[stopPositionInPattern])
                                         continue FREQUENCY_ENTRIES; // it's too late, can't board.
 
-                                    // best case boarding time is now, or when this frequency entry starts, whichever is later
+                                    // best case boarding time is now, or when this frequency entry starts _at this stop_,
+                                    // whichever is later
                                     boardTimeThisEntry = Math.max(inputState.bestTimes[stopIndex] + BOARD_SLACK, ts.startTimes[freqEntryIdx] + ts.departures[stopPositionInPattern]);
                                 }
                                 else if (boardingAssumption == BoardingAssumption.WORST_CASE) {

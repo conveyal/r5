@@ -78,10 +78,11 @@ public class RaptorWorker {
     BitSet stopsTouched;
 
     /**
-     * stops touched any round this minute.
-     *
-     * Technically this is slightly non-optimal, because if we run multiple frequency searches in a given minute it is possible
-     * that allStopsTouched will contain some stops that were touched this round but were not
+     * stops touched during this search, either a scheduled search at a particular minute, or a frequency search
+     * with a particular draw. Used in propagation. Cleared before each search; to make sure propagation is done correctly,
+     * it must be done at every minute of the scheduled search, and after every draw of the frequencies. Propagation output
+     * tables are saved between minutes, and copied from the scheduled search to the frequency search, so we only need to
+     * do propagation from stops that have been touched in a particular search, an update the tables.
      */
     BitSet allStopsTouched;
 
@@ -204,6 +205,8 @@ public class RaptorWorker {
         ts.timeStep = 60;
 
         // times at targets from scheduled search
+        // we keep a single output array with clock times, and range raptor updates it only as needed as the departure
+        // minute moves backwards.
         int[] scheduledTimesAtTargets = new int[nTargets];
         Arrays.fill(scheduledTimesAtTargets, UNREACHED);
 
@@ -263,12 +266,15 @@ public class RaptorWorker {
                     // do propagation
                     int[] frequencyTimesAtTargets = timesAtTargetsEachIteration[iteration++];
                     if (doPropagation) {
+                        // copy scheduled times into frequency array so that we don't have to propagate them again, we'll
+                        // just update them where they've improved, see #137.
                         System.arraycopy(scheduledTimesAtTargets, 0, frequencyTimesAtTargets, 0,
                                 scheduledTimesAtTargets.length);
                         // updates timesAtTargetsEachIteration directly because it has a reference into the array.
                         this.doPropagation(stateCopy.bestNonTransferTimes, frequencyTimesAtTargets,
                                 departureTime);
                     } else {
+                        // copy times at stops into output (includes frequency and scheduled times because we copied the scheduled state)
                         System.arraycopy(stateCopy.bestNonTransferTimes, 0, frequencyTimesAtTargets, 0, stateCopy.bestNonTransferTimes.length);
                     }
 
@@ -740,6 +746,10 @@ public class RaptorWorker {
      *
      * This is valid both for randomized frequencies and for schedules, because the stops that have
      * been updated will be in allStopsTouched.
+     *
+     * It must be called after every search (either a minute of the scheduled search, or a frequency search on top of the
+     * scheduled network). This is because propagation only occurs from stops that are marked in allStopsTouched, which
+     * is cleared before each search.
      */
     public void doPropagation (int[] timesAtTransitStops, int[] timesAtTargets, int departureTime) {
         long beginPropagationTime = System.currentTimeMillis();
@@ -757,7 +767,9 @@ public class RaptorWorker {
         // a sample would be able to reach these two stops within the walk limit, but that the two
         // intersections it is connected to cannot reach both.
 
-        // only loop over stops that were touched this minute
+        // only loop over stops that were touched in this particular search (schedule or frequency). We are updating
+        // timesAtTargets, which already contains times that were found during previous searches (either scheduled searches
+        // at previous minutes, or in the case of a frequency search, the scheduled search that was run at the same minute)
         for (int s = allStopsTouched.nextSetBit(0); s >= 0; s = allStopsTouched.nextSetBit(s + 1)) {
             // it's safe to use the best time at this stop for any number of transfers, even in range-raptor,
             // because we allow unlimited transfers. this is slightly different from the original RAPTOR implementation:

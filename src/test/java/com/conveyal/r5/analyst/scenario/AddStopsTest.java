@@ -57,12 +57,15 @@ public class AddStopsTest {
         assertEquals("SINGLE_LINE:s4", mod.transitLayer.stopIdForIndex.get(pattern.stops[3]));
 
         for (TripSchedule schedule : pattern.tripSchedules) {
-            // confirm the times are correct
-            int[] a = schedule.arrivals;
-            int[] d = schedule.departures;
-            assertEquals(d[1] + 60, a[2]);
-            assertEquals(a[2] + 40, d[2]);
-            assertEquals(d[2] + 70, a[3]);
+            int[] a = IntStream.of(schedule.arrivals).map(time -> time - schedule.arrivals[0]).toArray();
+            int[] d = IntStream.of(schedule.departures).map(time -> time - schedule.arrivals[0]).toArray();
+
+            // slightly awkward, but make sure that the trip starts at the same time it did before
+            assertEquals("SINGLE_LINE:trip" + schedule.arrivals[0], schedule.tripId);
+
+            // confirm the times are correct. Note that first and last stop of original route don't have a dwell time
+            assertArrayEquals(new int[] { 0, 500, 590, 700 }, a);
+            assertArrayEquals(new int[] { 0, 530, 630, 700 }, d);
         }
     }
 
@@ -95,11 +98,15 @@ public class AddStopsTest {
         assertEquals("SINGLE_LINE:s5", mod.transitLayer.stopIdForIndex.get(pattern.stops[4]));
 
         for (TripSchedule schedule : pattern.tripSchedules) {
-            // confirm the times are correct
-            int[] a = schedule.arrivals;
-            int[] d = schedule.departures;
-            assertEquals(d[3] + 60, a[4]);
-            assertEquals(a[4] + 40, d[4]);
+            // slightly awkward, but make sure that the trip starts at the same time it did before
+            assertEquals("SINGLE_LINE:trip" + schedule.arrivals[0], schedule.tripId);
+
+            int[] a = IntStream.of(schedule.arrivals).map(time -> time - schedule.arrivals[0]).toArray();
+            int[] d = IntStream.of(schedule.departures).map(time -> time - schedule.arrivals[0]).toArray();
+
+            // confirm the times are correct. Note that first and last stop of original route don't have a dwell time
+            assertArrayEquals(new int[] { 0, 500, 1030, 1560, 1620 }, a);
+            assertArrayEquals(new int[] { 0, 530, 1060, 1560, 1660}, d);
         }
     }
 
@@ -134,6 +141,11 @@ public class AddStopsTest {
         for (TripSchedule schedule : pattern.tripSchedules) {
             int[] a = IntStream.of(schedule.arrivals).map(time -> time - schedule.arrivals[0]).toArray();
             int[] d = IntStream.of(schedule.departures).map(time -> time - schedule.arrivals[0]).toArray();
+
+            // slightly awkward, but make sure that the trip starts at the same time it did before
+            // (the remainder of the schedule should just be pushed out); the original start time is part of the trip ID,
+            // which is not changed by the modification
+            assertEquals("SINGLE_LINE:trip" + schedule.arrivals[0], schedule.tripId);
 
             // confirm the times are correct. Note that first and last stop of original route don't have a dwell time
             assertArrayEquals(new int[] { 0, 100, 600, 1130, 1660 }, a);

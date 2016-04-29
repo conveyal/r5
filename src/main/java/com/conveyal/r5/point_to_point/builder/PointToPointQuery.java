@@ -268,31 +268,7 @@ public class PointToPointQuery {
 
             // getPaths actually returns a set, which is important so that things are deduplicated. However we need a list
             // so we can sort it below.
-            usefullpathList.addAll(router.getPaths().stream().filter(pathWithTimes -> {
-                //This filters all transit paths and keeps only those paths
-                // that have all of transit modes in requested transitModes
-                for (int i = 0; i < pathWithTimes.patterns.length; i++) {
-                    TripPattern pattern = pathWithTimes.getPattern(transportNetwork.transitLayer, i);
-                    if (pattern.routeIndex >= 0) {
-                        RouteInfo routeInfo = transportNetwork.transitLayer.routes.get(pattern.routeIndex);
-                        TransitModes mode = TransitLayer.getTransitModes(routeInfo.route_type);
-                        if (!request.transitModes.contains(mode)) {
-                            LOG.error("Route with unwanted transit mode found!!");
-                            return false;
-
-                            //If trip with wheelchair is requested filters out trips where boarding/arrival stop or trip doesn't allow a wheelchair
-                        } else if(request.wheelchair) {
-                            if (!(transportNetwork.transitLayer.stopsWheelchair.get(pathWithTimes.boardStops[i]) &&
-                                transportNetwork.transitLayer.stopsWheelchair.get(pathWithTimes.alightStops[i]) &&
-                                pattern.tripSchedules.get(pathWithTimes.trips[i]).getFlag(TripFlag.WHEELCHAIR))) {
-                                LOG.error("Trip that doesn't allow wheelchairs found!!");
-                                return false;
-                            }
-                        }
-                    }
-                }
-                return true;
-            }).collect(Collectors.toList()));
+            usefullpathList.addAll(router.getPaths());
 
             //This sort is necessary only for text debug output so it will be disabled when it is finished
 

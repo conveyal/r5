@@ -10,11 +10,7 @@ import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -120,11 +116,14 @@ public class AddStops extends Modification {
 
     @Override
     public boolean apply(TransportNetwork network) {
+        this.network = network;
         network.transitLayer.tripPatterns = network.transitLayer.tripPatterns.stream()
                 .map(this::processTripPattern)
                 .collect(Collectors.toList());
         return warnings.size() > 0;
     }
+
+    private TransportNetwork network;
 
     /**
      * Given a single TripPattern, if this Modification changes that TripPattern, return a modified copy of it.
@@ -176,32 +175,46 @@ public class AddStops extends Modification {
         // Copy the original pattern to the new one, inserting or leaving out stops as necessary.
         // This is copying the stops, PickDropTypes, etc. for the whole pattern.
         // Trip timetables will be modified separately below.
-        // i is the index within the source (original) pattern, j is the index within the target (new) pattern.
-        LOG.info("Old stop sequence: {}", originalTripPattern.stops);
-        for (int i = 0, j = 0; i < oldLength; i++) {
-            if (i == insertBeginIndex) {
-                // Splice in the new schedule fragment here.
+        int ss = 0; // the index within the source (original) pattern
+        int ts = 0; // the index within the target (new) pattern.
+        while (ts < newLength) {
+
+            // Splice in the new stops when we reach the appropriate location in the source pattern.
+            if (ss == insertBeginIndex) {
                 for (int ns = 0; ns < intNewStops.size(); ns++) {
-                    pattern.stops[j] = intNewStops.get(ns);
-                    pattern.pickups[j] = PickDropType.SCHEDULED;
-                    pattern.dropoffs[j] = PickDropType.SCHEDULED;
-                    // Assume newly created stops are wheelchair accessible
+                    pattern.stops[ts] = intNewStops.get(ns);
+                    pattern.pickups[ts] = PickDropType.SCHEDULED;
+                    pattern.dropoffs[ts] = PickDropType.SCHEDULED;
+                    // Assume newly created stops are wheelchair accessible.
                     // FIXME but we should be copying wheelchair accessibility value for existing inserted stops
-                    pattern.wheelchairAccessible.set(j, true);
-                    j++;
+                    pattern.wheelchairAccessible.set(ts, true);
+                    // Increment target stop but not source stop, since we have not consumed any source pattern stops.
+                    ts++;
                 }
             }
-            if (i >= insertBeginIndex && i < insertEndIndex) {
-                // Skip over the stops in the original (source) trip pattern that are to be replaced.
-                continue;
+
+            // Skip over the stops in the original (source) trip pattern that are to be replaced.
+            if (ss >= insertBeginIndex && ss < insertEndIndex) {
+                ss++;
             }
-            pattern.stops[j] = originalTripPattern.stops[i];
-            pattern.pickups[j] = originalTripPattern.pickups[i];
-            pattern.dropoffs[j] = originalTripPattern.dropoffs[i];
-            pattern.wheelchairAccessible.set(j, originalTripPattern.wheelchairAccessible.get(i));
-            j++;
+
+            // Copy one stop from the source to the target
+            // This code will be executed unless we are splicing the new stops onto the end of the pattern.
+            if (ts < newLength) {
+                pattern.stops[ts] = originalTripPattern.stops[ss];
+                pattern.pickups[ts] = originalTripPattern.pickups[ss];
+                pattern.dropoffs[ts] = originalTripPattern.dropoffs[ss];
+                pattern.wheelchairAccessible.set(ts, originalTripPattern.wheelchairAccessible.get(ss));
+                ss++;
+                ts++;
+            }
         }
+        LOG.info("Old stop sequence: {}", originalTripPattern.stops);
         LOG.info("New stop sequence: {}", pattern.stops);
+        LOG.info("Old stop IDs: {}", Arrays.stream(originalTripPattern.stops)
+                .mapToObj(network.transitLayer.stopIdForIndex::get).collect(Collectors.toList()));
+        LOG.info("New stop IDs: {}", Arrays.stream(pattern.stops)
+                .mapToObj(network.transitLayer.stopIdForIndex::get).collect(Collectors.toList()));
 
         // Perform the same splicing operation for every trip on this pattern.
         // Here we have to deal with both stops and the hops between them.
@@ -219,41 +232,38 @@ public class AddStops extends Modification {
             // TODO calculate all arrivals and departures zero-based, and then shift them at the end to maintain fixed-point stop.
             // The fixed-point stop should be different depending on whether we are splicing onto the beginning or end of the route
 
-            // Iterate over all stops in the source pattern. We have an arrival and departure time for each of them.
-            for (int ss = 0, ts = 0; ss < oldLength; ss++) {
+            ss = 0; // Source stop position in pattern
+            ts = 0; // Target stop position in pattern
 
-                // At stop zero, there is no preceding hop.
-                int hopTime = originalSchedule.arrivals[ss];
-                if (ss > 0) {
-                    hopTime -= originalSchedule.departures[ss - 1];
-                }
-                // This arrival time will be superseded where the new segment is spliced into the pattern.
-                int arrivalTime = prevOutputDeparture + hopTime;
+            // Iterate until we've filled all slots in the target pattern.
+            while (ts < newLength) {
 
                 // Splice in the new schedule fragment when we reach the right place in the source pattern.
-                // NOTE dwellTimes[hop] is not always the dwell after hopTimes[hop].
-                // Either keep two different indexes or pop element 0 off the dwellTimes as needed.
-                // The number of dwells is always equal to the number of hops or one less, so we iterate over all hops
-                // but track the dwell index separately.
+                int spliceArrivalTime = -1;
                 if (ss == insertBeginIndex) {
+                    // NOTE dwellTimes[hop] is not always the dwell after hopTimes[hop].
+                    // The number of dwells is always equal to the number of hops or one less,
+                    // so we iterate over all hops but track the dwell index separately.
                     int hop = 0, dwell = 0;
                     while (hop < hopTimes.length) {
                         if (ss == 0 && dwell == 0) {
                             // Inserting at the beginning of the route. On the first stop there is no preceding hop.
+                            // Consume one dwell, but no hop.
                             schedule.arrivals[ts] = originalSchedule.arrivals[0];
                             schedule.departures[ts] = schedule.arrivals[ts] + dwellTimes[dwell];
                             prevOutputDeparture = schedule.departures[ts];
                             dwell++;
                             ts++;
                             // Hop is not incremented because we did not consume one.
-                            continue;
+                            // continue;
                         }
                         // Always consume a hop, but only save arrival and departure times if there's a dwell.
-                        arrivalTime = prevOutputDeparture + hopTimes[hop];
+                        spliceArrivalTime = prevOutputDeparture + hopTimes[hop];
                         hop++;
                         // There will only be a final dwell if we're splicing onto the end of the pattern.
+                        // Otherwise arrivalTime will be used by the outer loop to save the next arrival / departure.
                         if (dwell < dwellTimes.length) {
-                            schedule.arrivals[ts] = arrivalTime;
+                            schedule.arrivals[ts] = spliceArrivalTime;
                             schedule.departures[ts] = schedule.arrivals[ts] + dwellTimes[dwell];
                             prevOutputDeparture = schedule.departures[ts];
                             dwell++;
@@ -273,12 +283,25 @@ public class AddStops extends Modification {
 
                 // Accumulate the remaining ride and dwell times from the source schedule.
                 // This block will be run unless we're splicing onto the end of the pattern.
-                if (ts < schedule.arrivals.length) {
+                if (ts < newLength) {
+                    int arrivalTime = spliceArrivalTime;
+                    if (arrivalTime < 0) {
+                        // If the splicing process did not supply an arrival time,
+                        // use a hop time from the source pattern.
+                        // At stop zero, there is no preceding hop.
+                        int hopTime = originalSchedule.arrivals[ss];
+                        if (ss > 0) {
+                            hopTime -= originalSchedule.departures[ss - 1];
+                        }
+                        arrivalTime = prevOutputDeparture + hopTime;
+                    }
+                    // If the new segment was just inserted on this iteration, that process has reset the arrival time.
                     schedule.arrivals[ts] = arrivalTime;
                     int dwellTime = originalSchedule.departures[ss] - originalSchedule.arrivals[ss];
                     schedule.departures[ts] = schedule.arrivals[ts] + dwellTime;
                     prevOutputDeparture = schedule.departures[ts];
                     ts++;
+                    ss++;
                 }
             }
             LOG.info("Original arrivals:   {}", originalSchedule.arrivals);

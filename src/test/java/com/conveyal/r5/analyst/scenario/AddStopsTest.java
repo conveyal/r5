@@ -64,6 +64,9 @@ public class AddStopsTest {
             assertEquals("SINGLE_LINE:trip" + schedule.arrivals[0], schedule.tripId);
 
             // confirm the times are correct. Note that first and last stop of original route don't have a dwell time
+            // so this is no dwell at s1, 500 sec travel time (from FakeGraph) to s2, 30 sec dwell time at s2,
+            // 60 sec travel time to s5 (which replaces s3), 40 sec dwell at s5, 70 sec travel time to s4 (which is part
+            // of the original route), and 0 sec dwell time at s4
             assertArrayEquals(new int[] { 0, 500, 590, 700 }, a);
             assertArrayEquals(new int[] { 0, 530, 630, 700 }, d);
         }
@@ -105,6 +108,9 @@ public class AddStopsTest {
             int[] d = IntStream.of(schedule.departures).map(time -> time - schedule.arrivals[0]).toArray();
 
             // confirm the times are correct. Note that first and last stop of original route don't have a dwell time
+            // so 0 sec dwell time at s1, 500 sec travel time from FakeGraph to s2, 30 sec dwell time at s2, 500 sec
+            // travel time to s3, 30 sec dwell time at s3, 500 sec travel time to s4, 0 sec dwell time at s4, and 60 sec travel
+            // time and 40 sec dwell time from modification to added stop s5
             assertArrayEquals(new int[] { 0, 500, 1030, 1560, 1620 }, a);
             assertArrayEquals(new int[] { 0, 530, 1060, 1560, 1660}, d);
         }
@@ -148,6 +154,9 @@ public class AddStopsTest {
             assertEquals("SINGLE_LINE:trip" + schedule.arrivals[0], schedule.tripId);
 
             // confirm the times are correct. Note that first and last stop of original route don't have a dwell time
+            // so from modification, 40 sec dwell time at added stop s5, 60 sec travel time to s1, and then continue original
+            // schedule: 0 sec dwell time at s1, 500 sec travel time from FakeGraph to s2, 30 sec dwell time at s2, 500 sec
+            // travel time to s3, 30 sec dwell time at s3, 500 sec travel time to s4, 0 sec dwell time at s4
             assertArrayEquals(new int[] { 0, 100, 600, 1130, 1660 }, a);
             assertArrayEquals(new int[] { 40, 100, 630, 1160, 1660}, d);
         }

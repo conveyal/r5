@@ -244,7 +244,7 @@ public class AddStopsTest {
             // 30 sec travel time to added stop, 15 sec dwell time at added stop, 40 sec travel time to s3, 20 sec dwell time
             // at s3, and back to original 500 sec travel time to s4 and 0 sec dwell time at s4, from FakeGraph
             assertArrayEquals(new int[] { 0, 500, 540, 595, 1115, 1645 }, a);
-            assertArrayEquals(new int[] { 0, 510, 555, 615, 1145, 1645 x}, d);
+            assertArrayEquals(new int[] { 0, 510, 555, 615, 1145, 1645 }, d);
         }
 
         assertEquals(checksum, network.checksum());

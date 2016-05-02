@@ -70,6 +70,8 @@ public class AddStopsTest {
             assertArrayEquals(new int[] { 0, 500, 580, 690 }, a);
             assertArrayEquals(new int[] { 0, 520, 620, 740 }, d);
         }
+
+        assertEquals(checksum, network.checksum());
     }
 
     /**
@@ -116,6 +118,8 @@ public class AddStopsTest {
             assertArrayEquals(new int[] { 0, 100, 650, 1180, 1710 }, a);
             assertArrayEquals(new int[] { 40, 150, 680, 1210, 1710 }, d);
         }
+
+        assertEquals(checksum, network.checksum());
     }
 
     /**
@@ -163,6 +167,8 @@ public class AddStopsTest {
             assertArrayEquals(new int[] { 0, 500, 1030, 1560, 1640 }, a);
             assertArrayEquals(new int[] { 0, 530, 1060, 1580, 1680}, d);
         }
+
+        assertEquals(checksum, network.checksum());
     }
 
     @After

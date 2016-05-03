@@ -362,10 +362,12 @@ public class FakeGraph {
             t.route = r;
             feed.trips.put(t.trip_id, t);
 
+            int currentTime = departure;
+
             StopTime st1 = new StopTime();
             st1.trip_id = t.trip_id;
-            st1.arrival_time = departure;
-            st1.departure_time = departure;
+            st1.arrival_time = currentTime;
+            st1.departure_time = currentTime;
             st1.stop_id = s1.stop_id;
             st1.stop_sequence = 1;
             feed.stop_times.put(new Fun.Tuple2(st1.trip_id, st1.stop_sequence), st1);
@@ -375,8 +377,10 @@ public class FakeGraph {
             if (secondStop) {
                 StopTime st2 = new StopTime();
                 st2.trip_id = t.trip_id;
-                st2.arrival_time = departure + TRAVEL_TIME;
-                st2.departure_time = departure + TRAVEL_TIME;
+                currentTime += TRAVEL_TIME;
+                st2.arrival_time = currentTime;
+                currentTime += DWELL_TIME;
+                st2.departure_time = currentTime;
                 st2.stop_sequence = 2;
                 st2.stop_id = s2.stop_id;
                 feed.stop_times.put(new Fun.Tuple2(st2.trip_id, st2.stop_sequence), st2);
@@ -384,8 +388,9 @@ public class FakeGraph {
 
             StopTime st3 = new StopTime();
             st3.trip_id = t.trip_id;
-            st3.arrival_time = departure + (secondStop ? 2 : 1) * TRAVEL_TIME;
-            st3.departure_time = departure + (secondStop ? 2 : 1) * TRAVEL_TIME;
+            currentTime += TRAVEL_TIME;
+            st3.arrival_time = currentTime;
+            st3.departure_time = currentTime;
             st3.stop_sequence = 3;
             st3.stop_id = s3.stop_id;
             feed.stop_times.put(new Fun.Tuple2(st3.trip_id, st3.stop_sequence), st3);

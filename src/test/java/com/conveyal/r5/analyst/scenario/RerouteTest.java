@@ -37,17 +37,17 @@ public class RerouteTest {
     /** Test rerouting a route in the middle */
     @Test
     public void testRerouteInMiddle () {
-        Reroute as = new Reroute();
+        Reroute reroute = new Reroute();
         // skip s3, insert s5
-        as.fromStop = "SINGLE_LINE:s2";
-        as.toStop = "SINGLE_LINE:s4";
-        as.stops = Arrays.asList(new StopSpec("SINGLE_LINE:s5"));
-        as.dwellTimes = new int[] { 20, 40, 50 };
-        as.hopTimes = new int[] { 60, 70 };
-        as.routes = set("SINGLE_LINE:route");
+        reroute.fromStop = "SINGLE_LINE:s2";
+        reroute.toStop = "SINGLE_LINE:s4";
+        reroute.stops = Arrays.asList(new StopSpec("SINGLE_LINE:s5"));
+        reroute.dwellTimes = new int[] { 20, 40, 50 };
+        reroute.hopTimes = new int[] { 60, 70 };
+        reroute.routes = set("SINGLE_LINE:route");
 
         Scenario scenario = new Scenario();
-        scenario.modifications = Arrays.asList(as);
+        scenario.modifications = Arrays.asList(reroute);
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
@@ -86,16 +86,16 @@ public class RerouteTest {
      */
     @Test
     public void testExtendRouteAtBeginning () {
-        Reroute as = new Reroute();
+        Reroute reroute = new Reroute();
         // add s5 at beginning
-        as.toStop = "SINGLE_LINE:s1";
-        as.stops = Arrays.asList(new StopSpec("SINGLE_LINE:s5"));
-        as.dwellTimes = new int[] { 40, 50 };
-        as.hopTimes = new int[] { 60 };
-        as.routes = set("SINGLE_LINE:route");
+        reroute.toStop = "SINGLE_LINE:s1";
+        reroute.stops = Arrays.asList(new StopSpec("SINGLE_LINE:s5"));
+        reroute.dwellTimes = new int[] { 40, 50 };
+        reroute.hopTimes = new int[] { 60 };
+        reroute.routes = set("SINGLE_LINE:route");
 
         Scenario scenario = new Scenario();
-        scenario.modifications = Arrays.asList(as);
+        scenario.modifications = Arrays.asList(reroute);
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
@@ -135,16 +135,16 @@ public class RerouteTest {
      */
     @Test
     public void testExtendRouteAtEnd () {
-        Reroute as = new Reroute();
+        Reroute reroute = new Reroute();
         // add s5 at end
-        as.fromStop = "SINGLE_LINE:s4";
-        as.stops = Arrays.asList(new StopSpec("SINGLE_LINE:s5"));
-        as.dwellTimes = new int[] { 20, 40 };
-        as.hopTimes = new int[] { 60 };
-        as.routes = set("SINGLE_LINE:route");
+        reroute.fromStop = "SINGLE_LINE:s4";
+        reroute.stops = Arrays.asList(new StopSpec("SINGLE_LINE:s5"));
+        reroute.dwellTimes = new int[] { 20, 40 };
+        reroute.hopTimes = new int[] { 60 };
+        reroute.routes = set("SINGLE_LINE:route");
 
         Scenario scenario = new Scenario();
-        scenario.modifications = Arrays.asList(as);
+        scenario.modifications = Arrays.asList(reroute);
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
@@ -181,19 +181,19 @@ public class RerouteTest {
     /** Insert a (created) stop in the middle of a route without removing any existing stops */
     @Test
     public void insertStopInMiddle () {
-        Reroute as = new Reroute();
-        as.stops = Arrays.asList(
+        Reroute reroute = new Reroute();
+        reroute.stops = Arrays.asList(
                 new StopSpec(-83.007, 39.967)
         );
 
-        as.fromStop = "SINGLE_LINE:s2";
-        as.toStop = "SINGLE_LINE:s3";
-        as.hopTimes = new int[] { 30, 40 };
-        as.dwellTimes = new int[] { 10, 15, 20 };
-        as.routes = set("SINGLE_LINE:route");
+        reroute.fromStop = "SINGLE_LINE:s2";
+        reroute.toStop = "SINGLE_LINE:s3";
+        reroute.hopTimes = new int[] { 30, 40 };
+        reroute.dwellTimes = new int[] { 10, 15, 20 };
+        reroute.routes = set("SINGLE_LINE:route");
 
         Scenario scenario = new Scenario();
-        scenario.modifications = Arrays.asList(as);
+        scenario.modifications = Arrays.asList(reroute);
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
@@ -255,15 +255,15 @@ public class RerouteTest {
     /** test diverting the end of a route, i.e. removing some stops and replacing them with others. */
     @Test
     public void testDivertEnd () {
-        Reroute rr = new Reroute();
-        rr.routes = set("SINGLE_LINE:route");
-        rr.stops = Collections.singletonList(new StopSpec("SINGLE_LINE:s5"));
-        rr.hopTimes = new int[] { 60 };
-        rr.dwellTimes = new int[] { 15, 25 };
-        rr.fromStop = "SINGLE_LINE:s3";
+        Reroute reroute = new Reroute();
+        reroute.routes = set("SINGLE_LINE:route");
+        reroute.stops = Collections.singletonList(new StopSpec("SINGLE_LINE:s5"));
+        reroute.hopTimes = new int[] { 60 };
+        reroute.dwellTimes = new int[] { 15, 25 };
+        reroute.fromStop = "SINGLE_LINE:s3";
 
         Scenario scenario = new Scenario();
-        scenario.modifications = Collections.singletonList(rr);
+        scenario.modifications = Collections.singletonList(reroute);
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
@@ -298,15 +298,15 @@ public class RerouteTest {
     /** test diverting the end of a route, i.e. removing some stops and replacing them with others. */
     @Test
     public void testDivertStart () {
-        Reroute rr = new Reroute();
-        rr.routes = set("SINGLE_LINE:route");
-        rr.stops = Collections.singletonList(new StopSpec("SINGLE_LINE:s5"));
-        rr.hopTimes = new int[] { 60 };
-        rr.dwellTimes = new int[] { 15, 25 };
-        rr.toStop = "SINGLE_LINE:s2";
+        Reroute reroute = new Reroute();
+        reroute.routes = set("SINGLE_LINE:route");
+        reroute.stops = Collections.singletonList(new StopSpec("SINGLE_LINE:s5"));
+        reroute.hopTimes = new int[] { 60 };
+        reroute.dwellTimes = new int[] { 15, 25 };
+        reroute.toStop = "SINGLE_LINE:s2";
 
         Scenario scenario = new Scenario();
-        scenario.modifications = Collections.singletonList(rr);
+        scenario.modifications = Collections.singletonList(reroute);
 
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 

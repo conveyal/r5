@@ -116,8 +116,9 @@ public class RerouteTest {
             int[] a = IntStream.of(schedule.arrivals).map(time -> time - schedule.arrivals[0]).toArray();
             int[] d = IntStream.of(schedule.departures).map(time -> time - schedule.arrivals[0]).toArray();
 
-            // slightly awkward, but make sure that the trip passes the original first stop at the same time it did before
-            assertEquals("SINGLE_LINE:trip" + schedule.arrivals[1], schedule.tripId);
+            // slightly awkward, but make sure that the trip starts at the same time as it did before
+            // TODO user-settable zero point for modification
+            assertEquals("SINGLE_LINE:trip" + schedule.arrivals[0], schedule.tripId);
 
             // 40 sec dwell time at added stop s5, 60 sec travel time to s1, 50 sec dwell at s1, and back to 500 and 30 sec dwell time
             // to end (with s4 having no dwell, per FakeGraph)

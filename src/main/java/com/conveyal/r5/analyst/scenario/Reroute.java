@@ -283,7 +283,8 @@ public class Reroute extends Modification {
         for (int ss = 0, ts = 0; ts < newPatternLength; ss++, ts++) {
 
             // When we reach the right place in the source pattern, splice in the new schedule fragment.
-            if (ss == insertBeginIndex) {
+            // When we're inserting in the middle of the pattern, consider that a dwell is supplied for the fromStop.
+            if ((ss == insertBeginIndex - 1) || (ss == 0 && insertBeginIndex == 0)) {
 
                 // Calculate hop time, dealing with the fact that at stop zero there is no preceding hop.
                 int hopTime = originalSchedule.arrivals[ss];
@@ -305,7 +306,8 @@ public class Reroute extends Modification {
                 }
 
                 // Skip over the part of the source pattern that was replaced by the new schedule fragment.
-                ss = insertEndIndex;
+                // We have used a dwell to replace the original dwell at toStop, so step up to the following hop.
+                ss = insertEndIndex + 1;
 
                 // If the output pattern is full, we just spliced the new stops onto the end of the pattern.
                 // Do not copy any more information from the source pattern.

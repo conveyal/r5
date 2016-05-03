@@ -21,8 +21,8 @@ import java.util.stream.Collectors;
  * pairs of stops adjacent to one another in the pattern.
  * We do not have an absolute speed parameter, only a scale parameter, because the server does not necessarily know
  * the route alignment and the inter-stop distances to calculate travel times from speeds.
- * You can specify either routes or trips to modify, but not both at once. Changing the speed of only some trips
- * on a pattern does not cause problems like adding or removing stops does.
+ * You can specify either routes or patterns to modify, but not both at once. Changing the speed of only some trips
+ * on a pattern does not cause problems like adding or removing stops does, so you can also specify individual trips.
  */
 public class AdjustSpeed extends Modification {
 
@@ -33,7 +33,10 @@ public class AdjustSpeed extends Modification {
     /** The routes which should be sped up or slowed down. */
     public Set<String> routes;
 
-    /** Trips which should be sped up or slowed down. */
+    /** One example trip on each pattern that should be sped up or slowed down. */
+    public Set<String> patterns;
+
+    /** Individual trips that should be sped up or slowed down. */
     public Set<String> trips;
 
     /** The multiplicative scale factor for speeds. */
@@ -95,11 +98,12 @@ public class AdjustSpeed extends Modification {
                 hopToStops.add(intToId);
             }
         }
-
-        // Not bitwise operator: non-short-circuit logical XOR.
-        boolean onlyOneDefined = (routes != null) ^ (trips != null);
-        if (!onlyOneDefined) {
-            warnings.add("Routes or trips must be specified, but not both.");
+        int nDefined = 0;
+        if (routes != null) nDefined += 1;
+        if (trips!= null) nDefined += 1;
+        if (patterns != null) nDefined += 1;
+        if (nDefined != 1) {
+            warnings.add("Exactly one of routes, patterns, or trips must be provided.");
         }
         return warnings.size() > 0;
     }
@@ -114,11 +118,15 @@ public class AdjustSpeed extends Modification {
 
     private TripPattern processTripPattern (TripPattern originalPattern) {
         if (routes != null && !routes.contains(originalPattern.routeId)) {
-            // This TripPattern is not on a route that has been chosen for adjustment.
+            // This Modification does not apply to the route this TripPattern is on, TripPattern remains unchanged.
             return originalPattern;
         }
-        // Avoid unnecessary new lists and cloning when no trips in this pattern are affected.
-        if (trips != null && originalPattern.tripSchedules.stream().noneMatch(s -> trips.contains(s.tripId))) {
+        if (patterns != null && originalPattern.containsNoTrips(patterns)) {
+            // This TripPattern does not contain any of the example trips, so its speed is not adjusted.
+            return originalPattern;
+        }
+        if (trips != null && originalPattern.containsNoTrips(trips)) {
+            // Avoid unnecessary new lists and cloning when no trips in this pattern are affected.
             return originalPattern;
         }
         // First, decide which hops in this pattern should be scaled.

@@ -23,8 +23,8 @@ import java.util.stream.Collectors;
  * If stops are skipped at the start of a trip, the remaining times are not shifted.
  *
  * If you remove stops from some but not all trips on a pattern, you've created another possibly new pattern.
- * Therefore we don't provide any way to remove stops from individual trips. You can only remove them from entire routes
- * and if you remove stops from an entire route, you automatically remove them from every trip in every pattern.
+ * Therefore we don't provide any way to remove stops from individual trips. You can only remove them from patterns or
+ * entire routes (in which case you automatically remove them from every trip in every pattern on that route).
  *
  * Also, there's no way to remove only one instance of a stop that occurs multiple times (e.g. in a loop route).
  * This is a known and accepted limitation.
@@ -41,6 +41,9 @@ public class RemoveStops extends Modification {
     /** On which routes the stops should be skipped. */
     public Set<String> routes;
 
+    /** One or more example tripIds on each pattern where the stops should be skipped. */
+    public Set<String> patterns;
+
     /** Stops to remove from the routes. */
     public Set<String> stops;
 
@@ -54,6 +57,10 @@ public class RemoveStops extends Modification {
 
     @Override
     public boolean resolve (TransportNetwork network) {
+        boolean onlyOneDefined = (routes != null) ^ (patterns != null);
+        if (!onlyOneDefined) {
+            warnings.add("Routes or patterns must be specified, but not both.");
+        }
         intStops = new TIntHashSet();
         for (String stringStopId : stops) {
             int intStopId = network.transitLayer.indexForStopId.get(stringStopId);
@@ -77,8 +84,12 @@ public class RemoveStops extends Modification {
     }
 
     public TripPattern processTripPattern (TripPattern originalTripPattern) {
-        if (!routes.contains(originalTripPattern.routeId)) {
-            // Modification does not apply to this TripPattern, it remains unchanged.
+        if (routes != null && !routes.contains(originalTripPattern.routeId)) {
+            // Modification does not apply to the route this TripPattern is on, so TripPattern remains unchanged.
+            return originalTripPattern;
+        }
+        if (patterns != null && originalTripPattern.containsNoTrips(patterns)) {
+            // This TripPattern does not contain any of the example trips, Modification does not apply here.
             return originalTripPattern;
         }
         int nToRemove = (int) Arrays.stream(originalTripPattern.stops).filter(intStops::contains).count();

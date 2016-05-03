@@ -34,9 +34,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
 /**
- * Add a trip pattern.
- * May add new stops or reuse existing stops.
- * Can include a full timetable of trips or be a frequency-based pattern.
+ * Create a new trip pattern and add some trips to that pattern.
+ * The pattern may create new stops or reuse existing ones from the base network.
+ * The newly created trips are true frequency trips, not scheduled or exact_times frequencies.
  */
 public class AddTrips extends Modification {
 

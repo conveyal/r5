@@ -19,6 +19,9 @@ public class RemoveTrips extends Modification {
     /** Which routes should have all their trips removed. */
     public Set<String> routes;
 
+    /** One or more example tripIds on every pattern that is to be removed. */
+    public Set<String> patterns;
+
     /** Which trips should be removed. */
     public Set<String> trips;
 
@@ -33,9 +36,12 @@ public class RemoveTrips extends Modification {
 
     @Override
     public boolean resolve (TransportNetwork network) {
-        boolean onlyOneDefined = (routes != null) ^ (trips != null); // Not bitwise, non-short-circuit logical XOR.
-        if (!onlyOneDefined) {
-            warnings.add("On RemoveTrips modifications, exactly one of routes or trips must be defined.");
+        int nDefined = 0;
+        if (routes != null) nDefined += 1;
+        if (trips!= null) nDefined += 1;
+        if (patterns != null) nDefined += 1;
+        if (nDefined != 1) {
+            warnings.add("Exactly one of routes, patterns, or trips must be provided.");
         }
         return warnings.size() > 0;
     }
@@ -48,7 +54,12 @@ public class RemoveTrips extends Modification {
             transitLayer.tripPatterns = transitLayer.tripPatterns.stream()
                     .filter(pattern -> !routes.contains(pattern.routeId))
                     .collect(Collectors.toList());
-        } else {
+        } else if (patterns != null) {
+            // Remove entire patterns, not specific trips.
+            transitLayer.tripPatterns = transitLayer.tripPatterns.stream()
+                    .filter(pattern -> pattern.containsNoTrips(patterns))
+                    .collect(Collectors.toList());
+        } else if (trips != null) {
             // Remove specific trips, not entire routes.
             transitLayer.tripPatterns = transitLayer.tripPatterns.stream()
                     .map(pattern -> processPattern(pattern))
@@ -59,8 +70,8 @@ public class RemoveTrips extends Modification {
     }
 
     private TripPattern processPattern (TripPattern originalTripPattern) {
-        // This causes an additional loop over every pattern's contents, but avoids a clone.
-        if (originalTripPattern.tripSchedules.stream().noneMatch(schedule -> trips.contains(schedule.tripId))) {
+        if (originalTripPattern.containsNoTrips(trips)) {
+            // Avoid unnecessary new lists and cloning when no trips in this pattern are affected.
             return originalTripPattern;
         }
         TripPattern newTripPattern = originalTripPattern.clone();

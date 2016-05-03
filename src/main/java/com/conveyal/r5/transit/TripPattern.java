@@ -6,13 +6,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.List;
+import java.util.*;
 
 /**
- * This is like a transmodel JourneyPattern.
+ * This is like a Transmodel JourneyPattern.
  * All the trips on the same Route that have the same sequence of stops, with the same pickup/dropoff options.
  */
 public class TripPattern implements Serializable, Cloneable {
@@ -140,4 +137,12 @@ public class TripPattern implements Serializable, Cloneable {
         sb.append(Arrays.toString(stops));
         return sb.toString();
     }
+
+    /**
+     * @return true when none of the supplied tripIds are on this pattern.
+     */
+    public boolean containsNoTrips(Set<String> tripIds) {
+        return this.tripSchedules.stream().noneMatch(ts -> tripIds.contains(ts.tripId));
+    }
+
 }

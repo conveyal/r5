@@ -13,16 +13,16 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Insert one or more stops into some trip patterns.
- * This splices a new chunk of timetable into an existing route.
+ * Insert a new route segment into some trip patterns.
+ * This may create new stops or reference existing ones, and splices a new chunk of timetable into an existing route.
  * If both fromStop and toStop are specified, the part of the timetable in between those stops is replaced.
  * If fromStop is null, then the whole timetable is replaced up to the toStop.
  * If toStop in null, then the whole timetable is replaced after fromStop.
- * One dwell time should be supplied for each new stop.
- * When both fromStop and toStop are specified, there should be one more hop time than there are new stops.
- * If one of fromStop or toStop is not specified, then there should be the same number of hop times as stops.
+ * Always specify one less hop time than there are dwell times.
+ * One dwell time should be supplied for each new stop, plus one dwell time for fromStop and one for toStop when they
+ * are specified.
  * Inserting stops into some trips but not others on a pattern could create new patterns. Therefore we only allow
- * applying this modification to entire routes, which ensures that it is applied to entire patterns.
+ * applying this modification to entire routes or patterns.
  */
 public class Reroute extends Modification {
 
@@ -30,8 +30,11 @@ public class Reroute extends Modification {
 
     private static final Logger LOG = LoggerFactory.getLogger(Reroute.class);
 
-    /** On which routes the stop should be inserted. */
+    /** Which routeIds should be rerouted. */
     public Set<String> routes;
+
+    /** One or more example tripIds on each pattern that should be rerouted. */
+    public Set<String> patterns;
 
     /** Stop after which to insert the new stops. */
     public String fromStop;
@@ -70,6 +73,10 @@ public class Reroute extends Modification {
 
     @Override
     public boolean resolve (TransportNetwork network) {
+        boolean onlyOneDefined = (routes != null) ^ (patterns != null);
+        if (!onlyOneDefined) {
+            warnings.add("Routes or patterns must be specified, but not both.");
+        }
         if (fromStop == null && toStop == null) {
             warnings.add("At least one of from and to stop must be supplied.");
         }
@@ -131,6 +138,10 @@ public class Reroute extends Modification {
     private TripPattern processTripPattern (TripPattern originalTripPattern) {
         if (routes != null && !routes.contains(originalTripPattern.routeId)) {
             // This pattern is not on one of the specified routes. The trip pattern should remain unchanged.
+            return originalTripPattern;
+        }
+        if (patterns != null && originalTripPattern.containsNoTrips(patterns)) {
+            // This TripPattern does not contain any of the example trips, so it is not rerouted.
             return originalTripPattern;
         }
         // The number of elements to copy from the original stops array before the new segment is spliced in.

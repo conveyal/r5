@@ -13,10 +13,10 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Adjust the dwell times on matched trips.
+ * Adjust the dwell times on matched routes, patterns, or trips.
  * This could reasonably be combined with adjust-speed, but adjust-speed requires a more complicated hop-based
  * description of which stops will be affected. This modification type exists for simplicity from the user perspective.
- * Supply only one of dwellSecs or scale, and supply only routes or trips, but not both.
+ * Supply only one of dwellSecs or scale, and supply exactly one of routes, patterns, or trips.
  */
 public class AdjustDwellTime extends Modification {
 
@@ -26,6 +26,9 @@ public class AdjustDwellTime extends Modification {
 
     /** The routes which should have dwell times changed. */
     public Set<String> routes;
+
+    /** One or more example tripIds from every pattern that should have its dwell times changed. */
+    public Set<String> patterns;
 
     /** Trips which should have dwell times changed. */
     public Set<String> trips;
@@ -48,7 +51,7 @@ public class AdjustDwellTime extends Modification {
     }
 
     @Override
-    public boolean apply (TransportNetwork network) {
+    public boolean resolve (TransportNetwork network) {
         if (stops != null) {
             intStops = new TIntHashSet();
             for (String stringStopId : stops) {
@@ -65,12 +68,18 @@ public class AdjustDwellTime extends Modification {
         if (!((dwellSecs >= 0) ^ (scale >= 0))) {
             warnings.add("Dwell time or scaling factor must be specified, but not both.");
         }
-        if (!((routes != null) ^ (trips != null))) {
-            warnings.add("Routes or trips must be specified, but not both.");
+        int nDefined = 0;
+        if (routes != null) nDefined += 1;
+        if (trips!= null) nDefined += 1;
+        if (patterns != null) nDefined += 1;
+        if (nDefined != 1) {
+            warnings.add("Exactly one of routes, patterns, or trips must be provided.");
         }
-        if (warnings.size() > 0) {
-            return true;
-        }
+        return warnings.size() > 0;
+    }
+
+    @Override
+    public boolean apply (TransportNetwork network) {
         network.transitLayer.tripPatterns = network.transitLayer.tripPatterns.stream()
                 .map(this::processTripPattern)
                 .collect(Collectors.toList());
@@ -82,8 +91,12 @@ public class AdjustDwellTime extends Modification {
             // This TripPattern is not on a route that has been chosen for adjustment.
             return originalPattern;
         }
-        // Avoid unnecessary new lists and cloning when no trips in this pattern are affected.
-        if (trips != null && originalPattern.tripSchedules.stream().noneMatch(s -> trips.contains(s.tripId))) {
+        if (patterns != null && originalPattern.containsNoTrips(patterns)) {
+            // This TripPattern does not contain any of the example trips, Modification does not apply.
+            return originalPattern;
+        }
+        if (trips != null && originalPattern.containsNoTrips(trips)) {
+            // Avoid unnecessary new lists and cloning when no trips in this pattern are affected.
             return originalPattern;
         }
         // Make a shallow protective copy of this TripPattern.

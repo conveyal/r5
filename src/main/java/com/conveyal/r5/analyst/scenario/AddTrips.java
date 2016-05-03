@@ -93,7 +93,7 @@ public class AddTrips extends Modification {
         transitLayer.tripPatterns = new ArrayList<>(transitLayer.tripPatterns);
         // We will be creating a service for each supplied timetable, make a protective copy of the list of services.
         transitLayer.services = new ArrayList<>(transitLayer.services);
-        generatePattern(transitLayer);
+        generatePattern(transitLayer, 0);
         if (bidirectional) {
             // We want to call generatePattern again, but with all stops and stoptimes reversed.
             // Reverse the intStopIds in place. The string stopIds should not be used anymore at this point.
@@ -110,7 +110,7 @@ public class AddTrips extends Modification {
                 dwellList.reverse();
                 ptt.dwellTimes = dwellList.toArray();
             }
-            generatePattern(transitLayer);
+            generatePattern(transitLayer, 1);
         }
         return false;
     }
@@ -119,12 +119,13 @@ public class AddTrips extends Modification {
      * This has been pulled out into a separate function so it can be called twice: once to generate the forward
      * pattern and once to generate the reverse pattern.
      * @param transitLayer a protective copy of a transit layer whose existing tripPatterns list will be extended.
+     * @param directionId should be 0 in one direction and 1 in the opposite direction.
      */
-    private void generatePattern (TransitLayer transitLayer) {
+    private void generatePattern (TransitLayer transitLayer, int directionId) {
         TripPattern pattern = new TripPattern(intStopIds);
         LOG.info("Created {}.", pattern);
         for (PatternTimetable timetable : frequencies) {
-            TripSchedule schedule = createSchedule(timetable, transitLayer.services);
+            TripSchedule schedule = createSchedule(timetable, directionId, transitLayer.services);
             if (schedule == null) {
                 warnings.add("Failed to create a trip.");
                 continue;
@@ -207,7 +208,7 @@ public class AddTrips extends Modification {
      * whose code will be saved in the new TripSchedule.
      * Make sure the supplied service list is a protective copy, not the one from the original TransportNetwork!
      */
-    public TripSchedule createSchedule (PatternTimetable timetable, List<Service> services) {
+    public TripSchedule createSchedule (PatternTimetable timetable, int directionId, List<Service> services) {
 
         // The code for a newly added Service will be the number of services already in the list.
         int serviceCode = services.size();
@@ -215,7 +216,7 @@ public class AddTrips extends Modification {
 
         // Create a dummy GTFS Trip object so we can use the standard TripSchedule factory method.
         Trip trip = new Trip();
-        trip.direction_id = 0; // FIXME this should probably be 1 when we create the reverse pattern
+        trip.direction_id = directionId;
 
         // Convert the supplied hop and dwell times (which are relative to adjacent entries) to arrival and departure
         // times (which are relative to the beginning of the trip or the beginning of the service day).

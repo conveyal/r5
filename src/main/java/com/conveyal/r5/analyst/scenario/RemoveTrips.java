@@ -25,10 +25,6 @@ public class RemoveTrips extends Modification {
     /** Which trips should be removed. */
     public Set<String> trips;
 
-    // FIXME What is this? Are these pattern ID numbers supposed to be supplied in the API call or pre-looked-up?
-    // This is set in SuboptimalPathProfileRouter, and should probably be moved into another Modification.
-    public TIntSet patternIds;
-
     @Override
     public String getType() {
         return "remove-trips";

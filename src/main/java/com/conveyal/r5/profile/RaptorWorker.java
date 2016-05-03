@@ -59,11 +59,11 @@ public class RaptorWorker {
      */
     public int MONTE_CARLO_COUNT_PER_MINUTE = 1;
 
-    /** If there are no schedules, the number of Monte Carlo draws to take */
+    /** If there are no schedules, the number of Monte Carlo draws to take. */
     public int TOTAL_MONTE_CARLO_COUNT = 99;
 
-    /** minimum slack time to board transit */
-    public static final int BOARD_SLACK = 60;
+    /** Minimum slack time to board transit in seconds. */
+    public static final int BOARD_SLACK_SECONDS = 60;
 
     int max_time = 0;
     int round = 0;
@@ -512,20 +512,20 @@ public class RaptorWorker {
                                 int boardTimeThisEntry;
 
                                 if (boardingAssumption == BoardingAssumption.BEST_CASE) {
-                                    if (inputState.bestTimes[stopIndex] + BOARD_SLACK > ts.endTimes[freqEntryIdx] + ts.departures[stopPositionInPattern])
+                                    if (inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS > ts.endTimes[freqEntryIdx] + ts.departures[stopPositionInPattern])
                                         continue FREQUENCY_ENTRIES; // it's too late, can't board.
 
                                     // best case boarding time is now, or when this frequency entry starts _at this stop_,
                                     // whichever is later
-                                    boardTimeThisEntry = Math.max(inputState.bestTimes[stopIndex] + BOARD_SLACK, ts.startTimes[freqEntryIdx] + ts.departures[stopPositionInPattern]);
+                                    boardTimeThisEntry = Math.max(inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS, ts.startTimes[freqEntryIdx] + ts.departures[stopPositionInPattern]);
                                 }
                                 else if (boardingAssumption == BoardingAssumption.WORST_CASE) {
                                     // worst case: cannot board this entry if there is not the full headway remaining before the end of the entry, we
                                     // might miss the vehicle.
-                                    if (inputState.bestTimes[stopIndex] + BOARD_SLACK > ts.endTimes[freqEntryIdx] + ts.departures[stopPositionInPattern] - ts.headwaySeconds[freqEntryIdx])
+                                    if (inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS > ts.endTimes[freqEntryIdx] + ts.departures[stopPositionInPattern] - ts.headwaySeconds[freqEntryIdx])
                                         continue FREQUENCY_ENTRIES;
 
-                                    boardTimeThisEntry = Math.max(inputState.bestTimes[stopIndex] + BOARD_SLACK + ts.headwaySeconds[freqEntryIdx],
+                                    boardTimeThisEntry = Math.max(inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS + ts.headwaySeconds[freqEntryIdx],
                                             ts.startTimes[freqEntryIdx] + ts.departures[stopPositionInPattern] + ts.headwaySeconds[freqEntryIdx]);
                                 }
                                 else {
@@ -539,7 +539,7 @@ public class RaptorWorker {
                                             ts.departures[stopPositionInPattern] +
                                             offset;
 
-                                    while (boardTimeThisEntry < inputState.bestTimes[stopIndex] + BOARD_SLACK) {
+                                    while (boardTimeThisEntry < inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS) {
                                         boardTimeThisEntry += ts.headwaySeconds[freqEntryIdx];
 
                                         // subtract the travel time to this stop from the board time at this stop, this gives
@@ -634,7 +634,7 @@ public class RaptorWorker {
                             continue;
 
                         int dep = trip.departures[stopPositionInPattern];
-                        if (dep > inputState.bestTimes[stopIndex] + BOARD_SLACK) {
+                        if (dep > inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS) {
                             onTrip = trip;
                             onTripIdx = tripIdx;
                             boardStopIndex = stopIndex;
@@ -677,7 +677,7 @@ public class RaptorWorker {
                                 // This is a frequency trip or it is not running on the day of the search.
                                 continue;
                             }
-                            if (trip.departures[stopPositionInPattern] > inputState.bestTimes[stopIndex] + BOARD_SLACK) {
+                            if (trip.departures[stopPositionInPattern] > inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS) {
                                 // This trip is running and departs later than we have arrived at this stop.
                                 onTripIdx = bestTripIdx;
                                 onTrip = trip;

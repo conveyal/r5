@@ -16,7 +16,7 @@ import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
 /**
  * Test converting lines to a frequency representation.
  */
-public class ConvertToFrequencyTest {
+public class AdjustFrequencyTest {
     public TransportNetwork network;
     public long checksum;
 

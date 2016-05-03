@@ -38,7 +38,7 @@ public class AdjustFrequency extends Modification {
 
     /**
      * The days and times of day at which the new frequency-based route will be running.
-     * We re-use the model class from AddStops because they are so similar to AdjustFrequency entries,
+     * We re-use the model class from Reroute because they are so similar to AdjustFrequency entries,
      * and we'd like to reuse the code for creating new calendar entries.
      */
     public List<PatternTimetable> entries;

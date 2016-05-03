@@ -40,7 +40,6 @@ public class ConvertToFrequencyTest {
 
         // make an entry
         AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();
-        entry.frequency = true;
         entry.headwaySecs = 900;
         entry.startTime = 6 * 3600;
         entry.endTime = 16 * 3600;
@@ -48,7 +47,6 @@ public class ConvertToFrequencyTest {
         entry.sourceTrip = "MULTIPLE_PATTERNS:trip25200"; // trip25200 is a two-stop trip
 
         AddTrips.PatternTimetable entry2 = new AddTrips.PatternTimetable();
-        entry2.frequency = true;
         entry2.headwaySecs = 1200;
         entry2.startTime = 16 * 3600;
         entry2.endTime = 22 * 3600;

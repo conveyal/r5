@@ -23,7 +23,7 @@ import static org.junit.Assert.assertTrue;
 /**
  * Test adding stops (rerouting)
  */
-public class AddStopsTest {
+public class RerouteTest {
     public TransportNetwork network;
     public long checksum;
 
@@ -36,7 +36,7 @@ public class AddStopsTest {
     /** Test rerouting a route in the middle */
     @Test
     public void testRerouteInMiddle () {
-        AddStops as = new AddStops();
+        Reroute as = new Reroute();
         // skip s3, insert s5
         as.fromStop = "SINGLE_LINE:s2";
         as.toStop = "SINGLE_LINE:s4";
@@ -85,7 +85,7 @@ public class AddStopsTest {
      */
     @Test
     public void testExtendRouteAtBeginning () {
-        AddStops as = new AddStops();
+        Reroute as = new Reroute();
         // add s5 at beginning
         as.toStop = "SINGLE_LINE:s1";
         as.stops = Arrays.asList(new StopSpec("SINGLE_LINE:s5"));
@@ -133,7 +133,7 @@ public class AddStopsTest {
      */
     @Test
     public void testExtendRouteAtEnd () {
-        AddStops as = new AddStops();
+        Reroute as = new Reroute();
         // add s5 at end
         as.fromStop = "SINGLE_LINE:s4";
         as.stops = Arrays.asList(new StopSpec("SINGLE_LINE:s5"));
@@ -179,7 +179,7 @@ public class AddStopsTest {
     /** Insert a (created) stop in the middle of a route without removing any existing stops */
     @Test
     public void insertStopInMiddle () {
-        AddStops as = new AddStops();
+        Reroute as = new Reroute();
         as.stops = Arrays.asList(
                 new StopSpec(-83.007, 39.967)
         );

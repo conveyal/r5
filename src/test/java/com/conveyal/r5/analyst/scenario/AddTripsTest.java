@@ -53,7 +53,6 @@ public class AddTripsTest {
         at.mode = Route.BUS;
 
         AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();
-        entry.frequency = true;
         entry.headwaySecs = 900;
         entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = true;
         entry.saturday = entry.sunday = false;
@@ -131,7 +130,6 @@ public class AddTripsTest {
         at.mode = Route.BUS;
 
         AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();
-        entry.frequency = true;
         entry.headwaySecs = 900;
         entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = true;
         entry.saturday = entry.sunday = false;
@@ -254,7 +252,6 @@ public class AddTripsTest {
         at.mode = Route.BUS;
 
         AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();
-        entry.frequency = true;
         entry.headwaySecs = 900;
         entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = true;
         entry.saturday = entry.sunday = false;

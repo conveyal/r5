@@ -30,7 +30,7 @@ import java.util.Set;
         @JsonSubTypes.Type(name = "adjust-dwell-time", value = AdjustDwellTime.class),
         @JsonSubTypes.Type(name = "add-trips", value = AddTrips.class),
         @JsonSubTypes.Type(name = "remove-trips", value = RemoveTrips.class),
-        @JsonSubTypes.Type(name = "add-stops", value = AddStops.class),
+        @JsonSubTypes.Type(name = "reroute", value = Reroute.class),
         @JsonSubTypes.Type(name = "remove-stops", value = RemoveStops.class),
         @JsonSubTypes.Type(name = "transfer-rule", value = TransferRule.class),
         @JsonSubTypes.Type(name = "set-trip-phasing", value = SetTripPhasing.class),

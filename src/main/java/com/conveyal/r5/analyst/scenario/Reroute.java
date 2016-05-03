@@ -1,7 +1,6 @@
 package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.r5.transit.PickDropType;
-import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
@@ -25,11 +24,11 @@ import java.util.stream.Collectors;
  * Inserting stops into some trips but not others on a pattern could create new patterns. Therefore we only allow
  * applying this modification to entire routes, which ensures that it is applied to entire patterns.
  */
-public class AddStops extends Modification {
+public class Reroute extends Modification {
 
     public static final long serialVersionUID = 1L;
 
-    private static final Logger LOG = LoggerFactory.getLogger(AddStops.class);
+    private static final Logger LOG = LoggerFactory.getLogger(Reroute.class);
 
     /** On which routes the stop should be inserted. */
     public Set<String> routes;
@@ -66,7 +65,7 @@ public class AddStops extends Modification {
 
     @Override
     public String getType() {
-        return "add-stops";
+        return "reroute";
     }
 
     @Override

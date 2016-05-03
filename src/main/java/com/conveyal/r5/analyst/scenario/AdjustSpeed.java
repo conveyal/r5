@@ -199,4 +199,6 @@ public class AdjustSpeed extends Modification {
         // This should be called in any Modification that changes a schedule.
     }
 
+    public int getSortOrder() { return 0; }
+
 }

@@ -35,6 +35,8 @@ public class Scenario implements Serializable {
     public TransportNetwork applyToTransportNetwork (TransportNetwork originalNetwork) {
         LOG.info("Applying scenario {}", this.id);
         long baseNetworkChecksum = 0;
+        // Put the modifications in canonical order before applying them.
+        modifications.sort((a, b) -> a.getSortOrder() - b.getSortOrder());
         if (VERIFY_BASE_NETWORK_UNCHANGED) {
             baseNetworkChecksum = originalNetwork.checksum();
         }

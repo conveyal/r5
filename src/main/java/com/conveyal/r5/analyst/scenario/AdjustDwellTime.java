@@ -140,4 +140,6 @@ public class AdjustDwellTime extends Modification {
         return newPattern;
     }
 
+    public int getSortOrder() { return 10; }
+
 }

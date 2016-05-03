@@ -161,4 +161,6 @@ public class RemoveStops extends Modification {
         return pattern;
     }
 
+    public int getSortOrder() { return 30; }
+
 }

@@ -247,4 +247,6 @@ public class AddTrips extends Modification {
         return stops.stream().anyMatch(s -> s.id == null);
     }
 
+    public int getSortOrder() { return 70; }
+
 }

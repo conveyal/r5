@@ -139,4 +139,10 @@ public abstract class Modification implements Serializable {
         return intStopIds;
     }
 
+    /**
+     * This determines the sequence in which modifications will be applied.
+     * It is used in a standard compare function, so lower numbered modifications will be applied before higher ones.
+     */
+    public abstract int getSortOrder();
+
 }

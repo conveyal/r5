@@ -81,4 +81,6 @@ public class RemoveTrips extends Modification {
         }
     }
 
+    public int getSortOrder() { return 60; }
+
 }

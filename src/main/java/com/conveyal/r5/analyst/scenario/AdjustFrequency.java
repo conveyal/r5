@@ -116,4 +116,6 @@ public class AdjustFrequency extends Modification {
         return newPattern;
     }
 
+    public int getSortOrder() { return 50; }
+
 }

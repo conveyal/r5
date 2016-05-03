@@ -80,7 +80,8 @@ public class AdjustFrequencyTest {
             exemplar1 = originalExemplar0;
         }
 
-        assertEquals(2, exemplar0.arrivals.length);
+        assertArrayEquals(new int[] { 0, 500 }, exemplar0.arrivals);
+        assertArrayEquals(new int[] { 0, 500 }, exemplar0.departures);
 
         assertArrayEquals(new int[] { entry.headwaySecs }, exemplar0.headwaySeconds);
         assertArrayEquals(new int[] { entry.startTime }, exemplar0.startTimes);
@@ -95,7 +96,9 @@ public class AdjustFrequencyTest {
         assertEquals(entry.saturday, service0.calendar.saturday == 1);
         assertEquals(entry.sunday, service0.calendar.sunday == 1);
 
-        assertEquals(2, exemplar1.arrivals.length);
+        // should be moved to have first arrival at 0
+        assertArrayEquals(new int[] { 0, 500 }, exemplar1.arrivals);
+        assertArrayEquals(new int[] { 0, 500 }, exemplar1.departures);
 
         assertArrayEquals(new int[] { entry2.headwaySecs }, exemplar1.headwaySeconds);
         assertArrayEquals(new int[] { entry2.startTime }, exemplar1.startTimes);
@@ -169,7 +172,8 @@ public class AdjustFrequencyTest {
         TripSchedule exemplar0 = twoStop.tripSchedules.get(0);
         TripSchedule exemplar1 = threeStop.tripSchedules.get(0);
 
-        assertEquals(2, exemplar0.arrivals.length);
+        assertArrayEquals(new int[] { 0, 500 }, exemplar0.arrivals);
+        assertArrayEquals(new int[] { 0, 500 }, exemplar0.departures);
 
         assertArrayEquals(new int[] { entry.headwaySecs }, exemplar0.headwaySeconds);
         assertArrayEquals(new int[] { entry.startTime }, exemplar0.startTimes);
@@ -184,7 +188,8 @@ public class AdjustFrequencyTest {
         assertEquals(entry.saturday, service0.calendar.saturday == 1);
         assertEquals(entry.sunday, service0.calendar.sunday == 1);
 
-        assertEquals(3, exemplar1.arrivals.length);
+        assertArrayEquals(new int[] { 0, 500, 1030 }, exemplar1.arrivals);
+        assertArrayEquals(new int[] { 0, 530, 1030 }, exemplar1.departures);
 
         assertArrayEquals(new int[] { entry2.headwaySecs }, exemplar1.headwaySeconds);
         assertArrayEquals(new int[] { entry2.startTime }, exemplar1.startTimes);

@@ -63,6 +63,9 @@ public class RaptorWorker {
     /** Minimum slack time to board transit in seconds. */
     public static final int BOARD_SLACK_SECONDS = 60;
 
+    /** How much to decrease the departure time between scheduled search iterations. */
+    private static final int DEPARTURE_STEP_SEC = 60;
+
     int max_time = 0;
     int round = 0;
     private int scheduledRounds = -1;
@@ -108,19 +111,27 @@ public class RaptorWorker {
 
     public BitSet servicesActive;
 
+    /**
+     * After each iteration (search at a single departure time with a specific Monte Carlo draw of schedules for
+     * frequency routes) we store the {@link RaptorState}.
+     */
     public List<RaptorState> statesEachIteration = new ArrayList<>();
 
+    /**
+     * After each iteration (search at a single departure time with a specific Monte Carlo draw of schedules for
+     * frequency routes) we store travel time to every target. (or arrival time? TODO clarify)
+     */
     public int[][] timesAtTargetsEachIteration;
 
     /**
-     * Should a particular iteration be included in averages?
-     * Extrema from the frequency search should not be.
+     * Whether each iteration (departure time / frequency draw) should be included in averages.
+     * The frequency searches that represent lower and upper bounds rather than randomly selected schedules
+     * should not be included in the averages.
      */
     public BitSet includeInAverages = new BitSet();
 
-    public RaptorWorker(TransitLayer data, LinkedPointSet targets, ProfileRequest req) {
+    public RaptorWorker (TransitLayer data, LinkedPointSet targets, ProfileRequest req) {
         this.data = data;
-        // these should only reflect the results of the (deterministic) scheduled search
         int nStops = data.streetVertexForStop.size();
 
         stopsTouched = new BitSet(nStops);
@@ -137,33 +148,36 @@ public class RaptorWorker {
         offsets = new FrequencyRandomOffsets(data);
     }
 
+    /**
+     * Prepare the RaptorWorker for the next RAPTOR round, copying or creating states as needed.
+     * If no previous departure minute or frequency draw has reached the next round before, initialize
+     * the next round from the current round. This function gets called in both scheduled searches and frequency
+     * searches, and the frequency search may proceed for more rounds than the scheduled search did.
+     * We always need to initialize the scheduled state here even when running a frequency search, because
+     * we copy that scheduled state to initialize each round of the frequency search.
+     */
     public void advance () {
-        // if we've never gotten to this round before, initialize from this round
-        // always advancing scheduleState here, copies for frequency routing are made in runRaptorFrequency
-        if (scheduleState.size() == round + 1)
+        if (scheduleState.size() == round + 1) {
             scheduleState.add(scheduleState.get(round).copy());
-
-        // otherwise copy best times forward
-        else
+        } else {
+            // Copy best times forward
             scheduleState.get(round + 1).min(scheduleState.get(round));
-
+        }
         round++;
-        //        timesPerStop = new int[data.nStops];
-        //        Arrays.fill(timesPerStop, UNREACHED);
-        //        timesPerStopPerRound.add(timesPerStop);
-        // uncomment to disable range-raptor
-        //Arrays.fill(bestTimes, UNREACHED);
     }
 
     /**
+     * This is the entry point to kick off a full RAPTOR search over many departure minutes randomizing
+     * frequency routes as needed.
      * @param accessTimes a map from transit stops to the time it takes to reach those stops
      * @param nonTransitTimes the time to reach all targets without transit. Targets can be vertices or points/samples.
      */
     public PropagatedTimesStore runRaptor (TIntIntMap accessTimes, PointSetTimes nonTransitTimes, TaskStatistics ts) {
         long beginCalcTime = System.currentTimeMillis();
-        TIntIntMap initialStops = new TIntIntHashMap();
+        TIntIntMap initialStops = new TIntIntHashMap(accessTimes);
         TIntIntIterator initialIterator = accessTimes.iterator();
         // TODO Isn't this just copying an int-int map into another one? Why reimplement map copy?
+        // It appears that we could just use accessTimes directly without even copying it.
         while (initialIterator.hasNext()) {
             initialIterator.advance();
             int stopIndex = initialIterator.key();
@@ -174,45 +188,52 @@ public class RaptorWorker {
             initialStops.put(stopIndex, accessTime);
         }
 
-        // we don't do propagation when generating a static site
+        // We don't propagate travel times from stops out to the targets or street intersections when generating
+        // a static site because the Javascript client does the propagation.
         boolean doPropagation = targets != null;
 
+        // In normal usage propagatedTimesStore is null here, but in tests a custom one may have been injected.
         if (propagatedTimesStore == null) {
-            if (doPropagation)
+            if (doPropagation) {
+                // Store min, max, avg travel times to all search targets (a set of points of interest in a PointSet)
                 propagatedTimesStore = new PropagatedTimesStore(targets.size());
-            else
+            } else {
+                // Store all the travel times (not averages) to all transit stops.
                 propagatedTimesStore = new StaticPropagatedTimesStore(data.getStopCount());
+            }
         }
 
         int nTargets = targets != null ? targets.size() : data.getStopCount();
 
-        // optimization: if no schedules, only run Monte Carlo
+        // Optimization: if there are no scheduled routes, only run Monte Carlo frequencies
         int fromTime = req.fromTime;
         int monteCarloDraws = MONTE_CARLO_COUNT_PER_MINUTE;
         if (!data.hasSchedules) {
             // only do one iteration
-            fromTime = req.toTime - 60;
+            // FIXME this is not actually correct when the frequencies are changing over the departure time window
+            fromTime = req.toTime - DEPARTURE_STEP_SEC;
             monteCarloDraws = TOTAL_MONTE_CARLO_COUNT;
         }
 
-        // if no frequencies, don't run Monte Carlo
-        int iterations = (req.toTime - fromTime - 60) / 60 + 1;
+        // If there are no frequency routes, we don't do any Monte Carlo draws within departure minutes.
+        // i.e. only a single RAPTOR search is run per departure minute.
+        // If we do Monte Carlo, we do more iterations. But we only do Monte Carlo when we have frequencies.
 
-        // if we do Monte Carlo, we do more iterations. But we only do monte carlo when we have frequencies.
-        // So only update the number of iterations when we're actually going to use all of them, to
-        // avoid uninitialized arrays.
-        // if we multiply when we're not doing monte carlo, we'll end up with too many iterations.
-        if (data.hasFrequencies)
-            // we add 2 because we do two "fake" draws where we do min or max instead of a monte carlo draw
+        // First, set the number of iterations to the number of departure minutes.
+        int iterations = (req.toTime - fromTime - DEPARTURE_STEP_SEC) / DEPARTURE_STEP_SEC + 1;
+
+        // Now multiply the number of departure minutes by the number of Monte Carlo frequency draws per minute.
+        if (data.hasFrequencies) {
+            // We add 2 because we do two additional iterations for zero and maximal boarding times (not Monte Carlo draws).
             iterations *= (monteCarloDraws + 2);
+        }
 
         ts.searchCount = iterations;
 
-        // Iterate backward through minutes (range-raptor) taking a snapshot of router state after each call
+        // We will iterate backward through minutes (range-raptor) taking a snapshot travel times to targets after each iteration.
         timesAtTargetsEachIteration = new int[iterations][nTargets];
 
-        // TODO don't hardwire timestep below
-        ts.timeStep = 60;
+        ts.timeStep = DEPARTURE_STEP_SEC;
 
         // times at targets from scheduled search
         // we keep a single output array with clock times, and range raptor updates it only as needed as the departure
@@ -220,13 +241,13 @@ public class RaptorWorker {
         int[] scheduledTimesAtTargets = new int[nTargets];
         Arrays.fill(scheduledTimesAtTargets, UNREACHED);
 
-        // current iteration
-        int iteration = 0;
+        int iteration = 0; // The current iteration (over all departure minutes and Monte Carlo draws)
+        int minuteNumber = 0; // How many different departure minutes have been hit so far, for display purposes.
 
         // FIXME this should be changed to tolerate a zero-width time range
-        for (int departureTime = req.toTime - 60, n = 0; departureTime >= fromTime; departureTime -= 60, n++) {
-            if (n % 15 == 0) {
-                LOG.info("minute {}", n);
+        for (int departureTime = req.toTime - DEPARTURE_STEP_SEC; departureTime >= fromTime; departureTime -= DEPARTURE_STEP_SEC) {
+            if (minuteNumber++ % 15 == 0) {
+                LOG.info("minute {}", minuteNumber);
             }
 
             final int departureTimeFinal = departureTime;

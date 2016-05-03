@@ -54,7 +54,8 @@ public class InactiveTripsFilter extends Modification {
         return false;
     }
 
-
+    @Override
+    public int getSortOrder() { return -10; }
 
     /**
      * For each trip within a pattern, check whether that trip occurs on the supplied date and during the supplied

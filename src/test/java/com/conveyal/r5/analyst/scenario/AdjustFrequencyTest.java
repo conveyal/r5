@@ -59,6 +59,7 @@ public class AdjustFrequencyTest {
         scenario.modifications = Arrays.asList(af);
         TransportNetwork mod = scenario.applyToTransportNetwork(network);
 
+        // Trip patterns not referred to by entries should be wiped
         assertEquals(1, mod.transitLayer.tripPatterns.size());
 
         TripPattern pattern = mod.transitLayer.tripPatterns.get(0);
@@ -80,10 +81,10 @@ public class AdjustFrequencyTest {
         }
 
         assertEquals(2, exemplar0.arrivals.length);
-        assertEquals(1, exemplar0.headwaySeconds.length);
 
-        assertEquals(entry.headwaySecs, exemplar0.headwaySeconds[0]);
-        assertEquals(entry.startTime, exemplar0.startTimes[0]);
+        assertArrayEquals(new int[] { entry.headwaySecs }, exemplar0.headwaySeconds);
+        assertArrayEquals(new int[] { entry.startTime }, exemplar0.startTimes);
+        assertArrayEquals(new int[] { entry.endTime }, exemplar0.endTimes);
 
         Service service0 = mod.transitLayer.services.get(exemplar0.serviceCode);
         assertEquals(entry.monday, service0.calendar.monday == 1);
@@ -95,10 +96,99 @@ public class AdjustFrequencyTest {
         assertEquals(entry.sunday, service0.calendar.sunday == 1);
 
         assertEquals(2, exemplar1.arrivals.length);
-        assertEquals(1, exemplar1.headwaySeconds.length);
 
-        assertEquals(entry2.headwaySecs, exemplar1.headwaySeconds[0]);
-        assertEquals(entry2.startTime, exemplar1.startTimes[0]);
+        assertArrayEquals(new int[] { entry2.headwaySecs }, exemplar1.headwaySeconds);
+        assertArrayEquals(new int[] { entry2.startTime }, exemplar1.startTimes);
+        assertArrayEquals(new int[] { entry2.endTime }, exemplar1.endTimes);
+
+        Service service1 = mod.transitLayer.services.get(exemplar1.serviceCode);
+        assertEquals(entry2.monday, service1.calendar.monday == 1);
+        assertEquals(entry2.tuesday, service1.calendar.tuesday == 1);
+        assertEquals(entry2.wednesday, service1.calendar.wednesday == 1);
+        assertEquals(entry2.thursday, service1.calendar.thursday == 1);
+        assertEquals(entry2.friday, service1.calendar.friday == 1);
+        assertEquals(entry2.saturday, service1.calendar.saturday == 1);
+        assertEquals(entry2.sunday, service1.calendar.sunday == 1);
+
+        // make sure we didn't modify base network
+        network.transitLayer.tripPatterns.forEach(tp -> {
+            assertTrue(tp.hasSchedules);
+            assertFalse(tp.hasFrequencies);
+        });
+
+        assertEquals(checksum, network.checksum());
+    }
+
+    /** Test converting multiple patterns of a route to frequency representations */
+    @Test
+    public void testConvertingMultiplePatternsToFrequency () {
+        AdjustFrequency af = new AdjustFrequency();
+        af.route = "MULTIPLE_PATTERNS:route";
+
+        AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();
+        entry.headwaySecs = 900;
+        entry.startTime = 6 * 3600;
+        entry.endTime = 16 * 3600;
+        entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = entry.saturday = entry.sunday = true;
+        entry.sourceTrip = "MULTIPLE_PATTERNS:trip25200"; // trip25200 is a two-stop trip
+
+        AddTrips.PatternTimetable entry2 = new AddTrips.PatternTimetable();
+        entry2.headwaySecs = 1200;
+        entry2.startTime = 16 * 3600;
+        entry2.endTime = 22 * 3600;
+        entry2.monday = entry2.tuesday = entry2.wednesday = entry2.thursday = entry2.friday = entry2.saturday = entry2.sunday = true;
+        entry2.sourceTrip = "MULTIPLE_PATTERNS:trip25800"; // trip25800 is a three-stop trip
+
+        af.entries = Arrays.asList(entry, entry2);
+
+        Scenario scenario = new Scenario();
+        scenario.modifications = Arrays.asList(af);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+
+        // both trip patterns should be still present
+        assertEquals(2, mod.transitLayer.tripPatterns.size());
+
+        TripPattern twoStop = null, threeStop = null;
+
+        for (TripPattern tp : mod.transitLayer.tripPatterns) {
+            if (tp.stops.length == 2) twoStop = tp;
+            else if (tp.stops.length == 3) threeStop = tp;
+        }
+
+        assertNotNull(twoStop);
+        assertNotNull(threeStop);
+
+        assertTrue(twoStop.hasFrequencies);
+        assertFalse(twoStop.hasSchedules);
+        assertTrue(threeStop.hasFrequencies);
+        assertFalse(threeStop.hasSchedules);
+
+        assertEquals(1, twoStop.tripSchedules.size());
+        assertEquals(1, threeStop.tripSchedules.size());
+
+        TripSchedule exemplar0 = twoStop.tripSchedules.get(0);
+        TripSchedule exemplar1 = threeStop.tripSchedules.get(0);
+
+        assertEquals(2, exemplar0.arrivals.length);
+
+        assertArrayEquals(new int[] { entry.headwaySecs }, exemplar0.headwaySeconds);
+        assertArrayEquals(new int[] { entry.startTime }, exemplar0.startTimes);
+        assertArrayEquals(new int[] { entry.endTime }, exemplar0.endTimes);
+
+        Service service0 = mod.transitLayer.services.get(exemplar0.serviceCode);
+        assertEquals(entry.monday, service0.calendar.monday == 1);
+        assertEquals(entry.tuesday, service0.calendar.tuesday == 1);
+        assertEquals(entry.wednesday, service0.calendar.wednesday == 1);
+        assertEquals(entry.thursday, service0.calendar.thursday == 1);
+        assertEquals(entry.friday, service0.calendar.friday == 1);
+        assertEquals(entry.saturday, service0.calendar.saturday == 1);
+        assertEquals(entry.sunday, service0.calendar.sunday == 1);
+
+        assertEquals(3, exemplar1.arrivals.length);
+
+        assertArrayEquals(new int[] { entry2.headwaySecs }, exemplar1.headwaySeconds);
+        assertArrayEquals(new int[] { entry2.startTime }, exemplar1.startTimes);
+        assertArrayEquals(new int[] { entry2.endTime }, exemplar1.endTimes);
 
         Service service1 = mod.transitLayer.services.get(exemplar1.serviceCode);
         assertEquals(entry2.monday, service1.calendar.monday == 1);

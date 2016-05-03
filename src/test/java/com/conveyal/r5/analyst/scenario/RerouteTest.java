@@ -11,6 +11,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.stream.IntStream;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
@@ -245,6 +246,92 @@ public class RerouteTest {
             // at s3, and back to original 500 sec travel time to s4 and 0 sec dwell time at s4, from FakeGraph
             assertArrayEquals(new int[] { 0, 500, 540, 595, 1115, 1645 }, a);
             assertArrayEquals(new int[] { 0, 510, 555, 615, 1145, 1645 }, d);
+        }
+
+        assertEquals(checksum, network.checksum());
+    }
+
+    /** test diverting the end of a route, i.e. removing some stops and replacing them with others. */
+    @Test
+    public void testDivertEnd () {
+        Reroute rr = new Reroute();
+        rr.routes = set("SINGLE_LINE:route");
+        rr.stops = Collections.singletonList(new StopSpec("SINGLE_LINE:s5"));
+        rr.hopTimes = new int[] { 60 };
+        rr.dwellTimes = new int[] { 15, 25 };
+        rr.fromStop = "SINGLE_LINE:s3";
+
+        Scenario scenario = new Scenario();
+        scenario.modifications = Collections.singletonList(rr);
+
+        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+
+        assertEquals(1, mod.transitLayer.tripPatterns.size());
+
+        TripPattern pattern = mod.transitLayer.tripPatterns.get(0);
+
+        // make sure the stops are in the right order
+        assertEquals(4, pattern.stops.length);
+        assertEquals("SINGLE_LINE:s1", mod.transitLayer.stopIdForIndex.get(pattern.stops[0]));
+        assertEquals("SINGLE_LINE:s2", mod.transitLayer.stopIdForIndex.get(pattern.stops[1]));
+        assertEquals("SINGLE_LINE:s3", mod.transitLayer.stopIdForIndex.get(pattern.stops[2]));
+        assertEquals("SINGLE_LINE:s5", mod.transitLayer.stopIdForIndex.get(pattern.stops[3]));
+
+        for (TripSchedule schedule : pattern.tripSchedules) {
+            // slightly awkward, but make sure that the trip starts at the same time it did before
+            assertEquals("SINGLE_LINE:trip" + schedule.arrivals[0], schedule.tripId);
+
+            int[] a = IntStream.of(schedule.arrivals).map(time -> time - schedule.arrivals[0]).toArray();
+            int[] d = IntStream.of(schedule.departures).map(time -> time - schedule.arrivals[0]).toArray();
+
+            // confirm the times are correct. Note that first and last stop of original route don't have a dwell time
+            // so 0 sec dwell at s1, then 500 sec travel time to s2 and 30 sec dwell time there, 500 sec travel time
+            // to s3, 15 sec dwell at s3 from modification, 60 sec travel time to s5, and 25 sec dwell time at s5.
+            assertArrayEquals(new int[] { 0, 500, 1030, 1105 }, a);
+            assertArrayEquals(new int[] { 0, 530, 1045, 1130 }, d);
+        }
+
+        assertEquals(checksum, network.checksum());
+    }
+
+    /** test diverting the end of a route, i.e. removing some stops and replacing them with others. */
+    @Test
+    public void testDivertStart () {
+        Reroute rr = new Reroute();
+        rr.routes = set("SINGLE_LINE:route");
+        rr.stops = Collections.singletonList(new StopSpec("SINGLE_LINE:s5"));
+        rr.hopTimes = new int[] { 60 };
+        rr.dwellTimes = new int[] { 15, 25 };
+        rr.toStop = "SINGLE_LINE:s2";
+
+        Scenario scenario = new Scenario();
+        scenario.modifications = Collections.singletonList(rr);
+
+        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+
+        assertEquals(1, mod.transitLayer.tripPatterns.size());
+
+        TripPattern pattern = mod.transitLayer.tripPatterns.get(0);
+
+        // make sure the stops are in the right order
+        assertEquals(4, pattern.stops.length);
+        assertEquals("SINGLE_LINE:s5", mod.transitLayer.stopIdForIndex.get(pattern.stops[0]));
+        assertEquals("SINGLE_LINE:s2", mod.transitLayer.stopIdForIndex.get(pattern.stops[1]));
+        assertEquals("SINGLE_LINE:s3", mod.transitLayer.stopIdForIndex.get(pattern.stops[2]));
+        assertEquals("SINGLE_LINE:s4", mod.transitLayer.stopIdForIndex.get(pattern.stops[3]));
+
+        for (TripSchedule schedule : pattern.tripSchedules) {
+            // slightly awkward, but make sure that the trip starts at the same time it did before
+            assertEquals("SINGLE_LINE:trip" + schedule.arrivals[0], schedule.tripId);
+
+            int[] a = IntStream.of(schedule.arrivals).map(time -> time - schedule.arrivals[0]).toArray();
+            int[] d = IntStream.of(schedule.departures).map(time -> time - schedule.arrivals[0]).toArray();
+
+            // confirm the times are correct. Note that first and last stop of original route don't have a dwell time
+            // so 15 sec dwell at s5 from modification, 60 sec travel time, 25 sec dwell at s2, then 500 sec travel times and
+            // 30 sec dwell times to s4, and 0 sec dwell at s4.
+            assertArrayEquals(new int[] { 0, 75, 600, 1130 }, a);
+            assertArrayEquals(new int[] { 15, 100, 630, 1130 }, d);
         }
 
         assertEquals(checksum, network.checksum());

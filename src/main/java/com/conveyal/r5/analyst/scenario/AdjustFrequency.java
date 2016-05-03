@@ -7,15 +7,12 @@ import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import org.eclipse.jetty.util.MultiMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.BitSet;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -78,23 +75,32 @@ public class AdjustFrequency extends Modification {
             // This pattern is not on the route to be frequency-adjusted.
             return originalPattern;
         }
-        // Retain clones of the TripSchedules for those trips, dropping all others, and then update the retained
-        // TripSchedules to be frequency entries.
+        // This pattern is on the route to be frequency-converted.
+        // Retain clones of the TripSchedules for those trips mentioned in any PatternTimetable.
+        // Drop all other TripSchedules, and then update the retained TripSchedules to be frequency entries.
         TripPattern newPattern = originalPattern.clone();
         newPattern.tripSchedules = new ArrayList<>();
         newPattern.servicesActive = new BitSet();
         for (TripSchedule originalSchedule : originalPattern.tripSchedules) {
+            // Grab all the frequency specification entries that reference this TripSchedule's tripId and create
+            // one new TripSchedule for each of them. It would be theoretically possible to have a single trip schedule
+            // represent several frequency entries by having more entries in headway seconds, but then we would have to
+            // sort out whether they have service on the same day, &c., so we just create a new trip schedule for each
+            // entry.
             for (PatternTimetable entry : entriesByTrip.get(originalSchedule.tripId)) {
                 TripSchedule newSchedule = originalSchedule.clone();
-
-                // It would be theoretically possible to have a single trip schedule represent several
-                // frequency entries by having more entries in headway seconds, but then we would have to sort out
-                // whether they have service on the same day, &c., so we just create a new trip schedule for each
-                // entry
+                newSchedule.arrivals = originalSchedule.arrivals.clone();
+                newSchedule.departures = originalSchedule.departures.clone();
+                // Adjust the arrival and departure times of this trip to be zero-based, since that's what R5 expects.
+                int offset = originalSchedule.arrivals[0];
+                for (int i = 0; i < originalSchedule.getNStops(); i++) {
+                    newSchedule.arrivals[i] = originalSchedule.arrivals[i] - offset;
+                    newSchedule.departures[i] = originalSchedule.departures[i] - offset;
+                }
                 newSchedule.headwaySeconds = new int[]{entry.headwaySecs};
                 newSchedule.startTimes = new int[]{entry.startTime};
                 newSchedule.endTimes = new int[]{entry.endTime};
-                // New service's code will be the number of services already in the list.
+                // The newly created service's code will be the number of services already in the list.
                 newSchedule.serviceCode = servicesCopy.size();
                 servicesCopy.add(AddTrips.createService(entry));
                 newPattern.servicesActive.set(newSchedule.serviceCode);

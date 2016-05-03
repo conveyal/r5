@@ -59,7 +59,7 @@ public class AdjustDwellTest {
         assertEquals(checksum, network.checksum());
     }
 
-    /** Confirm that setting a dwell time of zero works (since zero is also Java's default value */
+    /** Confirm that setting a dwell time of zero works (since zero is also Java's default value) */
     @Test
     public void testSetZeroDwellTimeRoute () {
         // confirm that the dwell times are what they should be in the source network

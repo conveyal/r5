@@ -7,9 +7,11 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.stream.IntStream;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
 import static com.conveyal.r5.analyst.scenario.FakeGraph.set;
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -108,8 +110,16 @@ public class AdjustSpeedTest {
         int expectedTripLength = FakeGraph.TRAVEL_TIME  + FakeGraph.TRAVEL_TIME / 2 * 2 + FakeGraph.DWELL_TIME * 2;
 
         for (TripSchedule schedule : mod.transitLayer.tripPatterns.get(0).tripSchedules) {
-            int newTripLength = schedule.departures[schedule.departures.length - 1] - schedule.arrivals[0];
-            assertEquals(expectedTripLength, newTripLength, 2); // epsilon of 2 seconds to account for rounding errors
+            // confirm the times are correct
+            int[] a = IntStream.of(schedule.arrivals).map(time -> time - schedule.arrivals[0]).toArray();
+            int[] d = IntStream.of(schedule.departures).map(time -> time - schedule.arrivals[0]).toArray();
+
+            // slightly awkward, but make sure that the trip starts at the same time as it did before
+            // TODO user-settable zero point for modification
+            assertEquals("SINGLE_LINE:trip" + schedule.arrivals[0], schedule.tripId);
+
+            assertArrayEquals(new int[] { 0, 500, 780, 1060 }, a);
+            assertArrayEquals(new int[] { 0, 530, 810, 1060 }, d);
         }
 
         assertEquals(checksum, network.checksum());

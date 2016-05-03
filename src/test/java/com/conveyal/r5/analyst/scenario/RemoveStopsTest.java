@@ -1,11 +1,14 @@
 package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TripPattern;
+import com.conveyal.r5.transit.TripSchedule;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.stream.IntStream;
 
 import static org.junit.Assert.*;
 import static com.conveyal.r5.analyst.scenario.FakeGraph.*;
@@ -46,6 +49,49 @@ public class RemoveStopsTest {
         // but no trips should stop at s2
         assertFalse(mod.transitLayer.tripPatterns.stream()
                 .anyMatch(tp -> tp.stops.length == 3 && "MULTIPLE_PATTERNS:s2".equals(mod.transitLayer.stopIdForIndex.get(tp.stops[1]))));
+
+        // make sure the times are correct
+        // One trip pattern did not ever stop at s2, while one trip pattern had s2 removed
+        TripPattern original = null, modified = null;
+
+        assertEquals(2, mod.transitLayer.tripPatterns.size());
+
+        for (TripPattern pattern : mod.transitLayer.tripPatterns) {
+            if (pattern.tripSchedules.stream().anyMatch(ts -> "MULTIPLE_PATTERNS:trip25200".equals(ts.tripId))) {
+                // two-stop trip
+                original = pattern;
+            } else {
+                modified = pattern;
+            }
+        }
+
+        assertNotNull(original);
+        assertNotNull(modified);
+
+        for (TripSchedule schedule : original.tripSchedules) {
+            // confirm the times are correct
+            int[] a = IntStream.of(schedule.arrivals).map(time -> time - schedule.arrivals[0]).toArray();
+            int[] d = IntStream.of(schedule.departures).map(time -> time - schedule.arrivals[0]).toArray();
+
+            // slightly awkward, but make sure that the trip starts at the same time as it did before
+            assertEquals("MULTIPLE_PATTERNS:trip" + schedule.arrivals[0], schedule.tripId);
+
+            assertArrayEquals(new int[] { 0, 500  }, a);
+            assertArrayEquals(new int[] { 0, 500 }, d);
+        }
+
+        for (TripSchedule schedule : modified.tripSchedules) {
+            // confirm the times are correct
+            int[] a = IntStream.of(schedule.arrivals).map(time -> time - schedule.arrivals[0]).toArray();
+            int[] d = IntStream.of(schedule.departures).map(time -> time - schedule.arrivals[0]).toArray();
+
+            // slightly awkward, but make sure that the trip starts at the same time as it did before
+            assertEquals("MULTIPLE_PATTERNS:trip" + schedule.arrivals[0], schedule.tripId);
+
+            // dwell time should be gone but travel time should remain
+            assertArrayEquals(new int[] { 0, 1000  }, a);
+            assertArrayEquals(new int[] { 0, 1000 }, d);
+        }
 
         // network checksum should not change
         assertEquals(checksum, network.checksum());

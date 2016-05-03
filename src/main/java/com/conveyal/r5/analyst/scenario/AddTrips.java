@@ -124,16 +124,13 @@ public class AddTrips extends Modification {
         TripPattern pattern = new TripPattern(intStopIds);
         LOG.info("Created {}.", pattern);
         for (PatternTimetable timetable : frequencies) {
-            // CreateSchedules may create more than one if we're in non-frequency ("exact-times") mode.
-            for (TripSchedule schedule : createSchedules(timetable, transitLayer.services)) {
-                if (schedule == null) {
-                    LOG.error("Failed to create a trip.");
-                    continue;
-                }
-                pattern.addTrip(schedule);
-                transitLayer.hasFrequencies |= timetable.frequency;
-                transitLayer.hasSchedules |= !timetable.frequency;
+            TripSchedule schedule = createSchedule(timetable, transitLayer.services);
+            if (schedule == null) {
+                warnings.add("Failed to create a trip.");
+                continue;
             }
+            pattern.addTrip(schedule);
+            transitLayer.hasFrequencies = true;
         }
         transitLayer.tripPatterns.add(pattern);
     }
@@ -152,9 +149,6 @@ public class AddTrips extends Modification {
 
         /** The time in seconds the vehicle waits at each stop. Used only in AddTrips, not AdjustFrequency. */
         public int[] dwellTimes;
-
-        /** If true, create a frequency entry rather than a bundle of scheduled trips. */
-        public boolean frequency;
 
         /** Start time of the first frequency-based trip in seconds since GTFS midnight. */
         public int startTime;
@@ -207,19 +201,22 @@ public class AddTrips extends Modification {
     }
 
     /**
-     * Creates one or more R5 TripSchedule objects from a PatternTimetable object that was deserialized from JSON.
-     * These represent either independent trips, or a frequency-based family of trips.
+     * Creates an R5 TripSchedule object from a PatternTimetable object that was deserialized from JSON.
+     * These represent a truly frequency-based family of trips (non-exact-times in GTFS parlance).
      * The supplied list of services will be extended with a new service,
-     * whose code will be saved int the new TripSchedule.
-     * Make sure the supplied list is a protective copy, not the one from the original TransportNetwork!
+     * whose code will be saved in the new TripSchedule.
+     * Make sure the supplied service list is a protective copy, not the one from the original TransportNetwork!
      */
-    public List<TripSchedule> createSchedules (PatternTimetable timetable, List<Service> services) {
-        int serviceCode = services.size(); // Code of a newly added Service will be the number of services in the list.
+    public TripSchedule createSchedule (PatternTimetable timetable, List<Service> services) {
+
+        // The code for a newly added Service will be the number of services already in the list.
+        int serviceCode = services.size();
         services.add(createService(timetable));
 
         // Create a dummy GTFS Trip object so we can use the standard TripSchedule factory method.
         Trip trip = new Trip();
-        trip.direction_id = 0;
+        trip.direction_id = 0; // FIXME this should probably be 1 when we create the reverse pattern
+
         // Convert the supplied hop and dwell times (which are relative to adjacent entries) to arrival and departure
         // times (which are relative to the beginning of the trip or the beginning of the service day).
         int nStops = stops.size();
@@ -233,29 +230,15 @@ public class AddTrips extends Modification {
                 t += timetable.hopTimes[s];
             }
         }
-        List<TripSchedule> schedules = new ArrayList<>();
-        if (timetable.frequency) {
-            Frequency freq = new Frequency();
-            freq.start_time = timetable.startTime;
-            freq.end_time = timetable.endTime;
-            freq.headway_secs = timetable.headwaySecs;
-            trip.frequencies = Lists.newArrayList(freq);
-            schedules.add(TripSchedule.create(trip, arrivals, departures, IntStream.range(0, arrivals.length).toArray(), serviceCode));
-        } else {
-            // TODO if the trip is not a frequency trip should we be creating multiple schedules?
-            // my understanding had been that when frequency == false, endTime and headway are ignored and the trip is
-            // assumed to only run once.
-            for (int t = timetable.startTime; t < timetable.endTime; t += timetable.headwaySecs) {
-                int[] shiftedArrivals = new int[arrivals.length];
-                int[] shiftedDepartures = new int[departures.length];
-                for (int i = 0; i < nStops; i++) {
-                    shiftedArrivals[i] = arrivals[i] + t;
-                    shiftedDepartures[i] = departures[i] + t;
-                }
-                schedules.add(TripSchedule.create(trip, shiftedArrivals, shiftedDepartures, IntStream.range(0, arrivals.length).toArray(), serviceCode));
-            }
-        }
-        return schedules;
+
+        // Create an R5 frequency entry and attach it to the new trip, then convert this to a TripSchedule
+        Frequency freq = new Frequency();
+        freq.start_time = timetable.startTime;
+        freq.end_time = timetable.endTime;
+        freq.headway_secs = timetable.headwaySecs;
+        trip.frequencies = Lists.newArrayList(freq);
+        return TripSchedule.create(trip, arrivals, departures, IntStream.range(0, arrivals.length).toArray(), serviceCode);
+
     }
 
     @Override

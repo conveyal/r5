@@ -28,18 +28,15 @@ import java.util.List;
 import java.util.stream.IntStream;
 
 /**
- * This is an exact copy of RaptorWorker that's being modified to work with (new) TransitNetworks
- * instead of (old) Graphs. We can afford the maintainability nightmare of duplicating so much code because this is
- * intended to completely replace the old class soon.
+ * This is an exact copy of RaptorWorker that's being modified to work with new TransportNetworks (from R5)
+ * instead of (old) OTP Graphs. We can afford the maintainability nightmare of duplicating so much code because
+ * we will soon delete the old OTP-based raptor worker class entirely.
  *
- * A RaptorWorker carries out RAPTOR searches on a pre-filtered, compacted representation of all the trips running
- * during a given time window. It originated as a rewrite of our RAPTOR code that would use "thin workers", allowing
+ * This class originated as a rewrite of our RAPTOR code that would use "thin workers", allowing
  * computation by a generic function-execution service like AWS Lambda. The gains in efficiency were significant enough
- * that RaptorWorkers are now used in the context of a full-size OTP server executing spatial analysis tasks.
+ * that this is now the way we do all analysis work.
  *
- * We can imagine that someday all OTP searches, including simple point-to-point searches, may be carried out on such
- * compacted tables, including both the transit and street searches (via a compacted street network in a column store
- * or struct-like byte array using something like the FastSerialization library).
+ * This system also accounts for pure-frequency routes by using Monte Carlo methods (generating randomized schedules).
  *
  * This implements the RAPTOR algorithm; see http://research.microsoft.com/pubs/156567/raptor_alenex.pdf
  */
@@ -48,14 +45,15 @@ public class RaptorWorker {
     private static final Logger LOG = LoggerFactory.getLogger(RaptorWorker.class);
     public static final int UNREACHED = Integer.MAX_VALUE;
     static final int MAX_DURATION = Integer.MAX_VALUE - 48 * 60 * 60;
+
     /**
      * The number of randomized frequency schedule draws to take for each minute of the search.
      *
-     * We loop over all departure minutes and do a schedule search, and then run this many Monte Carlo
-     * searches with randomized frequency schedules within each minute. It does not need to be particularly
+     * We loop over all departure minutes and do a search on the scheduled portion of the network, and then while
+     * holding the departure minute and scheduled search results stable, we run this many Monte Carlo searches with
+     * randomized frequency schedules that minute. The number of Monte Carlo draws does not need to be particularly
      * high as it happens each minute, and there is likely a lot of repetition in the scheduled service
-     * (i.e. many minutes look like each other), so several minutes' monte carlo draws are effectively
-     * pooled.
+     * (i.e. many minutes look like each other), so several minutes' Monte Carlo draws are effectively pooled.
      */
     public int MONTE_CARLO_COUNT_PER_MINUTE = 1;
 
@@ -69,27 +67,37 @@ public class RaptorWorker {
     int round = 0;
     private int scheduledRounds = -1;
 
-    /** Single raptor state for scheduled search, as we can use range-raptor on the scheduled search */
+    /**
+     * One {@link RaptorState} per round of the scheduled search. We don't need to keep a separate RaptorState at each
+     * departure minute because we use range-raptor on the scheduled search. We step backward through the departure
+     * minutes and reuse the RaptorStates.
+     */
     List<RaptorState> scheduleState;
 
     TransitLayer data;
 
-    /** stops touched this round */
+    /** Patterns touched during this round. */
+    BitSet patternsTouched;
+
+    /** Stops touched during this round. */
     BitSet stopsTouched;
 
     /**
-     * stops touched during this search, either a scheduled search at a particular minute, or a frequency search
-     * with a particular draw. Used in propagation. Cleared before each search; to make sure propagation is done correctly,
-     * it must be done at every minute of the scheduled search, and after every draw of the frequencies. Propagation output
-     * tables are saved between minutes, and copied from the scheduled search to the frequency search, so we only need to
-     * do propagation from stops that have been touched in a particular search, an update the tables.
+     * Stops touched during this search (with "search" meaning either a scheduled search at a particular minute,
+     * or one particular draw within a departure minute when working with frequency routes).
+     * Used in propagating travel times out to targets.
+     * Cleared before each search; in order for propagation to be correct, doPropagation must be called after every
+     * minute of the scheduled search, and after each search for a frequency draw. The propagation output table for
+     * the scheduled search at minute M is saved and reused in the scheduled search for minute M-1.
+     * The propagation output table for a scheduled search is also copied into each of the frequency searches within
+     * that same minute, so we only need to do propagation from stops that have been touched in a particular search,
+     * and update the tables.
      */
     BitSet allStopsTouched;
 
-    BitSet patternsTouched;
-
     private ProfileRequest req;
 
+    /** Clock time spent on propagation, for display and debugging. */
     private long totalPropagationTime = 0;
 
     private FrequencyRandomOffsets offsets;
@@ -104,8 +112,10 @@ public class RaptorWorker {
 
     public int[][] timesAtTargetsEachIteration;
 
-    // should a particular iteration be included in averages?
-    // extrema from the frequency search should not be.
+    /**
+     * Should a particular iteration be included in averages?
+     * Extrema from the frequency search should not be.
+     */
     public BitSet includeInAverages = new BitSet();
 
     public RaptorWorker(TransitLayer data, LinkedPointSet targets, ProfileRequest req) {

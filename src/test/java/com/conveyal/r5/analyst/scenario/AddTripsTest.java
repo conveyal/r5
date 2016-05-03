@@ -15,6 +15,7 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -344,6 +345,100 @@ public class AddTripsTest {
         assertEquals(entry.friday, service0.calendar.friday == 1);
         assertEquals(entry.saturday, service0.calendar.saturday == 1);
         assertEquals(entry.sunday, service0.calendar.sunday == 1);
+
+        assertEquals(checksum, network.checksum());
+    }
+
+    @Test
+    public void testMultipleFrequencyEntries () {
+        AddTrips at = new AddTrips();
+        at.bidirectional = false;
+        at.stops = Arrays.asList(
+                new StopSpec("SINGLE_LINE:s1"),
+                new StopSpec("SINGLE_LINE:s2"),
+                new StopSpec("SINGLE_LINE:s3")
+        );
+        at.mode = Route.BUS;
+
+        AddTrips.PatternTimetable entry0 = new AddTrips.PatternTimetable();
+        entry0.headwaySecs = 1200;
+        entry0.monday = entry0.tuesday = entry0.wednesday = entry0.thursday = entry0.friday = false;
+        entry0.saturday = entry0.sunday = true;
+        entry0.hopTimes = new int[] { 140, 160 };
+        entry0.dwellTimes = new int[] { 0, 30, 0 };
+        entry0.startTime = 11 * 3600;
+        entry0.endTime = 16 * 3600;
+
+        AddTrips.PatternTimetable entry1 = new AddTrips.PatternTimetable();
+        entry1.headwaySecs = 900;
+        entry1.monday = entry1.tuesday = entry1.wednesday = entry1.thursday = entry1.friday = true;
+        entry1.saturday = entry1.sunday = false;
+        entry1.hopTimes = new int[] { 120, 140 };
+        entry1.dwellTimes = new int[] { 0, 30, 0 };
+        entry1.startTime = 7 * 3600;
+        entry1.endTime = 10 * 3600;
+
+        at.frequencies = Arrays.asList(entry0, entry1);
+
+        Scenario scenario = new Scenario();
+        scenario.modifications = Collections.singletonList(at);
+
+        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+
+        // original pattern plus added pattern
+        assertEquals(2, mod.transitLayer.tripPatterns.size());
+
+        TripPattern pattern = mod.transitLayer.tripPatterns.stream()
+                .filter(tp -> !"SINGLE_LINE:route".equals(tp.routeId))
+                .findFirst()
+                .orElse(null);
+
+        assertNotNull(pattern);
+
+        // one from each entry
+        assertEquals(2, pattern.tripSchedules.size());
+
+        TripSchedule schedule0 = null, schedule1 = null;
+
+        for (TripSchedule schedule : pattern.tripSchedules) {
+            if (schedule.headwaySeconds[0] == entry0.headwaySecs) schedule0 = schedule;
+            else schedule1 = schedule;
+        }
+
+        assertNotNull(schedule0);
+        assertNotNull(schedule1);
+
+        assertArrayEquals(new int[] { 0, 140, 330 }, schedule0.arrivals);
+        assertArrayEquals(new int[] { 0, 170, 330 }, schedule0.departures);
+
+        assertArrayEquals(new int[] { entry0.headwaySecs }, schedule0.headwaySeconds);
+        assertArrayEquals(new int[] { entry0.startTime }, schedule0.startTimes);
+        assertArrayEquals(new int[] { entry0.endTime }, schedule0.endTimes);
+
+        Service service0 = mod.transitLayer.services.get(schedule0.serviceCode);
+        assertEquals(entry0.monday, service0.calendar.monday == 1);
+        assertEquals(entry0.tuesday, service0.calendar.tuesday == 1);
+        assertEquals(entry0.wednesday, service0.calendar.wednesday == 1);
+        assertEquals(entry0.thursday, service0.calendar.thursday == 1);
+        assertEquals(entry0.friday, service0.calendar.friday == 1);
+        assertEquals(entry0.saturday, service0.calendar.saturday == 1);
+        assertEquals(entry0.sunday, service0.calendar.sunday == 1);
+
+        assertArrayEquals(new int[] { 0, 120, 290 }, schedule1.arrivals);
+        assertArrayEquals(new int[] { 0, 150, 290 }, schedule1.departures);
+
+        assertArrayEquals(new int[] { entry1.headwaySecs }, schedule1.headwaySeconds);
+        assertArrayEquals(new int[] { entry1.startTime }, schedule1.startTimes);
+        assertArrayEquals(new int[] { entry1.endTime }, schedule1.endTimes);
+
+        Service service1 = mod.transitLayer.services.get(schedule1.serviceCode);
+        assertEquals(entry1.monday, service1.calendar.monday == 1);
+        assertEquals(entry1.tuesday, service1.calendar.tuesday == 1);
+        assertEquals(entry1.wednesday, service1.calendar.wednesday == 1);
+        assertEquals(entry1.thursday, service1.calendar.thursday == 1);
+        assertEquals(entry1.friday, service1.calendar.friday == 1);
+        assertEquals(entry1.saturday, service1.calendar.saturday == 1);
+        assertEquals(entry1.sunday, service1.calendar.sunday == 1);
 
         assertEquals(checksum, network.checksum());
     }

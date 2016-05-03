@@ -52,7 +52,6 @@ public class AnalystClusterRequest extends GenericClusterRequest implements Seri
         this(destinationPointsetId, graphId);
         profileRequest = req.clone();
 
-        profileRequest.analyst = true;
         profileRequest.toLat = profileRequest.fromLat;
         profileRequest.toLon = profileRequest.fromLon;
     }

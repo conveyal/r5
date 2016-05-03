@@ -120,9 +120,6 @@ public class ProfileRequest implements Serializable, Cloneable {
     @JsonSerialize(using = TransitModeSetSerializer.class)
     @JsonDeserialize(using = TransitModeSetDeserializer.class)
     public EnumSet<TransitModes> transitModes;
-    
-    /** If true, disable all goal direction and propagate results to the street network */
-    public boolean analyst = false;
 
     /**
      * What is the minimum proportion of the time for which a destination must be accessible for it to be included in

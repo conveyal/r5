@@ -582,7 +582,11 @@ public class StreetRouter {
         public State(int atVertex, int viaEdge, State backState) {
             this.vertex = atVertex;
             this.backEdge = viaEdge;
-            this.backState = backState;
+            //This makes sure that new states don't have non-geographic states as backStates
+            //non geographic states are states with negative edges since they aren't made from vertices on graph
+            if (backState.backEdge >= 0) {
+                this.backState = backState;
+            }
             this.distance = backState.distance;
             this.durationSeconds = backState.durationSeconds;
             this.weight = backState.weight;

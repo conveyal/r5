@@ -532,7 +532,7 @@ public class EdgeStore implements Serializable {
                 });
             }
 
-            if (s0.backEdge != -1 && getFlag(EdgeFlag.LINK) && getCursor(s0.backEdge).getFlag(EdgeFlag.LINK))
+            if ((s0.backEdge >=0 ) && getFlag(EdgeFlag.LINK) && getCursor(s0.backEdge).getFlag(EdgeFlag.LINK))
                 // two link edges in a row, in other words a shortcut. Disallow this.
                 return null;
 

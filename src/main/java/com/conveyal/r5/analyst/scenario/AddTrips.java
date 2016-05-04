@@ -141,6 +141,7 @@ public class AddTrips extends Modification {
      * TODO rename to reflect usage in both AddTrips and AdjustFrequency.
      */
     public static class PatternTimetable implements Serializable {
+        public static final long serialVersionUID = 1L;
 
         /** The trip ID from which to copy travel and dwell times. Used only in AdjustFrequency Modifications. */
         public String sourceTrip;

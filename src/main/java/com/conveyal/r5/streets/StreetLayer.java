@@ -1308,6 +1308,10 @@ public class StreetLayer implements Serializable, Cloneable {
         return outgoingEdges;
     }
 
+    public List<TIntList> getIncomingEdges() {
+        return incomingEdges;
+    }
+
     /**
      * We intentionally avoid using clone() on EdgeStore and VertexStore so all field copying is explicit and we can
      * clearly see whether we are accidentally shallow-copying any collections or data structures from the base graph.

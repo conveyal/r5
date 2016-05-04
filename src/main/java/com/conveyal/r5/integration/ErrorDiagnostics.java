@@ -78,7 +78,6 @@ public class ErrorDiagnostics implements RequestHandler<DiagnosticsRequest, Bool
                 sr.route();
 
                 RaptorWorker worker = new RaptorWorker(network.transitLayer, lps, req.request);
-                worker.TOTAL_MONTE_CARLO_COUNT = req.samples;
                 worker.runRaptor(sr.getReachedStops(), lps.eval(sr::getTravelTimeToVertex), new TaskStatistics());
 
                 BitSet include = new BitSet();

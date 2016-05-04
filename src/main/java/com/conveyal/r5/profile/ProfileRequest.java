@@ -191,6 +191,22 @@ public class ProfileRequest implements Serializable, Cloneable {
     /** maximum fare. If nonnegative, fares will be used in routing. */
     public int maxFare = -1;
 
+    /**
+     * Number of Monte Carlo draws to take for frequency searches.
+     *
+     * We loop over all departure minutes and do a search on the scheduled portion of the network, and then while
+     * holding the departure minute and scheduled search results stable, we run several Monte Carlo searches with
+     * randomized frequency schedules that minute. The number of Monte Carlo draws does not need to be particularly
+     * high as it happens each minute, and there is likely a lot of repetition in the scheduled service
+     * (i.e. many minutes look like each other), so several minutes' Monte Carlo draws are effectively pooled.
+     *
+     * The algorithm divides up the number of draws into an equal number at each minute of the time window, then rounds up.
+     * Note that the algorithm may actually take somewhat more draws than this, depending on the width of your time window.
+     * As an extreme example, if your time window is 120 minutes and you request 121 draws, you will actually get 240, because
+     * 1 < 121 / 120 < 2.
+     */
+    public int monteCarloDraws = 220;
+
     public boolean isProfile() {
         return profile;
     }

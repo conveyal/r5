@@ -42,20 +42,6 @@ public class RaptorWorker {
     public static final int UNREACHED = Integer.MAX_VALUE;
     static final int MAX_DURATION = Integer.MAX_VALUE - 48 * 60 * 60;
 
-    /**
-     * The number of randomized frequency schedule draws to take for each minute of the search.
-     *
-     * We loop over all departure minutes and do a search on the scheduled portion of the network, and then while
-     * holding the departure minute and scheduled search results stable, we run this many Monte Carlo searches with
-     * randomized frequency schedules that minute. The number of Monte Carlo draws does not need to be particularly
-     * high as it happens each minute, and there is likely a lot of repetition in the scheduled service
-     * (i.e. many minutes look like each other), so several minutes' Monte Carlo draws are effectively pooled.
-     */
-    public int MONTE_CARLO_COUNT_PER_MINUTE = 1;
-
-    /** If there are no schedules, the number of Monte Carlo draws to take. */
-    public int TOTAL_MONTE_CARLO_COUNT = 99;
-
     /** Minimum slack time to board transit in seconds. */
     public static final int BOARD_SLACK_SECONDS = 60;
 
@@ -201,22 +187,17 @@ public class RaptorWorker {
 
         int nTargets = targets != null ? targets.size() : data.getStopCount();
 
-        // Optimization: if there are no scheduled routes, only run Monte Carlo frequencies
-        int fromTime = req.fromTime;
-        int monteCarloDraws = MONTE_CARLO_COUNT_PER_MINUTE;
-        if (!data.hasSchedules) {
-            // only do one iteration
-            // FIXME this is not actually correct when the frequencies are changing over the departure time window
-            fromTime = req.toTime - DEPARTURE_STEP_SEC;
-            monteCarloDraws = TOTAL_MONTE_CARLO_COUNT;
-        }
-
         // If there are no frequency routes, we don't do any Monte Carlo draws within departure minutes.
         // i.e. only a single RAPTOR search is run per departure minute.
         // If we do Monte Carlo, we do more iterations. But we only do Monte Carlo when we have frequencies.
 
         // First, set the number of iterations to the number of departure minutes.
-        int iterations = (req.toTime - fromTime - DEPARTURE_STEP_SEC) / DEPARTURE_STEP_SEC + 1;
+        int iterations = (req.toTime - req.fromTime - DEPARTURE_STEP_SEC) / DEPARTURE_STEP_SEC + 1;
+
+        // figure out how many monte carlo draws to do (if we end up doing monte carlo).
+        // this is defined outside the conditional because it is also used in the loop body.
+        // At this point the number of iterations is just the number of minutes.
+        int monteCarloDraws = (int) Math.ceil((double) req.monteCarloDraws / iterations);
 
         // Now multiply the number of departure minutes by the number of Monte Carlo frequency draws per minute.
         if (data.hasFrequencies) {
@@ -241,7 +222,7 @@ public class RaptorWorker {
         int minuteNumber = 0; // How many different departure minutes have been hit so far, for display purposes.
 
         // FIXME this should be changed to tolerate a zero-width time range
-        for (int departureTime = req.toTime - DEPARTURE_STEP_SEC; departureTime >= fromTime; departureTime -= DEPARTURE_STEP_SEC) {
+        for (int departureTime = req.toTime - DEPARTURE_STEP_SEC; departureTime >= req.fromTime; departureTime -= DEPARTURE_STEP_SEC) {
             if (minuteNumber++ % 15 == 0) {
                 LOG.info("minute {}", minuteNumber);
             }
@@ -341,6 +322,7 @@ public class RaptorWorker {
         LOG.info("calc time {}sec", calcTime / 1000.0);
         LOG.info("  propagation {}sec", totalPropagationTime / 1000.0);
         LOG.info("  raptor {}sec", (calcTime - totalPropagationTime) / 1000.0);
+        LOG.info("  requested {} monte carlo draws, ran {}", req.monteCarloDraws, monteCarloDraws * minuteNumber);
         LOG.info("{} rounds", round + 1);
         ts.propagation = (int) totalPropagationTime;
         ts.transitSearch = (int) (calcTime - totalPropagationTime);

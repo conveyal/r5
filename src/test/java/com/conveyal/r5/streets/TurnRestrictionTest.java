@@ -228,7 +228,7 @@ public class TurnRestrictionTest extends TurnTest {
         restrictTurn(false, EW, ENW);
         restrictTurn(false, EW + 1, ES);
 
-        RoutingVisitor countingVisitor = new RoutingVisitor(streetLayer.edgeStore, StreetMode.CAR) {
+        RoutingVisitor countingVisitor = new RoutingVisitor(streetLayer.edgeStore) {
             public int count;
 
             @Override

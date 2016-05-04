@@ -330,8 +330,7 @@ public class PointToPointRouterServer {
             //TODO errorchecks
 
             Boolean fullStateList = request.queryMap("full").booleanValue();
-            RoutingVisitor routingVisitor = new RoutingVisitor(transportNetwork.streetLayer.edgeStore,
-                streetMode);
+            RoutingVisitor routingVisitor = new RoutingVisitor(transportNetwork.streetLayer.edgeStore);
 
             if (fullStateList == null) {
                 fullStateList = false;

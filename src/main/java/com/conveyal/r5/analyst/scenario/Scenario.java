@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
  * A scenario is an ordered sequence of modifications that will be applied non-destructively on top of a baseline graph.
  */
 public class Scenario implements Serializable {
+    public static final long serialVersionUID = 1L;
 
     private static final Logger LOG = LoggerFactory.getLogger(Scenario.class);
 

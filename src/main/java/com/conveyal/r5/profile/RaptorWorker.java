@@ -95,9 +95,10 @@ public class RaptorWorker {
 
     /**
      * After each iteration (search at a single departure time with a specific Monte Carlo draw of schedules for
-     * frequency routes) we store the {@link RaptorState}.
+     * frequency routes) we store the {@link RaptorState}. If null, states will not be saved (they are not needed
+     * in analysis and chew gobs of memory, especially when monteCarloDraws is large).
      */
-    public List<RaptorState> statesEachIteration = new ArrayList<>();
+    public List<RaptorState> statesEachIteration = null;
 
     /**
      * After each iteration (search at a single departure time with a specific Monte Carlo draw of schedules for
@@ -123,6 +124,9 @@ public class RaptorWorker {
         this.scheduleState.add(new RaptorState(nStops));
 
         this.targets = targets;
+
+        // targets== null implies a static site, save the results of each iteration
+        if (targets == null) this.statesEachIteration = new ArrayList<>();
 
         this.servicesActive = data.getActiveServicesForDate(req.date);
 
@@ -284,7 +288,7 @@ public class RaptorWorker {
                         System.arraycopy(stateCopy.bestNonTransferTimes, 0, frequencyTimesAtTargets, 0, stateCopy.bestNonTransferTimes.length);
                     }
 
-                    statesEachIteration.add(stateCopy.deepCopy());
+                    if (statesEachIteration != null) statesEachIteration.add(stateCopy.deepCopy());
 
                     // convert to elapsed time
                     for (int t = 0; t < frequencyTimesAtTargets.length; t++) {
@@ -303,7 +307,7 @@ public class RaptorWorker {
                         .map(i -> i != UNREACHED ? i - dt : i)
                         .toArray();
                 includeInAverages.set(iteration);
-                statesEachIteration.add(state.deepCopy());
+                if (statesEachIteration != null) statesEachIteration.add(state.deepCopy());
                 iteration++;
             }
         } // END for loop over departure minutes

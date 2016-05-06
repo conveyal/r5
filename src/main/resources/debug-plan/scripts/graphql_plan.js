@@ -557,6 +557,22 @@ function requestPlan() {
         'query': request,
         'variables': JSON.stringify(variables)
     };
+    
+    //This is object with variables copied into URL hash so requests can be shared
+    var filteredPlanConfig = {};
+    //Copies only variables from planConfig
+    Object.keys(planConfig)
+        .filter(function(varname) {
+            //Filters out functions
+            return !(varname == "plan" || varname == "showReachedStops")
+        })
+        .forEach(function(key) {
+            filteredPlanConfig[key] = planConfig[key];
+        });
+    var query = $.param(filteredPlanConfig);
+    var URL = location.pathname + "?" + query;
+
+    $("#requestLink").attr("href", URL);
 
     var compactedParams = JSON.stringify(params);
     //Removes useless spaces so that CURL CLI line is more compact
@@ -703,6 +719,45 @@ var sidebar = L.control.sidebar('sidebar').addTo(my_map);
         $('#resultTab').removeClass("status-waiting status-ok status-error");
 
     })
+    //Sets GUI from hash values
+    if (location.search != "") {
+        
+        // init url params
+        urlParams = { };
+        var match,
+            pl     = /\+/g,  // Regex for replacing addition symbol with a space
+            search = /([^&=]+)=?([^&]*)/g,
+            decode = function (s) { return decodeURIComponent(s.replace(pl, " ")); },
+            query  = window.location.search.substring(1);
+
+        while (match = search.exec(query)) {
+            var value = decode(match[2]);
+            var key = decode(match[1]);
+
+            //fromLat,fromLon toLat and toLon are actually floats
+            if ((key.indexOf("toL") >= 0) || (key.indexOf("fromL") >= 0)) {
+                value = parseFloat(value);
+            //wheelchair needs to be boolean
+            } else if (key == "wheelchair") {
+                planConfig[key] = $.parseJSON(value.toLowerCase());
+            } else {
+                planConfig[key] = value;
+            }
+            //This is actually unnecessary except for latitudes and longitudes
+            urlParams[key] = value;
+        }
+
+        // updates all gui controllers since we changed the values
+        for (var i in gui.__controllers) {
+            gui.__controllers[i].updateDisplay();
+        }
+
+        var fromEvent = {'latlng': L.latLng(urlParams['fromLat'], urlParams['fromLon'])};
+        addFirst(fromEvent);
+        var toEvent = {'latlng': L.latLng(urlParams['toLat'], urlParams['toLon'])};
+        addLast(toEvent);
+
+    }
 
 });
 

@@ -53,6 +53,7 @@ public class TransitLayer implements Serializable, Cloneable {
     public transient TIntIntMap stopForStreetVertex;
 
     // For each stop, a packed list of transfers to other stops
+    // FIXME we may currently be storing weight or time to reach other stop, which we did to avoid floating point division. Instead, store distances in millimeters, and divide by speed in mm/sec.
     public List<TIntList> transfersForStop = new ArrayList<>();
 
     /** Information about a route */

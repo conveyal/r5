@@ -56,6 +56,17 @@ public class RaptorWorker {
      * One {@link RaptorState} per round of the scheduled search. We don't need to keep a separate RaptorState at each
      * departure minute because we use range-raptor on the scheduled search. We step backward through the departure
      * minutes and reuse the RaptorStates.
+     *
+     * We need to have a separate state for each round to prevent ridiculous paths from being taken where multiple
+     * vehicles are ridden in the same round (see issue #23)
+     *
+     * Suppose lines are arranged in the graph in order 1...n, and line 2 goes towards the destination and 1 away
+     * from it. The RAPTOR search will first encounter line 1 and ride it away from the destination. Then it will
+     * board line 2 (in the same round) and ride it towards the destination. If frequencies are low enough, it will
+     * catch the same trip it would otherwise have caught by boarding at the origin, so will not re-board at the
+     * origin, hence the crazy path (which is still optimal in the earliest-arrival sense). This is also why some
+     * paths have a huge tangle of routes, because the router is finding different ways to kill time somewhere along
+     * the route before catching the bus that will take you to the destination.
      */
     List<RaptorState> scheduleState;
 
@@ -409,15 +420,19 @@ public class RaptorWorker {
      * results on top of them.
      */
     public RaptorState runRaptorFrequency (int departureTime, BoardingAssumption boardingAssumption) {
+
+        // Do not consider any travel after this clock time (currently effectively turned off).
         max_time = departureTime + MAX_DURATION;
 
         round = 0;
         advanceToNextRound(); // go to first round
-        patternsTouchedThisRound.clear(); // clear patterns left over from previous calls.
+
+        // Clear any information left over from previous searches.
+        patternsTouchedThisRound.clear();
         stopsTouchedThisSearch.clear();
         stopsTouchedThisRound.clear();
 
-        // mark only frequency patterns here. Any scheduled patterns that are reached downstream of frequency patterns
+        // Mark only frequency patterns here. Any scheduled patterns that are reached downstream of frequency patterns
         // will be marked during the search and explored in subsequent rounds.
         for (int p = 0; p < data.tripPatterns.size(); p++) {
             TripPattern pat = data.tripPatterns.get(p);
@@ -426,25 +441,29 @@ public class RaptorWorker {
             }
         }
 
-        // initialize with first round from scheduled search
-        // no need to make a copy here as this is not updated in the search
+        // Initialize the search state with the zeroth round from the scheduled search, which contains the access times
+        // to stops on the street network. There is no need to make a copy here as this is not updated in the search.
         RaptorState previousRound = scheduleState.get(round - 1);
+
+        // Copy the results of the first ride on a scheduled vehicle, which serve as bounds on the first ride on a frequency vehicle.
         RaptorState currentRound = scheduleState.get(round).copy();
         currentRound.previous = previousRound;
 
-        // Anytime a round updates some stops, move on to another round
+        // Anytime a round updates the travel time to some stops, move on to another round.
         // Do at least as many rounds as were done in the scheduled search plus one, so that we don't return a state
-        // at a previous round and cut off the scheduled search after 0, 1 or 2 transfers (see https://github.com/conveyal/r5/issues/82)
+        // at a previous round and cut off the scheduled search after only a few transfers (see issue #82)
         // However, if we didn't run a scheduled search, don't apply this constraint
-        while (doOneRound(previousRound, currentRound, true, boardingAssumption) || (scheduledRounds != -1 && round <= scheduledRounds)) {
+        while (doOneRound(previousRound, currentRound, true, boardingAssumption) ||
+                (scheduledRounds != -1 && round <= scheduledRounds)) {
             advanceToNextRound();
             previousRound = currentRound;
             currentRound = previousRound.copy();
-            // copy in scheduled times
+
+            // Copy the travel times from the scheduled search into this round's state.
             currentRound.min(scheduleState.get(round));
 
-            // re-mark all frequency patterns if we did a scheduled search, so that we explore them again;
-            // they may be reached at the second, third or later round by a scheduled trips
+            // If we did a scheduled search, on every round we re-mark all frequency patterns for exploration.
+            // They may be boarded at the second, third or later round by a transfer from a scheduled trip.
             if (data.hasSchedules) {
                 for (int p = 0; p < data.tripPatterns.size(); p++) {
                     TripPattern pat = data.tripPatterns.get(p);
@@ -459,30 +478,26 @@ public class RaptorWorker {
     }
 
     /**
-     * perform one round, possibly using frequencies with the defined boarding assumption
-     * (which is ignored and may be set to null if useFrequencies == false)
+     * Perform one round of the RAPTOR search. This is used for both scheduled and frequency searches.
+     * If useFrequencies is false we're doing a scheduled search and the boardingAssumption is ignored.
+     * In that case it may be set to null.
      *
-     * Note that schedules are always used. This is important, because it is possible to transfer between frequency and
-     * scheduled service an arbitrary number of times. So we can run the scheduled search and get a certain output, but
-     * when we run a frequency search on top of that, we may be able to catch a scheduled vehicle earlier by transferring
-     * from the frequency vehicle. So when we run the frequency search we also include any scheduled patterns touched
-     * during the frequency search.
+     * Note that scheduled vehicles are always explored, even when we're doing a frequency search.
+     * The reverse is not true: on a scheduled search, the frequency routes are ignored.
+     *
+     * It is possible to transfer between frequency and scheduled service an arbitrary number of times.
+     * Therefore the last search that is run must include both scheduled and frequency routes,
+     * i.e. we also include any scheduled patterns touched during the frequency search.
+     *
+     * Searching on the frequency routes separately from the scheduled routes is an optimization in the sense that
+     * it enables us to use the range-RAPTOR optimization on the scheduled searches.
+     *
+     * For more explanation see OpenTripPlanner #2072
      */
     public boolean doOneRound (RaptorState inputState, RaptorState outputState, boolean useFrequencies, BoardingAssumption boardingAssumption) {
-        // We need to have a separate state we copy from to prevent ridiculous paths from being taken because multiple
-        // vehicles can be ridden in the same round (see issue #23)
-
-        // Suppose lines are arranged in the graph in order 1...n, and line 2 goes towards the destination and 1 away
-        // from it. The RAPTOR search will first encounter line 1 and ride it away from the destination. Then it will
-        // board line 2 (in the same round) and ride it towards the destination. If frequencies are low enough, it will
-        // catch the same trip it would otherwise have caught by boarding at the origin, so will not re-board at the
-        // origin, hence the crazy path (which is still optimal in the earliest-arrival sense). This is also why some
-        // paths have a huge tangle of routes, because the router is finding different ways to kill time somewhere along
-        // the route before catching the bus that will take you to the destination.
-        //LOG.info("round {}", round);
-        stopsTouchedThisRound.clear(); // clear any stops left over from previous round.
+        // Clear any stops that were marked in the previous round.
+        stopsTouchedThisRound.clear();
         PATTERNS: for (int p = patternsTouchedThisRound.nextSetBit(0); p >= 0; p = patternsTouchedThisRound.nextSetBit(p+1)) {
-            //LOG.info("pattern {} {}", p, data.patternNames.get(p));
             TripPattern timetable = data.tripPatterns.get(p);
             // Do not even consider patterns that have no trips on active service IDs.
             // Anecdotally this can double or triple search speed.
@@ -494,45 +509,55 @@ public class RaptorWorker {
             int bestFreqBoardTime = Integer.MAX_VALUE;
             int bestFreqBoardStop = -1;
             int bestFreqBoardStopIndex = -1;
-            TripSchedule bestFreqTrip = null; // this is which _trip_ we are on if we are riding a frequency-based service. It is
-            // not important which frequency entry we used to board it.
 
-            // first look for a frequency entry
+            // This is which _trip_ we are on if we are riding a frequency-based service.
+            // It is not important which frequency entry we used to board it.
+            TripSchedule bestFreqTrip = null;
+
+            // First look for a frequency entry.
             if (useFrequencies) {
                 for (int stopIndex : timetable.stops) {
                     stopPositionInPattern += 1;
 
-                    // the time at this stop if we remain on board a vehicle we had already boarded
+                    // The arrival time at this stop if we have already boarded a trip and stay on that same trip.
                     int remainOnBoardTime;
                     if (bestFreqTrip != null) {
-                        // we are already aboard a trip, stay on board
-                        remainOnBoardTime = bestFreqBoardTime + bestFreqTrip.arrivals[stopPositionInPattern] -
-                                bestFreqTrip.departures[bestFreqBoardStop];
+                        // We have already boarded a trip, stay on board that trip.
+                        remainOnBoardTime = bestFreqBoardTime +
+                                (bestFreqTrip.arrivals[stopPositionInPattern] - bestFreqTrip.departures[bestFreqBoardStop]);
                     } else {
-                        // we cannot remain on board as we are not yet on board
+                        // We cannot remain on board as we have not yet boarded any trip.
                         remainOnBoardTime = Integer.MAX_VALUE;
                     }
 
-                    // the time at this stop if we board a new vehicle
+                    // This stop has been reached by some previous round. Try to board a vehicle here.
+                    // This could be the first time we board a vehicle on this pattern in this round, but if already
+                    // on board a vehicle we also need to check whether it's possible to board an earlier one.
+                    // TODO only attempt boarding when we have a non-UNREACHED value from the last round, not based on the bestTimes.
+                    // To do this, in the frequency search we'd need to re-mark stops that were reached by the scheduled search in the previous round.
+                    // stopsTouched could just be put into RaptorState.
                     if (inputState.bestTimes[stopIndex] != UNREACHED) {
                         for (int tripScheduleIdx = 0; tripScheduleIdx < timetable.tripSchedules.size(); tripScheduleIdx++) {
                             TripSchedule ts = timetable.tripSchedules.get(tripScheduleIdx);
-                            if (ts.headwaySeconds == null || !servicesActive.get(ts.serviceCode))
-                                continue; // not a frequency trip
-
-                            // TODO: boarding assumptions, transfer rules?
-                            // figure out best board time for each frequency entry on this trip, and choose the best of those
-                            // this is a valid thing to do and doesn't exhibit the problems we've seen in the past with
-                            // monte carlo simulations where we take the min of several random variables (e.g. when we used
-                            // to randomly choose a boarding wait on each boarding, see https://github.com/opentripplanner/OpenTripPlanner/issues/2072 and
-                            // https://github.com/opentripplanner/OpenTripPlanner/issues/2065).
-                            // In this case it is completely valid to assume that any frequency entries are uncorrelated,
-                            // and it's only a problem when they overlap anyhow.
+                            // TODO each pattern should be made to contain only scheduled or only frequency trips
+                            if (ts.headwaySeconds == null || !servicesActive.get(ts.serviceCode)) {
+                                continue; // Not a frequency trip, or not running today.
+                            }
+                            // Calculate the best board time for each frequency entry on this trip, and choose the best
+                            // of those. This is a valid thing to do and doesn't exhibit the problems we've seen in the
+                            // past with Monte Carlo simulations where we effectively took the min of several random
+                            // variables (e.g. when we used to randomly choose a boarding wait on each boarding,
+                            // see OpenTripPlanner issue #2072 and OpenTripPlanner issue #2065).
+                            // We assume that any frequency entries are uncorrelated, but this is not
+                            // necessarily correct. It's a problem when the entries overlap or even are adjacent in
+                            // time. See issue #122.
                             int boardTime = Integer.MAX_VALUE;
-                            FREQUENCY_ENTRIES: for (int freqEntryIdx = 0; freqEntryIdx < ts.headwaySeconds.length; freqEntryIdx++) {
+                            FREQUENCY_ENTRIES:
+                            for (int freqEntryIdx = 0; freqEntryIdx < ts.headwaySeconds.length; freqEntryIdx++) {
                                 int boardTimeThisEntry;
 
                                 if (boardingAssumption == BoardingAssumption.BEST_CASE) {
+                                    // Be optimistic and assume zero wait time to board every vehicle.
                                     if (inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS > ts.endTimes[freqEntryIdx] + ts.departures[stopPositionInPattern])
                                         continue FREQUENCY_ENTRIES; // it's too late, can't board.
 
@@ -541,6 +566,7 @@ public class RaptorWorker {
                                     boardTimeThisEntry = Math.max(inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS, ts.startTimes[freqEntryIdx] + ts.departures[stopPositionInPattern]);
                                 }
                                 else if (boardingAssumption == BoardingAssumption.WORST_CASE) {
+                                    // Be pessimistic and assume a full headway wait before boarding any vehicle.
                                     // worst case: cannot board this entry if there is not the full headway remaining before the end of the entry, we
                                     // might miss the vehicle.
                                     if (inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS > ts.endTimes[freqEntryIdx] + ts.departures[stopPositionInPattern] - ts.headwaySeconds[freqEntryIdx])
@@ -629,7 +655,7 @@ public class RaptorWorker {
                     continue PATTERNS;
             }
 
-            // perform scheduled search
+            // Perform a search on the scheduled routes.
             // We always perform a scheduled search, even when we're doing a frequency search as well. This is important
             // in mixed networks, because the frequency trips may allow you to reach scheduled trips more quickly. We perform
             // an initial search with only schedules which serves as a bound, but we must finish with a search that includes
@@ -719,11 +745,10 @@ public class RaptorWorker {
     }
 
     /**
-     * Apply transfers.
+     * After a round, transfer from each stop that was updated to all nearby stops before the next round.
      * This is also where patterns are marked for exploration on future rounds;
-     * all the patterns passing through these stops and any stops transferred to will be marked.
-     *
-     * This operates on a single round; we don't have separate rounds for transfers; see comments in RaptorState.
+     * all the patterns passing through stops reached this round and all patterns passing through stops transferred
+     * to will be marked. We don't have separate rounds for transfers; see comments in RaptorState.
      */
     private void doTransfers(RaptorState state) {
         patternsTouchedThisRound.clear();
@@ -749,22 +774,22 @@ public class RaptorWorker {
     }
 
     /**
-     * Propagate from the transit network to the street network.
+     * Propagate travel time out from transit stops to the targets.
      * Uses stopsTouchedThisSearch to determine from whence to propagate.
      *
      * This is valid both for randomized frequencies and for schedules, because the stops that have
      * been updated will be in stopsTouchedThisSearch.
      *
-     * It must be called after every search (either a minute of the scheduled search, or a frequency search on top of the
-     * scheduled network). This is because propagation only occurs from stops that are marked in stopsTouchedThisSearch, which
-     * is cleared before each search.
+     * This function must be called after every search (either a minute of the scheduled search, or a frequency search
+     * on top of the scheduled network). This is because propagation only occurs from stops that are marked in
+     * stopsTouchedThisSearch, which is cleared before each search. See issue #137.
      */
     public void doPropagation (int[] timesAtTransitStops, int[] timesAtTargets, int departureTime) {
+
+        // For debug and informational purposes, measure how long it takes to perform propagation.
         long beginPropagationTime = System.currentTimeMillis();
 
-        // Record distances to each sample or intersection
-        // We need to propagate all the way to samples (or intersections if there are no samples)
-        // when doing repeated RAPTOR.
+        // Record distances to each target. We need to propagate all the way to samples when doing repeated RAPTOR.
         // Consider the situation where there are two parallel transit lines on
         // 5th Street and 6th Street, and you live on A Street halfway between 5th and 6th.
         // Both lines run at 30 minute headways, but they are exactly out of phase, and for the
@@ -775,27 +800,25 @@ public class RaptorWorker {
         // a sample would be able to reach these two stops within the walk limit, but that the two
         // intersections it is connected to cannot reach both.
 
-        // only loop over stops that were touched in this particular search (schedule or frequency). We are updating
+        // Only loop over stops that were touched in this particular search (schedule or frequency). We are updating
         // timesAtTargets, which already contains times that were found during previous searches (either scheduled searches
-        // at previous minutes, or in the case of a frequency search, the scheduled search that was run at the same minute)
+        // at previous minutes, or in the case of a frequency search, the scheduled search that was run at the same minute).
         for (int s = stopsTouchedThisSearch.nextSetBit(0); s >= 0; s = stopsTouchedThisSearch.nextSetBit(s + 1)) {
-            // it's safe to use the best time at this stop for any number of transfers, even in range-raptor,
-            // because we allow unlimited transfers. this is slightly different from the original RAPTOR implementation:
-            // we do not necessarily compute all pareto-optimal paths on (journey time, number of transfers).
-            int baseTimeSeconds = timesAtTransitStops[s];
-            if (baseTimeSeconds != UNREACHED) {
+            int timeAtTransitStop = timesAtTransitStops[s];
+            if (timeAtTransitStop != UNREACHED) {
                 int[] targets = this.targets.stopTrees.get(s);
                 if (targets == null) {
                     continue;
                 }
                 // Targets contains pairs of (targetIndex, time).
-                // The cache has time in seconds rather than distance to avoid costly floating-point divides and integer casts here.
-                for (int i = 0; i < targets.length; ) { // Counter i is incremented in two places below.
-                    int targetIndex = targets[i++]; // Increment i after read
-                    int propagated_time = baseTimeSeconds + targets[i++]; // Increment i after read
+                // The cache has time in seconds rather than distance to avoid costly floating-point divides and
+                // integer casts here. FIXME this should be changed along with the transfers to use millimeters.
+                for (int i = 0; i < targets.length; i += 2) {
+                    int targetIndex = targets[i];
+                    int propagated_time = timeAtTransitStop + targets[i + 1];
 
                     if (propagated_time < departureTime) {
-                        //LOG.error("negative propagated time, will crash shortly");
+                        LOG.error("Negative propagated time, will crash shortly.");
                     }
 
                     if (timesAtTargets[targetIndex] > propagated_time) {

@@ -9,6 +9,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
 
 import static org.junit.Assert.*;
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
@@ -211,6 +212,135 @@ public class AdjustFrequencyTest {
         });
 
         assertEquals(checksum, network.checksum());
+    }
+
+    /** Test that schedules on frequency-converted lines outside of frequency-conversion window are retained */
+    @Test
+    public void testScheduleRetention () {
+        AdjustFrequency af = new AdjustFrequency();
+        af.dropTripsOutsideTimePeriod = false;
+        af.route = "MULTIPLE_PATTERNS:route";
+
+        AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();
+        entry.headwaySecs = 900;
+        entry.startTime = 12 * 3600;
+        entry.endTime = 14 * 3600;
+        entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = true;
+        entry.saturday = entry.sunday = false;
+        entry.sourceTrip = "MULTIPLE_PATTERNS:trip25200"; // trip25200 is a two-stop trip
+
+        AddTrips.PatternTimetable entry2 = new AddTrips.PatternTimetable();
+        entry2.headwaySecs = 900;
+        entry2.startTime = 9 * 3600;
+        entry2.endTime = 10 * 3600;
+        entry2.monday = entry2.tuesday = entry2.wednesday = entry2.thursday = entry2.friday = entry2.saturday = entry2.sunday = true;
+        entry2.sourceTrip = "MULTIPLE_PATTERNS:trip25200";
+
+        af.entries = Arrays.asList(entry, entry2);
+
+        Scenario scenario = new Scenario();
+        scenario.modifications = Arrays.asList(af);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+
+        // there should be frequencies and schedules
+        assertTrue(mod.transitLayer.hasFrequencies);
+        assertTrue(mod.transitLayer.hasSchedules);
+
+        // make sure we have the correct number of patterns and frequency entries
+        int twoStopPatternCount = 0;
+        int threeStopPatternCount = 0;
+        int frequencyScheduleCount = 0;
+
+        for (TripPattern pattern : mod.transitLayer.tripPatterns) {
+            if (pattern.stops.length == 2) {
+                twoStopPatternCount++;
+
+                // this is the frequency converted pattern
+                TripSchedule[] freqSchedules = pattern.tripSchedules.stream()
+                        .filter(ts -> ts.headwaySeconds != null)
+                        .toArray(i -> new TripSchedule[i]);
+
+                // for entry and entry2
+                TripSchedule ts, ts2;
+
+                // order of the frequency networks is not important, so don't inadvertently test that.
+                if (freqSchedules[0].startTimes[0] == entry.startTime) {
+                    ts = freqSchedules[0];
+                    ts2 = freqSchedules[1];
+                } else {
+                    ts2 = freqSchedules[0];
+                    ts = freqSchedules[1];
+                }
+
+                assertArrayEquals(new int[] { entry.startTime }, ts.startTimes);
+                assertArrayEquals(new int[] { entry.endTime }, ts.endTimes);
+                assertArrayEquals(new int[] { entry.headwaySecs }, ts.headwaySeconds);
+
+                assertArrayEquals(new int[] { entry2.startTime }, ts2.startTimes);
+                assertArrayEquals(new int[] { entry2.endTime }, ts2.endTimes);
+                assertArrayEquals(new int[] { entry2.headwaySecs }, ts2.headwaySeconds);
+
+                frequencyScheduleCount += freqSchedules.length;
+            } else {
+                threeStopPatternCount++;
+
+                // if it doesn't have two stops it should have three
+                assertEquals(3, pattern.stops.length);
+                // should all be schedule based
+                assertTrue(pattern.tripSchedules.stream().allMatch(ts -> ts.headwaySeconds == null));
+
+                boolean foundTripBefore9 = false;
+                boolean foundTripAfter10 = false;
+                boolean foundTripBetween12And2 = false;
+                boolean foundTripAfter2 = false;
+
+                for (TripSchedule schedule : pattern.tripSchedules) {
+                    // should be no trips between 9 and 10
+                    int dep = schedule.departures[0];
+                    assertFalse(dep > 9 * 3600 && dep < 10 * 3600);
+
+                    if (dep < 9 * 3600) foundTripBefore9 = true;
+                    if (dep > 10 * 3600 && dep < 12 * 3600) foundTripAfter10 = true;
+
+                    // the period in which service is dropped on some days
+                    if (dep > 12 * 3600 && dep < 14 * 3600) {
+                        foundTripBetween12And2 = true;
+
+                        Service service = mod.transitLayer.services.get(schedule.serviceCode);
+                        assertEquals(0, service.calendar.monday);
+                        assertEquals(0, service.calendar.tuesday);
+                        assertEquals(0, service.calendar.wednesday);
+                        assertEquals(0, service.calendar.thursday);
+                        assertEquals(0, service.calendar.friday);
+
+                        // weekend service should be retained as frequency entry is not active on the weekends
+                        assertEquals(1, service.calendar.saturday);
+                        assertEquals(1, service.calendar.sunday);
+                    } else {
+                        // ensure we didn't mess up the service for trips at other times
+                        Service service = mod.transitLayer.services.get(schedule.serviceCode);
+                        assertEquals(1, service.calendar.monday);
+                        assertEquals(1, service.calendar.tuesday);
+                        assertEquals(1, service.calendar.wednesday);
+                        assertEquals(1, service.calendar.thursday);
+                        assertEquals(1, service.calendar.friday);
+                        assertEquals(1, service.calendar.saturday);
+                        assertEquals(1, service.calendar.sunday);
+                    }
+
+                    if (dep > 14 * 3600) foundTripAfter2 = true;
+                }
+
+                assertTrue(foundTripBefore9);
+                assertTrue(foundTripAfter10);
+                assertTrue(foundTripBetween12And2);
+                assertTrue(foundTripAfter2);
+            }
+        }
+
+        assertEquals(1, threeStopPatternCount);
+        assertEquals(1, twoStopPatternCount);
+        assertEquals(2, frequencyScheduleCount);
     }
 
     @After

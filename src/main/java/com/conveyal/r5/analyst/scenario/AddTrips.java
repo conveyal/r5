@@ -1,37 +1,25 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.gtfs.model.Calendar;
-import com.conveyal.gtfs.model.Frequency;
-import com.conveyal.gtfs.model.Route;
-import com.conveyal.gtfs.model.Service;
-import com.conveyal.gtfs.model.StopTime;
-import com.conveyal.gtfs.model.Trip;
-import com.conveyal.r5.model.json_serialization.BitSetDeserializer;
-import com.conveyal.r5.model.json_serialization.BitSetSerializer;
-import com.conveyal.r5.model.json_serialization.LineStringDeserializer;
-import com.conveyal.r5.model.json_serialization.LineStringSerializer;
-import com.conveyal.r5.streets.Split;
-import com.conveyal.r5.streets.StreetLayer;
-import com.conveyal.r5.transit.*;
-import com.conveyal.r5.trove.AugmentedList;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.conveyal.gtfs.model.*;
+import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TripPattern;
+import com.conveyal.r5.transit.TripSchedule;
 import com.google.common.collect.Lists;
-import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.LineString;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.time.DayOfWeek;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.Collection;
-import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
+
+import static java.time.DayOfWeek.*;
 
 /**
  * Create a new trip pattern and add some trips to that pattern.
@@ -65,24 +53,14 @@ public class AddTrips extends Modification {
 
     @Override
     public boolean resolve (TransportNetwork network) {
-        for (PatternTimetable pt : frequencies) {
-            if (pt.endTime <= pt.startTime) {
-                warnings.add("End time is not later than start time.");
+        if (stops == null) {
+            warnings.add("You must provide some stops.");
+        } else {
+            for (PatternTimetable entry : frequencies) {
+                warnings.addAll(entry.validate(stops.size()));
             }
-            if (pt.headwaySecs <= 0) {
-                warnings.add("Headway is not greater than zero.");
-            }
-            if (stops.size() < 2) {
-                warnings.add("You must specify at least two stops when creating new trips");
-            }
-            if (pt.dwellTimes == null || pt.dwellTimes.length != stops.size()) {
-                warnings.add("The number of dwell times must be equal to the number of stops");
-            }
-            if (pt.hopTimes == null || pt.hopTimes.length != stops.size() - 1) {
-                warnings.add("The number of hop times must be one less than the number of stops");
-            }
+            intStopIds = findOrCreateStops(stops, network);
         }
-        intStopIds = findOrCreateStops(stops, network);
         return warnings.size() > 0;
     }
 
@@ -131,9 +109,9 @@ public class AddTrips extends Modification {
                 continue;
             }
             pattern.addTrip(schedule);
-            transitLayer.hasFrequencies = true;
         }
         transitLayer.tripPatterns.add(pattern);
+        transitLayer.hasFrequencies = true;
     }
 
     /**
@@ -153,13 +131,20 @@ public class AddTrips extends Modification {
         public int[] dwellTimes;
 
         /** Start time of the first frequency-based trip in seconds since GTFS midnight. */
-        public int startTime;
+        public int startTime = -1;
 
         /** End time for frequency-based trips in seconds since GTFS midnight. */
-        public int endTime;
+        public int endTime = -1;
 
         /** Headway for frequency-based patterns. */
-        public int headwaySecs;
+        public int headwaySecs = -1;
+
+        /**
+         * Times in seconds after midnight when trips will begin. If this field is non-null the newly added
+         * trips will be scheduled trips rather than frequency-based, and you must not provide the startTime,
+         * endTime, or headwaySecs fields.
+         */
+        public int[] firstDepartures;
 
         /** What days is this active on? */
         public boolean monday;
@@ -169,6 +154,64 @@ public class AddTrips extends Modification {
         public boolean friday;
         public boolean saturday;
         public boolean sunday;
+
+        protected EnumSet<DayOfWeek> activeDaysOfWeek() {
+            EnumSet days = EnumSet.noneOf(DayOfWeek.class);
+            if (monday)    days.add(MONDAY);
+            if (tuesday)   days.add(TUESDAY);
+            if (wednesday) days.add(WEDNESDAY);
+            if (thursday)  days.add(THURSDAY);
+            if (friday)    days.add(FRIDAY);
+            if (saturday)  days.add(SATURDAY);
+            if (sunday)    days.add(SUNDAY);
+            return days;
+        }
+
+        /**
+         * Sanity and range check the contents of this entry, considering the fact that PatternTimetables may be used
+         * to create either frequency or scheduled trips, and they may or may not include hop and dwell times depending
+         * on whether a new pattern is being created.
+         * @param nStops the number of stops in the pattern to be generated, or -1 if a new pattern is not being
+         *               generated and only schedule / frequency fields are to be validated, not hops and dwell times.
+         * @return a list of Strings, one for each warning generated.
+         */
+        protected List<String> validate (int nStops) {
+            List<String> warnings = new ArrayList<>();
+            if (headwaySecs >= 0 || startTime >= 0 || endTime >= 0) {
+                // This entry is expected to be in frequency mode.
+                if (headwaySecs < 0 || startTime < 0 || endTime < 0) {
+                    warnings.add("You must specify headwaySecs, startTime, and endTime together to create frequency trips.");
+                }
+                if (headwaySecs <= 0) {
+                    warnings.add("Headway is not greater than zero.");
+                }
+                if (endTime <= startTime) {
+                    warnings.add("End time is not later than start time.");
+                }
+                if (firstDepartures != null) {
+                    warnings.add("You cannot specify firstDepartures (which creates scheduled trips) along with headwaySecs, startTime, or endTime (which create frequency trips");
+                }
+            } else {
+                // This entry is expected to be in scheduled (specific departure times) mode.
+                if (firstDepartures == null) {
+                    warnings.add("You must specify either firstDepartures (which creates scheduled trips) or all of headwaySecs, startTime, and endTime (which create frequency trips");
+                }
+            }
+            if (nStops >= 0) {
+                // Validate hops and dwell times.
+                if (nStops < 2) {
+                    warnings.add("You must specify at least two stops when creating new trips");
+                }
+                if (dwellTimes == null || dwellTimes.length != nStops) {
+                    warnings.add("The number of dwell times must be equal to the number of stops");
+                }
+                if (hopTimes == null || hopTimes.length != nStops - 1) {
+                    warnings.add("The number of hop times must be one less than the number of stops");
+                }
+            }
+            return warnings;
+        }
+
     }
 
     /**
@@ -178,7 +221,7 @@ public class AddTrips extends Modification {
     public static Service createService (PatternTimetable timetable) {
         // Create a calendar entry and service ID for this new trip pattern.
         Calendar calendar = new Calendar();
-        // TODO move this logic to a function on Calendar in gtfs-lib
+        // TODO move this logic to a function on Calendar in gtfs-lib, e.g. calendar.setFromDays(timetable.activeDaysOfWeek())
         calendar.monday    = timetable.monday    ? 1 : 0;
         calendar.tuesday   = timetable.tuesday   ? 1 : 0;
         calendar.wednesday = timetable.wednesday ? 1 : 0;

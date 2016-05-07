@@ -221,4 +221,8 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
         return arrivals.length;
     }
 
+    public int nFrequencyEntries() {
+        return headwaySeconds.length;
+    }
+
 }

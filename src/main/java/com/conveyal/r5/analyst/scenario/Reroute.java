@@ -82,6 +82,15 @@ public class Reroute extends Modification {
 
     private int insertEndIndex;
 
+    /*
+     * A stop in the new pattern and a corresponding one in the original pattern at which all trips will
+     * see their arrival time unchanged. This allows preserving at least one timed transfer per route,
+     * e.g. at a major transit center. Eventually this should be set from a stop ID parameter in the modification.
+     */
+    private int originalFixedPointStopIndex = 0;
+
+    private int newFixedPointStopIndex = 0;
+
     private int newPatternLength;
 
     @Override
@@ -195,11 +204,27 @@ public class Reroute extends Modification {
 
         /* NOTE this is using fields which share information among private function calls. Not threadsafe! */
         int nStopsToRemove = insertEndIndex - insertBeginIndex;
-        int oldLength = originalTripPattern.stops.length;
-        newPatternLength = (oldLength + intNewStops.size()) - nStopsToRemove;
+        int oldPatternLength = originalTripPattern.stops.length;
+        newPatternLength = (oldPatternLength + intNewStops.size()) - nStopsToRemove;
 
         // First, reroute the pattern itself (the stops).
         TripPattern pattern = reroutePattern(originalTripPattern);
+
+        // Choose a stop in the new pattern and a corresponding one in the original pattern at which all trips will
+        // see their arrival time unchanged.
+        // For now we use the first stop in the original pattern that appears in the new pattern.
+        originalFixedPointStopIndex = 0;
+        newFixedPointStopIndex = 0;
+        OUTER:
+        for (int s = 0; s < oldPatternLength; s++) {
+            for (int t = 0; t < newPatternLength; t++) {
+                if (originalTripPattern.stops[s] == pattern.stops[t]) {
+                    originalFixedPointStopIndex = s;
+                    newFixedPointStopIndex = t;
+                    break OUTER;
+                }
+            }
+        }
 
         // Then perform the same rerouting operation for every individual trip on this pattern.
         pattern.tripSchedules = originalTripPattern.tripSchedules.stream()
@@ -325,6 +350,14 @@ public class Reroute extends Modification {
             schedule.departures[ts] = schedule.arrivals[ts] + dwellTime;
             prevOutputDeparture = schedule.departures[ts];
 
+        }
+
+        // Finally, shift the output pattern's times such that the arrival time at the fixed-point stop is unchanged.
+        // Eventually we will allow specifying a fixed-point stop in the modification parameters.
+        int timeShift = originalSchedule.arrivals[originalFixedPointStopIndex] - schedule.arrivals[newFixedPointStopIndex];
+        for (int i = 0; i < newPatternLength; i++) {
+            schedule.arrivals[i] += timeShift;
+            schedule.departures[i] += timeShift;
         }
 
         LOG.info("Original arrivals:   {}", originalSchedule.arrivals);

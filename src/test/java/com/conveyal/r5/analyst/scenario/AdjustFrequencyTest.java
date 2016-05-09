@@ -218,7 +218,7 @@ public class AdjustFrequencyTest {
     @Test
     public void testScheduleRetention () {
         AdjustFrequency af = new AdjustFrequency();
-        af.dropTripsOutsideTimePeriod = false;
+        af.retainTripsOutsideFrequencyEntries = true;
         af.route = "MULTIPLE_PATTERNS:route";
 
         AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();

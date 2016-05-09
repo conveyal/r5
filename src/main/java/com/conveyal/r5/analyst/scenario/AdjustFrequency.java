@@ -39,10 +39,15 @@ public class AdjustFrequency extends Modification {
     public List<PatternTimetable> entries;
 
     /**
-     * Should all existing trips on this route be removed (true, default), or should we retain trips that are not
-     * during the time windows being converted to frequency (false)?
+     * By default, all existing trips on this route will be removed.
+     * When retainTripsOutsideFrequencyEntries is true, we will retain all existing trips that do not begin during the
+     * time windows of newly created frequency entries. The reason we're looking at the start time of the trips is
+     * because frequency entries are defined to specify the start and end time at the first stop.
+     * When some entries define scheduled trips, those entries are considered to be zero-width and all existing trips
+     * are "outside" them, so existing trips will never be rejected because of a scheduled entry when
+     * retainTripsOutsideFrequencyEntries is true.
      */
-    public boolean dropTripsOutsideTimePeriod = true;
+    public boolean retainTripsOutsideFrequencyEntries = false;
 
     /**
      * A map containing all the frequency entries, keyed on the source trip ID of the frequency entries.
@@ -182,18 +187,17 @@ public class AdjustFrequency extends Modification {
             // Whether or not the current TripSchedule's trip was mentioned in any PatternTimetable (and has therefore
             // been mutated and copied to the output as a new frequency or scheduled trip), we may or may not want to
             // retain that original trip in the output TripPattern.
-            // By default (when dropTripsOutsideTimePeriod is true) we don't want to retain any of these original trips.
-            // But if dropTripsOutsideTimePeriod is false, we want to retain those trips that are outside the
+            // By default (when retainTripsOutsideFrequencyEntries is false) we don't want to retain any of these original trips.
+            // But if retainTripsOutsideFrequencyEntries is true, we want to retain those trips that are outside the
             // times ranges where the frequency PatternTimetables are active. Scheduled PatternTimetables are considered
             // to have a zero width, so all existing trips are considered to be outside their active time period.
-            // TODO rename to retainTripsOutsideTimePeriod or retainNonOverlappingTrips because whether it is on or off, we're always dropping trips. And anyway, we're even dropping trips inside the time period.
-
-            if (!dropTripsOutsideTimePeriod) {
+            if (retainTripsOutsideFrequencyEntries) {
                 // Copy all scheduled trips that are not entirely superseded by new frequency entries to the output pattern.
                 Service reducedService = blackOutService(originalSchedule);
                 if (reducedService != null) {
                     TripSchedule newSchedule = originalSchedule.clone();
                     // Assign the newly created reduced Service the next available int service code.
+                    // If the service was not modified, this will re-add an existing service to the list but that should be harmless.
                     newSchedule.serviceCode = servicesCopy.size();
                     servicesCopy.add(reducedService);
                     newPattern.servicesActive.set(newSchedule.serviceCode);
@@ -214,7 +218,8 @@ public class AdjustFrequency extends Modification {
     /**
      * Given a TripSchedule with service running on a set of days s, return a new Service object that represents
      * service running on s - f, where f is the set of all days on which this modification's PatternTimetables
-     * define a frequency service. This new Service object expresses when the given TripSchedule would run if it was
+     * define a frequency service during which the supplied schedule departs from its first stop.
+     * This new Service object expresses when the given TripSchedule would run if it was
      * prevented from running during any of these new frequency entries created by this modification.
      * @return a new Schedule for the given trip, considering the blackout period determined by the frequency
      *         PatternTimetables, or null if the tripSchedule will no longer be active at all.
@@ -229,8 +234,8 @@ public class AdjustFrequency extends Modification {
         // Get the service on which the given TripSchedule is active.
         Service service = servicesCopy.get(schedule.serviceCode);
 
-        // First, determine on which days of the week the source TripSchedule departs while a PatternTimetable
-        // is defining active frequency service.
+        // First, for all PatternTimetables that define frequency service over a time window during which the
+        // supplied TripSchedule departs from its first stop, record the days of the week that frequency is active.
         EnumSet blackoutDays = EnumSet.noneOf(DayOfWeek.class);
         int tripStart = schedule.departures[0];
         for (PatternTimetable entry : entries) {

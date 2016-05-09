@@ -212,6 +212,12 @@ public class AdjustFrequency extends Modification {
             // and none of the original trips were retained. Drop the pattern from the output network.
             return null;
         }
+
+        // we need to sort scheduled trips as RaptorWorker assumes they are sorted
+        if (newPattern.hasSchedules) {
+            newPattern.tripSchedules.sort((ts1, ts2) -> ts1.departures[0] - ts2.departures[0]);
+        }
+
         return newPattern;
     }
 

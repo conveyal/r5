@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.scenario;
 
+import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.Service;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
@@ -341,6 +342,78 @@ public class AdjustFrequencyTest {
         assertEquals(1, threeStopPatternCount);
         assertEquals(1, twoStopPatternCount);
         assertEquals(2, frequencyScheduleCount);
+    }
+
+    /** Test adding scheduled trips */
+    @Test
+    public void testAddedScheduledTrips () {
+        AdjustFrequency af = new AdjustFrequency();
+        af.route = "MULTIPLE_PATTERNS:route";
+        af.retainTripsOutsideFrequencyEntries = true;
+        AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();
+        entry.firstDepartures = new int[] { 25300, 25400 };
+        entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = true;
+        entry.saturday = entry.sunday = false;
+        entry.sourceTrip = "MULTIPLE_PATTERNS:trip25200"; // trip25200 is a two-stop trip
+
+        af.entries = Collections.singletonList(entry);
+
+        Scenario scenario = new Scenario();
+        scenario.modifications = Collections.singletonList(af);
+
+        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+
+        TripPattern originalTwoStopPattern = network.transitLayer.tripPatterns.stream()
+                .filter(p -> p.stops.length == 2)
+                .findFirst()
+                .orElse(null);
+
+        TripPattern originalThreeStopPattern = network.transitLayer.tripPatterns.stream()
+                .filter(p -> p.stops.length == 3)
+                .findFirst()
+                .orElse(null);
+
+        TripPattern newTwoStopPattern = mod.transitLayer.tripPatterns.stream()
+                .filter(p -> p.stops.length == 2)
+                .findFirst()
+                .orElse(null);
+
+        TripPattern newThreeStopPattern = mod.transitLayer.tripPatterns.stream()
+                .filter(p -> p.stops.length == 3)
+                .findFirst()
+                .orElse(null);
+
+        assertNotNull(originalTwoStopPattern);
+        assertNotNull(originalThreeStopPattern);
+        assertNotNull(newTwoStopPattern);
+        assertNotNull(newThreeStopPattern);
+
+        assertEquals(2, mod.transitLayer.tripPatterns.size());
+
+        // we did nothing to three stop trips, and all should be retained
+        assertEquals(originalThreeStopPattern.tripSchedules.size(), newThreeStopPattern.tripSchedules.size());
+        // we have added two trip schedules
+        assertEquals(originalTwoStopPattern.tripSchedules.size() + 2, newTwoStopPattern.tripSchedules.size());
+
+        // make sure the schedules were added correctly
+        // TripSchedules should be sorted by departure, so the relevant trips should be in positions 1 and 2
+        TripSchedule added1 = newTwoStopPattern.tripSchedules.get(1);
+
+        assertNull(added1.headwaySeconds);
+        assertNull(added1.startTimes);
+        assertNull(added1.endTimes);
+
+        assertArrayEquals(new int[] { 25300, 25800 }, added1.arrivals);
+        assertArrayEquals(new int[] { 25300, 25800 }, added1.departures);
+
+        TripSchedule added2 = newTwoStopPattern.tripSchedules.get(2);
+
+        assertNull(added2.headwaySeconds);
+        assertNull(added2.startTimes);
+        assertNull(added2.endTimes);
+
+        assertArrayEquals(new int[] { 25400, 25900 }, added2.arrivals);
+        assertArrayEquals(new int[] { 25400, 25900 }, added2.departures);
     }
 
     @After

@@ -111,18 +111,20 @@ public class RepeatedRaptorProfileRouter {
         // default to heaviest mode
         // FIXME what does WALK,CAR even mean in this context
         EnumSet<LegMode> modes = transit ? request.accessModes : request.directModes;
-        if (modes.contains(LegMode.CAR))
+        if (modes.contains(LegMode.CAR)) {
             streetRouter.streetMode = StreetMode.CAR;
-        else if (modes.contains(LegMode.BICYCLE))
+            streetRouter.distanceLimitMeters = 100_000; // FIXME arbitrary
+        } else if (modes.contains(LegMode.BICYCLE)) {
             streetRouter.streetMode = StreetMode.BICYCLE;
-        else
+            streetRouter.distanceLimitMeters = (int) (request.maxBikeTime * request.bikeSpeed * 60);
+        } else {
             streetRouter.streetMode = StreetMode.WALK;
+            // When walking, to make the search symmetric at origins/destinations, we clamp max walk at the maximum stop tree size
+            streetRouter.distanceLimitMeters =
+                    Math.min((int) (request.maxWalkTime * request.walkSpeed * 60), TransitLayer.STOP_TREE_DISTANCE_LIMIT);
+        }
 
         streetRouter.profileRequest = request;
-
-        // TODO add time and distance limits to routing, not just weight.
-        // TODO apply walk and bike speeds and maxBike time.
-        streetRouter.distanceLimitMeters = transit ? TransitLayer.STOP_TREE_DISTANCE_LIMIT : 100_000; // FIXME arbitrary, and account for bike or car access mode
         streetRouter.setOrigin(request.fromLat, request.fromLon);
         streetRouter.route();
 

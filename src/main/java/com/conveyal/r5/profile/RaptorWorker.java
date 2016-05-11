@@ -755,6 +755,7 @@ public class RaptorWorker {
     private void doTransfers(RaptorState state) {
         // avoid integer casts in tight loop below
         int walkSpeedMillimetersPerSecond = (int) (req.walkSpeed * 1000);
+        int maxWalkMillimeters = (int) (req.walkSpeed * req.maxWalkTime * 60 * 1000);
 
         patternsTouchedThisRound.clear();
         for (int stop = stopsTouchedThisRound.nextSetBit(0); stop >= 0; stop = stopsTouchedThisRound.nextSetBit(stop + 1)) {
@@ -768,6 +769,9 @@ public class RaptorWorker {
             for (int i = 0; i < transfers.size(); i += 2) {
                 int toStop = transfers.get(i);
                 int distance = transfers.get(i + 1);
+
+                if (distance > maxWalkMillimeters) continue;
+
                 int toTime = fromTime + distance / walkSpeedMillimetersPerSecond;
                 if (toTime < max_time && toTime < state.bestTimes[toStop]) {
                     state.bestTimes[toStop] = toTime;
@@ -796,6 +800,7 @@ public class RaptorWorker {
 
         // avoid integer casts in tight loop below
         int walkSpeedMillimetersPerSecond = (int) (req.walkSpeed * 1000);
+        int maxWalkMillimeters = (int) (req.walkSpeed * req.maxWalkTime * 60 * 1000);
 
         // Record distances to each target. We need to propagate all the way to samples when doing repeated RAPTOR.
         // Consider the situation where there are two parallel transit lines on
@@ -821,6 +826,10 @@ public class RaptorWorker {
                 // Targets contains pairs of (targetIndex, distanceMillimeters)
                 for (int i = 0; i < targets.length; i += 2) {
                     int targetIndex = targets[i];
+
+                    // don't walk too far
+                    if (targets[i + 1] > maxWalkMillimeters) continue;
+
                     int timeToTarget = targets[i + 1] / walkSpeedMillimetersPerSecond;
                     int propagated_time = timeAtTransitStop + timeToTarget;
 

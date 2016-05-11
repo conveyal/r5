@@ -28,10 +28,13 @@ import java.util.*;
  * A key simplifying factor is that we don't handle overnight trips. This is fine for analysis at usual times of day.
  */
 public class TransitLayer implements Serializable, Cloneable {
-    /** Distance limit for stop trees, meters */
-    public static final int STOP_TREE_DISTANCE_LIMIT = 2000;
+    /** Distance limit for stop trees, meters. Set to 3.5 km to match OTP GraphIndex.MAX_WALK_METERS */
+    public static final int STOP_TREE_DISTANCE_LIMIT = 3500;
 
-    /** Distance limit for transfers, meters */
+    /**
+     * Distance limit for transfers, meters. Set to 1km which is slightly above OTP's 600m (which was specified as
+     * 1 m/s with 600s max time, which is actually somewhat less than 600m due to extra costs due to steps etc.
+     */
     public static final int TRANSFER_DISTANCE_LIMIT = 1000;
 
     private static final Logger LOG = LoggerFactory.getLogger(TransitLayer.class);

@@ -28,10 +28,6 @@ public class TransferFinder {
 
     StreetLayer streetLayer;
 
-    StreetRouter streetRouter;
-
-    public int radiusMeters = 1000;
-
     /**
      * Should chooses whether to search via the street network or straight line distance based on the presence of
      * OSM street data (whether the street layer is null). However the street layer will always contain transit
@@ -40,8 +36,6 @@ public class TransferFinder {
     public TransferFinder(TransportNetwork network) {
         this.transitLayer = network.transitLayer;
         this.streetLayer = network.streetLayer;
-        streetRouter = new StreetRouter(streetLayer);
-        streetRouter.distanceLimitMeters = radiusMeters;
     }
 
     public void findTransfers () {
@@ -60,6 +54,10 @@ public class TransferFinder {
                 transfersForStop.add(EMPTY_INT_LIST);
                 continue;
             }
+
+            StreetRouter streetRouter = new StreetRouter(streetLayer);
+            streetRouter.distanceLimitMeters = TransitLayer.TRANSFER_DISTANCE_LIMIT;
+
             streetRouter.setOrigin(originStreetVertex);
             streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
 

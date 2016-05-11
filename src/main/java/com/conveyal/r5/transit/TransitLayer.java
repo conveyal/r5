@@ -28,6 +28,11 @@ import java.util.*;
  * A key simplifying factor is that we don't handle overnight trips. This is fine for analysis at usual times of day.
  */
 public class TransitLayer implements Serializable, Cloneable {
+    /** Distance limit for stop trees, meters */
+    public static final int STOP_TREE_DISTANCE_LIMIT = 2000;
+
+    /** Distance limit for transfers, meters */
+    public static final int TRANSFER_DISTANCE_LIMIT = 1000;
 
     private static final Logger LOG = LoggerFactory.getLogger(TransitLayer.class);
 
@@ -392,7 +397,7 @@ public class TransitLayer implements Serializable, Cloneable {
             return;
         }
         StreetRouter router = new StreetRouter(parentNetwork.streetLayer);
-        router.distanceLimitMeters = 2000;
+        router.distanceLimitMeters = STOP_TREE_DISTANCE_LIMIT;
 
         // Dominate based on distance in millimeters, since (a) we're using a hard distance limit, and (b) we divide
         // by a speed to get time when we use the stop trees.

@@ -3,6 +3,7 @@ package com.conveyal.r5.profile;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
 import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.transit.TransitLayer;
 import gnu.trove.map.TIntIntMap;
 import com.conveyal.r5.analyst.cluster.ResultEnvelope;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
@@ -121,7 +122,7 @@ public class RepeatedRaptorProfileRouter {
 
         // TODO add time and distance limits to routing, not just weight.
         // TODO apply walk and bike speeds and maxBike time.
-        streetRouter.distanceLimitMeters = transit ? 2000 : 100_000; // FIXME arbitrary, and account for bike or car access mode
+        streetRouter.distanceLimitMeters = transit ? TransitLayer.STOP_TREE_DISTANCE_LIMIT : 100_000; // FIXME arbitrary, and account for bike or car access mode
         streetRouter.setOrigin(request.fromLat, request.fromLon);
         streetRouter.route();
 

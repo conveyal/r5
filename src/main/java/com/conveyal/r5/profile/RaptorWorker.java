@@ -166,7 +166,9 @@ public class RaptorWorker {
     /**
      * This is the entry point to kick off a full RAPTOR search over many departure minutes randomizing
      * frequency routes as needed.
-     * @param accessTimes a map from transit stops to the time it takes to reach those stops
+     * @param accessTimes a map from transit stops to the time (in seconds) from the origin to those stops.
+     *                    Unlike elsewhere in R5, we don't use distance in millimeters, because we allow using cars as an
+     *                    access mode.
      * @param nonTransitTimes the time to reach all targets without transit. Targets can be vertices or points/samples.
      */
     public PropagatedTimesStore runRaptor (TIntIntMap accessTimes, PointSetTimes nonTransitTimes, TaskStatistics ts) {
@@ -751,6 +753,9 @@ public class RaptorWorker {
      * to will be marked. We don't have separate rounds for transfers; see comments in RaptorState.
      */
     private void doTransfers(RaptorState state) {
+        // avoid integer casts in tight loop below
+        int walkSpeedMillimetersPerSecond = (int) (req.walkSpeed * 1000);
+
         patternsTouchedThisRound.clear();
         for (int stop = stopsTouchedThisRound.nextSetBit(0); stop >= 0; stop = stopsTouchedThisRound.nextSetBit(stop + 1)) {
             // First, mark all patterns at this stop (the trivial "stay at the stop where you are" loop transfer).
@@ -759,11 +764,11 @@ public class RaptorWorker {
             // Then follow all transfers out of this stop, marking patterns that pass through those target stops.
             int fromTime = state.bestNonTransferTimes[stop];
             TIntList transfers = data.transfersForStop.get(stop);
-            // Transfers are stored as a flattened 2D array, advance two elements at a time.
+            // Transfers are stored as a flattened 2D array, advance two elements at a time, with (target stop, distance millimeters)
             for (int i = 0; i < transfers.size(); i += 2) {
                 int toStop = transfers.get(i);
                 int distance = transfers.get(i + 1);
-                int toTime = fromTime + (int) (distance / req.walkSpeed);
+                int toTime = fromTime + distance / walkSpeedMillimetersPerSecond;
                 if (toTime < max_time && toTime < state.bestTimes[toStop]) {
                     state.bestTimes[toStop] = toTime;
                     state.transferStop[toStop] = stop;
@@ -789,6 +794,9 @@ public class RaptorWorker {
         // For debug and informational purposes, measure how long it takes to perform propagation.
         long beginPropagationTime = System.currentTimeMillis();
 
+        // avoid integer casts in tight loop below
+        int walkSpeedMillimetersPerSecond = (int) (req.walkSpeed * 1000);
+
         // Record distances to each target. We need to propagate all the way to samples when doing repeated RAPTOR.
         // Consider the situation where there are two parallel transit lines on
         // 5th Street and 6th Street, and you live on A Street halfway between 5th and 6th.
@@ -810,12 +818,11 @@ public class RaptorWorker {
                 if (targets == null) {
                     continue;
                 }
-                // Targets contains pairs of (targetIndex, time).
-                // The cache has time in seconds rather than distance to avoid costly floating-point divides and
-                // integer casts here. FIXME this should be changed along with the transfers to use millimeters.
+                // Targets contains pairs of (targetIndex, distanceMillimeters)
                 for (int i = 0; i < targets.length; i += 2) {
                     int targetIndex = targets[i];
-                    int propagated_time = timeAtTransitStop + targets[i + 1];
+                    int timeToTarget = targets[i + 1] / walkSpeedMillimetersPerSecond;
+                    int propagated_time = timeAtTransitStop + timeToTarget;
 
                     if (propagated_time < departureTime) {
                         LOG.error("Negative propagated time, will crash shortly.");

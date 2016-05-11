@@ -61,13 +61,15 @@ public class TransferFinder {
                 continue;
             }
             streetRouter.setOrigin(originStreetVertex);
+            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+
             streetRouter.route();
-            TIntIntMap timesToReachedStops = streetRouter.getReachedStops();
-            retainClosestStopsOnPatterns(timesToReachedStops);
+            TIntIntMap distancesToReachedStops = streetRouter.getReachedStops();
+            retainClosestStopsOnPatterns(distancesToReachedStops);
             // At this point we have the distances to all stops that are the closest one on some pattern.
             // Make transfers to them, packed as pairs of (target stop index, distance).
             TIntList packedTransfers = new TIntArrayList();
-            timesToReachedStops.forEachEntry((targetStopIndex, distance) -> {
+            distancesToReachedStops.forEachEntry((targetStopIndex, distance) -> {
                 packedTransfers.add(targetStopIndex);
                 packedTransfers.add(distance);
                 return true;
@@ -81,9 +83,11 @@ public class TransferFinder {
             // If we are applying a scenario (extending the transfers list rather than starting from scratch), for
             // all transfers out of a scenario stop into a base network stop we must also create the reverse transfer.
             // The original packed transfers list is copied on write to avoid perturbing the base network.
+            // This is technically slightly incorrect, as distance(a, b) != distance(b, a), but for walking the equality
+            // is close to holding.
             if (firstStopIndex > 0) {
                 final int originStopIndex = s; // Why oh why, Java?
-                timesToReachedStops.forEachEntry((targetStopIndex, distance) -> {
+                distancesToReachedStops.forEachEntry((targetStopIndex, distance) -> {
                     TIntList packedTransfersCopy = new TIntArrayList(transfersForStop.get(targetStopIndex));
                     packedTransfersCopy.add(originStopIndex);
                     packedTransfersCopy.add(distance);
@@ -102,14 +106,15 @@ public class TransferFinder {
     /**
      * Filter down a map from target stop indexes to distances so it only includes those stops that are the
      * closest on some pattern. This is technically incorrect (think of transfers to a U shaped metro from a bus line
-     * running down the middle of the U vertically, a situation which actually exists in Washington, DC) but
-     * anecdotally it speeds up computation by up to 40 percent. We may want to look into other ways to optimize
-     * transfers (or why the transfers are making routing so much slower) if this turns out to affect results.
+     * running across the legs of the U, a situation which actually exists in Washington, DC with the
+     * red line and the Q4) but anecdotally it speeds up computation by up to 40 percent. We may want to look into
+     * other ways to optimize transfers (or why the transfers are making routing so much slower) if this turns out to
+     * affect results.
      */
     private void retainClosestStopsOnPatterns(TIntIntMap timesToReachedStops) {
         TIntIntMap bestStopOnPattern = new TIntIntHashMap(50, 0.5f, -1, -1);
         // For every reached stop,
-        timesToReachedStops.forEachEntry((stopIndex, timeToStop) -> {
+        timesToReachedStops.forEachEntry((stopIndex, distanceToStop) -> {
             // For every pattern passing through that stop,
             transitLayer.patternsForStop.get(stopIndex).forEach(patternIndex -> {
                 int currentBestStop = bestStopOnPattern.get(patternIndex);
@@ -118,7 +123,7 @@ public class TransferFinder {
                     bestStopOnPattern.put(patternIndex, stopIndex);
                 } else {
                     int currentBestTime = timesToReachedStops.get(currentBestStop);
-                    if (currentBestTime > timeToStop) {
+                    if (currentBestTime > distanceToStop) {
                         bestStopOnPattern.put(patternIndex, stopIndex);
                     }
                 }
@@ -126,7 +131,7 @@ public class TransferFinder {
             });
             return true; // iteration should continue
         });
-        timesToReachedStops.retainEntries((stop, time) -> bestStopOnPattern.containsValue(stop));
+        timesToReachedStops.retainEntries((stop, distance) -> bestStopOnPattern.containsValue(stop));
     }
 
     /**

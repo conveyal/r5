@@ -372,7 +372,7 @@ public class TransitLayer implements Serializable, Cloneable {
     }
 
     /**
-     * Perform a single on-street search from the specified transit stop. Store the distance to every reached
+     * Perform a single on-street search from the specified transit stop. Store the distance in millimeters to every reached
      * street vertex.
      * @param stop the internal integer stop ID for which to build a stop tree.
      */
@@ -393,8 +393,14 @@ public class TransitLayer implements Serializable, Cloneable {
         }
         StreetRouter router = new StreetRouter(parentNetwork.streetLayer);
         router.distanceLimitMeters = 2000;
+
+        // Dominate based on distance in millimeters, since (a) we're using a hard distance limit, and (b) we divide
+        // by a speed to get time when we use the stop trees.
+        router.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
         router.setOrigin(originVertex);
         router.route();
+
+        // This will return distance in millimeters since that is our dominance function
         stopTrees.add(router.getReachedVertices());
     }
 

@@ -1239,7 +1239,7 @@ public class StreetLayer implements Serializable, Cloneable {
             r.streetMode = StreetMode.WALK;
             r.setOrigin(vertex);
             // walk to the end of the graph
-            r.distanceLimitMeters = Integer.MAX_VALUE;
+            r.distanceLimitMeters = 0;
             r.route();
             nOrigins++;
             if (nOrigins % 100 == 0) {

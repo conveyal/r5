@@ -124,6 +124,11 @@ public class RepeatedRaptorProfileRouter {
         streetRouter.distanceLimitMeters = transit ? 2000 : 100_000; // FIXME arbitrary, and account for bike or car access mode
         streetRouter.setOrigin(request.fromLat, request.fromLon);
         streetRouter.route();
+
+        // TODO for bike, car access we really want to use weight to account for turn costs, but that's a resource limiting
+        // problem.
+        streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+
         ts.initialStopSearch = (int) (System.currentTimeMillis() - initialStopStartTime);
 
         // Find the travel time to every target without using any transit, based on the results in the StreetRouter.

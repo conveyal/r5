@@ -255,10 +255,16 @@ function requestStops() {
 }
 
 function getStopFeature(stop) {
+    var id;
+    if (stop.stopId != undefined) {
+        id = stop.stopId;
+    } else {
+        id = stop.id;
+    }
     var stopFeature = {
         "properties":{
             "name": stop.name,
-            "id": stop.stopId
+            "id": id
         },
         "type":"Feature",
         "geometry":{

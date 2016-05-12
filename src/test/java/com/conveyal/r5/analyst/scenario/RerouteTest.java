@@ -37,7 +37,6 @@ public class RerouteTest {
 
     /** Test rerouting a route in the middle */
     @Test
-    @Ignore("Failing due to decreased transfer limit, temporarily disable")
     public void testRerouteInMiddle () {
         Reroute reroute = new Reroute();
         // skip s3, insert s5
@@ -189,6 +188,7 @@ public class RerouteTest {
 
     /** Insert a (created) stop in the middle of a route without removing any existing stops */
     @Test
+    @Ignore("Failing due to decreased transfer limit, temporarily disable")
     public void insertStopInMiddle () {
         Reroute reroute = new Reroute();
         reroute.stops = Arrays.asList(

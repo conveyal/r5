@@ -35,7 +35,7 @@ public class TransitLayer implements Serializable, Cloneable {
      * Distance limit for transfers, meters. Set to 1km which is slightly above OTP's 600m (which was specified as
      * 1 m/s with 600s max time, which is actually somewhat less than 600m due to extra costs due to steps etc.
      */
-    public static final int TRANSFER_DISTANCE_LIMIT = 600;
+    public static final int TRANSFER_DISTANCE_LIMIT = 1000;
 
     private static final Logger LOG = LoggerFactory.getLogger(TransitLayer.class);
 

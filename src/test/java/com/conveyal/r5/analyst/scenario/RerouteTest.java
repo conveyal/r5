@@ -8,7 +8,6 @@ import gnu.trove.list.TIntList;
 import gnu.trove.map.TIntIntMap;
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -37,7 +36,6 @@ public class RerouteTest {
 
     /** Test rerouting a route in the middle */
     @Test
-    @Ignore("Failing due to decreased transfer limit, temporarily disable")
     public void testRerouteInMiddle () {
         Reroute reroute = new Reroute();
         // skip s3, insert s5

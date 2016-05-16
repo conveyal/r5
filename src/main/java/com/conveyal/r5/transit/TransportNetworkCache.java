@@ -31,14 +31,18 @@ public class TransportNetworkCache {
 
     private static final File CACHE_DIR = new File("cache", "graphs"); // reuse cached graphs from old analyst worker
 
-    private final String sourceBucket;
+    private final String defaultSourceBucket;
 
     String currentNetworkId = null;
 
     TransportNetwork currentNetwork = null;
 
-    public TransportNetworkCache(String sourceBucket) {
-        this.sourceBucket = sourceBucket;
+    public TransportNetworkCache(String defaultSourceBucket) {
+        this.defaultSourceBucket = defaultSourceBucket;
+    }
+
+    public TransportNetworkCache() {
+        this(null);
     }
 
     /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
@@ -47,12 +51,28 @@ public class TransportNetworkCache {
     /** This stores any number of lightweight scenario networks built upon the current base network. */
     private Map<String, TransportNetwork> scenarioNetworkCache = new HashMap<>();
 
+    /** Get the transport network for an ID, given the default source bucket. */
+    public TransportNetwork getNetwork (String networkId) {
+        return getNetwork(null, networkId);
+    }
+
     /**
      * Return the graph for the given unique identifier for graph builder inputs on S3.
      * If this is the same as the last graph built, just return the pre-built graph.
      * If not, build the graph from the inputs, fetching them from S3 to the local cache as needed.
+     *
+     * NB: It is assumed that network IDs are globally unique, not just unique within buckets. If we have a network with
+     * this ID cached, it is used with no regard as to which bucket it came from. This is fine as we use UUIDs as network
+     * IDs. There are any number of significantly more probable events than an ID collision to be concerned about.
      */
-    public synchronized TransportNetwork getNetwork (String networkId) {
+    public synchronized TransportNetwork getNetwork (String sourceBucket, String networkId) {
+        if (sourceBucket == null) {
+            if (this.defaultSourceBucket == null) {
+                throw new NullPointerException("No default bucket specified, and no bucket specified in call to TransportNetworkCache");
+            } else {
+                sourceBucket = this.defaultSourceBucket;
+            }
+        }
 
         LOG.info("Finding or building a TransportNetwork for ID {} and R5 commit {}", networkId, MavenVersion.commit);
 
@@ -61,11 +81,11 @@ public class TransportNetworkCache {
             return currentNetwork;
         }
 
-        TransportNetwork network = checkCached(networkId);
+        TransportNetwork network = checkCached(sourceBucket, networkId);
         if (network == null) {
             LOG.info("Cached transport network for id {} and commit {} was not found. Building the network from scratch.",
                     networkId, MavenVersion.commit);
-            network = buildNetwork(networkId);
+            network = buildNetwork(sourceBucket, networkId);
         }
 
         currentNetwork = network;
@@ -73,6 +93,10 @@ public class TransportNetworkCache {
         scenarioNetworkCache.clear(); // We cache only scenario graphs built upon the currently active base graph.
 
         return network;
+    }
+
+    public TransportNetwork getNetworkForScenario (String networkId, Scenario scenario) {
+        return getNetworkForScenario(null, networkId, scenario);
     }
 
     /**
@@ -86,9 +110,9 @@ public class TransportNetworkCache {
      *
      * TODO LinkedPointSets keep a reference back to a StreetLayer which means that the network will not be completely garbage collected upon network switch
      */
-    public synchronized TransportNetwork getNetworkForScenario (String networkId, Scenario scenario) {
+    public synchronized TransportNetwork getNetworkForScenario (String sourceBucket, String networkId, Scenario scenario) {
         // The following call clears the scenarioNetworkCache if the current base graph changes.
-        TransportNetwork baseNetwork = this.getNetwork(networkId);
+        TransportNetwork baseNetwork = this.getNetwork(sourceBucket, networkId);
         TransportNetwork scenarioNetwork = scenarioNetworkCache.get(scenario.id);
         if (scenarioNetwork == null) {
             LOG.info("Applying scenario to base network...");
@@ -106,7 +130,7 @@ public class TransportNetworkCache {
     }
 
     /** If this transport network is already built and cached, fetch it quick */
-    private TransportNetwork checkCached (String networkId) {
+    private TransportNetwork checkCached (String sourceBucket, String networkId) {
         try {
             String filename = networkId + "_" + MavenVersion.commit + ".dat";
             File cacheLocation = new File(CACHE_DIR, networkId + "_" + MavenVersion.commit + ".dat");
@@ -148,7 +172,7 @@ public class TransportNetworkCache {
     }
 
     /** If we did not find a cached network, build one */
-    public TransportNetwork buildNetwork (String networkId) {
+    public TransportNetwork buildNetwork (String sourceBucket, String networkId) {
         // The location of the inputs that will be used to build this graph
         File dataDirectory = new File(CACHE_DIR, networkId);
 

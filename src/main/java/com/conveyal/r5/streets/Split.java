@@ -3,6 +3,7 @@ package com.conveyal.r5.streets;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.geom.Envelope;
+import gnu.trove.TIntCollection;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.apache.commons.math3.util.FastMath;
@@ -63,13 +64,11 @@ public class Split {
         int squaredRadiusFixedLat = radiusFixedLat * radiusFixedLat;
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
         // Iterate over the set of forward (even) edges that may be near the given coordinate.
-        // We sort these to make linking deterministic (see issue #159).
-        TIntList edges = new TIntArrayList(streetLayer.findEdgesInEnvelope(envelope));
-        edges.sort();
+        TIntCollection candidateEdges = streetLayer.findEdgesInEnvelope(envelope);
         // The split location currently being examined and the best one seen so far.
         Split curr = new Split();
         Split best = new Split();
-        edges.forEach(e -> {
+        candidateEdges.forEach(e -> {
             curr.edge = e;
             edge.seek(e);
 
@@ -93,8 +92,12 @@ public class Split {
                 curr.distSquared = (int)(dx * dx + dy * dy);
                 // Ignore segments that are too far away (filter false positives).
                 if (curr.distSquared < squaredRadiusFixedLat) {
-                    // Update the best segment if we've found something closer.
                     if (curr.distSquared < best.distSquared) {
+                        // Update the best segment if we've found something closer.
+                        best.setFrom(curr);
+                    } else if (curr.distSquared == best.distSquared && curr.edge < best.edge) {
+                        // Break distance ties by favoring lower edge IDs. This makes destination linking
+                        // deterministic where centroids are equidistant to edges (see issue #159).
                         best.setFrom(curr);
                     }
                 }

@@ -4,6 +4,8 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.iterator.TIntIterator;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import org.apache.commons.math3.util.FastMath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,18 +63,22 @@ public class Split {
         double squaredRadiusFixedLat = radiusFixedLat * radiusFixedLat; // May overflow, don't use an int
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
         // Iterate over the set of forward (even) edges that may be near the given coordinate.
-        TIntIterator edgeIterator = streetLayer.findEdgesInEnvelope(envelope).iterator();
+        // We sort these to make linking deterministic (see issue #159).
+        TIntList edges = new TIntArrayList(streetLayer.findEdgesInEnvelope(envelope));
+        edges.sort();
         // The split location currently being examined and the best one seen so far.
         Split curr = new Split();
         Split best = new Split();
-        while (edgeIterator.hasNext()) {
-            curr.edge = edgeIterator.next();
-            edge.seek(curr.edge);
+        edges.forEach(e -> {
+            curr.edge = e;
+            edge.seek(e);
 
-            if (streetMode == StreetMode.WALK && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)) continue;
-            if (streetMode == StreetMode.BICYCLE && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE)) continue;
-            if (streetMode == StreetMode.CAR && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_CAR)) continue;
+            // If an edge does not allow traversal with the specified mode, skip over it.
+            if (streetMode == StreetMode.WALK && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)) return true;
+            if (streetMode == StreetMode.BICYCLE && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE)) return true;
+            if (streetMode == StreetMode.CAR && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_CAR)) return true;
 
+            // The distance to this edge is the distance to the closest segment of its geometry.
             edge.forEachSegment((seg, fLat0, fLon0, fLat1, fLon1) -> {
                 // Find the fraction along the current segment
                 curr.seg = seg;
@@ -86,12 +92,16 @@ public class Split {
                 double dy = (curr.fLat - fixLat);
                 curr.distSquared = dx * dx + dy * dy;
                 // Ignore segments that are too far away (filter false positives).
-                // Replace the best segment if we've found something closer.
-                if (curr.distSquared < squaredRadiusFixedLat && curr.distSquared < best.distSquared) {
-                    best.setFrom(curr);
+                // Update the best segment if we've found something closer.
+                if (curr.distSquared < squaredRadiusFixedLat) {
+                    if (curr.distSquared < best.distSquared) {
+                        best.setFrom(curr);
+                    }
                 }
-            }); // end loop over segments
-        } // end loop over edges
+            });
+            // The loop over the edges should continue.
+            return true;
+        });
 
         if (best.edge < 0) {
             // No edge found nearby.

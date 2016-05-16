@@ -48,7 +48,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Random;
-import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
@@ -1068,7 +1067,7 @@ public class StreetLayer implements Serializable, Cloneable {
         }
 
         // The split is somewhere along a street away from an existing intersection vertex. Make a new splitter vertex.
-        int newVertexIndex = vertexStore.addVertexFixed((int) split.fLat, (int) split.fLon);
+        int newVertexIndex = vertexStore.addVertexFixed((int) split.fixedLat, (int) split.fixedLon);
         int oldToVertex = edge.getToVertex(); // Hold a copy of the to vertex index, because it may be modified below.
         if (edge.isMutable()) {
             // The edge we are going to split is mutable.
@@ -1129,7 +1128,7 @@ public class StreetLayer implements Serializable, Cloneable {
         }
 
         // The split is somewhere away from an existing intersection vertex. Make a new vertex.
-        int newVertexIndex = vertexStore.addVertexFixed((int)split.fLat, (int)split.fLon);
+        int newVertexIndex = vertexStore.addVertexFixed((int)split.fixedLat, (int)split.fixedLon);
 
         // Modify the existing bidirectional edge pair to lead up to the split.
         // Its spatial index entry is still valid, its envelope has only shrunk.

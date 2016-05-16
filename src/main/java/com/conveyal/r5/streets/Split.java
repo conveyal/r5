@@ -3,7 +3,6 @@ package com.conveyal.r5.streets;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.geom.Envelope;
-import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.apache.commons.math3.util.FastMath;
@@ -22,10 +21,10 @@ public class Split {
     public int edge = -1;
     public int seg = 0; // the segment within the edge that is closest to the search point
     public double frac = 0; // the fraction along that segment where a link should occur
-    public double fLon; // the x coordinate of the link point along the edge
-    public double fLat; // the y coordinate of the link point along the edge
-    // by virtue of having twice as many digits, a long could always hold the square of an int, but would it be faster than float math?
-    public double distSquared = Double.POSITIVE_INFINITY;
+    public int fixedLon; // the x coordinate of the link point along the edge
+    public int fixedLat; // the y coordinate of the link point along the edge
+    // Squaring distance should not overflow an int at the distances we're working with.
+    public int distSquared = Integer.MAX_VALUE;
 
     // The following fields require more calculations and are only set once a best edge is found.
     public int distance0_mm = 0; // the accumulated distance along the edge geometry up to the split point
@@ -37,8 +36,8 @@ public class Split {
         edge = other.edge;
         seg = other.seg;
         frac = other.frac;
-        fLon = other.fLon;
-        fLat = other.fLat;
+        fixedLon = other.fixedLon;
+        fixedLat = other.fixedLat;
         distSquared = other.distSquared;
     }
 
@@ -48,19 +47,20 @@ public class Split {
      */
     public static Split find(double lat, double lon, double searchRadiusMeters, StreetLayer streetLayer, StreetMode streetMode) {
         // NOTE THIS ENTIRE GEOMETRIC CALCULATION IS HAPPENING IN FIXED PRECISION INT DEGREES
-        int fixLat = VertexStore.floatingDegreesToFixed(lat);
-        int fixLon = VertexStore.floatingDegreesToFixed(lon);
+        int fixedLat = VertexStore.floatingDegreesToFixed(lat);
+        int fixedLon = VertexStore.floatingDegreesToFixed(lon);
 
         // We won't worry about the perpendicular walks yet.
         // Just insert or find a vertex on the nearest road and return that vertex.
 
         final double metersPerDegreeLat = 111111.111;
         double cosLat = FastMath.cos(FastMath.toRadians(lat)); // The projection factor, Earth is a "sphere"
-        double radiusFixedLat = VertexStore.floatingDegreesToFixed(searchRadiusMeters / metersPerDegreeLat);
-        double radiusFixedLon = radiusFixedLat / cosLat; // Expand the X search space, don't shrink it.
-        Envelope envelope = new Envelope(fixLon, fixLon, fixLat, fixLat);
+        int radiusFixedLat = VertexStore.floatingDegreesToFixed(searchRadiusMeters / metersPerDegreeLat);
+        int radiusFixedLon = (int) (radiusFixedLat / cosLat); // Expand the X search space, don't shrink it.
+        Envelope envelope = new Envelope(fixedLon, fixedLon, fixedLat, fixedLat);
         envelope.expandBy(radiusFixedLon, radiusFixedLat);
-        double squaredRadiusFixedLat = radiusFixedLat * radiusFixedLat; // May overflow, don't use an int
+        // Squaring should not overflow an int for the distances we're measuring.
+        int squaredRadiusFixedLat = radiusFixedLat * radiusFixedLat;
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
         // Iterate over the set of forward (even) edges that may be near the given coordinate.
         // We sort these to make linking deterministic (see issue #159).
@@ -79,17 +79,17 @@ public class Split {
             if (streetMode == StreetMode.CAR && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_CAR)) return true;
 
             // The distance to this edge is the distance to the closest segment of its geometry.
-            edge.forEachSegment((seg, fLat0, fLon0, fLat1, fLon1) -> {
+            edge.forEachSegment((seg, fixedLat0, fixedLon0, fixedLat1, fixedLon1) -> {
                 // Find the fraction along the current segment
                 curr.seg = seg;
-                curr.frac = GeometryUtils.segmentFraction(fLon0, fLat0, fLon1, fLat1, fixLon, fixLat, cosLat);
+                curr.frac = GeometryUtils.segmentFraction(fixedLon0, fixedLat0, fixedLon1, fixedLat1, fixedLon, fixedLat, cosLat);
                 // Project to get the closest point on the segment.
                 // Note: the fraction is scaleless, xScale is accounted for in the segmentFraction function.
-                curr.fLon = fLon0 + curr.frac * (fLon1 - fLon0);
-                curr.fLat = fLat0 + curr.frac * (fLat1 - fLat0);
+                curr.fixedLon = (int) (fixedLon0 + curr.frac * (fixedLon1 - fixedLon0));
+                curr.fixedLat = (int) (fixedLat0 + curr.frac * (fixedLat1 - fixedLat0));
                 // Find squared distance to edge (avoid taking root)
-                double dx = (curr.fLon - fixLon) * cosLat;
-                double dy = (curr.fLat - fixLat);
+                int dx = (int) ((curr.fixedLon - fixedLon) * cosLat);
+                int dy = curr.fixedLat - fixedLat;
                 curr.distSquared = dx * dx + dy * dy;
                 // Ignore segments that are too far away (filter false positives).
                 // Update the best segment if we've found something closer.
@@ -152,11 +152,15 @@ public class Split {
         return best;
     }
 
-    /** find a split on a particular edge */
+    /**
+     * Find a split on a particular edge.
+     * FIXME this appears to be copy-pasted from another method. Can we reuse some code here?
+     */
     public static Split findOnEdge (double lat, double lon, EdgeStore.Edge edge) {
-        // NOTE THIS ENTIRE GEOMETRIC CALCULATION IS HAPPENING IN FIXED PRECISION INT DEGREES
-        int fixLat = VertexStore.floatingDegreesToFixed(lat);
-        int fixLon = VertexStore.floatingDegreesToFixed(lon);
+
+        // After this conversion, the entire geometric calculation is happening in fixed precision int degrees.
+        int fixedLat = VertexStore.floatingDegreesToFixed(lat);
+        int fixedLon = VertexStore.floatingDegreesToFixed(lon);
 
         // We won't worry about the perpendicular walks yet.
         // Just insert or find a vertex on the nearest road and return that vertex.
@@ -173,17 +177,18 @@ public class Split {
         best.vertex0 = edge.getFromVertex();
         best.vertex1 = edge.getToVertex();
         double[] lengthBefore_fixedDeg = new double[1];
-        edge.forEachSegment((seg, fLat0, fLon0, fLat1, fLon1) -> {
+        edge.forEachSegment((seg, fixedLat0, fixedLon0, fixedLat1, fixedLon1) -> {
+
             // Find the fraction along the current segment
             curr.seg = seg;
-            curr.frac = GeometryUtils.segmentFraction(fLon0, fLat0, fLon1, fLat1, fixLon, fixLat, cosLat);
+            curr.frac = GeometryUtils.segmentFraction(fixedLon0, fixedLat0, fixedLon1, fixedLat1, fixedLon, fixedLat, cosLat);
             // Project to get the closest point on the segment.
             // Note: the fraction is scaleless, xScale is accounted for in the segmentFraction function.
-            curr.fLon = fLon0 + curr.frac * (fLon1 - fLon0);
-            curr.fLat = fLat0 + curr.frac * (fLat1 - fLat0);
+            curr.fixedLon = (int) (fixedLon0 + curr.frac * (fixedLon1 - fixedLon0));
+            curr.fixedLat = (int) (fixedLat0 + curr.frac * (fixedLat1 - fixedLat0));
 
-            double dx = (fLon1 - fLon0) * cosLat;
-            double dy = (fLat1 - fLat0);
+            int dx = (int)((fixedLon1 - fixedLon0) * cosLat);
+            int dy = fixedLat1 - fixedLat0;
             double length = FastMath.sqrt(dx * dx + dy * dy);
 
             curr.distance0_mm = (int) ((lengthBefore_fixedDeg[0] + length * curr.frac) * metersPerDegreeLat * 1000);

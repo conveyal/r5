@@ -102,14 +102,20 @@ public class GeometryUtils {
         return 2 * RADIUS_OF_EARTH_M * FastMath.asin(FastMath.sqrt(underRadical));
     }
 
-    public static double segmentFraction(int fLon0, int fLat0, int fLon1, int fLat1, int fixLon, int fixLat, double cosLat) {
-        // convert to local cartesian system
-        fLon0 /= cosLat;
-        fLon1 /= cosLat;
-        fixLon /= cosLat;
-
-        // TODO can we do this with fixed-point math?
-        LineSegment seg = new LineSegment(fLon0, fLat0, fLon1, fLat1);
-        return seg.segmentFraction(new Coordinate(fixLon, fixLat));
+    /**
+     * Project the point (fixedLon, fixedLat) onto the line segment from (fixedLon0, fixedLat0) to
+     * (fixedLon1, fixedLat1) and return the fractional distance of the projected location along the segment as a
+     * double in the range [0, 1]. All coordinates are fixed-precision geographic.
+     * Pass in the cosine of the latitude to avoid repeatedly performing the expensive cosine operation.
+     */
+    public static double segmentFraction(int fixedLon0, int fixedLat0, int fixedLon1, int fixedLat1,
+                                         int fixedLon, int fixedLat, double cosLat) {
+        // Adjust x scale to account for lines of longitude converging toward the poles.
+        fixedLon0 = (int) (fixedLon0 / cosLat);
+        fixedLon1 = (int) (fixedLon1 / cosLat);
+        fixedLon  = (int) (fixedLon / cosLat);
+        LineSegment seg = new LineSegment(fixedLon0, fixedLat0, fixedLon1, fixedLat1);
+        return seg.segmentFraction(new Coordinate(fixedLon, fixedLat));
     }
+
 }

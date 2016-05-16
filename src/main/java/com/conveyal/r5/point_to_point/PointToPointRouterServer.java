@@ -401,7 +401,7 @@ public class PointToPointRouterServer {
                 featureCollection.put("type", "FeatureCollection");
                 List<GeoJsonFeature> features = new ArrayList<>(10);
                 GeoJsonFeature feature = new GeoJsonFeature(
-                    fixedDegreesToFloating(destinationSplit.fLon), fixedDegreesToFloating(destinationSplit.fLat));
+                    fixedDegreesToFloating(destinationSplit.fixedLon), fixedDegreesToFloating(destinationSplit.fixedLat));
                 feature.addProperty("type", "Point on edge");
 
                 features.add(feature);

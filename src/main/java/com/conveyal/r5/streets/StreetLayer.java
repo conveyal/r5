@@ -972,8 +972,14 @@ public class StreetLayer implements Serializable, Cloneable {
      */
     public TIntSet findEdgesInEnvelope (Envelope envelope) {
         TIntSet candidates = spatialIndex.query(envelope);
-        // Always include any temporary edges, since over-selection is allowed.
-        candidates.addAll(edgeStore.temporarilyAddedEdges);
+        // Always include any temporary edges created in a scenario.
+        // This allows us to skip rebuilding the spatial index for scenarios since over-selection is allowed.
+        edgeStore.forEachTemporarilyAddedEdge(candidates::add);
+        // Remove any edges that were temporarily deleted in a scenario.
+        // This allows properly re-splitting the same edge in multiple places.
+        if (edgeStore.temporarilyDeletedEdges != null) {
+            candidates.removeAll(edgeStore.temporarilyDeletedEdges);
+        }
         return candidates;
     }
 
@@ -1023,7 +1029,8 @@ public class StreetLayer implements Serializable, Cloneable {
 
     /**
      * Find an existing street vertex near the supplied coordinates, or create a new one if there are no vertices
-     * near enough.
+     * near enough. Note that calling this method is potentially destructive (it can modify the street network).
+     *
      * This uses {@link #findSplit(double, double, double, StreetMode)} and {@link Split} which need filled spatialIndex
      * In other works {@link #indexStreets()} needs to be called before this is used. Otherwise no near vertex is found.
      *
@@ -1036,13 +1043,16 @@ public class StreetLayer implements Serializable, Cloneable {
      *         or -1 if no such vertex could be found or created.
      */
     public int getOrCreateVertexNear(double lat, double lon, StreetMode streetMode) {
+
         Split split = findSplit(lat, lon, LINK_RADIUS_METERS, streetMode);
         if (split == null) {
             // No linking site was found within range.
             return -1;
         }
+
         // We have a linking site on a street edge. Find or make a suitable vertex at that site.
-        // It is not necessary to retain the original Edge cursor object inside findSplit, one object instantiation is harmless.
+        // It is not necessary to reuse the Edge cursor object created inside the findSplit call,
+        // one additional object instantiation is harmless.
         Edge edge = edgeStore.getCursor(split.edge);
 
         // Check for cases where we don't need to create a new vertex:
@@ -1067,23 +1077,29 @@ public class StreetLayer implements Serializable, Cloneable {
             // Its spatial index entry is still valid, since the edge's envelope will only shrink.
             edge.setLengthMm(split.distance0_mm);
             edge.setToVertex(newVertexIndex);
-            // Turn the edge into a straight line. FIXME split edges and new edges should have geometries!
+            // Turn the edge into a straight line.
+            // FIXME split edges and new edges should have geometries!
             edge.setGeometry(Collections.EMPTY_LIST);
         } else {
             // The edge we are going to split is immutable, and should be left as-is.
             // We must be applying a scenario, and this edge is part of the baseline graph shared between threads.
             // Preserve the existing edge pair, creating a new edge pair to lead up to the split.
             // The new edge will be added to the edge lists later (the edge lists are a transient index).
-            // We don't add it to the spatial index, which is shared between all threads. TODO include all temp edges in every spatial index query result.
+            // We don't add it to the spatial index, which is shared between all threads.
             EdgeStore.Edge newEdge0 = edgeStore.addStreetPair(edge.getFromVertex(), newVertexIndex, split.distance0_mm, edge.getOSMID());
             // Copy the flags and speeds for both directions, making the new edge like the existing one.
             newEdge0.copyPairFlagsAndSpeeds(edge);
+            // Exclude the original split edge from all future spatial index queries on this scenario copy.
+            // This should allow proper re-splitting of a single edge for multiple new transit stops.
+            edgeStore.temporarilyDeletedEdges.add(edge.edgeIndex);
         }
         // Make a new bidirectional edge pair for the segment after the split.
         // The new edge will be added to the edge lists later (the edge lists are a transient index).
         EdgeStore.Edge newEdge1 = edgeStore.addStreetPair(newVertexIndex, oldToVertex, split.distance1_mm, edge.getOSMID());
-        // Copy the flags and speeds for both directions, making the new edge1 like the existing edge.
+        // Copy the flags and speeds for both directions, making newEdge1 like the existing edge.
         newEdge1.copyPairFlagsAndSpeeds(edge);
+        // Insert the new edge into the spatial index if we are working on a baseline graph.
+        // If this is a scenario, all temporary edges will be included in every spatial index query result.
         if (!edgeStore.isExtendOnlyCopy()) {
             spatialIndex.insert(newEdge1.getEnvelope(), newEdge1.edgeIndex);
         }
@@ -1184,6 +1200,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * Find a location on an existing street near the given point, without actually creating any vertices or edges.
      * The search radius can be specified freely here because we use this function to link transit stops to streets but
      * also to link pointsets to streets, and currently we use different distances for these two things.
+     * This is a nondestructive operation: it simply finds a candidate split point without modifying anything.
      * TODO favor platforms and pedestrian paths when requested
      * @param lat latitude in floating point geographic coordinates (not fixed point int coordinates)
      * @param lon longitude in floating point geographic coordinates (not fixed point int coordinates)

@@ -96,8 +96,7 @@ public class LinkedPointSet {
         distances1_mm = new int[pointSet.featureCount()];
         int unlinked = 0;
         for (int i = 0; i < pointSet.featureCount(); i++) {
-            Split split = streetLayer.findSplit(pointSet.getLat(i), pointSet.getLon(i), 1000,
-                streetMode);
+            Split split = streetLayer.findSplit(pointSet.getLat(i), pointSet.getLon(i), 1000, streetMode);
             if (split == null) {
                 unlinked++;
                 edges[i] = -1;

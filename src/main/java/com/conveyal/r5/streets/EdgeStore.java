@@ -32,6 +32,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.function.IntConsumer;
 
 /**
  * A column store with parallel arrays is better than a struct simulation because:
@@ -103,17 +104,9 @@ public class EdgeStore implements Serializable {
      * When applying a scenario, we can't touch the baseline graph which is shared between all threads. Whenever we
      * must delete one of these immutable edges (e.g. when splitting a road to connect a new stop) we instead record
      * its index in temporarilyDeletedEdges, meaning it should be ignored as if it did not exist in this thread.
+     * TODO: ignore these edges when routing, not only during spatial index queries.
      */
     public TIntSet temporarilyDeletedEdges = null;
-
-    /**
-     * If this EdgeStore has has a Scenario applied, this list contains all the edge indexes created by that scenario.
-     * This is a bit redundant since the edges added temporarily by a Scenario should always be the numbers from
-     * firstModifiableEdge to nEdges. But it's useful to have a list of these numbers around (e.g. for spatial index
-     * queries) and placing it in a field rather than generating it on demand means the list instance gets reused.
-     * TODO perhaps this should be NULL when this is not an extend-only copy of an EdgeStore.
-     */
-    public TIntList temporarilyAddedEdges = new TIntArrayList();
 
     /**
      * There's one case where this method will fail: using Scenarios to create street networks from a blank slate,
@@ -319,12 +312,6 @@ public class EdgeStore implements Serializable {
         speeds.add(DEFAULT_SPEED_KPH);
         flags.add(0);
 
-        if (isExtendOnlyCopy()) {
-            // If we're working on a copy made for a Scenario the edges will not be spatially indexed, so record them.
-            temporarilyAddedEdges.add(forwardEdgeIndex);
-            temporarilyAddedEdges.add(forwardEdgeIndex + 1);
-        }
-
         return getCursor(forwardEdgeIndex);
     }
 
@@ -349,7 +336,7 @@ public class EdgeStore implements Serializable {
             return edgeIndex < nEdges();
         }
 
-        /** move the cursor back one edge */
+        /** Move the cursor back one edge. */
         public boolean retreat () {
             edgeIndex--;
             pairIndex = edgeIndex / 2;
@@ -711,8 +698,9 @@ public class EdgeStore implements Serializable {
             double lastCoorLon = reverse ? fromVertexLon : toVertexLon;
             double lastCoorLat = reverse ? fromVertexLat : toVertexLat;
 
-            // NB it initially appears that we are reversing the from and to vertex twice, but keep in mind that getFromVertex
-            // returns the from vertex when on a forward edge, or the to vertex on a back edge.
+            // NB it initially appears that we are reversing the from and to vertex twice, but keep in mind that
+            // getFromVertex returns the from vertex of the edge _pair_ rather than that of a particular edge.
+            // This is the from vertex when we are on a forward edge, and the to vertex when we are on a back edge.
             c[0] = new Coordinate(firstCoorLon, firstCoorLat);
             if (coords != null) {
                 for (int i = 1; i < c.length - 1; i++) {
@@ -955,10 +943,22 @@ public class EdgeStore implements Serializable {
         copy.lengths_mm = new TIntAugmentedList(lengths_mm);
         copy.osmids = new TLongAugmentedList(this.osmids);
         copy.temporarilyDeletedEdges = new TIntHashSet();
-        copy.temporarilyAddedEdges = new TIntArrayList();
         // We don't expect to add/change any turn restrictions.
         copy.turnRestrictions = turnRestrictions;
         return copy;
+    }
+
+    /**
+     * If this EdgeStore has has a Scenario applied, it may contain edges that are not in the baseline network.
+     * The edges added temporarily by a Scenario should always be the numbers from firstModifiableEdge to nEdges.
+     * Call the supplied int consumer function with every temporary edge in this EdgeStore.
+     */
+    public void forEachTemporarilyAddedEdge (IntConsumer consumer) {
+        if (this.isExtendOnlyCopy()) {
+            for (int edge = firstModifiableEdge; edge < this.nEdges(); edge++) {
+                consumer.accept(edge);
+            }
+        }
     }
 
 }

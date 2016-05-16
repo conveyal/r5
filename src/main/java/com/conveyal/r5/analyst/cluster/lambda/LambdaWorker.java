@@ -19,6 +19,7 @@ import com.conveyal.r5.transit.TransportNetworkCache;
 import com.fasterxml.jackson.core.JsonEncoding;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
+import com.google.common.io.Files;
 import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,7 +36,7 @@ public class LambdaWorker implements RequestStreamHandler {
     private static final Logger LOG = LoggerFactory.getLogger(LambdaWorker.class);
 
     /** single static cache, JVM scoped, re-use transport networks between lambda calls when possible */
-    private static TransportNetworkCache networkCache = new TransportNetworkCache();
+    private static LambdaNetworkCache networkCache = new LambdaNetworkCache();
 
     @Override
     public void handleRequest(InputStream inputStream, OutputStream outputStream, Context context) throws IOException {

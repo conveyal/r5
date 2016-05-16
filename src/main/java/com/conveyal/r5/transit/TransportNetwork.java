@@ -1,5 +1,6 @@
 package com.conveyal.r5.transit;
 
+import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.scenario.Scenario;
@@ -10,10 +11,12 @@ import com.conveyal.r5.profile.GreedyFareCalculator;
 import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.geom.Envelope;
 import org.nustaq.serialization.FSTObjectInput;
+import org.nustaq.serialization.FSTObjectInputNoShared;
 import org.nustaq.serialization.FSTObjectOutput;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
+import org.nustaq.serialization.FSTObjectOutputNoShared;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +55,7 @@ public class TransportNetwork implements Serializable {
 
     public void write (OutputStream stream) throws IOException {
         LOG.info("Writing transport network...");
-        FSTObjectOutput out = new FSTObjectOutput(stream);
+        FSTObjectOutput out = new FSTObjectOutputNoShared(stream);
         out.writeObject(this, TransportNetwork.class);
         out.close();
         LOG.info("Done writing.");
@@ -60,7 +63,7 @@ public class TransportNetwork implements Serializable {
 
     public static TransportNetwork read (InputStream stream) throws Exception {
         LOG.info("Reading transport network...");
-        FSTObjectInput in = new FSTObjectInput(stream);
+        FSTObjectInput in = new FSTObjectInputNoShared(stream);
         TransportNetwork result = (TransportNetwork) in.readObject(TransportNetwork.class);
         in.close();
         result.rebuildTransientIndexes();
@@ -72,10 +75,14 @@ public class TransportNetwork implements Serializable {
     }
 
     public void rebuildTransientIndexes() {
+        streetLayer.parentNetwork = this;
+        transitLayer.parentNetwork = this;
+        streetLayer.edgeStore.vertexStore = streetLayer.vertexStore;
+        streetLayer.edgeStore.layer = streetLayer;
         streetLayer.buildEdgeLists();
         streetLayer.indexStreets();
         transitLayer.rebuildTransientIndexes();
-        transitLayer.buildStopTrees();
+        //transitLayer.buildStopTrees();
     }
 
     /**

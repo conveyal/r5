@@ -94,14 +94,14 @@ public class TransitLayer implements Serializable, Cloneable {
      * For each transit stop, an int->int map giving the distance of every reachable street intersection from the
      * origin stop. This is the result of running a distance-constrained street search from every stop in the graph.
      */
-    public transient List<TIntIntMap> stopTrees;
+    public List<TIntIntMap> stopTrees;
 
     /**
      * The TransportNetwork containing this TransitLayer. This link up the object tree also allows us to access the
      * StreetLayer associated with this TransitLayer in the same TransportNetwork without maintaining bidirectional
      * references between the two layers.
      */
-    public TransportNetwork parentNetwork = null;
+    public transient TransportNetwork parentNetwork = null;
 
     /** Load a GTFS feed with full load level */
     public void loadFromGtfs (GTFSFeed gtfs) {

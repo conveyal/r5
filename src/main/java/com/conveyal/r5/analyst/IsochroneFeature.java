@@ -316,7 +316,7 @@ public class IsochroneFeature implements Serializable {
             if (it.next().getArea() < 1e-6) it.remove();
         }
 
-        int holeIdx = -1;
+        /*int holeIdx = -1;
         HOLES: for (Map.Entry<LinearRing, Polygon> hole : polygonsForInnerRing.entrySet()) {
             holeIdx++;
 
@@ -324,14 +324,16 @@ public class IsochroneFeature implements Serializable {
             if (hole.getValue().getArea() < 1e-6) continue;
 
             for (Map.Entry<LinearRing, Polygon> outer : polygonsForOuterRing.entrySet()) {
-                if (outer.getValue().contains(hole.getValue())) {
+                // optimization: check only first point of hole; holes are guaranteed to be completely contained by rings
+                // point-in-polygon is _way_ faster than polygon-in-polygon.
+                if (outer.getValue().contains(hole.getValue().getExteriorRing().getPointN(0))) {
                     holesForRing.put(outer.getKey(), hole.getKey());
                     continue HOLES;
                 }
             }
 
             LOG.warn("Found no fitting shell for isochrone hole {} at cutoff {}, dropping this hole.", holeIdx, cutoffSec);
-        }
+        }*/
 
         /*
         try {

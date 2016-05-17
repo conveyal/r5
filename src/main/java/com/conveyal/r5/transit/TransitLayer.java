@@ -29,7 +29,7 @@ import java.util.*;
  */
 public class TransitLayer implements Serializable, Cloneable {
     /** Distance limit for stop trees, meters. Set to 3.5 km to match OTP GraphIndex.MAX_WALK_METERS */
-    public static final int STOP_TREE_DISTANCE_LIMIT = 3500;
+    public static final int STOP_TREE_DISTANCE_LIMIT = 2000;
 
     /**
      * Distance limit for transfers, meters. Set to 1km which is slightly above OTP's 600m (which was specified as

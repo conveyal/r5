@@ -61,7 +61,7 @@ public class EdgeStore implements Serializable {
     private static final int[] EMPTY_INT_ARRAY = new int[0];
 
     // The vertices that are referred to in these edges
-    public transient VertexStore vertexStore;
+    public VertexStore vertexStore;
 
     /** Boolean flags for every edge. Separate entries for forward and backward edges. */
     public TIntList flags;
@@ -122,7 +122,7 @@ public class EdgeStore implements Serializable {
     /** Turn restrictions for turning _out of_ each edge */
     public TIntIntMultimap turnRestrictions;
 
-    public transient StreetLayer layer;
+    public StreetLayer layer;
 
     public static final transient EnumSet<EdgeFlag> PERMISSION_FLAGS = EnumSet
         .of(EdgeFlag.ALLOWS_PEDESTRIAN, EdgeFlag.ALLOWS_BIKE, EdgeFlag.ALLOWS_CAR);

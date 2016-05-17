@@ -136,7 +136,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * TransitLayer associated with this StreetLayer in the same TransportNetwork without maintaining bidirectional
      * references between the two layers.
      */
-    public transient TransportNetwork parentNetwork = null;
+    public TransportNetwork parentNetwork = null;
 
     public static final EnumSet<EdgeStore.EdgeFlag> ALL_PERMISSIONS = EnumSet
         .of(EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR,

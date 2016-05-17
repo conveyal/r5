@@ -101,7 +101,7 @@ public class TransitLayer implements Serializable, Cloneable {
      * StreetLayer associated with this TransitLayer in the same TransportNetwork without maintaining bidirectional
      * references between the two layers.
      */
-    public transient TransportNetwork parentNetwork = null;
+    public TransportNetwork parentNetwork = null;
 
     /** Load a GTFS feed with full load level */
     public void loadFromGtfs (GTFSFeed gtfs) {

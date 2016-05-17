@@ -24,7 +24,8 @@ public class Split {
     public double frac = 0; // the fraction along that segment where a link should occur
     public int fixedLon; // the x coordinate of the link point along the edge
     public int fixedLat; // the y coordinate of the link point along the edge
-    public int distSquared = Integer.MAX_VALUE;
+    // We must use a long because squaring a typical search radius in fixed-point _does_ cause sint32 overflow.
+    public long distSquared = Long.MAX_VALUE;
 
     // The following fields require more calculations and are only set once a best edge is found.
     public int distance0_mm = 0; // the accumulated distance along the edge geometry up to the split point
@@ -57,11 +58,12 @@ public class Split {
 
         final double metersPerDegreeLat = 111111.111;
         double cosLat = FastMath.cos(FastMath.toRadians(lat)); // The projection factor, Earth is a "sphere"
-        int radiusFixedLat = VertexStore.floatingDegreesToFixed(searchRadiusMeters / metersPerDegreeLat);
-        int radiusFixedLon = (int)(radiusFixedLat / cosLat); // Expand the X search space, don't shrink it.
+        // Use longs for radii and their square because squaring the fixed-point radius _will_ overflow a signed int32.
+        long radiusFixedLat = VertexStore.floatingDegreesToFixed(searchRadiusMeters / metersPerDegreeLat);
+        long radiusFixedLon = (int)(radiusFixedLat / cosLat); // Expand the X search space, don't shrink it.
         Envelope envelope = new Envelope(fixedLon, fixedLon, fixedLat, fixedLat);
         envelope.expandBy(radiusFixedLon, radiusFixedLat);
-        int squaredRadiusFixedLat = radiusFixedLat * radiusFixedLat;
+        long squaredRadiusFixedLat = radiusFixedLat * radiusFixedLat;
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
         // Iterate over the set of forward (even) edges that may be near the given coordinate.
         TIntCollection candidateEdges = streetLayer.findEdgesInEnvelope(envelope);
@@ -69,6 +71,7 @@ public class Split {
         Split curr = new Split();
         Split best = new Split();
         candidateEdges.forEach(e -> {
+
             curr.edge = e;
             edge.seek(e);
 
@@ -87,9 +90,9 @@ public class Split {
                 curr.fixedLon = (int)(fixedLon0 + curr.frac * (fixedLon1 - fixedLon0));
                 curr.fixedLat = (int)(fixedLat0 + curr.frac * (fixedLat1 - fixedLat0));
                 // Find squared distance to edge (avoid taking root)
-                double dx = (curr.fixedLon - fixedLon) * cosLat;
-                double dy = (curr.fixedLat - fixedLat);
-                curr.distSquared = (int)(dx * dx + dy * dy);
+                long dx = (long)((curr.fixedLon - fixedLon) * cosLat);
+                long dy = (long) (curr.fixedLat - fixedLat);
+                curr.distSquared = dx * dx + dy * dy;
                 // Ignore segments that are too far away (filter false positives).
                 if (curr.distSquared < squaredRadiusFixedLat) {
                     if (curr.distSquared < best.distSquared) {
@@ -197,7 +200,7 @@ public class Split {
 
             lengthBefore_fixedDeg[0] += length;
 
-            curr.distSquared = (int)(dx * dx + dy * dy);
+            curr.distSquared = (long)(dx * dx + dy * dy);
             // Replace the best segment if we've found something closer.
             if (curr.distSquared < best.distSquared) {
                 best.setFrom(curr);

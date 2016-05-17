@@ -406,6 +406,8 @@ public class AdjustFrequencyTest {
         assertArrayEquals(new int[] { 25300, 25800 }, added1.arrivals);
         assertArrayEquals(new int[] { 25300, 25800 }, added1.departures);
 
+        assertTrue(newTwoStopPattern.servicesActive.get(added1.serviceCode));
+
         TripSchedule added2 = newTwoStopPattern.tripSchedules.get(2);
 
         assertNull(added2.headwaySeconds);
@@ -414,6 +416,9 @@ public class AdjustFrequencyTest {
 
         assertArrayEquals(new int[] { 25400, 25900 }, added2.arrivals);
         assertArrayEquals(new int[] { 25400, 25900 }, added2.departures);
+
+        assertTrue(newTwoStopPattern.servicesActive.get(added2.serviceCode));
+
     }
 
     @After

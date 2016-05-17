@@ -828,7 +828,7 @@ public class RaptorWorker {
                     int targetIndex = targets[i];
 
                     // don't walk too far
-                    //if (targets[i + 1] > maxWalkMillimeters) continue;
+                    if (targets[i + 1] > maxWalkMillimeters) continue;
 
                     int timeToTarget = targets[i + 1] / walkSpeedMillimetersPerSecond;
                     int propagated_time = timeAtTransitStop + timeToTarget;

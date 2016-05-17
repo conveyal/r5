@@ -84,9 +84,7 @@ public class LambdaWorker implements RequestStreamHandler {
         JsonFactory jf = new JsonFactory();
 
         try {
-            OutputStream wrappedOutputStream = new GZIPOutputStream(outputStream);
-
-            JsonGenerator jgen = jf.createGenerator(wrappedOutputStream, JsonEncoding.UTF8);
+            JsonGenerator jgen = jf.createGenerator(outputStream, JsonEncoding.UTF8);
 
             jgen.writeStartObject();
 
@@ -96,7 +94,7 @@ public class LambdaWorker implements RequestStreamHandler {
             jgen.writeEndObject();
             jgen.close();
 
-            wrappedOutputStream.close();
+            outputStream.close();
         } catch (IOException e) {
             LOG.error("IO exception writing isochrones", e);
         }

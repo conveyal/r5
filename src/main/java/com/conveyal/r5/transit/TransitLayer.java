@@ -2,7 +2,14 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.validator.service.GeoUtils;
+import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.streets.LinkedPointSet;
+import com.conveyal.r5.streets.Split;
+import com.conveyal.r5.streets.VertexStore;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -95,6 +102,13 @@ public class TransitLayer implements Serializable, Cloneable {
      * origin stop. This is the result of running a distance-constrained street search from every stop in the graph.
      */
     public List<TIntIntMap> stopTrees;
+
+    /**
+     * For each stop, an int array containing the distance in meters to every nearby pixel in the web mercator grid.
+     * The first two values are the x and y offset from the left/top of the grid point set, the next two are width and height,
+     * and then we have the distances in row-major order.
+     */
+    public List<short[]> gridStopTrees;
 
     /**
      * The TransportNetwork containing this TransitLayer. This link up the object tree also allows us to access the
@@ -410,6 +424,115 @@ public class TransitLayer implements Serializable, Cloneable {
 
         // This will return distance in millimeters since that is our dominance function
         stopTrees.add(router.getReachedVertices());
+    }
+
+    /** Build stop trees all the way to the grids */
+    public void buildGridStopTrees () {
+        LOG.info("Building grid stop trees (cached distances between transit stops and grid targets).");
+        // Allocate a new empty array of stop trees, releasing any existing ones.
+        gridStopTrees = new ArrayList<>(getStopCount());
+        for (int stop = 0; stop < getStopCount(); stop++) {
+            buildOneGridStopTree(stop);
+        }
+        LOG.info("Done building stop trees.");
+    }
+
+    private void buildOneGridStopTree(int stop) {
+        // Lists do not auto-grow if you try to add an element past their end.
+        // So until we need different behavior, we only support adding a stop tree to the end of the list,
+        // not updating an existing one or adding one out past the end of the list.
+        if (gridStopTrees.size() != stop) {
+            throw new RuntimeException("New stop trees can only be added to the end of the list.");
+        }
+
+        int originVertex = streetVertexForStop.get(stop);
+        if (originVertex == -1) {
+            // -1 indicates that this stop is not linked to the street network.
+            LOG.warn("Stop {} has not been linked to the street network, cannot build stop tree.", stop);
+            gridStopTrees.add(null);
+            return;
+        }
+        StreetRouter router = new StreetRouter(parentNetwork.streetLayer);
+        router.distanceLimitMeters = STOP_TREE_DISTANCE_LIMIT;
+
+        // Dominate based on distance in millimeters, since (a) we're using a hard distance limit, and (b) we divide
+        // by a speed to get time when we use the stop trees.
+        router.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+        router.setOrigin(originVertex);
+        router.route();
+
+        // figure out the offsets and array sizes
+        WebMercatorGridPointSet ps = parentNetwork.getGridPointSet();
+        // linkage is cached, this is not linking the pointset once per stop
+        LinkedPointSet lps = ps.link(parentNetwork.streetLayer, StreetMode.WALK);
+        int pixelSizeMeters = (int) (GeometryUtils.EQUATORIAL_CIRCUMFERENCE_OF_EARTH_M / (Math.pow(2, ps.zoom) * 256));
+        int radius = STOP_TREE_DISTANCE_LIMIT / pixelSizeMeters;
+
+        // find the stop location
+        VertexStore.Vertex v = parentNetwork.streetLayer.vertexStore.getCursor(originVertex);
+
+        // project to grid
+        int stopY = (int) (ps.latToPixel(v.getLat()) - ps.north);
+        int stopX = (int) (ps.lonToPixel(v.getLon()) - ps.west);
+
+        int xoffset = stopX - radius;
+        int yoffset = stopY - radius;
+
+        int width = radius * 2;
+        int height = radius * 2;
+
+        // handle case of stop tree at edge of pointset
+        if (xoffset < 0) {
+            // xoffset is negative so this makes width narrower
+            width += xoffset;
+            xoffset = 0;
+        }
+
+        if (yoffset < 0) {
+            height += yoffset;
+            yoffset = 0;
+        }
+
+        if (xoffset + width > ps.width) {
+            width = (int) (ps.width - xoffset);
+        }
+
+        if (yoffset + height > ps.height) {
+            height = (int) (ps.height - yoffset);
+        }
+
+        short[] tree = new short[width * height + 4];
+        tree[0] = (short) xoffset;
+        tree[1] = (short) yoffset;
+        tree[2] = (short) width;
+        tree[3] = (short) height;
+
+        // loop over all pixels, i keeps track of position in output array
+        for (int i = 4, y = yoffset; y < yoffset + height; y++) {
+            for (int x = xoffset; x < xoffset + width; x++, i++) {
+
+                // find relevant split
+                int index = (int) (y * ps.width + x);
+                Split split = new Split();
+                split.edge = lps.edges[index];
+                split.distance0_mm = lps.distances0_mm[index];
+                split.distance1_mm = lps.distances1_mm[index];
+
+                if (split.edge == -1) {
+                    tree[i] = -1;
+                    continue;
+                }
+
+                // don't need vertices etc.
+
+                StreetRouter.State state = router.getState(split);
+
+                if (state == null) tree[i] = -1;
+                else tree[i] = (short) (state.getRoutingVariable(StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) / 1000);
+            }
+        }
+
+        gridStopTrees.add(tree);
     }
 
     public static TransitLayer fromGtfs (List<String> files) {

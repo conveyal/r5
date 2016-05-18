@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.BoardingAssumption;
+import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.publish.StaticPropagatedTimesStore;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransitLayer;
@@ -124,6 +125,9 @@ public class RaptorWorker {
      */
     public BitSet includeInAverages = new BitSet();
 
+    /** If false, don't propagate at all but rather just return times at transit stops */
+    public boolean doPropagation = true;
+
     public RaptorWorker (TransitLayer data, LinkedPointSet targets, ProfileRequest req) {
         this.data = data;
         int nStops = data.streetVertexForStop.size();
@@ -136,8 +140,8 @@ public class RaptorWorker {
 
         this.targets = targets;
 
-        // targets== null implies a static site, save the results of each iteration
-        if (targets == null) this.statesEachIteration = new ArrayList<>();
+        // doPropagation == false implies a static site, save the results of each iteration
+        if (!doPropagation) this.statesEachIteration = new ArrayList<>();
 
         this.servicesActive = data.getActiveServicesForDate(req.date);
 
@@ -187,22 +191,26 @@ public class RaptorWorker {
             initialStops.put(stopIndex, accessTime);
         }
 
-        // We don't propagate travel times from stops out to the targets or street intersections when generating
-        // a static site because the Javascript client does the propagation.
-        boolean doPropagation = targets != null;
-
         // In normal usage propagatedTimesStore is null here, but in tests a custom one may have been injected.
         if (propagatedTimesStore == null) {
             if (doPropagation) {
                 // Store min, max, avg travel times to all search targets (a set of points of interest in a PointSet)
-                propagatedTimesStore = new PropagatedTimesStore(targets.size());
+                propagatedTimesStore = new PropagatedTimesStore(targets != null ? targets.size() : data.parentNetwork.getGridPointSet().featureCount());
             } else {
                 // Store all the travel times (not averages) to all transit stops.
                 propagatedTimesStore = new StaticPropagatedTimesStore(data.getStopCount());
             }
         }
 
-        int nTargets = targets != null ? targets.size() : data.getStopCount();
+        int nTargets;
+
+        if (!doPropagation) {
+            nTargets = data.getStopCount();
+        } else if (targets == null) {
+            nTargets = data.parentNetwork.getGridPointSet().featureCount();
+        } else {
+            nTargets = targets.size();
+        }
 
         // If there are no frequency routes, we don't do any Monte Carlo draws within departure minutes.
         // i.e. only a single RAPTOR search is run per departure minute.
@@ -259,12 +267,16 @@ public class RaptorWorker {
 
                 // Copy in the travel times on the street network without boarding transit.
                 // We don't want to force people to ride transit instead of walking a block.
-                for (int i = 0; i < scheduledTimesAtTargets.length; i++) {
-                    int nonTransitTravelTime = nonTransitTimes.getTravelTimeToPoint(i);
-                    int nonTransitClockTime = nonTransitTravelTime + departureTime;
-                    if (nonTransitTravelTime != UNREACHED && nonTransitClockTime < scheduledTimesAtTargets[i]) {
-                        scheduledTimesAtTargets[i] = nonTransitClockTime;
+                if (nonTransitTimes != null) {
+                    for (int i = 0; i < scheduledTimesAtTargets.length; i++) {
+                        int nonTransitTravelTime = nonTransitTimes.getTravelTimeToPoint(i);
+                        int nonTransitClockTime = nonTransitTravelTime + departureTime;
+                        if (nonTransitTravelTime != UNREACHED && nonTransitClockTime < scheduledTimesAtTargets[i]) {
+                            scheduledTimesAtTargets[i] = nonTransitClockTime;
+                        }
                     }
+                } else {
+                    LOG.warn("Performing transit routing with no non-transit times. This will lead to strange accessibility holes around the origin.");
                 }
             }
 
@@ -816,29 +828,67 @@ public class RaptorWorker {
         // Only loop over stops that were touched in this particular search (schedule or frequency). We are updating
         // timesAtTargets, which already contains times that were found during previous searches (either scheduled searches
         // at previous minutes, or in the case of a frequency search, the scheduled search that was run at the same minute).
-        for (int s = stopsTouchedThisSearch.nextSetBit(0); s >= 0; s = stopsTouchedThisSearch.nextSetBit(s + 1)) {
-            int timeAtTransitStop = timesAtTransitStops[s];
-            if (timeAtTransitStop != UNREACHED) {
-                int[] targets = this.targets.stopTrees.get(s);
-                if (targets == null) {
-                    continue;
-                }
-                // Targets contains pairs of (targetIndex, distanceMillimeters)
-                for (int i = 0; i < targets.length; i += 2) {
-                    int targetIndex = targets[i];
-
-                    // don't walk too far
-                    if (targets[i + 1] > maxWalkMillimeters) continue;
-
-                    int timeToTarget = targets[i + 1] / walkSpeedMillimetersPerSecond;
-                    int propagated_time = timeAtTransitStop + timeToTarget;
-
-                    if (propagated_time < departureTime) {
-                        LOG.error("Negative propagated time, will crash shortly.");
+        if (this.targets != null) {
+            for (int s = stopsTouchedThisSearch.nextSetBit(0); s >= 0; s = stopsTouchedThisSearch.nextSetBit(s + 1)) {
+                int timeAtTransitStop = timesAtTransitStops[s];
+                if (timeAtTransitStop != UNREACHED) {
+                    int[] targets = this.targets.stopTrees.get(s);
+                    if (targets == null) {
+                        continue;
                     }
+                    // Targets contains pairs of (targetIndex, distanceMillimeters)
+                    for (int i = 0; i < targets.length; i += 2) {
+                        int targetIndex = targets[i];
 
-                    if (timesAtTargets[targetIndex] > propagated_time) {
-                        timesAtTargets[targetIndex] = propagated_time;
+                        // don't walk too far
+                        if (targets[i + 1] > maxWalkMillimeters) continue;
+
+                        int timeToTarget = targets[i + 1] / walkSpeedMillimetersPerSecond;
+                        int propagated_time = timeAtTransitStop + timeToTarget;
+
+                        if (propagated_time < departureTime) {
+                            LOG.error("Negative propagated time, will crash shortly.");
+                        }
+
+                        if (timesAtTargets[targetIndex] > propagated_time) {
+                            timesAtTargets[targetIndex] = propagated_time;
+                        }
+                    }
+                }
+            }
+        } else {
+            // doing propagation to implied grid point set
+            WebMercatorGridPointSet pointSet = data.parentNetwork.getGridPointSet();
+
+            for (int s = stopsTouchedThisSearch.nextSetBit(0); s >= 0; s = stopsTouchedThisSearch.nextSetBit(s + 1)) {
+                int timeAtTransitStop = timesAtTransitStops[s];
+                if (timeAtTransitStop != UNREACHED) {
+                    short[] stopTree = data.gridStopTrees.get(s);
+
+                    int xoff = stopTree[0];
+                    int yoff = stopTree[1];
+                    int width = stopTree[2];
+                    int height = stopTree[3];
+
+                    // loop over the x, y points in the grid point set referenced by this stop tree
+                    // note that x and y are relative to pointset not to world coordinates
+                    for (int y = yoff, i = 4; y < yoff + height; y++) {
+                        for (int x = xoff; x < xoff + width; x++, i++) {
+                            if (stopTree[i] < 0) continue;
+
+                            int distanceToTargetMillimeters = ((int) stopTree[i]) * 1000;
+
+                            if (distanceToTargetMillimeters > maxWalkMillimeters) continue; // don't walk too far
+
+                            int timeToTarget = distanceToTargetMillimeters / walkSpeedMillimetersPerSecond;
+                            int timeAtTarget = timeAtTransitStop + timeToTarget;
+
+                            int targetIndex = (int) (y * pointSet.width + x);
+
+                            if (timesAtTargets[targetIndex] > timeAtTarget) {
+                                timesAtTargets[targetIndex] = timeAtTarget;
+                            }
+                        }
                     }
                 }
             }

@@ -28,31 +28,7 @@ public class LocalLambdaWorker {
 
     private static Object isochrone(Request request, Response response) throws IOException, InterruptedException {
         LambdaWorker worker = new LambdaWorker();
-
-        // this is a major hack but it's ok for development
-        // Spark gzips the response automatically, but it's already gzipped, so ungzip it and pipe it into spark
-        PipedOutputStream pos = new PipedOutputStream();
-        PipedInputStream pis = new PipedInputStream(pos);
-
-        // http://stackoverflow.com/questions/1866255
-        CountDownLatch latch = new CountDownLatch(1);
-
-
-        new Thread(() -> {
-            try {
-                GZIPInputStream gzis = new GZIPInputStream(pis);
-                ByteStreams.copy(gzis, response.raw().getOutputStream());
-                latch.countDown();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }).start();
-
-        worker.handleRequest(request.raw().getInputStream(), pos, null);
-
-        // wait for gunzip process to complete
-        latch.await();
-
+        worker.handleRequest(request.raw().getInputStream(), response.raw().getOutputStream(), null);
         return response.raw();
     }
 }

@@ -8,6 +8,7 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.ResultEnvelope;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.common.MavenVersion;
 import com.conveyal.r5.profile.PropagatedTimesStore;
 import com.conveyal.r5.profile.RaptorWorker;
 import com.conveyal.r5.profile.StreetMode;
@@ -38,6 +39,10 @@ public class LambdaWorker implements RequestStreamHandler {
     /** single static cache, JVM scoped, re-use transport networks between lambda calls when possible */
     private static LambdaNetworkCache networkCache = new LambdaNetworkCache();
 
+    public LambdaWorker () {
+        LOG.info("Instantiating Lambda worker, version {}, commit {}", MavenVersion.describe, MavenVersion.commit);
+    }
+
     @Override
     public void handleRequest(InputStream inputStream, OutputStream outputStream, Context context) throws IOException {
         LambdaClusterRequest request = JsonUtilities.objectMapper.readValue(inputStream, LambdaClusterRequest.class);
@@ -58,7 +63,7 @@ public class LambdaWorker implements RequestStreamHandler {
                 networkCache.getNetworkForScenario(request.networkBucket, request.networkId, request.scenario);
 
         // should be cached if network has been used
-        LinkedPointSet targets = network.getLinkedGridPointSet();
+        WebMercatorGridPointSet targets = network.getGridPointSet();
 
         // find accessible transit stops
         StreetRouter sr = new StreetRouter(network.streetLayer);
@@ -73,13 +78,11 @@ public class LambdaWorker implements RequestStreamHandler {
 
         LOG.info("Found {} initial transit stops", accessTimes.size());
 
-        // TODO this is wrong when there is a turn restriction at the destination, see #155
-        // we need to use the code in streetrouter that gets the travel time to a sample.
-        PointSetTimes nonTransitTimes = targets.eval(sr::getTravelTimeToVertex);
+        // todo non transit times
 
-        RaptorWorker worker = new RaptorWorker(network.transitLayer, targets, request);
-        PropagatedTimesStore pts = worker.runRaptor(accessTimes, nonTransitTimes, new TaskStatistics());
-        ResultEnvelope re = pts.makeResults(targets.pointSet, false, false, true);
+        RaptorWorker worker = new RaptorWorker(network.transitLayer, null, request);
+        PropagatedTimesStore pts = worker.runRaptor(accessTimes, null, new TaskStatistics());
+        ResultEnvelope re = pts.makeResults(targets, false, false, true);
 
         JsonFactory jf = new JsonFactory();
 

@@ -116,6 +116,15 @@ public class LambdaNetworkCache {
             zis.close();
 
             this.currentNetwork = TransportNetwork.fromDirectory(directory);
+
+            // this is an inefficient hack, we're computing the normal stop trees, using them to link a pointset, and
+            // then nulling them out
+
+            // this will cause linked point set to be cached so it can be used after we null the stop trees
+            this.currentNetwork.getLinkedGridPointSet();
+            this.currentNetwork.transitLayer.stopTrees = null;
+            this.currentNetwork.transitLayer.buildGridStopTrees();
+
             this.currentNetworkId = networkId;
         } catch (Exception e) {
             throw new RuntimeException(e);

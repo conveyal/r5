@@ -39,7 +39,8 @@ public class TransportNetwork implements Serializable {
 
     public TransitLayer transitLayer;
 
-    private WebMercatorGridPointSet gridPointSet;
+    /** The GridPointSet for this TransportNetwork. This is implicit, so it does not need to be serialized. */
+    private transient WebMercatorGridPointSet gridPointSet;
 
     /**
      * A string uniquely identifying the contents of this TransportNetwork in the space of TransportNetwork objects.

@@ -65,8 +65,10 @@ public class StaticComputer implements Runnable {
         sr.setOrigin(lat, lon);
         sr.route();
 
-        // tell the Raptor Worker that we want a travel time to each stop by leaving the point set null
         RaptorWorker worker = new RaptorWorker(network.transitLayer, null, req.request.request);
+
+        // tell the Raptor Worker that we want a travel time to each stop by disabling propagation
+        worker.doPropagation = false;
         StaticPropagatedTimesStore pts = (StaticPropagatedTimesStore) worker.runRaptor(sr.getReachedStops(), null, ts);
 
         // get non-transit times

@@ -16,6 +16,7 @@ public class GeometryUtils {
 
     // average of polar and equatorial, https://en.wikipedia.org/wiki/Earth
     public static final double RADIUS_OF_EARTH_M = 6_367_450;
+    public static final int EQUATORIAL_CIRCUMFERENCE_OF_EARTH_M = 40_074_784;
 
     /**
      * Convert a org.geojson.Xxxx geometry to a JTS geometry. Copied from same-named class in OTP.

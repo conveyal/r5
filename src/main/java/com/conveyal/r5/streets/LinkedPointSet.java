@@ -106,7 +106,12 @@ public class LinkedPointSet {
                 distances1_mm[i] = split.distance1_mm;
             }
         }
-        this.makeStopTrees();
+
+        // TODO get rid of "classic" stop trees altogether
+        if (streetLayer.parentNetwork.transitLayer.stopTrees != null) {
+            this.makeStopTrees();
+        }
+
         LOG.info("Done linking pointset to street network. {} features unlinked.", unlinked);
     }
 

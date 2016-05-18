@@ -865,6 +865,8 @@ public class RaptorWorker {
                 if (timeAtTransitStop != UNREACHED) {
                     short[] stopTree = data.gridStopTrees.get(s);
 
+                    if (stopTree == null) continue;
+
                     int xoff = stopTree[0];
                     int yoff = stopTree[1];
                     int width = stopTree[2];

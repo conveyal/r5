@@ -7,6 +7,7 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.VertexStore;
@@ -501,11 +502,15 @@ public class TransitLayer implements Serializable, Cloneable {
             height = (int) (ps.height - yoffset);
         }
 
+        boolean found = false;
+
         short[] tree = new short[width * height + 4];
         tree[0] = (short) xoffset;
         tree[1] = (short) yoffset;
         tree[2] = (short) width;
         tree[3] = (short) height;
+
+        EdgeStore.Edge e = parentNetwork.streetLayer.edgeStore.getCursor();
 
         // loop over all pixels, i keeps track of position in output array
         for (int i = 4, y = yoffset; y < yoffset + height; y++) {
@@ -515,24 +520,36 @@ public class TransitLayer implements Serializable, Cloneable {
                 int index = (int) (y * ps.width + x);
                 Split split = new Split();
                 split.edge = lps.edges[index];
-                split.distance0_mm = lps.distances0_mm[index];
-                split.distance1_mm = lps.distances1_mm[index];
 
                 if (split.edge == -1) {
                     tree[i] = -1;
                     continue;
                 }
 
+                split.distance0_mm = lps.distances0_mm[index];
+                split.distance1_mm = lps.distances1_mm[index];
+                e.seek(split.edge);
+                split.vertex0 = e.getFromVertex();
+                split.vertex1 = e.getToVertex();
+
                 // don't need vertices etc.
 
                 StreetRouter.State state = router.getState(split);
 
                 if (state == null) tree[i] = -1;
-                else tree[i] = (short) (state.getRoutingVariable(StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) / 1000);
+                else {
+                    tree[i] = (short) (state.getRoutingVariable(StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) / 1000);
+                    found = true;
+                }
             }
         }
 
-        gridStopTrees.add(tree);
+        if (found) {
+            gridStopTrees.add(tree);
+        } else {
+            gridStopTrees.add(null);
+            LOG.info("Stop {} is linked to the street network, but not to any targets", stop);
+        }
     }
 
     public static TransitLayer fromGtfs (List<String> files) {

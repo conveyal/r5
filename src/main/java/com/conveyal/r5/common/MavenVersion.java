@@ -20,7 +20,7 @@ public class MavenVersion {
         Properties p = new Properties();
 
         try {
-            InputStream is = MavenVersion.class.getClassLoader().getResourceAsStream("git.properties");
+            InputStream is = MavenVersion.class.getClassLoader().getResourceAsStream("git-r5.properties");
             p.load(is);
             is.close();
         } catch (IOException | NullPointerException e) {

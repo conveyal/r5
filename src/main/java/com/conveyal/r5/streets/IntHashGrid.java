@@ -28,6 +28,7 @@ import gnu.trove.set.hash.TLongHashSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -45,7 +46,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 
  * @author laurentg, abyrd
  */
-public class IntHashGrid {
+public class IntHashGrid implements Serializable {
+    private static final long serialVersionUID = 1L;
 
     @SuppressWarnings("unused")
     private static final Logger LOG = LoggerFactory.getLogger(IntHashGrid.class);

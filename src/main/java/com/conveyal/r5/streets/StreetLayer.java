@@ -92,9 +92,9 @@ public class StreetLayer implements Serializable, Cloneable {
     public static final double LINK_RADIUS_METERS = 300;
 
     // Edge lists should be constructed after the fact from edges. This minimizes serialized size too.
-    public transient List<TIntList> outgoingEdges;
-    public transient List<TIntList> incomingEdges;
-    public transient IntHashGrid spatialIndex = new IntHashGrid();
+    public List<TIntList> outgoingEdges;
+    public List<TIntList> incomingEdges;
+    public IntHashGrid spatialIndex = new IntHashGrid();
     // Key is street vertex index, value is BikeRentalStation (with name, number of bikes, spaces id etc.)
     public TIntObjectMap<BikeRentalStation> bikeRentalStationMap;
     public TIntObjectMap<ParkRideParking> parkRideLocationsMap;

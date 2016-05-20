@@ -126,11 +126,15 @@ public class RepeatedRaptorProfileRouter {
 
         streetRouter.profileRequest = request;
         streetRouter.setOrigin(request.fromLat, request.fromLon);
-        streetRouter.route();
 
         // TODO for bike, car access we really want to use weight to account for turn costs, but that's a resource limiting
         // problem.
         streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+
+        // when doing a non-transit search, ignore all distance limits
+        if (!transit) streetRouter.distanceLimitMeters = 0;
+
+        streetRouter.route();
 
         ts.initialStopSearch = (int) (System.currentTimeMillis() - initialStopStartTime);
 

@@ -263,12 +263,12 @@ public class StreetLayer implements Serializable, Cloneable {
         LOG.info("Made {} vertices and {} edges.", vertexStore.getVertexCount(), edgeStore.nEdges());
         LOG.info("Found {} P+R node candidates", parkAndRideNodes.size());
 
-        // need edge lists to apply intersection costs
+        // We need edge lists to apply intersection costs.
         buildEdgeLists();
         stressLabeler.applyIntersectionCosts(this);
-//        TEMPORARILY REMOVING FOR SPEED IMPROVEMENT
-//        if (removeIslands)
-//            removeDisconnectedSubgraphs(MIN_SUBGRAPH_SIZE);
+        if (removeIslands) {
+            removeDisconnectedSubgraphs(MIN_SUBGRAPH_SIZE);
+        }
 
         // index the streets, we need the index to connect things to them.
         this.indexStreets();
@@ -1226,94 +1226,74 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /**
-     * Find and remove all subgraphs with fewer than minSubgraphSize vertices. Uses a flood fill
-     * algorithm, see http://stackoverflow.com/questions/1348783.
+     * Eliminate disconnected subgraphs in the street network that appear to be caused by OSM editing mistakes.
+     * We try to keep any true islands (places like airports that are walkable but have no pedestrian access).
+     * Islands with more than minSubgraphSize vertices are assumed to be intentional features in OSM.
+     *
+     * We don't actually remove the vertices and edges because different islands may exist from the point of view of
+     * different street modes, and because the total number of vertices and edges involved in islands is usually quite
+     * small relative to the full network so leaving them in does not waste a significant amount of space.
+     *
+     * Instead we remove pedestrian permissions. TODO re-run the searches removing bicycle and car permissions.
      */
     public void removeDisconnectedSubgraphs(int minSubgraphSize) {
         LOG.info("Removing subgraphs with fewer than {} vertices", minSubgraphSize);
+
         boolean edgeListsBuilt = incomingEdges != null;
-
-        int nSmallSubgraphs = 0;
-
-        if (!edgeListsBuilt)
+        if (!edgeListsBuilt) {
             buildEdgeLists();
+        }
 
-        // labels for the flood fill algorithm
-        TIntIntMap vertexLabels = new TIntIntHashMap();
-
-        // vertices and edges that should be removed
-        TIntSet verticesToRemove = new TIntHashSet();
-        TIntSet edgesToRemove = new TIntHashSet();
-
-        int nOrigins = 0;
+        TIntSet verticesExplored = new TIntHashSet();
+        int nSearches = 0;
+        int nSubgraphsRemoved = 0;
+        int nSubgraphsRetained = 0;
+        final Edge edge = edgeStore.getCursor(); // This edge cursor is reused on all subgraphs.
         for (int vertex = 0; vertex < vertexStore.getVertexCount(); vertex++) {
-            // N.B. this is not actually running a search for every vertex as after the first few
-            // almost all of the vertices are labeled
-            if (vertexLabels.containsKey(vertex))
+            if (verticesExplored.contains(vertex)) {
                 continue;
+            }
             StreetRouter r = new StreetRouter(this);
             r.streetMode = StreetMode.WALK;
             r.setOrigin(vertex);
-            // walk to the end of the graph
+            // Walk as far as possible within this subgraph.
             r.distanceLimitMeters = 0;
             r.route();
-            nOrigins++;
-            if (nOrigins % 100 == 0) {
-                LOG.info("Searched from vertex number {}, {} total searches performed, {} islands slated for removal.", vertex, nOrigins, nSmallSubgraphs);
+            TIntIntMap reachedVertices = r.getReachedVertices();
+            nSearches++;
+            if (nSearches % 10000 == 0) {
+                LOG.info("Searched from vertex number {}, {} total searches performed.", vertex, nSearches);
             }
-
-            TIntList reachedVertices = new TIntArrayList();
-            int nReached = 0;
-            for (int reachedVertex = 0; reachedVertex < vertexStore.getVertexCount(); reachedVertex++) {
-                if (r.getTravelTimeToVertex(reachedVertex) != Integer.MAX_VALUE) {
-                    nReached++;
-                    // use source vertex as label, saves a variable
-                    vertexLabels.put(reachedVertex, vertex);
-                    reachedVertices.add(reachedVertex);
-                }
+            verticesExplored.addAll(reachedVertices.keySet());
+            if (reachedVertices.size() >= minSubgraphSize) {
+                // This subgraph is big, it's probably literally an island (or airport) rather than bad OSM data.
+                nSubgraphsRetained++;
+                continue;
             }
-
-            // when origin is a vertex, the origin vertex is not included in the result
-            reachedVertices.add(vertex);
-            vertexLabels.put(vertex, vertex);
-
-            if (nReached < minSubgraphSize) {
-                nSmallSubgraphs++;
-                verticesToRemove.addAll(reachedVertices);
-                reachedVertices.forEach(v -> {
-                    // can't use method reference here because we always have to return true
-                    incomingEdges.get(v).forEach(e -> {
-                        edgesToRemove.add(e);
-                        return true; // continue iteration
-                    });
-                    outgoingEdges.get(v).forEach(e -> {
-                        edgesToRemove.add(e);
-                        return true; // continue iteration
-                    });
-                    return true; // iteration should continue
+            // Remove pedestrian permissions from all edges coming into and out of all vertices in this subgraph.
+            reachedVertices.put(vertex, 0); // Is this necessary or is origin vertex included?
+            reachedVertices.forEachKey(v -> {
+                incomingEdges.get(v).forEach(e -> {
+                    edge.seek(e);
+                    edge.clearFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+                    return true; // Iteration should continue.
                 });
-            }
+                outgoingEdges.get(v).forEach(e -> {
+                    edge.seek(e);
+                    edge.clearFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+                    return true; // Iteration should continue.
+                });
+                return true; // Iteration should continue.
+            });
+            nSubgraphsRemoved++;
         }
 
-        // rebuild the edge store with some edges removed
-        edgeStore.remove(edgesToRemove.toArray());
-        // TODO remove the vertices as well? this would be messy because the edges reference the vertices by index, and those indexes would change upon vertex removal.
-
-        // don't forget this
-        if (edgeListsBuilt) {
-            buildEdgeLists();
-            indexStreets();
-        }
-        else {
-            incomingEdges = null;
-            outgoingEdges = null;
-        }
-
-        if (nSmallSubgraphs > 0)
-            LOG.info("Removed {} disconnected subgraphs", nSmallSubgraphs);
-        else
+        LOG.info("Retained {} large disconnected subgraphs.", nSubgraphsRetained);
+        if (nSubgraphsRemoved > 0) {
+            LOG.info("Removed {} small disconnected subgraphs.", nSubgraphsRemoved);
+        } else {
             LOG.info("Found no subgraphs to remove, congratulations for having clean OSM data.");
-        LOG.info("Done removing subgraphs. {} edges remain", edgeStore.nEdges());
+        }
     }
 
     public Envelope getEnvelope() {

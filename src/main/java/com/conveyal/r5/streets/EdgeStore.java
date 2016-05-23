@@ -147,40 +147,6 @@ public class EdgeStore implements Serializable {
     }
 
     /**
-     * Remove the specified edges from this edge store.
-     * Removing edges causes their indexes to change, but the only place these indexes are used is in the incoming
-     * and outgoing edge lists of vertices. Those edge lists are transient data structures derived from the edges
-     * themselves, so fortunately we don't need to update them while the edges are shifted around, we just rebuild them
-     * afterward.
-     */
-    public void remove (int[] edgesToRemove) {
-        // Sort the list and traverse it backward. Removing an element only affects the array indices of elements later
-        // in the list, so backward traversal ensures that all edge indexes remain valid during a bulk remove operation.
-        Arrays.sort(edgesToRemove);
-        int prevPair = -1;
-        for (int cursor = edgesToRemove.length - 1; cursor >= 0; cursor--) {
-            int edgePair = edgesToRemove[cursor] / 2;
-            if (edgePair == prevPair) {
-                // Ignore duplicate edge indexes, which would cause two different edges to be removed.
-                continue;
-            }
-            prevPair = edgePair;
-            // Flags and speeds arrays have separate elements for the forward and backward edges within a pair.
-            // Use TIntList function to remove these two elements at once.
-            // Note that the 1-arg remove function will remove a certain value from the list, not an element at an index.
-            flags.remove(edgePair * 2, 2);
-            speeds.remove(edgePair * 2, 2);
-            // All other arrays have a single element describing both the forward and backward edges in an edge pair.
-            fromVertices.remove(edgePair, 1);
-            toVertices.remove(edgePair, 1);
-            lengths_mm.remove(edgePair, 1);
-            osmids.remove(edgePair, 1);
-            // This is not a TIntList, so use the 1-arg remove function to remove by index.
-            geometries.remove(edgePair);
-        }
-    }
-
-    /**
      * Edge flags are various boolean values (requiring a single bit of information) that can be attached to each
      * edge in the street graph. They are each assigned a bit number from 0...31 so they can all be packed into a
      * single integer field for space and speed reasons.

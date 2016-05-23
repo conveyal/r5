@@ -318,7 +318,7 @@ public class StreetRouter {
         if (timeLimitSeconds > 0 && distanceLimitMeters > 0) {
             LOG.warn("Both distance limit of {}m and time limit of {}s are set in streetrouter", distanceLimitMeters, timeLimitSeconds);
         } else if (timeLimitSeconds == 0 && distanceLimitMeters == 0) {
-            LOG.warn("Distance and time limit are set to 0 in streetrouter. This means NO LIMIT in searching so WHOLE of street graph will be searched. This can be slow.");
+            LOG.debug("Distance and time limit are set to 0 in streetrouter. This means NO LIMIT in searching so WHOLE of street graph will be searched. This can be slow.");
         } else if (distanceLimitMeters > 0) {
             LOG.debug("Using distance limit of {}m", distanceLimitMeters);
         } else if (timeLimitSeconds > 0) {

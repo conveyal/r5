@@ -139,7 +139,10 @@ public class StreetRouter {
         return result;
     }
 
-    /** Return a map where the keys are all the reached vertices, and the values are their distances from the origin (as used in the chosen dominance function). */
+    /**
+     * Return a map where the keys are all the reached vertices, and the values are their distances from the origin
+     * (as used in the chosen dominance function).
+     */
     public TIntIntMap getReachedVertices () {
         TIntIntMap result = new TIntIntHashMap();
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
@@ -169,13 +172,15 @@ public class StreetRouter {
         bestStatesAtEdge.forEachEntry((eidx, states) -> {
             if (eidx < 0) return true;
 
-            State state = states.stream().reduce((s0, s1) -> s0.getRoutingVariable(dominanceVariable) < s1.getRoutingVariable(dominanceVariable) ? s0 : s1).get();
+            State state = states.stream().reduce((s0, s1) ->
+                    s0.getRoutingVariable(dominanceVariable) < s1.getRoutingVariable(dominanceVariable) ? s0 : s1).get();
             e.seek(eidx);
             int vidx = e.getToVertex();
             v.seek(vidx);
 
             if (v.getFlag(flag)) {
-                if (!result.containsKey(vidx) || result.get(vidx).getRoutingVariable(dominanceVariable) > state.getRoutingVariable(dominanceVariable)) {
+                if (!result.containsKey(vidx) || result.get(vidx).getRoutingVariable(dominanceVariable) >
+                                                            state.getRoutingVariable(dominanceVariable)) {
                     result.put(vidx, state);
                 }
             }

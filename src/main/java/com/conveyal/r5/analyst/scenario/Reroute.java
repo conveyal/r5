@@ -277,8 +277,8 @@ public class Reroute extends Modification {
             pattern.wheelchairAccessible.set(ts, originalTripPattern.wheelchairAccessible.get(ss));
         }
 
-        LOG.info("Old stop sequence: {}", originalTripPattern.stops);
-        LOG.info("New stop sequence: {}", pattern.stops);
+        LOG.debug("Old stop sequence: {}", originalTripPattern.stops);
+        LOG.debug("New stop sequence: {}", pattern.stops);
         LOG.info("Old stop IDs: {}", Arrays.stream(originalTripPattern.stops)
                 .mapToObj(network.transitLayer.stopIdForIndex::get).collect(Collectors.toList()));
         LOG.info("New stop IDs: {}", Arrays.stream(pattern.stops)
@@ -359,11 +359,12 @@ public class Reroute extends Modification {
             schedule.arrivals[i] += timeShift;
             schedule.departures[i] += timeShift;
         }
-
-        LOG.info("Original arrivals:   {}", originalSchedule.arrivals);
-        LOG.info("Original departures: {}", originalSchedule.departures);
-        LOG.info("Modified arrivals:   {}", schedule.arrivals);
-        LOG.info("Modified departures: {}", schedule.departures);
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Original arrivals:   {}", originalSchedule.arrivals);
+            LOG.debug("Original departures: {}", originalSchedule.departures);
+            LOG.debug("Modified arrivals:   {}", schedule.arrivals);
+            LOG.debug("Modified departures: {}", schedule.departures);
+        }
         return schedule;
 
     }

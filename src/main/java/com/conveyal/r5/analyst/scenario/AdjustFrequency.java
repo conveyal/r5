@@ -51,12 +51,18 @@ public class AdjustFrequency extends Modification {
 
     /**
      * A map containing all the frequency entries, keyed on the source trip ID of the frequency entries.
-     *
-     * It's a multimap because yoou can have more than entry per trip.
+     * It's a multimap because more than one entry can referece the same trip.
      */
     private transient Multimap<String, PatternTimetable> entriesByTrip;
 
     private transient List<Service> servicesCopy;
+
+    /** For logging the effects of the modification and reporting an error when the modification has no effect. */
+    private int nTripSchedulesCreated = 0;
+
+    private int nPatternsCleared = 0;
+
+    private Set<PatternTimetable> entriesMatched = new HashSet<>();
 
     @Override
     public String getType() {
@@ -85,12 +91,20 @@ public class AdjustFrequency extends Modification {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
-        // we may have created frequencies or schedules
+        // We may have created frequencies or schedules.
         network.transitLayer.hasFrequencies = network.transitLayer.hasSchedules = false;
         for (TripPattern tp : network.transitLayer.tripPatterns) {
             if (tp.hasFrequencies) network.transitLayer.hasFrequencies = true;
             if (tp.hasSchedules) network.transitLayer.hasSchedules = true;
         }
+
+        // Check that every entry was applied and that this modification had the expected effect on the network.
+        Set<PatternTimetable> unmatchedEntries = new HashSet<>(entries);
+        unmatchedEntries.removeAll(entriesMatched);
+        for (PatternTimetable entry : unmatchedEntries) {
+            warnings.add("Trip not found for ID " + entry.sourceTrip);
+        }
+        LOG.info("Cleared {} patterns, creating {} new trip schedules.", nPatternsCleared, nTripSchedulesCreated);
 
         return warnings.size() > 0;
     }
@@ -131,6 +145,9 @@ public class AdjustFrequency extends Modification {
             return originalPattern;
         }
 
+        // Record that this pattern's TripScehedules are being replaced for error reporting and debugging purposes.
+        nPatternsCleared += 1;
+
         // This pattern is on the route to be frequency-adjusted.
         // Create a copy of the pattern to hold the filtered trips.
         TripPattern newPattern = originalPattern.clone();
@@ -143,12 +160,14 @@ public class AdjustFrequency extends Modification {
 
         // Retain modified clones of the TripSchedules for those trips mentioned in any PatternTimetable.
         // Drop all other TripSchedules, and then update the retained TripSchedules to be frequency entries. FIXME <-- comment is now wrong
-        // Iterate over all the
         for (TripSchedule originalSchedule : originalPattern.tripSchedules) {
 
             // If this current TripSchedule's trip is mentioned in any PatternTimetables,
             // convert it into one or more new TripSchedules that represent new frequency or scheduled trips.
             for (PatternTimetable entry : entriesByTrip.get(originalSchedule.tripId)) {
+
+                // Record that this entry has been matched for error reporting and debugging purposes.
+                entriesMatched.add(entry);
 
                 // Create one new service that reflects the days switched on in this PatternTimetable.
                 // The newly created service's code will be the number of services already in the list.
@@ -165,6 +184,7 @@ public class AdjustFrequency extends Modification {
                         newSchedule.startTimes = null;
                         newSchedule.endTimes = null;
                         newPattern.tripSchedules.add(newSchedule);
+                        nTripSchedulesCreated += 1;
                     }
                     newPattern.hasSchedules = true;
                 } else {
@@ -179,6 +199,7 @@ public class AdjustFrequency extends Modification {
                     newSchedule.startTimes = new int[]{entry.startTime};
                     newSchedule.endTimes = new int[]{entry.endTime};
                     newPattern.tripSchedules.add(newSchedule);
+                    nTripSchedulesCreated += 1;
                     newPattern.hasFrequencies = true;
                 }
 

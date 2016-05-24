@@ -45,6 +45,9 @@ public class AdjustDwellTime extends Modification {
     /** The internal integer IDs for the stops to be adjusted, resolved once before the modification is applied. */
     private transient TIntSet intStops;
 
+    /** For logging the effects of the modification and catching errors where nothing is changed. */
+    private int nTripsAffected = 0;
+
     @Override
     public String getType() {
         return "adjust-dwell-time";
@@ -77,6 +80,11 @@ public class AdjustDwellTime extends Modification {
         network.transitLayer.tripPatterns = network.transitLayer.tripPatterns.stream()
                 .map(this::processTripPattern)
                 .collect(Collectors.toList());
+        if (nTripsAffected > 0) {
+            LOG.info("Modified {} trips.", nTripsAffected);
+        } else {
+            warnings.add("This modification did not affect any trips.");
+        }
         return warnings.size() > 0;
     }
 
@@ -130,6 +138,7 @@ public class AdjustDwellTime extends Modification {
                     seconds += rideTime;
                 }
             }
+            nTripsAffected += 1;
         }
         return newPattern;
     }

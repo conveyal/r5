@@ -7,7 +7,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.conveyal.r5.transit.TripPattern;
-import gnu.trove.set.TIntSet;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Remove individual trips by ID, or remove all trips from an entire route.
@@ -15,6 +16,8 @@ import gnu.trove.set.TIntSet;
 public class RemoveTrips extends Modification {
 
     public static final long serialVersionUID = 1L;
+
+    private static final Logger LOG = LoggerFactory.getLogger(RemoveTrips.class);
 
     /** Which routes should have all their trips removed. */
     public Set<String> routes;
@@ -24,6 +27,9 @@ public class RemoveTrips extends Modification {
 
     /** Which trips should be removed. */
     public Set<String> trips;
+
+    /** The number of individual trips that were removed (not counting entire patterns). For logging and error detection. */
+    private int nTripsRemoved = 0;
 
     @Override
     public String getType() {
@@ -40,6 +46,7 @@ public class RemoveTrips extends Modification {
     @Override
     public boolean apply(TransportNetwork network) {
         TransitLayer transitLayer = network.transitLayer;
+        int nPatternsBefore = transitLayer.tripPatterns.size();
         if (routes != null) {
             // Remove entire routes, not specific trips.
             transitLayer.tripPatterns = transitLayer.tripPatterns.stream()
@@ -57,6 +64,11 @@ public class RemoveTrips extends Modification {
                     .filter(Objects::nonNull)
                     .collect(Collectors.toList());
         }
+        int nPatternsRemoved = nPatternsBefore - transitLayer.tripPatterns.size();
+        LOG.info("Removed {} entire patterns. Removed {} individual trips specified by ID.", nPatternsRemoved, nTripsRemoved);
+        if (nTripsRemoved == 0 && nPatternsRemoved == 0) {
+            warnings.add("No trips were removed.");
+        }
         return false;
     }
 
@@ -69,6 +81,7 @@ public class RemoveTrips extends Modification {
         newTripPattern.tripSchedules = originalTripPattern.tripSchedules.stream()
                 .filter(schedule -> !trips.contains(schedule.tripId))
                 .collect(Collectors.toList());
+        nTripsRemoved += originalTripPattern.tripSchedules.size() - newTripPattern.tripSchedules.size();
         if (newTripPattern.tripSchedules.isEmpty()) {
             return null;
         } else {

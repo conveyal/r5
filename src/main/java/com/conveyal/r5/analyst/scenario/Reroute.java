@@ -93,6 +93,9 @@ public class Reroute extends Modification {
 
     private int newPatternLength;
 
+    /** For logging the effects of the modification and reporting an error when the modification has no effect. */
+    private int nPatternsAffected = 0;
+
     @Override
     public String getType() {
         return "reroute";
@@ -149,6 +152,11 @@ public class Reroute extends Modification {
         network.transitLayer.tripPatterns = network.transitLayer.tripPatterns.stream()
                 .map(this::processTripPattern)
                 .collect(Collectors.toList());
+        if (nPatternsAffected > 0) {
+            LOG.info("Rerouted {} patterns.", nPatternsAffected);
+        } else {
+            warnings.add("No patterns were rerouted.");
+        }
         return warnings.size() > 0;
     }
 
@@ -167,6 +175,7 @@ public class Reroute extends Modification {
             // This TripPattern does not contain any of the example trips, so it is not rerouted.
             return originalTripPattern;
         }
+        nPatternsAffected += 1;
         // The number of elements to copy from the original stops array before the new segment is spliced in.
         // That is, the first index in the output stops array that will contain a stop from the new segment.
         insertBeginIndex = -1;

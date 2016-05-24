@@ -98,13 +98,7 @@ public class AdjustSpeed extends Modification {
                 hopToStops.add(intToId);
             }
         }
-        int nDefined = 0;
-        if (routes != null) nDefined += 1;
-        if (trips!= null) nDefined += 1;
-        if (patterns != null) nDefined += 1;
-        if (nDefined != 1) {
-            warnings.add("Exactly one of routes, patterns, or trips must be provided.");
-        }
+        checkIds(routes, patterns, trips, true, network);
         return warnings.size() > 0;
     }
 

@@ -57,10 +57,7 @@ public class RemoveStops extends Modification {
 
     @Override
     public boolean resolve (TransportNetwork network) {
-        boolean onlyOneDefined = (routes != null) ^ (patterns != null);
-        if (!onlyOneDefined) {
-            warnings.add("Routes or patterns must be specified, but not both.");
-        }
+        checkIds(routes, patterns, null, false, network);
         intStops = new TIntHashSet();
         for (String stringStopId : stops) {
             int intStopId = network.transitLayer.indexForStopId.get(stringStopId);

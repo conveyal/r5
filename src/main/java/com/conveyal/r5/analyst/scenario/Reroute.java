@@ -100,10 +100,7 @@ public class Reroute extends Modification {
 
     @Override
     public boolean resolve (TransportNetwork network) {
-        boolean onlyOneDefined = (routes != null) ^ (patterns != null);
-        if (!onlyOneDefined) {
-            warnings.add("Routes or patterns must be specified, but not both.");
-        }
+        checkIds(routes, patterns, null, false, network);
         if (fromStop == null && toStop == null) {
             warnings.add("At least one of from and to stop must be supplied.");
         }

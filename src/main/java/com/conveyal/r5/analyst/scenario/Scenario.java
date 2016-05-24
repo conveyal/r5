@@ -50,6 +50,7 @@ public class Scenario implements Serializable {
             boolean errorsInModification = modification.resolve(copiedNetwork);
             if (errorsInModification) {
                 LOG.error("Errors were detected in a scenario modification of type {}:", modification.getType());
+                LOG.error("Modification comment is: {}", modification.comment);
                 for (String warning : modification.warnings) {
                     LOG.error(warning);
                 }
@@ -66,6 +67,7 @@ public class Scenario implements Serializable {
             boolean errors = modification.apply(copiedNetwork);
             if (errors) {
                 LOG.error("Error while applying modification {}", modification);
+                LOG.error("Modification comment is: {}", modification.comment);
                 throw new RuntimeException("Errors occured while applying the Scenario to the TransportNetwork, bailing out.");
             }
         }

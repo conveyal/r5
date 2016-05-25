@@ -68,6 +68,11 @@ public class Scenario implements Serializable {
             if (errors) {
                 LOG.error("Error while applying modification {}", modification);
                 LOG.error("Modification comment is: {}", modification.comment);
+                for (String warning : modification.warnings) {
+                    LOG.error(warning);
+                }
+                // Bail out at the first error, because modification application changes the underlying network and
+                // could lead to meaningless errors on subsequent modifications.
                 throw new RuntimeException("Errors occured while applying the Scenario to the TransportNetwork, bailing out.");
             }
         }

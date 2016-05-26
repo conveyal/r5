@@ -198,9 +198,18 @@ public class Reroute extends Modification {
             insertEndIndex = originalTripPattern.stops.length;
         }
         if (insertBeginIndex == -1 || insertEndIndex == -1) {
-            // We are missing either the beginning or the end of the insertion slice.
-            // This TripPattern does not match.
-            warnings.add("The specified fromStop and/or toStop could not be matched on pattern " + originalTripPattern);
+            // We are missing either the beginning or the end of the insertion slice. This TripPattern does not match.
+            String warning = String.format("The specified fromStop (%s) and/or toStop (%s) could not be matched on %s",
+                    fromStop, toStop, originalTripPattern.toStringDetailed(network.transitLayer));
+            if (routes != null) {
+                // This Modification is being applied to all patterns on a route.
+                // Some of those patterns might not contain the from/to stops, and that's not necessarily a problem.
+                LOG.warn(warning);
+            } else {
+                // This Modification is being applied to specifically chosen patterns.
+                // If one does not contain the from or to stops, it's probably a badly formed modification so fail hard.
+                warnings.add(warning);
+            }
             return originalTripPattern;
         }
         if (insertEndIndex < insertBeginIndex) {

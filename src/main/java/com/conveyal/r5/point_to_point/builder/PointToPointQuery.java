@@ -58,18 +58,18 @@ public class PointToPointQuery {
 
     private static final EnumSet<LegMode> currentlyUnsupportedModes = EnumSet.of(LegMode.CAR_PARK);
 
-    /** Time to rent a bike */
-    private static final int BIKE_RENTAL_PICKUP_TIMEMS = 60*1000;
+    /** Time to rent a bike in seconds */
+    private static final int BIKE_RENTAL_PICKUP_TIME_S = 60;
     /**
      * Cost of renting a bike. The cost is a bit more than actual time to model the associated cost and trouble.
      */
     private static final int BIKE_RENTAL_PICKUP_COST = 120;
-    /** Time to drop-off a rented bike */
-    private static final int BIKE_RENTAL_DROPOFF_TIMEMS = 30*1000;
+    /** Time to drop-off a rented bike in seconds */
+    private static final int BIKE_RENTAL_DROPOFF_TIME_S = 30;
     /** Cost of dropping-off a rented bike */
     private static final int BIKE_RENTAL_DROPOFF_COST = 30;
-    /** Time to park car in P+R **/
-    private static final int CAR_PARK_DROPOFF_TIMEMS = 120*1000;
+    /** Time to park car in P+R in seconds **/
+    private static final int CAR_PARK_DROPOFF_TIME_S = 120;
 
     private static final int CAR_PARK_DROPOFF_COST = 120;
 
@@ -376,7 +376,7 @@ public class PointToPointQuery {
             walking.streetMode = StreetMode.WALK;
             walking.profileRequest = request;
             walking.distanceLimitMeters = 2_000 + streetRouter.distanceLimitMeters;
-            walking.setOrigin(carParks, CAR_PARK_DROPOFF_TIMEMS, CAR_PARK_DROPOFF_COST, LegMode.CAR_PARK);
+            walking.setOrigin(carParks, CAR_PARK_DROPOFF_TIME_S, CAR_PARK_DROPOFF_COST, LegMode.CAR_PARK);
             walking.route();
             walking.previous = streetRouter;
             return walking;
@@ -419,7 +419,7 @@ public class PointToPointQuery {
             bicycle.streetMode = StreetMode.BICYCLE;
             bicycle.profileRequest = request;
             bicycle.distanceLimitMeters = 15_000 + streetRouter.distanceLimitMeters;
-            bicycle.setOrigin(bikeStations, BIKE_RENTAL_PICKUP_TIMEMS, BIKE_RENTAL_PICKUP_COST, LegMode.BICYCLE_RENT);
+            bicycle.setOrigin(bikeStations, BIKE_RENTAL_PICKUP_TIME_S, BIKE_RENTAL_PICKUP_COST, LegMode.BICYCLE_RENT);
             bicycle.route();
             TIntObjectMap<StreetRouter.State> cycledStations = bicycle.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
             LOG.info("BIKE RENT: Found {} cycled stations in {}km cycled distance", cycledStations.size(), bicycle.distanceLimitMeters/1000);
@@ -439,7 +439,7 @@ public class PointToPointQuery {
             end.streetMode = StreetMode.WALK;
             end.profileRequest = request;
             end.distanceLimitMeters = 2_000 + bicycle.distanceLimitMeters;
-            end.setOrigin(cycledStations, BIKE_RENTAL_DROPOFF_TIMEMS, BIKE_RENTAL_DROPOFF_COST, LegMode.BICYCLE_RENT);
+            end.setOrigin(cycledStations, BIKE_RENTAL_DROPOFF_TIME_S, BIKE_RENTAL_DROPOFF_COST, LegMode.BICYCLE_RENT);
             end.route();
             end.previous = bicycle;
             return end;

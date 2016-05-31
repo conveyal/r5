@@ -249,7 +249,7 @@ public class StreetRouter {
      * If legMode is LegMode.BICYCLE_RENT state.isBikeShare is set to true
      *
      * @param previousStates map of bikeshares/P+Rs vertexIndexes and states Return of {@link #getReachedVertices(VertexStore.VertexFlag)}}
-     * @param switchTime How many ms is added to state time (this is used when switching modes, renting bike, parking a car etc.)
+     * @param switchTime How many s is added to state time (this is used when switching modes, renting bike, parking a car etc.)
      * @param switchCost This is added to the weight and is a cost of switching modes
      * @param legMode What origin search is this bike share or P+R
      */

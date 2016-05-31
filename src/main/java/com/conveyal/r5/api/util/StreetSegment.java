@@ -73,7 +73,7 @@ public class StreetSegment {
         double lastAngle = 0;
         for (StreetRouter.State state: path.getStates()) {
             int edgeIdx = state.backEdge;
-            if (edgeIdx != -1) {
+            if (edgeIdx >= 0) {
                 EdgeStore.Edge edge = path.getEdge(edgeIdx);
                 StreetEdgeInfo streetEdgeInfo = new StreetEdgeInfo();
                 streetEdgeInfo.edgeId = edgeIdx;

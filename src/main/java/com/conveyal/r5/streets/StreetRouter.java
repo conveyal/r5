@@ -586,11 +586,10 @@ public class StreetRouter {
         public State(int atVertex, int viaEdge, State backState) {
             this.vertex = atVertex;
             this.backEdge = viaEdge;
-            //This makes sure that new states don't have non-geographic states as backStates
-            //non geographic states are states with negative edges since they aren't made from vertices on graph
-            if (backState.backEdge >= 0) {
-                this.backState = backState;
-            }
+            //Note here it can happen that back state has edge with negative index
+            //This means that this state was created from vertex and can be skipped in display
+            //but it is necessary in bike sharing and P+R to combine WALK and BIKE/CAR parts+
+            this.backState = backState;
             this.distance = backState.distance;
             this.durationSeconds = backState.durationSeconds;
             this.weight = backState.weight;

@@ -40,7 +40,6 @@ public class RaptorWorker {
 
     private static final Logger LOG = LoggerFactory.getLogger(RaptorWorker.class);
     public static final int UNREACHED = Integer.MAX_VALUE;
-    static final int MAX_DURATION = Integer.MAX_VALUE - 48 * 60 * 60;
 
     /** Minimum slack time to board transit in seconds. */
     public static final int BOARD_SLACK_SECONDS = 60;
@@ -334,6 +333,16 @@ public class RaptorWorker {
             throw new IllegalStateException("Iterations did not completely fill output array");
         }
 
+        // post process all iterations to apply maximum trip time cutoff. We apply the cutoff during the search primarily
+        // for speed, but it does not apply to trips copied back from later in clock time minutes (range-RAPTOR), or to propagation
+        for (int it = 0; it < timesAtTargetsEachIteration.length; it++) {
+            for (int target = 0; target < timesAtTargetsEachIteration[it].length; target++) {
+                if (timesAtTargetsEachIteration[it][target] > req.maxTripDurationMinutes * 60) {
+                    timesAtTargetsEachIteration[it][target] = UNREACHED;
+                }
+            }
+        }
+
         // Display the time spent calculating all iterations.
         long calcTime = System.currentTimeMillis() - beginCalcTime;
         LOG.info("calc time {}sec", calcTime / 1000.0);
@@ -361,7 +370,7 @@ public class RaptorWorker {
         // Do not consider any travel after this time (in seconds after midnight).
         // FIXME We may generate results past this time, but they are invalid and should not be included in averages.
         // This is currently effectively turned off by making MAX_DURATION very large.
-        max_time = departureTime + MAX_DURATION;
+        max_time = departureTime + req.maxTripDurationMinutes * 60;
 
         // Clear any information left over from previous searches.
         round = 0;
@@ -423,8 +432,11 @@ public class RaptorWorker {
      */
     public RaptorState runRaptorFrequency (int departureTime, BoardingAssumption boardingAssumption) {
 
-        // Do not consider any travel after this clock time (currently effectively turned off).
-        max_time = departureTime + MAX_DURATION;
+        // Do not consider any travel after this clock time. This is for algorithm speed and avoiding taking
+        // ridiculous transit trips. There are ways the output could include travel after this time
+        // (notably trips from future minutes found using range-RAPTOR, and propagation). For this reason we apply
+        // the cutoff again to all elapsed times after all iterations but before tabulating and reporting results.
+        max_time = departureTime + req.maxTripDurationMinutes * 60;
 
         round = 0;
         advanceToNextRound(); // go to first round

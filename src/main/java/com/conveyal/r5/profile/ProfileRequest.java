@@ -173,6 +173,47 @@ public class ProfileRequest implements Serializable, Cloneable {
     */
     public int suboptimalMinutes = 5;
 
+    /**
+     * The maximum duration of any transit trip found by this search.
+     *
+     * Believe it or not the search can be quite sensitive to the value of this number, or at least whether it is set to a
+     * non-infinite value, as it effectively eliminates outliers in the samples of travel time, see ticket #162.
+     *
+     * Consider a network in which there is significant peak-only service, that runs from say 6-8am and 4-6pm,
+     * and your analysis window is 6:30 - 8:30. Suppose for the purpose of argument that there is no other way
+     * to reach your destination other than this peak only transit service, and also assume that there is
+     * no walking or waiting time. During your time window the you can take transit for the first 1.5 hours,
+     * and after that you would have to wait until 4pm to get the first bus in the PM peak. Of course
+     * no one would ever do this; the trip should be considered not possible after 8 am. The reachability threshold will
+     * then determine whether this destination should be considered reachable during the time window or not.
+     *
+     * We had initially considered using a cutoff on wait time to board a vehicle, rather than on maximum trip duration.
+     * However, the planner will cunningly work around that limit and still get on the later vehicle by riding buses the
+     * wrong direction, taking long walks to transfer to other buses, etc., eventually eating up all the time until that
+     * later trip. The results would then be even less clear, as they would be speckled. If the origin had no other transit
+     * service, the planner would not be able to find a way to kill enough time, and the destination would be
+     * considered unreachable. However, if the origin had a network of local buses that don't go to the destination, the
+     * planner might be able to kill all day riding buses (without visiting the same stop twice) and still get on the late
+     * afternoon vehicle.
+     *
+     * If we used percentiles rather than a mean, this parameter would have no effect and we could also eliminate
+     * reachability thresholds. We'd just sort long or impossible trips to the top of the list (it doesn't matter whether
+     * they're long or impossible; they're the same once you're past whatever travel time cutoff is being analyzed), and
+     * let the percentile fall where it may; if it happens to end up in the unreachable portion, then that destination
+     * is unreachable.
+     *
+     * Default is four hours. It should be somewhat longer than the longest travel time cutoff you wish to analyze, because
+     * travel times whose "true average" (whatever that means) is near this value will be biased faster. Suppose there is a
+     * trip that takes between 1.5 and 2.5 hours depending on your departure time. If you set max duration to 2 hours, the
+     * average would be 1.75 hours not 2 (assuming a uniform distribution of travel times).
+     *
+     * This cutoff is applied to the final, propagated times at the pointset.
+     *
+     * It is expected that this parameter will have a significant impact on compute times in large networks as it will
+     * prevent exploration to the end of the Earth.
+     */
+    public int maxTripDurationMinutes = 4 * 60;
+
     /** A non-destructive scenario to apply when executing this request */
     public Scenario scenario;
 

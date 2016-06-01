@@ -214,6 +214,12 @@ public class ProfileRequest implements Serializable, Cloneable {
      */
     public int maxTripDurationMinutes = 4 * 60;
 
+    /**
+     * The maximum number of rides, e.g. taking the L2 to the Red line to the Green line would be three rides.
+     * Default of 6 should be enough for most intercity trips (two local buses, two intercity trains, two local buses).
+     */
+    public int maxRides = 8;
+
     /** A non-destructive scenario to apply when executing this request */
     public Scenario scenario;
 

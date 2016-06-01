@@ -349,7 +349,7 @@ public class RaptorWorker {
         LOG.info("  propagation {}sec", totalPropagationTime / 1000.0);
         LOG.info("  raptor {}sec", (calcTime - totalPropagationTime) / 1000.0);
         LOG.info("  requested {} monte carlo draws, ran {}", req.monteCarloDraws, monteCarloDraws * minuteNumber);
-        LOG.info("{} rounds", round + 1);
+        LOG.info("{} rounds", round);
         ts.propagation = (int) totalPropagationTime;
         ts.transitSearch = (int) (calcTime - totalPropagationTime);
 
@@ -401,8 +401,10 @@ public class RaptorWorker {
         // Move on to the round 1, the first one that uses transit.
         advanceToNextRound();
 
-        // Run RAPTOR rounds repeatedly until a round has no effect (does not update the travel time to any stops).
-        while (doOneRound(scheduleState.get(round - 1), scheduleState.get(round), false, null)) {
+        // Run RAPTOR rounds repeatedly until a round has no effect (does not update the travel time to any stops),
+        // or we are out of rounds. If maxRides is 7, this will get to round == 7, which is what we want as round 0
+        // is the initial walk.
+        while (doOneRound(scheduleState.get(round - 1), scheduleState.get(round), false, null) && round < req.maxRides) {
             advanceToNextRound();
         }
 
@@ -467,8 +469,11 @@ public class RaptorWorker {
         // Do at least as many rounds as were done in the scheduled search plus one, so that we don't return a state
         // at a previous round and cut off the scheduled search after only a few transfers (see issue #82)
         // However, if we didn't run a scheduled search, don't apply this constraint
-        while (doOneRound(previousRound, currentRound, true, boardingAssumption) ||
-                (scheduledRounds != -1 && round <= scheduledRounds)) {
+        // Don't do more rounds than we're allowed rides. This will get us to round == maxRides, which is what we want
+        // since round 0 is the initial walk.
+        while ((doOneRound(previousRound, currentRound, true, boardingAssumption) ||
+                (scheduledRounds != -1 && round <= scheduledRounds)) &&
+                round < req.maxRides) {
             advanceToNextRound();
             previousRound = currentRound;
             currentRound = previousRound.copy();

@@ -182,7 +182,7 @@ public class TransitLayer implements Serializable, Cloneable {
                 stopSequences.add(st.stop_sequence);
 
                 if (previousDeparture > st.arrival_time || st.arrival_time > st.departure_time) {
-                    LOG.warn("Reverse travel at stop {} on trip {} on route {}, skipping this trip as it will wreak havoc with routing", st.stop_id, trip.trip_id, trip.route.route_id);
+                    LOG.warn("Negative-time travel at stop {} on trip {} on route {}, skipping this trip as it will wreak havoc with routing", st.stop_id, trip.trip_id, trip.route.route_id);
                     continue TRIPS;
                 }
 

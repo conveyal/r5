@@ -223,6 +223,9 @@ public class ProfileRequest implements Serializable, Cloneable {
     /** A non-destructive scenario to apply when executing this request */
     public Scenario scenario;
 
+    /** The ID of a scenario stored in S3. It is an error if both scenario and the scenarioId are specified */
+    public String scenarioId;
+
     @JsonSerialize(using=ZoneIdSerializer.class)
     @JsonDeserialize(using=ZoneIdDeserializer.class)
     public ZoneId zoneId = ZoneOffset.UTC;

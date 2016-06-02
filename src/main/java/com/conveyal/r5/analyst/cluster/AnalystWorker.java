@@ -398,7 +398,7 @@ public class AnalystWorker implements Runnable {
         else mode = StreetMode.WALK;
 
         TransportNetwork transportNetwork =
-                transportNetworkCache.getNetworkForScenario(clusterRequest.graphId, clusterRequest.profileRequest.scenario);
+                transportNetworkCache.getNetworkForScenario(clusterRequest.graphId, clusterRequest.profileRequest);
 
         // THIS IS A HACK TO TEMPORARILY PREVENT NL NETWORKS FROM USING TRANSFER AND TRAVEL TIME LIMITING
         // IT SHOULD BE REMOVED ASAP AFTER THE MRA PROJECT

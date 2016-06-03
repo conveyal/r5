@@ -26,6 +26,19 @@ public class RoadAnglesTest {
     private LineString reverseLine;
     private static WKTReader wktReader;
 
+    //180 degrees brads
+    private final byte m180 = radiansToBrads(Math.PI);
+
+    /** Converts angle in radians to angle in binary radians **/
+    private byte radiansToBrads(double angleRadians) {
+        return (byte) Math.round(angleRadians * 128 / Math.PI);
+    }
+
+    /** Converts binary radians to angle in degrees **/
+    private int bradsToDegree(byte brad) {
+        return brad * 180 / 128;
+    }
+
     @Parameterized.Parameters(name="road {0} - {1} - {2}")
     public static Collection<Object[]> data() {
         //LineStrings are generated with Turf.js in javascript
@@ -33,6 +46,7 @@ public class RoadAnglesTest {
         //next number is angle between next two points with distance 1 km
         //next number is angle between last two points with distance 15 m
         return Arrays.asList(new Object[][] {
+            { 30 , 45 , 15 , " LINESTRING(15.6455 46.557611,15.645598059424662 46.55772778859906,15.654844273895241 46.56408458455182,15.6548950392579 46.56421484534359) "},
             { 15 , 15 , 15 , " LINESTRING(15.6455 46.557611,15.645533839510197 46.55769784053035,15.648918332204317 46.56638184416238,15.64895217718556 46.56646868469273) "},
             { 30 , 45 , 30 , " LINESTRING(15.6455 46.557611,15.645598059424662 46.55772778859906,15.654844273895241 46.56408458455182,15.654942345020629 46.56420137315087) "},
 
@@ -461,6 +475,53 @@ public class RoadAnglesTest {
     public void testFirstAngle() throws Exception {
         Assert.assertEquals(startAngle, DirectionUtils.getFirstAngle(lineString), delta);
         //Assert.assertEquals(angle, 180+DirectionUtils.getLastAngle(reverseLine), delta);
+
+
+    }
+
+
+
+    //Tests if we can get values of first and last angles for backward edge
+    //from forward edge angles
+    @Test
+    public void testAngleReversed() throws Exception {
+        //How are first and last angle if this is forward edge
+        double radAngleFirst = Math.toRadians(DirectionUtils.getFirstAngle(lineString));
+        double radAngleLast = Math.toRadians(DirectionUtils.getLastAngle(lineString));
+
+        final byte bradForwardFirstAngle = radiansToBrads(radAngleFirst);
+        final byte bradForwardLastAngle = radiansToBrads(radAngleLast);
+
+        //How are first and last angles if this is backward edge
+        double radRAngleFirst = Math.toRadians(DirectionUtils.getFirstAngle(reverseLine));
+        double radRAngleLast = Math.toRadians(DirectionUtils.getLastAngle(reverseLine));
+
+        final byte bradBackwardLastAngle = radiansToBrads(radRAngleLast);
+        final byte bradBackwardFirstAngle = radiansToBrads(radRAngleFirst);
+
+        //Double because we need to have delta since conversion from radians -> brads -> degrees is lossy
+        Assert.assertEquals(startAngle == 180 ? -180 : startAngle, bradsToDegree(bradForwardFirstAngle),1);
+        Assert.assertEquals(endAngle == 180 ? -180: endAngle, bradsToDegree(bradForwardLastAngle),1);
+
+
+
+        //We need to calculate backward angles from forward angles
+        //This can be done if we subtract 180 degrees
+
+        //First forward angle is at the same place as last backward angle
+        Assert.assertEquals(bradBackwardLastAngle, (byte)(bradForwardFirstAngle - m180));
+        //Last forward angle is at the same place as first backward angle
+        Assert.assertEquals(bradBackwardFirstAngle, (byte)(bradForwardLastAngle - m180));
+/*
+
+        LOG.info("Forward: {} - {}", bradsToDegree(bradForwardFirstAngle), bradsToDegree(
+            bradForwardLastAngle));
+
+
+        LOG.info("Backward: {} - {}", bradsToDegree(bradBackwardLastAngle), bradsToDegree(
+            bradBackwardFirstAngle));
+        LOG.info("BackwardC: {} - {}", bradsToDegree((byte)(bradForwardFirstAngle -m180)),
+            bradsToDegree((byte)(bradForwardLastAngle -m180)));*/
 
 
     }

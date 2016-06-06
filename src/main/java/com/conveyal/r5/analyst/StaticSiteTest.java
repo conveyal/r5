@@ -70,8 +70,8 @@ public class StaticSiteTest {
 
             worker.propagatedTimesStore = new PropagatedTimesStore(lpset.size()) {
                 @Override
-                public void setFromArray(int[][] times, BitSet includeInAverages, ConfidenceCalculationMethod confidenceCalculationMethod) {
-                    super.setFromArray(times, includeInAverages, confidenceCalculationMethod);
+                public void setFromArray(int[][] times, BitSet includeInAverages, ConfidenceCalculationMethod confidenceCalculationMethod, float reachabilityThreshold) {
+                    super.setFromArray(times, includeInAverages, confidenceCalculationMethod, reachabilityThreshold);
                     // dodge stupid effectively final nonsense
                     fullTimes[0] = times;
                 }

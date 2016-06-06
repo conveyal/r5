@@ -357,7 +357,7 @@ public class RaptorWorker {
         // summarizes them (average, min, max).
         // We can use the MIN_MAX confidence calculation method here even when frequency draws were done, because we
         // include two pseudo-draws per departure minute for zero and maximal board times.
-        propagatedTimesStore.setFromArray(timesAtTargetsEachIteration, includeInAverages, ConfidenceCalculationMethod.MIN_MAX);
+        propagatedTimesStore.setFromArray(timesAtTargetsEachIteration, includeInAverages, ConfidenceCalculationMethod.MIN_MAX, req.reachabilityThreshold);
         return propagatedTimesStore;
     }
 

@@ -157,7 +157,8 @@ public class RepeatedRaptorProfileRouter {
             int[][] singleRoundResults = new int[][] {nonTransitTimes.travelTimes};
             BitSet includeInAverages = new BitSet();
             includeInAverages.set(0);
-            propagatedTimesStore.setFromArray(singleRoundResults, includeInAverages, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX);
+            // fine to set a reachability threshold of 0 here because the street network does not vary over time.
+            propagatedTimesStore.setFromArray(singleRoundResults, includeInAverages, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX, 0);
         }
         ts.targetsReached = propagatedTimesStore.countTargetsReached();
         ts.compute = (int) (System.currentTimeMillis() - computationStartTime);

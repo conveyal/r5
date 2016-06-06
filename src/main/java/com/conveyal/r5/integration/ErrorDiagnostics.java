@@ -94,7 +94,7 @@ public class ErrorDiagnostics implements RequestHandler<DiagnosticsRequest, Bool
                     int[] times = worker.timesAtTargetsEachIteration[iteration];
 
                     PropagatedTimesStore pts = new PropagatedTimesStore(times.length);
-                    pts.setFromArray(new int[][]{times}, include, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX);
+                    pts.setFromArray(new int[][]{times}, include, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX, req.request.reachabilityThreshold);
                     req.results.add(pts.makeResults(pset, false, true, false).avgCase.histograms.get(req.pointsetField).sums);
                 }
             } else {
@@ -111,7 +111,7 @@ public class ErrorDiagnostics implements RequestHandler<DiagnosticsRequest, Bool
                 for (int[] times : router.timesAtTargetsEachIteration) {
                     // everything is included in averages, we are not calculating bounds
                     PropagatedTimesStore pts = new PropagatedTimesStore(times.length);
-                    pts.setFromArray(new int[][]{times}, include, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX);
+                    pts.setFromArray(new int[][]{times}, include, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX, req.request.reachabilityThreshold);
                     req.results.add(pts.makeResults(pset, false, true, false).avgCase.histograms.get(req.pointsetField).sums);
                 }
             }

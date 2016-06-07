@@ -11,6 +11,9 @@ public class DirectionUtils {
     //How far in meters is the
     final static double DIST = 10;
 
+    //180 degrees brads
+    public final static byte m180 = radiansToBrads(Math.PI);
+
     /**
      * Returns the approximate azimuth from coordinate A to B in decimal degrees clockwise from North,
      * in the range (-PI to PI). The computation is exact for small delta between A and B.
@@ -99,5 +102,23 @@ public class DirectionUtils {
             }
         }
         return getAzimuth(geometry.getCoordinateN(0), geometry.getCoordinateN(n-1));
+    }
+
+    /** Converts angle in radians to angle in binary radians **/
+    public static byte radiansToBrads(double angleRadians) {
+        return (byte) Math.round(angleRadians * 128 / Math.PI);
+    }
+
+    /** Converts binary radians to angle in degrees **/
+    public static int bradsToDegree(byte brad) {
+        return brad * 180 / 128;
+    }
+
+    public static byte getFirstAngleBrads(LineString geometry) {
+        return radiansToBrads(getFirstAngle(geometry));
+    }
+
+    public static byte getLastAngleBrads(LineString geometry) {
+        return radiansToBrads(getLastAngle(geometry));
     }
 }

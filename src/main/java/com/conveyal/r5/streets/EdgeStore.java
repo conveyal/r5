@@ -651,30 +651,20 @@ public class EdgeStore implements Serializable {
 
             LineString geometry = getGeometry();
 
-            double inAngleRad = DirectionUtils.getFirstAngle(geometry);
-            inAngles.set(pairIndex, radiansToBrads(inAngleRad));
+            byte inAngleRad = DirectionUtils.getFirstAngleBrads(geometry);
+            inAngles.set(pairIndex, inAngleRad);
 
-            double outAngleRad = DirectionUtils.getLastAngle(geometry);
-            outAngles.set(pairIndex, radiansToBrads(outAngleRad));
-        }
-
-        /** Converts angle in radians to angle in binary radians **/
-        private byte radiansToBrads(double angleRadians) {
-            return (byte) Math.round(angleRadians * 128 / Math.PI);
-        }
-
-        /** Converts binary radians to angle in degrees **/
-        private int bradsToDegree(byte brad) {
-            return brad * 180 / 128;
+            byte outAngleRad = DirectionUtils.getLastAngleBrads(geometry);
+            outAngles.set(pairIndex, outAngleRad);
         }
 
         public int getOutAngle() {
             int angle;
             if (isBackward()) {
-                angle  = bradsToDegree(inAngles.get(pairIndex));
-                return 180+angle;
+                angle  = DirectionUtils.bradsToDegree((byte)(inAngles.get(pairIndex)-DirectionUtils.m180));
+                return angle;
             } else {
-                angle  = bradsToDegree(outAngles.get(pairIndex));
+                angle  = DirectionUtils.bradsToDegree(outAngles.get(pairIndex));
                 return angle;
             }
         }
@@ -682,10 +672,10 @@ public class EdgeStore implements Serializable {
         public int getInAngle() {
             int angle;
             if (isBackward()) {
-                angle = bradsToDegree(outAngles.get(pairIndex));
-                return 180+angle;
+                angle = DirectionUtils.bradsToDegree((byte)(outAngles.get(pairIndex)-DirectionUtils.m180));
+                return angle;
             } else {
-                angle = bradsToDegree(inAngles.get(pairIndex));
+                angle = DirectionUtils.bradsToDegree(inAngles.get(pairIndex));
                 return angle;
             }
         }

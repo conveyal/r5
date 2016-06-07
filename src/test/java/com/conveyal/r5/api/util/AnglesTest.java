@@ -100,7 +100,7 @@ public class AnglesTest {
 
     @Test
     public void testFirstAngle() throws Exception {
-        Assert.assertEquals(angle, DirectionUtils.getFirstAngle(lineString), delta);
+        Assert.assertEquals(angle, Math.toDegrees(DirectionUtils.getFirstAngle(lineString)), delta);
         //Assert.assertEquals(angle, 180+DirectionUtils.getLastAngle(reverseLine), delta);
 
 
@@ -108,7 +108,7 @@ public class AnglesTest {
 
     @Test
     public void testLastAngle() throws Exception {
-        Assert.assertEquals(angle, DirectionUtils.getLastAngle(lineString), delta);
+        Assert.assertEquals(angle, Math.toDegrees(DirectionUtils.getLastAngle(lineString)), delta);
 
     }
 

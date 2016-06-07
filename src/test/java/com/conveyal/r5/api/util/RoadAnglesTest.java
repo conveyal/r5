@@ -473,7 +473,7 @@ public class RoadAnglesTest {
 
     @Test
     public void testFirstAngle() throws Exception {
-        Assert.assertEquals(startAngle, DirectionUtils.getFirstAngle(lineString), delta);
+        Assert.assertEquals(startAngle, Math.toDegrees(DirectionUtils.getFirstAngle(lineString)), delta);
         //Assert.assertEquals(angle, 180+DirectionUtils.getLastAngle(reverseLine), delta);
 
 
@@ -486,15 +486,15 @@ public class RoadAnglesTest {
     @Test
     public void testAngleReversed() throws Exception {
         //How are first and last angle if this is forward edge
-        double radAngleFirst = Math.toRadians(DirectionUtils.getFirstAngle(lineString));
-        double radAngleLast = Math.toRadians(DirectionUtils.getLastAngle(lineString));
+        double radAngleFirst = DirectionUtils.getFirstAngle(lineString);
+        double radAngleLast = DirectionUtils.getLastAngle(lineString);
 
         final byte bradForwardFirstAngle = radiansToBrads(radAngleFirst);
         final byte bradForwardLastAngle = radiansToBrads(radAngleLast);
 
         //How are first and last angles if this is backward edge
-        double radRAngleFirst = Math.toRadians(DirectionUtils.getFirstAngle(reverseLine));
-        double radRAngleLast = Math.toRadians(DirectionUtils.getLastAngle(reverseLine));
+        double radRAngleFirst = DirectionUtils.getFirstAngle(reverseLine);
+        double radRAngleLast = DirectionUtils.getLastAngle(reverseLine);
 
         final byte bradBackwardLastAngle = radiansToBrads(radRAngleLast);
         final byte bradBackwardFirstAngle = radiansToBrads(radRAngleFirst);
@@ -528,7 +528,7 @@ public class RoadAnglesTest {
 
     @Test
     public void testLastAngle() throws Exception {
-        Assert.assertEquals(endAngle, DirectionUtils.getLastAngle(lineString), delta);
+        Assert.assertEquals(endAngle, Math.toDegrees(DirectionUtils.getLastAngle(lineString)), delta);
 
     }
 

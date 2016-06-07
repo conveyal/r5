@@ -13,7 +13,7 @@ public class DirectionUtils {
 
     /**
      * Returns the approximate azimuth from coordinate A to B in decimal degrees clockwise from North,
-     * in the range (-180° to +180°). The computation is exact for small delta between A and B.
+     * in the range (-PI to PI). The computation is exact for small delta between A and B.
      */
     public static double getAzimuth(Coordinate a, Coordinate b) {
         //From Midgard Valhalla library
@@ -30,8 +30,8 @@ public class DirectionUtils {
         double y =  (FastMath.sin(dlng) * FastMath.cos(lat2));
         double x =  (FastMath.cos(lat1) * FastMath.sin(lat2) - FastMath.sin(lat1) * FastMath.cos(lat2) * FastMath.cos(dlng));
         if (FastMath.abs(x) < 1e-10 && FastMath.abs(y) < 1e-10)
-            return 180;
-        double bearing = FastMath.toDegrees(FastMath.atan2(y, x));
+            return Math.PI;
+        double bearing = FastMath.atan2(y, x);
         return bearing; // (bearing < 0.0f) ? bearing + 360.0f: bearing;
     }
 
@@ -72,7 +72,7 @@ public class DirectionUtils {
 
     /**
      * Computes the angle of the first segment of a LineString or MultiLineString in radians clockwise from North
-     * in the range (-180, 180).
+     * in the range (-PI, PI).
      * @param geometry a LineString
      */
     public static double getFirstAngle(LineString geometry) {

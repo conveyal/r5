@@ -48,7 +48,7 @@ public class RaptorWorker {
     private static final int DEPARTURE_STEP_SEC = 60;
 
     int max_time = 0;
-    int round = 0;
+    protected int round = 0;
     private int scheduledRounds = -1;
 
     /**
@@ -72,10 +72,10 @@ public class RaptorWorker {
     TransitLayer data;
 
     /** Patterns touched during this round. */
-    BitSet patternsTouchedThisRound;
+    protected BitSet patternsTouchedThisRound;
 
     /** Stops touched during this round. */
-    BitSet stopsTouchedThisRound;
+    protected BitSet stopsTouchedThisRound;
 
     /**
      * Stops touched during this search (with "search" meaning either a scheduled search at a particular minute,
@@ -322,6 +322,8 @@ public class RaptorWorker {
                 if (statesEachIteration != null) statesEachIteration.add(state.deepCopy());
                 iteration++;
             }
+
+            advanceToNextMinute();
         } // END for loop over departure minutes
 
         // Sanity check:
@@ -359,6 +361,11 @@ public class RaptorWorker {
         // include two pseudo-draws per departure minute for zero and maximal board times.
         propagatedTimesStore.setFromArray(timesAtTargetsEachIteration, includeInAverages, ConfidenceCalculationMethod.MIN_MAX, req.reachabilityThreshold);
         return propagatedTimesStore;
+    }
+
+    /** hook function overridden in instrumentedraptorworker b/efore advancing to the next minute */
+    public void advanceToNextMinute () {
+        /* do nothing */
     }
 
     /**
@@ -769,7 +776,7 @@ public class RaptorWorker {
      * all the patterns passing through stops reached this round and all patterns passing through stops transferred
      * to will be marked. We don't have separate rounds for transfers; see comments in RaptorState.
      */
-    private void doTransfers(RaptorState state) {
+    protected void doTransfers(RaptorState state) {
         // avoid integer casts in tight loop below
         int walkSpeedMillimetersPerSecond = (int) (req.walkSpeed * 1000);
         int maxWalkMillimeters = (int) (req.walkSpeed * req.maxWalkTime * 60 * 1000);

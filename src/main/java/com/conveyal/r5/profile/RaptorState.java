@@ -1,5 +1,7 @@
 package com.conveyal.r5.profile;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.util.Arrays;
 import java.util.BitSet;
 
@@ -11,7 +13,8 @@ import java.util.BitSet;
  * @author mattwigway
  */
 public class RaptorState {
-    /** Previous state (one less transfer) */
+    /** Previous state (one less transfer). Don't serialize and send to debug interface. */
+    @JsonIgnore
     public RaptorState previous;
 
     /** departure time for this state */

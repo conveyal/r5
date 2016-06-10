@@ -100,7 +100,7 @@ public class TransportNetworkCache {
             Scenario scenario;
             if (request.scenario == null && request.scenarioId != null) {
                 // resolve scenario
-                LOG.info("Retrieving network from S3");
+                LOG.info("Retrieving scenario from S3");
                 S3Object obj = s3.getObject(sourceBucket, String.format("%s_%s.json", networkId, scenarioId));
                 InputStream is = obj.getObjectContent();
 

@@ -2,6 +2,8 @@ package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.r5.transit.TransferFinder;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TripPattern;
+import com.conveyal.r5.transit.TripSchedule;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import gnu.trove.list.TIntList;
@@ -144,5 +146,59 @@ public abstract class Modification implements Serializable {
      * It is used in a standard compare function, so lower numbered modifications will be applied before higher ones.
      */
     public abstract int getSortOrder();
+
+    /**
+     * Enforces constraints on the list of routes, patterns, or trips that will be affected by a modification.
+     * Only one of routes, trips, or patterns is defined, and sometimes trips are not allowed.
+     * The IDs in the list must reference actual trip or route IDs in the target transport network.
+     * @param allowTrips whether or not this modification allows specifying trips.
+     */
+    public void checkIds (Set<String> routes, Set<String> patterns, Set<String> trips, boolean allowTrips, TransportNetwork network) {
+
+        // We will remove items from these sets as they are encountered when iterating over all trips.
+        Set<String> unmatchedRoutes = new HashSet<>();
+        Set<String> unmatchedTrips = new HashSet<>();
+
+        // Check that only one of routes, trips, or patterns is defined, and initialize the unmatched ID sets.
+        int nDefined = 0;
+        if (routes != null && routes.size() > 0) {
+            nDefined += 1;
+            unmatchedRoutes.addAll(routes);
+        }
+        if (patterns != null && patterns.size() > 0) {
+            nDefined += 1;
+            unmatchedTrips.addAll(patterns); // The pattern IDs are actually trip IDs for example trips on patterns.
+        }
+        if (trips!= null && trips.size() > 0) {
+            nDefined += 1;
+            unmatchedTrips.addAll(trips);
+        }
+        if (nDefined != 1) {
+            if (allowTrips) {
+                warnings.add("Exactly one of routes, patterns, or trips must be provided.");
+            } else {
+                warnings.add("Either routes or patterns must be provided, but not both.");
+            }
+        }
+        if (!allowTrips && trips != null) {
+            // This cannot happen yet, but it will if (TODO) we pull these fields up to the Modification class.
+            warnings.add("This modification type does not allow specifying individual trips by ID.");
+        }
+
+        // TODO pull the network field up into the Modification class.
+        for (TripPattern pattern : network.transitLayer.tripPatterns) {
+            unmatchedRoutes.remove(pattern.routeId);
+            for (TripSchedule schedule : pattern.tripSchedules) {
+                unmatchedTrips.remove(schedule.tripId);
+            }
+        }
+        if (unmatchedRoutes.size() > 0) {
+            warnings.add("These route IDs could not be found: " + unmatchedRoutes.toString());
+        }
+        if (unmatchedTrips.size() > 0) {
+            warnings.add("These trip IDs could not be found: " + unmatchedTrips.toString());
+        }
+
+    }
 
 }

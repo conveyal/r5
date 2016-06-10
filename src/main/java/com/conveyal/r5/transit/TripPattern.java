@@ -138,6 +138,20 @@ public class TripPattern implements Serializable, Cloneable {
         return sb.toString();
     }
 
+    public String toStringDetailed (TransitLayer transitLayer) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("TripPattern on route ");
+        sb.append(routeId);
+        sb.append(" with stops ");
+        for (int s : stops) {
+            sb.append(transitLayer.stopIdForIndex.get(s));
+            sb.append(" (");
+            sb.append(s);
+            sb.append(") ");
+        }
+        return sb.toString();
+    }
+
     /**
      * @return true when none of the supplied tripIds are on this pattern.
      */

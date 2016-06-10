@@ -28,6 +28,14 @@ import java.util.*;
  * A key simplifying factor is that we don't handle overnight trips. This is fine for analysis at usual times of day.
  */
 public class TransitLayer implements Serializable, Cloneable {
+    /** Distance limit for stop trees, meters. Set to 3.5 km to match OTP GraphIndex.MAX_WALK_METERS */
+    public static final int STOP_TREE_DISTANCE_LIMIT = 3500;
+
+    /**
+     * Distance limit for transfers, meters. Set to 1km which is slightly above OTP's 600m (which was specified as
+     * 1 m/s with 600s max time, which is actually somewhat less than 600m due to extra costs due to steps etc.
+     */
+    public static final int TRANSFER_DISTANCE_LIMIT = 1000;
 
     private static final Logger LOG = LoggerFactory.getLogger(TransitLayer.class);
 
@@ -53,6 +61,7 @@ public class TransitLayer implements Serializable, Cloneable {
     public transient TIntIntMap stopForStreetVertex;
 
     // For each stop, a packed list of transfers to other stops
+    // FIXME we may currently be storing weight or time to reach other stop, which we did to avoid floating point division. Instead, store distances in millimeters, and divide by speed in mm/sec.
     public List<TIntList> transfersForStop = new ArrayList<>();
 
     /** Information about a route */
@@ -173,7 +182,7 @@ public class TransitLayer implements Serializable, Cloneable {
                 stopSequences.add(st.stop_sequence);
 
                 if (previousDeparture > st.arrival_time || st.arrival_time > st.departure_time) {
-                    LOG.warn("Reverse travel at stop {} on trip {} on route {}, skipping this trip as it will wreak havoc with routing", st.stop_id, trip.trip_id, trip.route.route_id);
+                    LOG.warn("Negative-time travel at stop {} on trip {} on route {}, skipping this trip as it will wreak havoc with routing", st.stop_id, trip.trip_id, trip.route.route_id);
                     continue TRIPS;
                 }
 
@@ -371,7 +380,7 @@ public class TransitLayer implements Serializable, Cloneable {
     }
 
     /**
-     * Perform a single on-street search from the specified transit stop. Store the distance to every reached
+     * Perform a single on-street search from the specified transit stop. Store the distance in millimeters to every reached
      * street vertex.
      * @param stop the internal integer stop ID for which to build a stop tree.
      */
@@ -391,9 +400,15 @@ public class TransitLayer implements Serializable, Cloneable {
             return;
         }
         StreetRouter router = new StreetRouter(parentNetwork.streetLayer);
-        router.distanceLimitMeters = 2000;
+        router.distanceLimitMeters = STOP_TREE_DISTANCE_LIMIT;
+
+        // Dominate based on distance in millimeters, since (a) we're using a hard distance limit, and (b) we divide
+        // by a speed to get time when we use the stop trees.
+        router.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
         router.setOrigin(originVertex);
         router.route();
+
+        // This will return distance in millimeters since that is our dominance function
         stopTrees.add(router.getReachedVertices());
     }
 

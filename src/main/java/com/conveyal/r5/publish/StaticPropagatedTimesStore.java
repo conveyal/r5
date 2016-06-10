@@ -16,8 +16,8 @@ public class StaticPropagatedTimesStore extends PropagatedTimesStore {
     }
 
     @Override
-    public void setFromArray(int[][] times, BitSet includeInAverages, ConfidenceCalculationMethod confidenceCalculationMethod) {
-        super.setFromArray(times, includeInAverages, confidenceCalculationMethod);
+    public void setFromArray(int[][] times, BitSet includeInAverages, ConfidenceCalculationMethod confidenceCalculationMethod, float reachabilityThreshold) {
+        super.setFromArray(times, includeInAverages, confidenceCalculationMethod, reachabilityThreshold);
 
         // don't include extrema in the times we save.
         this.times = new int[includeInAverages.cardinality()][];

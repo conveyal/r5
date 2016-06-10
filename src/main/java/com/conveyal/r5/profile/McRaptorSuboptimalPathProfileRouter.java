@@ -199,7 +199,7 @@ public class McRaptorSuboptimalPathProfileRouter {
             includeInAverages.set(0, timesAtTargetsEachIteration.size());
             // TODO min/max not appropriate without explicitly calculated extrema in frequency search
             propagatedTimesStore.setFromArray(timesAtTargetsEachIteration.toArray(new int[timesAtTargetsEachIteration.size()][]),
-                    includeInAverages, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX);
+                    includeInAverages, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX, request.reachabilityThreshold);
         }
 
         LOG.info("McRAPTOR took {}ms", System.currentTimeMillis() - startTime);
@@ -223,7 +223,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         // TODO add time and distance limits to routing, not just weight.
         // TODO apply walk and bike speeds and maxBike time.
-        streetRouter.distanceLimitMeters = 2_000; // FIXME arbitrary, and account for bike or car access mode
+        streetRouter.distanceLimitMeters = TransitLayer.STOP_TREE_DISTANCE_LIMIT; // FIXME arbitrary, and account for bike or car access mode
         streetRouter.setOrigin(request.fromLat, request.fromLon);
         streetRouter.route();
         accessTimes = streetRouter.getReachedStops();

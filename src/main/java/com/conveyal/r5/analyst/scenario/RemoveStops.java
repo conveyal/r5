@@ -50,6 +50,9 @@ public class RemoveStops extends Modification {
     /** Internal integer IDs for a specific transit network, converted from the string IDs. */
     private transient TIntSet intStops;
 
+    /** For logging the effects of the modification and reporting an error when the modification has no effect. */
+    private int nPatternsAffected = 0;
+
     @Override
     public String getType() {
         return "remove-stops";
@@ -57,10 +60,7 @@ public class RemoveStops extends Modification {
 
     @Override
     public boolean resolve (TransportNetwork network) {
-        boolean onlyOneDefined = (routes != null) ^ (patterns != null);
-        if (!onlyOneDefined) {
-            warnings.add("Routes or patterns must be specified, but not both.");
-        }
+        checkIds(routes, patterns, null, false, network);
         intStops = new TIntHashSet();
         for (String stringStopId : stops) {
             int intStopId = network.transitLayer.indexForStopId.get(stringStopId);
@@ -80,6 +80,11 @@ public class RemoveStops extends Modification {
                 .map(this::processTripPattern)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
+        if (nPatternsAffected > 0) {
+            LOG.info("Stops were removed from {} patterns.", nPatternsAffected);
+        } else {
+            warnings.add("No patterns had any stops removed by this modification.");
+        }
         return warnings.size() > 0;
     }
 
@@ -97,11 +102,12 @@ public class RemoveStops extends Modification {
             // The new pattern would be identical to the original.
             return originalTripPattern;
         }
+        LOG.debug("Modifying {}", originalTripPattern);
+        nPatternsAffected += 1;
         if (nToRemove == originalTripPattern.stops.length) {
             // The new pattern would be empty.
             return null;
         }
-        LOG.debug("Modifying {}", originalTripPattern);
         // Make a protective copy that we can destructively modify.
         TripPattern pattern = originalTripPattern.clone();
         int oldLength = originalTripPattern.stops.length;

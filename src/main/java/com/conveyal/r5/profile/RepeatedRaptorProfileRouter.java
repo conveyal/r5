@@ -3,6 +3,7 @@ package com.conveyal.r5.profile;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
 import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.transit.TransitLayer;
 import gnu.trove.map.TIntIntMap;
 import com.conveyal.r5.analyst.cluster.ResultEnvelope;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
@@ -110,20 +111,31 @@ public class RepeatedRaptorProfileRouter {
         // default to heaviest mode
         // FIXME what does WALK,CAR even mean in this context
         EnumSet<LegMode> modes = transit ? request.accessModes : request.directModes;
-        if (modes.contains(LegMode.CAR))
+        if (modes.contains(LegMode.CAR)) {
             streetRouter.streetMode = StreetMode.CAR;
-        else if (modes.contains(LegMode.BICYCLE))
+            streetRouter.distanceLimitMeters = 100_000; // FIXME arbitrary
+        } else if (modes.contains(LegMode.BICYCLE)) {
             streetRouter.streetMode = StreetMode.BICYCLE;
-        else
+            streetRouter.distanceLimitMeters = (int) (request.maxBikeTime * request.bikeSpeed * 60);
+        } else {
             streetRouter.streetMode = StreetMode.WALK;
+            // When walking, to make the search symmetric at origins/destinations, we clamp max walk at the maximum stop tree size
+            streetRouter.distanceLimitMeters =
+                    Math.min((int) (request.maxWalkTime * request.walkSpeed * 60), TransitLayer.STOP_TREE_DISTANCE_LIMIT);
+        }
 
         streetRouter.profileRequest = request;
-
-        // TODO add time and distance limits to routing, not just weight.
-        // TODO apply walk and bike speeds and maxBike time.
-        streetRouter.distanceLimitMeters = transit ? 2000 : 100_000; // FIXME arbitrary, and account for bike or car access mode
         streetRouter.setOrigin(request.fromLat, request.fromLon);
+
+        // TODO for bike, car access we really want to use weight to account for turn costs, but that's a resource limiting
+        // problem.
+        streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+
+        // when doing a non-transit search, ignore all distance limits
+        if (!transit) streetRouter.distanceLimitMeters = 0;
+
         streetRouter.route();
+
         ts.initialStopSearch = (int) (System.currentTimeMillis() - initialStopStartTime);
 
         // Find the travel time to every target without using any transit, based on the results in the StreetRouter.
@@ -145,7 +157,8 @@ public class RepeatedRaptorProfileRouter {
             int[][] singleRoundResults = new int[][] {nonTransitTimes.travelTimes};
             BitSet includeInAverages = new BitSet();
             includeInAverages.set(0);
-            propagatedTimesStore.setFromArray(singleRoundResults, includeInAverages, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX);
+            // fine to set a reachability threshold of 0 here because the street network does not vary over time.
+            propagatedTimesStore.setFromArray(singleRoundResults, includeInAverages, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX, 0);
         }
         ts.targetsReached = propagatedTimesStore.countTargetsReached();
         ts.compute = (int) (System.currentTimeMillis() - computationStartTime);

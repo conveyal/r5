@@ -96,8 +96,7 @@ public class LinkedPointSet {
         distances1_mm = new int[pointSet.featureCount()];
         int unlinked = 0;
         for (int i = 0; i < pointSet.featureCount(); i++) {
-            Split split = streetLayer.findSplit(pointSet.getLat(i), pointSet.getLon(i), 1000,
-                streetMode);
+            Split split = streetLayer.findSplit(pointSet.getLat(i), pointSet.getLon(i), 1000, streetMode);
             if (split == null) {
                 unlinked++;
                 edges[i] = -1;
@@ -165,8 +164,7 @@ public class LinkedPointSet {
     /**
      * Get a distance table to all target points in this LinkedPointSet that were reached in the provided
      * stop tree to street vertices.
-     * @return A packed array of (pointIndex, distanceMeters) for every reachable point in this set.
-     * This is currently returning the weight, which is the distance in meters.
+     * @return A packed array of (pointIndex, distanceMillimeters)
      */
     private int[] getStopTree (TIntIntMap stopTreeToVertices) {
         TIntIntMap distanceToPoint = new TIntIntHashMap(edges.length, 0.5f, Integer.MAX_VALUE, Integer.MAX_VALUE);
@@ -182,11 +180,12 @@ public class LinkedPointSet {
 
             int t1 = Integer.MAX_VALUE, t2 = Integer.MAX_VALUE;
 
+            // TODO this is not strictly correct when there are turn restrictions onto the edge this is linked to
             if (stopTreeToVertices.containsKey(edge.getFromVertex()))
-                t1 = (int) (stopTreeToVertices.get(edge.getFromVertex()) / 1.3f + distances0_mm[p] / 1300);
+                t1 = stopTreeToVertices.get(edge.getFromVertex()) + distances0_mm[p];
 
             if (stopTreeToVertices.containsKey(edge.getToVertex()))
-                t1 = (int) (stopTreeToVertices.get(edge.getToVertex()) / 1.3f + distances1_mm[p] / 1300);
+                t1 = stopTreeToVertices.get(edge.getToVertex()) + distances1_mm[p];
 
             int t = Math.min(t1, t2);
 

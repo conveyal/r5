@@ -82,7 +82,19 @@ public class Reroute extends Modification {
 
     private int insertEndIndex;
 
+    /*
+     * A stop in the new pattern and a corresponding one in the original pattern at which all trips will
+     * see their arrival time unchanged. This allows preserving at least one timed transfer per route,
+     * e.g. at a major transit center. Eventually this should be set from a stop ID parameter in the modification.
+     */
+    private int originalFixedPointStopIndex = 0;
+
+    private int newFixedPointStopIndex = 0;
+
     private int newPatternLength;
+
+    /** For logging the effects of the modification and reporting an error when the modification has no effect. */
+    private int nPatternsAffected = 0;
 
     @Override
     public String getType() {
@@ -91,10 +103,7 @@ public class Reroute extends Modification {
 
     @Override
     public boolean resolve (TransportNetwork network) {
-        boolean onlyOneDefined = (routes != null) ^ (patterns != null);
-        if (!onlyOneDefined) {
-            warnings.add("Routes or patterns must be specified, but not both.");
-        }
+        checkIds(routes, patterns, null, false, network);
         if (fromStop == null && toStop == null) {
             warnings.add("At least one of from and to stop must be supplied.");
         }
@@ -143,6 +152,11 @@ public class Reroute extends Modification {
         network.transitLayer.tripPatterns = network.transitLayer.tripPatterns.stream()
                 .map(this::processTripPattern)
                 .collect(Collectors.toList());
+        if (nPatternsAffected > 0) {
+            LOG.info("Rerouted {} patterns.", nPatternsAffected);
+        } else {
+            warnings.add("No patterns were rerouted.");
+        }
         return warnings.size() > 0;
     }
 
@@ -161,6 +175,7 @@ public class Reroute extends Modification {
             // This TripPattern does not contain any of the example trips, so it is not rerouted.
             return originalTripPattern;
         }
+        nPatternsAffected += 1;
         // The number of elements to copy from the original stops array before the new segment is spliced in.
         // That is, the first index in the output stops array that will contain a stop from the new segment.
         insertBeginIndex = -1;
@@ -183,9 +198,18 @@ public class Reroute extends Modification {
             insertEndIndex = originalTripPattern.stops.length;
         }
         if (insertBeginIndex == -1 || insertEndIndex == -1) {
-            // We are missing either the beginning or the end of the insertion slice.
-            // This TripPattern does not match.
-            warnings.add("The specified fromStop and/or toStop could not be matched on pattern " + originalTripPattern);
+            // We are missing either the beginning or the end of the insertion slice. This TripPattern does not match.
+            String warning = String.format("The specified fromStop (%s) and/or toStop (%s) could not be matched on %s",
+                    fromStop, toStop, originalTripPattern.toStringDetailed(network.transitLayer));
+            if (routes != null) {
+                // This Modification is being applied to all patterns on a route.
+                // Some of those patterns might not contain the from/to stops, and that's not necessarily a problem.
+                LOG.warn(warning);
+            } else {
+                // This Modification is being applied to specifically chosen patterns.
+                // If one does not contain the from or to stops, it's probably a badly formed modification so fail hard.
+                warnings.add(warning);
+            }
             return originalTripPattern;
         }
         if (insertEndIndex < insertBeginIndex) {
@@ -195,11 +219,27 @@ public class Reroute extends Modification {
 
         /* NOTE this is using fields which share information among private function calls. Not threadsafe! */
         int nStopsToRemove = insertEndIndex - insertBeginIndex;
-        int oldLength = originalTripPattern.stops.length;
-        newPatternLength = (oldLength + intNewStops.size()) - nStopsToRemove;
+        int oldPatternLength = originalTripPattern.stops.length;
+        newPatternLength = (oldPatternLength + intNewStops.size()) - nStopsToRemove;
 
         // First, reroute the pattern itself (the stops).
         TripPattern pattern = reroutePattern(originalTripPattern);
+
+        // Choose a stop in the new pattern and a corresponding one in the original pattern at which all trips will
+        // see their arrival time unchanged.
+        // For now we use the first stop in the original pattern that appears in the new pattern.
+        originalFixedPointStopIndex = 0;
+        newFixedPointStopIndex = 0;
+        OUTER:
+        for (int s = 0; s < oldPatternLength; s++) {
+            for (int t = 0; t < newPatternLength; t++) {
+                if (originalTripPattern.stops[s] == pattern.stops[t]) {
+                    originalFixedPointStopIndex = s;
+                    newFixedPointStopIndex = t;
+                    break OUTER;
+                }
+            }
+        }
 
         // Then perform the same rerouting operation for every individual trip on this pattern.
         pattern.tripSchedules = originalTripPattern.tripSchedules.stream()
@@ -252,8 +292,8 @@ public class Reroute extends Modification {
             pattern.wheelchairAccessible.set(ts, originalTripPattern.wheelchairAccessible.get(ss));
         }
 
-        LOG.info("Old stop sequence: {}", originalTripPattern.stops);
-        LOG.info("New stop sequence: {}", pattern.stops);
+        LOG.debug("Old stop sequence: {}", originalTripPattern.stops);
+        LOG.debug("New stop sequence: {}", pattern.stops);
         LOG.info("Old stop IDs: {}", Arrays.stream(originalTripPattern.stops)
                 .mapToObj(network.transitLayer.stopIdForIndex::get).collect(Collectors.toList()));
         LOG.info("New stop IDs: {}", Arrays.stream(pattern.stops)
@@ -327,10 +367,19 @@ public class Reroute extends Modification {
 
         }
 
-        LOG.info("Original arrivals:   {}", originalSchedule.arrivals);
-        LOG.info("Original departures: {}", originalSchedule.departures);
-        LOG.info("Modified arrivals:   {}", schedule.arrivals);
-        LOG.info("Modified departures: {}", schedule.departures);
+        // Finally, shift the output pattern's times such that the arrival time at the fixed-point stop is unchanged.
+        // Eventually we will allow specifying a fixed-point stop in the modification parameters.
+        int timeShift = originalSchedule.arrivals[originalFixedPointStopIndex] - schedule.arrivals[newFixedPointStopIndex];
+        for (int i = 0; i < newPatternLength; i++) {
+            schedule.arrivals[i] += timeShift;
+            schedule.departures[i] += timeShift;
+        }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Original arrivals:   {}", originalSchedule.arrivals);
+            LOG.debug("Original departures: {}", originalSchedule.departures);
+            LOG.debug("Modified arrivals:   {}", schedule.arrivals);
+            LOG.debug("Modified departures: {}", schedule.departures);
+        }
         return schedule;
 
     }

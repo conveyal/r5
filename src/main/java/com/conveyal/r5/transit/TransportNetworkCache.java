@@ -5,6 +5,8 @@ import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.S3Object;
 import com.conveyal.r5.analyst.scenario.InactiveTripsFilter;
 import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.profile.ProfileRequest;
 import com.google.common.io.ByteStreams;
 import org.apache.commons.io.IOUtils;
 import com.conveyal.r5.common.MavenVersion;
@@ -86,12 +88,36 @@ public class TransportNetworkCache {
      *
      * TODO LinkedPointSets keep a reference back to a StreetLayer which means that the network will not be completely garbage collected upon network switch
      */
-    public synchronized TransportNetwork getNetworkForScenario (String networkId, Scenario scenario) {
+    public synchronized TransportNetwork getNetworkForScenario (String networkId, ProfileRequest request) {
+        String scenarioId = request.scenarioId != null ? request.scenarioId : request.scenario.id;
+
         // The following call clears the scenarioNetworkCache if the current base graph changes.
         TransportNetwork baseNetwork = this.getNetwork(networkId);
-        TransportNetwork scenarioNetwork = scenarioNetworkCache.get(scenario.id);
+        TransportNetwork scenarioNetwork = scenarioNetworkCache.get(scenarioId);
         if (scenarioNetwork == null) {
             LOG.info("Applying scenario to base network...");
+
+            Scenario scenario;
+            if (request.scenario == null && request.scenarioId != null) {
+                // resolve scenario
+                LOG.info("Retrieving network from S3");
+                S3Object obj = s3.getObject(sourceBucket, String.format("%s_%s.json", networkId, scenarioId));
+                InputStream is = obj.getObjectContent();
+
+                try {
+                    scenario = JsonUtilities.objectMapper.readValue(is, Scenario.class);
+                    is.close();
+                } catch (Exception e) {
+                    LOG.info("Error retrieving scenario from S3", e);
+                    return null;
+                }
+            } else if (request.scenario != null) {
+                scenario = request.scenario;
+            } else {
+                LOG.warn("No scenario specified");
+                scenario = new Scenario();
+            }
+
             // Apply any scenario modifications to the network before use, performing protective copies where necessary.
             // Prepend a pre-filter that removes trips that are not running during the search time window.
             // FIXME Caching transportNetworks with scenarios already applied means we can’t use the InactiveTripsFilter. Solution may be to cache linked point sets based on scenario ID but always apply scenarios every time.
@@ -100,7 +126,7 @@ public class TransportNetworkCache {
             LOG.info("Done applying scenario. Caching the resulting network.");
             scenarioNetworkCache.put(scenario.id, scenarioNetwork);
         } else {
-            LOG.info("Reusing cached TransportNetwork for scenario {}.", scenario.id);
+            LOG.info("Reusing cached TransportNetwork for scenario {}.", scenarioId);
         }
         return scenarioNetwork;
     }

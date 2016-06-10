@@ -46,6 +46,9 @@ public class StreetRouter {
     public int distanceLimitMeters = 0;
     public int timeLimitSeconds = 0;
 
+    /** What routing variable (weight, distance, etc.) should be used in the dominance function? */
+    public State.RoutingVariable dominanceVariable = State.RoutingVariable.WEIGHT;
+
     /**
      * Store the best state at the end of each edge. We store states at the ends of edges, rather than at vertices, so
      * that we can apply turn costs. You can't apply turn costs (which are vertex costs) when you are storing a single state
@@ -77,7 +80,7 @@ public class StreetRouter {
     // single state per edge (the only time we don't is when we're in the middle of a turn restriction).
     TIntObjectMultimap<State> bestStatesAtEdge = new TIntObjectHashMultimap<>();
 
-    PriorityQueue<State> queue = new PriorityQueue<>((s0, s1) -> s0.weight - s1.weight);
+    PriorityQueue<State> queue = new PriorityQueue<>((s0, s1) -> s0.getRoutingVariable(dominanceVariable) - s1.getRoutingVariable(dominanceVariable));
 
     // If you set this to a non-negative number, the search will be directed toward that vertex .
     public int toVertex = ALL_VERTICES;
@@ -94,7 +97,8 @@ public class StreetRouter {
 
     private Split destinationSplit;
 
-    private int bestWeightAtDestination = Integer.MAX_VALUE;
+    /** The best value of the chosen dominance variable at the destination, used to prune the search */
+    private int bestValueAtDestination = Integer.MAX_VALUE;
 
     /**
      * Here is previous streetRouter in multi router search
@@ -129,25 +133,29 @@ public class StreetRouter {
             if (streetVertex == -1) return true;
             State state = getStateAtVertex(streetVertex);
             // TODO should this be time?
-            if (state != null) result.put(stop, state.weight);
+            if (state != null) result.put(stop, state.getRoutingVariable(dominanceVariable));
             return true; // continue iteration
         });
         return result;
     }
 
-    /** Return a map where the keys are all the reached vertices, and the values are their distances from the origin. */
+    /**
+     * Return a map where the keys are all the reached vertices, and the values are their distances from the origin
+     * (as used in the chosen dominance function).
+     */
     public TIntIntMap getReachedVertices () {
         TIntIntMap result = new TIntIntHashMap();
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
         bestStatesAtEdge.forEachEntry((eidx, states) -> {
             if (eidx < 0) return true;
 
-            State state = states.stream().reduce((s0, s1) -> s0.weight < s1.weight ? s0 : s1).get();
+            State state = states.stream()
+                    .reduce((s0, s1) -> s0.getRoutingVariable(dominanceVariable) < s1.getRoutingVariable(dominanceVariable) ? s0 : s1).get();
             e.seek(eidx);
             int vidx = e.getToVertex();
 
-            if (!result.containsKey(vidx) || result.get(vidx) > state.weight)
-                result.put(vidx, state.weight);
+            if (!result.containsKey(vidx) || result.get(vidx) > state.getRoutingVariable(dominanceVariable))
+                result.put(vidx, state.getRoutingVariable(dominanceVariable));
 
             return true; // continue iteration
         });
@@ -164,13 +172,15 @@ public class StreetRouter {
         bestStatesAtEdge.forEachEntry((eidx, states) -> {
             if (eidx < 0) return true;
 
-            State state = states.stream().reduce((s0, s1) -> s0.weight < s1.weight ? s0 : s1).get();
+            State state = states.stream().reduce((s0, s1) ->
+                    s0.getRoutingVariable(dominanceVariable) < s1.getRoutingVariable(dominanceVariable) ? s0 : s1).get();
             e.seek(eidx);
             int vidx = e.getToVertex();
             v.seek(vidx);
 
             if (v.getFlag(flag)) {
-                if (!result.containsKey(vidx) || result.get(vidx).weight > state.weight) {
+                if (!result.containsKey(vidx) || result.get(vidx).getRoutingVariable(dominanceVariable) >
+                                                            state.getRoutingVariable(dominanceVariable)) {
                     result.put(vidx, state);
                 }
             }
@@ -178,24 +188,6 @@ public class StreetRouter {
             return true; // continue iteration
         });
         return result;
-    }
-
-    /**
-     * Get a distance table to all street vertices touched by the last search operation on this StreetRouter.
-     * @return A packed list of (vertex, distance) for every reachable street vertex.
-     * This is currently returning the weight, which is the distance in meters.
-     */
-    public int[] getStopTree () {
-        TIntIntMap states = getReachedVertices();
-
-        TIntList result = new TIntArrayList(states.size() * 2);
-        // Convert stop vertex indexes in street layer to transit layer stop indexes.
-        states.forEachEntry((vertexIndex, weight) -> {
-            result.add(vertexIndex);
-            result.add(weight);
-            return true; // continue iteration
-        });
-        return result.toArray();
     }
 
     public StreetRouter (StreetLayer streetLayer) {
@@ -308,6 +300,10 @@ public class StreetRouter {
         if (distanceLimitMeters > 0) {
             //Distance in State is in mm wanted distance is in meters which means that conversion is necessary
             distanceLimitMm = distanceLimitMeters * 1000;
+
+            if (dominanceVariable != State.RoutingVariable.DISTANCE_MILLIMETERS) {
+                LOG.warn("Setting a distance limit when distance is not the dominance function, this is a resource limiting issue and paths may be incorrect.");
+            }
         } else {
             //We need to set distance limit to largest possible value otherwise nothing would get routed
             //since first edge distance would be larger then 0 m and routing would stop
@@ -315,6 +311,10 @@ public class StreetRouter {
         }
         if (timeLimitSeconds > 0) {
             tmpTimeLimitSeconds = timeLimitSeconds;
+
+            if (dominanceVariable != State.RoutingVariable.DURATION_SECONDS) {
+                LOG.warn("Setting a time limit when time is not the dominance function, this is a resource limiting issue and paths may be incorrect.");
+            }
         } else {
             //Same issue with time limit
             tmpTimeLimitSeconds = Integer.MAX_VALUE;
@@ -323,7 +323,7 @@ public class StreetRouter {
         if (timeLimitSeconds > 0 && distanceLimitMeters > 0) {
             LOG.warn("Both distance limit of {}m and time limit of {}s are set in streetrouter", distanceLimitMeters, timeLimitSeconds);
         } else if (timeLimitSeconds == 0 && distanceLimitMeters == 0) {
-            LOG.warn("Distance and time limit are set to 0 in streetrouter. This means NO LIMIT in searching so WHOLE of street graph will be searched. This can be slow.");
+            LOG.debug("Distance and time limit are set to 0 in streetrouter. This means NO LIMIT in searching so WHOLE of street graph will be searched. This can be slow.");
         } else if (distanceLimitMeters > 0) {
             LOG.debug("Using distance limit of {}m", distanceLimitMeters);
         } else if (timeLimitSeconds > 0) {
@@ -393,16 +393,20 @@ public class StreetRouter {
 
                 // non-dominated state coming off the pqueue is by definition the best way to get to that vertex
                 // but states in turn restrictions don't dominate anything, to avoid resource limiting issues
-                if (s0.turnRestrictions != null)
+                if (s0.turnRestrictions != null) {
                     bestStatesAtEdge.put(s0.backEdge, s0);
-                else {
+                } else {
                     // we might need to save an existing state that is in a turn restriction so is codominant
                     for (Iterator<State> it = bestStatesAtEdge.get(s0.backEdge).iterator(); it.hasNext(); ) {
                         State other = it.next();
-                        // avoid a ton of codominant states when there is e.g. duplicated OSM data
-                        // However, save this state if it is not in a turn restriction and the other state is
-                        if (s0.weight == other.weight && !(other.turnRestrictions != null && s0.turnRestrictions == null))
+                        // Avoid a ton of codominant states when there is e.g. duplicated OSM data.
+                        // However, save this state if it is not in a turn restriction and the other state is.
+                        if (s0.getRoutingVariable(dominanceVariable) < other.getRoutingVariable(dominanceVariable)) {
+                            it.remove();
+                        } else if (s0.getRoutingVariable(dominanceVariable) == other.getRoutingVariable(dominanceVariable)
+                                && !(other.turnRestrictions != null && s0.turnRestrictions == null)) {
                             continue QUEUE;
+                        }
                     }
                     bestStatesAtEdge.put(s0.backEdge, s0);
                 }
@@ -413,7 +417,7 @@ public class StreetRouter {
                 break;
             }
 
-            if (s0.weight > bestWeightAtDestination) break;
+            if (s0.getRoutingVariable(dominanceVariable) > bestValueAtDestination) break;
 
             if (routingVisitor != null) {
                 routingVisitor.visitVertex(s0);
@@ -425,7 +429,9 @@ public class StreetRouter {
             if (destinationSplit != null && (s0.vertex == destinationSplit.vertex0 || s0.vertex == destinationSplit.vertex1)) {
                 State atDest = getState(destinationSplit);
                 // atDest could be null even though we've found a nearby vertex because of a turn restriction
-                if (atDest != null && bestWeightAtDestination > atDest.weight) bestWeightAtDestination = atDest.weight;
+                if (atDest != null && bestValueAtDestination > atDest.getRoutingVariable(dominanceVariable)) {
+                    bestValueAtDestination = atDest.getRoutingVariable(dominanceVariable);
+                }
             }
 
             // explore edges leaving this vertex
@@ -454,7 +460,7 @@ public class StreetRouter {
         }
 
         // get the lowest weight, even if it's in the middle of a turn restriction
-        return states.stream().reduce((s0, s1) -> s0.weight < s1.weight ? s0 : s1).get();
+        return states.stream().reduce((s0, s1) -> s0.getRoutingVariable(dominanceVariable) < s1.getRoutingVariable(dominanceVariable) ? s0 : s1).get();
     }
 
     /**
@@ -472,7 +478,9 @@ public class StreetRouter {
             if (state == null) continue;
 
             if (ret == null) ret = state;
-            else if (ret.weight > state.weight) ret = state;
+            else if (ret.getRoutingVariable(dominanceVariable) > state.getRoutingVariable(dominanceVariable)) {
+                ret = state;
+            }
         }
 
         return ret;
@@ -480,7 +488,7 @@ public class StreetRouter {
 
     public int getTravelTimeToVertex (int vertexIndex) {
         State state = getStateAtVertex(vertexIndex);
-        return state != null ? state.weight : Integer.MAX_VALUE;
+        return state != null ? state.durationSeconds : Integer.MAX_VALUE;
     }
 
     /**
@@ -499,6 +507,8 @@ public class StreetRouter {
 
         for (TIntIterator it = streetLayer.incomingEdges.get(split.vertex0).iterator(); it.hasNext();) {
             Collection<State> states = bestStatesAtEdge.get(it.next());
+            // NB this needs a state to copy turn restrictions into. We then don't use that state, which is fine because
+            // we don't need the turn restrictions any more because we're at the end of the search
             states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge, s)))
                     .map(s -> {
                         State ret = new State(-1, split.edge, s);
@@ -511,6 +521,7 @@ public class StreetRouter {
                         // TODO length of perpendicular
                         ret.incrementWeight(turnCost + traversalCost);
                         ret.incrementTimeInSeconds(turnCost + traversalCost);
+                        ret.distance += split.distance0_mm;
 
                         return ret;
                     })
@@ -530,6 +541,7 @@ public class StreetRouter {
                         // figure out the turn cost
                         int turnCost = this.turnCostCalculator.computeTurnCost(s.backEdge, split.edge + 1, s.streetMode);
                         int traversalCost = (int) Math.round(split.distance1_mm / 1000d / e.calculateSpeed(profileRequest, s.streetMode));
+                        ret.distance += split.distance1_mm;
 
                         // TODO length of perpendicular
                         ret.incrementWeight(turnCost + traversalCost);
@@ -540,7 +552,9 @@ public class StreetRouter {
                     .forEach(relevantStates::add);
         }
 
-        return relevantStates.stream().reduce((s0, s1) -> s0.weight < s1.weight ? s0 : s1).orElse(null);
+        return relevantStates.stream()
+                .reduce((s0, s1) -> s0.getRoutingVariable(dominanceVariable) < s1.getRoutingVariable(dominanceVariable) ? s0 : s1)
+                .orElse(null);
     }
 
     public Split getDestinationSplit() {
@@ -635,6 +649,31 @@ public class StreetRouter {
 
             return out.toString();
         }
-    }
 
+        public int getRoutingVariable (RoutingVariable variable) {
+            if (variable == null) throw new NullPointerException("Routing variable is null");
+
+            switch (variable) {
+                case DURATION_SECONDS:
+                    return this.durationSeconds;
+                case WEIGHT:
+                    return this.weight;
+                case DISTANCE_MILLIMETERS:
+                    return this.distance;
+                default:
+                    throw new IllegalStateException("Unknown routing variable");
+            }
+        }
+
+        public static enum RoutingVariable {
+            /** Time, in seconds */
+            DURATION_SECONDS,
+
+            /** Weight/generalized cost (this is what is actually used to find paths */
+            WEIGHT,
+
+            /** Distance, in millimeters */
+            DISTANCE_MILLIMETERS
+        }
+    }
 }

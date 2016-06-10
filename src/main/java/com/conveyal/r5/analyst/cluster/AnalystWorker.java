@@ -398,7 +398,17 @@ public class AnalystWorker implements Runnable {
         else mode = StreetMode.WALK;
 
         TransportNetwork transportNetwork =
-                transportNetworkCache.getNetworkForScenario(clusterRequest.graphId, clusterRequest.profileRequest.scenario);
+                transportNetworkCache.getNetworkForScenario(clusterRequest.graphId, clusterRequest.profileRequest);
+
+        // THIS IS A HACK TO TEMPORARILY PREVENT NL NETWORKS FROM USING TRANSFER AND TRAVEL TIME LIMITING
+        // IT SHOULD BE REMOVED ASAP AFTER THE MRA PROJECT
+        if (transportNetwork.transitLayer.stopIdForIndex.get(0).startsWith("NL:")) {
+            LOG.warn("Network contains transit stop from the NL feed. Disabling transfer and travel time limiting.");
+            clusterRequest.profileRequest.maxRides = 1000;
+            clusterRequest.profileRequest.maxTripDurationMinutes = 48 * 60;
+        }
+        LOG.info("Maximum number of rides: {}", clusterRequest.profileRequest.maxRides);
+        LOG.info("Maximum trip duration: {}", clusterRequest.profileRequest.maxTripDurationMinutes);
 
         // If this one-to-many request is for accessibility information based on travel times to a pointset,
         // fetch the set of points we will use as destinations.

@@ -65,6 +65,9 @@ public class AdjustSpeed extends Modification {
 
     private transient TIntList hopToStops;
 
+    /** For logging the effects of the modification and reporting an error when the modification has no effect. */
+    private int nTripsAffected = 0;
+
     @Override
     public String getType() {
         return "adjust-speed";
@@ -98,13 +101,7 @@ public class AdjustSpeed extends Modification {
                 hopToStops.add(intToId);
             }
         }
-        int nDefined = 0;
-        if (routes != null) nDefined += 1;
-        if (trips!= null) nDefined += 1;
-        if (patterns != null) nDefined += 1;
-        if (nDefined != 1) {
-            warnings.add("Exactly one of routes, patterns, or trips must be provided.");
-        }
+        checkIds(routes, patterns, trips, true, network);
         return warnings.size() > 0;
     }
 
@@ -113,6 +110,11 @@ public class AdjustSpeed extends Modification {
         network.transitLayer.tripPatterns = network.transitLayer.tripPatterns.stream()
                 .map(this::processTripPattern)
                 .collect(Collectors.toList());
+        if (nTripsAffected > 0) {
+            LOG.info("Speed was changed on {} trips.", nTripsAffected);
+        } else {
+            warnings.add("This modification did not cause any changes to the transport network.");
+        }
         return warnings.size() > 0;
     }
 
@@ -188,6 +190,7 @@ public class AdjustSpeed extends Modification {
             int updatedTravelTime = newSchedule.departures[nStops - 1] - newSchedule.arrivals[0];
             LOG.debug("Total travel time on trip {} changed from {} to {} seconds.",
                     newSchedule.tripId, originalTravelTime, updatedTravelTime);
+            nTripsAffected += 1;
             postSanityCheck(newSchedule);
         }
         LOG.debug("Scaled speeds (factor {}) for all trips on {}.", scale, originalPattern);

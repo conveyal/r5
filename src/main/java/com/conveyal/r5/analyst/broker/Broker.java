@@ -50,15 +50,14 @@ import java.util.*;
  *
  * It may also be helpful to mark jobs every time they are skipped in the LRU queue. Each time a job is serviced,
  * it is taken out of the queue and put at its end. Jobs that have not been serviced float to the top.
+ *
+ * TODO: occasionally purge closed connections from consumersByGraph
+ * TODO: worker catalog and graph affinity homeostasis
+ * TODO: catalog of recently seen consumers by affinity with IP: response.getRequest().getRemoteAddr();
  */
 public class Broker implements Runnable {
 
-    // TODO catalog of recently seen consumers by affinity with IP: response.getRequest().getRemoteAddr();
-
     private static final Logger LOG = LoggerFactory.getLogger(Broker.class);
-
-    /* How often we should check for delivered tasks that have timed out. */
-    private static final int REDELIVERY_INTERVAL_SEC = 10;
 
     public final CircularList<Job> jobs = new CircularList<>();
 
@@ -91,16 +90,14 @@ public class Broker implements Runnable {
         mapper.registerModule(TraverseModeSetSerializer.makeModule());
     }*/
 
-    /** broker configuration */
+    /** The broker configuration. */
     private final Properties config;
 
-    /** configuration for workers launched by this broker */
+    /** The configuration that will be applied to workers launched by this broker. */
     private final Properties workerConfig;
 
+    /** Keeps track of all the workers that have contacted this broker recently asking for work. */
     private WorkerCatalog workerCatalog = new WorkerCatalog();
-
-    /** The time at which each task was delivered to a worker, to allow re-delivery. */
-    TIntIntMap deliveryTimes = new TIntIntHashMap();
 
     /**
      * Requests that are not part of a job and can "cut in line" in front of jobs for immediate execution.
@@ -448,27 +445,11 @@ public class Broker implements Runnable {
     }
 
     /**
-     *  Check whether there are any delivered tasks that have reached their invisibility timeout but have not yet been
-     *  marked complete. Enqueue those tasks for redelivery.
-     */
-    private void redeliver() {
-        if (System.currentTimeMillis() > nextRedeliveryCheckTime) {
-            nextRedeliveryCheckTime += REDELIVERY_INTERVAL_SEC * 1000;
-            LOG.info("Scanning for redelivery...");
-            int nRedelivered = 0;
-            int nInvisible = 0;
-            for (Job job : jobs) {
-                nInvisible += job.invisibleUntil.size();
-                nRedelivered += job.redeliver();
-            }
-            LOG.info("{} tasks enqueued for redelivery out of {} invisible tasks.", nRedelivered, nInvisible);
-            nUndeliveredTasks += nRedelivered;
-        }
-    }
-
-    /**
      * This method checks whether there are any high-priority tasks or normal job tasks and attempts to match them with
-     * waiting workers. It blocks until there are tasks or workers available.
+     * waiting workers.
+     *
+     * It blocks by calling wait() whenever it has nothing to do (when no tasks or workers available). It is awakened
+     * whenever new tasks come in or when a worker (re-)connects.
      */
     public synchronized void deliverTasks() throws InterruptedException {
 
@@ -476,18 +457,22 @@ public class Broker implements Runnable {
         while (nUndeliveredTasks == 0) {
             LOG.debug("Task delivery thread is going to sleep, there are no tasks waiting for delivery.");
             logQueueStatus();
+            // Thread will be notified when tasks are added or there are new incoming consumer connections.
             wait();
-            redeliver();
+            // If a worker connected while there were no tasks queued for delivery,
+            // we need to check if any should be re-delivered.
+            for (Job job : jobs) {
+                nUndeliveredTasks += job.redeliver();
+            }
         }
         LOG.debug("Task delivery thread is awake and there are some undelivered tasks.");
         logQueueStatus();
 
         while (nWaitingConsumers == 0) {
             LOG.debug("Task delivery thread is going to sleep, there are no consumers waiting.");
-            // Thread will be notified when there are new incoming consumer connections.
+            // Thread will be notified when tasks are added or there are new incoming consumer connections.
             wait();
         }
-
         LOG.debug("Task delivery thread awake; consumers are waiting and tasks are available");
 
         // Loop over all jobs and send them to consumers
@@ -578,7 +563,7 @@ public class Broker implements Runnable {
 
     /**
      * This uses a linear search through jobs, which should not be problematic unless there are thousands of
-     * simultaneous jobs.
+     * simultaneous jobs. TODO task IDs should really not be sequential integers should they?
      * @return a Job object that contains the given task ID.
      */
     public Job getJobForTask (int taskId) {
@@ -626,14 +611,10 @@ public class Broker implements Runnable {
             job.tasksAwaitingDelivery.addAll(tasks);
             return false;
         }
-
-        // Delivery succeeded, move tasks from undelivered to delivered status
         LOG.debug("Delivery of {} tasks succeeded.", tasks.size());
-        nUndeliveredTasks -= tasks.size();
-        job.markTasksDelivered(tasks);
-
+        nUndeliveredTasks -= tasks.size(); // FIXME keeping a separate counter for this seems redundant, why not compute it?
+        job.lastDeliveryTime = System.currentTimeMillis();
         return true;
-
     }
 
     /**
@@ -647,7 +628,7 @@ public class Broker implements Runnable {
             LOG.error("Could not find a job containing task {}, and therefore could not mark the task as completed.");
             return false;
         }
-        job.markTaskCompleted(taskId);
+        job.completedTasks.add(taskId);
         return true;
     }
 
@@ -662,9 +643,7 @@ public class Broker implements Runnable {
         return highPriorityResponses.remove(taskId);
     }
 
-    // TODO: occasionally purge closed connections from consumersByGraph
-    // TODO: worker catalog and graph affinity homeostasis
-
+    /** This is the broker's main event loop. */
     @Override
     public void run() {
         while (true) {
@@ -677,20 +656,19 @@ public class Broker implements Runnable {
         }
     }
 
-    /** find the job for a task, creating it if it does not exist */
+    /** Find the job that should contain a given task, creating that job if it does not exist. */
     public Job findJob (GenericClusterRequest task) {
         Job job = findJob(task.jobId);
-
-        if (job != null)
+        if (job != null) {
             return job;
-
+        }
         job = new Job(task.jobId);
         job.graphId = task.graphId;
         jobs.insertAtTail(job);
         return job;
     }
 
-    /** find the job for a jobId, or null if it does not exist */
+    /** Find the job for the given jobId, returning null if that job does not exist. */
     public Job findJob (String jobId) {
         for (Job job : jobs) {
             if (job.jobId.equals(jobId)) {
@@ -700,7 +678,7 @@ public class Broker implements Runnable {
         return null;
     }
 
-    /** delete a job */
+    /** Delete the job with the given ID. */
     public synchronized boolean deleteJob (String jobId) {
         Job job = findJob(jobId);
         if (job == null) return false;
@@ -708,21 +686,12 @@ public class Broker implements Runnable {
         return jobs.remove(job);
     }
 
-    private Multimap<String, String> activeJobsPerGraph = HashMultimap.create();
-
+    /** Returns whether this broker is tracking and jobs that have unfinished tasks. */
     public synchronized boolean anyJobsActive() {
         for (Job job : jobs) {
             if (!job.isComplete()) return true;
         }
         return false;
-    }
-
-    void activateJob (Job job) {
-        activeJobsPerGraph.put(job.graphId, job.jobId);
-    }
-
-    void deactivateJob (Job job) {
-        activeJobsPerGraph.remove(job.graphId, job.jobId);
     }
 
     /**

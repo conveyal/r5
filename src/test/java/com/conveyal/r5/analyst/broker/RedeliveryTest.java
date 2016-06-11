@@ -34,8 +34,8 @@ public class RedeliveryTest {
         brokerThread.start();
 
         // Start some workers.
+        // Do not set any initial graph, because the workers are only going to simulate doing any work.
         Properties workerConfig = new Properties();
-        workerConfig.setProperty("initial-graph-id", "GRAPH");
         List<Thread> workerThreads = new ArrayList<>();
         for (int i = 0; i < N_WORKERS; i++) {
             AnalystWorker worker = new AnalystWorker(workerConfig);

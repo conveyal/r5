@@ -18,18 +18,18 @@ import java.util.Queue;
 /**
  * FIXME delivered tasks map is oblivious to multiple tasks having the same ID.
  * In fact we just generate numeric queue task IDs. Origin point IDs will be handled at the application layer.
+ * FIXME ^^ Does this mean we "should" generate numeric task IDs?
  */
 public class Job {
 
     private static final Logger LOG = LoggerFactory.getLogger(Job.class);
 
-    /* How long until tasks are eligible for re-delivery. */
-    private static final int INVISIBLE_DURATION_SEC = 10 * 60;
+    public static final int REDELIVERY_QUIET_PERIOD_MSEC = 60 * 1000;
 
     /* A unique identifier for this job, usually a random UUID. */
     public final String jobId;
 
-    /* The graph needed to handle all tasks contained in this job. */
+    /* The graph on which tasks are to be run. All tasks contained in a job must run on the same graph. */
     String graphId;
 
     /* Tasks in this job that have yet to be delivered, or that will be re-delivered due to completion timeout. */
@@ -39,15 +39,14 @@ public class Job {
     /* The tasks in this job keyed on their task ID. */
     TIntObjectMap<GenericClusterRequest> tasksById = new TIntObjectHashMap<>();
 
-    /*
-     * Completion timeouts for tasks that have been delivered.
-     * A task whose ID is in this map has been delivered, has not been reported completed,
-     * and is not awaiting re-delivery.
-     */
-    TIntLongMap invisibleUntil = new TIntLongHashMap();
+    /* The last time tasks were delivered to a worker. Enables a quiet period between delivery and re-delivery. */
+    long lastDeliveryTime = 0;
 
     /* The IDs of all tasks that have been marked completed. */
     TIntSet completedTasks = new TIntHashSet();
+
+    /* How many times incomplete tasks were redelivered on this job. */
+    public int redeliveryCount = 0;
 
     public Job (String jobId) {
         this.jobId = jobId;
@@ -59,61 +58,32 @@ public class Job {
         tasksAwaitingDelivery.add(task);
     }
 
-    public void markTasksDelivered(List<GenericClusterRequest> tasks) {
-        long deliveryTime = System.currentTimeMillis();
-        long visibleAt = deliveryTime + INVISIBLE_DURATION_SEC * 1000;
-        for (GenericClusterRequest task : tasks) {
-            invisibleUntil.put(task.taskId, visibleAt);
-        }
-    }
-
     /**
-     * Find all tasks that are currently invisible but have passed their invisibility timeout without being marked
-     * completed, and make all these tasks visible again for delivery.
-     * TODO maybe this should only be triggered when the awaiting delivery queue is empty to reduce double-delivery.
+     * Check if there are any delivered tasks that were never marked as completed.
+     * This could happen if the workers are spot instances and they are terminated by AWS while processing some tasks.
      */
     public int redeliver () {
-        long now = System.currentTimeMillis();
-        TIntLongIterator invisibleIterator = invisibleUntil.iterator();
-        int nRedelivered = 0;
-        while (invisibleIterator.hasNext()) {
-            invisibleIterator.advance();
-            int taskId = invisibleIterator.key();
-            long timeout = invisibleIterator.value();
-            if (now > timeout) {
-                invisibleIterator.remove();
-                tasksAwaitingDelivery.add(tasksById.get(taskId));
-                LOG.warn("Task {} of job {} was not completed in time, queueing it for re-delivery.", taskId, jobId);
-                nRedelivered += 1;
+
+        // Only redeliver on jobs that are still active (that have some tasks not marked complete).
+        if (this.isComplete()) return 0;
+
+        // Only redeliver tasks when the delivery queue is empty.
+        // This reduces the frequency of redelivery operations and is more predictable.
+        if (tasksAwaitingDelivery.size() > 0) return 0;
+
+        // After the last task is delivered, wait a while before redelivering to avoid spurious re-delivery.
+        if (System.currentTimeMillis() - lastDeliveryTime < REDELIVERY_QUIET_PERIOD_MSEC) return 0;
+
+        // If we arrive here, we should have an empty delivery queue but some tasks that are not marked complete.
+        tasksById.forEachEntry((taskId, task) -> {
+            if (!completedTasks.contains(taskId)) {
+                tasksAwaitingDelivery.add(task);
             }
-        }
-        return nRedelivered;
-    }
-
-    public void markTaskCompleted (int taskId) {
-        if (tasksById.get(taskId) == null) {
-            LOG.error("Tried to mark task {} completed, but it was not in job {}.", taskId, jobId);
-            return;
-        }
-        if (invisibleUntil.remove(taskId) != 0) {
-            // If the taskId was found in the invisibleUntil map, the task was delivered and has not been slated for
-            // re-delivery.
-            completedTasks.add(taskId);
-        } else {
-            // If the taskId was not found in the invisibleUntil map, the task was never delivered, or timed out and was
-            // slated for redelivery. We should ignore the completion message and let the re-delivery proceed to avoid
-            // problems with redelivered tasks overwriting results in S3 after the job is considered finished.
-            // TODO verify that there are no race conditions here.
-            LOG.warn("Ignoring late task completion message, task {} was queued for re-delivery.");
-        }
-    }
-
-    public int getTotalTaskCount() {
-        return tasksById.size();
-    }
-
-    public int getCompletedTaskCount() {
-        return completedTasks.size();
+            return true;
+        });
+        redeliveryCount += 1;
+        LOG.info("Redelivered {} incomplete tasks on job {}.", tasksAwaitingDelivery.size(), this.jobId);
+        return tasksAwaitingDelivery.size();
     }
 
     public boolean isComplete() {

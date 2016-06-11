@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -69,25 +70,15 @@ class BrokerHttpHandler extends HttpHandler {
                 response.setStatus(HttpStatus.OK_200);
                 return;
             } else if (request.getMethod() == Method.GET && "status".equals(pathComponents[1])) {
-                /* fetch job status */
-                String[] jobIds = pathComponents[2].split(",");
-
-                List<JobStatus> ret = Arrays.asList(jobIds).stream()
-                        .map(id -> broker.findJob(id))
-                        .filter(job -> job != null)
-                        .map(job -> new JobStatus(job))
-                        .collect(Collectors.toList());
-
-                if (ret.isEmpty()) {
-                    response.setStatus(HttpStatus.NOT_FOUND_404);
-                    response.setDetailMessage("no job IDs were found");
-                }
-                else {
-                    response.setStatus(HttpStatus.OK_200);
-                    OutputStream os = response.getOutputStream();
-                    mapper.writeValue(os, ret);
-                    os.close();
-                }
+                /* Fetch status of all jobs. */
+                List<JobStatus> ret = new ArrayList<>();
+                broker.jobs.forEach(job -> ret.add(new JobStatus(job)));
+                // Add a summary of all jobs to the list.
+                ret.add(new JobStatus(ret));
+                response.setStatus(HttpStatus.OK_200);
+                OutputStream os = response.getOutputStream();
+                mapper.writeValue(os, ret);
+                os.close();
                 return;
             } else if (request.getMethod() == Method.POST) {
                 /* dequeue messages. */

@@ -15,4 +15,9 @@ public class WorkerObservation {
         this.lastSeen = System.currentTimeMillis();
     }
 
+    /** This method is here to enrich the REST API responses making them more human readable. */
+    public long getSecondsAgo() {
+        return (System.currentTimeMillis() - lastSeen) / 1000;
+    }
+
 }

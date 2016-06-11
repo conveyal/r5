@@ -97,7 +97,7 @@ public class Broker implements Runnable {
     private final Properties workerConfig;
 
     /** Keeps track of all the workers that have contacted this broker recently asking for work. */
-    private WorkerCatalog workerCatalog = new WorkerCatalog();
+    protected WorkerCatalog workerCatalog = new WorkerCatalog();
 
     /**
      * Requests that are not part of a job and can "cut in line" in front of jobs for immediate execution.
@@ -415,7 +415,6 @@ public class Broker implements Runnable {
         if (deque.remove(response)) {
             nWaitingConsumers -= 1;
             LOG.debug("Removed closed connection from queue.");
-            logQueueStatus();
             return true;
         }
         return false;
@@ -437,13 +436,6 @@ public class Broker implements Runnable {
         return singlePointChannels.remove(graphAffinity, response);
     }
 
-    private void logQueueStatus() {
-        LOG.info("{} undelivered, of which {} high-priority", nUndeliveredTasks,
-                stalledHighPriorityTasks.size());
-        LOG.info("{} producers waiting, {} consumers waiting", highPriorityResponses.size(), nWaitingConsumers);
-        LOG.info("{} total workers", workerCatalog.size());
-    }
-
     /**
      * This method checks whether there are any high-priority tasks or normal job tasks and attempts to match them with
      * waiting workers.
@@ -456,7 +448,6 @@ public class Broker implements Runnable {
         // Wait until there are some undelivered tasks.
         while (nUndeliveredTasks == 0) {
             LOG.debug("Task delivery thread is going to sleep, there are no tasks waiting for delivery.");
-            logQueueStatus();
             // Thread will be notified when tasks are added or there are new incoming consumer connections.
             wait();
             // If a worker connected while there were no tasks queued for delivery,
@@ -466,7 +457,6 @@ public class Broker implements Runnable {
             }
         }
         LOG.debug("Task delivery thread is awake and there are some undelivered tasks.");
-        logQueueStatus();
 
         while (nWaitingConsumers == 0) {
             LOG.debug("Task delivery thread is going to sleep, there are no consumers waiting.");

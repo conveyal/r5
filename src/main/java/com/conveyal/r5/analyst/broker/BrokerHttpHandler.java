@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -69,7 +70,8 @@ class BrokerHttpHandler extends HttpHandler {
                 mapper.readTree(request.getInputStream());
                 response.setStatus(HttpStatus.OK_200);
                 return;
-            } else if (request.getMethod() == Method.GET && "status".equals(pathComponents[1])) {
+            }
+            else if (request.getMethod() == Method.GET && "jobs".equals(pathComponents[1])) {
                 /* Fetch status of all jobs. */
                 List<JobStatus> ret = new ArrayList<>();
                 broker.jobs.forEach(job -> ret.add(new JobStatus(job)));
@@ -80,7 +82,16 @@ class BrokerHttpHandler extends HttpHandler {
                 mapper.writeValue(os, ret);
                 os.close();
                 return;
-            } else if (request.getMethod() == Method.POST) {
+            }
+            else if (request.getMethod() == Method.GET && "workers".equals(pathComponents[1])) {
+                /* Report on all known workers. */
+                response.setStatus(HttpStatus.OK_200);
+                OutputStream os = response.getOutputStream();
+                mapper.writeValue(os, broker.workerCatalog.observationsByWorkerId.values());
+                os.close();
+                return;
+            }
+            else if (request.getMethod() == Method.POST) {
                 /* dequeue messages. */
                 String command = pathComponents[1];
 

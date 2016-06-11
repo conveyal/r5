@@ -315,11 +315,15 @@ public class AnalystWorker implements Runnable {
             // This worker is running in test mode.
             // It should report all work as completed without actually doing anything,
             // but will fail a certain percentage of the time.
+            try {
+                Thread.sleep(random.nextInt(5000) + 1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
             if (random.nextInt(100) >= dryRunFailureRate) {
-                // Pretend to succeed.
                 deleteRequest(clusterRequest);
             } else {
-                LOG.info("Intentionally failing on task {}", clusterRequest.taskId);
+                LOG.info("Intentionally failing to complete task {}", clusterRequest.taskId);
             }
             return;
         }

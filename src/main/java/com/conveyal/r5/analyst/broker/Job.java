@@ -26,6 +26,8 @@ public class Job {
 
     public static final int REDELIVERY_QUIET_PERIOD_MSEC = 60 * 1000;
 
+    public static final int MAX_REDELIVERIES = 2;
+
     /* A unique identifier for this job, usually a random UUID. */
     public final String jobId;
 
@@ -82,8 +84,9 @@ public class Job {
             return true;
         });
         redeliveryCount += 1;
-        LOG.info("Redelivered {} incomplete tasks on job {}.", tasksAwaitingDelivery.size(), this.jobId);
+        LOG.info("Re-enqueued {} incomplete tasks for delivery on job {}.", tasksAwaitingDelivery.size(), this.jobId);
         return tasksAwaitingDelivery.size();
+
     }
 
     public boolean isComplete() {

@@ -14,6 +14,9 @@ import java.util.Properties;
  * a long time to run. It will start up a broker and some local workers, then submit a large job to the broker. The
  * workers will fail to complete tasks some percentage of the time, but eventually the whole job should be finished
  * because the broker will redeliver lost tasks to the workers.
+ *
+ * Progress can be followed with:
+ * watch --interval 1 curl http://localhost:9001/jobs
  */
 public class RedeliveryTest {
 

@@ -13,7 +13,7 @@ import java.util.Properties;
  * This test is not an automatic unit test. It is an integration test that must be started manually, because it takes
  * a long time to run. It will start up a broker and some local workers, then submit a large job to the broker. The
  * workers will fail to complete tasks some percentage of the time, but eventually the whole job should be finished
- * because the broker will re-send tasks.
+ * because the broker will redeliver lost tasks to the workers.
  */
 public class RedeliveryTest {
 

@@ -19,10 +19,6 @@ public abstract class PointSet {
     /** Maximum number of street network linkages to cache per PointSet. Affects memory consumption. */
     public static int LINKAGE_CACHE_SIZE = 5;
 
-    public abstract int featureCount();
-
-    public abstract Coordinate getCoordinate(int index);
-
     /**
      * When this PointSet is connected to the street network, the resulting data are cached in this Map to speed up
      * later reuse. Different linkages are produced for different street networks and for different on-street modes
@@ -58,5 +54,11 @@ public abstract class PointSet {
 
     public abstract double getLon(int i);
 
+    public abstract int featureCount();
+
+    /** Returns a new coordinate object for the feature at the given index in this set, or its centroid. */
+    public Coordinate getCoordinate(int index) {
+        return new Coordinate(getLon(index), getLat(index));
+    }
 
 }

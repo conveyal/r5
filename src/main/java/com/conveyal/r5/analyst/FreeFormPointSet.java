@@ -818,12 +818,6 @@ public class FreeFormPointSet extends PointSet implements Serializable {
         return ret;
     }
 
-    /** Returns a new coordinate object for the feature at the given index in this set, or its centroid. */
-    @Override
-    public Coordinate getCoordinate(int index) {
-        return new Coordinate(lons[index], lats[index]);
-    }
-
     /**
      * Using getter methods here to allow generating coordinates and geometries on demand instead of storing them.
      * This would allow for implicit geometry, as in a regular grid of points.

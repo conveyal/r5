@@ -65,11 +65,6 @@ public class WebMercatorGridPointSet extends PointSet {
     }
 
     @Override
-    public Coordinate getCoordinate(int index) {
-        return null;
-    }
-
-    @Override
     public double getLat(int i) {
         long y = i / this.width + this.north;
         return pixelToLat(y);

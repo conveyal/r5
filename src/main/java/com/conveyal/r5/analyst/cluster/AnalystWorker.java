@@ -426,7 +426,7 @@ public class AnalystWorker implements Runnable {
         }
 
         // Linkage is performed after applying the scenario because the linkage may be different after street modifications.
-        // LinkedPointSets retained withing the unlinked PointSet in a LoadingCache.
+        // LinkedPointSets retained withing the unlinked PointSet in a LoadingCache, so only one thread will perform the linkage..
         final LinkedPointSet linkedTargets = targets.link(transportNetwork.streetLayer, mode);
 
         // Run the core repeated-raptor analysis.

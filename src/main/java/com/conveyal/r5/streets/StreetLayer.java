@@ -99,21 +99,19 @@ public class StreetLayer implements Serializable, Cloneable {
     public TIntObjectMap<BikeRentalStation> bikeRentalStationMap;
     public TIntObjectMap<ParkRideParking> parkRideLocationsMap;
 
-    private transient TraversalPermissionLabeler permissions = new USTraversalPermissionLabeler(); // TODO don't hardwire to US
+    // TODO these are only needed when building the network, should we really be keeping them here in the layer?
+    // TODO don't hardwire to US
+    private transient TraversalPermissionLabeler permissions = new USTraversalPermissionLabeler();
     private transient LevelOfTrafficStressLabeler stressLabeler = new LevelOfTrafficStressLabeler();
     private transient TypeOfEdgeLabeler typeOfEdgeLabeler = new TypeOfEdgeLabeler();
     private transient SpeedConfigurator speedConfigurator;
+    // This is only used when loading from OSM, and is then nulled to save memory.
+    transient OSM osm;
 
     /** Envelope of this street layer, in decimal degrees (floating, not fixed-point) */
     public Envelope envelope = new Envelope();
 
     TLongIntMap vertexIndexForOsmNode = new TLongIntHashMap(100_000, 0.75f, -1, -1);
-    // TIntLongMap osmWayForEdgeIndex;
-
-    // TODO use negative IDs for temp vertices and edges.
-
-    // This is only used when loading from OSM, and is then nulled to save memory.
-    transient OSM osm;
 
     // Initialize these when we have an estimate of the number of expected edges.
     public VertexStore vertexStore = new VertexStore(100_000);
@@ -123,17 +121,20 @@ public class StreetLayer implements Serializable, Cloneable {
      * A string uniquely identifying the contents of this street layer in the space of all StreetLayers.
      * When a scenario has modified the base street layer to produce this layer, the streetLayerId will be the scenario
      * ID. When no scenario has been applied, this field will contain the base network's networkId.
-     * This allows proper caching of LinkedPointSets:
-     * we need a way to know what's in the layer independent of object identity.
+     * This allows proper caching of LinkedPointSets: we need a way to know what's in the layer independent of object identity.
+     * TODO this field is only written to now, never read.
      */
     public String streetLayerId = null;
 
-    /** Turn restrictions can potentially have a large number of affected edges, so store them once and reference them */
+    /**
+     * Turn restrictions can potentially have a large number of affected edges, so store them once and reference them.
+     * TODO clarify documentation: what does "store them once and reference them" mean? Why?
+     */
     public List<TurnRestriction> turnRestrictions = new ArrayList<>();
 
     /**
      * The TransportNetwork containing this StreetLayer. This link up the object tree also allows us to access the
-     * TransitLayer associated with this StreetLayer in the same TransportNetwork without maintaining bidirectional
+     * TransitLayer associated with this StreetLayer of the same TransportNetwork without maintaining bidirectional
      * references between the two layers.
      */
     public TransportNetwork parentNetwork = null;
@@ -299,6 +300,9 @@ public class StreetLayer implements Serializable, Cloneable {
         osm = null;
     }
 
+    /**
+     * TODO Javadoc. What is this for?
+     */
     public void openOSM(File file) {
         osm = new OSM(file.getPath());
         LOG.info("Read OSM");
@@ -1300,14 +1304,6 @@ public class StreetLayer implements Serializable, Cloneable {
         return envelope;
     }
 
-    public List<TIntList> getOutgoingEdges() {
-        return outgoingEdges;
-    }
-
-    public List<TIntList> getIncomingEdges() {
-        return incomingEdges;
-    }
-
     /**
      * We intentionally avoid using clone() on EdgeStore and VertexStore so all field copying is explicit and we can
      * clearly see whether we are accidentally shallow-copying any collections or data structures from the base graph.
@@ -1321,10 +1317,6 @@ public class StreetLayer implements Serializable, Cloneable {
         // The extend-only copy of the EdgeStore also contains a new extend-only copy of the VertexStore.
         copy.vertexStore = copy.edgeStore.vertexStore;
         return copy;
-    }
-
-    public boolean isExtendOnlyCopy() {
-        return this.edgeStore.isExtendOnlyCopy();
     }
 
     // FIXME radiusMeters is now set project-wide
@@ -1349,12 +1341,6 @@ public class StreetLayer implements Serializable, Cloneable {
         }
         LOG.info("Added {} out of {} stations ratio:{}", numAddedStations, bikeRentalStations.size(), numAddedStations/bikeRentalStations.size());
 
-    }
-
-    private static class TurnRestrictionSearchState {
-        public TurnRestrictionSearchState back;
-        public long node;
-        public long backWay;
     }
 
     public StreetLayer clone () {

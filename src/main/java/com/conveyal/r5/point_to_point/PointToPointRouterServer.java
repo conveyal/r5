@@ -412,7 +412,7 @@ public class PointToPointRouterServer {
                 feature.addProperty("vertex_idx", destinationSplit.vertex0);
                 feature.addProperty("distance_to_vertex", destinationSplit.distance0_mm/1000);
                 features.add(feature);
-                transportNetwork.streetLayer.getIncomingEdges().get(destinationSplit.vertex0)
+                transportNetwork.streetLayer.incomingEdges.get(destinationSplit.vertex0)
                     .forEach(edge_idx -> {
                         EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edge_idx);
                         GeoJsonFeature edge_feature = new GeoJsonFeature(edge.getGeometry());
@@ -429,7 +429,7 @@ public class PointToPointRouterServer {
                 feature.addProperty("vertex_idx", destinationSplit.vertex1);
                 feature.addProperty("distance_to_vertex", destinationSplit.distance1_mm/1000);
                 features.add(feature);
-                transportNetwork.streetLayer.getIncomingEdges().get(destinationSplit.vertex1)
+                transportNetwork.streetLayer.incomingEdges.get(destinationSplit.vertex1)
                     .forEach(edge_idx -> {
                         EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edge_idx);
                         GeoJsonFeature edge_feature = new GeoJsonFeature(edge.getGeometry());

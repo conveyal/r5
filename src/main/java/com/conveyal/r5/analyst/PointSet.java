@@ -7,10 +7,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.Point;
-import org.mapdb.Fun;
 import org.mapdb.Fun.Tuple2;
-import sun.awt.image.ImageWatched;
 
 import java.util.concurrent.ExecutionException;
 
@@ -22,10 +19,11 @@ public abstract class PointSet {
     /**
      * When this PointSet is connected to the street network, the resulting data are cached in this Map to speed up
      * later reuse. Different linkages are produced for different street networks and for different on-street modes
-     * of travel. We don't want to key this cache on the TransportNetwork or Scenario, only semantically on the
-     * StreetNetwork. This ensures linkages are re-used for multiple scenarios that have different transit
-     * characteristics but the same street network.
-     * TODO change equals and hashcode of StreetLayer to use its ID, which will accelerate some of these operations by using semantic equality.
+     * of travel. We don't want to key this cache on the TransportNetwork or Scenario, only on the StreetNetwork.
+     * This ensures linkages are re-used for multiple scenarios that have different transit characteristics but the
+     * same street network.
+     * R5 is now smart enough to only clone the StreetLayer when it's really changed by a scenario, so we can key on
+     * the StreetLayer's identity rather than semantically.
      */
     protected LoadingCache<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> linkageCache = CacheBuilder.newBuilder()
             .maximumSize(LINKAGE_CACHE_SIZE)

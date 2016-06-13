@@ -395,9 +395,6 @@ public class TransportNetwork implements Serializable {
         }
         if (scenario.affectsStreetLayer()) {
             copy.streetLayer = this.streetLayer.scenarioCopy(copy);
-            // Indicate that the new StreetLayer will differ from that of the base graph,
-            // allowing proper LinkedPointSet caching.
-            copy.streetLayer.streetLayerId = scenario.id;
         } else {
             copy.streetLayer = this.streetLayer;
         }

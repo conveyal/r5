@@ -213,7 +213,6 @@ public class TransportNetworkCache {
 
         // Set the ID on the network and its layers to allow caching linkages and analysis results.
         network.networkId = networkId;
-        network.streetLayer.streetLayerId = networkId;
 
         // cache the network
         String filename = networkId + "_" + MavenVersion.commit + ".dat";

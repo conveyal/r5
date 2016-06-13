@@ -118,15 +118,6 @@ public class StreetLayer implements Serializable, Cloneable {
     public EdgeStore edgeStore = new EdgeStore(vertexStore, this, 200_000);
 
     /**
-     * A string uniquely identifying the contents of this street layer in the space of all StreetLayers.
-     * When a scenario has modified the base street layer to produce this layer, the streetLayerId will be the scenario
-     * ID. When no scenario has been applied, this field will contain the base network's networkId.
-     * This allows proper caching of LinkedPointSets: we need a way to know what's in the layer independent of object identity.
-     * TODO this field is only written to now, never read.
-     */
-    public String streetLayerId = null;
-
-    /**
      * Turn restrictions can potentially have a large number of affected edges, so store them once and reference them.
      * TODO clarify documentation: what does "store them once and reference them" mean? Why?
      */

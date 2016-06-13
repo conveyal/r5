@@ -130,6 +130,14 @@ public class StreetLayer implements Serializable, Cloneable {
      */
     public TransportNetwork parentNetwork = null;
 
+    /**
+     * Some StreetLayers are created by applying a scenario to an existing StreetLayer. All the contents of the base
+     * StreetLayer are not copied, they are wrapped to make them extensible. These are called "scenario copies".
+     * If this StreetLayer is such a scenario copy, this field points to the original StreetLayer it was based upon.
+     * Otherwise this field should be null.
+     */
+    public StreetLayer baseStreetLayer = null;
+
     public static final EnumSet<EdgeStore.EdgeFlag> ALL_PERMISSIONS = EnumSet
         .of(EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR,
             EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.NO_THRU_TRAFFIC,
@@ -1303,6 +1311,7 @@ public class StreetLayer implements Serializable, Cloneable {
      */
     public StreetLayer scenarioCopy(TransportNetwork newScenarioNetwork) {
         StreetLayer copy = this.clone();
+        copy.baseStreetLayer = this;
         copy.parentNetwork = newScenarioNetwork;
         copy.edgeStore = edgeStore.extendOnlyCopy();
         // The extend-only copy of the EdgeStore also contains a new extend-only copy of the VertexStore.
@@ -1340,6 +1349,11 @@ public class StreetLayer implements Serializable, Cloneable {
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException("This exception cannot happen. This is why I love checked exceptions.");
         }
+    }
+
+    /** @return true iff this StreetLayer was created by a scenario, and is therefore wrapping a base StreetLayer. */
+    public boolean isScenarioCopy() {
+        return baseStreetLayer != null;
     }
 
 }

@@ -6,9 +6,7 @@ import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.profile.RaptorWorker;
 import com.conveyal.r5.profile.StreetMode;
-import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransitLayer;
@@ -91,7 +89,7 @@ public class RaptorDebugger {
             streetRouter.streetMode = StreetMode.WALK;
             // When walking, to make the search symmetric at origins/destinations, we clamp max walk at the maximum stop tree size
             streetRouter.distanceLimitMeters =
-                    Math.min((int) (request.maxWalkTime * request.walkSpeed * 60), TransitLayer.STOP_TREE_DISTANCE_LIMIT);
+                    Math.min((int) (request.maxWalkTime * request.walkSpeed * 60), TransitLayer.STOP_TREE_DISTANCE_METERS);
         }
 
         streetRouter.profileRequest = request;

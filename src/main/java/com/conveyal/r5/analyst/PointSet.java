@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
@@ -7,6 +8,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Point;
 import org.mapdb.Fun.Tuple2;
 
 import java.util.concurrent.ExecutionException;
@@ -27,11 +29,18 @@ public abstract class PointSet {
      */
     protected LoadingCache<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> linkageCache = CacheBuilder.newBuilder()
             .maximumSize(LINKAGE_CACHE_SIZE)
-            // Unfortunately Java can't seemt to infer the types for a lambda function here.
             .build(new CacheLoader<Tuple2<StreetLayer, StreetMode>, LinkedPointSet>() {
                 @Override public LinkedPointSet load(Tuple2<StreetLayer, StreetMode> key) throws Exception {
-                    // PointSet.this accesses outer class
-                    return new LinkedPointSet(PointSet.this, key.a, key.b);
+                    // If this StreetLayer is a part of a scenario and is therefore wrapping a base StreetLayer we need
+                    // to recursively fetch / create a linkage for that base StreetLayer so we don't duplicate work.
+                    // PointSet.this accesses the instance of the outer class.
+                    LinkedPointSet baseLinkage = null;
+                    if (key.a.isScenarioCopy()) {
+                        baseLinkage = PointSet.this.linkageCache.get(new Tuple2<>(key.a.baseStreetLayer, key.b));
+                    }
+                    // Build a new linkage from this PointSet to the supplied StreetNetwork,
+                    // initialized with the existing linkage to the base StreetNetwork when relevant.
+                    return new LinkedPointSet(PointSet.this, key.a, key.b, baseLinkage);
                 }
             });
 
@@ -57,6 +66,11 @@ public abstract class PointSet {
     /** Returns a new coordinate object for the feature at the given index in this set, or its centroid. */
     public Coordinate getCoordinate(int index) {
         return new Coordinate(getLon(index), getLat(index));
+    }
+
+    /** Returns a new coordinate object for the feature at the given index in this set, or its centroid. */
+    public Point getJTSPoint(int index) {
+        return GeometryUtils.geometryFactory.createPoint(getCoordinate(index));
     }
 
 }

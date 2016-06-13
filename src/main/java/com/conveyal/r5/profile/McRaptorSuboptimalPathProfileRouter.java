@@ -1,6 +1,5 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.analyst.ResultSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
 import com.conveyal.r5.analyst.cluster.ResultEnvelope;
@@ -223,7 +222,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         // TODO add time and distance limits to routing, not just weight.
         // TODO apply walk and bike speeds and maxBike time.
-        streetRouter.distanceLimitMeters = TransitLayer.STOP_TREE_DISTANCE_LIMIT; // FIXME arbitrary, and account for bike or car access mode
+        streetRouter.distanceLimitMeters = TransitLayer.STOP_TREE_DISTANCE_METERS; // FIXME arbitrary, and account for bike or car access mode
         streetRouter.setOrigin(request.fromLat, request.fromLon);
         streetRouter.route();
         accessTimes = streetRouter.getReachedStops();

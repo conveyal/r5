@@ -927,4 +927,20 @@ public class EdgeStore implements Serializable {
         }
     }
 
+    /**
+     * Call the supplied int consumer function with every temporarily added edge in this EdgeStore, then on every
+     * temporarily deleted edge.
+     */
+    public void forEachTemporarilyAddedOrDeletedEdge (IntConsumer consumer) {
+        if (this.isExtendOnlyCopy()) {
+            for (int edge = firstModifiableEdge; edge < this.nEdges(); edge++) {
+                consumer.accept(edge);
+            }
+            temporarilyDeletedEdges.forEach(edge -> {
+                consumer.accept(edge);
+                return true;
+            });
+        }
+    }
+
 }

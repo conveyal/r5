@@ -9,6 +9,7 @@ import com.conveyal.osmlib.Way;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.common.SphericalDistanceLibrary;
 import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
 import com.conveyal.r5.labeling.RoadPermission;
 import com.conveyal.r5.labeling.SpeedConfigurator;
@@ -19,11 +20,7 @@ import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.streets.EdgeStore.Edge;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.Envelope;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.LineString;
-import com.vividsolutions.jts.geom.Point;
+import com.vividsolutions.jts.geom.*;
 import com.conveyal.r5.profile.StreetMode;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -1356,4 +1353,23 @@ public class StreetLayer implements Serializable, Cloneable {
         return baseStreetLayer != null;
     }
 
+    /**
+     * Create a geometry containing all the points on all edges created or removed by the scenario that produced this
+     * StreetLayer, buffered by radiusMeters. This is a MultiPolygon or GeometryCollection.
+     */
+    public Geometry scenarioEdgesBoundingGeometry(int radiusMeters) {
+        List<Geometry> geoms = new ArrayList<>();
+        Edge edge = edgeStore.getCursor();
+        edgeStore.forEachTemporarilyAddedOrDeletedEdge(e -> {
+            edge.seek(e);
+            Envelope envelope = edge.getEnvelope();
+            // Intentionally overestimate by scaling for the latitude closest to the equator.
+            double lat0 = Math.min(Math.abs(envelope.getMaxY()), Math.abs(envelope.getMinY()));
+            double yExpansion = SphericalDistanceLibrary.metersToDegreesLatitude(radiusMeters);
+            double xExpansion = SphericalDistanceLibrary.metersToDegreesLongitude(radiusMeters, lat0);
+            envelope.expandBy(xExpansion, yExpansion);
+            geoms.add(GeometryUtils.geometryFactory.toGeometry(envelope));
+        });
+        return GeometryUtils.geometryFactory.createGeometryCollection((Geometry[])geoms.toArray());
+    }
 }

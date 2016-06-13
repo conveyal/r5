@@ -3,9 +3,14 @@ package com.conveyal.r5.transit;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.streets.VertexStore;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.Point;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -29,7 +34,7 @@ import java.util.*;
  */
 public class TransitLayer implements Serializable, Cloneable {
     /** Distance limit for stop trees, meters. Set to 3.5 km to match OTP GraphIndex.MAX_WALK_METERS */
-    public static final int STOP_TREE_DISTANCE_LIMIT = 3500;
+    public static final int STOP_TREE_DISTANCE_METERS = 3500;
 
     /**
      * Distance limit for transfers, meters. Set to 1km which is slightly above OTP's 600m (which was specified as
@@ -400,7 +405,7 @@ public class TransitLayer implements Serializable, Cloneable {
             return;
         }
         StreetRouter router = new StreetRouter(parentNetwork.streetLayer);
-        router.distanceLimitMeters = STOP_TREE_DISTANCE_LIMIT;
+        router.distanceLimitMeters = STOP_TREE_DISTANCE_METERS;
 
         // Dominate based on distance in millimeters, since (a) we're using a hard distance limit, and (b) we divide
         // by a speed to get time when we use the stop trees.
@@ -451,6 +456,16 @@ public class TransitLayer implements Serializable, Cloneable {
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public Coordinate getCoordinateForStop(int s) {
+        int v = streetVertexForStop.get(s);
+        VertexStore.Vertex vertex = parentNetwork.streetLayer.vertexStore.getCursor(v);
+        return new Coordinate(vertex.getLon(), vertex.getLat());
+    }
+
+    public Point getJTSPointForStop(int s) {
+        return GeometryUtils.geometryFactory.createPoint(getCoordinateForStop(s));
     }
 
     /** How much information should we load/save? */

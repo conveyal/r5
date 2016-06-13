@@ -120,7 +120,8 @@ public class TransportNetworkCache {
 
             // Apply any scenario modifications to the network before use, performing protective copies where necessary.
             // Prepend a pre-filter that removes trips that are not running during the search time window.
-            // FIXME Caching transportNetworks with scenarios already applied means we can’t use the InactiveTripsFilter. Solution may be to cache linked point sets based on scenario ID but always apply scenarios every time.
+            // FIXME Caching transportNetworks with scenarios already applied means we can’t use the InactiveTripsFilter.
+            // Solution may be to cache linked point sets based on scenario ID but always apply scenarios every time.
             // scenario.modifications.add(0, new InactiveTripsFilter(baseNetwork, clusterRequest.profileRequest));
             scenarioNetwork = scenario.applyToTransportNetwork(baseNetwork);
             LOG.info("Done applying scenario. Caching the resulting network.");

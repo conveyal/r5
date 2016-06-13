@@ -425,8 +425,8 @@ public class AnalystWorker implements Runnable {
             targets = pointSetDatastore.get(clusterRequest.destinationPointsetId);
         }
 
-        // Linkage is performed after applying the scenario to account for street modifications.
-        // LinkedPointSets are lazy-linked and cached within the unlinked PointSet.
+        // Linkage is performed after applying the scenario because the linkage may be different after street modifications.
+        // LinkedPointSets retained withing the unlinked PointSet in a LoadingCache.
         final LinkedPointSet linkedTargets = targets.link(transportNetwork.streetLayer, mode);
 
         // Run the core repeated-raptor analysis.

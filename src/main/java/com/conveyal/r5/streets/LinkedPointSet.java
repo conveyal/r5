@@ -96,6 +96,7 @@ public class LinkedPointSet {
         distances1_mm = new int[pointSet.featureCount()];
         int unlinked = 0;
         for (int i = 0; i < pointSet.featureCount(); i++) {
+            // FIXME this radius should not be hard-coded. Besides, 1KM is really far to walk off a street.
             Split split = streetLayer.findSplit(pointSet.getLat(i), pointSet.getLon(i), 1000, streetMode);
             if (split == null) {
                 unlinked++;
@@ -210,16 +211,17 @@ public class LinkedPointSet {
 
     /**
      * Makes one stop tree for each transit stop in the associated TransportNetwork.
-     * They are stored in the LinkedPointSet because it provides enough context: points, streets, and transit together.
+     * At one point we experimented with doing the entire search within this method, from all transit stops all the way
+     * up to the points. However that takes too long when switching PointSets. So we pre-cache distances to all street
+     * vertices in the TransitNetwork, and then just extend that to the points in the PointSet.
      *
-     * The street later linked to this PointSet must already be associated with a transit layer.
-     * It is a bad idea to serialize the trees, that makes the serialized graph about 3x bigger.
+     * These trees are stored in the LinkedPointSet because it provides enough context:
+     * points, streets, and transit together.
+     *
+     * The street layer linked to this PointSet must already be associated with a transit layer.
+     * Serializing the trees makes the serialized graph about 3x bigger.
      * The packed format does not make the serialized size any smaller (the Trove serializers are already smart).
      * However the packed representation uses less live memory: 665 vs 409 MB (including all other data) on Portland.
-     *
-     * At one point we experimented with doing the entire search here from all transit stops all the way
-     * up to the points. However that takes too long when switching pointsets. So we precache distances
-     * to all street vertices, and then just extend that to points.
      */
     public void makeStopTrees () {
         LOG.info("Creating travel distance trees from each transit stop...");

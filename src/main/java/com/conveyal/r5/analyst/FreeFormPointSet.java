@@ -59,7 +59,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 
  * PointSets are one of the three main web analyst resources: Pointsets, Indicators, and TimeSurfaces
  */
-public class FreeFormPointSet implements Serializable, PointSet {
+public class FreeFormPointSet extends PointSet implements Serializable {
 
     private static final long serialVersionUID = -8962916330731463238L;
 
@@ -81,15 +81,6 @@ public class FreeFormPointSet implements Serializable, PointSet {
     public Map<String, int[]> properties = new ConcurrentHashMap<String, int[]>();
 
     public int capacity = 0; // The total number of features this FreeFormPointSet can hold.
-
-    /**
-     * When this PointSet is connected to the street network, the resulting data are cached in this Map to speed up
-     * later reuse. Different linkages are produced for different street networks and for different on-street modes
-     * of travel. We don't want to key this cache on the TransportNetwork or Scenario, only semantically on the
-     * StreetNetwork. This ensures linkages are re-used for multiple scenarios that have different transit
-     * characteristics but the same street network.
-     */
-    Map<Fun.Tuple2<String, StreetMode>, LinkedPointSet> linkageCache = new HashMap<>();
 
     /**
      * Map from string IDs to their array indices. This is a view into FreeFormPointSet.ids, namely its reverse mapping.
@@ -831,23 +822,6 @@ public class FreeFormPointSet implements Serializable, PointSet {
     @Override
     public Coordinate getCoordinate(int index) {
         return new Coordinate(lons[index], lats[index]);
-    }
-
-    /**
-     * Associate each feature in this PointSet with a nearby street edge in the StreetLayer of the supplied
-     * TransportNetwork. This is a rather slow operation involving a lot of geometry calculations, so we cache these
-     * LinkedPointSets. This method returns one from the cache if this operation has already been performed.
-     *
-     * TODO pull this code up to an abstract superclass, it's the same in WebMercator and FreeForm PointSets.
-     */
-    @Override
-    public LinkedPointSet link (StreetLayer streetLayer, StreetMode streetMode) {
-        LinkedPointSet linkedPointSet = linkageCache.get(Fun.t2(streetLayer.streetLayerId, streetMode));
-        if (linkedPointSet == null) {
-            linkedPointSet = new LinkedPointSet(this, streetLayer, streetMode);
-            linkageCache.put(Fun.t2(streetLayer.streetLayerId, streetMode), linkedPointSet);
-        }
-        return linkedPointSet;
     }
 
     /**

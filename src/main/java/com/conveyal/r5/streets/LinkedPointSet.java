@@ -48,6 +48,9 @@ public class LinkedPointSet {
 
     private static final Logger LOG = LoggerFactory.getLogger(LinkedPointSet.class);
 
+    // FIXME 1KM is really far to walk off a street.
+    public static final int MAX_OFFSTREET_WALK_METERS = 1000;
+
     /**
      * LinkedPointSets are long-lived and not extremely numerous, so we keep references to the objects it was built from.
      * Besides these fields are useful for later processing of LinkedPointSets.
@@ -75,8 +78,7 @@ public class LinkedPointSet {
     // For each transit stop, the distances to nearby streets as packed (vertex, distance) pairs.
     public transient List<int[]> stopTrees;
 
-
-    /** it is preferred to specify a mode when linking */
+    /** it is preferred to specify a mode when linking TODO remove this. */
     @Deprecated
     public LinkedPointSet(PointSet pointSet, StreetLayer streetLayer) {
         this(pointSet, streetLayer, null);
@@ -94,10 +96,11 @@ public class LinkedPointSet {
         edges = new int[pointSet.featureCount()];
         distances0_mm = new int[pointSet.featureCount()];
         distances1_mm = new int[pointSet.featureCount()];
+
+        /* First, link the points in this PointSet to specific street vertices. */
         int unlinked = 0;
         for (int i = 0; i < pointSet.featureCount(); i++) {
-            // FIXME this radius should not be hard-coded. Besides, 1KM is really far to walk off a street.
-            Split split = streetLayer.findSplit(pointSet.getLat(i), pointSet.getLon(i), 1000, streetMode);
+            Split split = streetLayer.findSplit(pointSet.getLat(i), pointSet.getLon(i), MAX_OFFSTREET_WALK_METERS, streetMode);
             if (split == null) {
                 unlinked++;
                 edges[i] = -1;
@@ -107,7 +110,10 @@ public class LinkedPointSet {
                 distances1_mm[i] = split.distance1_mm;
             }
         }
+
+        /* Second, make a table of distances from each transit stop to the points in this PointSet. */
         this.makeStopTrees();
+
         LOG.info("Done linking pointset to street network. {} features unlinked.", unlinked);
     }
 
@@ -163,19 +169,20 @@ public class LinkedPointSet {
     }
 
     /**
-     * Get a distance table to all target points in this LinkedPointSet that were reached in the provided
-     * stop tree to street vertices.
+     * Given a table of distances to street vertices from a particular transit stop, create a table of distances to
+     * points in this PointSet from the same transit stop.
      * @return A packed array of (pointIndex, distanceMillimeters)
      */
     private int[] getStopTree (TIntIntMap stopTreeToVertices) {
         TIntIntMap distanceToPoint = new TIntIntHashMap(edges.length, 0.5f, Integer.MAX_VALUE, Integer.MAX_VALUE);
-        // Iterating over the points, rather than iterating over all the reached vertices, is much simpler.
-        // Iterating over the reached vertices requires additional indexes and I'm not sure it would be any faster.
         Edge edge = streetLayer.edgeStore.getCursor();
+        // Iterate over all points. This is simpler than iterating over all the reached vertices.
+        // Iterating over the reached vertices requires additional indexes and I'm not sure it would be any faster.
+        // TODO iterating over all points seems excessive, only a few points will be close to the transit stop.
         for (int p = 0; p < edges.length; p++) {
-            // edge value of -1 indicates unlinked
-            if (edges[p] == -1)
-                continue;
+
+            // An edge index of -1 indicates that this unlinked
+            if (edges[p] == -1) continue;
 
             edge.seek(edges[p]);
 
@@ -231,13 +238,15 @@ public class LinkedPointSet {
 
         // create trees in parallel to make this fast, for interactive use
         IntStream.range(0, nStops).parallel().forEach(s -> {
-            // the tree going as far as vertices
+            // Get the pre-computed tree from the stop to the street vertices
             TIntIntMap stopTreeToVertices = transitLayer.stopTrees.get(s);
-            // maintain length
-            if (stopTreeToVertices == null)
-                stopTrees[s] = (null);
-            else
+            if (stopTreeToVertices == null) {
+                // No tree found for this stop. Put a null placeholder in the stopTrees array for this stop.
+                stopTrees[s] = null;
+            } else {
+                // Extend the pre-computed tree from the street vertices out to the points in this PointSet.
                 stopTrees[s] = this.getStopTree(stopTreeToVertices);
+            }
         });
 
         this.stopTrees = Arrays.asList(stopTrees);

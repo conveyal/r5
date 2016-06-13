@@ -95,6 +95,12 @@ public class RaptorWorker {
     /** Clock time spent on propagation, for display and debugging. */
     private long totalPropagationTime = 0;
 
+    /** Clock time spent on frequency searches */
+    private long frequencySearchTime = 0;
+
+    /** Clock time spent on scheduled searches */
+    private long scheduledSearchTime = 0;
+
     private FrequencyRandomOffsets offsets;
 
     public PropagatedTimesStore propagatedTimesStore;
@@ -350,6 +356,8 @@ public class RaptorWorker {
         LOG.info("calc time {}sec", calcTime / 1000.0);
         LOG.info("  propagation {}sec", totalPropagationTime / 1000.0);
         LOG.info("  raptor {}sec", (calcTime - totalPropagationTime) / 1000.0);
+        LOG.info("    scheduled {}", scheduledSearchTime / 1000.0);
+        LOG.info("    frequency {}", frequencySearchTime / 1000.0);
         LOG.info("  requested {} monte carlo draws, ran {}", req.monteCarloDraws, monteCarloDraws * minuteNumber);
         LOG.info("{} rounds", round);
         ts.propagation = (int) totalPropagationTime;
@@ -373,6 +381,7 @@ public class RaptorWorker {
      * The output of this process will be stored in the scheduleState field.
      */
     public void runRaptorScheduled (TIntIntMap initialStops, int departureTime) {
+        long startClockTime = System.currentTimeMillis();
 
         // Do not consider any travel after this time (in seconds after midnight).
         // FIXME We may generate results past this time, but they are invalid and should not be included in averages.
@@ -430,6 +439,8 @@ public class RaptorWorker {
             scheduleState.get(round + 1).min(scheduleState.get(round));
             round++;
         }
+
+        scheduledSearchTime += System.currentTimeMillis() - startClockTime;
     }
 
     /**
@@ -440,6 +451,7 @@ public class RaptorWorker {
      * results on top of them.
      */
     public RaptorState runRaptorFrequency (int departureTime, BoardingAssumption boardingAssumption) {
+        long startClockTime = System.currentTimeMillis();
 
         // Do not consider any travel after this clock time. This is for algorithm speed and avoiding taking
         // ridiculous transit trips. There are ways the output could include travel after this time
@@ -499,7 +511,9 @@ public class RaptorWorker {
                 }
             }
         }
-        
+
+        frequencySearchTime += System.currentTimeMillis() - startClockTime;
+
         return currentRound;
     }
 

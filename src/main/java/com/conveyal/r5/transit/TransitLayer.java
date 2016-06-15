@@ -103,15 +103,24 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     public TransportNetwork parentNetwork = null;
 
+    /** Map from feed ID to feed CRC32 to ensure that we can't apply scenarios to the wrong feeds */
+    public Map<String, Long> feedChecksums = new HashMap<>();
+
     /** Load a GTFS feed with full load level */
-    public void loadFromGtfs (GTFSFeed gtfs) {
+    public void loadFromGtfs (GTFSFeed gtfs) throws DuplicateFeedException {
         loadFromGtfs(gtfs, LoadLevel.FULL);
     }
 
     /**
      * Load data from a GTFS feed. Call multiple times to load multiple feeds.
      */
-    public void loadFromGtfs (GTFSFeed gtfs, LoadLevel level) {
+    public void loadFromGtfs (GTFSFeed gtfs, LoadLevel level) throws DuplicateFeedException {
+        if (feedChecksums.containsKey(gtfs.feedId)) {
+            throw new DuplicateFeedException(gtfs.feedId);
+        }
+
+        // checksum feed and add to checksum cache
+        feedChecksums.put(gtfs.feedId, gtfs.checksum);
 
         // Load stops.
         // ID is the GTFS string ID, stopIndex is the zero-based index, stopVertexIndex is the index in the street layer.
@@ -149,14 +158,17 @@ public class TransitLayer implements Serializable, Cloneable {
         // These are temporary maps used only for grouping purposes.
         Map<TripPatternKey, TripPattern> tripPatternForStopSequence = new HashMap<>();
         Multimap<String, TripSchedule> tripsForBlock = HashMultimap.create();
-        TObjectIntMap<Route> routeIndexForRoute = new TObjectIntHashMap<>();
+
+        // Keyed with unscoped route_id, which is fine as this is for a single GTFS feed
+        TObjectIntMap<String> routeIndexForRoute = new TObjectIntHashMap<>();
         int nTripsAdded = 0;
         TRIPS: for (String tripId : gtfs.trips.keySet()) {
             Trip trip = gtfs.trips.get(tripId);
+            Route route = gtfs.routes.get(trip.route_id);
             // Construct the stop pattern and schedule for this trip
             // Should we really be resolving to an object reference for Route?
             // That gets in the way of GFTS persistence.
-            String scopedRouteId = String.join(":", trip.route.feed_id, trip.route.route_id);
+            String scopedRouteId = String.join(":", gtfs.feedId, trip.route_id);
             TripPatternKey tripPatternKey = new TripPatternKey(scopedRouteId);
             TIntList arrivals = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
             TIntList departures = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
@@ -171,7 +183,7 @@ public class TransitLayer implements Serializable, Cloneable {
             try {
                 stopTimes = gtfs.getInterpolatedStopTimesForTrip(tripId);
             } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes e) {
-                LOG.warn("First and last stops do not both have times specified on trip {} on route {}, skipping this as interpolation is impossible", trip.trip_id, trip.route.route_id);
+                LOG.warn("First and last stops do not both have times specified on trip {} on route {}, skipping this as interpolation is impossible", trip.trip_id, trip.route_id);
                 continue TRIPS;
             }
 
@@ -182,12 +194,12 @@ public class TransitLayer implements Serializable, Cloneable {
                 stopSequences.add(st.stop_sequence);
 
                 if (previousDeparture > st.arrival_time || st.arrival_time > st.departure_time) {
-                    LOG.warn("Negative-time travel at stop {} on trip {} on route {}, skipping this trip as it will wreak havoc with routing", st.stop_id, trip.trip_id, trip.route.route_id);
+                    LOG.warn("Negative-time travel at stop {} on trip {} on route {}, skipping this trip as it will wreak havoc with routing", st.stop_id, trip.trip_id, trip.route_id);
                     continue TRIPS;
                 }
 
                 if (previousDeparture == st.arrival_time) {
-                    LOG.warn("Zero-length hop at stop {} on trip {} on route {} {}", st.stop_id, trip.trip_id, trip.route.route_id, trip.route.route_short_name);
+                    LOG.warn("Zero-length hop at stop {} on trip {} on route {} {}", st.stop_id, trip.trip_id, trip.route_id, route.route_short_name);
                 }
 
                 previousDeparture = st.departure_time;
@@ -196,7 +208,7 @@ public class TransitLayer implements Serializable, Cloneable {
             }
 
             if (nStops == 0) {
-                LOG.warn("Trip {} on route {} has no stops, it will not be used", trip.trip_id, trip.route.route_id);
+                LOG.warn("Trip {} on route {} {} has no stops, it will not be used", trip.trip_id, trip.route_id, route.route_short_name);
                 continue;
 
             }
@@ -208,14 +220,14 @@ public class TransitLayer implements Serializable, Cloneable {
                 // if we haven't seen the route yet _from this feed_ (as IDs are only feed-unique)
                 // create it.
                 if (level == LoadLevel.FULL) {
-                    if (!routeIndexForRoute.containsKey(trip.route)) {
+                    if (!routeIndexForRoute.containsKey(trip.route_id)) {
                         int routeIndex = routes.size();
-                        RouteInfo ri = new RouteInfo(trip.route);
+                        RouteInfo ri = new RouteInfo(route, gtfs.agency.get(route.agency_id));
                         routes.add(ri);
-                        routeIndexForRoute.put(trip.route, routeIndex);
+                        routeIndexForRoute.put(trip.route_id, routeIndex);
                     }
 
-                    tripPattern.routeIndex = routeIndexForRoute.get(trip.route);
+                    tripPattern.routeIndex = routeIndexForRoute.get(trip.route_id);
                 }
 
                 tripPatternForStopSequence.put(tripPatternKey, tripPattern);
@@ -223,11 +235,12 @@ public class TransitLayer implements Serializable, Cloneable {
                 tripPatterns.add(tripPattern);
             }
             tripPattern.setOrVerifyDirection(trip.direction_id);
-            int serviceCode = serviceCodeNumber.get(trip.service.service_id);
+            int serviceCode = serviceCodeNumber.get(trip.service_id);
 
             // TODO there's no reason why we can't just filter trips like this, correct?
             // TODO this means that invalid trips still have empty patterns created
-            TripSchedule tripSchedule = TripSchedule.create(trip, arrivals.toArray(), departures.toArray(), stopSequences.toArray(), serviceCode);
+            Collection<Frequency> frequencies = gtfs.getFrequencies(trip.trip_id);
+            TripSchedule tripSchedule = TripSchedule.create(trip, arrivals.toArray(), departures.toArray(), frequencies, stopSequences.toArray(), serviceCode);
             if (tripSchedule == null) continue;
 
             tripPattern.addTrip(tripSchedule);
@@ -412,7 +425,7 @@ public class TransitLayer implements Serializable, Cloneable {
         stopTrees.add(router.getReachedVertices());
     }
 
-    public static TransitLayer fromGtfs (List<String> files) {
+    public static TransitLayer fromGtfs (List<String> files) throws DuplicateFeedException {
         TransitLayer transitLayer = new TransitLayer();
 
         for (String file : files) {

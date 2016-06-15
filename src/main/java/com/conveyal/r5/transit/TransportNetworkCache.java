@@ -209,7 +209,13 @@ public class TransportNetworkCache {
         }
 
         // Now we have a local copy of these graph inputs. Make a graph out of them.
-        TransportNetwork network = TransportNetwork.fromDirectory(new File(CACHE_DIR, networkId));
+        TransportNetwork network;
+        try {
+            network = TransportNetwork.fromDirectory(new File(CACHE_DIR, networkId));
+        } catch (DuplicateFeedException e) {
+            LOG.error("Duplicate feeds in transport network {}", networkId, e);
+            throw new RuntimeException(e);
+        }
 
         // Set the ID on the network and its layers to allow caching linkages and analysis results.
         network.networkId = networkId;

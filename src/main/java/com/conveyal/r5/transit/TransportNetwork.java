@@ -83,7 +83,14 @@ public class TransportNetwork implements Serializable {
      */
     public static void main (String[] args) {
         // TransportNetwork transportNetwork = TransportNetwork.fromFiles(args[0], args[1]);
-        TransportNetwork transportNetwork = TransportNetwork.fromDirectory(new File("."));
+        TransportNetwork transportNetwork;
+        try {
+            transportNetwork = TransportNetwork.fromDirectory(new File("."));
+        } catch (DuplicateFeedException e) {
+            LOG.error("Duplicate feeds in directory", e);
+            return;
+        }
+
         try {
             OutputStream outputStream = new BufferedOutputStream(new FileOutputStream("network.dat"));
             transportNetwork.write(outputStream);
@@ -102,7 +109,7 @@ public class TransportNetwork implements Serializable {
     }
 
     /** Legacy method to load from a single GTFS file */
-    public static TransportNetwork fromFiles (String osmSourceFile, String gtfsSourceFile, TNBuilderConfig tnBuilderConfig) {
+    public static TransportNetwork fromFiles (String osmSourceFile, String gtfsSourceFile, TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
         return fromFiles(osmSourceFile, Arrays.asList(gtfsSourceFile), tnBuilderConfig);
     }
 
@@ -115,7 +122,7 @@ public class TransportNetwork implements Serializable {
      * distinction should be maintained for various reasons. However, we use the GTFS IDs only for reference, so it doesn't
      * really matter, particularly for analytics.
      */
-    public static TransportNetwork fromFiles (String osmSourceFile, List<String> gtfsSourceFiles, TNBuilderConfig tnBuilderConfig) {
+    public static TransportNetwork fromFiles (String osmSourceFile, List<String> gtfsSourceFiles, TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
 
         System.out.println("Summarizing builder config: " + BUILDER_CONFIG_FILENAME);
         System.out.println(tnBuilderConfig);
@@ -167,7 +174,7 @@ public class TransportNetwork implements Serializable {
         return transportNetwork;
     }
 
-    public static TransportNetwork fromDirectory (File directory) {
+    public static TransportNetwork fromDirectory (File directory) throws DuplicateFeedException {
         File osmFile = null;
         List<String> gtfsFiles = new ArrayList<>();
         TNBuilderConfig builderConfig = null;

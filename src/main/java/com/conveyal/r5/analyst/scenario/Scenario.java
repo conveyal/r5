@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -28,6 +29,9 @@ public class Scenario implements Serializable {
 
     public List<Modification> modifications = Lists.newArrayList();
 
+    /** Map from feed ID to feed CRC32 to ensure that we can't apply scenarios to the wrong feeds */
+    public Map<String, Long> feedChecksums;
+
     private static final boolean VERIFY_BASE_NETWORK_UNCHANGED = true;
 
     /**
@@ -35,6 +39,42 @@ public class Scenario implements Serializable {
      */
     public TransportNetwork applyToTransportNetwork (TransportNetwork originalNetwork) {
         LOG.info("Applying scenario {}", this.id);
+
+        // make sure this scenario is applicable to this network
+        if (feedChecksums == null) {
+            LOG.warn("Scenario does not have feed checksums, not checking to ensure it is applicable to transport network.");
+        } else if (originalNetwork.transitLayer.feedChecksums == null || originalNetwork.transitLayer.feedChecksums.isEmpty()) {
+            LOG.warn("Transit layer does not have feed checksums, not checking to ensure scenario is applicable.");
+        } else {
+            if (originalNetwork.transitLayer.feedChecksums.size() != feedChecksums.size()) {
+                // is this warning necessary? modifications should apply cleanly if there are additional feeds in the
+                // transport network.
+                LOG.error("Number of feeds does not match in transport network and scenario: network has {}, scenario {}",
+                        originalNetwork.transitLayer.feedChecksums.size(), feedChecksums.size());
+                return null; // TODO throw exception?
+            }
+
+            for (Map.Entry<String, Long> e : feedChecksums.entrySet()) {
+                long checksum = e.getValue();
+                String feedId = e.getKey();
+
+                if (!originalNetwork.transitLayer.feedChecksums.containsKey(feedId)) {
+                    LOG.error("Scenario refers to feed {} not in base network", feedId);
+                    throw new IllegalArgumentException("Scenario refers to feed not in base network");
+                }
+
+                long checksumInBaseNetwork = originalNetwork.transitLayer.feedChecksums.get(feedId);
+
+                if (checksumInBaseNetwork != checksum) {
+                    LOG.error("Checksum in base network for feed ID {} does not match scenario: base {}, scenario {}",
+                            feedId, checksumInBaseNetwork, checksum);
+                    throw new IllegalArgumentException("Checksums for feed do not match");
+                }
+            }
+
+            LOG.info("All checksums match between scenario and base network.");
+        }
+
         long baseNetworkChecksum = 0;
         // Put the modifications in canonical order before applying them.
         modifications.sort((a, b) -> a.getSortOrder() - b.getSortOrder());

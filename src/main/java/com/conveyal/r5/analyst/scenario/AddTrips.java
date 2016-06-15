@@ -281,8 +281,7 @@ public class AddTrips extends Modification {
         freq.start_time = timetable.startTime;
         freq.end_time = timetable.endTime;
         freq.headway_secs = timetable.headwaySecs;
-        trip.frequencies = Lists.newArrayList(freq);
-        return TripSchedule.create(trip, arrivals, departures, IntStream.range(0, arrivals.length).toArray(), serviceCode);
+        return TripSchedule.create(trip, arrivals, departures, Lists.newArrayList(freq), IntStream.range(0, arrivals.length).toArray(), serviceCode);
 
     }
 

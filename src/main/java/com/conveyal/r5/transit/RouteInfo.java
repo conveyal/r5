@@ -1,5 +1,6 @@
 package com.conveyal.r5.transit;
 
+import com.conveyal.gtfs.model.Agency;
 import com.conveyal.gtfs.model.Route;
 
 import java.io.Serializable;
@@ -20,9 +21,9 @@ public class RouteInfo implements Serializable {
     public String color;
     public URL agency_url;
 
-    public RouteInfo (Route route) {
-        this.agency_id = route.agency.agency_id;
-        this.agency_name = route.agency.agency_name;
+    public RouteInfo (Route route, Agency agency) {
+        this.agency_id = route.agency_id;
+        this.agency_name = agency.agency_name;
         this.route_id = route.route_id;
         this.route_short_name = route.route_short_name;
         this.route_long_name = route.route_long_name;

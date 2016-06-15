@@ -383,7 +383,7 @@
     <dependency>
       <groupId>com.conveyal</groupId>
       <artifactId>gtfs-lib</artifactId>
-      <version>0.2-SNAPSHOT</version>
+      <version>0.3-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>com.conveyal</groupId>

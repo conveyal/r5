@@ -617,7 +617,7 @@ public class Broker implements Runnable {
     public synchronized boolean markTaskCompleted (int taskId) {
         Job job = getJobForTask(taskId);
         if (job == null) {
-            LOG.error("Could not find a job containing task {}, and therefore could not mark the task as completed.");
+            LOG.error("Could not find a job containing task {}, and therefore could not mark the task as completed.", taskId);
             return false;
         }
         job.completedTasks.add(taskId);

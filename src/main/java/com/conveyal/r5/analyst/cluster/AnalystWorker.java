@@ -6,6 +6,7 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.common.R5Version;
 import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.publish.StaticComputer;
@@ -29,7 +30,6 @@ import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.util.EntityUtils;
 import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.common.MavenVersion;
 import com.conveyal.r5.profile.RepeatedRaptorProfileRouter;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -506,7 +506,7 @@ public class AnalystWorker implements Runnable {
 
         // Run a POST request (long-polling for work) indicating which graph and r5 commit this worker has
         String url = String.join("/", BROKER_BASE_URL, "dequeue", type == WorkType.SINGLE ? "single" : "regional",
-                networkId, MavenVersion.version);
+                networkId, R5Version.version);
         HttpPost httpPost = new HttpPost(url);
         httpPost.setHeader(new BasicHeader(WORKER_ID_HEADER, machineId));
         HttpResponse response = null;
@@ -677,9 +677,9 @@ public class AnalystWorker implements Runnable {
      * initial-graph-id             The graph ID for this worker to start on
      */
     public static void main(String[] args) {
-        LOG.info("Starting R5 Analyst Worker version {}", MavenVersion.version);
-        LOG.info("R5 commit is {}", MavenVersion.commit);
-        LOG.info("R5 describe is {}", MavenVersion.describe);
+        LOG.info("Starting R5 Analyst Worker version {}", R5Version.version);
+        LOG.info("R5 commit is {}", R5Version.commit);
+        LOG.info("R5 describe is {}", R5Version.describe);
 
         Properties config = new Properties();
 

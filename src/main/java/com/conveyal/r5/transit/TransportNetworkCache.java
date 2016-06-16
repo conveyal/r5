@@ -3,13 +3,12 @@ package com.conveyal.r5.transit;
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.S3Object;
-import com.conveyal.r5.analyst.scenario.InactiveTripsFilter;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.common.R5Version;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.google.common.io.ByteStreams;
 import org.apache.commons.io.IOUtils;
-import com.conveyal.r5.common.MavenVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +55,7 @@ public class TransportNetworkCache {
      */
     public synchronized TransportNetwork getNetwork (String networkId) {
 
-        LOG.info("Finding or building a TransportNetwork for ID {} and R5 commit {}", networkId, MavenVersion.commit);
+        LOG.info("Finding or building a TransportNetwork for ID {} and R5 commit {}", networkId, R5Version.commit);
 
         if (networkId.equals(currentNetworkId)) {
             LOG.info("Network ID has not changed. Reusing the last one that was built.");
@@ -66,7 +65,7 @@ public class TransportNetworkCache {
         TransportNetwork network = checkCached(networkId);
         if (network == null) {
             LOG.info("Cached transport network for id {} and commit {} was not found. Building the network from scratch.",
-                    networkId, MavenVersion.commit);
+                    networkId, R5Version.commit);
             network = buildNetwork(networkId);
         }
 
@@ -135,8 +134,8 @@ public class TransportNetworkCache {
     /** If this transport network is already built and cached, fetch it quick */
     private TransportNetwork checkCached (String networkId) {
         try {
-            String filename = networkId + "_" + MavenVersion.commit + ".dat";
-            File cacheLocation = new File(CACHE_DIR, networkId + "_" + MavenVersion.commit + ".dat");
+            String filename = networkId + "_" + R5Version.commit + ".dat";
+            File cacheLocation = new File(CACHE_DIR, networkId + "_" + R5Version.commit + ".dat");
             if (cacheLocation.exists())
                 LOG.info("Found locally-cached TransportNetwork at {}", cacheLocation);
             else {
@@ -221,8 +220,8 @@ public class TransportNetworkCache {
         network.networkId = networkId;
 
         // cache the network
-        String filename = networkId + "_" + MavenVersion.commit + ".dat";
-        File cacheLocation = new File(CACHE_DIR, networkId + "_" + MavenVersion.commit + ".dat");
+        String filename = networkId + "_" + R5Version.commit + ".dat";
+        File cacheLocation = new File(CACHE_DIR, networkId + "_" + R5Version.commit + ".dat");
         
         try {
 

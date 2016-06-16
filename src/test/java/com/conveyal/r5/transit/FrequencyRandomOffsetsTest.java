@@ -11,6 +11,7 @@ import gnu.trove.list.array.TIntArrayList;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.List;
 
 import static org.junit.Assert.*;
 
@@ -40,8 +41,8 @@ public class FrequencyRandomOffsetsTest {
         f1.end_time = 11 * 60 * 60;
         f1.headway_secs = 30 * 60;
         f1.exact_times = 0;
-        t1.frequencies = Arrays.asList(f1);
-        TripSchedule ts1 = TripSchedule.create(t1, new int [] { 0, 120, 240, 360 }, new int [] { 0, 120, 240, 360 }, new int[] { 1, 2, 3, 4 }, 0);
+        List<Frequency> frequencies = Arrays.asList(f1);
+        TripSchedule ts1 = TripSchedule.create(t1, new int [] { 0, 120, 240, 360 }, new int [] { 0, 120, 240, 360 }, frequencies, new int[] { 1, 2, 3, 4 }, 0);
         pattern1.addTrip(ts1);
 
         layer.tripPatterns.add(pattern1);
@@ -61,8 +62,8 @@ public class FrequencyRandomOffsetsTest {
         f2.end_time = 11 * 60 * 60;
         f2.headway_secs = 30 * 60;
         f2.exact_times = 0;
-        t2.frequencies = Arrays.asList(f2);
-        TripSchedule ts2 = TripSchedule.create(t2, new int [] { 0, 60, 90, 180 }, new int [] { 0, 60, 90, 180 }, new int[] { 1, 2, 3, 4 }, 0);
+        frequencies = Arrays.asList(f2);
+        TripSchedule ts2 = TripSchedule.create(t2, new int [] { 0, 60, 90, 180 }, new int [] { 0, 60, 90, 180 }, frequencies, new int[] { 1, 2, 3, 4 }, 0);
 
         ts2.phasedAtTargetStopPosition = new int[] { 1 };
         ts2.phasedFromSourceStopPosition = new int[] { 2 };

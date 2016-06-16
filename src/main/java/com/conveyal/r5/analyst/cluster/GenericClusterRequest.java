@@ -1,7 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.broker.WorkerCategory;
-import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.publish.StaticSiteRequest;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -24,7 +23,7 @@ public abstract class GenericClusterRequest implements Serializable {
     public String graphId;
 
     /** The commit of r5 the worker should be running when it processes this request. */
-    public String workerCommit;
+    public String workerVersion;
 
     /** The job ID this is associated with. */
     public String jobId;
@@ -36,7 +35,7 @@ public abstract class GenericClusterRequest implements Serializable {
     public int taskId;
 
     public WorkerCategory getWorkerCategory() {
-        return new WorkerCategory(graphId, workerCommit);
+        return new WorkerCategory(graphId, workerVersion);
     }
 
 }

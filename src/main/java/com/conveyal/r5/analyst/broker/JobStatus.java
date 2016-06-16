@@ -36,7 +36,7 @@ public class JobStatus {
     public JobStatus (Job job) {
         this.jobId = job.jobId;
         this.graphId = job.workerCategory.graphId;
-        this.workerCommit = job.workerCategory.workerCommit;
+        this.workerCommit = job.workerCategory.workerVersion;
         this.total = job.tasksById.size();
         this.complete = job.completedTasks.size();
         this.incomplete = job.tasksById.size() - job.completedTasks.size();

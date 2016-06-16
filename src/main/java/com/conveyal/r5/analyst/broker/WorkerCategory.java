@@ -9,16 +9,16 @@ import java.util.Objects;
 public class WorkerCategory implements Comparable<WorkerCategory> {
 
     final String graphId;
-    final String workerCommit;
+    final String workerVersion;
 
     public WorkerCategory(String graphId, String workerCommit) {
         this.graphId = graphId;
-        this.workerCommit = workerCommit;
+        this.workerVersion = workerCommit;
     }
 
     @Override
     public String toString() {
-        return "graph ID '" + graphId + '\'' + ", worker commit '" + workerCommit + '\'';
+        return "graph ID '" + graphId + '\'' + ", worker version '" + workerVersion + '\'';
     }
 
     @Override
@@ -27,18 +27,18 @@ public class WorkerCategory implements Comparable<WorkerCategory> {
         if (o == null || getClass() != o.getClass()) return false;
         WorkerCategory that = (WorkerCategory) o;
         return Objects.equals(graphId, that.graphId) &&
-                Objects.equals(workerCommit, that.workerCommit);
+                Objects.equals(workerVersion, that.workerVersion);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(graphId, workerCommit);
+        return Objects.hash(graphId, workerVersion);
     }
 
     @Override
     public int compareTo (WorkerCategory other) {
         int result = this.graphId.compareTo(other.graphId);
-        return result == 0 ? this.workerCommit.compareTo(other.workerCommit) : result;
+        return result == 0 ? this.workerVersion.compareTo(other.workerVersion) : result;
     }
 
 }

@@ -4,8 +4,6 @@ import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
-import com.conveyal.r5.analyst.scenario.InactiveTripsFilter;
-import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
@@ -138,7 +136,7 @@ public class AnalystWorker implements Runnable {
     AmazonS3 s3;
 
     /** The transport network this worker already has loaded, and therefore prefers to work on. */
-    String graphIdAffinity = null;
+    String networkId = null;
 
     long startupTime, nextShutdownCheckTime;
 
@@ -196,7 +194,7 @@ public class AnalystWorker implements Runnable {
         // set to null, i.e. no graph affinity)
         // we don't actually build the graph now; this is just a hint to the broker as to what
         // graph this machine was intended to analyze.
-        this.graphIdAffinity = config.getProperty("initial-graph-id");
+        this.networkId = config.getProperty("initial-graph-id");
 
         this.pointSetDatastore = new PointSetDatastore(10, null, false, config.getProperty("pointsets-bucket"));
         this.transportNetworkCache = new TransportNetworkCache(config.getProperty("graphs-bucket"));
@@ -241,10 +239,10 @@ public class AnalystWorker implements Runnable {
         // a 503 (Service Not Available) to tell it to try again later. It can't do that after it's
         // sent a request to a worker, so the worker needs to not come online until it's ready to process
         // requests.
-        if (graphIdAffinity != null) {
-            LOG.info("Prebuilding graph {}", graphIdAffinity);
-            transportNetworkCache.getNetwork(graphIdAffinity);
-            LOG.info("Done prebuilding graph {}", graphIdAffinity);
+        if (networkId != null) {
+            LOG.info("Prebuilding graph {}", networkId);
+            transportNetworkCache.getNetwork(networkId);
+            LOG.info("Done prebuilding graph {}", networkId);
         }
 
         // Start filling the work queues.
@@ -268,7 +266,7 @@ public class AnalystWorker implements Runnable {
             }
             LOG.debug("Long-polling for work ({} second timeout).", POLL_TIMEOUT / 1000.0);
             // Long-poll (wait a few seconds for messages to become available)
-            List<GenericClusterRequest> tasks = getSomeWork(WorkType.BATCH);
+            List<GenericClusterRequest> tasks = getSomeWork(WorkType.REGIONAL);
             if (tasks == null) {
                 LOG.debug("Didn't get any work. Retrying.");
                 idle = true;
@@ -347,7 +345,7 @@ public class AnalystWorker implements Runnable {
             TransportNetwork transportNetwork = transportNetworkCache.getNetwork(clusterRequest.graphId);
             // Record graphId so we "stick" to this same graph on subsequent polls.
             // TODO allow for a list of multiple cached TransitNetworks.
-            graphIdAffinity = clusterRequest.graphId;
+            networkId = clusterRequest.graphId;
             // FIXME this stats stuff needs to be moved to where the graph is actually built, or fetch the graph out here.
             ts.graphBuild = (int) (System.currentTimeMillis() - graphStartTime);
             // TODO lazy-initialize all additional indexes on transitLayer
@@ -489,7 +487,7 @@ public class AnalystWorker implements Runnable {
             while (System.currentTimeMillis() < lastHighPriorityRequestProcessed + SINGLE_POINT_KEEPALIVE_MSEC) {
                 LOG.debug("Awaiting high-priority work");
                 try {
-                    List<GenericClusterRequest> tasks = getSomeWork(WorkType.HIGH_PRIORITY);
+                    List<GenericClusterRequest> tasks = getSomeWork(WorkType.SINGLE);
 
                     if (tasks != null)
                         tasks.stream().forEach(t -> highPriorityExecutor.execute(
@@ -507,8 +505,8 @@ public class AnalystWorker implements Runnable {
     public List<GenericClusterRequest> getSomeWork(WorkType type) {
 
         // Run a POST request (long-polling for work) indicating which graph and r5 commit this worker has
-        String url = String.join("/", BROKER_BASE_URL, "dequeue", type == WorkType.HIGH_PRIORITY ? "single" : "regional",
-                graphIdAffinity, MavenVersion.commit);
+        String url = String.join("/", BROKER_BASE_URL, "dequeue", type == WorkType.SINGLE ? "single" : "regional",
+                networkId, MavenVersion.version);
         HttpPost httpPost = new HttpPost(url);
         httpPost.setHeader(new BasicHeader(WORKER_ID_HEADER, machineId));
         HttpResponse response = null;
@@ -679,8 +677,9 @@ public class AnalystWorker implements Runnable {
      * initial-graph-id             The graph ID for this worker to start on
      */
     public static void main(String[] args) {
-        LOG.info("Starting R5 Analyst Worker version {}", MavenVersion.describe);
-        LOG.info("OTP commit is {}", MavenVersion.commit);
+        LOG.info("Starting R5 Analyst Worker version {}", MavenVersion.version);
+        LOG.info("R5 commit is {}", MavenVersion.commit);
+        LOG.info("R5 describe is {}", MavenVersion.describe);
 
         Properties config = new Properties();
 
@@ -708,6 +707,6 @@ public class AnalystWorker implements Runnable {
     }
 
     public static enum WorkType {
-        HIGH_PRIORITY, BATCH;
+        SINGLE, REGIONAL;
     }
 }

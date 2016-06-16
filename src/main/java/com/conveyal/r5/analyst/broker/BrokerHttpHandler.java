@@ -17,10 +17,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
 * A Grizzly Async Http Service (uses response suspend/resume)
@@ -150,7 +147,7 @@ class BrokerHttpHandler extends HttpHandler {
                     for (GenericClusterRequest task : tasks) {
                         if (task.jobId != exemplar.jobId ||
                             task.graphId != exemplar.graphId ||
-                            task.workerCommit != exemplar.workerCommit) {
+                            task.workerVersion != exemplar.workerVersion) {
                             response.setStatus(HttpStatus.BAD_REQUEST_400);
                             response.setDetailMessage("All tasks must be for the same graph, job, and worker commit.");
                             return;

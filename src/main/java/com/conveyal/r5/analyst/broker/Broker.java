@@ -293,8 +293,8 @@ public class Broker implements Runnable {
             if (!task.graphId.equals(job.workerCategory.graphId)) {
                 LOG.error("Task graph ID {} does not match job: {}.", task.graphId, job.workerCategory);
             }
-            if (!task.workerCommit.equals(job.workerCategory.workerCommit)) {
-                LOG.error("Task R5 commit {} does not match job: {}.", task.workerCommit, job.workerCategory);
+            if (!task.workerVersion.equals(job.workerCategory.workerVersion)) {
+                LOG.error("Task R5 commit {} does not match job: {}.", task.workerVersion, job.workerCategory);
             }
         }
         // Wake up the delivery thread if it's waiting on input.
@@ -346,7 +346,10 @@ public class Broker implements Runnable {
 
         // it's fine to just modify the worker config as this method is synchronized
         workerConfig.setProperty("initial-graph-id", category.graphId);
-        workerConfig.setProperty("worker-commit", category.workerCommit);
+        workerConfig.setProperty("worker-version", category.workerVersion);
+        String workerDownloadUrl = String.format("http://maven.conveyal.com/com/conveyal/r5/%s/r5-%s-shaded.jar",
+                category.workerVersion, category.workerVersion);
+        workerConfig.setProperty("download-url", workerDownloadUrl);
         ByteArrayOutputStream cfg = new ByteArrayOutputStream();
         try {
             workerConfig.store(cfg, "Worker config");
@@ -355,7 +358,7 @@ public class Broker implements Runnable {
             throw new RuntimeException(e);
         }
 
-        // send the config as user data
+        // Send the config to the new workers as EC2 "user data"
         String userData = new String(Base64.getEncoder().encode(cfg.toByteArray()));
         req.setUserData(userData);
 
@@ -652,7 +655,7 @@ public class Broker implements Runnable {
             return job;
         }
         job = new Job(task.jobId);
-        job.workerCategory = new WorkerCategory(task.graphId, task.workerCommit);
+        job.workerCategory = new WorkerCategory(task.graphId, task.workerVersion);
         jobs.insertAtTail(job);
         return job;
     }

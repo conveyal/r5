@@ -342,6 +342,7 @@ public class AnalystWorker implements Runnable {
             // Get the graph object for the ID given in the request, fetching inputs and building as needed.
             // All requests handled together are for the same graph, and this call is synchronized so the graph will
             // only be built once.
+            // FIXME this is causing the transportNetwork to be fetched twice, once here and once in handleAnalystRequest.
             TransportNetwork transportNetwork = transportNetworkCache.getNetwork(clusterRequest.graphId);
             // Record graphId so we "stick" to this same graph on subsequent polls.
             // TODO allow for a list of multiple cached TransitNetworks.

@@ -55,7 +55,7 @@ public class TransportNetworkCache {
      */
     public synchronized TransportNetwork getNetwork (String networkId) {
 
-        LOG.info("Finding or building a TransportNetwork for ID {} and R5 commit {}", networkId, R5Version.commit);
+        LOG.info("Finding or building a TransportNetwork for ID {} and R5 version {}", networkId, R5Version.version);
 
         if (networkId.equals(currentNetworkId)) {
             LOG.info("Network ID has not changed. Reusing the last one that was built.");
@@ -64,8 +64,8 @@ public class TransportNetworkCache {
 
         TransportNetwork network = checkCached(networkId);
         if (network == null) {
-            LOG.info("Cached transport network for id {} and commit {} was not found. Building the network from scratch.",
-                    networkId, R5Version.commit);
+            LOG.info("Cached transport network for id {} and R5 version {} was not found. Building the network from scratch.",
+                    networkId, R5Version.version);
             network = buildNetwork(networkId);
         }
 
@@ -134,8 +134,8 @@ public class TransportNetworkCache {
     /** If this transport network is already built and cached, fetch it quick */
     private TransportNetwork checkCached (String networkId) {
         try {
-            String filename = networkId + "_" + R5Version.commit + ".dat";
-            File cacheLocation = new File(CACHE_DIR, networkId + "_" + R5Version.commit + ".dat");
+            String filename = networkId + "_" + R5Version.version + ".dat";
+            File cacheLocation = new File(CACHE_DIR, networkId + "_" + R5Version.version + ".dat");
             if (cacheLocation.exists())
                 LOG.info("Found locally-cached TransportNetwork at {}", cacheLocation);
             else {
@@ -220,8 +220,8 @@ public class TransportNetworkCache {
         network.networkId = networkId;
 
         // cache the network
-        String filename = networkId + "_" + R5Version.commit + ".dat";
-        File cacheLocation = new File(CACHE_DIR, networkId + "_" + R5Version.commit + ".dat");
+        String filename = networkId + "_" + R5Version.version + ".dat";
+        File cacheLocation = new File(CACHE_DIR, networkId + "_" + R5Version.version + ".dat");
         
         try {
 

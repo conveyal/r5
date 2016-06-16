@@ -16,9 +16,11 @@ import java.util.List;
 import java.util.Queue;
 
 /**
- * FIXME delivered tasks map is oblivious to multiple tasks having the same ID.
- * In fact we just generate numeric queue task IDs. Origin point IDs will be handled at the application layer.
- * FIXME ^^ Does this mean we "should" generate numeric task IDs?
+ * A Job is a collection of tasks that represent all the origins in a regional analysis. All the tasks must have the
+ * same network ID and be run against the same R5 version on the workers.
+ *
+ * There is no concern about multiple tasks having the same ID, because those IDs are created by the broker.
+ * An unlikely potential problem is that if the broker restarts, the workers might mark the wrong tasks as completed.
  */
 public class Job {
 
@@ -31,11 +33,16 @@ public class Job {
     /* A unique identifier for this job, usually a random UUID. */
     public final String jobId;
 
-    /* The graph on which tasks are to be run. All tasks contained in a job must run on the same graph. */
-    String graphId;
+    /**
+     * The graph and r5 commit on which tasks are to be run.
+     * All tasks contained in a job must run on the same graph and r5 commit.
+     */
+    WorkerCategory workerCategory;
 
-    /* Tasks in this job that have yet to be delivered, or that will be re-delivered due to completion timeout. */
-    // maybe this should only be a list of IDs.
+    /**
+     * Tasks in this job that have yet to be delivered, or that will be re-delivered due to completion timeout.
+     * Maybe this should only be a list of IDs.
+     */
     Queue<GenericClusterRequest> tasksAwaitingDelivery = new ArrayDeque<>();
 
     /* The tasks in this job keyed on their task ID. */
@@ -61,7 +68,7 @@ public class Job {
     }
 
     /**
-     * Check if there are any delivered tasks that were never marked as completed.
+     * Check if there are any tasks that were delivered to workers but never marked as completed.
      * This could happen if the workers are spot instances and they are terminated by AWS while processing some tasks.
      */
     public int redeliver () {
@@ -102,6 +109,10 @@ public class Job {
             return true;
         }
         return false;
+    }
+
+    public WorkerCategory getWorkerCategory() {
+        return workerCategory;
     }
 
 }

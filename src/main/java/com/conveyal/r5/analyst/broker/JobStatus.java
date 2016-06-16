@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst.broker;
 
 /**
- * Describes the status of Job.
+ * Describes the status of a Job in a REST API response.
  */
 public class JobStatus {
 
@@ -10,6 +10,9 @@ public class JobStatus {
 
     /** The graph ID of this job. */
     public String graphId;
+
+    /** The commit of R5 the worker should be running for this job. */
+    public String workerCommit;
 
     /** The total number of tasks in this job. */
     public int total;
@@ -27,12 +30,13 @@ public class JobStatus {
     public int redeliveryCount;
 
     /** default constructor for JSON deserialization */
-    public JobStatus () { /* nothing */ }
+    public JobStatus () { /* do nothing */ }
 
     /** Summarize the given job to return its status over the REST API. */
     public JobStatus (Job job) {
         this.jobId = job.jobId;
-        this.graphId = job.graphId;
+        this.graphId = job.workerCategory.graphId;
+        this.workerCommit = job.workerCategory.workerCommit;
         this.total = job.tasksById.size();
         this.complete = job.completedTasks.size();
         this.incomplete = job.tasksById.size() - job.completedTasks.size();

@@ -233,7 +233,6 @@
             <phase>package</phase>
             <goals><goal>shade</goal></goals>
             <configuration>
-              <finalName>r5</finalName>
               <!-- Include the shaded JAR in deployments -->
               <shadedArtifactAttached>true</shadedArtifactAttached>
               <shadedClassifierName>shaded</shadedClassifierName>

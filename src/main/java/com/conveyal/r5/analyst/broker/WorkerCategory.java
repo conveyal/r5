@@ -1,15 +1,16 @@
 package com.conveyal.r5.analyst.broker;
 
+import java.io.Serializable;
 import java.util.Objects;
 
 /**
  * This identifies a category of workers that are all running the same R5 commit and have the same graph loaded.
  * TODO perhaps this is a TaskCategory rather than a WorkerCategory.
  */
-public class WorkerCategory implements Comparable<WorkerCategory> {
+public class WorkerCategory implements Comparable<WorkerCategory>, Serializable {
 
-    final String graphId;
-    final String workerVersion;
+    public final String graphId;
+    public final String workerVersion;
 
     public WorkerCategory(String graphId, String workerCommit) {
         this.graphId = graphId;

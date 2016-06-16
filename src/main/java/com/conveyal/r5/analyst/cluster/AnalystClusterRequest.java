@@ -8,6 +8,7 @@ import java.io.Serializable;
  * A class for vanilla Analyst requests with a pointset and a transportnetwork.
  */
 public class AnalystClusterRequest extends GenericClusterRequest implements Serializable {
+
     public static final long serialVersionUID = 1L;
 
     public final String type = "analyst";

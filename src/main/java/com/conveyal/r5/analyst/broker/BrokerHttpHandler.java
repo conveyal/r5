@@ -61,12 +61,13 @@ class BrokerHttpHandler extends HttpHandler {
         String[] pathComponents = request.getPathInfo().split("/");
 
         // Path component 0 is empty since the path always starts with a slash.
-        // Together with the HTTP method, path component 1 establishes what the client wants to do.
+        // Together with the HTTP method, path component 1 establishes which action the client wishes to take.
         if (pathComponents.length < 2) {
             response.setStatus(HttpStatus.BAD_REQUEST_400);
             response.setDetailMessage("path should have at least one part");
         }
 
+        String command = pathComponents[1];
         try {
             if (request.getMethod() == Method.HEAD) {
                 /* Let the client know server is alive and URI + request are valid. */
@@ -74,7 +75,6 @@ class BrokerHttpHandler extends HttpHandler {
                 response.setStatus(HttpStatus.OK_200);
                 return;
             }
-            String command = pathComponents[1];
             if (request.getMethod() == Method.GET && "jobs".equals(command)) {
                 /* Fetch status of all jobs. */
                 List<JobStatus> ret = new ArrayList<>();
@@ -99,52 +99,69 @@ class BrokerHttpHandler extends HttpHandler {
                 /* Workers use this command to fetch tasks from a work queue.
                    They supply their R5 commit and network ID to make sure they always get the same category of work.
                    The method is POST because unlike GETs it modifies the task queue on the server. */
-                String graphId = pathComponents[2];
-                String workerCommit = pathComponents[3];
+                String workType = pathComponents[2];
+                String graphId = pathComponents[3];
+                String workerCommit = pathComponents[4];
                 WorkerCategory category = new WorkerCategory(graphId, workerCommit);
-                request.getRequest().getConnection()
-                        .addCloseListener((closeable, iCloseType) -> {
-                            broker.removeSuspendedResponse(category, response);
-                        });
-                response.suspend(); // The request object should survive after the handler function exits.
-                broker.registerSuspendedResponse(category, response);
+                if ("single".equals(workType)) {
+                    // Worker is polling for single point tasks.
+                    Broker.WrappedResponse wrappedResponse = new Broker.WrappedResponse(request, response);
+                    request.getRequest().getConnection().addCloseListener(
+                            (c, i) -> broker.removeSinglePointChannel(category, wrappedResponse));
+                    // The request object will be shelved and survive after the handler function exits.
+                    response.suspend();
+                    broker.registerSinglePointChannel(category, wrappedResponse);
+                }
+                else if ("regional".equals(workType)) {
+                    // Worker is polling for tasks from regional batch jobs.
+                    request.getRequest().getConnection().addCloseListener(
+                            (c, i) -> broker.removeSuspendedResponse(category, response));
+                    // The request object will be shelved and survive after the handler function exits.
+                    response.suspend();
+                    broker.registerSuspendedResponse(category, response);
+                }
+                else {
+                    response.setStatus(HttpStatus.NOT_FOUND_404);
+                    response.setDetailMessage("Context not found; should be either 'jobs' or 'priority'");
+                }
             }
             else if (request.getMethod() == Method.POST && "enqueue".equals(command)) {
-                /* The front end uses this to enqueue work tasks. */
-                String context = pathComponents[2];
-                if ("priority".equals(context)) { // TODO rename 'single'
+                /* The front end wants to enqueue work tasks. */
+                String workType = pathComponents[2];
+                if ("single".equals(workType)) {
                     // Enqueue a single priority task.
-                    GenericClusterRequest task = mapper.readValue(request.getInputStream(),
-                            GenericClusterRequest.class);
+                    GenericClusterRequest task =
+                            mapper.readValue(request.getInputStream(), GenericClusterRequest.class);
                     broker.enqueuePriorityTask(task, response);
                     // Enqueueing the priority task has set its internal taskId.
                     // TODO move all removal listener registration into the broker functions.
                     request.getRequest().getConnection()
-                            .addCloseListener((closeable, iCloseType) -> {
-                                broker.deletePriorityTask(task.taskId);
-                            });
-                    response.suspend(); // The request should survive after the handler function exits.
+                            .addCloseListener((closeable, iCloseType) -> broker.deletePriorityTask(task.taskId));
+                    // The request object will be shelved and survive after the handler function exits.
+                    response.suspend();
                     return;
-                } else if ("jobs".equals(context)) { // TODO make singular 'job'
+                }
+                else if ("regional".equals(workType)) {
                     // Enqueue a list of tasks that all belong to one job.
-                    List<GenericClusterRequest> tasks = mapper
-                            .readValue(request.getInputStream(),
-                                    new TypeReference<List<GenericClusterRequest>>() {
-                                    });
+                    List<GenericClusterRequest> tasks = mapper.readValue(request.getInputStream(),
+                            new TypeReference<List<GenericClusterRequest>>() { });
                     // Pre-validate tasks checking that they are all on the same job
                     GenericClusterRequest exemplar = tasks.get(0);
                     for (GenericClusterRequest task : tasks) {
-                        if (task.jobId != exemplar.jobId || task.graphId != exemplar.graphId || task.workerCommit != exemplar.workerCommit) {
+                        if (task.jobId != exemplar.jobId ||
+                            task.graphId != exemplar.graphId ||
+                            task.workerCommit != exemplar.workerCommit) {
                             response.setStatus(HttpStatus.BAD_REQUEST_400);
-                            response.setDetailMessage("All tasks must be for the same graph and job, and use the same worker commit.");
+                            response.setDetailMessage("All tasks must be for the same graph, job, and worker commit.");
+                            return;
                         }
                     }
                     broker.enqueueTasks(tasks);
                     response.setStatus(HttpStatus.ACCEPTED_202);
-                } else {
+                }
+                else {
                     response.setStatus(HttpStatus.NOT_FOUND_404);
-                    response.setDetailMessage(
-                            "Context not found; should be either 'jobs' or 'priority'");
+                    response.setDetailMessage("Context not found; should be either 'jobs' or 'priority'");
                 }
             }
             else if (request.getMethod() == Method.POST && "complete".equals(command)) {
@@ -169,30 +186,20 @@ class BrokerHttpHandler extends HttpHandler {
                 suspendedProducerResponse.resume();
                 return;
             }
-            else if (request.getMethod() == Method.POST && "single".equals(command)) { // TODO shouldn't this be dequeue/single ?
-                // await single point responses
-                String graphId = pathComponents[2];
-                String workerCommit = pathComponents[3];
-                WorkerCategory category = new WorkerCategory(graphId, workerCommit);
-                Broker.WrappedResponse wr = new Broker.WrappedResponse(request, response);
-                request.getRequest().getConnection().addCloseListener((c, i) -> {
-                    broker.removeSinglePointChannel(category, wr);
-                });
-                response.suspend();
-                broker.registerSinglePointChannel(category, wr);
-            }
             else if (request.getMethod() == Method.DELETE) {
                 /* Used by workers to acknowledge completion of a task and remove it from queues, avoiding re-delivery. */
-                if ("tasks".equalsIgnoreCase(pathComponents[1])) {
-                    int taskId = Integer.parseInt(pathComponents[2]);
+                String context = pathComponents[1];
+                String id = pathComponents[2];
+                if ("tasks".equalsIgnoreCase(context)) {
+                    int taskId = Integer.parseInt(id);
                     // This must not have been a priority task. Try to delete it as a normal job task.
                     if (broker.markTaskCompleted(taskId)) {
                         response.setStatus(HttpStatus.OK_200);
                     } else {
                         response.setStatus(HttpStatus.NOT_FOUND_404);
                     }
-                } else if ("jobs".equals((pathComponents[1]))) {
-                    if (broker.deleteJob(pathComponents[2])) {
+                } else if ("jobs".equals((context))) {
+                    if (broker.deleteJob(id)) {
                         response.setStatus(HttpStatus.OK_200);
                         response.setDetailMessage("job deleted");
                     } else {

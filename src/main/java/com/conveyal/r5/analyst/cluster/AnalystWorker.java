@@ -137,7 +137,9 @@ public class AnalystWorker implements Runnable {
     // Clients for communicating with Amazon web services
     AmazonS3 s3;
 
+    /** The transport network this worker already has loaded, and therefore prefers to work on. */
     String graphIdAffinity = null;
+
     long startupTime, nextShutdownCheckTime;
 
     // Region awsRegion = Region.getRegion(Regions.EU_CENTRAL_1);
@@ -504,14 +506,9 @@ public class AnalystWorker implements Runnable {
 
     public List<GenericClusterRequest> getSomeWork(WorkType type) {
 
-        // Run a POST request (long-polling for work) indicating which graph this worker prefers to work on
-        String url;
-        if (type == WorkType.HIGH_PRIORITY) {
-            // this is a side-channel request for single point work
-            url = BROKER_BASE_URL + "/single/" + graphIdAffinity;
-        } else {
-            url = BROKER_BASE_URL + "/dequeue/" + graphIdAffinity;
-        }
+        // Run a POST request (long-polling for work) indicating which graph and r5 commit this worker has
+        String url = String.join("/", BROKER_BASE_URL, "dequeue", type == WorkType.HIGH_PRIORITY ? "single" : "regional",
+                graphIdAffinity, MavenVersion.commit);
         HttpPost httpPost = new HttpPost(url);
         httpPost.setHeader(new BasicHeader(WORKER_ID_HEADER, machineId));
         HttpResponse response = null;

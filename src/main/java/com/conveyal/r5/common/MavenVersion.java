@@ -8,9 +8,12 @@ import java.io.InputStream;
 import java.util.Properties;
 
 /**
- * Hold version information.
+ * This collects the Maven artifact version information from a properties file written during the Maven build.
+ * We use this to ensure that workers are running the exact version of the code that we want to keep results consistent.
+ * Note that building the code in an IDE may not cause this to be updated. You'll need to do a command line build.
  */
 public class MavenVersion {
+
     private static final Logger LOG = LoggerFactory.getLogger(MavenVersion.class);
 
     public static final String commit;

@@ -350,6 +350,8 @@ public class Broker implements Runnable {
         String workerDownloadUrl = String.format("http://maven.conveyal.com/com/conveyal/r5/%s/r5-%s-shaded.jar",
                 category.workerVersion, category.workerVersion);
         workerConfig.setProperty("download-url", workerDownloadUrl);
+        // This is the R5 broker, so always start R5 workers (rather than OTP workers)
+        workerConfig.setProperty("use-transport-networks", "true");
         ByteArrayOutputStream cfg = new ByteArrayOutputStream();
         try {
             workerConfig.store(cfg, "Worker config");

@@ -58,7 +58,7 @@ public class Broker implements Runnable {
 
     public final CircularList<Job> jobs = new CircularList<>();
 
-    /** the most tasks to deliver to a worker at a time */
+    /** The most tasks to deliver to a worker at a time. */
     public final int MAX_TASKS_PER_WORKER = 8;
 
     /**
@@ -67,7 +67,7 @@ public class Broker implements Runnable {
      */
     public static final long WORKER_STARTUP_TIME = 60 * 60 * 1000;
 
-    private int nUndeliveredTasks = 0; // Including normal priority jobs and high-priority tasks.
+    private int nUndeliveredTasks = 0; // Including normal priority jobs and high-priority tasks. TODO check that this total is really properly maintained
 
     private int nWaitingConsumers = 0; // including some that might be closed
 
@@ -87,8 +87,8 @@ public class Broker implements Runnable {
         mapper.registerModule(TraverseModeSetSerializer.makeModule());
     }*/
 
-    /** The broker configuration. */
-    private final Properties config;
+    /** The configuration for this broker. */
+    private final Properties brokerConfig;
 
     /** The configuration that will be applied to workers launched by this broker. */
     private final Properties workerConfig;
@@ -147,15 +147,15 @@ public class Broker implements Runnable {
         // print out date on startup so that CloudWatch logs has a unique fingerprint
         LOG.info("Analyst broker starting at {}", LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
 
-        this.config = brokerConfig;
+        this.brokerConfig = brokerConfig;
 
         // create a config for the AWS workers
         workerConfig = new Properties();
 
         // load the base worker configuration if specified
-        if (config.getProperty("worker-config") != null) {
+        if (this.brokerConfig.getProperty("worker-config") != null) {
             try {
-                File f = new File(config.getProperty("worker-config"));
+                File f = new File(this.brokerConfig.getProperty("worker-config"));
                 FileInputStream fis = new FileInputStream(f);
                 workerConfig.load(fis);
                 fis.close();
@@ -336,15 +336,15 @@ public class Broker implements Runnable {
         // There are no workers on this graph with the right worker commit, start some.
         LOG.info("Starting {} workers as there are none on {}", nWorkers, category);
         RunInstancesRequest req = new RunInstancesRequest();
-        req.setImageId(config.getProperty("ami-id"));
-        req.setInstanceType(InstanceType.valueOf(config.getProperty("worker-type")));
-        req.setSubnetId(config.getProperty("subnet-id"));
+        req.setImageId(brokerConfig.getProperty("ami-id"));
+        req.setInstanceType(InstanceType.valueOf(brokerConfig.getProperty("worker-type")));
+        req.setSubnetId(brokerConfig.getProperty("subnet-id"));
 
         // even if we can't get all the workers we want at least get some
         req.setMinCount(1);
         req.setMaxCount(nWorkers);
 
-        // it's fine to just modify the worker config as this method is synchronized
+        // It's fine to just modify the worker config without a protective copy because this method is synchronized.
         workerConfig.setProperty("initial-graph-id", category.graphId);
         workerConfig.setProperty("worker-version", category.workerVersion);
         String workerDownloadUrl = String.format("http://maven.conveyal.com/com/conveyal/r5/%s/r5-%s-shaded.jar",
@@ -364,12 +364,12 @@ public class Broker implements Runnable {
         String userData = new String(Base64.getEncoder().encode(cfg.toByteArray()));
         req.setUserData(userData);
 
-        if (config.getProperty("worker-iam-role") != null)
-            req.setIamInstanceProfile(new IamInstanceProfileSpecification().withArn(config.getProperty("worker-iam-role")));
+        if (brokerConfig.getProperty("worker-iam-role") != null)
+            req.setIamInstanceProfile(new IamInstanceProfileSpecification().withArn(brokerConfig.getProperty("worker-iam-role")));
 
         // launch into a VPC if desired
-        if (config.getProperty("subnet") != null)
-            req.setSubnetId(config.getProperty("subnet"));
+        if (brokerConfig.getProperty("subnet") != null)
+            req.setSubnetId(brokerConfig.getProperty("subnet"));
 
         // allow us to retry request at will
         req.setClientToken(clientToken);

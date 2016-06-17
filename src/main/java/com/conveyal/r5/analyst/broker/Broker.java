@@ -347,11 +347,12 @@ public class Broker implements Runnable {
         // It's fine to just modify the worker config without a protective copy because this method is synchronized.
         workerConfig.setProperty("initial-graph-id", category.graphId);
         workerConfig.setProperty("worker-version", category.workerVersion);
+        // Tell the worker where to get its R5 JAR.
         String workerDownloadUrl = String.format("http://maven.conveyal.com/com/conveyal/r5/%s/r5-%s-shaded.jar",
                 category.workerVersion, category.workerVersion);
         workerConfig.setProperty("download-url", workerDownloadUrl);
-        // This is the R5 broker, so always start R5 workers (rather than OTP workers)
-        workerConfig.setProperty("use-transport-networks", "true");
+        // This is the R5 broker, so always start R5 workers (rather than OTP workers).
+        workerConfig.setProperty("main-class", AnalystWorker.class.getName());
         ByteArrayOutputStream cfg = new ByteArrayOutputStream();
         try {
             workerConfig.store(cfg, "Worker config");

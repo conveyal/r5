@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.IntStream;
 
 /**
  * A LinkedPointSet is a PointSet that has been pre-connected to a StreetLayer in a non-destructive, reversible way.
@@ -161,21 +162,21 @@ public class LinkedPointSet {
      * @param relinkZone only link points inside this geometry, leaving all the others alone. If null, link all points.
      */
     private void linkPointsToStreets(Geometry relinkZone) {
-        int unlinked = 0;
-        for (int p = 0; p < pointSet.featureCount(); p++) {
+        // Perform linkage calculations in parallel, writing results to the shared parallel arrays.
+        IntStream.range(0, pointSet.featureCount()).parallel().forEach(p -> {
             // When working with a scenario, skip all points outside the zone that could be affected by new edges.
             // The linkage from the original base StreetNetwork will be retained for these points.
-            if (relinkZone != null && !relinkZone.contains(pointSet.getJTSPoint(p))) continue;
+            if (relinkZone != null && !relinkZone.contains(pointSet.getJTSPoint(p))) return;
             Split split = streetLayer.findSplit(pointSet.getLat(p), pointSet.getLon(p), MAX_OFFSTREET_WALK_METERS, streetMode);
             if (split == null) {
-                unlinked++;
                 edges[p] = -1;
             } else {
                 edges[p] = split.edge;
                 distances0_mm[p] = split.distance0_mm;
                 distances1_mm[p] = split.distance1_mm;
             }
-        }
+        });
+        long unlinked = Arrays.stream(edges).filter(e -> e == -1).count();
         LOG.info("Done linking points to street network. {} features were not linked.", unlinked);
     }
 
@@ -300,10 +301,10 @@ public class LinkedPointSet {
         LOG.info("Creating distance tables from each transit stop to PointSet points...");
         TransitLayer transitLayer = streetLayer.parentNetwork.transitLayer;
         int nStops = transitLayer.getStopCount();
-        // Create trees in parallel to make this fast, for interactive use.
-        for (int s = 0; s < nStops; s++) {
+        // Create trees in parallel.
+        IntStream.range(0, nStops).parallel().forEach(s ->{
             // When working on a scenario, skip over all stops that could not have been affected by new street edges.
-            if (treeRebuildZone!= null && !treeRebuildZone.contains(transitLayer.getJTSPointForStop(s))) continue;
+            if (treeRebuildZone!= null && !treeRebuildZone.contains(transitLayer.getJTSPointForStop(s))) return;
             // Get the pre-computed tree from the stop to the street vertices
             TIntIntMap stopTreeToVertices = transitLayer.stopTrees.get(s);
             if (stopTreeToVertices != null) {
@@ -311,7 +312,7 @@ public class LinkedPointSet {
                 // Note that the list must be pre-initialized with nulls or with the stop trees from a base linkage.
                 stopTrees.set(s, this.getStopTree(stopTreeToVertices));
             }
-        }
+        });
         LOG.info("Done creating travel distance tables.");
     }
 }

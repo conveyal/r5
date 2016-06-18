@@ -135,7 +135,7 @@ public abstract class Modification implements Serializable {
         network.streetLayer.buildEdgeLists();
         int firstNewStop = network.transitLayer.stopTrees.size();
         for (int intStopIndex = firstNewStop; intStopIndex < network.transitLayer.getStopCount(); intStopIndex++) {
-            network.transitLayer.buildOneStopTree(intStopIndex);
+            network.transitLayer.stopTrees.add(network.transitLayer.buildOneStopTree(intStopIndex));
         }
         new TransferFinder(network).findTransfers();
         return intStopIds;

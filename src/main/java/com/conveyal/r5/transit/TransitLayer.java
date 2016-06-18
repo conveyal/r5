@@ -27,6 +27,8 @@ import java.time.DateTimeException;
 import java.time.ZoneId;
 import java.time.zone.ZoneRulesException;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 
 /**
@@ -391,31 +393,24 @@ public class TransitLayer implements Serializable, Cloneable {
         LOG.info("Building stop trees (cached distances between transit stops and street intersections).");
         // Allocate a new empty array of stop trees, releasing any existing ones.
         stopTrees = new ArrayList<>(getStopCount());
-        for (int stop = 0; stop < getStopCount(); stop++) {
-            buildOneStopTree(stop);
-        }
+        // Parallelized.
+        stopTrees = IntStream.range(0, getStopCount()).parallel()
+                .mapToObj(s -> buildOneStopTree(s)).collect(Collectors.toList());
         LOG.info("Done building stop trees.");
     }
 
     /**
-     * Perform a single on-street search from the specified transit stop. Store the distance in millimeters to every reached
-     * street vertex.
+     * Perform a single on-street search from the specified transit stop.
+     * Return the distance in millimeters to every reached street vertex.
      * @param stop the internal integer stop ID for which to build a stop tree.
+     * @return a map from street vertex numbers to distances in millimeters
      */
-    public void buildOneStopTree(int stop) {
-        // Lists do not auto-grow if you try to add an element past their end.
-        // So until we need different behavior, we only support adding a stop tree to the end of the list,
-        // not updating an existing one or adding one out past the end of the list.
-        if (stopTrees.size() != stop) {
-            throw new RuntimeException("New stop trees can only be added to the end of the list.");
-        }
-
+    public TIntIntMap buildOneStopTree(int stop) {
         int originVertex = streetVertexForStop.get(stop);
         if (originVertex == -1) {
             // -1 indicates that this stop is not linked to the street network.
             LOG.warn("Stop {} has not been linked to the street network, cannot build stop tree.", stop);
-            stopTrees.add(null);
-            return;
+            return null;
         }
         StreetRouter router = new StreetRouter(parentNetwork.streetLayer);
         router.distanceLimitMeters = STOP_TREE_DISTANCE_METERS;
@@ -427,7 +422,7 @@ public class TransitLayer implements Serializable, Cloneable {
         router.route();
 
         // This will return distance in millimeters since that is our dominance function
-        stopTrees.add(router.getReachedVertices());
+        return router.getReachedVertices();
     }
 
     public static TransitLayer fromGtfs (List<String> files) throws DuplicateFeedException {

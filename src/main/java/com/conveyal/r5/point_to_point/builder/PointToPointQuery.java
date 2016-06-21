@@ -153,6 +153,7 @@ public class PointToPointQuery {
                 // TODO add time and distance limits to routing, not just weight.
                 // TODO apply walk and bike speeds and maxBike time.
                 streetRouter.distanceLimitMeters = transit ? 2000 : 100_000; // FIXME arbitrary, and account for bike or car access mode
+                streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
                 if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
                     streetRouter.route();
                      //Searching for access paths
@@ -212,6 +213,7 @@ public class PointToPointQuery {
                 } else {
                     streetRouter.streetMode = StreetMode.valueOf(mode.toString());
                     streetRouter.distanceLimitMeters = 100_000; // FIXME arbitrary, and account for bike or car access mode
+                    streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
                     if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
                         streetRouter.setDestination(request.toLat, request.toLon);
                         streetRouter.route();
@@ -245,6 +247,7 @@ public class PointToPointQuery {
                 // TODO add time and distance limits to routing, not just weight.
                 // TODO apply walk and bike speeds and maxBike time.
                 streetRouter.distanceLimitMeters =  2000; // FIXME arbitrary, and account for bike or car access mode
+                streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
                 if(streetRouter.setOrigin(request.toLat, request.toLon)) {
                     streetRouter.route();
                     TIntIntMap stops = streetRouter.getReachedStops();
@@ -368,6 +371,7 @@ public class PointToPointQuery {
     private StreetRouter findParkRidePath(ProfileRequest request, StreetRouter streetRouter) {
         streetRouter.streetMode = StreetMode.CAR;
         streetRouter.distanceLimitMeters = 15_000;
+        streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
         if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
             streetRouter.route();
             TIntObjectMap<StreetRouter.State> carParks = streetRouter.getReachedVertices(VertexStore.VertexFlag.PARK_AND_RIDE);
@@ -376,6 +380,7 @@ public class PointToPointQuery {
             walking.streetMode = StreetMode.WALK;
             walking.profileRequest = request;
             walking.distanceLimitMeters = 2_000 + streetRouter.distanceLimitMeters;
+            walking.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
             walking.setOrigin(carParks, CAR_PARK_DROPOFF_TIME_S, CAR_PARK_DROPOFF_COST, LegMode.CAR_PARK);
             walking.route();
             walking.previous = streetRouter;
@@ -402,6 +407,7 @@ public class PointToPointQuery {
         // TODO add time and distance limits to routing, not just weight.
         // TODO apply walk and bike speeds and maxBike time.
         streetRouter.distanceLimitMeters = 2_000;
+        streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
         if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
             streetRouter.route();
             //This finds all the nearest bicycle rent stations when walking
@@ -419,6 +425,7 @@ public class PointToPointQuery {
             bicycle.streetMode = StreetMode.BICYCLE;
             bicycle.profileRequest = request;
             bicycle.distanceLimitMeters = 15_000 + streetRouter.distanceLimitMeters;
+            bicycle.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
             bicycle.setOrigin(bikeStations, BIKE_RENTAL_PICKUP_TIME_S, BIKE_RENTAL_PICKUP_COST, LegMode.BICYCLE_RENT);
             bicycle.route();
             TIntObjectMap<StreetRouter.State> cycledStations = bicycle.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
@@ -439,6 +446,7 @@ public class PointToPointQuery {
             end.streetMode = StreetMode.WALK;
             end.profileRequest = request;
             end.distanceLimitMeters = 2_000 + bicycle.distanceLimitMeters;
+            end.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
             end.setOrigin(cycledStations, BIKE_RENTAL_DROPOFF_TIME_S, BIKE_RENTAL_DROPOFF_COST, LegMode.BICYCLE_RENT);
             end.route();
             end.previous = bicycle;

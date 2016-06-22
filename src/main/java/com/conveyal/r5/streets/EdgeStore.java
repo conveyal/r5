@@ -502,6 +502,11 @@ public class EdgeStore implements Serializable {
             } else if (streetMode == StreetMode.BICYCLE) {
                 // walk a bike if biking is not allowed on this edge, or if the traffic stress is too high
                 boolean walking = !getFlag(EdgeFlag.ALLOWS_BIKE);
+                if (walking) {
+                    //Recalculation of time and speed is needed if we are walking with bike
+                    speedms = calculateSpeed(req, StreetMode.WALK)*0.9f;
+                    time = (float) (getLengthM() / speedms);
+                }
 
                 if (req.bikeTrafficStress > 0 && req.bikeTrafficStress < 4) {
                     if (getFlag(EdgeFlag.BIKE_LTS_4)) walking = true;

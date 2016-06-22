@@ -178,7 +178,6 @@ public class PointToPointRouterServer {
             streetRouter.profileRequest = profileRequest;
             streetRouter.streetMode = streetMode;
             streetRouter.distanceLimitMeters = 2000;
-            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
             if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
                 streetRouter.route();
                 streetRouter.getReachedStops().forEachEntry((stopIdx, weight) -> {
@@ -235,7 +234,6 @@ public class PointToPointRouterServer {
             streetRouter.profileRequest = profileRequest;
             streetRouter.streetMode = streetMode;
             streetRouter.distanceLimitMeters = 2000;
-            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
             if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
                 streetRouter.route();
                 streetRouter.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING).forEachEntry((vertexIdx, state) -> {
@@ -289,7 +287,6 @@ public class PointToPointRouterServer {
             streetRouter.profileRequest = profileRequest;
             streetRouter.streetMode = streetMode;
             streetRouter.distanceLimitMeters = 10_000;
-            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
             if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
                 streetRouter.route();
                 streetRouter.getReachedVertices(VertexStore.VertexFlag.PARK_AND_RIDE).forEachEntry((vertexIdx, state) -> {
@@ -352,7 +349,6 @@ public class PointToPointRouterServer {
 
             // TODO use target pruning instead of a distance limit
             streetRouter.distanceLimitMeters = 100_000;
-            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
             //Split for end coordinate
             if (!streetRouter.setDestination(profileRequest.toLat, profileRequest.toLon)) {
                 content.put("errors", "Edge near the end coordinate wasn't found. Routing didn't start!");

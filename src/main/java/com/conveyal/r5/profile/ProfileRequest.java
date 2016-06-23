@@ -61,7 +61,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     /** The speed of driving, in meters per second */
     public float  carSpeed;
 
-    /** Maximum time to reach the destination without using transit */
+    /** Maximum time to reach the destination without using transit in minutes */
     public int    streetTime = 60;
     
     /**
@@ -441,5 +441,25 @@ public class ProfileRequest implements Serializable, Cloneable {
         fromZonedDateTime = ZonedDateTime.parse(fromTime);
         toZonedDateTime = ZonedDateTime.parse(toTime);
         setTime();
+    }
+
+    /**
+     * Returns maxCar/Bike/Walk based on LegMode
+     *
+     * @param mode
+     * @return
+     */
+    public int getTimeLimit(LegMode mode) {
+        switch (mode) {
+        case CAR:
+            return maxCarTime * 60;
+        case BICYCLE:
+            return maxBikeTime * 60;
+        case WALK:
+            return maxWalkTime * 60;
+        default:
+            System.err.println("Unknown mode in getTimeLimit:"+mode.toString());
+            return streetTime * 60;
+        }
     }
 }

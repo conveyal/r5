@@ -16,7 +16,7 @@ script: |
 
 after_success:
   # upload shaded JAR to S3
-  aws s3 cp --recursive --exclude "*" --include "*.jar" --exclude "r5-*" target s3://r5-builds
+  aws s3 cp --recursive --exclude "*" --include "*.jar" --exclude "r5-*" /home/travis/build/conveyal/r5/target s3://r5-builds
 
 env:
   global:

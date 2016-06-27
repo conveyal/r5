@@ -83,9 +83,7 @@
             <phase>package</phase>
             <goals><goal>shade</goal></goals>
             <configuration>
-              <!-- Include the shaded JAR in deployments -->
-              <shadedArtifactAttached>true</shadedArtifactAttached>
-              <shadedClassifierName>shaded</shadedClassifierName>
+              <finalName>${git.commit.id.describe}</finalName>
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <manifestEntries>

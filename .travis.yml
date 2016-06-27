@@ -14,7 +14,7 @@ script: |
     mvn clean verify
   fi
 
-after_success:
+after_success: |
   # upload shaded JAR to S3
   pip install --user awscli && export PATH=$PATH:~/.local/bin/
   aws s3 cp --recursive --exclude "*" --include "*.jar" --exclude "r5-*" /home/travis/build/conveyal/r5/target s3://r5-builds

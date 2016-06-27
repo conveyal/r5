@@ -14,6 +14,10 @@ script: |
     mvn clean verify
   fi
 
+after_success:
+  # upload shaded JAR to S3
+  aws s3 cp --recursive --exclude "*" --include "*.jar" --exclude "r5-*" target s3://r5-builds
+
 env:
   global:
   - secure: co/cnAH0EYVS68v81DCv5xwBizBAsiLrUMM/mI/H6np11bVFR4Pxc0yrfkOdoznf6kW/huyQMsCULHZDP2XnAb9jUR6MWZ6t8xhmOBDscSuTDmgQkrwefRc64mJkbA7xqndh1j71oLUqvKGQpc6IvlfHc0yyzIFwA9eNmAive9R5H1MGb7M21LNAXO4ALh9kAVJOSi48xOZ8fcoWm2tJ+RNbVHSguyAdKpHSWuu1UkaPE4mUshXx6ZQFskZLu8YhazkajzKff5mGziaqhAB8BInwXRzpvu+0bMAkz/eBSgyeAtZ9p21bC3s0F5DRAwrrk640Ejkg3aa8eGPQi1ufD0xY4lUZNsva9tgQgmXfhe0NYWH130tr4Tr/gY0EmmDLAa/CjK2Fs8Qe16bs1LnUfb4/Bj5apK1qiKqp+dJdxgEGCTPzLTl/3pSbL4mTGllIkt8rf91XDwEW9EMs0K5JjjpJJTnzSA/DeKUivSzib735/vW5JLsxWToI2ER0QdXoDek7yejnvapMadCh7MjF/Ectw0qBVrjB16DLQbxk/Q5wxm2ZnYshjCO1f2phja/c18UAnalWfqbWWGtRKDHYhwBaVsbaeeRBIC2vHPfc8KS7ZbuXNcmyNjDoSoviwPo73TAYNM8rIz+wM0hZkBiHxcPBJ5Ne3WLEX1SB9haBWBM=

@@ -293,7 +293,10 @@ public class EdgeStore implements Serializable {
         // Increment total number of edges created so far, and return the index of the first new edge.
         int forwardEdgeIndex = nEdges;
         nEdges += 2;
-        return getCursor(forwardEdgeIndex);
+        Edge edge = getCursor(forwardEdgeIndex);
+        //angles needs to be calculated here since some edges don't get additional geometry (P+R, transit, etc.)
+        edge.calculateAngles();
+        return edge;
 
     }
 
@@ -633,6 +636,9 @@ public class EdgeStore implements Serializable {
             // The same empty int array represents all straight-line edges.
             if (nodes.size() <= 2) {
                 geometries.set(pairIndex, EMPTY_INT_ARRAY);
+                //Angles also need to be calculated here since when splitting edges some edges currently loose geometry
+                //and otherwise angles would be incorrect
+                calculateAngles();
                 return;
             }
             if (isBackward) {
@@ -649,6 +655,28 @@ public class EdgeStore implements Serializable {
             }
             geometries.set(pairIndex, intermediateCoords);
 
+            //This is where angles for most edges is calculated
+            calculateAngles();
+
+        }
+
+        /**
+         * Reads edge geometry and calculates in and out angle
+         *
+         * Angles are saved as binary radians clockwise from North.
+         * 0 is 0
+         * -180° = -128
+         * 180° = -180° = -128
+         * 178° = 127
+         *
+         * First and last angles are calculated between first/last and point that is at
+         * least 10 m from it according to line distance
+         *
+         * @see DirectionUtils
+         *
+         * TODO: calculate angles without converting to the Linestring and back
+         */
+        private void calculateAngles() {
             LineString geometry = getGeometry();
 
             byte inAngleRad = DirectionUtils.getFirstAngleBrads(geometry);

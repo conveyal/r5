@@ -6,7 +6,12 @@
   <packaging>jar</packaging>
   <version>0.3-SNAPSHOT</version>
   <name>r5</name>
-  <url>http://maven.apache.org</url>
+  <url>https://github.com/conveyal/r5</url>
+
+  <scm>
+    <connection>scm:git:https://github.com/conveyal/r5.gitk</connection>
+    <developerConnection>scm:git:https://github.com/conveyal/r5.git</developerConnection>
+  </scm>
 
   <properties>
     <geotools.version>14.0</geotools.version>

@@ -152,7 +152,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         for (int departureTime = request.toTime - 60, n = 0; departureTime > request.fromTime; departureTime -= mersenneTwister.nextInt(maxSamplingFrequency), n++) {
 
-            // we're not using range-raptor so it's safe to change the schedule on each round
+            // we're not using range-raptor so it's safe to change the schedule on each search
             offsets.randomize();
 
             bestStates.clear(); // if we ever use range-raptor, for it to be valid in a search with a limited number of transfers we need a separate state after each round

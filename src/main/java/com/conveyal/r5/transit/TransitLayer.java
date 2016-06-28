@@ -425,19 +425,6 @@ public class TransitLayer implements Serializable, Cloneable {
         return router.getReachedVertices();
     }
 
-    public static TransitLayer fromGtfs (List<String> files) throws DuplicateFeedException {
-        TransitLayer transitLayer = new TransitLayer();
-
-        for (String file : files) {
-            GTFSFeed gtfs = GTFSFeed.fromFile(file);
-            transitLayer.loadFromGtfs(gtfs);
-            //Makes sure that temporary mapdb files are deleted after they aren't needed
-            gtfs.close();
-        }
-
-        return transitLayer;
-    }
-
     public int getStopCount () {
         return stopIdForIndex.size();
     }

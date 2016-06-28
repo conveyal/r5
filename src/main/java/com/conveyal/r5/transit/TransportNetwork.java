@@ -1,5 +1,6 @@
 package com.conveyal.r5.transit;
 
+import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.scenario.Scenario;
@@ -113,16 +114,12 @@ public class TransportNetwork implements Serializable {
         return fromFiles(osmSourceFile, Arrays.asList(gtfsSourceFile), tnBuilderConfig);
     }
 
-    /**
-     * OSM PBF files are fragments of a single global database with a single namespace. Therefore it is valid to load
-     * more than one PBF file into a single OSM storage object. However they might be from different points in time,
-     * so it may be cleaner to just map one PBF file to one OSM object.
-     *
-     * On the other hand, GTFS feeds each have their own namespace. Each GTFS object is for one specific feed, and this
-     * distinction should be maintained for various reasons. However, we use the GTFS IDs only for reference, so it doesn't
-     * really matter, particularly for analytics.
+    /** It would seem cleaner to just have two versions of this function, one which takes a list of strings and converts
+     * it to a list of feeds, and one that just takes a list of feeds directly. However, this would require loading all the
+     * feeds into memory simulataneously, which shouldn't be so bad with mapdb-based feeds, but it's still not great (due
+     * to caching etc.)
      */
-    public static TransportNetwork fromFiles (String osmSourceFile, List<String> gtfsSourceFiles, TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
+    private static TransportNetwork fromFiles (String osmSourceFile, List<String> gtfsSourceFiles, List<GTFSFeed> feeds, TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
 
         System.out.println("Summarizing builder config: " + BUILDER_CONFIG_FILENAME);
         System.out.println(tnBuilderConfig);
@@ -152,7 +149,20 @@ public class TransportNetwork implements Serializable {
         }
 
         // Load transit data TODO remove need to supply street layer at this stage
-        TransitLayer transitLayer = TransitLayer.fromGtfs(gtfsSourceFiles);
+        TransitLayer transitLayer = new TransitLayer();
+
+        if (feeds != null) {
+            for (GTFSFeed feed : feeds) {
+                transitLayer.loadFromGtfs(feed);
+            }
+        } else {
+            for (String feedFile: gtfsSourceFiles) {
+                GTFSFeed feed = GTFSFeed.fromFile(feedFile);
+                transitLayer.loadFromGtfs(feed);
+                feed.close();
+            }
+        }
+
         transportNetwork.transitLayer = transitLayer;
         transitLayer.parentNetwork = transportNetwork;
 
@@ -173,6 +183,25 @@ public class TransportNetwork implements Serializable {
 
         return transportNetwork;
     }
+
+    /**
+     * OSM PBF files are fragments of a single global database with a single namespace. Therefore it is valid to load
+     * more than one PBF file into a single OSM storage object. However they might be from different points in time,
+     * so it may be cleaner to just map one PBF file to one OSM object.
+     *
+     * On the other hand, GTFS feeds each have their own namespace. Each GTFS object is for one specific feed, and this
+     * distinction should be maintained for various reasons. However, we use the GTFS IDs only for reference, so it doesn't
+     * really matter, particularly for analytics.
+     */
+    public static TransportNetwork fromFiles (String osmFile, List<String> gtfsFiles, TNBuilderConfig config) {
+        return fromFiles(osmFile, gtfsFiles, null, config);
+    }
+
+    /** Create a transport network from already loaded GTFS feeds */
+    public static TransportNetwork fromFeeds (String osmFile, List<GTFSFeed> feeds, TNBuilderConfig config) {
+        return fromFiles(osmFile, null, feeds, config);
+    }
+
 
     public static TransportNetwork fromDirectory (File directory) throws DuplicateFeedException {
         File osmFile = null;

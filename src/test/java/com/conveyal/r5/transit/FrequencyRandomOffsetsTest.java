@@ -26,6 +26,10 @@ public class FrequencyRandomOffsetsTest {
         layer.hasFrequencies = true;
         layer.hasSchedules = false;
 
+        for (int i = 0; i < 9; i++) {
+            layer.stopIdForIndex.add(String.format("FEED:STOP_%d", i));
+        }
+
         // create two frequency-based lines
         TripPatternKey key1 = new TripPatternKey("route1");
         key1.stops = new TIntArrayList(new int[] { 1, 2, 3, 4 });
@@ -36,11 +40,14 @@ public class FrequencyRandomOffsetsTest {
 
         TripPattern pattern1 = new TripPattern(key1);
         Trip t1 = new Trip();
+        t1.feed_id = "FEED";
+        t1.trip_id = "TRIP1";
         Frequency f1 = new Frequency();
         f1.start_time = 5 * 60 * 60;
         f1.end_time = 11 * 60 * 60;
         f1.headway_secs = 30 * 60;
         f1.exact_times = 0;
+        f1.trip_id = "TRIP1";
         List<Frequency> frequencies = Arrays.asList(f1);
         TripSchedule ts1 = TripSchedule.create(t1, new int [] { 0, 120, 240, 360 }, new int [] { 0, 120, 240, 360 }, frequencies, new int[] { 1, 2, 3, 4 }, 0);
         pattern1.addTrip(ts1);
@@ -56,25 +63,27 @@ public class FrequencyRandomOffsetsTest {
 
         TripPattern pattern2 = new TripPattern(key2);
         Trip t2 = new Trip();
+        t2.feed_id = "FEED";
+        t2.trip_id = "TRIP2";
         Frequency f2 = new Frequency();
         // use a different start time to ensure that that is taken into account
         f2.start_time = 5 * 60 * 60 + 8 * 60;
         f2.end_time = 11 * 60 * 60;
         f2.headway_secs = 30 * 60;
         f2.exact_times = 0;
+        f2.trip_id = "TRIP2";
         frequencies = Arrays.asList(f2);
-        TripSchedule ts2 = TripSchedule.create(t2, new int [] { 0, 60, 90, 180 }, new int [] { 0, 60, 90, 180 }, frequencies, new int[] { 1, 2, 3, 4 }, 0);
+        TripSchedule ts2 = TripSchedule.create(t2, new int [] { 0, 60, 90, 180 }, new int [] { 0, 60, 90, 180 }, frequencies, new int[] { 5, 6, 7, 8 }, 0);
 
-        ts2.phasedAtTargetStopPosition = new int[] { 1 };
-        ts2.phasedFromSourceStopPosition = new int[] { 2 };
-        ts2.phasedFromFrequencyEntry = new int[] { 0 };
-        ts2.phasedFromPattern = new int [] { 0 };
-        ts2.phasedFromTrip = new int [] { 0 };
-        ts2.phaseSeconds = new int [] { 10 * 60 };
+        ts2.phasedFromId = new String[] { "FEED:TRIP1_05:00:00_to_11:00:00_every_30m00s" };
+        ts2.phasedAtStop = new String[] { "FEED:STOP_6" };
+        ts2.phasedFromStop = new String[] { "FEED:STOP_3" };
+        ts2.phaseSeconds = new int[] { 600 };
 
         pattern2.addTrip(ts2);
 
         layer.tripPatterns.add(pattern2);
+        layer.rebuildTransientIndexes();
 
         FrequencyRandomOffsets fro = new FrequencyRandomOffsets(layer);
         fro.randomize();

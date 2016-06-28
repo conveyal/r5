@@ -20,6 +20,7 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
     private static final Logger LOG = LoggerFactory.getLogger(TripSchedule.class);
 
     public String tripId;
+
     public int[] arrivals;
     public int[] departures;
 
@@ -32,23 +33,50 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
     /** end times for frequency entries */
     public int[] endTimes = null;
 
+    /** IDs for frequency entries */
+    public String[] frequencyEntryIds;
+
     public int flags;
     public int serviceCode;
     public TripSchedule nextInBlock = null;
 
-    public int[] phasedFromPattern = null;
-    public int[] phasedFromTrip = null;
-    public int[] phasedFromFrequencyEntry = null;
-    /** NB these are stop positions (0-based, incrementing by 1), NOT GTFS stop sequences */
-    public int[] phasedFromSourceStopPosition = null;
-    public int[] phasedAtTargetStopPosition = null;
-    public int[] phaseSeconds = null;
+    // Phasing information: how does this frequency-based trip schedule interact with others?
+
+    /**
+     * Frequency entry each frequency entry on this trip is phased from. If the array is null, no entries are phased;
+     * if any entry is null, that entry is not phased.
+     */
+    public String[] phasedFromId;
+
+    /**
+     * Scoped stop ID on this trip where this the phase is applied.
+     */
+    public String[] phasedAtStop;
+
+    /** Scoped stop ID on source (phased-from) trip where the phase is applied */
+    public String[] phasedFromStop;
+
+    /**
+     * Phase between trips. Applied to departure time except at last stop, where it is applied to arrival time.
+     *
+     * If the from and to trips have the same frequency, this is pretty straightforward. If they do not, it is slightly
+     * more complicated, and the guarantee of phasing is weaker. We will make it so that one of the trips on this frequency
+     * entry passes phaseSeconds after one of the trips on the other entry. We will also ensure that the headway of this
+     * frequency entry is a factor or constant multiple of the headway of the other.
+     *
+     * TODO this works in the abstract, however what happens when the time windows of frequency entries are small and do
+     * not start at the same time? I think there's a possibility that no trip would "fall into place" during the active
+     * period of the frequency entry.
+     */
+    public int[] phaseSeconds;
 
     /**
      * The stop sequences of this trip in the GTFS. Unfortunately we need to store this at the trip level as every
      * trip on a pattern could have different stop sequence numbers. We need to save the sequence numbers so we can
      * uniquely identify stop positions in patterns in SetPhasing modifications (this could potentially be ripped out
      * when we change how setting phasing is done, for example by not allowing changing phasing on existing routes at all)
+     *
+     * TODO phasing now works differently, is this still needed?
      */
     public int[] stopSequences;
 
@@ -114,6 +142,7 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
                 this.headwaySeconds = new int[frequencies.size()];
                 this.startTimes = new int[frequencies.size()];
                 this.endTimes = new int[frequencies.size()];
+                this.frequencyEntryIds = new String[frequencies.size()];
 
                 // reset everything to zero-based on frequency-based trips
                 if (arrivals.length > 0) {
@@ -140,6 +169,8 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
                     this.headwaySeconds[fidx] = f.headway_secs;
                     this.endTimes[fidx] = f.end_time;
                     this.startTimes[fidx] = f.start_time;
+                    // feed scope frequency IDs
+                    this.frequencyEntryIds[fidx] = String.join(":", trip.feed_id, f.getId());
 
                     fidx++;
                 }

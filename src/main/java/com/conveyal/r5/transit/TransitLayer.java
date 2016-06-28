@@ -9,7 +9,6 @@ import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.Point;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -80,6 +79,9 @@ public class TransitLayer implements Serializable, Cloneable {
     public List<TIntList> patternsForStop;
 
     public List<Service> services = new ArrayList<>();
+
+    /** Map from frequency entry ID to pattern index, trip index, frequency entry index */
+    public Map<String, int[]> frequencyEntryIndexForId;
 
     /** If true at index stop allows boarding with wheelchairs **/
     public BitSet stopsWheelchair;
@@ -354,6 +356,7 @@ public class TransitLayer implements Serializable, Cloneable {
 
     /** (Re-)build transient indexes of this TripPattern, connecting stops to patterns etc. */
     public void rebuildTransientIndexes () {
+        LOG.info("Rebuilding transient indices.");
 
         // 1. Which patterns pass through each stop?
         // We could store references to patterns rather than indexes.
@@ -383,6 +386,24 @@ public class TransitLayer implements Serializable, Cloneable {
         for (int s = 0; s < stopIdForIndex.size(); s++) {
             indexForStopId.put(stopIdForIndex.get(s), s);
         }
+
+        // 4. What are the indices for each frequency entry?
+        frequencyEntryIndexForId = new HashMap<>();
+
+        for (int patternIdx = 0; patternIdx < tripPatterns.size(); patternIdx++) {
+            TripPattern pattern = tripPatterns.get(patternIdx);
+            for (int tripScheduleIdx = 0; tripScheduleIdx < pattern.tripSchedules.size(); tripScheduleIdx++) {
+                TripSchedule schedule = pattern.tripSchedules.get(tripScheduleIdx);
+                if (schedule.headwaySeconds == null) continue;
+
+                for (int frequencyEntryIdx = 0; frequencyEntryIdx < schedule.headwaySeconds.length; frequencyEntryIdx++) {
+                    frequencyEntryIndexForId.put(schedule.frequencyEntryIds[frequencyEntryIdx],
+                            new int [] { patternIdx, tripScheduleIdx, frequencyEntryIdx });
+                }
+            }
+        }
+
+        LOG.info("Done rebuilding transient indices.");
     }
 
     /**

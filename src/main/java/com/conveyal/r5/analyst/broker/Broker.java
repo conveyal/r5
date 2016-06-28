@@ -347,7 +347,7 @@ public class Broker implements Runnable {
         // It's fine to just modify the worker config without a protective copy because this method is synchronized.
         workerConfig.setProperty("initial-graph-id", category.graphId);
         workerConfig.setProperty("worker-version", category.workerVersion);
-        // Tell the worker where to get its R5 JAR.
+        // Tell the worker where to get its R5 JAR. This is a Conveyal S3 bucket with HTTP access turned on.
         String workerDownloadUrl = String.format("http://r5-builds.s3-website-eu-west-1.amazonaws.com/%s.jar",
                 category.workerVersion);
         workerConfig.setProperty("download-url", workerDownloadUrl);

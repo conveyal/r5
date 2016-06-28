@@ -505,9 +505,9 @@ public class AnalystWorker implements Runnable {
 
     public List<GenericClusterRequest> getSomeWork(WorkType type) {
 
-        // Run a POST request (long-polling for work) indicating which graph and r5 commit this worker has
+        // Run a POST request (long-polling for work) indicating which graph and r5 commit this worker has.
         String url = String.join("/", BROKER_BASE_URL, "dequeue", type == WorkType.SINGLE ? "single" : "regional",
-                networkId, R5Version.version);
+                networkId, R5Version.describe);
         HttpPost httpPost = new HttpPost(url);
         httpPost.setHeader(new BasicHeader(WORKER_ID_HEADER, machineId));
         HttpResponse response = null;

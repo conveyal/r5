@@ -16,7 +16,9 @@ came from [OpenTripPlanner](http://opentripplanner.org). Many of the algorithms,
 
 ## Performing a Release
 
-We are not currently using the Maven release plugin. To do so, we'd have to make R5 depend only on non-SNAPSHOT repos. The manual release process closely mimics what Maven release does. Releases must be tagged with git *annotated* commits, not *lightweight* commits. This is because `git describe` references the last annotated commit, and we use git describe as a way of specifying and identifying analyst woker versions. These annotated tags should systematically begin with the letter v because this is how our scripts recognize shaded JARs named with git describe output as opposed to un-shaded maven artifact JARs. For example:
+We are not currently using the Maven release plugin. To do so, we'd have to make R5 depend only on non-SNAPSHOT repos. Anyway, we don't want to perform releases from our local machines and prefer to let Travis CI do this. It provides a consistent build environment and there is no risk of stray local commits getting into a release.
+
+However, our manual release process closely mimics what Maven release does. Releases must be tagged with git *annotated* commits, not *lightweight* commits. This is because `git describe` references the last annotated commit, and we use git describe as a way of specifying and identifying analyst woker versions. These annotated tags should systematically begin with the letter v because this is how our scripts recognize shaded JARs named with git describe output as opposed to un-shaded maven artifact JARs. For example:
 
 ```
 [check that all dependencies are on non-SNAPSHOT versions]

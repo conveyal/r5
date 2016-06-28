@@ -19,6 +19,9 @@ came from [OpenTripPlanner](http://opentripplanner.org). Many of the algorithms,
 We are not currently using the Maven release plugin. To do so, we'd have to make R5 depend only on non-SNAPSHOT repos. The manual release process closely mimics what Maven release does. Releases must be tagged with git *annotated* commits, not *lightweight* commits. This is because `git describe` references the last annotated commit, and we use git describe as a way of specifying and identifying analyst woker versions. These annotated tags should systematically begin with the letter v because this is how our scripts recognize shaded JARs named with git describe output as opposed to un-shaded maven artifact JARs. For example:
 
 ```
+[check that all dependencies are on non-SNAPSHOT versions]
+[check on Travis that the build is currently passing]
+[check that you have pulled all changes from origin]
 [edit version in POM to 0.3.0]
 git add pom.xml
 git commit -m "Prepare version 0.3.0 release"

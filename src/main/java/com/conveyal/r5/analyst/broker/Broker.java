@@ -348,8 +348,8 @@ public class Broker implements Runnable {
         workerConfig.setProperty("initial-graph-id", category.graphId);
         workerConfig.setProperty("worker-version", category.workerVersion);
         // Tell the worker where to get its R5 JAR.
-        String workerDownloadUrl = String.format("http://maven.conveyal.com/com/conveyal/r5/%s/r5-%s-shaded.jar",
-                category.workerVersion, category.workerVersion);
+        String workerDownloadUrl = String.format("http://r5-builds.s3-website-eu-west-1.amazonaws.com/%s.jar",
+                category.workerVersion);
         workerConfig.setProperty("download-url", workerDownloadUrl);
         // This is the R5 broker, so always start R5 workers (rather than OTP workers).
         workerConfig.setProperty("main-class", AnalystWorker.class.getName());

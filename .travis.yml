@@ -18,7 +18,7 @@ after_success: |
   # Upload shaded JAR to S3. Un-shaded jar was deployed to Maven repo during the build.
   # Ideally we'd use the Travis S3 deployer for this, but it copies the main build artifact, not a detached shaded JAR.
   pip install --user awscli && export PATH=$PATH:~/.local/bin/
-  aws s3 cp --recursive --exclude "*" --include "*.jar" --exclude "r5-*" /home/travis/build/conveyal/r5/target s3://r5-builds
+  aws s3 cp --recursive --exclude "*" --include "*.jar" /home/travis/build/conveyal/r5/target s3://r5-builds
 
 sudo: false
 

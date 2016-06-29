@@ -219,6 +219,15 @@ public class AddTrips extends Modification {
                 }
             }
 
+            if (phaseFromTimetable != null || phaseFromStop != null || phaseAtStop != null) {
+                if (phaseFromTimetable == null || phaseFromStop == null || phaseAtStop == null) {
+                    warnings.add("If one of phaseFromTimetable, phaseFromStop, phaseAtStop, or phaseSeconds is specified, all must be");
+                }
+
+                if (phaseSeconds < 0) {
+                    warnings.add("Negative phasing not supported.");
+                }
+            }
 
             if (nStops >= 0) {
                 // Validate hops and dwell times.

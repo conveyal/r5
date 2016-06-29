@@ -18,6 +18,7 @@ public class JsonUtilities {
         objectMapper.registerModule(BitSetSerializer.makeModule());
         objectMapper.configure(JsonParser.Feature.ALLOW_COMMENTS, true);
         objectMapper.configure(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true);
-        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false); // ignore JSON fields that don't match target type
+        // If we receive a JSON object containing a field that we don't recognize, fail. This should catch misspellings.
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
     }
 }

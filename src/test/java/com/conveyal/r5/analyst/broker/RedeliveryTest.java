@@ -13,7 +13,10 @@ import java.util.Properties;
  * This test is not an automatic unit test. It is an integration test that must be started manually, because it takes
  * a long time to run. It will start up a broker and some local workers, then submit a large job to the broker. The
  * workers will fail to complete tasks some percentage of the time, but eventually the whole job should be finished
- * because the broker will re-send tasks.
+ * because the broker will redeliver lost tasks to the workers.
+ *
+ * Progress can be followed with:
+ * watch --interval 1 curl http://localhost:9001/jobs
  */
 public class RedeliveryTest {
 
@@ -34,8 +37,8 @@ public class RedeliveryTest {
         brokerThread.start();
 
         // Start some workers.
+        // Do not set any initial graph, because the workers are only going to simulate doing any work.
         Properties workerConfig = new Properties();
-        workerConfig.setProperty("initial-graph-id", "GRAPH");
         List<Thread> workerThreads = new ArrayList<>();
         for (int i = 0; i < N_WORKERS; i++) {
             AnalystWorker worker = new AnalystWorker(workerConfig);

@@ -1,16 +1,20 @@
 package com.conveyal.r5.profile;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.util.Arrays;
 import java.util.BitSet;
 
 /**
  * Tracks the state of a RAPTOR search. We have a separate class because we need to clone it when doing Monte Carlo
- * frequency searches.
+ * frequency searches. Note that this represents the _entire_ state of the RAPTOR search, rather than the state at
+ * a particular vertex, as is the case with State objects in other search algorithms we have.
  *
  * @author mattwigway
  */
 public class RaptorState {
-    /** Previous state (one less transfer) */
+    /** Previous state (one less transfer). Don't serialize and send to debug interface. */
+    @JsonIgnore
     public RaptorState previous;
 
     /** departure time for this state */
@@ -24,27 +28,14 @@ public class RaptorState {
 
 
     /**
-     * The previous pattern used to get to this stop, parallel to bestNonTransferTimes. Used to apply transfer rules. This is conceptually
-     * similar to the "parent pointer" used in the RAPTOR paper to allow reconstructing paths. This could
-     * be used to reconstruct a path (although potentially not the one that was used to get to a particular
-     * location, as a later round may have found a faster but more-transfers way to get there). A path
-     * reconstructed this way will thus be optimal in the earliest-arrival sense but may not have the
-     * fewest transfers; in fact, it will tend not to.
-     *
-     * Consider the case where there is a slower one-seat ride and a quicker route with a transfer
-     * to get to a transit center. At the transit center you board another vehicle. If it turns out
-     * that you still catch that vehicle at the same time regardless of which option you choose,
-     * general utility theory would suggest that you would choose the one seat ride due to a) the
-     * inconvenience of the transfer and b) the fact that most people have a smaller disutility for
-     * in-vehicle time than waiting time, especially if the waiting is exposed to the elements, etc.
-     *
-     * However, this implementation will find the more-transfers trip because it doesn't know where you're
-     * going from the transit center, whereas true RAPTOR would find both. It's not non-optimal in the
-     * earliest arrival sense, but it's also not the only optimal option.
-     *
-     * All of that said, we could reconstruct paths simply by storing one more parallel array with
-     * the index of the stop that you boarded a particular pattern at. Then we can do the typical
-     * reverse-optimization step.
+     * The previous pattern used to get to this stop, parallel to bestNonTransferTimes.
+     * When there is a transfer, bestNonTransferTimes will contain the time that the pattern in
+     * previousPatterns arrived, whereas bestTimes will contain the time the transfer arrived (these are kept separate
+     * to keep the router from blowing past the walk limit by stringing multiple transfers together). The previous pattern
+     * for the transfer can be found by looking up the stop at which the transfer originated in transferStop, and looking
+     * at the previous pattern at that stop. Transfers are done at the end of a round but do not have a separate round,
+     * so a single RaptorState represents everything that happened in a round, including riding transit vehicles and any
+     * possible transfers from those transit vehicles to other stops.
      */
     public int[] previousPatterns;
 
@@ -54,6 +45,7 @@ public class RaptorState {
     /** If this stop is optimally reached via a transfer, the stop we transferred from */
     public int[] transferStop;
 
+    /** create a RaptorState for a network with a particular number of stops */
     public RaptorState (int nStops) {
         this.bestTimes = new int[nStops];
         this.bestNonTransferTimes = new int[nStops];

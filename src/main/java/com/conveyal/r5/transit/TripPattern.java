@@ -1,23 +1,15 @@
 package com.conveyal.r5.transit;
 
-import com.conveyal.r5.analyst.scenario.Modification;
-import com.conveyal.r5.analyst.scenario.RemoveTrip;
-import com.conveyal.r5.analyst.scenario.Scenario;
-import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.*;
 
 /**
- * This is like a transmodel JourneyPattern.
+ * This is like a Transmodel JourneyPattern.
  * All the trips on the same Route that have the same sequence of stops, with the same pickup/dropoff options.
  */
 public class TripPattern implements Serializable, Cloneable {
@@ -64,6 +56,25 @@ public class TripPattern implements Serializable, Cloneable {
             dropoffs[s] = PickDropType.forGtfsCode(tripPatternKey.dropoffTypes.get(s));
         }
         routeId = tripPatternKey.routeId;
+    }
+
+    /**
+     * Create a TripPattern based only on a list of internal integer stop IDs.
+     * This is used when creating brand new patterns in scenario modifications, rather than from GTFS.
+     * Pick up and drop off will be allowed at all stops.
+     */
+    public TripPattern (TIntList intStopIds) {
+        stops = intStopIds.toArray(); // Copy.
+        int nStops = stops.length;
+        pickups = new PickDropType[nStops];
+        dropoffs = new PickDropType[nStops];
+        wheelchairAccessible = new BitSet(nStops);
+        for (int s = 0; s < nStops; s++) {
+            pickups[s] = PickDropType.SCHEDULED;
+            dropoffs[s] = PickDropType.SCHEDULED;
+            wheelchairAccessible.set(s);
+        }
+        routeId = "SCENARIO_MODIFICATION";
     }
 
     public void addTrip (TripSchedule tripSchedule) {
@@ -126,4 +137,26 @@ public class TripPattern implements Serializable, Cloneable {
         sb.append(Arrays.toString(stops));
         return sb.toString();
     }
+
+    public String toStringDetailed (TransitLayer transitLayer) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("TripPattern on route ");
+        sb.append(routeId);
+        sb.append(" with stops ");
+        for (int s : stops) {
+            sb.append(transitLayer.stopIdForIndex.get(s));
+            sb.append(" (");
+            sb.append(s);
+            sb.append(") ");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * @return true when none of the supplied tripIds are on this pattern.
+     */
+    public boolean containsNoTrips(Set<String> tripIds) {
+        return this.tripSchedules.stream().noneMatch(ts -> tripIds.contains(ts.tripId));
+    }
+
 }

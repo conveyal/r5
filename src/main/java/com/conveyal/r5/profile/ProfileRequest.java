@@ -61,7 +61,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     /** The speed of driving, in meters per second */
     public float  carSpeed;
 
-    /** Maximum time to reach the destination without using transit */
+    /** Maximum time to reach the destination without using transit in minutes */
     public int    streetTime = 60;
     
     /**
@@ -120,9 +120,6 @@ public class ProfileRequest implements Serializable, Cloneable {
     @JsonSerialize(using = TransitModeSetSerializer.class)
     @JsonDeserialize(using = TransitModeSetDeserializer.class)
     public EnumSet<TransitModes> transitModes;
-    
-    /** If true, disable all goal direction and propagate results to the street network */
-    public boolean analyst = false;
 
     /**
      * What is the minimum proportion of the time for which a destination must be accessible for it to be included in
@@ -176,8 +173,58 @@ public class ProfileRequest implements Serializable, Cloneable {
     */
     public int suboptimalMinutes = 5;
 
+    /**
+     * The maximum duration of any transit trip found by this search.
+     *
+     * Believe it or not the search can be quite sensitive to the value of this number, or at least whether it is set to a
+     * non-infinite value, as it effectively eliminates outliers in the samples of travel time, see ticket #162.
+     *
+     * Consider a network in which there is significant peak-only service, that runs from say 6-8am and 4-6pm,
+     * and your analysis window is 6:30 - 8:30. Suppose for the purpose of argument that there is no other way
+     * to reach your destination other than this peak only transit service, and also assume that there is
+     * no walking or waiting time. During your time window the you can take transit for the first 1.5 hours,
+     * and after that you would have to wait until 4pm to get the first bus in the PM peak. Of course
+     * no one would ever do this; the trip should be considered not possible after 8 am. The reachability threshold will
+     * then determine whether this destination should be considered reachable during the time window or not.
+     *
+     * We had initially considered using a cutoff on wait time to board a vehicle, rather than on maximum trip duration.
+     * However, the planner will cunningly work around that limit and still get on the later vehicle by riding buses the
+     * wrong direction, taking long walks to transfer to other buses, etc., eventually eating up all the time until that
+     * later trip. The results would then be even less clear, as they would be speckled. If the origin had no other transit
+     * service, the planner would not be able to find a way to kill enough time, and the destination would be
+     * considered unreachable. However, if the origin had a network of local buses that don't go to the destination, the
+     * planner might be able to kill all day riding buses (without visiting the same stop twice) and still get on the late
+     * afternoon vehicle.
+     *
+     * If we used percentiles rather than a mean, this parameter would have no effect and we could also eliminate
+     * reachability thresholds. We'd just sort long or impossible trips to the top of the list (it doesn't matter whether
+     * they're long or impossible; they're the same once you're past whatever travel time cutoff is being analyzed), and
+     * let the percentile fall where it may; if it happens to end up in the unreachable portion, then that destination
+     * is unreachable.
+     *
+     * Default is four hours. It should be somewhat longer than the longest travel time cutoff you wish to analyze, because
+     * travel times whose "true average" (whatever that means) is near this value will be biased faster. Suppose there is a
+     * trip that takes between 1.5 and 2.5 hours depending on your departure time. If you set max duration to 2 hours, the
+     * average would be 1.75 hours not 2 (assuming a uniform distribution of travel times).
+     *
+     * This cutoff is applied to the final, propagated times at the pointset.
+     *
+     * It is expected that this parameter will have a significant impact on compute times in large networks as it will
+     * prevent exploration to the end of the Earth.
+     */
+    public int maxTripDurationMinutes = 4 * 60;
+
+    /**
+     * The maximum number of rides, e.g. taking the L2 to the Red line to the Green line would be three rides.
+     * Default of 6 should be enough for most intercity trips (two local buses, two intercity trains, two local buses).
+     */
+    public int maxRides = 8;
+
     /** A non-destructive scenario to apply when executing this request */
     public Scenario scenario;
+
+    /** The ID of a scenario stored in S3. It is an error if both scenario and the scenarioId are specified */
+    public String scenarioId;
 
     @JsonSerialize(using=ZoneIdSerializer.class)
     @JsonDeserialize(using=ZoneIdDeserializer.class)
@@ -193,6 +240,22 @@ public class ProfileRequest implements Serializable, Cloneable {
 
     /** maximum fare. If nonnegative, fares will be used in routing. */
     public int maxFare = -1;
+
+    /**
+     * Number of Monte Carlo draws to take for frequency searches.
+     *
+     * We loop over all departure minutes and do a search on the scheduled portion of the network, and then while
+     * holding the departure minute and scheduled search results stable, we run several Monte Carlo searches with
+     * randomized frequency schedules that minute. The number of Monte Carlo draws does not need to be particularly
+     * high as it happens each minute, and there is likely a lot of repetition in the scheduled service
+     * (i.e. many minutes look like each other), so several minutes' Monte Carlo draws are effectively pooled.
+     *
+     * The algorithm divides up the number of draws into an equal number at each minute of the time window, then rounds up.
+     * Note that the algorithm may actually take somewhat more draws than this, depending on the width of your time window.
+     * As an extreme example, if your time window is 120 minutes and you request 121 draws, you will actually get 240, because
+     * 1 < 121 / 120 < 2.
+     */
+    public int monteCarloDraws = 220;
 
     public boolean isProfile() {
         return profile;
@@ -272,8 +335,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      * @param timezone transportNetwork timezone
      * @return
      */
-    public static ProfileRequest fromEnvironment(DataFetchingEnvironment environment,
-        ZoneId timezone) {
+    public static ProfileRequest fromEnvironment(DataFetchingEnvironment environment, ZoneId timezone) {
         ProfileRequest profileRequest = new ProfileRequest();
         profileRequest.zoneId = timezone;
 
@@ -379,5 +441,25 @@ public class ProfileRequest implements Serializable, Cloneable {
         fromZonedDateTime = ZonedDateTime.parse(fromTime);
         toZonedDateTime = ZonedDateTime.parse(toTime);
         setTime();
+    }
+
+    /**
+     * Returns maxCar/Bike/Walk based on LegMode
+     *
+     * @param mode
+     * @return
+     */
+    public int getTimeLimit(LegMode mode) {
+        switch (mode) {
+        case CAR:
+            return maxCarTime * 60;
+        case BICYCLE:
+            return maxBikeTime * 60;
+        case WALK:
+            return maxWalkTime * 60;
+        default:
+            System.err.println("Unknown mode in getTimeLimit:"+mode.toString());
+            return streetTime * 60;
+        }
     }
 }

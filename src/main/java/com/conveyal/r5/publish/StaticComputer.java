@@ -55,6 +55,7 @@ public class StaticComputer implements Runnable {
         TaskStatistics ts = new TaskStatistics();
 
         if (req.request.request.scenario != null) {
+            // TODO use the cached TransportNetworks with scenarios pre-applied (which also enables re-using LinkedPointSets)
             network = network.applyScenario(req.request.request.scenario);
         }
 

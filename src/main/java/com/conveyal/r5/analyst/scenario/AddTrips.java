@@ -1,0 +1,295 @@
+package com.conveyal.r5.analyst.scenario;
+
+import com.conveyal.gtfs.model.*;
+import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TripPattern;
+import com.conveyal.r5.transit.TripSchedule;
+import com.google.common.collect.Lists;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.Serializable;
+import java.time.DayOfWeek;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.stream.IntStream;
+
+import static java.time.DayOfWeek.*;
+
+/**
+ * Create a new trip pattern and add some trips to that pattern.
+ * The pattern may create new stops or reuse existing ones from the base network.
+ * The newly created trips are true frequency trips, not scheduled or exact_times frequencies.
+ */
+public class AddTrips extends Modification {
+
+    public static final long serialVersionUID = 1L;
+    public static final Logger LOG = LoggerFactory.getLogger(AddTrips.class);
+
+    /** A list of stops on the new trip pattern. These may be existing or completely new stops. */
+    public List<StopSpec> stops;
+
+    /** The timetables for this trip pattern */
+    public Collection<PatternTimetable> frequencies;
+
+    /** GTFS mode (route_type), see constants in com.conveyal.gtfs.model.Route */
+    public int mode = Route.BUS;
+
+    /** If set to true, create both the forward pattern and a derived backward pattern as a matching set. */
+    public boolean bidirectional = true;
+
+    /** A list of the internal integer IDs for the existing or newly created stops. */
+    private TIntList intStopIds;
+
+    @Override
+    public String getType() {
+        return "add-trips";
+    }
+
+    @Override
+    public boolean resolve (TransportNetwork network) {
+        if (stops == null) {
+            warnings.add("You must provide some stops.");
+        } else {
+            for (PatternTimetable entry : frequencies) {
+                warnings.addAll(entry.validate(stops.size()));
+            }
+            intStopIds = findOrCreateStops(stops, network);
+        }
+        return warnings.size() > 0;
+    }
+
+    @Override
+    public boolean apply (TransportNetwork network) {
+        TransitLayer transitLayer = network.transitLayer;
+        // We will be extending the list of TripPatterns, so make a protective copy of it.
+        transitLayer.tripPatterns = new ArrayList<>(transitLayer.tripPatterns);
+        // We will be creating a service for each supplied timetable, make a protective copy of the list of services.
+        transitLayer.services = new ArrayList<>(transitLayer.services);
+        generatePattern(transitLayer, 0);
+        if (bidirectional) {
+            // We want to call generatePattern again, but with all stops and stoptimes reversed.
+            // Reverse the intStopIds in place. The string stopIds should not be used anymore at this point.
+            intStopIds.reverse();
+            for (PatternTimetable ptt : frequencies) {
+                // Reverse all the pattern timetables in place. Not sure how wise this is but it works.
+                // Amazingly, there is no Arrays.reverse() or Ints.reverse().
+                TIntList hopList = new TIntArrayList();
+                hopList.add(ptt.hopTimes);
+                hopList.reverse();
+                ptt.hopTimes = hopList.toArray();
+                TIntList dwellList = new TIntArrayList();
+                dwellList.add(ptt.dwellTimes);
+                dwellList.reverse();
+                ptt.dwellTimes = dwellList.toArray();
+            }
+            generatePattern(transitLayer, 1);
+        }
+        return false;
+    }
+
+    /**
+     * This has been pulled out into a separate function so it can be called twice: once to generate the forward
+     * pattern and once to generate the reverse pattern.
+     * @param transitLayer a protective copy of a transit layer whose existing tripPatterns list will be extended.
+     * @param directionId should be 0 in one direction and 1 in the opposite direction.
+     */
+    private void generatePattern (TransitLayer transitLayer, int directionId) {
+        TripPattern pattern = new TripPattern(intStopIds);
+        LOG.info("Created {}.", pattern);
+        for (PatternTimetable timetable : frequencies) {
+            TripSchedule schedule = createSchedule(timetable, directionId, transitLayer.services);
+            if (schedule == null) {
+                warnings.add("Failed to create a trip.");
+                continue;
+            }
+            pattern.addTrip(schedule);
+        }
+        transitLayer.tripPatterns.add(pattern);
+        transitLayer.hasFrequencies = true;
+    }
+
+    /**
+     * A class representing a timetable from the incoming modification deserialized from JSON.
+     * TODO rename to reflect usage in both AddTrips and AdjustFrequency.
+     */
+    public static class PatternTimetable implements Serializable {
+        public static final long serialVersionUID = 1L;
+
+        /** The trip ID from which to copy travel and dwell times. Used only in AdjustFrequency Modifications. */
+        public String sourceTrip;
+
+        /** The travel times in seconds between adjacent stops. Used only in AddTrips, not AdjustFrequency. */
+        public int[] hopTimes;
+
+        /** The time in seconds the vehicle waits at each stop. Used only in AddTrips, not AdjustFrequency. */
+        public int[] dwellTimes;
+
+        /** Start time of the first frequency-based trip in seconds since GTFS midnight. */
+        public int startTime = -1;
+
+        /** End time for frequency-based trips in seconds since GTFS midnight. */
+        public int endTime = -1;
+
+        /** Headway for frequency-based patterns. */
+        public int headwaySecs = -1;
+
+        /**
+         * Times in seconds after midnight when trips will begin. If this field is non-null the newly added
+         * trips will be scheduled trips rather than frequency-based, and you must not provide the startTime,
+         * endTime, or headwaySecs fields.
+         */
+        public int[] firstDepartures;
+
+        /** What days is this active on? */
+        public boolean monday;
+        public boolean tuesday;
+        public boolean wednesday;
+        public boolean thursday;
+        public boolean friday;
+        public boolean saturday;
+        public boolean sunday;
+
+        protected EnumSet<DayOfWeek> activeDaysOfWeek() {
+            EnumSet days = EnumSet.noneOf(DayOfWeek.class);
+            if (monday)    days.add(MONDAY);
+            if (tuesday)   days.add(TUESDAY);
+            if (wednesday) days.add(WEDNESDAY);
+            if (thursday)  days.add(THURSDAY);
+            if (friday)    days.add(FRIDAY);
+            if (saturday)  days.add(SATURDAY);
+            if (sunday)    days.add(SUNDAY);
+            return days;
+        }
+
+        /**
+         * Sanity and range check the contents of this entry, considering the fact that PatternTimetables may be used
+         * to create either frequency or scheduled trips, and they may or may not include hop and dwell times depending
+         * on whether a new pattern is being created.
+         * @param nStops the number of stops in the pattern to be generated, or -1 if a new pattern is not being
+         *               generated and only schedule / frequency fields are to be validated, not hops and dwell times.
+         * @return a list of Strings, one for each warning generated.
+         */
+        protected List<String> validate (int nStops) {
+            List<String> warnings = new ArrayList<>();
+            if (headwaySecs >= 0 || startTime >= 0 || endTime >= 0) {
+                // This entry is expected to be in frequency mode.
+                if (headwaySecs < 0 || startTime < 0 || endTime < 0) {
+                    warnings.add("You must specify headwaySecs, startTime, and endTime together to create frequency trips.");
+                }
+                if (headwaySecs <= 0) {
+                    warnings.add("Headway is not greater than zero.");
+                }
+                if (endTime <= startTime) {
+                    warnings.add("End time is not later than start time.");
+                }
+                if (firstDepartures != null) {
+                    warnings.add("You cannot specify firstDepartures (which creates scheduled trips) along with headwaySecs, startTime, or endTime (which create frequency trips");
+                }
+            } else {
+                // This entry is expected to be in scheduled (specific departure times) mode.
+                if (firstDepartures == null) {
+                    warnings.add("You must specify either firstDepartures (which creates scheduled trips) or all of headwaySecs, startTime, and endTime (which create frequency trips");
+                }
+            }
+            if (nStops >= 0) {
+                // Validate hops and dwell times.
+                if (nStops < 2) {
+                    warnings.add("You must specify at least two stops when creating new trips");
+                }
+                if (dwellTimes == null || dwellTimes.length != nStops) {
+                    warnings.add("The number of dwell times must be equal to the number of stops");
+                }
+                if (hopTimes == null || hopTimes.length != nStops - 1) {
+                    warnings.add("The number of hop times must be one less than the number of stops");
+                }
+            }
+            return warnings;
+        }
+
+    }
+
+    /**
+     * Creates a gtfs-lib Service object based on the information in the given PatternTimetable, which is usually
+     * part of a Modification deserialized from JSON.
+     */
+    public static Service createService (PatternTimetable timetable) {
+        // Create a calendar entry and service ID for this new trip pattern.
+        Calendar calendar = new Calendar();
+        // TODO move this logic to a function on Calendar in gtfs-lib, e.g. calendar.setFromDays(timetable.activeDaysOfWeek())
+        calendar.monday    = timetable.monday    ? 1 : 0;
+        calendar.tuesday   = timetable.tuesday   ? 1 : 0;
+        calendar.wednesday = timetable.wednesday ? 1 : 0;
+        calendar.thursday  = timetable.thursday  ? 1 : 0;
+        calendar.friday    = timetable.friday    ? 1 : 0;
+        calendar.saturday  = timetable.saturday  ? 1 : 0;
+        calendar.sunday    = timetable.sunday    ? 1 : 0;
+        StringBuilder nameBuilder = new StringBuilder("MOD-");
+        nameBuilder.append(timetable.monday ? 'M' : 'x');
+        nameBuilder.append(timetable.monday ? 'T' : 'x');
+        nameBuilder.append(timetable.monday ? 'W' : 'x');
+        nameBuilder.append(timetable.monday ? 'T' : 'x');
+        nameBuilder.append(timetable.monday ? 'F' : 'x');
+        nameBuilder.append(timetable.monday ? 'S' : 'x');
+        nameBuilder.append(timetable.monday ? 'S' : 'x');
+        Service service = new Service(nameBuilder.toString());
+        // Very long date range from the year 1850 to 2200 should be sufficient.
+        calendar.start_date = 18500101;
+        calendar.end_date = 22000101;
+        service.calendar = calendar;
+        return service;
+    }
+
+    /**
+     * Creates an R5 TripSchedule object from a PatternTimetable object that was deserialized from JSON.
+     * These represent a truly frequency-based family of trips (non-exact-times in GTFS parlance).
+     * The supplied list of services will be extended with a new service,
+     * whose code will be saved in the new TripSchedule.
+     * Make sure the supplied service list is a protective copy, not the one from the original TransportNetwork!
+     */
+    public TripSchedule createSchedule (PatternTimetable timetable, int directionId, List<Service> services) {
+
+        // The code for a newly added Service will be the number of services already in the list.
+        int serviceCode = services.size();
+        services.add(createService(timetable));
+
+        // Create a dummy GTFS Trip object so we can use the standard TripSchedule factory method.
+        Trip trip = new Trip();
+        trip.direction_id = directionId;
+
+        // Convert the supplied hop and dwell times (which are relative to adjacent entries) to arrival and departure
+        // times (which are relative to the beginning of the trip or the beginning of the service day).
+        int nStops = stops.size();
+        int[] arrivals = new int[nStops];
+        int[] departures = new int[nStops];
+        for (int s = 0, t = 0; s < nStops; s++) {
+            arrivals[s] = t;
+            t += timetable.dwellTimes[s];
+            departures[s] = t;
+            if (s < timetable.hopTimes.length) {
+                t += timetable.hopTimes[s];
+            }
+        }
+
+        // Create an R5 frequency entry and attach it to the new trip, then convert this to a TripSchedule
+        Frequency freq = new Frequency();
+        freq.start_time = timetable.startTime;
+        freq.end_time = timetable.endTime;
+        freq.headway_secs = timetable.headwaySecs;
+        return TripSchedule.create(trip, arrivals, departures, Lists.newArrayList(freq), IntStream.range(0, arrivals.length).toArray(), serviceCode);
+
+    }
+
+    @Override
+    public boolean affectsStreetLayer() {
+        return stops.stream().anyMatch(s -> s.id == null);
+    }
+
+    public int getSortOrder() { return 70; }
+
+}

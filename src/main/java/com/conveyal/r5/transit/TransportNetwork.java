@@ -5,6 +5,7 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+import com.google.common.io.ByteStreams;
 import com.conveyal.r5.profile.GreedyFareCalculator;
 import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.geom.Envelope;
@@ -19,15 +20,14 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.time.ZoneId;
 import java.util.*;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
+import java.util.zip.*;
 
 /**
  * This is a completely new replacement for Graph, Router etc.
  * It uses a lot less object pointers and can be built, read, and written orders of magnitude faster.
  * @author abyrd
  */
-public class TransportNetwork implements Serializable, Cloneable {
+public class TransportNetwork implements Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransportNetwork.class);
 
@@ -36,6 +36,15 @@ public class TransportNetwork implements Serializable, Cloneable {
     public TransitLayer transitLayer;
 
     private WebMercatorGridPointSet gridPointSet;
+
+    /**
+     * A string uniquely identifying the contents of this TransportNetwork in the space of TransportNetwork objects.
+     * When a scenario has modified the base network to produce this layer, the networkId will be changed to the
+     * scenario ID. When no scenario has been applied, this field will contain the original base networkId.
+     * This allows proper caching of downstream data and results: we need a way to know what informatio is in the
+     * network independent of object identity.
+     */
+    public String networkId = null;
 
     public static final String BUILDER_CONFIG_FILENAME = "build-config.json";
 
@@ -54,21 +63,33 @@ public class TransportNetwork implements Serializable, Cloneable {
         FSTObjectInput in = new FSTObjectInput(stream);
         TransportNetwork result = (TransportNetwork) in.readObject(TransportNetwork.class);
         in.close();
-        result.streetLayer.buildEdgeLists();
-        result.streetLayer.indexStreets();
-        result.transitLayer.rebuildTransientIndexes();
-        result.transitLayer.buildStopTree();
-
-        if (result.fareCalculator != null) result.fareCalculator.transitLayer = result.transitLayer;
-
+        result.rebuildTransientIndexes();
+        if (result.fareCalculator != null) {
+            result.fareCalculator.transitLayer = result.transitLayer;
+        }
         LOG.info("Done reading.");
         return result;
     }
 
+    public void rebuildTransientIndexes() {
+        streetLayer.buildEdgeLists();
+        streetLayer.indexStreets();
+        transitLayer.rebuildTransientIndexes();
+        transitLayer.buildStopTrees();
+    }
+
+    /**
+     * Test main method: Round-trip serialize the transit layer and test its speed after deserialization.
+     */
     public static void main (String[] args) {
-        // Round-trip serialize the transit layer and test its speed after deserialization.
         // TransportNetwork transportNetwork = TransportNetwork.fromFiles(args[0], args[1]);
-        TransportNetwork transportNetwork = TransportNetwork.fromDirectory(new File("."));
+        TransportNetwork transportNetwork;
+        try {
+            transportNetwork = TransportNetwork.fromDirectory(new File("."));
+        } catch (DuplicateFeedException e) {
+            LOG.error("Duplicate feeds in directory", e);
+            return;
+        }
 
         try {
             OutputStream outputStream = new BufferedOutputStream(new FileOutputStream("network.dat"));
@@ -88,7 +109,7 @@ public class TransportNetwork implements Serializable, Cloneable {
     }
 
     /** Legacy method to load from a single GTFS file */
-    public static TransportNetwork fromFiles (String osmSourceFile, String gtfsSourceFile, TNBuilderConfig tnBuilderConfig) {
+    public static TransportNetwork fromFiles (String osmSourceFile, String gtfsSourceFile, TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
         return fromFiles(osmSourceFile, Arrays.asList(gtfsSourceFile), tnBuilderConfig);
     }
 
@@ -101,11 +122,15 @@ public class TransportNetwork implements Serializable, Cloneable {
      * distinction should be maintained for various reasons. However, we use the GTFS IDs only for reference, so it doesn't
      * really matter, particularly for analytics.
      */
-    public static TransportNetwork fromFiles (String osmSourceFile, List<String> gtfsSourceFiles, TNBuilderConfig tnBuilderConfig) {
+    public static TransportNetwork fromFiles (String osmSourceFile, List<String> gtfsSourceFiles, TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
 
         System.out.println("Summarizing builder config: " + BUILDER_CONFIG_FILENAME);
         System.out.println(tnBuilderConfig);
         File dir = new File(osmSourceFile).getParentFile();
+
+        // Create a transport network to hold the street and transit layers
+        TransportNetwork transportNetwork = new TransportNetwork();
+
         // Load OSM data into MapDB
         OSM osm = new OSM(new File(dir,"osm.mapdb").getPath());
         osm.intersectionDetection = true;
@@ -113,6 +138,8 @@ public class TransportNetwork implements Serializable, Cloneable {
 
         // Make street layer from OSM data in MapDB
         StreetLayer streetLayer = new StreetLayer(tnBuilderConfig);
+        transportNetwork.streetLayer = streetLayer;
+        streetLayer.parentNetwork = transportNetwork;
         streetLayer.loadFromOsm(osm);
         osm.close();
 
@@ -126,20 +153,19 @@ public class TransportNetwork implements Serializable, Cloneable {
 
         // Load transit data TODO remove need to supply street layer at this stage
         TransitLayer transitLayer = TransitLayer.fromGtfs(gtfsSourceFiles);
+        transportNetwork.transitLayer = transitLayer;
+        transitLayer.parentNetwork = transportNetwork;
 
-        streetLayer.associateStops(transitLayer, 500);
+        // The street index is needed for associating transit stops with the street network.
+        streetLayer.indexStreets();
+        streetLayer.associateStops(transitLayer);
         // Edge lists must be built after all inter-layer linking has occurred.
         streetLayer.buildEdgeLists();
         transitLayer.rebuildTransientIndexes();
-        transitLayer.buildStopTree();
+        transitLayer.buildStopTrees();
 
         // Create transfers
-        new TransferFinder(transitLayer, streetLayer, 1000).findTransfers();
-
-        // Create and serialize a transport network
-        TransportNetwork transportNetwork = new TransportNetwork();
-        transportNetwork.streetLayer = streetLayer;
-        transportNetwork.transitLayer = transitLayer;
+        new TransferFinder(transportNetwork).findTransfers();
 
         transportNetwork.fareCalculator = tnBuilderConfig.analysisFareCalculator;
 
@@ -148,7 +174,7 @@ public class TransportNetwork implements Serializable, Cloneable {
         return transportNetwork;
     }
 
-    public static TransportNetwork fromDirectory (File directory) {
+    public static TransportNetwork fromDirectory (File directory) throws DuplicateFeedException {
         File osmFile = null;
         List<String> gtfsFiles = new ArrayList<>();
         TNBuilderConfig builderConfig = null;
@@ -297,15 +323,6 @@ public class TransportNetwork implements Serializable, Cloneable {
         return getGridPointSet().link(streetLayer, StreetMode.WALK);
     }
 
-    public TransportNetwork clone() {
-        try {
-            return (TransportNetwork) super.clone();
-        } catch (CloneNotSupportedException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-
     //TODO: add transit stops to envelope
     public Envelope getEnvelope() {
         return streetLayer.getEnvelope();
@@ -350,14 +367,63 @@ public class TransportNetwork implements Serializable, Cloneable {
      * Really we should use the same function for modifications and when initially creating the TransportNetwork. This
      * function would need to create the stop, link it to the street network, and make a stop tree for that stop.
      */
-    public int addStop (String id, double lat, double lon, double radiusMeters) {
+    public int addStop (String id, double lat, double lon) {
         int newStopIndex = transitLayer.getStopCount();
-        int newStreetVertexIndex = streetLayer.getOrCreateVertexNear(lat, lon, radiusMeters, false,
-            StreetMode.WALK);
+        int newStreetVertexIndex = streetLayer.getOrCreateVertexNear(lat, lon, StreetMode.WALK);
         transitLayer.stopIdForIndex.add(id); // TODO check for uniqueness
         transitLayer.streetVertexForStop.add(newStreetVertexIndex);
         // TODO stop tree, any other stop-indexed arrays or lists
         return newStopIndex;
+    }
+
+    /**
+     * We want to apply Scenarios to TransportNetworks, yielding a new TransportNetwork without disrupting the original
+     * one. The approach is to make a copy of the TransportNetwork, then apply all the Modifications in the Scenario
+     * one by one to that same copy. Two very different modification strategies are used for the TransitLayer and the
+     * StreetLayer.
+     * The TransitLayer has a hierarchy of collections, from patterns to trips to stoptimes. We can
+     * selectively copy-on-modify these collections without much impact on performance as long as they don't become too
+     * large. This is somewhat inefficient but easy to reason about, considering we allow both additions and deletions.
+     * We don't use clone() here with the expectation that it will be more clear and maintainable to show exactly
+     * how each field is being copied.
+     * On the other hand, the StreetLayer contains a few very large lists which would be wasteful to copy.
+     * It is duplicated in such a way that it wraps the original lists, allowing them to be non-destructively extended.
+     * There will be some performance hit from wrapping these lists, but it's probably completely negligible.
+     * @return a semi-shallow copy of this TransportNetwork.
+     */
+    public TransportNetwork scenarioCopy(Scenario scenario) {
+        TransportNetwork copy = new TransportNetwork();
+        copy.networkId = scenario.id;
+        copy.gridPointSet = this.gridPointSet;
+        if (scenario.affectsTransitLayer()) {
+            copy.transitLayer = this.transitLayer.scenarioCopy(copy);
+        } else {
+            copy.transitLayer = this.transitLayer;
+        }
+        if (scenario.affectsStreetLayer()) {
+            copy.streetLayer = this.streetLayer.scenarioCopy(copy);
+        } else {
+            copy.streetLayer = this.streetLayer;
+        }
+        return copy;
+    }
+
+    /**
+     * @return a checksum of the graph, for use in verifying whether it changed or remained the same after
+     * some operation.
+     */
+    public long checksum () {
+        LOG.info("Calculating transport network checksum...");
+        Checksum crc32 = new CRC32();
+        OutputStream out = new CheckedOutputStream(ByteStreams.nullOutputStream(), crc32);
+        try {
+            this.write(out);
+            out.close();
+        } catch (IOException e) {
+            throw new RuntimeException();
+        }
+        LOG.info("Network CRC is {}", crc32.getValue());
+        return crc32.getValue();
     }
 
 }

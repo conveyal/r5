@@ -4,6 +4,7 @@ import com.conveyal.r5.api.util.*;
 import com.conveyal.r5.profile.*;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.DCFareCalculator;
+import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -180,7 +181,7 @@ public class ProfileResponse {
             streetRouter.streetMode = StreetMode.WALK;
             streetRouter.profileRequest = request;
             //TODO: make configurable distanceLimitMeters in middle
-            streetRouter.distanceLimitMeters = 2000;
+            streetRouter.distanceLimitMeters = TransitLayer.TRANSFER_DISTANCE_LIMIT;
             int stopIndex = transportNetwork.transitLayer.streetVertexForStop.get(entry.getKey());
             streetRouter.setOrigin(stopIndex);
             streetRouter.route();

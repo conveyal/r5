@@ -2,8 +2,6 @@ package com.conveyal.r5.profile;
 
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
-import com.conveyal.r5.transit.TripSchedule;
-import com.google.common.collect.Lists;
 import gnu.trove.list.TIntList;
 import gnu.trove.map.TIntIntMap;
 
@@ -77,7 +75,7 @@ public class PathWithTimes extends Path {
         // loop over departures within the time window
         // firstTrip is the trip on the first pattern
         int firstTrip = 0;
-        while (times[0][firstTrip][0] < req.fromTime + accessTime + RaptorWorker.BOARD_SLACK) firstTrip++;
+        while (times[0][firstTrip][0] < req.fromTime + accessTime + RaptorWorker.BOARD_SLACK_SECONDS) firstTrip++;
 
         // now interleave times
         TIMES: while (firstTrip < times[0].length) {
@@ -120,7 +118,7 @@ public class PathWithTimes extends Path {
 
                     // TODO should board slack be applied at the origin stop? Is this done in RaptorWorker?
                     // See also below in computeStatistics
-                    time = times[patIdx][trip][1] + transferTime + RaptorWorker.BOARD_SLACK;
+                    time = times[patIdx][trip][1] + transferTime + RaptorWorker.BOARD_SLACK_SECONDS;
                 }
             }
 
@@ -173,7 +171,7 @@ public class PathWithTimes extends Path {
 
         for (int start = req.fromTime; start < req.toTime; start += 60) {
             // TODO should board slack be applied at the origin stop? Is this done in RaptorWorker?
-            int timeAtOriginStop = start + accessTime + RaptorWorker.BOARD_SLACK;
+            int timeAtOriginStop = start + accessTime + RaptorWorker.BOARD_SLACK_SECONDS;
             int bestTimeAtDestinationStop = Integer.MAX_VALUE;
 
             for (Itinerary itin : this.itineraries) {

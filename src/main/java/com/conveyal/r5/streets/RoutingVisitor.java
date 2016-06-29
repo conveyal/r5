@@ -13,21 +13,18 @@ import java.util.List;
  * Created by mabu on 10.12.2015.
  */
 public class RoutingVisitor {
-    private final StreetMode streetMode;
 
     private List<GeoJsonFeature> features;
     private final EdgeStore edgeStore;
 
     /**
      * Mode should be in the state itself
+     *  @param edgeStore streetLayer edgeStore
      *
-     * @param edgeStore streetLayer edgeStore
-     * @param streetMode of this routing
      */
-    public RoutingVisitor(EdgeStore edgeStore, StreetMode streetMode) {
+    public RoutingVisitor(EdgeStore edgeStore) {
         this.features = new ArrayList<>();
         this.edgeStore = edgeStore;
-        this.streetMode = streetMode;
     }
 
     /**
@@ -42,8 +39,8 @@ public class RoutingVisitor {
             EdgeStore.Edge edge = edgeStore.getCursor(edgeIdx);
             GeoJsonFeature feature = new GeoJsonFeature(edge.getGeometry());
             feature.addProperty("weight", state.weight);
-            //FIXME: this is temporary until mode isn't in state itself
-            feature.addProperty("mode", streetMode);
+            feature.addProperty("mode", state.streetMode);
+            feature.addProperty("backEdge", state.backEdge);
             features.add(feature);
         }
     }

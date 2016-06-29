@@ -91,7 +91,7 @@ public class StaticMetadata implements Runnable {
         // build the stop trees
         LinkedPointSet lps = network.getLinkedGridPointSet();
         if (lps.stopTrees == null)
-            lps.makeStopTrees();
+            lps.makeStopTrees(null); // null means make all trees, not just those in a certain geographic area.
 
         // invert the stop trees
         TIntList[] stopTrees = new TIntList[lps.pointSet.featureCount()];

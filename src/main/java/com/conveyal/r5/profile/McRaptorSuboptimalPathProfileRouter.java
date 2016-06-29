@@ -1,14 +1,16 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.analyst.ResultSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
 import com.conveyal.r5.analyst.cluster.ResultEnvelope;
 import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.RouteInfo;
+import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TripFlag;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
 import gnu.trove.list.TIntList;
@@ -53,12 +55,12 @@ public class McRaptorSuboptimalPathProfileRouter {
     /**
      * the number of searches to run (approximately). We use a constrained random walk to get about this many searches.
      */
-    public static final int NUMBER_OF_SEARCHES = 20;
+    public int NUMBER_OF_SEARCHES = 20;
 
     private LinkedPointSet pointSet = null;
 
     /** Use a list for the iterations since we aren't sure how many there will be (we're using random sampling over the departure minutes) */
-    private List<int[]> timesAtTargetsEachIteration = null;
+    public List<int[]> timesAtTargetsEachIteration = null;
 
     private TransportNetwork network;
     private ProfileRequest request;
@@ -112,6 +114,11 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     /** Get a McRAPTOR state bag for every departure minute */
     public Collection<McRaptorState> route () {
+        // TODO hack changing original request!
+        if (request.transitModes == null || request.transitModes.isEmpty() || request.transitModes.contains(TransitModes.TRANSIT)) {
+            request.transitModes = EnumSet.allOf(TransitModes.class);
+        }
+
         if (accessTimes == null) computeAccessTimes();
 
         LOG.info("Found {} access stops:\n{}", accessTimes.size(), dumpStops(accessTimes));
@@ -191,7 +198,7 @@ public class McRaptorSuboptimalPathProfileRouter {
             includeInAverages.set(0, timesAtTargetsEachIteration.size());
             // TODO min/max not appropriate without explicitly calculated extrema in frequency search
             propagatedTimesStore.setFromArray(timesAtTargetsEachIteration.toArray(new int[timesAtTargetsEachIteration.size()][]),
-                    includeInAverages, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX);
+                    includeInAverages, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX, request.reachabilityThreshold);
         }
 
         LOG.info("McRAPTOR took {}ms", System.currentTimeMillis() - startTime);
@@ -215,7 +222,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         // TODO add time and distance limits to routing, not just weight.
         // TODO apply walk and bike speeds and maxBike time.
-        streetRouter.distanceLimitMeters = 2_000; // FIXME arbitrary, and account for bike or car access mode
+        streetRouter.distanceLimitMeters = TransitLayer.STOP_TREE_DISTANCE_METERS; // FIXME arbitrary, and account for bike or car access mode
         streetRouter.setOrigin(request.fromLat, request.fromLon);
         streetRouter.route();
         accessTimes = streetRouter.getReachedStops();
@@ -278,13 +285,23 @@ public class McRaptorSuboptimalPathProfileRouter {
             TObjectIntMap<StatePatternKey> boardStopsPositionsPerPatternSequence = new TObjectIntHashMap<>();
 
             TripPattern pattern = network.transitLayer.tripPatterns.get(patIdx);
+            RouteInfo routeInfo = network.transitLayer.routes.get(pattern.routeIndex);
+            TransitModes mode = TransitLayer.getTransitModes(routeInfo.route_type);
             //skips trip patterns with trips which don't run on wanted date
-            if (!pattern.servicesActive.intersects(servicesActive)) {
+            if (!pattern.servicesActive.intersects(servicesActive) ||
+                //skips pattern with Transit mode which isn't wanted by profileRequest
+                !request.transitModes.contains(mode)) {
                 continue;
             }
 
             for (int stopPositionInPattern = 0; stopPositionInPattern < pattern.stops.length; stopPositionInPattern++) {
                 int stop = pattern.stops[stopPositionInPattern];
+                //Skips stops that don't allow wheelchair users if this is wanted in request
+                if (request.wheelchair) {
+                    if (!network.transitLayer.stopsWheelchair.get(stop)) {
+                        continue;
+                    }
+                }
 
                 // perform this check here so we don't needlessly loop over states at a stop that are all created by
                 // getting off this pattern.
@@ -342,7 +359,9 @@ public class McRaptorSuboptimalPathProfileRouter {
                             for (TripSchedule tripSchedule : pattern.tripSchedules) {
                                 currentTrip++;
                                 //Skips trips which don't run on wanted date
-                                if (!servicesActive.get(tripSchedule.serviceCode)) {
+                                if (!servicesActive.get(tripSchedule.serviceCode) ||
+                                    //Skip trips that can't be used with wheelchairs when wheelchair trip is requested
+                                    (request.wheelchair && !tripSchedule.getFlag(TripFlag.WHEELCHAIR))) {
                                     continue;
                                 }
 
@@ -363,7 +382,11 @@ public class McRaptorSuboptimalPathProfileRouter {
                         } else if (pattern.hasFrequencies) {
                             currentTrip++;
                             for (TripSchedule tripSchedule : pattern.tripSchedules) {
-                                if (!servicesActive.get(tripSchedule.serviceCode)) continue;
+                                if (!servicesActive.get(tripSchedule.serviceCode) ||
+                                    //Skip trips that can't be used with wheelchairs when wheelchair trip is requested
+                                    (request.wheelchair && !tripSchedule.getFlag(TripFlag.WHEELCHAIR))) {
+                                    continue;
+                                }
 
                                 int earliestPossibleBoardTime = state.time + BOARD_SLACK;
 

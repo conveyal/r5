@@ -8,13 +8,10 @@ import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import com.conveyal.r5.common.JsonUtilities;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
-import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
-import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TObjectLongMap;
-import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TObjectLongHashMap;
 import org.glassfish.grizzly.http.server.Request;
@@ -50,19 +47,18 @@ import java.util.*;
  *
  * It may also be helpful to mark jobs every time they are skipped in the LRU queue. Each time a job is serviced,
  * it is taken out of the queue and put at its end. Jobs that have not been serviced float to the top.
+ *
+ * TODO: occasionally purge closed connections from workersByCategory
+ * TODO: worker catalog and graph affinity homeostasis
+ * TODO: catalog of recently seen consumers by affinity with IP: response.getRequest().getRemoteAddr();
  */
 public class Broker implements Runnable {
 
-    // TODO catalog of recently seen consumers by affinity with IP: response.getRequest().getRemoteAddr();
-
     private static final Logger LOG = LoggerFactory.getLogger(Broker.class);
-
-    /* How often we should check for delivered tasks that have timed out. */
-    private static final int REDELIVERY_INTERVAL_SEC = 10;
 
     public final CircularList<Job> jobs = new CircularList<>();
 
-    /** the most tasks to deliver to a worker at a time */
+    /** The most tasks to deliver to a worker at a time. */
     public final int MAX_TASKS_PER_WORKER = 8;
 
     /**
@@ -71,7 +67,7 @@ public class Broker implements Runnable {
      */
     public static final long WORKER_STARTUP_TIME = 60 * 60 * 1000;
 
-    private int nUndeliveredTasks = 0; // Including normal priority jobs and high-priority tasks.
+    private int nUndeliveredTasks = 0; // Including normal priority jobs and high-priority tasks. TODO check that this total is really properly maintained
 
     private int nWaitingConsumers = 0; // including some that might be closed
 
@@ -91,16 +87,14 @@ public class Broker implements Runnable {
         mapper.registerModule(TraverseModeSetSerializer.makeModule());
     }*/
 
-    /** broker configuration */
-    private final Properties config;
+    /** The configuration for this broker. */
+    private final Properties brokerConfig;
 
-    /** configuration for workers launched by this broker */
+    /** The configuration that will be applied to workers launched by this broker. */
     private final Properties workerConfig;
 
-    private WorkerCatalog workerCatalog = new WorkerCatalog();
-
-    /** The time at which each task was delivered to a worker, to allow re-delivery. */
-    TIntIntMap deliveryTimes = new TIntIntHashMap();
+    /** Keeps track of all the workers that have contacted this broker recently asking for work. */
+    protected WorkerCatalog workerCatalog = new WorkerCatalog();
 
     /**
      * Requests that are not part of a job and can "cut in line" in front of jobs for immediate execution.
@@ -108,7 +102,7 @@ public class Broker implements Runnable {
      * the side channels. If that doesn't work, we put them here to be picked up the next time a worker
      * is available via normal task distribution channels.
      */
-    private ArrayListMultimap<String, GenericClusterRequest> stalledHighPriorityTasks = ArrayListMultimap.create();
+    private ArrayListMultimap<WorkerCategory, GenericClusterRequest> stalledHighPriorityTasks = ArrayListMultimap.create();
 
     /**
      * High priority requests that have just come and are about to be sent down a single point channel.
@@ -117,13 +111,13 @@ public class Broker implements Runnable {
      * two different workers because the second came in in between closing the side channel and the worker
      * reopening it.
      */
-    private Multimap<String, GenericClusterRequest> newHighPriorityTasks = ArrayListMultimap.create();
+    private Multimap<WorkerCategory, GenericClusterRequest> newHighPriorityTasks = ArrayListMultimap.create();
 
     /** Priority requests that have already been farmed out to workers, and are awaiting a response. */
     private TIntObjectMap<Response> highPriorityResponses = new TIntObjectHashMap<>();
 
     /** Outstanding requests from workers for tasks, grouped by worker graph affinity. */
-    Map<String, Deque<Response>> consumersByGraph = new HashMap<>();
+    Map<WorkerCategory, Deque<Response>> workersByCategory = new HashMap<>();
 
     /**
      * Side channels used to send single point requests to workers, cutting in front of any other work on said workers.
@@ -131,7 +125,7 @@ public class Broker implements Runnable {
      * machine ID. This way, the same machine will tend to get all single point work for a graph,
      * so multiple machines won't stay alive to do single point work.
      */
-    private Multimap<String, WrappedResponse> singlePointChannels = TreeMultimap.create();
+    private Multimap<WorkerCategory, WrappedResponse> singlePointChannels = TreeMultimap.create();
 
     /** should we work offline */
     private boolean workOffline;
@@ -146,22 +140,22 @@ public class Broker implements Runnable {
      * keep track of which graphs we have launched workers on and how long ago we launched them,
      * so that we don't re-request workers which have been requested.
      */
-    private TObjectLongMap<String> recentlyRequestedWorkers = new TObjectLongHashMap<>();
+    private TObjectLongMap<WorkerCategory> recentlyRequestedWorkers = new TObjectLongHashMap<>();
 
     // Queue of tasks to complete Delete, Enqueue etc. to avoid synchronizing all the functions ?
     public Broker (Properties brokerConfig, String addr, int port) {
         // print out date on startup so that CloudWatch logs has a unique fingerprint
         LOG.info("Analyst broker starting at {}", LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
 
-        this.config = brokerConfig;
+        this.brokerConfig = brokerConfig;
 
         // create a config for the AWS workers
         workerConfig = new Properties();
 
         // load the base worker configuration if specified
-        if (config.getProperty("worker-config") != null) {
+        if (this.brokerConfig.getProperty("worker-config") != null) {
             try {
-                File f = new File(config.getProperty("worker-config"));
+                File f = new File(this.brokerConfig.getProperty("worker-config"));
                 FileInputStream fis = new FileInputStream(f);
                 workerConfig.load(fis);
                 fis.close();
@@ -205,15 +199,15 @@ public class Broker implements Runnable {
      * Low-reliability, no re-delivery.
      */
     public synchronized void enqueuePriorityTask (GenericClusterRequest task, Response response) {
-        boolean workersAvailable = workersAvailableForGraph(task.graphId);
 
+        boolean workersAvailable = workersAvailable(task.getWorkerCategory());
         if (!workersAvailable) {
-            createWorkersForGraph(task.graphId);
+            createWorkersInCategory(task.getWorkerCategory());
             // chances are it won't be done in 30 seconds, but we want to poll frequently to avoid issues with phasing
             try {
                 response.setHeader("Retry-After", "30");
                 response.sendError(503,
-                        "No workers available with this graph affinity, please retry shortly.");
+                        "No workers available in this category, please retry shortly.");
             } catch (IOException e) {
                 LOG.error("Could not finish high-priority 503 response", e);
             }
@@ -224,14 +218,13 @@ public class Broker implements Runnable {
         // so some unnecessary computation takes place
         if (workersAvailable || workOffline) {
             task.taskId = nextTaskId++;
-            newHighPriorityTasks.put(task.graphId, task);
+            newHighPriorityTasks.put(task.getWorkerCategory(), task);
             highPriorityResponses.put(task.taskId, response);
-
             // wait 100ms to deliver to workers in case another request comes in almost simultaneously
             timer.schedule(new TimerTask() {
                 @Override
                 public void run() {
-                    deliverHighPriorityTasks(task.graphId);
+                    deliverHighPriorityTasks(task.getWorkerCategory());
                 }
             }, 100);
         }
@@ -239,16 +232,16 @@ public class Broker implements Runnable {
         // do not notify task delivery thread just yet as we haven't put anything in the task delivery queue yet.
     }
 
-    /** attempt to deliver high priority tasks via side channels, or move them into normal channels if need be */
-    public synchronized void deliverHighPriorityTasks (String graphId) {
-        Collection<GenericClusterRequest> tasks = newHighPriorityTasks.get(graphId);
+    /** Attempt to deliver high priority tasks via side channels, or move them into normal channels if need be. */
+    public synchronized void deliverHighPriorityTasks (WorkerCategory category) {
+        Collection<GenericClusterRequest> tasks = newHighPriorityTasks.get(category);
 
         if (tasks.isEmpty())
             // someone got here first
             return;
 
         // try to deliver via side channels
-        Collection<WrappedResponse> wrs = singlePointChannels.get(graphId);
+        Collection<WrappedResponse> wrs = singlePointChannels.get(category);
 
         if (!wrs.isEmpty()) {
             // there is (probably) a single point machine waiting to receive this
@@ -261,24 +254,24 @@ public class Broker implements Runnable {
                 os.close();
                 wr.response.resume();
 
-                newHighPriorityTasks.removeAll(graphId);
+                newHighPriorityTasks.removeAll(category);
 
                 return;
             } catch (Exception e) {
                 LOG.info("Failed to deliver single point job via side channel, reverting to normal channel", e);
             } finally {
                 // remove responses whether they are dead or alive
-                removeSinglePointChannel(graphId, wr);
+                removeSinglePointChannel(category, wr);
             }
         }
 
         // if we got here we didn't manage to send it via side channel, put it in the rotation for normal channels
         // not using putAll as it retains a link to the original collection and then we get a concurrent modification exception later.
-        tasks.forEach(t -> stalledHighPriorityTasks.put(graphId, t));
+        tasks.forEach(t -> stalledHighPriorityTasks.put(category, t));
         LOG.info("No side channel available for graph {}, delivering {} tasks via normal channel",
-                graphId, tasks.size());
+                category, tasks.size());
         nUndeliveredTasks += tasks.size();
-        newHighPriorityTasks.removeAll(graphId);
+        newHighPriorityTasks.removeAll(category);
 
         // wake up delivery thread
         notify();
@@ -288,16 +281,20 @@ public class Broker implements Runnable {
     public synchronized void enqueueTasks (List<GenericClusterRequest> tasks) {
         Job job = findJob(tasks.get(0)); // creates one if it doesn't exist
 
-        if (!workersAvailableForGraph(job.graphId))
-            createWorkersForGraph(job.graphId);
+        if (!workersAvailable(job.getWorkerCategory())) {
+            createWorkersInCategory(job.getWorkerCategory());
+        }
 
         for (GenericClusterRequest task : tasks) {
             task.taskId = nextTaskId++;
             job.addTask(task);
             nUndeliveredTasks += 1;
             LOG.debug("Enqueued task id {} in job {}", task.taskId, job.jobId);
-            if ( ! task.graphId.equals(job.graphId)) {
-                LOG.warn("Task graph ID {} does not match job graph ID {}.", task.graphId, job.graphId);
+            if (!task.graphId.equals(job.workerCategory.graphId)) {
+                LOG.error("Task graph ID {} does not match job: {}.", task.graphId, job.workerCategory);
+            }
+            if (!task.workerVersion.equals(job.workerCategory.workerVersion)) {
+                LOG.error("Task R5 commit {} does not match job: {}.", task.workerVersion, job.workerCategory);
             }
         }
         // Wake up the delivery thread if it's waiting on input.
@@ -305,52 +302,57 @@ public class Broker implements Runnable {
         notify();
     }
 
-    public boolean workersAvailableForGraph (String graphId) {
-        // make sure that we don't assign work to dead workers
+    public boolean workersAvailable (WorkerCategory category) {
+        // Ensure we don't assign work to dead workers.
         workerCatalog.purgeDeadWorkers();
-
-        return !workerCatalog.workersByGraph.get(graphId).isEmpty();
+        return !workerCatalog.workersByCategory.get(category).isEmpty();
     }
 
     /** Create workers for a given job, if need be */
-    public void createWorkersForGraph (String graphId) {
+    public void createWorkersInCategory (WorkerCategory category) {
+
         String clientToken = UUID.randomUUID().toString().replaceAll("-", "");
 
         if (workOffline) {
-            LOG.info("Work offline enabled, not creating workers for graph {}", graphId);
+            LOG.info("Work offline enabled, not creating workers for {}", category);
             return;
         }
 
         if (workerCatalog.observationsByWorkerId.size() >= maxWorkers) {
-            LOG.warn("{} workers already started, not starting more; jobs on graph {} will not complete", maxWorkers, graphId);
+            LOG.warn("{} workers already started, not starting more; jobs will not complete on {}", maxWorkers, category);
             return;
         }
 
-        // don't re-request workers
-        if (recentlyRequestedWorkers.containsKey(graphId)
-                && recentlyRequestedWorkers.get(graphId) >= System.currentTimeMillis() - WORKER_STARTUP_TIME){
-            LOG.info("workers still starting on graph {}, not starting more", graphId);
+        // If workers have already been started up, don't repeat the operation.
+        if (recentlyRequestedWorkers.containsKey(category)
+                && recentlyRequestedWorkers.get(category) >= System.currentTimeMillis() - WORKER_STARTUP_TIME){
+            LOG.info("Workers still starting on {}, not starting more", category);
             return;
         }
-
 
         // TODO: compute
         int nWorkers = 1;
 
-        LOG.info("Starting {} workers as there are none on graph {}", nWorkers, graphId);
-        // there are no workers on this graph, start one
+        // There are no workers on this graph with the right worker commit, start some.
+        LOG.info("Starting {} workers as there are none on {}", nWorkers, category);
         RunInstancesRequest req = new RunInstancesRequest();
-        req.setImageId(config.getProperty("ami-id"));
-        req.setInstanceType(InstanceType.valueOf(config.getProperty("worker-type")));
-        req.setSubnetId(config.getProperty("subnet-id"));
+        req.setImageId(brokerConfig.getProperty("ami-id"));
+        req.setInstanceType(InstanceType.valueOf(brokerConfig.getProperty("worker-type")));
+        req.setSubnetId(brokerConfig.getProperty("subnet-id"));
 
         // even if we can't get all the workers we want at least get some
         req.setMinCount(1);
         req.setMaxCount(nWorkers);
 
-        // it's fine to just modify the worker config as this method is synchronized
-        workerConfig.setProperty("initial-graph-id", graphId);
-
+        // It's fine to just modify the worker config without a protective copy because this method is synchronized.
+        workerConfig.setProperty("initial-graph-id", category.graphId);
+        workerConfig.setProperty("worker-version", category.workerVersion);
+        // Tell the worker where to get its R5 JAR. This is a Conveyal S3 bucket with HTTP access turned on.
+        String workerDownloadUrl = String.format("http://r5-builds.s3-website-eu-west-1.amazonaws.com/%s.jar",
+                category.workerVersion);
+        workerConfig.setProperty("download-url", workerDownloadUrl);
+        // This is the R5 broker, so always start R5 workers (rather than OTP workers).
+        workerConfig.setProperty("main-class", AnalystWorker.class.getName());
         ByteArrayOutputStream cfg = new ByteArrayOutputStream();
         try {
             workerConfig.store(cfg, "Worker config");
@@ -359,16 +361,16 @@ public class Broker implements Runnable {
             throw new RuntimeException(e);
         }
 
-        // send the config as user data
+        // Send the config to the new workers as EC2 "user data"
         String userData = new String(Base64.getEncoder().encode(cfg.toByteArray()));
         req.setUserData(userData);
 
-        if (config.getProperty("worker-iam-role") != null)
-            req.setIamInstanceProfile(new IamInstanceProfileSpecification().withArn(config.getProperty("worker-iam-role")));
+        if (brokerConfig.getProperty("worker-iam-role") != null)
+            req.setIamInstanceProfile(new IamInstanceProfileSpecification().withArn(brokerConfig.getProperty("worker-iam-role")));
 
         // launch into a VPC if desired
-        if (config.getProperty("subnet") != null)
-            req.setSubnetId(config.getProperty("subnet"));
+        if (brokerConfig.getProperty("subnet") != null)
+            req.setSubnetId(brokerConfig.getProperty("subnet"));
 
         // allow us to retry request at will
         req.setClientToken(clientToken);
@@ -382,25 +384,25 @@ public class Broker implements Runnable {
             );
             i.setTags(tags);
         });
-        recentlyRequestedWorkers.put(graphId, System.currentTimeMillis());
+        recentlyRequestedWorkers.put(category, System.currentTimeMillis());
         LOG.info("Requesting {} workers", nWorkers);
     }
 
     /** Consumer long-poll operations are enqueued here. */
-    public synchronized void registerSuspendedResponse(String graphId, Response response) {
+    public synchronized void registerSuspendedResponse(WorkerCategory category, Response response) {
         // Add this worker to our catalog, tracking its graph affinity and the last time it was seen.
         String workerId = response.getRequest().getHeader(AnalystWorker.WORKER_ID_HEADER);
         if (workerId != null && !workerId.isEmpty()) {
-            workerCatalog.catalog(workerId, graphId);
+            workerCatalog.catalog(workerId, category);
         } else {
             LOG.error("Worker did not supply a unique ID for itself . Ignoring it.");
             return;
         }
         // Shelf this suspended response in a queue grouped by graph affinity.
-        Deque<Response> deque = consumersByGraph.get(graphId);
+        Deque<Response> deque = workersByCategory.get(category);
         if (deque == null) {
             deque = new ArrayDeque<>();
-            consumersByGraph.put(graphId, deque);
+            workersByCategory.put(category, deque);
         }
         deque.addLast(response);
         nWaitingConsumers += 1;
@@ -410,15 +412,14 @@ public class Broker implements Runnable {
     }
 
     /** When we notice that a long poll connection has closed, we remove it here. */
-    public synchronized boolean removeSuspendedResponse(String graphId, Response response) {
-        Deque<Response> deque = consumersByGraph.get(graphId);
+    public synchronized boolean removeSuspendedResponse(WorkerCategory category, Response response) {
+        Deque<Response> deque = workersByCategory.get(category);
         if (deque == null) {
             return false;
         }
         if (deque.remove(response)) {
             nWaitingConsumers -= 1;
             LOG.debug("Removed closed connection from queue.");
-            logQueueStatus();
             return true;
         }
         return false;
@@ -428,66 +429,45 @@ public class Broker implements Runnable {
      * Register an HTTP connection that can be used to send single point requests directly to
      * workers, bypassing normal task distribution channels.
      */
-    public synchronized void registerSinglePointChannel (String graphAffinity,WrappedResponse response) {
-        singlePointChannels.put(graphAffinity, response);
-        // no need to notify as the side channels are not used by the normal task delivery loop
+    public synchronized void registerSinglePointChannel (WorkerCategory category, WrappedResponse response) {
+        singlePointChannels.put(category, response);
+        // No need to notify as the side channels are not used by the normal task delivery loop.
     }
 
     /**
      * Remove a single point channel because the connection was closed.
      */
-    public synchronized boolean removeSinglePointChannel (String graphAffinity, WrappedResponse response) {
-        return singlePointChannels.remove(graphAffinity, response);
-    }
-
-    private void logQueueStatus() {
-        LOG.info("{} undelivered, of which {} high-priority", nUndeliveredTasks,
-                stalledHighPriorityTasks.size());
-        LOG.info("{} producers waiting, {} consumers waiting", highPriorityResponses.size(), nWaitingConsumers);
-        LOG.info("{} total workers", workerCatalog.size());
-    }
-
-    /**
-     *  Check whether there are any delivered tasks that have reached their invisibility timeout but have not yet been
-     *  marked complete. Enqueue those tasks for redelivery.
-     */
-    private void redeliver() {
-        if (System.currentTimeMillis() > nextRedeliveryCheckTime) {
-            nextRedeliveryCheckTime += REDELIVERY_INTERVAL_SEC * 1000;
-            LOG.info("Scanning for redelivery...");
-            int nRedelivered = 0;
-            int nInvisible = 0;
-            for (Job job : jobs) {
-                nInvisible += job.invisibleUntil.size();
-                nRedelivered += job.redeliver();
-            }
-            LOG.info("{} tasks enqueued for redelivery out of {} invisible tasks.", nRedelivered, nInvisible);
-            nUndeliveredTasks += nRedelivered;
-        }
+    public synchronized boolean removeSinglePointChannel (WorkerCategory category, WrappedResponse response) {
+        return singlePointChannels.remove(category, response);
     }
 
     /**
      * This method checks whether there are any high-priority tasks or normal job tasks and attempts to match them with
-     * waiting workers. It blocks until there are tasks or workers available.
+     * waiting workers.
+     *
+     * It blocks by calling wait() whenever it has nothing to do (when no tasks or workers available). It is awakened
+     * whenever new tasks come in or when a worker (re-)connects.
      */
     public synchronized void deliverTasks() throws InterruptedException {
 
         // Wait until there are some undelivered tasks.
         while (nUndeliveredTasks == 0) {
             LOG.debug("Task delivery thread is going to sleep, there are no tasks waiting for delivery.");
-            logQueueStatus();
+            // Thread will be notified when tasks are added or there are new incoming consumer connections.
             wait();
-            redeliver();
+            // If a worker connected while there were no tasks queued for delivery,
+            // we need to check if any should be re-delivered.
+            for (Job job : jobs) {
+                nUndeliveredTasks += job.redeliver();
+            }
         }
         LOG.debug("Task delivery thread is awake and there are some undelivered tasks.");
-        logQueueStatus();
 
         while (nWaitingConsumers == 0) {
             LOG.debug("Task delivery thread is going to sleep, there are no consumers waiting.");
-            // Thread will be notified when there are new incoming consumer connections.
+            // Thread will be notified when tasks are added or there are new incoming consumer connections.
             wait();
         }
-
         LOG.debug("Task delivery thread awake; consumers are waiting and tasks are available");
 
         // Loop over all jobs and send them to consumers
@@ -495,25 +475,25 @@ public class Broker implements Runnable {
         // workers on their graph.
 
         // start with high-priority tasks
-        HIGHPRIORITY: for (Map.Entry<String, Collection<GenericClusterRequest>> e : stalledHighPriorityTasks
+        HIGHPRIORITY: for (Map.Entry<WorkerCategory, Collection<GenericClusterRequest>> e : stalledHighPriorityTasks
                 .asMap().entrySet()) {
             // the collection is an arraylist with the most recently added at the end
-            String graphId = e.getKey();
+            WorkerCategory workerCategory = e.getKey();
             Collection<GenericClusterRequest> tasks = e.getValue();
 
-            // see if there are any consumers for this
-            // don't respect graph affinity when working offline; we can't arbitrarily start more workers
+            // See if there are any workers that requested tasks in this category.
+            // Don't respect graph affinity when working offline; we can't arbitrarily start more workers.
             Deque<Response> consumers;
-            if (!workOffline)
-                consumers = consumersByGraph.get(graphId);
-            else {
-                Optional<Deque<Response>> opt = consumersByGraph.values().stream().filter(c -> !c.isEmpty()).findFirst();
+            if (!workOffline) {
+                consumers = workersByCategory.get(workerCategory);
+            } else {
+                Optional<Deque<Response>> opt = workersByCategory.values().stream().filter(c -> !c.isEmpty()).findFirst();
                 if (opt.isPresent()) consumers = opt.get();
                 else consumers = null;
             }
 
             if (consumers == null || consumers.isEmpty()) {
-                LOG.warn("No consumer found for graph {}, needed for {} high-priority tasks", graphId, tasks.size());
+                LOG.warn("No worker found for {}, needed for {} high-priority tasks", workerCategory, tasks.size());
                 continue HIGHPRIORITY;
             }
 
@@ -523,7 +503,7 @@ public class Broker implements Runnable {
 
                 // package tasks into a job
                 Job job = new Job("HIGH PRIORITY");
-                job.graphId = graphId;
+                job.workerCategory = workerCategory;
                 for (int i = 0; i < MAX_TASKS_PER_WORKER && taskIt.hasNext(); i++) {
                     job.addTask(taskIt.next());
                     taskIt.remove();
@@ -545,9 +525,9 @@ public class Broker implements Runnable {
             // We don't respect graph affinity when working offline, because we can't start more workers
             Job current;
             if (!workOffline) {
-                current = jobs.advanceToElement(e -> !e.tasksAwaitingDelivery.isEmpty() &&
-                        consumersByGraph.containsKey(e.graphId) &&
-                        !consumersByGraph.get(e.graphId).isEmpty());
+                current = jobs.advanceToElement(job -> !job.tasksAwaitingDelivery.isEmpty() &&
+                        workersByCategory.containsKey(job.workerCategory) &&
+                        !workersByCategory.get(job.workerCategory).isEmpty());
             }
             else {
                 current = jobs.advanceToElement(e -> !e.tasksAwaitingDelivery.isEmpty());
@@ -558,9 +538,9 @@ public class Broker implements Runnable {
 
             Deque<Response> consumers;
             if (!workOffline)
-                consumers = consumersByGraph.get(current.graphId);
+                consumers = workersByCategory.get(current.workerCategory);
             else {
-                Optional<Deque<Response>> opt = consumersByGraph.values().stream().filter(c -> !c.isEmpty()).findFirst();
+                Optional<Deque<Response>> opt = workersByCategory.values().stream().filter(c -> !c.isEmpty()).findFirst();
                 if (opt.isPresent()) consumers = opt.get();
                 else consumers = null;
             }
@@ -578,7 +558,7 @@ public class Broker implements Runnable {
 
     /**
      * This uses a linear search through jobs, which should not be problematic unless there are thousands of
-     * simultaneous jobs.
+     * simultaneous jobs. TODO task IDs should really not be sequential integers should they?
      * @return a Job object that contains the given task ID.
      */
     public Job getJobForTask (int taskId) {
@@ -626,14 +606,10 @@ public class Broker implements Runnable {
             job.tasksAwaitingDelivery.addAll(tasks);
             return false;
         }
-
-        // Delivery succeeded, move tasks from undelivered to delivered status
         LOG.debug("Delivery of {} tasks succeeded.", tasks.size());
-        nUndeliveredTasks -= tasks.size();
-        job.markTasksDelivered(tasks);
-
+        nUndeliveredTasks -= tasks.size(); // FIXME keeping a separate counter for this seems redundant, why not compute it?
+        job.lastDeliveryTime = System.currentTimeMillis();
         return true;
-
     }
 
     /**
@@ -644,10 +620,10 @@ public class Broker implements Runnable {
     public synchronized boolean markTaskCompleted (int taskId) {
         Job job = getJobForTask(taskId);
         if (job == null) {
-            LOG.error("Could not find a job containing task {}, and therefore could not mark the task as completed.");
+            LOG.error("Could not find a job containing task {}, and therefore could not mark the task as completed.", taskId);
             return false;
         }
-        job.markTaskCompleted(taskId);
+        job.completedTasks.add(taskId);
         return true;
     }
 
@@ -662,9 +638,7 @@ public class Broker implements Runnable {
         return highPriorityResponses.remove(taskId);
     }
 
-    // TODO: occasionally purge closed connections from consumersByGraph
-    // TODO: worker catalog and graph affinity homeostasis
-
+    /** This is the broker's main event loop. */
     @Override
     public void run() {
         while (true) {
@@ -677,20 +651,19 @@ public class Broker implements Runnable {
         }
     }
 
-    /** find the job for a task, creating it if it does not exist */
+    /** Find the job that should contain a given task, creating that job if it does not exist. */
     public Job findJob (GenericClusterRequest task) {
         Job job = findJob(task.jobId);
-
-        if (job != null)
+        if (job != null) {
             return job;
-
+        }
         job = new Job(task.jobId);
-        job.graphId = task.graphId;
+        job.workerCategory = new WorkerCategory(task.graphId, task.workerVersion);
         jobs.insertAtTail(job);
         return job;
     }
 
-    /** find the job for a jobId, or null if it does not exist */
+    /** Find the job for the given jobId, returning null if that job does not exist. */
     public Job findJob (String jobId) {
         for (Job job : jobs) {
             if (job.jobId.equals(jobId)) {
@@ -700,7 +673,7 @@ public class Broker implements Runnable {
         return null;
     }
 
-    /** delete a job */
+    /** Delete the job with the given ID. */
     public synchronized boolean deleteJob (String jobId) {
         Job job = findJob(jobId);
         if (job == null) return false;
@@ -708,21 +681,12 @@ public class Broker implements Runnable {
         return jobs.remove(job);
     }
 
-    private Multimap<String, String> activeJobsPerGraph = HashMultimap.create();
-
+    /** Returns whether this broker is tracking and jobs that have unfinished tasks. */
     public synchronized boolean anyJobsActive() {
         for (Job job : jobs) {
             if (!job.isComplete()) return true;
         }
         return false;
-    }
-
-    void activateJob (Job job) {
-        activeJobsPerGraph.put(job.graphId, job.jobId);
-    }
-
-    void deactivateJob (Job job) {
-        activeJobsPerGraph.remove(job.graphId, job.jobId);
     }
 
     /**

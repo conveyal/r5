@@ -80,14 +80,20 @@ public class JobSimulator {
         String url = String.format("http://localhost:9001/enqueue/jobs");
         HttpPost httpPost = new HttpPost(url);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        try {
-            mapper.writeValue(out, requests);
-            // System.out.println(out.toString());
-            httpPost.setEntity(new ByteArrayEntity(out.toByteArray()));
-            HttpResponse response = httpClient.execute(httpPost);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        while (true) {
+            try {
+                Thread.sleep(2000);
+                mapper.writeValue(out, requests);
+                // System.out.println(out.toString());
+                httpPost.setEntity(new ByteArrayEntity(out.toByteArray()));
+                httpClient.execute(httpPost);
+                break;
+            } catch (IOException e) {
+                System.out.println("Failed to enqueue job, retrying.");
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        };
 
     }
 

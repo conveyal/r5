@@ -8,6 +8,7 @@ import gnu.trove.iterator.TIntIterator;
 import junit.framework.TestCase;
 import org.junit.Test;
 
+import java.util.Arrays;
 import java.util.EnumSet;
 
 public class StreetLayerTest extends TestCase {
@@ -44,9 +45,12 @@ public class StreetLayerTest extends TestCase {
 
         sl.removeDisconnectedSubgraphs(40);
 
-        // note: vertices of disconnected subgraphs are not removed
-        assertEquals(0, sl.incomingEdges.get(v).size());
-        assertEquals(0, sl.outgoingEdges.get(v).size());
+        // note: disconnected subgraphs are not removed, they are de-pedestrianized
+        final EdgeStore.Edge edge = sl.edgeStore.getCursor();
+        assertTrue(Arrays.stream(sl.incomingEdges.get(v).toArray())
+                .noneMatch(i -> sl.edgeStore.getCursor(i).getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)));
+        assertTrue(Arrays.stream(sl.outgoingEdges.get(v).toArray())
+                .noneMatch(i -> sl.edgeStore.getCursor(i).getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)));
     }
 
     /**
@@ -91,7 +95,7 @@ public class StreetLayerTest extends TestCase {
 
         //This inserts vertex around the middle of the way.
         //Vertices are A->B->C B is new vertex
-        int vertexId = streetLayer.getOrCreateVertexNear(lat, lon, 500, true, StreetMode.WALK);
+        int vertexId = streetLayer.getOrCreateVertexNear(lat, lon, StreetMode.WALK);
         //Edge from A to B
         EdgeStore.Edge oldForwardEdge = streetLayer.edgeStore.getCursor(0);
         //This should always work since in existing edges only length and toVertex changes

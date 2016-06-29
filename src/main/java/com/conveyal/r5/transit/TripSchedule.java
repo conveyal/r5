@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -52,7 +53,7 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
     public int[] stopSequences;
 
     /** static factory so we can return null */
-    public static TripSchedule create (Trip trip, int[] arrivals, int[] departures, int[] stopSequences, int serviceCode) {
+    public static TripSchedule create (Trip trip, int[] arrivals, int[] departures, Collection<Frequency> frequencies, int[] stopSequences, int serviceCode) {
         // ensure that trip times are monotonically increasing, otherwise throw them out
         for (int i = 0; i < arrivals.length; i++) {
             if (departures[i] < arrivals[i]) {
@@ -66,19 +67,20 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
             }
         }
 
-        if (trip.frequencies != null && !trip.frequencies.isEmpty()) {
-            if (trip.frequencies.stream().allMatch(f -> f.end_time < f.start_time)) {
+        if (frequencies != null && !frequencies.isEmpty()) {
+            if (frequencies.stream().allMatch(f -> f.end_time < f.start_time)) {
                 LOG.error("All frequency entries on trip {} have end time before start time, excluding this trip.", trip.trip_id);
                 return null;
             }
         }
 
-        return new TripSchedule(trip, arrivals, departures, stopSequences, serviceCode);
+        return new TripSchedule(trip, arrivals, departures, frequencies, stopSequences, serviceCode);
     }
 
     // Maybe make a TripSchedule.Factory so we don't have to pass in serviceCode or map.
-    private TripSchedule(Trip trip, int[] arrivals, int[] departures, int[] stopSequences, int serviceCode) {
-        this.tripId = trip.trip_id;
+    private TripSchedule(Trip trip, int[] arrivals, int[] departures, Collection<Frequency> frequencies, int[] stopSequences, int serviceCode) {
+        String scopedTripId = String.join(":", trip.feed_id, trip.trip_id);
+        this.tripId = scopedTripId;
         if (trip.bikes_allowed == 1) {
             setFlag(TripFlag.BICYCLE);
         }
@@ -92,11 +94,11 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
 
         // TODO handle exact times!
 
-        if (trip.frequencies != null && !trip.frequencies.isEmpty()) {
+        if (frequencies != null && !frequencies.isEmpty()) {
 
             // filter to valid frequencies
             // TODO some trips may have no service after this filter is applied
-            List<Frequency> frequencies = trip.frequencies.stream()
+            frequencies = frequencies.stream()
                     .filter(f -> {
                         if (f.start_time > f.end_time) {
                             LOG.warn("Frequency entry for trip {} has end time before start time; it will not be used. Perhaps this is an issue with overnight service?", trip.trip_id);
@@ -218,6 +220,10 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
 
     public int getNStops() {
         return arrivals.length;
+    }
+
+    public int nFrequencyEntries() {
+        return headwaySeconds.length;
     }
 
 }

@@ -40,7 +40,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * any bounding envelope for each object: we will therefore return false positives when querying,
  * and it's up to the caller to filter them out (with whatever knowledge it has on the location of the object).
  * 
- * Note: For performance reasons, write operations are not synchronized, synchronization must be handles by the caller.
+ * Note: For performance reasons, write operations are not synchronized, synchronization must be handled by the caller.
  * Read-only operations are thread-safe though.
  * 
  * @author laurentg, abyrd

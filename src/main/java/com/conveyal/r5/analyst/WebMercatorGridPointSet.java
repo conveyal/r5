@@ -15,7 +15,7 @@ import java.util.Map;
 /**
  * A linked pointset that represents a web mercator grid laid over the graph.
  */
-public class WebMercatorGridPointSet implements PointSet {
+public class WebMercatorGridPointSet extends PointSet {
     public static final Logger LOG = LoggerFactory.getLogger(WebMercatorGridPointSet.class);
 
     public static final int DEFAULT_ZOOM = 9;
@@ -34,12 +34,6 @@ public class WebMercatorGridPointSet implements PointSet {
 
     /** height */
     public final long height;
-
-    private int[] edges;
-    private int[] distances0_mm;
-    private int[] distances1_mm;
-
-    private Map<Fun.Tuple2<StreetLayer, StreetMode>, LinkedPointSet> linkageCache = new HashMap<>();
 
     public WebMercatorGridPointSet(int zoom, long west, long north, long width, long height) {
         this.zoom = zoom;
@@ -68,28 +62,6 @@ public class WebMercatorGridPointSet implements PointSet {
     @Override
     public int featureCount() {
         return (int) (height * width);
-    }
-
-    @Override
-    public Coordinate getCoordinate(int index) {
-        return null;
-    }
-
-    /**
-     * Creates an object similar to a SampleSet but for the new TransitNetwork representation.
-     * Or returns one from the cache if this operation has already been performed.
-     * This is a somewhat slow operation involving a lot of geometry calculations. In some sense the point of making
-     * LinkedPointSets is to cache the relationship between the FreeFormPointSet and a StreetLayer, so we don't have to
-     * repeatedly do a lot of geometry calculations to temporarily connect the points to the streets.
-     */
-    @Override
-    public LinkedPointSet link(StreetLayer streetLayer, StreetMode streetMode) {
-        LinkedPointSet linkedPointSet = linkageCache.get(Fun.t2(streetLayer, streetMode));
-        if (linkedPointSet == null) {
-            linkedPointSet = new LinkedPointSet(this, streetLayer, streetMode);
-            linkageCache.put(Fun.t2(streetLayer, streetMode), linkedPointSet);
-        }
-        return linkedPointSet;
     }
 
     @Override

@@ -3,13 +3,18 @@ package com.conveyal.r5.transit;
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.S3Object;
+import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.common.R5Version;
+import com.conveyal.r5.profile.ProfileRequest;
 import com.google.common.io.ByteStreams;
 import org.apache.commons.io.IOUtils;
-import com.conveyal.r5.common.MavenVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -40,6 +45,9 @@ public class TransportNetworkCache {
     /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
     private boolean workOffline;
 
+    /** This stores any number of lightweight scenario networks built upon the current base network. */
+    private Map<String, TransportNetwork> scenarioNetworkCache = new HashMap<>();
+
     /**
      * Return the graph for the given unique identifier for graph builder inputs on S3.
      * If this is the same as the last graph built, just return the pre-built graph.
@@ -47,7 +55,7 @@ public class TransportNetworkCache {
      */
     public synchronized TransportNetwork getNetwork (String networkId) {
 
-        LOG.info("Finding or building a TransportNetwork for ID {} and R5 commit {}", networkId, MavenVersion.commit);
+        LOG.info("Finding or building a TransportNetwork for ID {} and R5 version {}", networkId, R5Version.version);
 
         if (networkId.equals(currentNetworkId)) {
             LOG.info("Network ID has not changed. Reusing the last one that was built.");
@@ -56,22 +64,78 @@ public class TransportNetworkCache {
 
         TransportNetwork network = checkCached(networkId);
         if (network == null) {
-            LOG.info("Cached transport network for id {} and commit {} was not found. Building the network from scratch.",
-                    networkId, MavenVersion.commit);
+            LOG.info("Cached transport network for id {} and R5 version {} was not found. Building the network from scratch.",
+                    networkId, R5Version.version);
             network = buildNetwork(networkId);
         }
 
         currentNetwork = network;
         currentNetworkId = networkId;
+        scenarioNetworkCache.clear(); // We cache only scenario graphs built upon the currently active base graph.
 
         return network;
+    }
+
+    /**
+     * Find or create a TransportNetwork for the given
+     * By design a particular scenario is always defined relative to a single base graph (it's never applied to multiple
+     * different base graphs). Therefore we can look up cached scenario networks based solely on their scenarioId
+     * rather than a compound key of (networkId, scenarioId).
+     *
+     * The fact that scenario networks are cached means that PointSet linkages will be automatically reused when
+     * the scenario is found by its ID and reused.
+     *
+     * TODO LinkedPointSets keep a reference back to a StreetLayer which means that the network will not be completely garbage collected upon network switch
+     */
+    public synchronized TransportNetwork getNetworkForScenario (String networkId, ProfileRequest request) {
+        String scenarioId = request.scenarioId != null ? request.scenarioId : request.scenario.id;
+
+        // The following call clears the scenarioNetworkCache if the current base graph changes.
+        TransportNetwork baseNetwork = this.getNetwork(networkId);
+        TransportNetwork scenarioNetwork = scenarioNetworkCache.get(scenarioId);
+        if (scenarioNetwork == null) {
+            LOG.info("Applying scenario to base network...");
+
+            Scenario scenario;
+            if (request.scenario == null && request.scenarioId != null) {
+                // resolve scenario
+                LOG.info("Retrieving scenario from S3");
+                S3Object obj = s3.getObject(sourceBucket, String.format("%s_%s.json", networkId, scenarioId));
+                InputStream is = obj.getObjectContent();
+
+                try {
+                    scenario = JsonUtilities.objectMapper.readValue(is, Scenario.class);
+                    is.close();
+                } catch (Exception e) {
+                    LOG.info("Error retrieving scenario from S3", e);
+                    return null;
+                }
+            } else if (request.scenario != null) {
+                scenario = request.scenario;
+            } else {
+                LOG.warn("No scenario specified");
+                scenario = new Scenario();
+            }
+
+            // Apply any scenario modifications to the network before use, performing protective copies where necessary.
+            // Prepend a pre-filter that removes trips that are not running during the search time window.
+            // FIXME Caching transportNetworks with scenarios already applied means we can’t use the InactiveTripsFilter.
+            // Solution may be to cache linked point sets based on scenario ID but always apply scenarios every time.
+            // scenario.modifications.add(0, new InactiveTripsFilter(baseNetwork, clusterRequest.profileRequest));
+            scenarioNetwork = scenario.applyToTransportNetwork(baseNetwork);
+            LOG.info("Done applying scenario. Caching the resulting network.");
+            scenarioNetworkCache.put(scenario.id, scenarioNetwork);
+        } else {
+            LOG.info("Reusing cached TransportNetwork for scenario {}.", scenarioId);
+        }
+        return scenarioNetwork;
     }
 
     /** If this transport network is already built and cached, fetch it quick */
     private TransportNetwork checkCached (String networkId) {
         try {
-            String filename = networkId + "_" + MavenVersion.commit + ".dat";
-            File cacheLocation = new File(CACHE_DIR, networkId + "_" + MavenVersion.commit + ".dat");
+            String filename = networkId + "_" + R5Version.version + ".dat";
+            File cacheLocation = new File(CACHE_DIR, networkId + "_" + R5Version.version + ".dat");
             if (cacheLocation.exists())
                 LOG.info("Found locally-cached TransportNetwork at {}", cacheLocation);
             else {
@@ -144,11 +208,20 @@ public class TransportNetworkCache {
         }
 
         // Now we have a local copy of these graph inputs. Make a graph out of them.
-        TransportNetwork network = TransportNetwork.fromDirectory(new File(CACHE_DIR, networkId));
+        TransportNetwork network;
+        try {
+            network = TransportNetwork.fromDirectory(new File(CACHE_DIR, networkId));
+        } catch (DuplicateFeedException e) {
+            LOG.error("Duplicate feeds in transport network {}", networkId, e);
+            throw new RuntimeException(e);
+        }
+
+        // Set the ID on the network and its layers to allow caching linkages and analysis results.
+        network.networkId = networkId;
 
         // cache the network
-        String filename = networkId + "_" + MavenVersion.commit + ".dat";
-        File cacheLocation = new File(CACHE_DIR, networkId + "_" + MavenVersion.commit + ".dat");
+        String filename = networkId + "_" + R5Version.version + ".dat";
+        File cacheLocation = new File(CACHE_DIR, networkId + "_" + R5Version.version + ".dat");
         
         try {
 
@@ -162,7 +235,6 @@ public class TransportNetworkCache {
 
             // Upload the serialized TransportNetwork to S3
             LOG.info("Uploading the serialized TransportNetwork to S3 for use by other workers.");
-
             s3.putObject(sourceBucket, filename, cacheLocation);
             LOG.info("Done uploading the serialized TransportNetwork to S3.");
 

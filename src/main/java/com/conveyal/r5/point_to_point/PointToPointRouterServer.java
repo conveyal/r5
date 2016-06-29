@@ -330,8 +330,7 @@ public class PointToPointRouterServer {
             //TODO errorchecks
 
             Boolean fullStateList = request.queryMap("full").booleanValue();
-            RoutingVisitor routingVisitor = new RoutingVisitor(transportNetwork.streetLayer.edgeStore,
-                streetMode);
+            RoutingVisitor routingVisitor = new RoutingVisitor(transportNetwork.streetLayer.edgeStore);
 
             if (fullStateList == null) {
                 fullStateList = false;
@@ -387,7 +386,7 @@ public class PointToPointRouterServer {
                 featureCollection.put("features", features);
                 content.put("data", featureCollection);
             } else {
-                Split originSplit = streetRouter.getOriginSplit();
+                Split destinationSplit = streetRouter.getDestinationSplit();
                 //FIXME: why are coordinates of vertex0 and vertex1 the same
                 //but distance to vertex and vertex idx differ
 
@@ -396,47 +395,47 @@ public class PointToPointRouterServer {
                  * - Point on end of edge that started the search
                  * - Closest point on edge to start coordinate
                  *
-                 * We also return outgoing edges from start and end points of edge that started the search
+                 * We also return incoming edges to end points of edge that should end the search
                  */
                 Map<String, Object> featureCollection = new HashMap<>(2);
                 featureCollection.put("type", "FeatureCollection");
                 List<GeoJsonFeature> features = new ArrayList<>(10);
                 GeoJsonFeature feature = new GeoJsonFeature(
-                    fixedDegreesToFloating(originSplit.fLon), fixedDegreesToFloating(originSplit.fLat));
+                    fixedDegreesToFloating(destinationSplit.fixedLon), fixedDegreesToFloating(destinationSplit.fixedLat));
                 feature.addProperty("type", "Point on edge");
 
                 features.add(feature);
 
-                VertexStore.Vertex vertex = transportNetwork.streetLayer.vertexStore.getCursor(originSplit.vertex0);
+                VertexStore.Vertex vertex = transportNetwork.streetLayer.vertexStore.getCursor(destinationSplit.vertex0);
                 feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
                 feature.addProperty("type", "Edge start point");
-                feature.addProperty("vertex_idx", originSplit.vertex0);
-                feature.addProperty("distance_to_vertex", originSplit.distance0_mm/1000);
+                feature.addProperty("vertex_idx", destinationSplit.vertex0);
+                feature.addProperty("distance_to_vertex", destinationSplit.distance0_mm/1000);
                 features.add(feature);
-                transportNetwork.streetLayer.getOutgoingEdges().get(originSplit.vertex0)
+                transportNetwork.streetLayer.incomingEdges.get(destinationSplit.vertex0)
                     .forEach(edge_idx -> {
                         EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edge_idx);
                         GeoJsonFeature edge_feature = new GeoJsonFeature(edge.getGeometry());
                         edge_feature.addProperty("idx", edge_idx);
                         edge_feature.addProperty("permissions", edge.getPermissionsAsString());
-                        edge_feature.addProperty("from", "vertex0");
+                        edge_feature.addProperty("to", "vertex0");
                         features.add(edge_feature);
                         return true;
                     });
 
-                transportNetwork.streetLayer.vertexStore.getCursor(originSplit.vertex1);
+                transportNetwork.streetLayer.vertexStore.getCursor(destinationSplit.vertex1);
                 feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
                 feature.addProperty("type", "Edge end point");
-                feature.addProperty("vertex_idx", originSplit.vertex1);
-                feature.addProperty("distance_to_vertex", originSplit.distance1_mm/1000);
+                feature.addProperty("vertex_idx", destinationSplit.vertex1);
+                feature.addProperty("distance_to_vertex", destinationSplit.distance1_mm/1000);
                 features.add(feature);
-                transportNetwork.streetLayer.getOutgoingEdges().get(originSplit.vertex1)
+                transportNetwork.streetLayer.incomingEdges.get(destinationSplit.vertex1)
                     .forEach(edge_idx -> {
                         EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edge_idx);
                         GeoJsonFeature edge_feature = new GeoJsonFeature(edge.getGeometry());
                         edge_feature.addProperty("idx", edge_idx);
                         edge_feature.addProperty("permissions", edge.getPermissionsAsString());
-                        edge_feature.addProperty("from", "vertex1");
+                        edge_feature.addProperty("to", "vertex1");
                         features.add(edge_feature);
                         return true;
                     });
@@ -479,7 +478,7 @@ public class PointToPointRouterServer {
 
             Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
                 floatingDegreesToFixed(south), floatingDegreesToFixed(north));
-            TIntSet streets = transportNetwork.streetLayer.spatialIndex.query(env);
+            TIntSet streets = transportNetwork.streetLayer.findEdgesInEnvelope(env);
 
             if (streets.size() > 100_000) {
                 LOG.warn("Refusing to include more than 100,000 edges in result");
@@ -557,7 +556,7 @@ public class PointToPointRouterServer {
             if (request.queryParams().size() < 4) {
 
                 EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor();
-                for (int e = 0; e < transportNetwork.streetLayer.edgeStore.getnEdges(); e += 2) {
+                for (int e = 0; e < transportNetwork.streetLayer.edgeStore.nEdges(); e += 2) {
                     edge.seek(e);
 
                     try {
@@ -586,7 +585,7 @@ public class PointToPointRouterServer {
 
             Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
                 floatingDegreesToFixed(south), floatingDegreesToFixed(north));
-            TIntSet streets = transportNetwork.streetLayer.spatialIndex.query(env);
+            TIntSet streets = transportNetwork.streetLayer.findEdgesInEnvelope(env);
             //transportNetwork.streetLayer.edgeStore.getCursor()
 
             if (streets.size() > 100_000) {
@@ -628,7 +627,7 @@ public class PointToPointRouterServer {
             if (request.queryParams().size() < 4) {
 
                 EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor();
-                for (int e = 0; e < transportNetwork.streetLayer.edgeStore.getnEdges(); e += 2) {
+                for (int e = 0; e < transportNetwork.streetLayer.edgeStore.nEdges(); e += 2) {
                     edge.seek(e);
 
                     try {
@@ -652,7 +651,7 @@ public class PointToPointRouterServer {
 
             Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
                 floatingDegreesToFixed(south), floatingDegreesToFixed(north));
-            TIntSet streets = transportNetwork.streetLayer.spatialIndex.query(env);
+            TIntSet streets = transportNetwork.streetLayer.findEdgesInEnvelope(env);
 
             if (streets.size() > 100_000) {
                 LOG.warn("Refusing to include more than 100,000 edges in result");

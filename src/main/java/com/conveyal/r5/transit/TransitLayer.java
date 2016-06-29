@@ -3,16 +3,20 @@ package com.conveyal.r5.transit;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.*;
 import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.streets.VertexStore;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
+import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.Point;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
-import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
 import java.time.LocalDate;
 import org.slf4j.Logger;
@@ -23,12 +27,22 @@ import java.time.DateTimeException;
 import java.time.ZoneId;
 import java.time.zone.ZoneRulesException;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 
 /**
  * A key simplifying factor is that we don't handle overnight trips. This is fine for analysis at usual times of day.
  */
 public class TransitLayer implements Serializable, Cloneable {
+    /** Distance limit for stop trees, meters. Set to 3.5 km to match OTP GraphIndex.MAX_WALK_METERS */
+    public static final int STOP_TREE_DISTANCE_METERS = 3500;
+
+    /**
+     * Distance limit for transfers, meters. Set to 1km which is slightly above OTP's 600m (which was specified as
+     * 1 m/s with 600s max time, which is actually somewhat less than 600m due to extra costs due to steps etc.
+     */
+    public static final int TRANSFER_DISTANCE_LIMIT = 1000;
 
     private static final Logger LOG = LoggerFactory.getLogger(TransitLayer.class);
 
@@ -39,7 +53,7 @@ public class TransitLayer implements Serializable, Cloneable {
     // It contains information that is temporarily also held in stopForIndex.
     public List<String> stopIdForIndex = new ArrayList<>();
 
-    // Inverse map of stopIdForIndex, reconstructed from that list (not serialized).
+    // Inverse map of stopIdForIndex, reconstructed from that list (not serialized). No-entry value is -1.
     public transient TObjectIntMap<String> indexForStopId;
 
     // This is used as an initial size estimate for many lists.
@@ -54,7 +68,8 @@ public class TransitLayer implements Serializable, Cloneable {
     public transient TIntIntMap stopForStreetVertex;
 
     // For each stop, a packed list of transfers to other stops
-    public List<TIntList> transfersForStop;
+    // FIXME we may currently be storing weight or time to reach other stop, which we did to avoid floating point division. Instead, store distances in millimeters, and divide by speed in mm/sec.
+    public List<TIntList> transfersForStop = new ArrayList<>();
 
     /** Information about a route */
     public List<RouteInfo> routes = new ArrayList<>();
@@ -82,41 +97,48 @@ public class TransitLayer implements Serializable, Cloneable {
     /** Does this TransitLayer have any schedules */
     public boolean hasSchedules = false;
 
-    public int nTrips = 0;
+    /**
+     * For each transit stop, an int->int map giving the distance of every reachable street intersection from the
+     * origin stop. This is the result of running a distance-constrained street search from every stop in the graph.
+     */
+    public transient List<TIntIntMap> stopTrees;
 
     /**
-     * This is the result of running a search from every stop in the graph.
-     * It is an array of maps (one for each of these origin stops). Each array entry is a map from all reachable
-     * destination street vertex indexes to their distances.
+     * The TransportNetwork containing this TransitLayer. This link up the object tree also allows us to access the
+     * StreetLayer associated with this TransitLayer in the same TransportNetwork without maintaining bidirectional
+     * references between the two layers.
      */
-    public transient TIntIntMap[] stopTree;
+    public TransportNetwork parentNetwork = null;
 
-    /**
-     * A transitLayer can only be linked to one StreetLayer, otherwise the street indexes for the transit stops would
-     * be ambiguous. It can however be linked to no StreetLayer. So if this field is null there are no known streets,
-     * but if this field is set then this TransitLayer has already been linked to a StreetLayer.
-     * This field is only public because it has to be set from StreetLayer, which is in another package.
-     */
-    public StreetLayer linkedStreetLayer = null;
+    /** Map from feed ID to feed CRC32 to ensure that we can't apply scenarios to the wrong feeds */
+    public Map<String, Long> feedChecksums = new HashMap<>();
 
     /** Load a GTFS feed with full load level */
-    public void loadFromGtfs (GTFSFeed gtfs) {
+    public void loadFromGtfs (GTFSFeed gtfs) throws DuplicateFeedException {
         loadFromGtfs(gtfs, LoadLevel.FULL);
     }
 
     /**
      * Load data from a GTFS feed. Call multiple times to load multiple feeds.
      */
-    public void loadFromGtfs (GTFSFeed gtfs, LoadLevel level) {
+    public void loadFromGtfs (GTFSFeed gtfs, LoadLevel level) throws DuplicateFeedException {
+        if (feedChecksums.containsKey(gtfs.feedId)) {
+            throw new DuplicateFeedException(gtfs.feedId);
+        }
+
+        // checksum feed and add to checksum cache
+        feedChecksums.put(gtfs.feedId, gtfs.checksum);
 
         // Load stops.
         // ID is the GTFS string ID, stopIndex is the zero-based index, stopVertexIndex is the index in the street layer.
-        TObjectIntMap<String> indexForStopId = new TObjectIntHashMap<>();
+        TObjectIntMap<String> indexForUnscopedStopId = new TObjectIntHashMap<>();
         stopsWheelchair = new BitSet(gtfs.stops.size());
         for (Stop stop : gtfs.stops.values()) {
             int stopIndex = stopIdForIndex.size();
-            indexForStopId.put(stop.stop_id, stopIndex);
-            stopIdForIndex.add(stop.stop_id);
+            String scopedStopId = String.join(":", stop.feed_id, stop.stop_id);
+            // This is only used while building the TransitNetwork to look up StopTimes from the same feed.
+            indexForUnscopedStopId.put(stop.stop_id, stopIndex);
+            stopIdForIndex.add(scopedStopId);
             stopForIndex.add(stop);
             if (stop.wheelchair_boarding != null && stop.wheelchair_boarding.trim().equals("1")) {
                 stopsWheelchair.set(stopIndex);
@@ -143,14 +165,18 @@ public class TransitLayer implements Serializable, Cloneable {
         // These are temporary maps used only for grouping purposes.
         Map<TripPatternKey, TripPattern> tripPatternForStopSequence = new HashMap<>();
         Multimap<String, TripSchedule> tripsForBlock = HashMultimap.create();
-        TObjectIntMap<Route> routeIndexForRoute = new TObjectIntHashMap<>();
+
+        // Keyed with unscoped route_id, which is fine as this is for a single GTFS feed
+        TObjectIntMap<String> routeIndexForRoute = new TObjectIntHashMap<>();
         int nTripsAdded = 0;
         TRIPS: for (String tripId : gtfs.trips.keySet()) {
             Trip trip = gtfs.trips.get(tripId);
+            Route route = gtfs.routes.get(trip.route_id);
             // Construct the stop pattern and schedule for this trip
             // Should we really be resolving to an object reference for Route?
             // That gets in the way of GFTS persistence.
-            TripPatternKey tripPatternKey = new TripPatternKey(trip.route.route_id);
+            String scopedRouteId = String.join(":", gtfs.feedId, trip.route_id);
+            TripPatternKey tripPatternKey = new TripPatternKey(scopedRouteId);
             TIntList arrivals = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
             TIntList departures = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
             TIntList stopSequences = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
@@ -164,23 +190,23 @@ public class TransitLayer implements Serializable, Cloneable {
             try {
                 stopTimes = gtfs.getInterpolatedStopTimesForTrip(tripId);
             } catch (GTFSFeed.FirstAndLastStopsDoNotHaveTimes e) {
-                LOG.warn("First and last stops do not both have times specified on trip {} on route {}, skipping this as interpolation is impossible", trip.trip_id, trip.route.route_id);
+                LOG.warn("First and last stops do not both have times specified on trip {} on route {}, skipping this as interpolation is impossible", trip.trip_id, trip.route_id);
                 continue TRIPS;
             }
 
             for (StopTime st : stopTimes) {
-                tripPatternKey.addStopTime(st, indexForStopId);
+                tripPatternKey.addStopTime(st, indexForUnscopedStopId);
                 arrivals.add(st.arrival_time);
                 departures.add(st.departure_time);
                 stopSequences.add(st.stop_sequence);
 
                 if (previousDeparture > st.arrival_time || st.arrival_time > st.departure_time) {
-                    LOG.warn("Reverse travel at stop {} on trip {} on route {}, skipping this trip as it will wreak havoc with routing", st.stop_id, trip.trip_id, trip.route.route_id);
+                    LOG.warn("Negative-time travel at stop {} on trip {} on route {}, skipping this trip as it will wreak havoc with routing", st.stop_id, trip.trip_id, trip.route_id);
                     continue TRIPS;
                 }
 
                 if (previousDeparture == st.arrival_time) {
-                    LOG.warn("Zero-length hop at stop {} on trip {} on route {} {}", st.stop_id, trip.trip_id, trip.route.route_id, trip.route.route_short_name);
+                    LOG.warn("Zero-length hop at stop {} on trip {} on route {} {}", st.stop_id, trip.trip_id, trip.route_id, route.route_short_name);
                 }
 
                 previousDeparture = st.departure_time;
@@ -189,7 +215,7 @@ public class TransitLayer implements Serializable, Cloneable {
             }
 
             if (nStops == 0) {
-                LOG.warn("Trip {} on route {} has no stops, it will not be used", trip.trip_id, trip.route.route_id);
+                LOG.warn("Trip {} on route {} {} has no stops, it will not be used", trip.trip_id, trip.route_id, route.route_short_name);
                 continue;
 
             }
@@ -201,14 +227,14 @@ public class TransitLayer implements Serializable, Cloneable {
                 // if we haven't seen the route yet _from this feed_ (as IDs are only feed-unique)
                 // create it.
                 if (level == LoadLevel.FULL) {
-                    if (!routeIndexForRoute.containsKey(trip.route)) {
+                    if (!routeIndexForRoute.containsKey(trip.route_id)) {
                         int routeIndex = routes.size();
-                        RouteInfo ri = new RouteInfo(trip.route);
+                        RouteInfo ri = new RouteInfo(route, gtfs.agency.get(route.agency_id));
                         routes.add(ri);
-                        routeIndexForRoute.put(trip.route, routeIndex);
+                        routeIndexForRoute.put(trip.route_id, routeIndex);
                     }
 
-                    tripPattern.routeIndex = routeIndexForRoute.get(trip.route);
+                    tripPattern.routeIndex = routeIndexForRoute.get(trip.route_id);
                 }
 
                 tripPatternForStopSequence.put(tripPatternKey, tripPattern);
@@ -216,11 +242,12 @@ public class TransitLayer implements Serializable, Cloneable {
                 tripPatterns.add(tripPattern);
             }
             tripPattern.setOrVerifyDirection(trip.direction_id);
-            int serviceCode = serviceCodeNumber.get(trip.service.service_id);
+            int serviceCode = serviceCodeNumber.get(trip.service_id);
 
             // TODO there's no reason why we can't just filter trips like this, correct?
             // TODO this means that invalid trips still have empty patterns created
-            TripSchedule tripSchedule = TripSchedule.create(trip, arrivals.toArray(), departures.toArray(), stopSequences.toArray(), serviceCode);
+            Collection<Frequency> frequencies = gtfs.getFrequencies(trip.trip_id);
+            TripSchedule tripSchedule = TripSchedule.create(trip, arrivals.toArray(), departures.toArray(), frequencies, stopSequences.toArray(), serviceCode);
             if (tripSchedule == null) continue;
 
             tripPattern.addTrip(tripSchedule);
@@ -352,44 +379,53 @@ public class TransitLayer implements Serializable, Cloneable {
         }
 
         // 3. What is the integer index for each GTFS stop ID?
-        indexForStopId = new TObjectIntHashMap<>();
+        indexForStopId = new TObjectIntHashMap<>(stopIdForIndex.size(), 0.5f, -1);
         for (int s = 0; s < stopIdForIndex.size(); s++) {
             indexForStopId.put(stopIdForIndex.get(s), s);
         }
     }
 
-    public void buildStopTree () {
-
+    /**
+     * Run a distance-constrained street search from every transit stop in the graph.
+     * Store the distance to every reachable street vertex for each of these origin stops.
+     */
+    public void buildStopTrees() {
         LOG.info("Building stop trees (cached distances between transit stops and street intersections).");
-        if (linkedStreetLayer == null) {
-            throw new IllegalStateException("Attempt to build stop trees on a transit layer that is not linked to a street layer.");
-        }
-
-        // For each transit stop, an int->int map giving the distance of every reached street intersection from the origin stop.
-        stopTree = new TIntIntMap[getStopCount()];
-
-        StreetRouter r = new StreetRouter(linkedStreetLayer);
-        r.distanceLimitMeters = 2000;
-
-        for (int stop = 0; stop < getStopCount(); stop++) {
-            int originVertex = streetVertexForStop.get(stop);
-
-            if (originVertex == -1) {
-                // -1 indicates that this stop is not linked to the street network.
-                LOG.info("Stop {} has not been linked to the street network.", stop);
-                stopTree[stop] = null;
-                continue;
-            }
-
-            r.setOrigin(originVertex);
-            r.route();
-
-            stopTree[stop] = r.getReachedVertices();
-        }
+        // Allocate a new empty array of stop trees, releasing any existing ones.
+        stopTrees = new ArrayList<>(getStopCount());
+        // Parallelized.
+        stopTrees = IntStream.range(0, getStopCount()).parallel()
+                .mapToObj(s -> buildOneStopTree(s)).collect(Collectors.toList());
         LOG.info("Done building stop trees.");
     }
 
-    public static TransitLayer fromGtfs (List<String> files) {
+    /**
+     * Perform a single on-street search from the specified transit stop.
+     * Return the distance in millimeters to every reached street vertex.
+     * @param stop the internal integer stop ID for which to build a stop tree.
+     * @return a map from street vertex numbers to distances in millimeters
+     */
+    public TIntIntMap buildOneStopTree(int stop) {
+        int originVertex = streetVertexForStop.get(stop);
+        if (originVertex == -1) {
+            // -1 indicates that this stop is not linked to the street network.
+            LOG.warn("Stop {} has not been linked to the street network, cannot build stop tree.", stop);
+            return null;
+        }
+        StreetRouter router = new StreetRouter(parentNetwork.streetLayer);
+        router.distanceLimitMeters = STOP_TREE_DISTANCE_METERS;
+
+        // Dominate based on distance in millimeters, since (a) we're using a hard distance limit, and (b) we divide
+        // by a speed to get time when we use the stop trees.
+        router.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+        router.setOrigin(originVertex);
+        router.route();
+
+        // This will return distance in millimeters since that is our dominance function
+        return router.getReachedVertices();
+    }
+
+    public static TransitLayer fromGtfs (List<String> files) throws DuplicateFeedException {
         TransitLayer transitLayer = new TransitLayer();
 
         for (String file : files) {
@@ -428,6 +464,16 @@ public class TransitLayer implements Serializable, Cloneable {
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public Coordinate getCoordinateForStop(int s) {
+        int v = streetVertexForStop.get(s);
+        VertexStore.Vertex vertex = parentNetwork.streetLayer.vertexStore.getCursor(v);
+        return new Coordinate(vertex.getLon(), vertex.getLat());
+    }
+
+    public Point getJTSPointForStop(int s) {
+        return GeometryUtils.geometryFactory.createPoint(getCoordinateForStop(s));
     }
 
     /** How much information should we load/save? */
@@ -491,4 +537,22 @@ public class TransitLayer implements Serializable, Cloneable {
             throw new IllegalArgumentException("unknown gtfs route type " + routeType);
         }
     }
+
+    /**
+     * @return a semi-shallow copy of this transit layer for use when applying scenarios.
+     */
+    public TransitLayer scenarioCopy(TransportNetwork newScenarioNetwork) {
+        TransitLayer copy = this.clone();
+        copy.parentNetwork = newScenarioNetwork;
+        // Protectively copy all the lists that will be affected by adding new stops to the network
+        // See: StopSpec.materializeOne()
+        // We would really only need to do this for modifications that create new stops.
+        copy.stopIdForIndex = new ArrayList<>(this.stopIdForIndex);
+        copy.stopNames = new ArrayList<>(this.stopNames);
+        copy.streetVertexForStop = new TIntArrayList(this.streetVertexForStop);
+        copy.stopTrees = new ArrayList<>(this.stopTrees);
+        copy.transfersForStop = new ArrayList<>(this.transfersForStop);
+        return copy;
+    }
+
 }

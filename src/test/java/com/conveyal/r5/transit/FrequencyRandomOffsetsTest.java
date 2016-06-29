@@ -4,9 +4,6 @@ package com.conveyal.r5.transit;
 import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.r5.profile.FrequencyRandomOffsets;
-import com.conveyal.r5.transit.TransitLayer;
-import com.conveyal.r5.transit.TripPattern;
-import com.conveyal.r5.transit.TripPatternKey;
 import gnu.trove.list.array.TIntArrayList;
 import org.junit.Test;
 
@@ -75,9 +72,9 @@ public class FrequencyRandomOffsetsTest {
         frequencies = Arrays.asList(f2);
         TripSchedule ts2 = TripSchedule.create(t2, new int [] { 0, 60, 90, 180 }, new int [] { 0, 60, 90, 180 }, frequencies, new int[] { 5, 6, 7, 8 }, 0);
 
-        ts2.phasedFromId = new String[] { "FEED:TRIP1_05:00:00_to_11:00:00_every_30m00s" };
-        ts2.phasedAtStop = new String[] { "FEED:STOP_6" };
-        ts2.phasedFromStop = new String[] { "FEED:STOP_3" };
+        ts2.phaseFromId = new String[] { "FEED:TRIP1_05:00:00_to_11:00:00_every_30m00s" };
+        ts2.phaseAtStop = new String[] { "FEED:STOP_6" };
+        ts2.phaseFromStop = new String[] { "FEED:STOP_3" };
         ts2.phaseSeconds = new int[] { 600 };
 
         pattern2.addTrip(ts2);
@@ -90,8 +87,8 @@ public class FrequencyRandomOffsetsTest {
 
         // check that phasing is correct
         // offset indices are trip pattern, trip, frequency entry
-        int timeAtTargetStop = ts2.startTimes[0] + ts2.arrivals[1] + fro.offsets.get(1)[0][0];
-        int timeAtSourceStop = ts1.startTimes[0] + ts1.arrivals[2] + fro.offsets.get(0)[0][0];
+        int timeAtTargetStop = ts2.startTimes[0] + ts2.departures[1] + fro.offsets.get(1)[0][0];
+        int timeAtSourceStop = ts1.startTimes[0] + ts1.departures[2] + fro.offsets.get(0)[0][0];
         int timeDifference = timeAtTargetStop - timeAtSourceStop;
         // Depending on how large the offset on the first route is, the new route may come 10 minutes after on its first
         // trip, or 20 minutes before (which is the same phasing, just changing which route arrives first).

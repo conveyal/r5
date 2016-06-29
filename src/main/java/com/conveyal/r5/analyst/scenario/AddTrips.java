@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.IntStream;
 
 import static java.time.DayOfWeek.*;
@@ -155,6 +156,24 @@ public class AddTrips extends Modification {
         public boolean saturday;
         public boolean sunday;
 
+        /** If non-null, phase this timetable from another timetable */
+        public String phaseFromTimetable;
+
+        /** What stop ID to perform phasing at in this trip pattern */
+        public String phaseAtStop;
+
+        /** What stop ID to perform phasing at in the phaseFrom trip pattern */
+        public String phaseFromStop;
+
+        /** Phase in seconds */
+        public int phaseSeconds;
+
+        /**
+         * ID for this frequency entry, so that it can be referred to for phasing purposes. May be left null if
+         * there is no phasing from this entry.
+         */
+        public String entryId;
+
         protected EnumSet<DayOfWeek> activeDaysOfWeek() {
             EnumSet days = EnumSet.noneOf(DayOfWeek.class);
             if (monday)    days.add(MONDAY);
@@ -195,8 +214,12 @@ public class AddTrips extends Modification {
                 // This entry is expected to be in scheduled (specific departure times) mode.
                 if (firstDepartures == null) {
                     warnings.add("You must specify either firstDepartures (which creates scheduled trips) or all of headwaySecs, startTime, and endTime (which create frequency trips");
+                } else if (phaseFromTimetable != null || phaseFromStop != null || phaseSeconds != 0 || phaseAtStop != null) {
+                    warnings.add("You cannot specify phasing information in a scheduled trip.");
                 }
             }
+
+
             if (nStops >= 0) {
                 // Validate hops and dwell times.
                 if (nStops < 2) {
@@ -212,6 +235,25 @@ public class AddTrips extends Modification {
             return warnings;
         }
 
+        /**
+         * If this PatternTimetable contains phasing information, apply it to the given TripSchedule destructively. Also
+         * set the frequency entry ID.
+         */
+        public void applyPhasing(TripSchedule sched) {
+            if (phaseFromTimetable != null) {
+                sched.phaseFromId = new String[]{phaseFromTimetable};
+                sched.phaseFromStop = new String[]{phaseFromStop};
+                sched.phaseAtStop = new String[]{phaseAtStop};
+                sched.phaseSeconds = new int[]{phaseSeconds};
+            }
+
+            // Generate an entry ID if none is specified.
+            if (firstDepartures == null) {
+                // not a schedule based trip, there is a frequency entry ID.
+                // This won't work if we ever generate trips with multiple requency entries.
+                sched.frequencyEntryIds = new String[]{entryId != null ? entryId : UUID.randomUUID().toString()};
+            }
+        }
     }
 
     /**
@@ -281,8 +323,12 @@ public class AddTrips extends Modification {
         freq.start_time = timetable.startTime;
         freq.end_time = timetable.endTime;
         freq.headway_secs = timetable.headwaySecs;
-        return TripSchedule.create(trip, arrivals, departures, Lists.newArrayList(freq), IntStream.range(0, arrivals.length).toArray(), serviceCode);
+        TripSchedule sched =
+                TripSchedule.create(trip, arrivals, departures, Lists.newArrayList(freq), IntStream.range(0, arrivals.length).toArray(), serviceCode);
 
+        timetable.applyPhasing(sched);
+
+        return sched;
     }
 
     @Override

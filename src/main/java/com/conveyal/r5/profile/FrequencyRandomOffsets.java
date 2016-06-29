@@ -74,7 +74,7 @@ public class FrequencyRandomOffsets {
                         val[tripScheduleIndex] = null;
                     else {
                         for (int frequencyEntryIndex = 0; frequencyEntryIndex < val[tripScheduleIndex].length; frequencyEntryIndex++) {
-                            if (schedule.phasedFromId == null || schedule.phasedFromId[frequencyEntryIndex] == null) {
+                            if (schedule.phaseFromId == null || schedule.phaseFromId[frequencyEntryIndex] == null) {
                                 // not phased. also, don't overwrite with new random number on each iteration, as other
                                 // trips may be phased from this one
                                 if (val[tripScheduleIndex][frequencyEntryIndex] == -1) {
@@ -86,7 +86,7 @@ public class FrequencyRandomOffsets {
                                 if (val[tripScheduleIndex][frequencyEntryIndex] != -1) continue; // already randomized
 
                                 // find source phase information
-                                int[] source = data.frequencyEntryIndexForId.get(schedule.phasedFromId[frequencyEntryIndex]);
+                                int[] source = data.frequencyEntryIndexForId.get(schedule.phaseFromId[frequencyEntryIndex]);
 
                                 int sourcePatternIdx = source[0];
                                 int sourceTripScheduleIdx = source[1];
@@ -101,7 +101,7 @@ public class FrequencyRandomOffsets {
 
                                     // figure out stop indices
                                     int sourceStopIndexInPattern = 0;
-                                    int sourceStopIndexInNetwork = data.indexForStopId.get(schedule.phasedFromStop[frequencyEntryIndex]);
+                                    int sourceStopIndexInNetwork = data.indexForStopId.get(schedule.phaseFromStop[frequencyEntryIndex]);
 
                                     // TODO check that stop IDs were found.
 
@@ -111,21 +111,29 @@ public class FrequencyRandomOffsets {
                                     }
 
                                     int targetStopIndexInPattern = 0;
-                                    int targetStopIndexInNetwork = data.indexForStopId.get(schedule.phasedAtStop[frequencyEntryIndex]);
+                                    int targetStopIndexInNetwork = data.indexForStopId.get(schedule.phaseAtStop[frequencyEntryIndex]);
 
                                     while (targetStopIndexInPattern < pattern.stops.length &&
                                             pattern.stops[targetStopIndexInPattern] != targetStopIndexInNetwork) {
                                         targetStopIndexInPattern++;
                                     }
 
+                                    // use arrivals at last stop
+                                    int[] sourceTravelTimes = sourceStopIndexInPattern < phaseFromPattern.stops.length - 1 ?
+                                            phaseFromSchedule.departures : phaseFromSchedule.arrivals;
+
                                     // figure out the offset if they were to pass the stops at the same time
                                     int timeAtSourceStop = phaseFromSchedule.startTimes[sourceFrequencyEntryIdx] +
-                                            phaseFromSchedule.arrivals[sourceStopIndexInPattern] +
+                                            sourceTravelTimes[sourceStopIndexInPattern] +
                                             previousOffset;
+
+                                    // use arrivals at last stop
+                                    int[] targetTravelTimes = targetStopIndexInPattern < pattern.stops.length - 1 ?
+                                            schedule.departures : schedule.arrivals;
 
                                     // figure out when the target trip passes the stop if the offset were 0.
                                     int timeAtTargetStop = schedule.startTimes[frequencyEntryIndex] +
-                                            schedule.arrivals[targetStopIndexInPattern];
+                                            targetTravelTimes[targetStopIndexInPattern];
 
                                     int offset = timeAtSourceStop - timeAtTargetStop;
 

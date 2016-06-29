@@ -421,6 +421,73 @@ public class AdjustFrequencyTest {
 
     }
 
+    @Test
+    public void testPhasing () {
+        AdjustFrequency af = new AdjustFrequency();
+        af.route = "MULTIPLE_PATTERNS:route";
+
+        assertEquals(2, network.transitLayer.tripPatterns.size());
+
+        network.transitLayer.tripPatterns.forEach(tp -> {
+            assertTrue(tp.hasSchedules);
+            assertFalse(tp.hasFrequencies);
+        });
+
+        // make an entry
+        AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();
+        entry.headwaySecs = 1800;
+        entry.startTime = 6 * 3600;
+        entry.endTime = 16 * 3600;
+        entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = entry.saturday = entry.sunday = true;
+        entry.sourceTrip = "MULTIPLE_PATTERNS:trip25200"; // trip25200 is a two-stop trip
+        entry.entryId = "SHORT_TURN";
+
+        AddTrips.PatternTimetable entry2 = new AddTrips.PatternTimetable();
+        entry2.headwaySecs = 1800;
+        entry2.startTime = 16 * 3600;
+        entry2.endTime = 22 * 3600;
+        entry2.monday = entry2.tuesday = entry2.wednesday = entry2.thursday = entry2.friday = entry2.saturday = entry2.sunday = true;
+        entry2.sourceTrip = "MULTIPLE_PATTERNS:trip25800"; // trip25800 is a three-stop trip
+        entry2.phaseFromTimetable = "SHORT_TURN";
+        entry2.phaseFromStop = "MULTIPLE_PATTERNS:s1";
+        entry2.phaseAtStop = "MULTIPLE_PATTERNS:s2";
+        entry2.phaseSeconds = 900;
+
+        af.entries = Arrays.asList(entry, entry2);
+
+        Scenario scenario = new Scenario();
+        scenario.modifications = Arrays.asList(af);
+        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+
+        TripSchedule ts1 = mod.transitLayer.tripPatterns.stream()
+                .flatMap(tp -> tp.tripSchedules.stream())
+                .filter(ts -> ts.tripId.equals("MULTIPLE_PATTERNS:trip25200"))
+                .findFirst()
+                .orElse(null);
+
+        assertNotNull(ts1);
+
+        TripSchedule ts2 = mod.transitLayer.tripPatterns.stream()
+                .flatMap(tp -> tp.tripSchedules.stream())
+                .filter(ts -> ts.tripId.equals("MULTIPLE_PATTERNS:trip25800"))
+                .findFirst()
+                .orElse(null);
+
+        assertNotNull(ts2);
+
+        assertArrayEquals(ts1.frequencyEntryIds, ts2.phaseFromId);
+        assertArrayEquals(new String[] { "MULTIPLE_PATTERNS:s1" }, ts2.phaseFromStop);
+        assertArrayEquals(new String[] { "MULTIPLE_PATTERNS:s2" }, ts2.phaseAtStop);
+        assertArrayEquals(new int[] { 900 }, ts2.phaseSeconds);
+
+        assertNull(ts1.phaseFromId);
+        assertNull(ts1.phaseAtStop);
+        assertNull(ts1.phaseFromStop);
+        assertNull(ts1.phaseSeconds);
+
+        assertEquals(checksum, network.checksum());
+    }
+
     @After
     public void tearDown () {
         network = null;

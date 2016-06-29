@@ -164,6 +164,7 @@ public class AdjustFrequency extends Modification {
 
             // If this current TripSchedule's trip is mentioned in any PatternTimetables,
             // convert it into one or more new TripSchedules that represent new frequency or scheduled trips.
+            // TODO this may create multiple entries with the same trip ID.
             for (PatternTimetable entry : entriesByTrip.get(originalSchedule.tripId)) {
 
                 // Record that this entry has been matched for error reporting and debugging purposes.
@@ -198,6 +199,9 @@ public class AdjustFrequency extends Modification {
                     newSchedule.headwaySeconds = new int[]{entry.headwaySecs};
                     newSchedule.startTimes = new int[]{entry.startTime};
                     newSchedule.endTimes = new int[]{entry.endTime};
+
+                    entry.applyPhasing(newSchedule);
+
                     newPattern.tripSchedules.add(newSchedule);
                     nTripSchedulesCreated += 1;
                     newPattern.hasFrequencies = true;

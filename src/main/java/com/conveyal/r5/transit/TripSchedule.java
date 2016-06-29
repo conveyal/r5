@@ -46,15 +46,15 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
      * Frequency entry each frequency entry on this trip is phased from. If the array is null, no entries are phased;
      * if any entry is null, that entry is not phased.
      */
-    public String[] phasedFromId;
+    public String[] phaseFromId;
 
     /**
      * Scoped stop ID on this trip where this the phase is applied.
      */
-    public String[] phasedAtStop;
+    public String[] phaseAtStop;
 
     /** Scoped stop ID on source (phased-from) trip where the phase is applied */
-    public String[] phasedFromStop;
+    public String[] phaseFromStop;
 
     /**
      * Phase between trips. Applied to departure time except at last stop, where it is applied to arrival time.

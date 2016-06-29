@@ -250,6 +250,23 @@ public class StreetLayer implements Serializable, Cloneable {
             }
         }
 
+        // summarize LTS statistics
+        Edge cursor = edgeStore.getCursor();
+        cursor.seek(0);
+
+        int lts1 = 0, lts2 = 0, lts3 = 0, lts4 = 0, ltsUnknown = 0;
+
+        do {
+            if (cursor.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_1)) lts1++;
+            else if (cursor.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_2)) lts2++;
+            else if (cursor.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_3)) lts3++;
+            else if (cursor.getFlag(EdgeStore.EdgeFlag.BIKE_LTS_4)) lts4++;
+            else ltsUnknown++;
+        } while (cursor.advance());
+
+        LOG.info("Surrogate LTS:\n  1: {} edges\n  2: {} edges\n  3: {} edges\n  4: {} edges\n  Unknown: {} edges",
+                lts1, lts2, lts3, lts4, ltsUnknown);
+
         List<Node> parkAndRideNodes = new ArrayList<>();
 
         for (Node node : osm.nodes.values()) {

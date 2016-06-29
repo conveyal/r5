@@ -110,12 +110,21 @@ public class FrequencyRandomOffsets {
                                         sourceStopIndexInPattern++;
                                     }
 
+                                    if (sourceStopIndexInPattern == phaseFromPattern.stops.length) {
+                                        throw new IllegalArgumentException(String.format("Stop %s was not found in source pattern!", schedule.phaseFromStop[frequencyEntryIndex]));
+                                    }
+
                                     int targetStopIndexInPattern = 0;
                                     int targetStopIndexInNetwork = data.indexForStopId.get(schedule.phaseAtStop[frequencyEntryIndex]);
 
                                     while (targetStopIndexInPattern < pattern.stops.length &&
                                             pattern.stops[targetStopIndexInPattern] != targetStopIndexInNetwork) {
                                         targetStopIndexInPattern++;
+                                    }
+
+                                    // TODO This should really be checked also before modifications are applied.
+                                    if (targetStopIndexInPattern == pattern.stops.length) {
+                                        throw new IllegalArgumentException(String.format("Stop %s was not found in target pattern!", schedule.phaseAtStop[frequencyEntryIndex]));
                                     }
 
                                     // use arrivals at last stop

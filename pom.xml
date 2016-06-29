@@ -54,6 +54,8 @@
         <filtering>true</filtering>
         <includes>
           <include>**/*.properties</include>
+          <include>debug-plan/**</include>
+          <include>fares/**</include>
         </includes>
       </resource>
     </resources>

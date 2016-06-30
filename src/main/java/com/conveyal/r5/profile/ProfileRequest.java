@@ -9,6 +9,7 @@ import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.SearchType;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.model.json_serialization.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import graphql.schema.DataFetchingEnvironment;
@@ -281,6 +282,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      *
      * uses {@link this#getFromTimeDateZD()}
      */
+    @JsonIgnore
     public long getFromTimeDate() {
         return getFromTimeDateZD().toInstant().toEpochMilli();
     }
@@ -294,6 +296,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      *
      * If date isn't set current date is used. Time is empty (one hour before midnight in UTC if +1 timezone is used)
      */
+    @JsonIgnore
     public ZonedDateTime getFromTimeDateZD() {
         ZonedDateTime currentDateTime;
 
@@ -307,6 +310,7 @@ public class ProfileRequest implements Serializable, Cloneable {
         return  currentDateTime.plusSeconds(fromTime);
     }
 
+    @JsonIgnore
     public float getSpeed(StreetMode streetMode) {
         switch (streetMode) {
         case WALK:
@@ -449,6 +453,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      * @param mode
      * @return
      */
+    @JsonIgnore
     public int getTimeLimit(LegMode mode) {
         switch (mode) {
         case CAR:

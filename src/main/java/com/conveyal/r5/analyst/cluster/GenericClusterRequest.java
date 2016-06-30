@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.broker.WorkerCategory;
 import com.conveyal.r5.publish.StaticSiteRequest;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
@@ -34,6 +35,7 @@ public abstract class GenericClusterRequest implements Serializable {
     /** A unique identifier for this request assigned by the queue/broker system. */
     public int taskId;
 
+    @JsonIgnore
     public WorkerCategory getWorkerCategory() {
         return new WorkerCategory(graphId, workerVersion);
     }

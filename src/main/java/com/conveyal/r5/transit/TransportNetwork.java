@@ -434,6 +434,9 @@ public class TransportNetwork implements Serializable {
         } else {
             copy.streetLayer = this.streetLayer;
         }
+
+        copy.fareCalculator = this.fareCalculator;
+
         return copy;
     }
 

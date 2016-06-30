@@ -17,8 +17,10 @@
     <geotools.version>14.0</geotools.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <!-- In an IDE the git commit plugin does not run. Set default values for that situation. -->
+    <!-- unfortunately these were overwriting the values in non-IDE builds
     <git.commit.id>UNKNOWN</git.commit.id>
     <git.commit.id.describe>UNKNOWN</git.commit.id.describe>
+    -->
   </properties>
 
   <!-- Specify the repo where we will deploy JARs of R5 -->

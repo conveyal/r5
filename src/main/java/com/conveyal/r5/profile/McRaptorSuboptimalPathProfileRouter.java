@@ -512,7 +512,7 @@ public class McRaptorSuboptimalPathProfileRouter {
                 int target = stopTree[i];
                 int distance = stopTree[i + 1];
 
-                int timeAtTarget = (int) (best.time + distance / request.walkSpeed);
+                int timeAtTarget = (int) (best.time + distance / request.walkSpeed / 1000);
 
                 if (timesAtTargetsThisIteration[target] > timeAtTarget) timesAtTargetsThisIteration[target] = timeAtTarget;
             }

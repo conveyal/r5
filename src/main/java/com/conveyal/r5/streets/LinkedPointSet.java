@@ -304,7 +304,8 @@ public class LinkedPointSet {
         // Create trees in parallel.
         IntStream.range(0, nStops).parallel().forEach(s ->{
             // When working on a scenario, skip over all stops that could not have been affected by new street edges.
-            if (treeRebuildZone!= null && !treeRebuildZone.contains(transitLayer.getJTSPointForStop(s))) return;
+            Point stopPoint = transitLayer.getJTSPointForStop(s);
+            if (stopPoint == null || treeRebuildZone!= null && !treeRebuildZone.contains(stopPoint)) return;
             // Get the pre-computed tree from the stop to the street vertices
             TIntIntMap stopTreeToVertices = transitLayer.stopTrees.get(s);
             if (stopTreeToVertices != null) {

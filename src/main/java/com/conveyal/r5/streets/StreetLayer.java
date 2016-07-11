@@ -1387,6 +1387,6 @@ public class StreetLayer implements Serializable, Cloneable {
             envelope.expandBy(xExpansion, yExpansion);
             geoms.add(GeometryUtils.geometryFactory.toGeometry(envelope));
         });
-        return GeometryUtils.geometryFactory.createGeometryCollection((Geometry[])geoms.toArray());
+        return GeometryUtils.geometryFactory.createGeometryCollection(geoms.toArray(new Geometry[geoms.size()]));
     }
 }

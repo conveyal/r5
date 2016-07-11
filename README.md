@@ -34,3 +34,5 @@ git add pom.xml
 git commit -m "Prepare next development iteration 0.4.0-SNAPSHOT"
 git push
 ```
+
+Note that the release must be tagged on the master branch, not a maintenance or feature branch. The maintenance branch for a particular release should be created *after* that release is tagged. This is because git-describe determines the version by tracing back through the history to the most recent tag. A tag on a non-master branch will never be seen.

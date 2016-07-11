@@ -39,6 +39,8 @@ public class CircularList<T> implements Iterable<T> {
 
     @Override
     public void forEach(Consumer<? super T> action) {
+        if (head == null) return; // empty list
+
         Node<T> curr = head;
         do {
             action.accept(curr.element);

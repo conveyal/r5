@@ -4,6 +4,7 @@ import com.conveyal.r5.transit.TransferFinder;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import gnu.trove.list.TIntList;
@@ -145,6 +146,7 @@ public abstract class Modification implements Serializable {
      * This determines the sequence in which modifications will be applied.
      * It is used in a standard compare function, so lower numbered modifications will be applied before higher ones.
      */
+    @JsonIgnore
     public abstract int getSortOrder();
 
     /**

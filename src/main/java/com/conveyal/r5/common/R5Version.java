@@ -31,10 +31,22 @@ public class R5Version {
         } catch (IOException | NullPointerException e) {
             LOG.error("Error loading version and commit information", e);
         }
-        version = p.getProperty("version");
-        finalName = p.getProperty("finalName");
-        commit = p.getProperty("commit");
-        describe = p.getProperty("describe");
+        version = getPropertyWithFallback(p, "version", "UNKNOWN");
+        finalName = getPropertyWithFallback(p, "finalName", "UNKNOWN");
+        commit = getPropertyWithFallback(p, "commit", "UNKNOWN");
+        describe = getPropertyWithFallback(p, "describe", "UNKNOWN");
+    }
+
+    /**
+     * Return the value for the given key in the supplied Properties.
+     * If the key is not present or if the value appears to be an uninterpolated Maven variable, return the supplied
+     * fallback value. See isse #190.
+     */
+    public static String getPropertyWithFallback (Properties properties, String key, String fallback) {
+        String result = properties.getProperty(key);
+        if (result == null) return fallback;
+        if (result.startsWith("${")) return fallback;
+        return result;
     }
 
 }

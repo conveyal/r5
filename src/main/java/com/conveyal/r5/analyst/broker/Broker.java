@@ -91,7 +91,7 @@ public class Broker implements Runnable {
     private final Properties brokerConfig;
 
     /** The configuration that will be applied to workers launched by this broker. */
-    private final Properties workerConfig;
+    private Properties workerConfig;
 
     /** Keeps track of all the workers that have contacted this broker recently asking for work. */
     protected WorkerCatalog workerCatalog = new WorkerCatalog();
@@ -149,37 +149,40 @@ public class Broker implements Runnable {
 
         this.brokerConfig = brokerConfig;
 
-        // create a config for the AWS workers
-        workerConfig = new Properties();
-
-        // load the base worker configuration if specified
-        if (this.brokerConfig.getProperty("worker-config") != null) {
-            try {
-                File f = new File(this.brokerConfig.getProperty("worker-config"));
-                FileInputStream fis = new FileInputStream(f);
-                workerConfig.load(fis);
-                fis.close();
-            } catch (IOException e) {
-                LOG.error("Error loading base worker configuration", e);
-            }
-        }
-
-        workerConfig.setProperty("broker-address", addr);
-        workerConfig.setProperty("broker-port", "" + port);
-
-        if (brokerConfig.getProperty("statistics-queue") != null)
-            workerConfig.setProperty("statistics-queue", brokerConfig.getProperty("statistics-queue"));
-
-        workerConfig.setProperty("graphs-bucket", brokerConfig.getProperty("graphs-bucket"));
-        workerConfig.setProperty("pointsets-bucket", brokerConfig.getProperty("pointsets-bucket"));
-
-        // Tell the workers to shut themselves down automatically
-        workerConfig.setProperty("auto-shutdown", "true");
-
         Boolean workOffline = Boolean.parseBoolean(brokerConfig.getProperty("work-offline"));
         if (workOffline == null) workOffline = true;
         this.workOffline = workOffline;
 
+        if (!workOffline) {
+            // create a config for the AWS workers
+            workerConfig = new Properties();
+
+            if (this.brokerConfig.getProperty("worker-config") != null) {
+                // load the base worker configuration if specified
+                try {
+                    File f = new File(this.brokerConfig.getProperty("worker-config"));
+                    FileInputStream fis = new FileInputStream(f);
+                    workerConfig.load(fis);
+                    fis.close();
+                } catch (IOException e) {
+                    LOG.error("Error loading base worker configuration", e);
+                }
+            }
+
+            workerConfig.setProperty("broker-address", addr);
+            workerConfig.setProperty("broker-port", "" + port);
+
+            if (brokerConfig.getProperty("statistics-queue") != null)
+                workerConfig.setProperty("statistics-queue", brokerConfig.getProperty("statistics-queue"));
+
+            workerConfig.setProperty("graphs-bucket", brokerConfig.getProperty("graphs-bucket"));
+            workerConfig.setProperty("pointsets-bucket", brokerConfig.getProperty("pointsets-bucket"));
+
+            // Tell the workers to shut themselves down automatically
+            workerConfig.setProperty("auto-shutdown", "true");
+        }
+
+        // TODO what are these for?
         workerName = brokerConfig.getProperty("worker-name") != null ? brokerConfig.getProperty("worker-name") : "analyst-worker";
         project = brokerConfig.getProperty("project") != null ? brokerConfig.getProperty("project") : "analyst";
 
@@ -640,7 +643,7 @@ public class Broker implements Runnable {
 
     /** This is the broker's main event loop. */
     @Override
-    public void run() {
+    public void  run() {
         while (true) {
             try {
                 deliverTasks();

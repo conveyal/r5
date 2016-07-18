@@ -197,7 +197,8 @@ public class AnalystWorker implements Runnable {
         this.networkId = config.getProperty("initial-graph-id");
 
         this.pointSetDatastore = new PointSetDatastore(10, null, false, config.getProperty("pointsets-bucket"));
-        this.transportNetworkCache = new TransportNetworkCache(config.getProperty("graphs-bucket"));
+        File cacheDir = new File(config.getProperty("cache-dir", "cache/graphs"));
+        this.transportNetworkCache = new TransportNetworkCache(workOffline ? null : config.getProperty("graphs-bucket"), cacheDir);
         Boolean autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown"));
         this.autoShutdown = autoShutdown == null ? false : autoShutdown;
 

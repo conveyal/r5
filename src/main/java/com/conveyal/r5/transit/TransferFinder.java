@@ -85,11 +85,14 @@ public class TransferFinder {
             // is close to holding.
             if (firstStopIndex > 0) {
                 final int originStopIndex = s; // Why oh why, Java?
+                // don't build transfers to other new stops
                 distancesToReachedStops.forEachEntry((targetStopIndex, distance) -> {
-                    TIntList packedTransfersCopy = new TIntArrayList(transfersForStop.get(targetStopIndex));
-                    packedTransfersCopy.add(originStopIndex);
-                    packedTransfersCopy.add(distance);
-                    transfersForStop.set(targetStopIndex, packedTransfersCopy);
+                    if (targetStopIndex < firstStopIndex) {
+                        TIntList packedTransfersCopy = new TIntArrayList(transfersForStop.get(targetStopIndex));
+                        packedTransfersCopy.add(originStopIndex);
+                        packedTransfersCopy.add(distance);
+                        transfersForStop.set(targetStopIndex, packedTransfersCopy);
+                    }
                     return true;
                 });
             }

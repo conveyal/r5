@@ -9,6 +9,7 @@ import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.Point;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -418,6 +419,37 @@ public class TransitLayer implements Serializable, Cloneable {
         stopTrees = IntStream.range(0, getStopCount()).parallel()
                 .mapToObj(s -> buildOneStopTree(s)).collect(Collectors.toList());
         LOG.info("Done building stop trees.");
+    }
+
+    /** Rebuild stop trees for all stops in the tree rebuild zone (FIXED DEGREES) */
+    public void rebuildStopTrees(Geometry treeRebuildZone) {
+        if (treeRebuildZone == null) {
+            LOG.warn("Not rebuilding stop trees, rebuild area is null");
+            return;
+        }
+
+        LOG.info("Rebuilding stop trees potentially affected by scenario application");
+        int buildCount = 0;
+
+        // extend the list
+        if (stopTrees.size() < getStopCount()) {
+            for (int i = stopTrees.size(); i < getStopCount(); i++) {
+                stopTrees.add(null);
+            }
+        }
+
+        for (int stopIdx = 0; stopIdx < getStopCount(); stopIdx++) {
+            Point p = getJTSPointForStopFixed(stopIdx);
+
+            if (p != null && treeRebuildZone.contains(p)) {
+                TIntIntMap stopTree = this.buildOneStopTree(stopIdx);
+                // stopIdx will either be an existing index, or the first index after the end of stopTrees
+                this.stopTrees.set(stopIdx, stopTree);
+                buildCount++;
+            }
+        }
+
+        LOG.info("(Re)-built {} stop trees, {} stop trees left unchanged", buildCount, stopTrees.size() - buildCount);
     }
 
     /**

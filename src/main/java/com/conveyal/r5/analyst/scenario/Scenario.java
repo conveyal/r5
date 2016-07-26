@@ -132,10 +132,7 @@ public class Scenario implements Serializable {
         copiedNetwork.streetLayer.buildEdgeLists();
         Geometry treeRebuildZone = copiedNetwork.streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.STOP_TREE_DISTANCE_METERS);
         copiedNetwork.transitLayer.rebuildStopTrees(treeRebuildZone);
-
-        Geometry wgsRebuildZone = (Geometry) treeRebuildZone.clone();
-        wgsRebuildZone.apply((CoordinateFilter) c -> { c.x = fixedDegreesToFloating(c.x); c.y = fixedDegreesToFloating(c.y); });
-
+        
         // find the transfers originating at or terminating at new stops.
         // TODO also rebuild transfers which are near street network changes but which do not connect to new stops
         new TransferFinder(copiedNetwork).findTransfers();

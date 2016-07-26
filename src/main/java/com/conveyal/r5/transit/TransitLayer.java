@@ -474,17 +474,19 @@ public class TransitLayer implements Serializable, Cloneable {
         }
     }
 
-    public Coordinate getCoordinateForStop(int s) {
+    /** Get a coordinate for a stop in FIXED POINT DEGREES */
+    public Coordinate getCoordinateForStopFixed(int s) {
         int v = streetVertexForStop.get(s);
 
         if (v == -1) return null;
 
         VertexStore.Vertex vertex = parentNetwork.streetLayer.vertexStore.getCursor(v);
-        return new Coordinate(vertex.getLon(), vertex.getLat());
+        return new Coordinate(vertex.getFixedLon(), vertex.getFixedLat());
     }
 
-    public Point getJTSPointForStop(int s) {
-        Coordinate c = getCoordinateForStop(s);
+    /** Get a JTS point for a stop in FIXED POINT DEGREES */
+    public Point getJTSPointForStopFixed(int s) {
+        Coordinate c = getCoordinateForStopFixed(s);
         return c == null ? null : GeometryUtils.geometryFactory.createPoint(c);
     }
 

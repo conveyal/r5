@@ -22,6 +22,7 @@ import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.vividsolutions.jts.geom.*;
 import com.conveyal.r5.profile.StreetMode;
+import com.vividsolutions.jts.operation.union.UnaryUnionOp;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -1371,22 +1372,41 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /**
-     * Create a geometry containing all the points on all edges created or removed by the scenario that produced this
+     * Create a geometry in FIXED POINT DEGREES containing all the points on all edges created or removed by the scenario that produced this
      * StreetLayer, buffered by radiusMeters. This is a MultiPolygon or GeometryCollection.
      */
     public Geometry scenarioEdgesBoundingGeometry(int radiusMeters) {
-        List<Geometry> geoms = new ArrayList<>();
+        List<Polygon> geoms = new ArrayList<>();
         Edge edge = edgeStore.getCursor();
         edgeStore.forEachTemporarilyAddedOrDeletedEdge(e -> {
             edge.seek(e);
             Envelope envelope = edge.getEnvelope();
             // Intentionally overestimate by scaling for the latitude closest to the equator.
-            double lat0 = Math.min(Math.abs(envelope.getMaxY()), Math.abs(envelope.getMinY()));
-            double yExpansion = SphericalDistanceLibrary.metersToDegreesLatitude(radiusMeters);
-            double xExpansion = SphericalDistanceLibrary.metersToDegreesLongitude(radiusMeters, lat0);
+            // convert latitude to floating for use with SphericalDistanceLibrary below
+            double floatingLat0 =
+                    VertexStore.fixedDegreesToFloating(Math.min(Math.abs(envelope.getMaxY()), Math.abs(envelope.getMinY())));
+            double yExpansion =
+                    VertexStore.floatingDegreesToFixed(SphericalDistanceLibrary.metersToDegreesLatitude(radiusMeters));
+            double xExpansion =
+                    VertexStore.floatingDegreesToFixed(SphericalDistanceLibrary.metersToDegreesLongitude(radiusMeters, floatingLat0));
+
+            if (xExpansion < 0 || yExpansion < 0) {
+                throw new IllegalStateException("Buffer distance in geographic units is negative!");
+            }
+
             envelope.expandBy(xExpansion, yExpansion);
-            geoms.add(GeometryUtils.geometryFactory.toGeometry(envelope));
+            Geometry geometry = GeometryUtils.geometryFactory.toGeometry(envelope);
+
+            if (!(geometry instanceof Polygon)) {
+                throw new IllegalStateException(
+                        String.format("Envelope geometry %s is not a polygon!", geometry == null ? "null" : geometry.toString())
+                );
+            }
+
+            geoms.add((Polygon) geometry);
         });
-        return GeometryUtils.geometryFactory.createGeometryCollection(geoms.toArray(new Geometry[geoms.size()]));
+
+        // can't just make a multipolygon as the components are likely not disjoint. unions are pretty quick though.
+        return UnaryUnionOp.union(geoms);
     }
 }

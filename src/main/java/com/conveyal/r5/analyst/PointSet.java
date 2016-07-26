@@ -4,6 +4,7 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
+import com.conveyal.r5.streets.VertexStore;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
@@ -12,6 +13,8 @@ import com.vividsolutions.jts.geom.Point;
 import org.mapdb.Fun.Tuple2;
 
 import java.util.concurrent.ExecutionException;
+
+import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
 
 public abstract class PointSet {
 
@@ -63,14 +66,14 @@ public abstract class PointSet {
 
     public abstract int featureCount();
 
-    /** Returns a new coordinate object for the feature at the given index in this set, or its centroid. */
-    public Coordinate getCoordinate(int index) {
-        return new Coordinate(getLon(index), getLat(index));
+    /** Returns a new coordinate object for the feature at the given index in this set, or its centroid, in FIXED POINT DEGREES. */
+    public Coordinate getCoordinateFixed(int index) {
+        return new Coordinate(floatingDegreesToFixed(getLon(index)), floatingDegreesToFixed(getLat(index)));
     }
 
-    /** Returns a new coordinate object for the feature at the given index in this set, or its centroid. */
-    public Point getJTSPoint(int index) {
-        return GeometryUtils.geometryFactory.createPoint(getCoordinate(index));
+    /** Returns a new coordinate object for the feature at the given index in this set, or its centroid, in FIXED POINT DEGREES. */
+    public Point getJTSPointFixed(int index) {
+        return GeometryUtils.geometryFactory.createPoint(getCoordinateFixed(index));
     }
 
 }

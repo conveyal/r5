@@ -159,14 +159,14 @@ public class LinkedPointSet {
 
     /**
      * Associate the points in this PointSet with the street vertices at the ends of the closest street edge.
-     * @param relinkZone only link points inside this geometry, leaving all the others alone. If null, link all points.
+     * @param relinkZone only link points inside this geometry in FIXED POINT DEGREES, leaving all the others alone. If null, link all points.
      */
     private void linkPointsToStreets(Geometry relinkZone) {
         // Perform linkage calculations in parallel, writing results to the shared parallel arrays.
         IntStream.range(0, pointSet.featureCount()).parallel().forEach(p -> {
             // When working with a scenario, skip all points outside the zone that could be affected by new edges.
             // The linkage from the original base StreetNetwork will be retained for these points.
-            if (relinkZone != null && !relinkZone.contains(pointSet.getJTSPoint(p))) return;
+            if (relinkZone != null && !relinkZone.contains(pointSet.getJTSPointFixed(p))) return;
             Split split = streetLayer.findSplit(pointSet.getLat(p), pointSet.getLon(p), MAX_OFFSTREET_WALK_METERS, streetMode);
             if (split == null) {
                 edges[p] = -1;
@@ -294,7 +294,7 @@ public class LinkedPointSet {
      * The packed format does not make the serialized size any smaller (the Trove serializers are already smart).
      * However the packed representation uses less live memory: 665 vs 409 MB (including all other data) on Portland.
      *
-     * @param treeRebuildZone only build trees for stops inside this geometry, leaving all the others alone.
+     * @param treeRebuildZone only build trees for stops inside this geometry in FIXED POINT DEGREES, leaving all the others alone.
      *                        If null, build trees for all stops.
      */
     public void makeStopTrees (Geometry treeRebuildZone) {
@@ -304,7 +304,7 @@ public class LinkedPointSet {
         // Create trees in parallel.
         IntStream.range(0, nStops).parallel().forEach(s ->{
             // When working on a scenario, skip over all stops that could not have been affected by new street edges.
-            Point stopPoint = transitLayer.getJTSPointForStop(s);
+            Point stopPoint = transitLayer.getJTSPointForStopFixed(s);
             if (stopPoint == null || treeRebuildZone!= null && !treeRebuildZone.contains(stopPoint)) return;
             // Get the pre-computed tree from the stop to the street vertices
             TIntIntMap stopTreeToVertices = transitLayer.stopTrees.get(s);

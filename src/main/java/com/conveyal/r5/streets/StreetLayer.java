@@ -1,5 +1,6 @@
 package com.conveyal.r5.streets;
 
+import com.conveyal.geojson.GeoJsonModule;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
@@ -33,6 +34,7 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
+import org.geotools.geojson.geom.GeometryJSON;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,6 +50,9 @@ import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
+
+import static com.conveyal.r5.streets.VertexStore.fixedDegreeGeometryToFloating;
+import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
 /**
  * This stores the street layer of OTP routing data.
@@ -1384,7 +1389,7 @@ public class StreetLayer implements Serializable, Cloneable {
             // Intentionally overestimate by scaling for the latitude closest to the equator.
             // convert latitude to floating for use with SphericalDistanceLibrary below
             double floatingLat0 =
-                    VertexStore.fixedDegreesToFloating(Math.min(Math.abs(envelope.getMaxY()), Math.abs(envelope.getMinY())));
+                    fixedDegreesToFloating(Math.min(Math.abs(envelope.getMaxY()), Math.abs(envelope.getMinY())));
             double yExpansion =
                     VertexStore.floatingDegreesToFixed(SphericalDistanceLibrary.metersToDegreesLatitude(radiusMeters));
             double xExpansion =
@@ -1402,11 +1407,25 @@ public class StreetLayer implements Serializable, Cloneable {
                         String.format("Envelope geometry %s is not a polygon!", geometry == null ? "null" : geometry.toString())
                 );
             }
-
             geoms.add((Polygon) geometry);
         });
 
         // can't just make a multipolygon as the components are likely not disjoint. unions are pretty quick though.
-        return UnaryUnionOp.union(geoms);
+        Geometry result = UnaryUnionOp.union(geoms);
+        logFixedPointGeometry("Unioned buffered streets", result);
+        return result;
     }
+
+    /**
+     * Given a JTS Geometry in fixed-point latitude and longitude, log it as floating-point GeoJSON.
+     */
+    public static void logFixedPointGeometry (String label, Geometry fixedPointGeometry) {
+        if (fixedPointGeometry != null) {
+            String geoJson = new GeometryJSON().toString(fixedDegreeGeometryToFloating(fixedPointGeometry));
+            LOG.info("{} {}", label, geoJson);
+        } else {
+            LOG.info("{} was null.", label);
+        }
+    }
+
 }

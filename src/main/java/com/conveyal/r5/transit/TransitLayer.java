@@ -103,6 +103,10 @@ public class TransitLayer implements Serializable, Cloneable {
     /**
      * For each transit stop, an int->int map giving the distance of every reachable street intersection from the
      * origin stop. This is the result of running a distance-constrained street search from every stop in the graph.
+     *
+     * Avoiding the lengthy rebuild of stopTrees is as simple as making this non-transient and removing the call to
+     * buildStopTrees in TransportNetwork. That does make serialized networks much bigger (not a big deal when saving
+     * to S3) and makes our checks to ensure that scenario application does not damage base graphs very slow.
      */
     public transient List<TIntIntMap> stopTrees;
 

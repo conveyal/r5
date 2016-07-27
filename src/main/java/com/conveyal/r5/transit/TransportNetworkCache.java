@@ -111,6 +111,10 @@ public class TransportNetworkCache {
         // The following call clears the scenarioNetworkCache if the current base graph changes.
         TransportNetwork baseNetwork = this.getNetwork(networkId);
         TransportNetwork scenarioNetwork = scenarioNetworkCache.get(scenarioId);
+
+        // DEBUG force scenario re-application
+        // scenarioNetwork = null;
+
         if (scenarioNetwork == null) {
             LOG.info("Applying scenario to base network...");
 

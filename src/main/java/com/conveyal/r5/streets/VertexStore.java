@@ -1,6 +1,8 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.trove.TIntAugmentedList;
+import com.vividsolutions.jts.geom.CoordinateFilter;
+import com.vividsolutions.jts.geom.Geometry;
 import gnu.trove.list.TByteList;
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
@@ -143,6 +145,18 @@ public class VertexStore implements Serializable {
      */
     public static double fixedDegreesToFloating(double fixed) {
         return fixed / FIXED_FACTOR;
+    }
+
+    /**
+     * Given a Geometry in fixed-point latitude and longitude, return a copy converted to floating point latitude and
+     * longitude.
+     */
+    public static Geometry fixedDegreeGeometryToFloating(Geometry fixedGeometry) {
+        Geometry wgsResult = (Geometry)fixedGeometry.clone();
+        wgsResult.apply((CoordinateFilter) c -> {
+            c.x = fixedDegreesToFloating(c.x); c.y = fixedDegreesToFloating(c.y);
+        });
+        return wgsResult;
     }
 
     /** Convert a JTS envelope to fixed-point degrees. */

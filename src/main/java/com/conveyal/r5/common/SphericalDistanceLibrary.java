@@ -7,8 +7,10 @@ import org.apache.commons.math3.util.FastMath;
  * Created by matthewc on 10/22/15.
  */
 public class SphericalDistanceLibrary {
+
     // average of equatorial and meriodonal circumferences, https://en.wikipedia.org/wiki/Earth
-    public static final double EARTH_CIRCUMFERENCE_METERS = 4041438.5;
+    public static final double EARTH_CIRCUMFERENCE_KM = 40041.4385;
+    public static final double EARTH_CIRCUMFERENCE_METERS = EARTH_CIRCUMFERENCE_KM * 1000;
 
     public static final double RADIUS_OF_EARTH_IN_KM = 6371.01;
     public static final double RADIUS_OF_EARTH_IN_M = RADIUS_OF_EARTH_IN_KM * 1000;

@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.amazonaws.SDKGlobalConfiguration;
 import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
@@ -140,8 +141,8 @@ public class AnalystWorker implements Runnable {
 
     long startupTime, nextShutdownCheckTime;
 
-    // Region awsRegion = Region.getRegion(Regions.EU_CENTRAL_1);
-    Region awsRegion = Region.getRegion(Regions.US_EAST_1);
+    /* The EC2 region this worker is running in, otherwise this will be null. */
+    Region awsRegion;
 
     /** AWS instance type, or null if not running on AWS. */
     private String instanceType;
@@ -206,12 +207,23 @@ public class AnalystWorker implements Runnable {
         startupTime = System.currentTimeMillis();
         nextShutdownCheckTime = startupTime + 55 * 60 * 1000;
 
+        // When running on an Amazon EC2 instance, discover what region the worker is running in.
+        // If the worker isn't running in Amazon EC2, then region will be null so we fall back on a default.
+        awsRegion = Regions.getCurrentRegion();
+        if (awsRegion == null) {
+            LOG.info("Unable to detect the region, this worker must not be running on EC2.");
+        } else {
+            LOG.info("Detected that this worker is running in region {}", awsRegion);
+        }
+
         // When creating the S3 and SQS clients use the default credentials chain.
         // This will check environment variables and ~/.aws/credentials first, then fall back on
         // the auto-assigned IAM role if this code is running on an EC2 instance.
         // http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/java-dg-roles.html
         s3 = new AmazonS3Client();
-        s3.setRegion(awsRegion);
+
+        // The new request signing v4 requires you to know the region where the S3 objects are.
+        s3.setRegion(awsRegion == null ? Region.getRegion(Regions.EU_WEST_1) : awsRegion);
 
         /* The ObjectMapper (de)serializes JSON. */
         objectMapper = JsonUtilities.objectMapper;
@@ -656,7 +668,7 @@ public class AnalystWorker implements Runnable {
             reader.close();
             return type;
         } catch (Exception e) {
-            LOG.info("could not retrieve EC2 instance type, you may be running outside of EC2.");
+            LOG.info("Could not retrieve EC2 instance type, this worker may be running outside of EC2.");
             return null;
         }
     }

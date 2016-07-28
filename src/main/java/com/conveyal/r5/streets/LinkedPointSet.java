@@ -315,6 +315,8 @@ public class LinkedPointSet {
                 Point stopPoint = transitLayer.getJTSPointForStopFixed(stopIndex);
                 if (stopPoint == null || !treeRebuildZone.contains(stopPoint)) {
                     // This stop is not affected by the scenario. Return any existing stop tree.
+                    // This should only return null for new stops created by the scenario that are unlinked,
+                    // because all these new stops should be inside the relink zone.
                     return stopIndex < stopTrees.size() ? stopTrees.get(stopIndex) : null;
                 }
             }

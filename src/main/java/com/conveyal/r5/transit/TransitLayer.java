@@ -5,6 +5,7 @@ import com.conveyal.gtfs.model.*;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.streets.VertexStore;
+import com.conveyal.r5.util.LambdaCounter;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -414,46 +415,36 @@ public class TransitLayer implements Serializable, Cloneable {
     /**
      * Run a distance-constrained street search from every transit stop in the graph.
      * Store the distance to every reachable street vertex for each of these origin stops.
+     * If a scenario has been applied, we need to build trees for any newly created stops and any stops within
+     * transfer or access/egress distance of those new stops. In that case a treeRebuildZone geometry should be
+     * supplied. If treeRebuildZone is null, a complete rebuild of trees will occur for all stops.
+     * @param treeRebuildZone the zone within which to rebuild trees in FIXED-POINT DEGREES, or null to build all trees.
      */
-    public void buildStopTrees() {
-        LOG.info("Building stop trees (cached distances between transit stops and street intersections).");
-        // Allocate a new empty array of stop trees, releasing any existing ones.
-        stopTrees = new ArrayList<>(getStopCount());
-        // Parallelized.
-        stopTrees = IntStream.range(0, getStopCount()).parallel()
-                .mapToObj(s -> buildOneStopTree(s)).collect(Collectors.toList());
-        LOG.info("Done building stop trees.");
-    }
+    public void buildStopTrees (Geometry treeRebuildZone) {
 
-    /** Rebuild stop trees for all stops in the tree rebuild zone (FIXED DEGREES) */
-    public void rebuildStopTrees(Geometry treeRebuildZone) {
-        if (treeRebuildZone == null) {
-            LOG.warn("Not rebuilding stop trees, rebuild area is null");
-            return;
+        LOG.info("Finding distances from transit stops to street vertices.");
+        if (treeRebuildZone != null) {
+            LOG.info("Selectively finding distances for only those stops potentially affected by scenario application.");
         }
 
-        LOG.info("Rebuilding stop trees potentially affected by scenario application");
-        int buildCount = 0;
+        LambdaCounter buildCounter = new LambdaCounter(LOG, getStopCount(), 500,
+                "Computed distances to street vertices from {} of {} transit stops.");
 
-        // extend the list
-        if (stopTrees.size() < getStopCount()) {
-            for (int i = stopTrees.size(); i < getStopCount(); i++) {
-                stopTrees.add(null);
+        // Working in parallel, create a new list of stop trees for every stop index, optionally skipping stops falling
+        // outside a specified geometry.
+        stopTrees = IntStream.range(0, getStopCount()).parallel().mapToObj(stopIndex -> {
+            if (treeRebuildZone != null) {
+                // Skip existing or new stops outside the zone that may be affected by the scenario.
+                Point p = getJTSPointForStopFixed(stopIndex);
+                if (p == null || !treeRebuildZone.contains(p)) {
+                    // This stop can't be affected, return any existing one.
+                    return stopIndex < stopTrees.size() ? stopTrees.get(stopIndex) : null;
+                }
             }
-        }
-
-        for (int stopIdx = 0; stopIdx < getStopCount(); stopIdx++) {
-            Point p = getJTSPointForStopFixed(stopIdx);
-
-            if (p != null && treeRebuildZone.contains(p)) {
-                TIntIntMap stopTree = this.buildOneStopTree(stopIdx);
-                // stopIdx will either be an existing index, or the first index after the end of stopTrees
-                this.stopTrees.set(stopIdx, stopTree);
-                buildCount++;
-            }
-        }
-
-        LOG.info("(Re)-built {} stop trees, {} stop trees left unchanged", buildCount, stopTrees.size() - buildCount);
+            buildCounter.increment();
+            return this.buildOneStopTree(stopIndex);
+        }).collect(Collectors.toList());
+        buildCounter.done();
     }
 
     /**

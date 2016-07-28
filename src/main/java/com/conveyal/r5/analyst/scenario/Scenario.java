@@ -131,7 +131,7 @@ public class Scenario implements Serializable {
         // first rebuild edge lists
         copiedNetwork.streetLayer.buildEdgeLists();
         Geometry treeRebuildZone = copiedNetwork.streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.STOP_TREE_DISTANCE_METERS);
-        copiedNetwork.transitLayer.rebuildStopTrees(treeRebuildZone);
+        copiedNetwork.transitLayer.buildStopTrees(treeRebuildZone);
         
         // find the transfers originating at or terminating at new stops.
         // TODO also rebuild transfers which are near street network changes but which do not connect to new stops

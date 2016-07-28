@@ -3,6 +3,7 @@ package com.conveyal.r5.streets;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.util.LambdaCounter;
 import com.vividsolutions.jts.geom.*;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -15,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -294,26 +296,34 @@ public class LinkedPointSet {
      * The packed format does not make the serialized size any smaller (the Trove serializers are already smart).
      * However the packed representation uses less live memory: 665 vs 409 MB (including all other data) on Portland.
      *
-     * @param treeRebuildZone only build trees for stops inside this geometry in FIXED POINT DEGREES, leaving all the others alone.
-     *                        If null, build trees for all stops.
+     * @param treeRebuildZone only build trees for stops inside this geometry in FIXED POINT DEGREES,
+     *                        leaving all the others alone. If null, build trees for all stops.
      */
     public void makeStopTrees (Geometry treeRebuildZone) {
-        LOG.info("Creating distance tables from each transit stop to PointSet points...");
+        LOG.info("Creating distance tables from each transit stop to PointSet points.");
+        if (treeRebuildZone != null) {
+            LOG.info("Selectively computing tables for only those stops that might be affected by the scenario.");
+        }
         TransitLayer transitLayer = streetLayer.parentNetwork.transitLayer;
         int nStops = transitLayer.getStopCount();
-        // Create trees in parallel.
-        IntStream.range(0, nStops).parallel().forEach(s ->{
-            // When working on a scenario, skip over all stops that could not have been affected by new street edges.
-            Point stopPoint = transitLayer.getJTSPointForStopFixed(s);
-            if (stopPoint == null || treeRebuildZone!= null && !treeRebuildZone.contains(stopPoint)) return;
-            // Get the pre-computed tree from the stop to the street vertices
-            TIntIntMap stopTreeToVertices = transitLayer.stopTrees.get(s);
-            if (stopTreeToVertices != null) {
-                // Extend the pre-computed tree from the street vertices out to the points in this PointSet.
-                // Note that the list must be pre-initialized with nulls or with the stop trees from a base linkage.
-                stopTrees.set(s, this.getStopTree(stopTreeToVertices));
+        LambdaCounter counter = new LambdaCounter(LOG, nStops, 1000,
+                "Computed distances to PointSet points from {} of {} transit stops.");
+        // Create a distance table from each transit stop to the points in this PointSet in parallel.
+        // When applying a scenario, keep the existing distance table for those stops that could not be affected.
+        stopTrees = IntStream.range(0, nStops).parallel().mapToObj(stopIndex -> {
+            if (treeRebuildZone != null) {
+                Point stopPoint = transitLayer.getJTSPointForStopFixed(stopIndex);
+                if (stopPoint == null || !treeRebuildZone.contains(stopPoint)) {
+                    // This stop is not affected by the scenario. Return any existing stop tree.
+                    return stopIndex < stopTrees.size() ? stopTrees.get(stopIndex) : null;
+                }
             }
-        });
-        LOG.info("Done creating travel distance tables.");
+            // Get the pre-computed tree from the stop to the street vertices, which we will extend out to the points.
+            TIntIntMap stopTreeToVertices = transitLayer.stopTrees.get(stopIndex);
+            // Extend the pre-computed tree (if it exists) out to the points in this PointSet.
+            counter.increment();
+            return stopTreeToVertices != null ? getStopTree(stopTreeToVertices) : null;
+        }).collect(Collectors.toList());
+        counter.done();
     }
 }

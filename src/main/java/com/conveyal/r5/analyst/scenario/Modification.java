@@ -35,6 +35,7 @@ import java.util.Set;
         @JsonSubTypes.Type(name = "remove-trips", value = RemoveTrips.class),
         @JsonSubTypes.Type(name = "reroute", value = Reroute.class),
         @JsonSubTypes.Type(name = "remove-stops", value = RemoveStops.class),
+        @JsonSubTypes.Type(name = "set-fare-calculator", value = SetFareCalculator.class)
 })
 public abstract class Modification implements Serializable {
 

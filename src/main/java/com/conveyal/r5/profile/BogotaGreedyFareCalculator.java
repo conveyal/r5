@@ -90,9 +90,11 @@ public class BogotaGreedyFareCalculator extends GreedyFareCalculator {
         TPC, TRANSMILENIO;
 
         public static RouteType fromAgencyName (String agencyName, BogotaGreedyFareCalculator calculator) {
-            if (calculator.tpcAgencyName.equals(agencyName)) return TPC;
-            else if (calculator.tmAgencyName.equals(agencyName)) return TRANSMILENIO;
-            else return null;
+            if (calculator.tmAgencyName.equals(agencyName)) {
+                return TRANSMILENIO;
+            } else {
+                return TPC;
+            }
         }
     }
 }

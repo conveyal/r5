@@ -21,9 +21,15 @@ import java.io.Serializable;
         @JsonSubTypes.Type(name = "simple", value = SimpleGreedyFareCalculator.class)
 })
 public abstract class GreedyFareCalculator implements Serializable {
+    public static final long serialVersionUID = 0L;
+
     public abstract int calculateFare (McRaptorSuboptimalPathProfileRouter.McRaptorState state);
 
     public abstract String getType ();
+
+    public void setType (String type) {
+        /* do nothing */
+    }
 
     // injected on load
     public transient TransitLayer transitLayer;

@@ -500,7 +500,9 @@ public class McRaptorSuboptimalPathProfileRouter {
                 // of possibilities that is too large to be stored.
                 int fareAtState = network.fareCalculator.calculateFare(state);
 
-                if (fareAtState > request.maxFare) continue;
+                if (fareAtState > request.maxFare) {
+                    continue;
+                }
 
                 if (best == null || state.time < best.time) best = state;
             }
@@ -546,8 +548,11 @@ public class McRaptorSuboptimalPathProfileRouter {
          * NB need to have cutoff be relative to toTime because otherwise when we do range-RAPTOR we'll have left over states
          * that are past the cutoff.
          */
-        // NB subtracting suboptimal minutes from LHS to avoid int overflow when adding to Integer.MAX_VALUE
-        if (time - request.suboptimalMinutes * 60 > bestTimeAtTarget || time > request.toTime + 3 * 60 * 60) return false;
+        // cut off excessively long searches
+        if (time > request.toTime + request.maxTripDurationMinutes * 60) return false;
+
+        // local pruning iff in suboptimal point-to-point (Modeify) mode
+        if (request.maxFare < 0 && time - request.suboptimalMinutes * 60 > bestTimeAtTarget) return false;
 
         if (back != null && back.time > time)
             throw new IllegalStateException("Attempt to decrement time in state!");

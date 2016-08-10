@@ -57,6 +57,8 @@ public class McRaptorSuboptimalPathProfileRouter {
      */
     public int NUMBER_OF_SEARCHES = 20;
 
+    private final boolean DUMP_STOPS = false;
+
     private LinkedPointSet pointSet = null;
 
     /** Use a list for the iterations since we aren't sure how many there will be (we're using random sampling over the departure minutes) */
@@ -230,15 +232,19 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     /** dump out all stop names */
     public String dumpStops (TIntIntMap stops) {
-        StringBuilder sb = new StringBuilder();
+        if (DUMP_STOPS) {
+            StringBuilder sb = new StringBuilder();
 
-        stops.forEachEntry((stop, time) -> {
-            String stopName = network.transitLayer.stopNames.get(stop);
-            sb.append(String.format("%s (%d) at %sm %ss\n", stopName, stop, time / 60, time % 60));
-            return true;
-        });
+            stops.forEachEntry((stop, time) -> {
+                String stopName = network.transitLayer.stopNames.get(stop);
+                sb.append(String.format("%s (%d) at %sm %ss\n", stopName, stop, time / 60, time % 60));
+                return true;
+            });
 
-        return sb.toString();
+            return sb.toString();
+        } else {
+            return "";
+        }
     }
 
     /** Perform a McRAPTOR search and extract paths */

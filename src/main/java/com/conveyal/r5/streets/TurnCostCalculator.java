@@ -27,21 +27,59 @@ public class TurnCostCalculator {
 
     public int computeTurnCost (int fromEdge, int toEdge, StreetMode streetMode) {
         if (streetMode == StreetMode.CAR) {
-            double angle = computeAngle(fromEdge, toEdge);
+            double angle = calculateNewTurnAngle(fromEdge, toEdge);
 
-            if (angle < 0.15 * Math.PI)
+            if (angle < 27)
                 return STRAIGHT_ON;
-            else if (angle < 0.85 * Math.PI)
+            else if (angle < 153)
                 return driveOnRight ? LEFT_TURN : RIGHT_TURN;
-            else if (angle < 1.15 * Math.PI)
+            else if (angle < 207)
                 return U_TURN;
-            else if (angle < 1.85 * Math.PI)
+            else if (angle < 333)
                 return driveOnRight ? RIGHT_TURN : LEFT_TURN;
             else
                 return STRAIGHT_ON;
         }
 
         return 0;
+    }
+
+    /**
+     * Gets in/out angles from edges and calculates angle between them
+     * @param fromEdge
+     * @param toEdge
+     * @return angle in degrees from 0-360
+     */
+    public double calculateNewTurnAngle(int fromEdge, int toEdge) {
+        EdgeStore.Edge e = layer.edgeStore.getCursor(fromEdge);
+
+        int outAngle = e.getOutAngle();
+
+        e = layer.edgeStore.getCursor(toEdge);
+
+        int inAngle = e.getInAngle();
+        return calculateTurnAngle(outAngle, inAngle);
+    }
+
+    /**
+     *
+     * @param angleIntoIntersectionDeg from edge Out angle in degrees
+     * @param angleOutOfIntersectionDeg to edge In angle in degrees
+     * @return angle in degrees between 0 and 360
+     */
+    public int calculateTurnAngle(int angleIntoIntersectionDeg, int angleOutOfIntersectionDeg) {
+
+        if (angleIntoIntersectionDeg < angleOutOfIntersectionDeg) {
+            angleIntoIntersectionDeg += 360;
+        }
+
+        int turnAngle = angleIntoIntersectionDeg - angleOutOfIntersectionDeg;
+        if (!driveOnRight) {
+            turnAngle = 360 - turnAngle;
+        }
+
+        return turnAngle;
+
     }
 
     /** Compute the angle between two edges, positive, from 0 to 2 * Pi. The angle is _counterclockwise_ because that's how it's done in JTS. */

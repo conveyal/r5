@@ -70,7 +70,7 @@ public class StreetSegment {
         }
         //Used to know if found bike rental station where we picked a bike or one where we dropped of a bike
         boolean first = true;
-        double lastAngle = 0;
+        double lastAngleRad = 0;
         for (StreetRouter.State state: path.getStates()) {
             int edgeIdx = state.backEdge;
             if (edgeIdx >= 0) {
@@ -99,12 +99,12 @@ public class StreetSegment {
                     streetEdgeInfo.parkRide = streetLayer.parkRideLocationsMap.get(state.vertex);
                 }
 
-                double thisAngle = DirectionUtils.getFirstAngle(streetEdgeInfo.geometry);
+                double thisAngleRad = DirectionUtils.getFirstAngle(streetEdgeInfo.geometry);
                 if (streetEdges.isEmpty()) {
-                    streetEdgeInfo.setAbsoluteDirection(thisAngle);
+                    streetEdgeInfo.setAbsoluteDirection(thisAngleRad);
                     streetEdgeInfo.relativeDirection = RelativeDirection.DEPART;
                 } else {
-                    streetEdgeInfo.setDirections(lastAngle, thisAngle, edge.getFlag(
+                    streetEdgeInfo.setDirections(Math.toDegrees(lastAngleRad), Math.toDegrees(thisAngleRad), edge.getFlag(
                         EdgeStore.EdgeFlag.ROUNDABOUT));
                     //If we are moving on street with same name we need to set stayOn to true
                     StreetEdgeInfo prev = streetEdges.get(streetEdges.size()-1);
@@ -112,7 +112,7 @@ public class StreetSegment {
                         streetEdgeInfo.stayOn = true;
                     }
                 }
-                lastAngle = DirectionUtils.getLastAngle(streetEdgeInfo.geometry);
+                lastAngleRad = DirectionUtils.getLastAngle(streetEdgeInfo.geometry);
                 streetEdges.add(streetEdgeInfo);
             }
         }

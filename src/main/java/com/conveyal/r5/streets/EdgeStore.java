@@ -1,6 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.osmlib.Node;
+import com.conveyal.r5.common.DirectionUtils;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
@@ -13,9 +14,11 @@ import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.LineString;
 import gnu.trove.iterator.TIntIntIterator;
+import gnu.trove.list.TByteList;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.TLongList;
 import gnu.trove.list.TShortList;
+import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.list.array.TShortArrayList;
@@ -90,7 +93,20 @@ public class EdgeStore implements Serializable {
     public List<int[]> geometries; // intermediate points along the edge, other than the intersection endpoints
 
     /**
-     * When applying scenarios, we don't duplicate the entire set of edges and vertices. We extend them, treating
+     * The angle at the start of the edge geometry.
+     * Internal representation is -180 to +179 integer degrees mapped to -128 to +127 (brads)
+     * One entry for each edge pair.
+     */
+    public TByteList inAngles;
+
+    /**
+     * The angle at the end of the edge geometry
+     * Internal representation is -180 to +179 integer degrees mapped to -128 to +127 (brads)
+     * One entry for each edge pair.
+     */
+    public TByteList outAngles;
+
+    /** When applying scenarios, we don't duplicate the entire set of edges and vertices. We extend them, treating
      * the baseline graph as immutable. We have to be careful not to change or delete any elements of that baseline
      * graph which is shared between all threads. All edges at or above the index firstModifiableEdge can be modified,
      * all lower indexes should be treated as immutable.
@@ -119,6 +135,7 @@ public class EdgeStore implements Serializable {
         return firstModifiableEdge > 0;
     }
 
+
     /** Turn restrictions for turning _out of_ each edge */
     public TIntIntMultimap turnRestrictions;
 
@@ -143,6 +160,8 @@ public class EdgeStore implements Serializable {
         geometries = new ArrayList<>(initialEdgePairs);
         lengths_mm = new TIntArrayList(initialEdgePairs);
         osmids = new TLongArrayList(initialEdgePairs);
+        inAngles = new TByteArrayList(initialEdgePairs);
+        outAngles = new TByteArrayList(initialEdgePairs);
         turnRestrictions = new TIntIntHashMultimap();
     }
 
@@ -265,6 +284,8 @@ public class EdgeStore implements Serializable {
         toVertices.add(endVertexIndex);
         geometries.add(EMPTY_INT_ARRAY);
         osmids.add(osmID);
+        inAngles.add((byte) 0);
+        outAngles.add((byte)0);
 
         // Speed and flags are stored separately for each edge in a pair (unlike length, geom, etc.)
 
@@ -278,7 +299,10 @@ public class EdgeStore implements Serializable {
         speeds.add(DEFAULT_SPEED_KPH);
         flags.add(0);
 
-        return getCursor(forwardEdgeIndex);
+        Edge edge = getCursor(forwardEdgeIndex);
+        //angles needs to be calculated here since some edges don't get additional geometry (P+R, transit, etc.)
+        edge.calculateAngles();
+        return edge;
     }
 
     /**
@@ -623,6 +647,9 @@ public class EdgeStore implements Serializable {
             // The same empty int array represents all straight-line edges.
             if (nodes.size() <= 2) {
                 geometries.set(pairIndex, EMPTY_INT_ARRAY);
+                //Angles also need to be calculated here since when splitting edges some edges currently loose geometry
+                //and otherwise angles would be incorrect
+                calculateAngles();
                 return;
             }
             if (isBackward) {
@@ -638,7 +665,60 @@ public class EdgeStore implements Serializable {
                 intermediateCoords[i++] = node.fixedLon;
             }
             geometries.set(pairIndex, intermediateCoords);
+
+            //This is where angles for most edges is calculated
+            calculateAngles();
+
         }
+
+        /**
+         * Reads edge geometry and calculates in and out angle
+         *
+         * Angles are saved as binary radians clockwise from North.
+         * 0 is 0
+         * -180° = -128
+         * 180° = -180° = -128
+         * 178° = 127
+         *
+         * First and last angles are calculated between first/last and point that is at
+         * least 10 m from it according to line distance
+         *
+         * @see DirectionUtils
+         *
+         * TODO: calculate angles without converting to the Linestring and back
+         */
+        private void calculateAngles() {
+            LineString geometry = getGeometry();
+
+            byte inAngleRad = DirectionUtils.getFirstAngleBrads(geometry);
+            inAngles.set(pairIndex, inAngleRad);
+
+            byte outAngleRad = DirectionUtils.getLastAngleBrads(geometry);
+            outAngles.set(pairIndex, outAngleRad);
+        }
+
+        public int getOutAngle() {
+            int angle;
+            if (isBackward()) {
+                angle  = DirectionUtils.bradsToDegree((byte)(inAngles.get(pairIndex)-DirectionUtils.m180));
+                return angle;
+            } else {
+                angle  = DirectionUtils.bradsToDegree(outAngles.get(pairIndex));
+                return angle;
+            }
+        }
+
+        public int getInAngle() {
+            int angle;
+            if (isBackward()) {
+                angle = DirectionUtils.bradsToDegree((byte)(outAngles.get(pairIndex)-DirectionUtils.m180));
+                return angle;
+            } else {
+                angle = DirectionUtils.bradsToDegree(inAngles.get(pairIndex));
+                return angle;
+            }
+        }
+
 
         /**
          * Returns LineString geometry of edge
@@ -915,6 +995,9 @@ public class EdgeStore implements Serializable {
         copy.lengths_mm = new TIntAugmentedList(lengths_mm);
         copy.osmids = new TLongAugmentedList(this.osmids);
         copy.temporarilyDeletedEdges = new TIntHashSet();
+        //Angles are deep copy for now
+        copy.inAngles = new TByteArrayList(inAngles);
+        copy.outAngles = new TByteArrayList(outAngles);
         // We don't expect to add/change any turn restrictions.
         copy.turnRestrictions = turnRestrictions;
         return copy;

@@ -78,6 +78,7 @@ public class PointToPointQuery {
 
     //Does point to point routing with data from request
     public ProfileResponse getPlan(ProfileRequest request) {
+        long startRouting = System.currentTimeMillis();
         request.zoneId = transportNetwork.getTimeZone();
         //Do the query and return result
         ProfileResponse profileResponse = new ProfileResponse();
@@ -358,6 +359,7 @@ public class PointToPointQuery {
         }
 
         LOG.info("Returned {} options", profileResponse.getOptions().size());
+        LOG.info("Took {} ms", System.currentTimeMillis() - startRouting);
 
         return profileResponse;
     }

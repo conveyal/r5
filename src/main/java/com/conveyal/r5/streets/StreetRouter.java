@@ -441,7 +441,7 @@ public class StreetRouter {
                 State s1 = edge.traverse(s0, streetMode, profileRequest, turnCostCalculator);
 
                 if (s1 != null && s1.distance <= distanceLimitMm && s1.getDurationSeconds() < tmpTimeLimitSeconds) {
-                    queue.add(s1);
+                    addState(s1);
                 }
 
                 return true; // iteration over edges should continue
@@ -449,6 +449,56 @@ public class StreetRouter {
         }
         if (DEBUG_OUTPUT) {
             printStream.close();
+        }
+
+
+    }
+
+    private void addState(State s0) {
+        // Don't do any domination for states at the origin
+        if (s0.backEdge >= 0) {
+            if (bestStatesAtEdge.containsKey(s0.backEdge)) {
+                for (State state : bestStatesAtEdge.get(s0.backEdge)) {
+                    // states in turn restrictions don't dominate anything
+                    if (state.turnRestrictions == null)
+                        return;
+                    else if (s0.turnRestrictions != null && s0.turnRestrictions.size() == state.turnRestrictions.size()) {
+                        // if they have the same turn restrictions, dominate this state with the one in the queue.
+                        // if we make all turn-restricted states strictly incomparable we can get infinite loops with adjacent turn
+                        // restrictions, see #88.
+                        boolean[] same = new boolean[]{true};
+                        s0.turnRestrictions.forEachEntry((ridx, pos) -> {
+                            if (!state.turnRestrictions.containsKey(ridx) || state.turnRestrictions.get(ridx) != pos)
+                                same[0] = false;
+                            return same[0]; // shortcut iteration if they're not the same
+                        });
+
+                        if (same[0]) return;
+                    }
+                }
+            }
+
+            // non-dominated state coming off the pqueue is by definition the best way to get to that vertex
+            // but states in turn restrictions don't dominate anything, to avoid resource limiting issues
+            if (s0.turnRestrictions != null) {
+                queue.add(s0);
+            } else {
+                // we might need to save an existing state that is in a turn restriction so is codominant
+                for (Iterator<State> it = bestStatesAtEdge.get(s0.backEdge).iterator(); it.hasNext(); ) {
+                    State other = it.next();
+                    // Avoid a ton of codominant states when there is e.g. duplicated OSM data.
+                    // However, save this state if it is not in a turn restriction and the other state is.
+                    if (s0.getRoutingVariable(dominanceVariable) < other.getRoutingVariable(dominanceVariable)) {
+                        it.remove();
+                    } else if (s0.getRoutingVariable(dominanceVariable) == other.getRoutingVariable(dominanceVariable)
+                        && !(other.turnRestrictions != null && s0.turnRestrictions == null)) {
+                        return;
+                    }
+                }
+                queue.add(s0);
+            }
+        } else {
+            LOG.info("Wants to add state with 0 back edge to queue");
         }
     }
 

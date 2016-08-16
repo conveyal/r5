@@ -67,8 +67,6 @@ public class Broker implements Runnable {
      */
     public static final long WORKER_STARTUP_TIME = 60 * 60 * 1000;
 
-    private int nUndeliveredTasks = 0; // Including normal priority jobs and high-priority tasks. TODO check that this total is really properly maintained
-
     private int nWaitingConsumers = 0; // including some that might be closed
 
     private int nextTaskId = 0;
@@ -273,7 +271,6 @@ public class Broker implements Runnable {
         tasks.forEach(t -> stalledHighPriorityTasks.put(category, t));
         LOG.info("No side channel available for graph {}, delivering {} tasks via normal channel",
                 category, tasks.size());
-        nUndeliveredTasks += tasks.size();
         newHighPriorityTasks.removeAll(category);
 
         // wake up delivery thread
@@ -291,7 +288,6 @@ public class Broker implements Runnable {
         for (GenericClusterRequest task : tasks) {
             task.taskId = nextTaskId++;
             job.addTask(task);
-            nUndeliveredTasks += 1;
             LOG.debug("Enqueued task id {} in job {}", task.taskId, job.jobId);
             if (!task.graphId.equals(job.workerCategory.graphId)) {
                 LOG.error("Task graph ID {} does not match job: {}.", task.graphId, job.workerCategory);
@@ -445,6 +441,24 @@ public class Broker implements Runnable {
     }
 
     /**
+     * See if any jobs have undelivered tasks that should be re-enqueued for delivery.
+     */
+    private void checkRedelivery() {
+        for (Job job : jobs) {
+            job.redeliver();
+        }
+    }
+
+    private boolean noUndeliveredTasks() {
+        for (Job job : jobs) {
+            if (!job.tasksAwaitingDelivery.isEmpty()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * This method checks whether there are any high-priority tasks or normal job tasks and attempts to match them with
      * waiting workers.
      *
@@ -456,16 +470,17 @@ public class Broker implements Runnable {
      */
     public synchronized void deliverTasks() throws InterruptedException {
 
+        // See if any tasks need to be re-enqueued because they were never marked completed.
+        checkRedelivery();
+
         // Wait until there are some undelivered tasks.
-        while (nUndeliveredTasks == 0) {
+        while (noUndeliveredTasks()) {
             LOG.debug("Task delivery thread is going to sleep, there are no tasks waiting for delivery.");
             // Thread will be notified when tasks are added or there are new incoming consumer connections.
             wait();
             // If a worker connected while there were no tasks queued for delivery,
             // we need to check if any should be re-delivered.
-            for (Job job : jobs) {
-                nUndeliveredTasks += job.redeliver();
-            }
+            checkRedelivery();
         }
         LOG.debug("Task delivery thread is awake and there are some undelivered tasks.");
 
@@ -613,7 +628,6 @@ public class Broker implements Runnable {
             return false;
         }
         LOG.debug("Delivery of {} tasks succeeded.", tasks.size());
-        nUndeliveredTasks -= tasks.size(); // FIXME keeping a separate counter for this seems redundant, why not compute it?
         job.lastDeliveryTime = System.currentTimeMillis();
         return true;
     }
@@ -683,11 +697,10 @@ public class Broker implements Runnable {
     public synchronized boolean deleteJob (String jobId) {
         Job job = findJob(jobId);
         if (job == null) return false;
-        nUndeliveredTasks -= job.tasksAwaitingDelivery.size();
         return jobs.remove(job);
     }
 
-    /** Returns whether this broker is tracking and jobs that have unfinished tasks. */
+    /** Returns whether this broker is tracking any jobs that have unfinished tasks. */
     public synchronized boolean anyJobsActive() {
         for (Job job : jobs) {
             if (!job.isComplete()) return true;

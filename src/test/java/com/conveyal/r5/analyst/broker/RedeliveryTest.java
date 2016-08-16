@@ -33,7 +33,7 @@ public class RedeliveryTest {
         brokerConfig.setProperty("pointsets-bucket", "FAKE");
         brokerConfig.setProperty("work-offline", "true");
         BrokerMain brokerMain = new BrokerMain(brokerConfig);
-        Thread brokerThread = new Thread(brokerMain); // TODO combine broker and brokermain, set offline mode.
+        Thread brokerThread = new Thread(null, brokerMain, "BROKER-THREAD"); // TODO combine broker and brokermain, set offline mode.
         brokerThread.start();
 
         // Start some workers.

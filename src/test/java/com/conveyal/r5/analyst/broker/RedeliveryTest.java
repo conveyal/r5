@@ -49,19 +49,27 @@ public class RedeliveryTest {
         }
 
         // Feed some work to the broker.
-        JobSimulator jobSimulator = new JobSimulator();
-        jobSimulator.nOrigins = N_TASKS;
-        jobSimulator.graphId = "GRAPH";
-        jobSimulator.sendFakeJob();
+        JobSimulator jobSimulatorA = new JobSimulator();
+        jobSimulatorA.nOrigins = N_TASKS;
+        jobSimulatorA.graphId = "GRAPH";
+        jobSimulatorA.sendFakeJob();
+
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) { }
+
+        // Feed another job to the broker, to ensure redelivery can deal with multiple jobs.
+        JobSimulator jobSimulatorB = new JobSimulator();
+        jobSimulatorB.nOrigins = N_TASKS;
+        jobSimulatorB.graphId = "GRAPH";
+        jobSimulatorB.sendFakeJob();
 
         // Wait for all tasks to be marked finished
         while (brokerMain.broker.anyJobsActive()) {
             try {
                 LOG.info("Some jobs are still not complete.");
                 Thread.sleep(2000);
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+            } catch (InterruptedException e) { }
         }
 
         LOG.info("All jobs finished.");

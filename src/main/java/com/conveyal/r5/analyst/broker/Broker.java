@@ -450,6 +450,9 @@ public class Broker implements Runnable {
      *
      * It blocks by calling wait() whenever it has nothing to do (when no tasks or workers available). It is awakened
      * whenever new tasks come in or when a worker (re-)connects.
+     *
+     * This whole function is synchronized because wait() must be called within a synchronized block. When wait() is
+     * called, the monitor is released and other threads listening for worker connections or added jobs can act.
      */
     public synchronized void deliverTasks() throws InterruptedException {
 

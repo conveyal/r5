@@ -470,7 +470,7 @@ public class Broker implements Runnable {
      */
     public synchronized void deliverTasks() throws InterruptedException {
 
-        // See if any tasks need to be re-enqueued because they were never marked completed.
+        // See if any tasks failed and need to be re-enqueued.
         checkRedelivery();
 
         // Wait until there are some undelivered tasks.

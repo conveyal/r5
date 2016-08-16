@@ -455,7 +455,9 @@ public class Broker implements Runnable {
                 return false;
             }
         }
-        return true;
+        // No jobs have any tasks waiting for delivery, but high priority tasks that were not delivered via the side
+        // channel are stored outside the jobs.
+        return stalledHighPriorityTasks.isEmpty();
     }
 
     /**

@@ -145,9 +145,9 @@ class BrokerHttpHandler extends HttpHandler {
                     // Pre-validate tasks checking that they are all on the same job
                     GenericClusterRequest exemplar = tasks.get(0);
                     for (GenericClusterRequest task : tasks) {
-                        if (task.jobId != exemplar.jobId ||
-                            task.graphId != exemplar.graphId ||
-                            task.workerVersion != exemplar.workerVersion) {
+                        if (!task.jobId.equals(exemplar.jobId) ||
+                            !task.graphId.equals(exemplar.graphId) ||
+                            !task.workerVersion.equals(exemplar.workerVersion)) {
                             response.setStatus(HttpStatus.BAD_REQUEST_400);
                             response.setDetailMessage("All tasks must be for the same graph, job, and worker commit.");
                             return;
@@ -158,7 +158,7 @@ class BrokerHttpHandler extends HttpHandler {
                 }
                 else {
                     response.setStatus(HttpStatus.NOT_FOUND_404);
-                    response.setDetailMessage("Context not found; should be either 'jobs' or 'priority'");
+                    response.setDetailMessage("Context not found; should be either 'single' or 'regional'");
                 }
             }
             else if (request.getMethod() == Method.POST && "complete".equals(command)) {

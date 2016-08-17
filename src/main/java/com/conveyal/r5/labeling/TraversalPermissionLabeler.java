@@ -310,6 +310,10 @@ public abstract class TraversalPermissionLabeler {
      *
      * It splits tags on | and for each tag calls {@link #addPermission(String, String)}
      *
+     * This method is a bit stringly-typed since it's really accepting pipe- or semicolon-separated lists crammed
+     * into Strings, but the tags are already being split on equals as well. Look at the places where this method is
+     * called to see that this compromise leads to more readable code.
+     *
      * @param tags Tags are separated with | they can be specified with tag=value or just value where it is assumed that tag is highway.
      * @param traversalPermissions are separated with ; they are specified as tag=value
      */

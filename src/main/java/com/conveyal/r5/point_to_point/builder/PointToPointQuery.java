@@ -388,7 +388,7 @@ public class PointToPointQuery {
             walking.timeLimitSeconds = request.maxWalkTime * 60 + streetRouter.timeLimitSeconds;
             walking.setOrigin(carParks, CAR_PARK_DROPOFF_TIME_S, CAR_PARK_DROPOFF_COST, LegMode.CAR_PARK);
             walking.route();
-            walking.previous = streetRouter;
+            walking.previousRouter = streetRouter;
             return walking;
         } else {
             return null;
@@ -427,7 +427,7 @@ public class PointToPointQuery {
 
             //This finds best cycling path from best start bicycle station to end bicycle station
             StreetRouter bicycle = new StreetRouter(transportNetwork.streetLayer);
-            bicycle.previous = streetRouter;
+            bicycle.previousRouter = streetRouter;
             bicycle.streetMode = StreetMode.BICYCLE;
             bicycle.profileRequest = request;
             //Longer bike part if this is direct search
@@ -458,7 +458,7 @@ public class PointToPointQuery {
             end.timeLimitSeconds = request.maxWalkTime * 60 + bicycle.timeLimitSeconds;
             end.setOrigin(cycledStations, BIKE_RENTAL_DROPOFF_TIME_S, BIKE_RENTAL_DROPOFF_COST, LegMode.BICYCLE_RENT);
             end.route();
-            end.previous = bicycle;
+            end.previousRouter = bicycle;
             return end;
         } else {
             return null;

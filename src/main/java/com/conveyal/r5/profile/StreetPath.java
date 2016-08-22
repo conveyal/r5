@@ -62,13 +62,13 @@ public class StreetPath {
         //First streetPath is part of path from last bicycle station to the end destination on foot
         if (mode == LegMode.BICYCLE_RENT) {
             StreetRouter.State endCycling = getStates().getFirst();
-            StreetRouter bicycle = streetRouter.previous;
+            StreetRouter bicycle = streetRouter.previousRouter;
             lastState = bicycle.getStateAtVertex(endCycling.vertex);
             if (lastState != null) {
                 lastState.isBikeShare = endCycling.isBikeShare;
                 //Here part from first bikeshare to the last bikeshare on rented bike is created
                 add(lastState);
-                StreetRouter first = bicycle.previous;
+                StreetRouter first = bicycle.previousRouter;
                 StreetRouter.State startCycling = getStates().getFirst();
                 lastState = first.getStateAtVertex(startCycling.vertex);
                 if (lastState != null) {
@@ -84,7 +84,7 @@ public class StreetPath {
              //First state in walk part of CAR PARK is state where we ended driving
             StreetRouter.State carPark = getStates().getFirst();
             //So we need to search for driving part in previous streetRouter
-            StreetRouter.State carState = streetRouter.previous.getStateAtVertex(carPark.vertex);
+            StreetRouter.State carState = streetRouter.previousRouter.getStateAtVertex(carPark.vertex);
             if (carState != null) {
                 add(carState);
             } else {

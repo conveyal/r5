@@ -59,6 +59,9 @@ import java.util.function.IntConsumer;
  */
 public class EdgeStore implements Serializable {
 
+    public static final double STAIR_RELUCTANCE_FACTOR = 3.0;
+    public static final double WALK_RELUCTANCE_FACTOR = 2.0;
+
     private static final Logger LOG = LoggerFactory.getLogger(EdgeStore.class);
     private static final short DEFAULT_SPEED_KPH = 50;
     private static final int[] EMPTY_INT_ARRAY = new int[0];
@@ -547,7 +550,6 @@ public class EdgeStore implements Serializable {
                 // only walk if you're allowed to
                 if (walking && !getFlag(EdgeFlag.ALLOWS_PEDESTRIAN)) return null;
 
-
                 if (walking) {
                     //TODO: set bike walking in state
                     s1.streetMode = StreetMode.WALK;
@@ -559,24 +561,23 @@ public class EdgeStore implements Serializable {
 
             } else if (streetMode == StreetMode.CAR && getFlag(EdgeFlag.ALLOWS_CAR)) {
                 weight = time;
-            } else
+            } else {
                 return null; // this mode cannot traverse this edge
-
-
-            if(getFlag(EdgeFlag.STAIRS)) {
-                weight*=3.0; //stair reluctance
-            } else if (streetMode == StreetMode.WALK) {
-                weight*=2.0; //walk reluctance
             }
 
-
+            if(getFlag(EdgeFlag.STAIRS)) {
+                weight *= STAIR_RELUCTANCE_FACTOR;
+            } else if (streetMode == StreetMode.WALK) {
+                weight *= WALK_RELUCTANCE_FACTOR;
+            }
 
             int roundedTime = (int) Math.ceil(time);
 
-            // negative backedge is start of search.
-            int turnCost = s0.backEdge >= 0 ? turnCostCalculator.computeTurnCost(s0.backEdge, getEdgeIndex(),
-                streetMode) : 0;
+            // Negative backEdge means this state is not the result of traversing an edge (it's the start of a search).
+            int turnCost = s0.backEdge >= 0 ?
+                    turnCostCalculator.computeTurnCost(s0.backEdge, getEdgeIndex(), streetMode) : 0;
 
+            // TODO add checks for negative increment values to these functions.
             s1.incrementTimeInSeconds(roundedTime + turnCost);
             s1.incrementWeight(weight + turnCost);
             s1.distance += getLengthMm();

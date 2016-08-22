@@ -98,7 +98,7 @@ public class ProfileResponse {
                 StreetRouter.State state = streetRouter.getStateAtVertex(startVertexStopIndex);
                 if (state != null) {
                     StreetPath streetPath;
-                    if ((accessMode == LegMode.CAR_PARK || accessMode == LegMode.BICYCLE_RENT) && streetRouter.previous != null) {
+                    if ((accessMode == LegMode.CAR_PARK || accessMode == LegMode.BICYCLE_RENT) && streetRouter.previousRouter != null) {
                         streetPath = new StreetPath(state, streetRouter, accessMode,
                             transportNetwork);
                     } else {

@@ -1205,8 +1205,10 @@ public class StreetLayer implements Serializable, Cloneable {
         // Allow all modes to traverse street-to-transit link edges.
         // In practice, mode permissions will be controlled by whatever street edges lead up to these link edges.
         e.allowAllModes(); // forward edge
+        e.setFlag(EdgeStore.EdgeFlag.LINK);
         e.advance();
         e.allowAllModes(); // backward edge
+        e.setFlag(EdgeStore.EdgeFlag.LINK);
         return stopVertex;
     }
 

@@ -74,6 +74,10 @@ public class Split {
 
             curr.edge = e;
             edge.seek(e);
+            //Skip Link edges those are links between transit stops/P+R/Bike share vertices and graph
+            //Without this origin or destination point can link to those edges because they have ALL permissions
+            //and route is never found since point is inaccessible because edges leading to it don't have required permission
+            if (edge.getFlag(EdgeStore.EdgeFlag.LINK)) return true;
 
             // If an edge does not allow traversal with the specified mode, skip over it.
             if (streetMode == StreetMode.WALK && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)) return true;

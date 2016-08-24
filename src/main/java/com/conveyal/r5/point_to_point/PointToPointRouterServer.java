@@ -66,7 +66,7 @@ public class PointToPointRouterServer {
                 LOG.error("'{}' is not a readable directory.", dir);
             }
 
-            TransportNetwork transportNetwork = TransportNetwork.fromDirectory(dir);
+            TransportNetwork transportNetwork = TransportNetwork.fromDirectory(dir, false);
             //In memory doesn't save it to disk others do (build, preFlight)
             if (!inMemory) {
                 try {

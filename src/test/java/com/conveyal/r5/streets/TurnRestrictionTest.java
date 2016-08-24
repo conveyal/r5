@@ -228,9 +228,8 @@ public class TurnRestrictionTest extends TurnTest {
         restrictTurn(false, EW, ENW);
         restrictTurn(false, EW + 1, ES);
 
-        RoutingVisitor countingVisitor = new RoutingVisitor(streetLayer.edgeStore) {
-            public int count;
-
+        RoutingVisitor countingVisitor = new RoutingVisitor() {
+            int count;
             @Override
             public void visitVertex (StreetRouter.State state) {
                 if (count++ > 1000) throw new CountExceededException();

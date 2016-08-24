@@ -330,7 +330,7 @@ public class PointToPointRouterServer {
             //TODO errorchecks
 
             Boolean fullStateList = request.queryMap("full").booleanValue();
-            RoutingVisitor routingVisitor = new RoutingVisitor(transportNetwork.streetLayer.edgeStore);
+            DebugRoutingVisitor debugRoutingVisitor = new DebugRoutingVisitor(transportNetwork.streetLayer.edgeStore);
 
             if (fullStateList == null) {
                 fullStateList = false;
@@ -359,7 +359,7 @@ public class PointToPointRouterServer {
                 return content;
             }
             if (fullStateList) {
-                streetRouter.setRoutingVisitor(routingVisitor);
+                streetRouter.setRoutingVisitor(debugRoutingVisitor);
             }
 
             streetRouter.route();
@@ -367,7 +367,7 @@ public class PointToPointRouterServer {
             if (fullStateList) {
                 Map<String, Object> featureCollection = new HashMap<>(2);
                 featureCollection.put("type", "FeatureCollection");
-                List<GeoJsonFeature> features = routingVisitor.getFeatures();
+                List<GeoJsonFeature> features = debugRoutingVisitor.getFeatures();
 
                 LOG.info("Num features:{}", features.size());
                 featureCollection.put("features", features);

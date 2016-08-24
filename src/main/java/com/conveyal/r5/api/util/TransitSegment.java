@@ -48,6 +48,7 @@ public class TransitSegment {
             segmentPatterns.add(segmentPattern);
             //FIXME: set pattern and time based on real values
             transitJourneyIDs.add(new TransitJourneyID(0,0));
+            mode = TransitLayer.getTransitModes(routeInfo.route_type);
 
         }
     }

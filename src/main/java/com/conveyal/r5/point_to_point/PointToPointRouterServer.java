@@ -2,6 +2,7 @@ package com.conveyal.r5.point_to_point;
 
 import com.conveyal.r5.api.GraphQlRequest;
 import com.conveyal.r5.api.util.BikeRentalStation;
+import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.GeoJsonFeature;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.common.JsonUtilities;
@@ -177,7 +178,9 @@ public class PointToPointRouterServer {
 
             streetRouter.profileRequest = profileRequest;
             streetRouter.streetMode = streetMode;
-            streetRouter.distanceLimitMeters = 2000;
+            streetRouter.timeLimitSeconds = profileRequest.getTimeLimit(LegMode.valueOf(streetMode.toString()));
+            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+            streetRouter.transitStopSearch = true;
             if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
                 streetRouter.route();
                 streetRouter.getReachedStops().forEachEntry((stopIdx, weight) -> {
@@ -233,7 +236,10 @@ public class PointToPointRouterServer {
 
             streetRouter.profileRequest = profileRequest;
             streetRouter.streetMode = streetMode;
-            streetRouter.distanceLimitMeters = 2000;
+            streetRouter.timeLimitSeconds = profileRequest.getTimeLimit(LegMode.valueOf(streetMode.toString()));
+            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+            streetRouter.flagSearch = VertexStore.VertexFlag.BIKE_SHARING;
+            streetRouter.maxVertices = 50;
             if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
                 streetRouter.route();
                 streetRouter.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING).forEachEntry((vertexIdx, state) -> {
@@ -286,7 +292,10 @@ public class PointToPointRouterServer {
 
             streetRouter.profileRequest = profileRequest;
             streetRouter.streetMode = streetMode;
-            streetRouter.distanceLimitMeters = 10_000;
+            streetRouter.timeLimitSeconds = profileRequest.getTimeLimit(LegMode.valueOf(streetMode.toString()));
+            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+            streetRouter.flagSearch = VertexStore.VertexFlag.PARK_AND_RIDE;
+            streetRouter.maxVertices = 50;
             if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
                 streetRouter.route();
                 streetRouter.getReachedVertices(VertexStore.VertexFlag.PARK_AND_RIDE).forEachEntry((vertexIdx, state) -> {

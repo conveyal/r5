@@ -157,6 +157,7 @@ public class PointToPointQuery {
                     //Gets correct maxCar/Bike/Walk time in seconds for access leg based on mode since it depends on the mode
                     streetRouter.timeLimitSeconds = request.getTimeLimit(mode);
                     streetRouter.transitStopSearch = true;
+                    streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
                 } else {
                     //Time in direct search doesn't depend on mode
                     streetRouter.timeLimitSeconds = request.streetTime * 60;
@@ -245,6 +246,7 @@ public class PointToPointQuery {
             for(LegMode mode: request.egressModes) {
                 StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
                 streetRouter.transitStopSearch = true;
+                streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
                 if (currentlyUnsupportedModes.contains(mode)) {
                     continue;
                 }
@@ -380,6 +382,7 @@ public class PointToPointQuery {
         streetRouter.streetMode = StreetMode.CAR;
         streetRouter.timeLimitSeconds = request.maxCarTime * 60;
         streetRouter.flagSearch = VertexStore.VertexFlag.PARK_AND_RIDE;
+        streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
         if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
             streetRouter.route();
             TIntObjectMap<StreetRouter.State> carParks = streetRouter.getReachedVertices(VertexStore.VertexFlag.PARK_AND_RIDE);
@@ -390,6 +393,7 @@ public class PointToPointQuery {
             walking.timeLimitSeconds = request.maxCarTime * 60;
             walking.transitStopSearch = true;
             walking.setOrigin(carParks, CAR_PARK_DROPOFF_TIME_S, CAR_PARK_DROPOFF_COST, LegMode.CAR_PARK);
+            walking.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             walking.route();
             walking.previousRouter = streetRouter;
             return walking;
@@ -416,6 +420,9 @@ public class PointToPointQuery {
         streetRouter.streetMode = StreetMode.WALK;
         // TODO add time and distance limits to routing, not just weight.
         streetRouter.timeLimitSeconds = request.maxWalkTime * 60;
+        if (!direct) {
+            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+        }
         if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
             streetRouter.route();
             //This finds all the nearest bicycle rent stations when walking
@@ -437,6 +444,7 @@ public class PointToPointQuery {
                 bicycle.timeLimitSeconds = request.streetTime * 60;
             } else {
                 bicycle.timeLimitSeconds = request.maxBikeTime * 60;
+                bicycle.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             }
             bicycle.setOrigin(bikeStations, BIKE_RENTAL_PICKUP_TIME_S, BIKE_RENTAL_PICKUP_COST, LegMode.BICYCLE_RENT);
             bicycle.route();
@@ -460,6 +468,7 @@ public class PointToPointQuery {
             end.timeLimitSeconds = request.maxBikeTime * 60;
             if (!direct) {
                 end.transitStopSearch = true;
+                end.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             }
             end.setOrigin(cycledStations, BIKE_RENTAL_DROPOFF_TIME_S, BIKE_RENTAL_DROPOFF_COST, LegMode.BICYCLE_RENT);
             end.route();

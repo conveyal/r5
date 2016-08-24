@@ -2,6 +2,7 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.SphericalDistanceLibrary;
+import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.transit.TransitLayer;
@@ -33,6 +34,32 @@ public class StreetRouter {
     public static final int ALL_VERTICES = -1;
 
     public final StreetLayer streetLayer;
+
+    /**
+     * True if this is transitStop search
+     *
+     * This will stop search when maxStop stops will be found
+     * or before if queue is empty or time/distance limit is tripped
+     */
+    public boolean transitStopSearch = false;
+
+    /**
+     * non null if this is search for vertices with specific flags AKA bike share or Park ride
+     *
+     * This will stop the search when maxVertices are found
+     * or before if queue is empty or time/distance limit is tripped
+     */
+    public VertexStore.VertexFlag flagSearch = null;
+
+    /**
+     * How many transit stops should we find
+     */
+    public int maxTransitStops = PointToPointQuery.MAX_ACCESS_STOPS;
+
+    /**
+     * How many vertices with flags should we find
+     */
+    public int maxVertices = 20;
 
     // TODO don't hardwire drive-on-right
     private TurnCostCalculator turnCostCalculator;
@@ -139,10 +166,16 @@ public class StreetRouter {
     }
 
     /**
+     * This uses stops found in {@link StopVisitor} if transitStopSearch is true
+     * and DOESN'T search in found states for stops
+     *
      * @return a map from transit stop indexes to their distances from the origin.
      * Note that the TransitLayer contains all the information about which street vertices are transit stops.
      */
     public TIntIntMap getReachedStops() {
+        if (transitStopSearch && routingVisitor instanceof StopVisitor) {
+            return ((StopVisitor) routingVisitor).getStops();
+        }
         TIntIntMap result = new TIntIntHashMap();
         TransitLayer transitLayer = streetLayer.parentNetwork.transitLayer;
         transitLayer.stopForStreetVertex.forEachEntry((streetVertex, stop) -> {
@@ -179,9 +212,15 @@ public class StreetRouter {
     }
 
     /**
+     * Uses states found in {@link VertexFlagVisitor} if flagSearch is for the same flag as requested one
+     * and DOESN't search in found states for found vertices
+     *
      * @return a map where all the keys are vertex indexes with the particular flag and all the values are states.
      */
     public TIntObjectMap<State> getReachedVertices (VertexStore.VertexFlag flag) {
+        if (flagSearch == flag && routingVisitor instanceof VertexFlagVisitor) {
+            return ((VertexFlagVisitor) routingVisitor).getVertices();
+        }
         TIntObjectMap<State> result = new TIntObjectHashMap<>();
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
         VertexStore.Vertex v = streetLayer.vertexStore.getCursor();
@@ -385,6 +424,11 @@ public class StreetRouter {
 
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
 
+        if (transitStopSearch) {
+            routingVisitor = new StopVisitor(streetLayer, dominanceVariable, maxTransitStops, profileRequest.getMinTimeLimit(streetMode));
+        } else if (flagSearch != null) {
+            routingVisitor = new VertexFlagVisitor(streetLayer, dominanceVariable, flagSearch, maxVertices, profileRequest.getMinTimeLimit(streetMode));
+        }
         while (!queue.isEmpty()) {
             State s0 = queue.poll();
 
@@ -418,7 +462,14 @@ public class StreetRouter {
             if (s0.getRoutingVariable(dominanceVariable) > bestValueAtDestination) break;
 
             // Hit RoutingVistor callbacks to monitor search progress.
-            if (routingVisitor != null) routingVisitor.visitVertex(s0);
+            if (routingVisitor != null) {
+                routingVisitor.visitVertex(s0);
+
+                if (routingVisitor.shouldBreakSearch()) {
+                    LOG.debug("{} routing visitor stopped search", routingVisitor.getClass().getSimpleName());
+                    break;
+                }
+            }
 
             // If this state is at the destination, figure out the cost at the destination and use it for target pruning.
             // TODO explain what "target pruning" is in this context and why we need it. It seems that this is mainly about traversing split streets.
@@ -759,6 +810,144 @@ public class StreetRouter {
 
             /** Distance, in millimeters */
             DISTANCE_MILLIMETERS
+        }
+    }
+
+    /**
+     * Saves maxStops number of transitStops that are at least minTravelTimeSeconds from start of search
+     * If stop is found multiple times best states according to dominanceVariable wins.
+     */
+    private static class StopVisitor implements RoutingVisitor {
+        private final int minTravelTimeSeconds;
+
+        private final StreetLayer streetLayer;
+
+        private final State.RoutingVariable dominanceVariable;
+
+        private final int maxStops;
+
+        private final int NO_STOP_FOUND;
+
+        TIntIntMap stops = new TIntIntHashMap();
+
+        /**
+         * @param streetLayer          needed because we need stopForStreetVertex
+         * @param dominanceVariable    according to which dominance variable should states be compared (same as in routing)
+         * @param maxStops             maximal number of stops that should be found
+         * @param minTravelTimeSeconds for stops that should be still added to list of stops
+         */
+        public StopVisitor(StreetLayer streetLayer, State.RoutingVariable dominanceVariable,
+            int maxStops, int minTravelTimeSeconds) {
+            this.minTravelTimeSeconds = minTravelTimeSeconds;
+            this.streetLayer = streetLayer;
+            this.dominanceVariable = dominanceVariable;
+            this.maxStops = maxStops;
+            this.NO_STOP_FOUND = streetLayer.parentNetwork.transitLayer.stopForStreetVertex
+                .getNoEntryKey();
+        }
+
+        /**
+         * If vertex at current state is transit stop. It adds it to best stops
+         * if it is more then minTravelTimeSeconds away and is better then existing path
+         * to the same stop according to dominance variable
+         */
+        @Override
+        public void visitVertex(State state) {
+            int stop = streetLayer.parentNetwork.transitLayer.stopForStreetVertex.get(state.vertex);
+            if (stop != NO_STOP_FOUND) {
+                if (state.durationSeconds < minTravelTimeSeconds) {
+                    return;
+                }
+                if (!stops.containsKey(stop) || stops.get(stop) > state
+                    .getRoutingVariable(dominanceVariable)) {
+                    stops.put(stop, state.getRoutingVariable(dominanceVariable));
+                }
+            }
+
+        }
+
+        /**
+         * @return true when maxStops transitStops are found
+         */
+        public boolean shouldBreakSearch() {
+            return stops.size() >= this.maxStops;
+        }
+
+        /**
+         * @return found stops. Same format of returned value as in {@link StreetRouter#getReachedStops()}
+         */
+        public TIntIntMap getStops() {
+            return stops;
+        }
+    }
+
+    /**
+     * Saves maxVertices number of vertices which have wantedFlag
+     * and are at least minTravelTimeSeconds away from the origin
+     * <p>
+     * If vertex is found multiple times vertex with lower dominanceVariable is saved
+     */
+    private static class VertexFlagVisitor implements RoutingVisitor {
+        private final int minTravelTimeSeconds;
+
+        private final State.RoutingVariable dominanceVariable;
+
+        private final int maxVertices;
+
+        private final VertexStore.VertexFlag wantedFlag;
+
+        VertexStore.Vertex v;
+
+        TIntObjectMap<State> vertices = new TIntObjectHashMap<>();
+
+        public VertexFlagVisitor(StreetLayer streetLayer, State.RoutingVariable dominanceVariable,
+            VertexStore.VertexFlag wantedFlag, int maxVertices, int minTravelTimeSeconds) {
+            this.minTravelTimeSeconds = minTravelTimeSeconds;
+            this.dominanceVariable = dominanceVariable;
+            this.wantedFlag = wantedFlag;
+            this.maxVertices = maxVertices;
+            v = streetLayer.vertexStore.getCursor();
+        }
+
+        /**
+         * If vertex at current state has wantedFlag it is added to vertices map
+         * if it is more then minTravelTimeSeconds away and has backState and non negative vertexIdx
+         * <p>
+         * If vertex is found multiple times vertex with lower dominanceVariable is saved
+         *
+         * @param state
+         */
+        @Override
+        public void visitVertex(State state) {
+            if (state.vertex < 0 ||
+                //skips origin states for bikeShare (since in cycle search for bikeShare origin states
+                //can be added to vertices otherwise since they could be traveled for minTravelTimeSeconds with different transport mode)
+                state.backState == null || state.durationSeconds < minTravelTimeSeconds) {
+                return;
+            }
+            v.seek(state.vertex);
+            if (v.getFlag(wantedFlag)) {
+                if (!vertices.containsKey(state.vertex)
+                    || vertices.get(state.vertex).getRoutingVariable(dominanceVariable) > state
+                    .getRoutingVariable(dominanceVariable)) {
+                    vertices.put(state.vertex, state);
+                }
+            }
+
+        }
+
+        /**
+         * @return true when maxVertices vertices are found
+         */
+        public boolean shouldBreakSearch() {
+            return vertices.size() >= this.maxVertices;
+        }
+
+        /**
+         * @return found vertices with wantedFlag. Same format of returned value as in {@link StreetRouter#getReachedVertices(VertexStore.VertexFlag)}
+         */
+        public TIntObjectMap<State> getVertices() {
+            return vertices;
         }
     }
 }

@@ -467,4 +467,24 @@ public class ProfileRequest implements Serializable, Cloneable {
             return streetTime * 60;
         }
     }
+
+    /**
+     * Returns minCar/BikeTime based on StreetMode
+     *
+     * default is 0
+     *
+     * @param mode
+     * @return min number of seconds that this mode should be used to get to stop/Park ride/bike share etc.
+     */
+    @JsonIgnore
+    public int getMinTimeLimit(StreetMode mode) {
+        switch (mode) {
+        case CAR:
+            return minCarTime * 60;
+        case BICYCLE:
+            return minBikeTime * 60;
+        default:
+            return 0;
+        }
+    }
 }

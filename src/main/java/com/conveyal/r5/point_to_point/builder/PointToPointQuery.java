@@ -36,7 +36,7 @@ public class PointToPointQuery {
      *
      * It's not clear this has a major effect on speed, so we could consider removing it.
      */
-    private static final int MAX_ACCESS_STOPS = 200;
+    public static final int MAX_ACCESS_STOPS = 200;
 
     private final TransportNetwork transportNetwork;
 
@@ -156,6 +156,7 @@ public class PointToPointQuery {
                 if (transit) {
                     //Gets correct maxCar/Bike/Walk time in seconds for access leg based on mode since it depends on the mode
                     streetRouter.timeLimitSeconds = request.getTimeLimit(mode);
+                    streetRouter.transitStopSearch = true;
                 } else {
                     //Time in direct search doesn't depend on mode
                     streetRouter.timeLimitSeconds = request.streetTime * 60;
@@ -243,6 +244,7 @@ public class PointToPointQuery {
             //TODO: this must be reverse search
             for(LegMode mode: request.egressModes) {
                 StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+                streetRouter.transitStopSearch = true;
                 if (currentlyUnsupportedModes.contains(mode)) {
                     continue;
                 }
@@ -377,6 +379,7 @@ public class PointToPointQuery {
     private StreetRouter findParkRidePath(ProfileRequest request, StreetRouter streetRouter) {
         streetRouter.streetMode = StreetMode.CAR;
         streetRouter.timeLimitSeconds = request.maxCarTime * 60;
+        streetRouter.flagSearch = VertexStore.VertexFlag.PARK_AND_RIDE;
         if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
             streetRouter.route();
             TIntObjectMap<StreetRouter.State> carParks = streetRouter.getReachedVertices(VertexStore.VertexFlag.PARK_AND_RIDE);
@@ -385,6 +388,7 @@ public class PointToPointQuery {
             walking.streetMode = StreetMode.WALK;
             walking.profileRequest = request;
             walking.timeLimitSeconds = request.maxCarTime * 60;
+            walking.transitStopSearch = true;
             walking.setOrigin(carParks, CAR_PARK_DROPOFF_TIME_S, CAR_PARK_DROPOFF_COST, LegMode.CAR_PARK);
             walking.route();
             walking.previousRouter = streetRouter;
@@ -454,6 +458,9 @@ public class PointToPointQuery {
             end.streetMode = StreetMode.WALK;
             end.profileRequest = request;
             end.timeLimitSeconds = request.maxBikeTime * 60;
+            if (!direct) {
+                end.transitStopSearch = true;
+            }
             end.setOrigin(cycledStations, BIKE_RENTAL_DROPOFF_TIME_S, BIKE_RENTAL_DROPOFF_COST, LegMode.BICYCLE_RENT);
             end.route();
             end.previousRouter = bicycle;

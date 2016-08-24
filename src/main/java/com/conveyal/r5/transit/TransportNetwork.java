@@ -76,7 +76,6 @@ public class TransportNetwork implements Serializable {
         streetLayer.buildEdgeLists();
         streetLayer.indexStreets();
         transitLayer.rebuildTransientIndexes();
-        transitLayer.buildStopTrees(null);
     }
 
     /**
@@ -86,7 +85,7 @@ public class TransportNetwork implements Serializable {
         // TransportNetwork transportNetwork = TransportNetwork.fromFiles(args[0], args[1]);
         TransportNetwork transportNetwork;
         try {
-            transportNetwork = TransportNetwork.fromDirectory(new File("."));
+            transportNetwork = TransportNetwork.fromDirectory(new File("."), true);
         } catch (DuplicateFeedException e) {
             LOG.error("Duplicate feeds in directory", e);
             return;
@@ -111,7 +110,7 @@ public class TransportNetwork implements Serializable {
 
     /** Legacy method to load from a single GTFS file */
     public static TransportNetwork fromFiles (String osmSourceFile, String gtfsSourceFile, TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
-        return fromFiles(osmSourceFile, Arrays.asList(gtfsSourceFile), tnBuilderConfig);
+        return fromFiles(osmSourceFile, Arrays.asList(gtfsSourceFile), tnBuilderConfig, true);
     }
 
     /** It would seem cleaner to just have two versions of this function, one which takes a list of strings and converts
@@ -119,7 +118,8 @@ public class TransportNetwork implements Serializable {
      * feeds into memory simulataneously, which shouldn't be so bad with mapdb-based feeds, but it's still not great (due
      * to caching etc.)
      */
-    private static TransportNetwork fromFiles (String osmSourceFile, List<String> gtfsSourceFiles, List<GTFSFeed> feeds, TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
+    private static TransportNetwork fromFiles(String osmSourceFile, List<String> gtfsSourceFiles,
+        List<GTFSFeed> feeds, TNBuilderConfig tnBuilderConfig, boolean buildStopTrees) throws DuplicateFeedException {
 
         System.out.println("Summarizing builder config: " + BUILDER_CONFIG_FILENAME);
         System.out.println(tnBuilderConfig);
@@ -172,7 +172,9 @@ public class TransportNetwork implements Serializable {
         // Edge lists must be built after all inter-layer linking has occurred.
         streetLayer.buildEdgeLists();
         transitLayer.rebuildTransientIndexes();
-        transitLayer.buildStopTrees(null);
+        if (buildStopTrees) {
+            transitLayer.buildStopTrees(null);
+        }
 
         // Create transfers
         new TransferFinder(transportNetwork).findTransfers();
@@ -193,17 +195,18 @@ public class TransportNetwork implements Serializable {
      * distinction should be maintained for various reasons. However, we use the GTFS IDs only for reference, so it doesn't
      * really matter, particularly for analytics.
      */
-    public static TransportNetwork fromFiles (String osmFile, List<String> gtfsFiles, TNBuilderConfig config) {
-        return fromFiles(osmFile, gtfsFiles, null, config);
+    public static TransportNetwork fromFiles(String osmFile, List<String> gtfsFiles,
+        TNBuilderConfig config, boolean buildStopTrees) {
+        return fromFiles(osmFile, gtfsFiles, null, config, buildStopTrees);
     }
 
     /** Create a transport network from already loaded GTFS feeds */
-    public static TransportNetwork fromFeeds (String osmFile, List<GTFSFeed> feeds, TNBuilderConfig config) {
-        return fromFiles(osmFile, null, feeds, config);
+    public static TransportNetwork fromFeeds (String osmFile, List<GTFSFeed> feeds, TNBuilderConfig config, boolean buildStopTrees) {
+        return fromFiles(osmFile, null, feeds, config, buildStopTrees);
     }
 
 
-    public static TransportNetwork fromDirectory (File directory) throws DuplicateFeedException {
+    public static TransportNetwork fromDirectory(File directory, boolean buildStopTrees) throws DuplicateFeedException {
         File osmFile = null;
         List<String> gtfsFiles = new ArrayList<>();
         TNBuilderConfig builderConfig = null;
@@ -230,7 +233,7 @@ public class TransportNetwork implements Serializable {
                     LOG.warn("Skipping non-input file '{}'", file);
             }
         }
-        return fromFiles(osmFile.getAbsolutePath(), gtfsFiles, builderConfig);
+        return fromFiles(osmFile.getAbsolutePath(), gtfsFiles, builderConfig, buildStopTrees);
     }
 
     /**

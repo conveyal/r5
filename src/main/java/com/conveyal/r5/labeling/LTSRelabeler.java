@@ -92,7 +92,7 @@ public class LTSRelabeler {
         File netFile = new File(args[0]);
         TransportNetwork network;
         if (netFile.isDirectory())
-            network = TransportNetwork.fromDirectory(netFile);
+            network = TransportNetwork.fromDirectory(netFile, true);
         else {
             InputStream is = new BufferedInputStream(new FileInputStream(netFile));
             network = TransportNetwork.read(is);

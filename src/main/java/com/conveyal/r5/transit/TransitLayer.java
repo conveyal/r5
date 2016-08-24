@@ -109,7 +109,7 @@ public class TransitLayer implements Serializable, Cloneable {
      * buildStopTrees in TransportNetwork. That does make serialized networks much bigger (not a big deal when saving
      * to S3) and makes our checks to ensure that scenario application does not damage base graphs very slow.
      */
-    public transient List<TIntIntMap> stopTrees;
+    public List<TIntIntMap> stopTrees;
 
     /**
      * The TransportNetwork containing this TransitLayer. This link up the object tree also allows us to access the

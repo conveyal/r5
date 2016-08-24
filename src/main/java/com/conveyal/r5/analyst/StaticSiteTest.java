@@ -24,7 +24,7 @@ import java.util.zip.GZIPOutputStream;
  */
 public class StaticSiteTest {
     public static void main (String... args) throws Exception {
-        TransportNetwork tn = TransportNetwork.fromDirectory(new File("."));
+        TransportNetwork tn = TransportNetwork.fromDirectory(new File("."), true);
         // run a search from each transit stop
         int[] sum = new int[] { 0 };
         int[] count = new int[] { 0 };

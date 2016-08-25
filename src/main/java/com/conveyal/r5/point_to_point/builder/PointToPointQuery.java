@@ -222,7 +222,10 @@ public class PointToPointQuery {
                     streetRouter.streetMode = StreetMode.valueOf(mode.toString());
                     streetRouter.timeLimitSeconds = request.streetTime * 60;
                     if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
-                        streetRouter.setDestination(request.toLat, request.toLon);
+                        if(!streetRouter.setDestination(request.toLat, request.toLon)) {
+                            LOG.warn("Direct mode {} destination wasn't found!", mode);
+                            continue;
+                        }
                         streetRouter.route();
                         StreetRouter.State lastState = streetRouter.getState(streetRouter.getDestinationSplit());
                         if (lastState == null) {

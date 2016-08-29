@@ -1225,13 +1225,22 @@ public class StreetLayer implements Serializable, Cloneable {
      * The search radius can be specified freely here because we use this function to link transit stops to streets but
      * also to link pointsets to streets, and currently we use different distances for these two things.
      * This is a nondestructive operation: it simply finds a candidate split point without modifying anything.
+     * This function starts with a small search envelope and expands it as needed under the assumption that most
+     * search envelopes will be close to a road.
      * TODO favor platforms and pedestrian paths when requested
      * @param lat latitude in floating point geographic coordinates (not fixed point int coordinates)
      * @param lon longitude in floating point geographic coordinates (not fixed point int coordinates)
      * @return a Split object representing a point along a sub-segment of a specific edge, or null if there are no streets nearby.
      */
     public Split findSplit(double lat, double lon, double radiusMeters, StreetMode streetMode) {
-        return Split.find(lat, lon, radiusMeters, this, streetMode);
+        Split split = null;
+        if (radiusMeters > 300) {
+            split = Split.find(lat, lon, 150, this, streetMode);
+        }
+        if (split == null) {
+            split = Split.find(lat, lon, radiusMeters, this, streetMode);
+        }
+        return split;
     }
 
     /**

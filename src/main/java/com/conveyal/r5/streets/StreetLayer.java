@@ -482,18 +482,12 @@ public class StreetLayer implements Serializable, Cloneable {
             EdgeStore.Edge created = edgeStore.addStreetPair(vidx, targetWalking, 1, -1);
 
             // allow link edges to be traversed by all, access is controlled by connected edges
-            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
-            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
-            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+            created.allowAllModes();
             created.setFlag(EdgeStore.EdgeFlag.LINK);
 
             // and the back edge
             created.advance();
-            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
-            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
-            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+            created.allowAllModes();
             created.setFlag(EdgeStore.EdgeFlag.LINK);
 
             int targetDriving = getOrCreateVertexNear(node.getLat(), node.getLon(), StreetMode.CAR);
@@ -504,18 +498,12 @@ public class StreetLayer implements Serializable, Cloneable {
             created = edgeStore.addStreetPair(vidx, targetDriving, 1, -1);
 
             // allow link edges to be traversed by all, access is controlled by connected edges
-            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
-            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
-            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+            created.allowAllModes();
             created.setFlag(EdgeStore.EdgeFlag.LINK);
 
             // and the back edge
             created.advance();
-            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
-            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
-            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-            created.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+            created.allowAllModes();
             created.setFlag(EdgeStore.EdgeFlag.LINK);
         }
     }
@@ -526,18 +514,12 @@ public class StreetLayer implements Serializable, Cloneable {
         int targetVertex = splitEdge(split);
         EdgeStore.Edge created = edgeStore.addStreetPair(centerVertex, targetVertex, 1, -1); // basically free to enter/leave P&R for now.
         // allow link edges to be traversed by all, access is controlled by connected edges
-        created.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
-        created.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
-        created.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-        created.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+        created.allowAllModes();
         created.setFlag(EdgeStore.EdgeFlag.LINK);
 
         // and the back edge
         created.advance();
-        created.setFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
-        created.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
-        created.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-        created.setFlag(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+        created.allowAllModes();
         created.setFlag(EdgeStore.EdgeFlag.LINK);
     }
 

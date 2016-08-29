@@ -2,6 +2,7 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.model.Frequency;
+import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.gtfs.model.Trip;
 import com.conveyal.r5.profile.FrequencyRandomOffsets;
 import gnu.trove.list.array.TIntArrayList;
@@ -9,6 +10,7 @@ import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.junit.Assert.*;
 
@@ -28,14 +30,8 @@ public class FrequencyRandomOffsetsTest {
         }
 
         // create two frequency-based lines
-        TripPatternKey key1 = new TripPatternKey("route1");
-        key1.stops = new TIntArrayList(new int[] { 1, 2, 3, 4 });
 
-        // java initializes everything to 0, and pickup type 0 is normal service
-        key1.pickupTypes = new TIntArrayList(new int[4]);
-        key1.dropoffTypes = new TIntArrayList(new int[4]);
-
-        TripPattern pattern1 = new TripPattern(key1);
+        TripPattern pattern1 = new TripPattern(new TIntArrayList(new int[] { 1, 2, 3, 4 }));
         Trip t1 = new Trip();
         t1.feed_id = "FEED";
         t1.trip_id = "TRIP1";
@@ -51,14 +47,7 @@ public class FrequencyRandomOffsetsTest {
 
         layer.tripPatterns.add(pattern1);
 
-        TripPatternKey key2 = new TripPatternKey("route1");
-        key2.stops = new TIntArrayList(new int[] { 5, 6, 7, 8 });
-
-        // java initializes everything to 0, and pickup type 0 is normal service
-        key2.pickupTypes = new TIntArrayList(new int[4]);
-        key2.dropoffTypes = new TIntArrayList(new int[4]);
-
-        TripPattern pattern2 = new TripPattern(key2);
+        TripPattern pattern2 = new TripPattern(new TIntArrayList(new int[] { 5, 6, 7, 8 }));
         Trip t2 = new Trip();
         t2.feed_id = "FEED";
         t2.trip_id = "TRIP2";
@@ -108,14 +97,8 @@ public class FrequencyRandomOffsetsTest {
         }
 
         // create two frequency-based lines
-        TripPatternKey key1 = new TripPatternKey("route1");
-        key1.stops = new TIntArrayList(new int[] { 1, 2, 3, 4 });
 
-        // java initializes everything to 0, and pickup type 0 is normal service
-        key1.pickupTypes = new TIntArrayList(new int[4]);
-        key1.dropoffTypes = new TIntArrayList(new int[4]);
-
-        TripPattern pattern1 = new TripPattern(key1);
+        TripPattern pattern1 = new TripPattern(new TIntArrayList(new int[] { 1, 2, 3, 4 }));
         Trip t1 = new Trip();
         t1.feed_id = "FEED";
         t1.trip_id = "TRIP1";
@@ -131,14 +114,7 @@ public class FrequencyRandomOffsetsTest {
 
         layer.tripPatterns.add(pattern1);
 
-        TripPatternKey key2 = new TripPatternKey("route1");
-        key2.stops = new TIntArrayList(new int[] { 5, 6, 7, 8 });
-
-        // java initializes everything to 0, and pickup type 0 is normal service
-        key2.pickupTypes = new TIntArrayList(new int[4]);
-        key2.dropoffTypes = new TIntArrayList(new int[4]);
-
-        TripPattern pattern2 = new TripPattern(key2);
+        TripPattern pattern2 = new TripPattern(new TIntArrayList(new int[] { 5, 6, 7, 8 }));
         Trip t2 = new Trip();
         t2.feed_id = "FEED";
         t2.trip_id = "TRIP2";

@@ -172,10 +172,12 @@ public class TransitLayer implements Serializable, Cloneable {
         // Group trips by stop pattern (including pickup/dropoff type) and fill stop times into patterns.
         // Also group trips by the blockId they belong to, and chain them together if they allow riders to stay on board
         // the vehicle from one trip to the next, even if it changes routes or directions. This is called "interlining".
+        gtfs.findPatterns();
 
-        LOG.info("Grouping trips by stop pattern and block, and creating trip schedules.");
+        LOG.info("Creating trip patterns and schedules.");
+
         // These are temporary maps used only for grouping purposes.
-        Map<TripPatternKey, TripPattern> tripPatternForStopSequence = new HashMap<>();
+        Map<String, TripPattern> tripPatternForPatternId = new HashMap<>();
         Multimap<String, TripSchedule> tripsForBlock = HashMultimap.create();
 
         // Keyed with unscoped route_id, which is fine as this is for a single GTFS feed
@@ -186,7 +188,6 @@ public class TransitLayer implements Serializable, Cloneable {
             Route route = gtfs.routes.get(trip.route_id);
             // Construct the stop pattern and schedule for this trip.
             String scopedRouteId = String.join(":", gtfs.feedId, trip.route_id);
-            TripPatternKey tripPatternKey = new TripPatternKey(scopedRouteId);
             TIntList arrivals = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
             TIntList departures = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
             TIntList stopSequences = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
@@ -205,7 +206,6 @@ public class TransitLayer implements Serializable, Cloneable {
             }
 
             for (StopTime st : stopTimes) {
-                tripPatternKey.addStopTime(st, indexForUnscopedStopId);
                 arrivals.add(st.arrival_time);
                 departures.add(st.departure_time);
                 stopSequences.add(st.stop_sequence);
@@ -229,9 +229,11 @@ public class TransitLayer implements Serializable, Cloneable {
                 continue;
             }
 
-            TripPattern tripPattern = tripPatternForStopSequence.get(tripPatternKey);
+            String patternId = gtfs.tripPatternMap.get(tripId);
+
+            TripPattern tripPattern = tripPatternForPatternId.get(patternId);
             if (tripPattern == null) {
-                tripPattern = new TripPattern(tripPatternKey);
+                tripPattern = new TripPattern(String.format("%s:%s", gtfs.feedId, route.route_id), stopTimes, indexForUnscopedStopId);
 
                 // if we haven't seen the route yet _from this feed_ (as IDs are only feed-unique)
                 // create it.
@@ -246,7 +248,7 @@ public class TransitLayer implements Serializable, Cloneable {
                     tripPattern.routeIndex = routeIndexForRoute.get(trip.route_id);
                 }
 
-                tripPatternForStopSequence.put(tripPatternKey, tripPattern);
+                tripPatternForPatternId.put(patternId, tripPattern);
                 tripPattern.originalId = tripPatterns.size();
                 tripPatterns.add(tripPattern);
             }
@@ -270,7 +272,7 @@ public class TransitLayer implements Serializable, Cloneable {
                 tripsForBlock.put(trip.block_id, tripSchedule);
             }
         }
-        LOG.info("Done creating {} trips on {} patterns.", nTripsAdded, tripPatternForStopSequence.size());
+        LOG.info("Done creating {} trips on {} patterns.", nTripsAdded, tripPatternForPatternId.size());
 
         LOG.info("Chaining trips together according to blocks to model interlining...");
         // Chain together trips served by the same vehicle that allow transfers by simply staying on board.
@@ -286,7 +288,7 @@ public class TransitLayer implements Serializable, Cloneable {
         LOG.info("Done chaining trips together according to blocks.");
 
         LOG.info("Sorting trips on each pattern");
-        for (TripPattern tripPattern : tripPatternForStopSequence.values()) {
+        for (TripPattern tripPattern : tripPatternForPatternId.values()) {
             Collections.sort(tripPattern.tripSchedules);
         }
         LOG.info("done sorting");
@@ -617,6 +619,7 @@ public class TransitLayer implements Serializable, Cloneable {
         copy.streetVertexForStop = new TIntArrayList(this.streetVertexForStop);
         copy.stopTrees = new ArrayList<>(this.stopTrees);
         copy.transfersForStop = new ArrayList<>(this.transfersForStop);
+        copy.routes = new ArrayList<>(this.routes);
         return copy;
     }
 

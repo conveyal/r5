@@ -1,12 +1,15 @@
 package com.conveyal.r5.transit;
 
+import com.conveyal.gtfs.model.StopTime;
 import gnu.trove.list.TIntList;
-import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.TObjectIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /**
  * This is like a Transmodel JourneyPattern.
@@ -44,20 +47,6 @@ public class TripPattern implements Serializable, Cloneable {
     /** index of this route in TransitLayer data. -1 if detailed route information has not been loaded */
     public int routeIndex = -1;
 
-    public TripPattern (TripPatternKey tripPatternKey) {
-        int nStops = tripPatternKey.stops.size();
-        stops = new int[nStops];
-        pickups = new PickDropType[nStops];
-        dropoffs = new PickDropType[nStops];
-        wheelchairAccessible = new BitSet(nStops);
-        for (int s = 0; s < nStops; s++) {
-            stops[s] = tripPatternKey.stops.get(s);
-            pickups[s] = PickDropType.forGtfsCode(tripPatternKey.pickupTypes.get(s));
-            dropoffs[s] = PickDropType.forGtfsCode(tripPatternKey.dropoffTypes.get(s));
-        }
-        routeId = tripPatternKey.routeId;
-    }
-
     /**
      * Create a TripPattern based only on a list of internal integer stop IDs.
      * This is used when creating brand new patterns in scenario modifications, rather than from GTFS.
@@ -75,6 +64,22 @@ public class TripPattern implements Serializable, Cloneable {
             wheelchairAccessible.set(s);
         }
         routeId = "SCENARIO_MODIFICATION";
+    }
+
+    public TripPattern(String routeId, Iterable<StopTime> stopTimes, TObjectIntMap<String> indexForUnscopedStopId) {
+        List<StopTime> stopTimeList = StreamSupport.stream(stopTimes.spliterator(), false).collect(Collectors.toList());
+        int nStops = stopTimeList.size();
+        stops = new int[nStops];
+        pickups = new PickDropType[nStops];
+        dropoffs = new PickDropType[nStops];
+        wheelchairAccessible = new BitSet(nStops);
+        for (int s = 0; s < nStops; s++) {
+            StopTime st = stopTimeList.get(s);
+            stops[s] = indexForUnscopedStopId.get(st.stop_id);
+            pickups[s] = PickDropType.forGtfsCode(st.pickup_type);
+            dropoffs[s] = PickDropType.forGtfsCode(st.drop_off_type);
+        }
+        this.routeId = routeId;
     }
 
     public void addTrip (TripSchedule tripSchedule) {

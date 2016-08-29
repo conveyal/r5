@@ -9,7 +9,7 @@
   <url>https://github.com/conveyal/r5</url>
 
   <scm>
-    <connection>scm:git:https://github.com/conveyal/r5.gitk</connection>
+    <connection>scm:git:https://github.com/conveyal/r5.git</connection>
     <developerConnection>scm:git:https://github.com/conveyal/r5.git</developerConnection>
   </scm>
 
@@ -247,7 +247,7 @@
     <dependency>
       <groupId>com.conveyal</groupId>
       <artifactId>gtfs-lib</artifactId>
-      <version>1.1.0-SNAPSHOT</version>
+      <version>1.2.0-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>com.conveyal</groupId>

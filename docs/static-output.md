@@ -67,14 +67,16 @@ TODO: EXAMPLE
 #### `stop_trees.dat`
 
 This contains the connection from Web Mercator pixels to transit stops. It is a row-first flat stream of the connections for each pixel in the query
-(as defined in the query.json). For each pixel, the following data structure is present:
+(as defined in the query.json). All numbers are four-byte signed little endian ints, allowing use in typed arrays. For each pixel, the following data structure is present:
 
 ```
-(2 bytes) number of transit stops reachable from this pixel
+number of transit stops reachable from this pixel
 	for each reachable stop:
-	(4 bytes) stop ID
-	(2 bytes) travel time to stop, seconds
+	stop ID, delta coded
+	travel time to stop, seconds, delta coded
 ```
+
+Delta coding flows across pixels, i.e. the first stop ID and time at pixel n is delta-coded from the last stop ID and time at the previous pixel.
 
 This file does not obviously have constant offsets. It is assumed that the client will build an index for the file when it is loaded. If this proves
 to be too slow, we can pregenerate an index for the file.
@@ -92,25 +94,42 @@ Header (five 32-bit ints):
 
 The rest of the file is repeated 4-byte int values, one for each pixel in row-major order (i.e. x changes faster than y), delta coded.
 
+#### Transitive file
+
+This represents the network in the format expected by transitive.js
+
 ### Per-origin file
 
 #### `{x}/{y}.dat`
 
 There is one file per origin, which contains transit travel times in seconds from that origin to every transit stop in the network, as well as to all nearby pixels. It is
-named with the x and y position of the pixel origin _relative to the north and west offsets in query.json_ (to avoid enormous numbers). It is formatted as follows.
+named with the x and y position of the pixel origin _relative to the north and west offsets in query.json_ (to avoid enormous numbers). It is formatted as follows. All numbers
+are four-byte little-endian signed integers. The non-transit times are in the first section of the file, followed by transit travel times to all stops in the network.
 
 ```
-(2 bytes) radius of surrounding pixel area (e.g. if this is 20, there is an area 20 pixels above, below, to the right and left of the origin represented here,
+radius of surrounding pixel area (e.g. if this is 20, there is an area 20 pixels above, below, to the right and left of the origin represented here,
 for a 41x41 pixel image centered on the origin)
 	for each pixel, rows first:
-	(2 bytes) travel time to pixel, seconds, delta-coded from previous pixel
+	travel time to pixel, seconds, delta-coded from previous pixel
 
-(4 bytes) number of transit stops
-(2 bytes) number of departure minutes
-	for each transit stop:
-	(2 bytes) travel time to stop, seconds, at first departure minute, with value -1 indicating unreachability
+number of transit stops
+number of departure minutes
+
+for each transit stop:
+	travel time to stop, seconds, at first departure minute, with value -1 indicating unreachability
+	Index of the path used to reach this stop (see below)
 	for each departure minute after first:
-		(2 bytes) delta from previous travel time (in order to reduce entropy and allow gzip to efficiently compress data)
+		delta from previous travel time (in order to reduce entropy and allow gzip to efficiently compress data)
+		index of path used, delta coded from previous
+
+	number of paths used to reach this stop over the time window
+	for each path:
+		number of patterns used in this path
+		for each pattern
+			board stop index
+			pattern ID (which is an index into the patterns in the transitive information file)
+			alight stop index
+
 ```
 
 ## Calculating accessibility

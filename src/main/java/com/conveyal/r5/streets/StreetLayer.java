@@ -1379,8 +1379,10 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /**
-     * Create a geometry in FIXED POINT DEGREES containing all the points on all edges created or removed by the scenario that produced this
-     * StreetLayer, buffered by radiusMeters. This is a MultiPolygon or GeometryCollection.
+     * Create a geometry in FIXED POINT DEGREES containing all the points on all edges created or removed by the
+     * scenario that produced this StreetLayer, buffered by radiusMeters. This is a MultiPolygon or GeometryCollection.
+     * When there are no created or removed edges, returns an empty geometry rather than null, because we test whether
+     * transit stops are contained within the resulting geometry.
      */
     public Geometry scenarioEdgesBoundingGeometry(int radiusMeters) {
         List<Polygon> geoms = new ArrayList<>();
@@ -1406,7 +1408,7 @@ public class StreetLayer implements Serializable, Cloneable {
 
             if (!(geometry instanceof Polygon)) {
                 throw new IllegalStateException(
-                        String.format("Envelope geometry %s is not a polygon!", geometry == null ? "null" : geometry.toString())
+                    String.format("Envelope geometry %s is not a polygon!", geometry == null ? "null" : geometry.toString())
                 );
             }
             geoms.add((Polygon) geometry);

@@ -63,6 +63,7 @@ public class TransferFinder {
 
             streetRouter.route();
             TIntIntMap distancesToReachedStops = streetRouter.getReachedStops();
+            // FIXME the following is technically incorrect, measure that it's actually improving calculation speed
             retainClosestStopsOnPatterns(distancesToReachedStops);
             // At this point we have the distances to all stops that are the closest one on some pattern.
             // Make transfers to them, packed as pairs of (target stop index, distance).
@@ -134,12 +135,5 @@ public class TransferFinder {
         });
         timesToReachedStops.retainEntries((stop, distance) -> bestStopOnPattern.containsValue(stop));
     }
-
-    /**
-     * Return all stops within a certain radius of the given vertex, using straight-line distance independent of streets.
-     * If the origin vertex is a TransitStop, the result will include it.
-     */
-    /* Skip stops that are entrances to stations or whose entrances are coded separately */
-    /* Determine the set of stops that are already reachable via other pathways or transfers */
 
 }

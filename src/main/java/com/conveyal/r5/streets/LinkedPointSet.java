@@ -109,7 +109,7 @@ public class LinkedPointSet {
         final int nPoints = pointSet.featureCount();
         final int nStops = streetLayer.parentNetwork.transitLayer.getStopCount();
 
-        // The regions within which we want to link points to edges.
+        // The regions within which we want to link points to edges, then connect transit stops to points.
         // Null means relink and rebuild everything, but this will be constrained below if a base linkage was supplied.
         Geometry relinkZone = null, treeRebuildZone = null;
 
@@ -164,6 +164,8 @@ public class LinkedPointSet {
      * @param relinkZone only link points inside this geometry in FIXED POINT DEGREES, leaving all the others alone. If null, link all points.
      */
     private void linkPointsToStreets(Geometry relinkZone) {
+        LambdaCounter counter = new LambdaCounter(LOG, pointSet.featureCount(), 10000,
+                "Linked {} of {} PointSet points to streets.");
         // Perform linkage calculations in parallel, writing results to the shared parallel arrays.
         IntStream.range(0, pointSet.featureCount()).parallel().forEach(p -> {
             // When working with a scenario, skip all points outside the zone that could be affected by new edges.
@@ -177,9 +179,11 @@ public class LinkedPointSet {
                 distances0_mm[p] = split.distance0_mm;
                 distances1_mm[p] = split.distance1_mm;
             }
+            counter.increment();
         });
         long unlinked = Arrays.stream(edges).filter(e -> e == -1).count();
-        LOG.info("Done linking points to street network. {} features were not linked.", unlinked);
+        counter.done();
+        LOG.info("{} points are not linked to the street network.", unlinked);
     }
 
     /** @return the number of linkages, which should be the same as the number of points in the PointSet. */

@@ -1424,11 +1424,17 @@ public class StreetLayer implements Serializable, Cloneable {
      * Given a JTS Geometry in fixed-point latitude and longitude, log it as floating-point GeoJSON.
      */
     public static void logFixedPointGeometry (String label, Geometry fixedPointGeometry) {
-        if (fixedPointGeometry != null) {
-            String geoJson = new GeometryJSON().toString(fixedDegreeGeometryToFloating(fixedPointGeometry));
-            LOG.info("{} {}", label, geoJson);
+        if (fixedPointGeometry == null){
+            LOG.info("{} is null.", label);
+        } else if (fixedPointGeometry.isEmpty()) {
+            LOG.info("{} is empty.", label);
         } else {
-            LOG.info("{} was null.", label);
+            String geoJson = new GeometryJSON().toString(fixedDegreeGeometryToFloating(fixedPointGeometry));
+            if (geoJson == null) {
+                LOG.info("Could not convert non-null geometry to GeoJSON");
+            } else {
+                LOG.info("{} {}", label, geoJson);
+            }
         }
     }
 

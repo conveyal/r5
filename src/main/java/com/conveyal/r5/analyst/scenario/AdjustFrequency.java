@@ -62,6 +62,7 @@ public class AdjustFrequency extends Modification {
 
     private int nPatternsCleared = 0;
 
+    /** As we scan over the patterns, this set is populated to keep track of which entries have been handled. */
     private Set<PatternTimetable> entriesMatched = new HashSet<>();
 
     @Override
@@ -79,19 +80,24 @@ public class AdjustFrequency extends Modification {
 
     @Override
     public boolean apply(TransportNetwork network) {
+
+        // Sort out all the service entries by which pattern they use as a template.
         entriesByTrip = HashMultimap.create();
         for (PatternTimetable entry : entries) {
             entriesByTrip.put(entry.sourceTrip, entry);
         }
-        // Protective copy that we can extend.
+
+        // Make a protective copy of the services that we can extend.
         servicesCopy = new ArrayList<>(network.transitLayer.services);
         network.transitLayer.services = servicesCopy;
+
+        // Scan over all patterns, copying and modifying those on the given route, but leaving others untouched.
         network.transitLayer.tripPatterns = network.transitLayer.tripPatterns.stream()
                 .map(this::processPattern)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
 
-        // We may have created frequencies or schedules.
+        // We may have created frequencies or schedules. Update the relevant summary fields at the network layer.
         network.transitLayer.hasFrequencies = network.transitLayer.hasSchedules = false;
         for (TripPattern tp : network.transitLayer.tripPatterns) {
             if (tp.hasFrequencies) network.transitLayer.hasFrequencies = true;
@@ -145,7 +151,7 @@ public class AdjustFrequency extends Modification {
             return originalPattern;
         }
 
-        // Record that this pattern's TripScehedules are being replaced for error reporting and debugging purposes.
+        // Record that this pattern's TripSchedules are being replaced for error reporting and debugging purposes.
         nPatternsCleared += 1;
 
         // This pattern is on the route to be frequency-adjusted.

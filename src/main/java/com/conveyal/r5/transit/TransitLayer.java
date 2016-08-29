@@ -227,7 +227,6 @@ public class TransitLayer implements Serializable, Cloneable {
             if (nStops == 0) {
                 LOG.warn("Trip {} on route {} {} has no stops, it will not be used", trip.trip_id, trip.route_id, route.route_short_name);
                 continue;
-
             }
 
             TripPattern tripPattern = tripPatternForStopSequence.get(tripPatternKey);

@@ -6,7 +6,8 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TObjectIntMap;
 
 /**
- * Used as a map key when grouping trips by stop pattern.
+ * Used as a map key when grouping trips by stop pattern. Note that this includes the routeId, so the same sequence of
+ * stops on two different routes makes two different patterns.
  * These objects are not intended for use outside the grouping process.
  */
 public class TripPatternKey {

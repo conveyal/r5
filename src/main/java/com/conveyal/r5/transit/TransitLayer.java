@@ -429,7 +429,7 @@ public class TransitLayer implements Serializable, Cloneable {
             LOG.info("Selectively finding distances for only those stops potentially affected by scenario application.");
         }
 
-        LambdaCounter buildCounter = new LambdaCounter(LOG, getStopCount(), 500,
+        LambdaCounter buildCounter = new LambdaCounter(LOG, getStopCount(), 1000,
                 "Computed distances to street vertices from {} of {} transit stops.");
 
         // Working in parallel, create a new list of stop trees for every stop index, optionally skipping stops falling

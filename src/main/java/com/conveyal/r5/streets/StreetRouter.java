@@ -728,8 +728,10 @@ public class StreetRouter {
         public int heuristic = 0; // Underestimate of remaining weight to the destination.
 
         /**
-         * turn restrictions we are in the middle of.
-         * Value is how many edges of this turn restriction we have traversed so far, so if 1 we have traversed only the from edge, etc.
+         * All turn restrictions this state is currently passing through.
+         * The values are how many edges of a turn restriction have been traversed so far,
+         * keyed on the turn restriction index.
+         * If the value is 1 we have traversed only the from edge, etc.
          */
         public TIntIntMap turnRestrictions;
 
@@ -753,7 +755,6 @@ public class StreetRouter {
             this.streetMode = streetMode;
             this.durationSeconds = 0;
         }
-
 
         public void incrementTimeInSeconds(long seconds) {
             if (seconds < 0) {

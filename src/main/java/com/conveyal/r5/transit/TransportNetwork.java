@@ -6,6 +6,8 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+import com.google.common.collect.HashMultimap;
+import com.google.common.collect.Multimap;
 import com.google.common.io.ByteStreams;
 import com.conveyal.r5.profile.GreedyFareCalculator;
 import com.conveyal.r5.profile.StreetMode;
@@ -162,9 +164,9 @@ public class TransportNetwork implements Serializable {
                 feed.close();
             }
         }
-
         transportNetwork.transitLayer = transitLayer;
         transitLayer.parentNetwork = transportNetwork;
+        // transitLayer.summarizeRoutesAndPatterns();
 
         // The street index is needed for associating transit stops with the street network.
         streetLayer.indexStreets();
@@ -172,6 +174,8 @@ public class TransportNetwork implements Serializable {
         // Edge lists must be built after all inter-layer linking has occurred.
         streetLayer.buildEdgeLists();
         transitLayer.rebuildTransientIndexes();
+
+        // TODO why are we building these when the graph is built, shouldn't these (and others above) be covered by the transient index build?
         transitLayer.buildStopTrees(null);
 
         // Create transfers

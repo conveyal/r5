@@ -20,6 +20,9 @@ import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
 import com.conveyal.r5.streets.StreetRouter;
 import java.time.LocalDate;
+
+import gnu.trove.set.TIntSet;
+import gnu.trove.set.hash.TIntHashSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +39,7 @@ import java.util.stream.IntStream;
  * A key simplifying factor is that we don't handle overnight trips. This is fine for analysis at usual times of day.
  */
 public class TransitLayer implements Serializable, Cloneable {
+
     /** Distance limit for stop trees, meters. Set to 3.5 km to match OTP GraphIndex.MAX_WALK_METERS */
     public static final int STOP_TREE_DISTANCE_METERS = 3500;
 
@@ -180,9 +184,7 @@ public class TransitLayer implements Serializable, Cloneable {
         TRIPS: for (String tripId : gtfs.trips.keySet()) {
             Trip trip = gtfs.trips.get(tripId);
             Route route = gtfs.routes.get(trip.route_id);
-            // Construct the stop pattern and schedule for this trip
-            // Should we really be resolving to an object reference for Route?
-            // That gets in the way of GFTS persistence.
+            // Construct the stop pattern and schedule for this trip.
             String scopedRouteId = String.join(":", gtfs.feedId, trip.route_id);
             TripPatternKey tripPatternKey = new TripPatternKey(scopedRouteId);
             TIntList arrivals = new TIntArrayList(TYPICAL_NUMBER_OF_STOPS_PER_TRIP);
@@ -515,6 +517,29 @@ public class TransitLayer implements Serializable, Cloneable {
     public Point getJTSPointForStopFixed(int s) {
         Coordinate c = getCoordinateForStopFixed(s);
         return c == null ? null : GeometryUtils.geometryFactory.createPoint(c);
+    }
+
+    /**
+     * Log some summary information about the contents of the layer that might help with spotting errors or bad data.
+     */
+    public void summarizeRoutesAndPatterns() {
+        System.out.println("Total stops " + stopForIndex.size());
+        System.out.println("Total patterns " + tripPatterns.size());
+        System.out.println("routeId,patterns,trips,stops");
+        Multimap<String, TripPattern> patternsForRoute = HashMultimap.create();
+        for (TripPattern pattern : tripPatterns) {
+            patternsForRoute.put(pattern.routeId, pattern);
+        }
+        for (String routeId : patternsForRoute.keySet()) {
+            Collection<TripPattern> patterns = patternsForRoute.get(routeId);
+            int nTrips = patterns.stream().mapToInt(p -> p.tripSchedules.size()).sum();
+            TIntSet stopsUsed = new TIntHashSet();
+            for (TripPattern pattern : patterns) stopsUsed.addAll(pattern.stops);
+            int nStops = stopsUsed.size();
+            int nPatterns = patternsForRoute.get(routeId).size();
+            System.out.println(String.join(",", routeId,
+                    Integer.toString(nPatterns), Integer.toString(nTrips), Integer.toString(nStops)));
+        }
     }
 
     /** How much information should we load/save? */

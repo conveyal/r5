@@ -32,8 +32,8 @@ public class PointToPointQuery {
     private static final Logger LOG = LoggerFactory.getLogger(PointToPointQuery.class);
 
     /**
-     * The largest number of stops to consider boarding at. If there are 1000 stops within 2km, only consider boarding at the closest 200.
-     *
+     * The largest number of stops to consider boarding at.
+     * If there are 1000 stops within 2km, only consider boarding at the closest 200.
      * It's not clear this has a major effect on speed, so we could consider removing it.
      */
     public static final int MAX_ACCESS_STOPS = 200;
@@ -55,6 +55,7 @@ public class PointToPointQuery {
 
     /** Time to rent a bike in seconds */
     private static final int BIKE_RENTAL_PICKUP_TIME_S = 60;
+
     /**
      * Cost of renting a bike. The cost is a bit more than actual time to model the associated cost and trouble.
      */

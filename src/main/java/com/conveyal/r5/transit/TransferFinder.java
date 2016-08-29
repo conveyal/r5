@@ -39,12 +39,12 @@ public class TransferFinder {
     }
 
     public void findTransfers () {
-        LOG.info("Finding transfers through the street network from all stops...");
         // For each stop, store all transfers out of that stop as packed pairs of (toStopIndex, distance)
         final List<TIntList> transfersForStop = transitLayer.transfersForStop;
         // When applying scenarios we want to find transfers for only the newly added stops.
         // We look at any existing list of transfers and do enough iterations to make it as long as the list of stops.
         int firstStopIndex = transfersForStop.size();
+        LOG.info("Finding transfers through the street network from {} stops...", transitLayer.getStopCount() - transfersForStop.size());
         for (int s = firstStopIndex; s < transitLayer.getStopCount(); s++) {
             // From each stop, run a street search looking for other transit stops.
             int originStreetVertex = transitLayer.streetVertexForStop.get(s);

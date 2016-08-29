@@ -1414,9 +1414,11 @@ public class StreetLayer implements Serializable, Cloneable {
             geoms.add((Polygon) geometry);
         });
 
-        // can't just make a multipolygon as the components are likely not disjoint. unions are pretty quick though.
-        Geometry result = UnaryUnionOp.union(geoms);
-        logFixedPointGeometry("Unioned buffered streets", result);
+        // We can't just make a multipolygon as the component polygons may not be disjoint. Unions are pretty quick though.
+        // The UnaryUnionOp gets its geometryFactory from the geometries it's operating on.
+        // We need to supply one in case the list is empty, so it can return an empty geometry instead of null.
+        Geometry result = new UnaryUnionOp(geoms, GeometryUtils.geometryFactory).union();
+        // logFixedPointGeometry("Unioned buffered streets", result);
         return result;
     }
 

@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.gtfs.model.*;
+import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
@@ -111,6 +112,15 @@ public class AddTrips extends Modification {
             }
             pattern.addTrip(schedule);
         }
+
+        // TODO lots more to fill in here, need to have a way to just specify all needed info in scenario editor.
+        RouteInfo info = new RouteInfo();
+        info.route_short_name = "";
+        info.route_long_name = this.comment;
+
+        pattern.routeIndex = transitLayer.routes.size();
+        transitLayer.routes.add(info);
+
         transitLayer.tripPatterns.add(pattern);
         transitLayer.hasFrequencies = true;
     }

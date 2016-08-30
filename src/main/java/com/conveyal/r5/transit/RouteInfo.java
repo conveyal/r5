@@ -31,4 +31,6 @@ public class RouteInfo implements Serializable {
         this.color = route.route_color;
         this.agency_url = route.route_url;
     }
+
+    public RouteInfo () { /* do nothing */ }
 }

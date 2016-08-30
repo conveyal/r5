@@ -73,7 +73,7 @@ This contains the connection from Web Mercator pixels to transit stops. It is a 
 number of transit stops reachable from this pixel
 	for each reachable stop:
 	stop ID, delta coded
-	travel time to stop, seconds, delta coded
+	travel time to stop, minutes, delta coded
 ```
 
 Delta coding flows across pixels, i.e. the first stop ID and time at pixel n is delta-coded from the last stop ID and time at the previous pixel.

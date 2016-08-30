@@ -368,8 +368,10 @@ public class AnalystWorker implements Runnable {
 
             if (clusterRequest instanceof AnalystClusterRequest)
                 this.handleAnalystRequest((AnalystClusterRequest) clusterRequest, ts);
-            else if (clusterRequest instanceof StaticSiteRequest.PointRequest)
+            else if (clusterRequest instanceof StaticSiteRequest.PointRequest) {
+                transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, ((StaticSiteRequest.PointRequest) clusterRequest).request.request);
                 this.handleStaticSiteRequest((StaticSiteRequest.PointRequest) clusterRequest, transportNetwork, ts);
+            }
             else
                 LOG.error("Unrecognized request type {}", clusterRequest.getClass());
 

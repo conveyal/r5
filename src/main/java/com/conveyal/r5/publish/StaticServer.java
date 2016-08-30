@@ -28,8 +28,15 @@ public class StaticServer {
         staticSiteRequest = JsonUtilities.objectMapper.readValue(in, StaticSiteRequest.class);
 
         // read network
-        TransportNetworkCache cache = new TransportNetworkCache(args[1]);
-        network = cache.getNetwork(staticSiteRequest.transportNetworkId);
+        File cacheDir = new File("cache");
+        if (!cacheDir.exists()) cacheDir.mkdir();
+        TransportNetworkCache cache = new TransportNetworkCache(args[1], cacheDir);
+        if (staticSiteRequest.request.scenario != null || staticSiteRequest.request.scenarioId != null) {
+            network = cache.getNetworkForScenario(staticSiteRequest.transportNetworkId, staticSiteRequest.request);
+        }
+        else {
+            network = cache.getNetwork(staticSiteRequest.transportNetworkId);
+        }
 
         // precompute metadata and stop tree
         ByteArrayOutputStream mbaos = new ByteArrayOutputStream();

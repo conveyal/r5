@@ -111,7 +111,7 @@ public class StaticMetadata implements Runnable {
                 }
 
                 // tree[i + 1] is distance
-                stopTrees[tree[i]].add(new int[] { stop, tree[i + 1] });
+                stopTrees[tree[i]].add(new int[] { stop, (int) (tree[i + 1] / 1300 / 60)});
             }
         }
 

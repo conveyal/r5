@@ -29,7 +29,7 @@ public class StaticComputer implements Runnable {
     private TransportNetwork network;
     private TaskStatistics taskStatistics;
 
-    /** Compute the origin specified by x and y (relative to the request origin) */
+    /** Compute the origin specified by x and y (relative to the request origin). Provide a network with the scenario pre-applied. */
     public StaticComputer (StaticSiteRequest.PointRequest req, TransportNetwork network, TaskStatistics ts) {
         this.req = req;
         this.network = network;
@@ -53,11 +53,6 @@ public class StaticComputer implements Runnable {
         double lon = points.pixelToLon(points.west + req.x);
 
         TaskStatistics ts = new TaskStatistics();
-
-        if (req.request.request.scenario != null) {
-            // TODO use the cached TransportNetworks with scenarios pre-applied (which also enables re-using LinkedPointSets)
-            network = network.applyScenario(req.request.request.scenario);
-        }
 
         // perform street search to find transit stops and non-transit times
         StreetRouter sr = new StreetRouter(network.streetLayer);
@@ -132,6 +127,8 @@ public class StaticComputer implements Runnable {
                 out.writeInt(pathIdx - prevPath);
                 prevPath = pathIdx;
             }
+
+            sum += pathList.size();
 
             // write the paths
             out.writeInt(pathList.size());

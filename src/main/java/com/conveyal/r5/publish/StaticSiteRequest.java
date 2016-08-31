@@ -12,6 +12,9 @@ public class StaticSiteRequest {
     /** Transport network ID to use */
     public String transportNetworkId;
 
+    /** Worker version */
+    public String workerVersion;
+
     /** profile request */
     public ProfileRequest request;
 
@@ -35,6 +38,7 @@ public class StaticSiteRequest {
             this.request = request;
             this.x = x;
             this.y = y;
+            this.workerVersion = request.workerVersion;
             this.graphId = request.transportNetworkId;
             this.jobId = request.jobId;
             this.id = x + "_" + y;

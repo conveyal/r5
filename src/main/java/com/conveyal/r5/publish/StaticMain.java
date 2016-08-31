@@ -63,7 +63,7 @@ public class StaticMain {
         for (int offset = 0; offset < nRequests; offset += 50000) {
             try {
                 HttpClient httpClient = HttpClients.createDefault();
-                HttpPost request = new HttpPost(args[2] + "/enqueue/jobs");
+                HttpPost request = new HttpPost(args[2] + "/enqueue/regional");
                 request.setHeader("Content-Type", "application/json");
                 List<StaticSiteRequest.PointRequest> subRequests = requests.subList(offset, Math.min(offset + 50000, nRequests));
                 request.setEntity(new StringEntity(JsonUtilities.objectMapper.writeValueAsString(subRequests)));

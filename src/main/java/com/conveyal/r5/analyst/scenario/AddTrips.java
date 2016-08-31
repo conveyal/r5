@@ -48,6 +48,11 @@ public class AddTrips extends Modification {
     /** A list of the internal integer IDs for the existing or newly created stops. */
     private TIntList intStopIds;
 
+    /** unique ID for transitive */
+    private String routeId = UUID.randomUUID().toString();
+
+    private int routeIndex;
+
     @Override
     public String getType() {
         return "add-trips";
@@ -73,6 +78,16 @@ public class AddTrips extends Modification {
         transitLayer.tripPatterns = new ArrayList<>(transitLayer.tripPatterns);
         // We will be creating a service for each supplied timetable, make a protective copy of the list of services.
         transitLayer.services = new ArrayList<>(transitLayer.services);
+
+        // TODO lots more to fill in here, need to have a way to just specify all needed info in scenario editor.
+        RouteInfo info = new RouteInfo();
+        info.route_short_name = "";
+        info.route_long_name = this.comment;
+        info.route_id = this.routeId;
+        info.color = "4444FF";
+        this.routeIndex = transitLayer.routes.size();
+        transitLayer.routes.add(info);
+
         generatePattern(transitLayer, 0);
         if (bidirectional) {
             // We want to call generatePattern again, but with all stops and stoptimes reversed.
@@ -113,13 +128,8 @@ public class AddTrips extends Modification {
             pattern.addTrip(schedule);
         }
 
-        // TODO lots more to fill in here, need to have a way to just specify all needed info in scenario editor.
-        RouteInfo info = new RouteInfo();
-        info.route_short_name = "";
-        info.route_long_name = this.comment;
-
-        pattern.routeIndex = transitLayer.routes.size();
-        transitLayer.routes.add(info);
+        pattern.routeIndex = this.routeIndex;
+        pattern.routeId = this.routeId;
 
         transitLayer.tripPatterns.add(pattern);
         transitLayer.hasFrequencies = true;

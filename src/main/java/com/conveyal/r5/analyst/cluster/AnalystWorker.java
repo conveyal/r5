@@ -387,6 +387,9 @@ public class AnalystWorker implements Runnable {
     /** handle a fancy new-fangled static site request */
     private void handleStaticSiteRequest (StaticSiteRequest.PointRequest request, TransportNetwork transportNetwork, TaskStatistics ts) {
         new StaticComputer(request, transportNetwork, ts).run();
+
+        // mark the task as complete
+        deleteRequest(request);
     }
 
     /** Handle a stock Analyst request */

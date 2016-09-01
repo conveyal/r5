@@ -1,13 +1,9 @@
 package com.conveyal.r5.analyst.scenario;
 
 import com.beust.jcommander.internal.Lists;
-import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransferFinder;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.CoordinateFilter;
 import com.vividsolutions.jts.geom.Geometry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +11,6 @@ import org.slf4j.LoggerFactory;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
@@ -130,8 +125,8 @@ public class Scenario implements Serializable {
         // Rebuild stop trees that are near street network changes
         // first rebuild edge lists
         copiedNetwork.streetLayer.buildEdgeLists();
-        Geometry treeRebuildZone = copiedNetwork.streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.STOP_TREE_DISTANCE_METERS);
-        copiedNetwork.transitLayer.buildStopTrees(treeRebuildZone);
+        Geometry treeRebuildZone = copiedNetwork.streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.DISTANCE_TABLE_SIZE_METERS);
+        copiedNetwork.transitLayer.buildDistanceTables(treeRebuildZone);
         
         // find the transfers originating at or terminating at new stops.
         // TODO also rebuild transfers which are near street network changes but which do not connect to new stops

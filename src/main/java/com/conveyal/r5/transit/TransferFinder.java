@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- *     // TODO combine TransferFinder with stop tree builder.
+ * TODO optimization: combine TransferFinder with stop-to-vertex distance table builder.
  */
 public class TransferFinder {
 

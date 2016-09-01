@@ -857,7 +857,7 @@ public class RaptorWorker {
         for (int s = stopsTouchedThisSearch.nextSetBit(0); s >= 0; s = stopsTouchedThisSearch.nextSetBit(s + 1)) {
             int timeAtTransitStop = timesAtTransitStops[s];
             if (timeAtTransitStop != UNREACHED) {
-                int[] targets = this.targets.stopTrees.get(s);
+                int[] targets = this.targets.stopToPointDistanceTables.get(s);
                 if (targets == null) {
                     continue;
                 }

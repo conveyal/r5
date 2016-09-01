@@ -6,8 +6,6 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
-import com.google.common.collect.HashMultimap;
-import com.google.common.collect.Multimap;
 import com.google.common.io.ByteStreams;
 import com.conveyal.r5.profile.GreedyFareCalculator;
 import com.conveyal.r5.profile.StreetMode;
@@ -78,7 +76,7 @@ public class TransportNetwork implements Serializable {
         streetLayer.buildEdgeLists();
         streetLayer.indexStreets();
         transitLayer.rebuildTransientIndexes();
-        transitLayer.buildStopTrees(null);
+        transitLayer.buildDistanceTables(null);
     }
 
     /**
@@ -176,7 +174,7 @@ public class TransportNetwork implements Serializable {
         transitLayer.rebuildTransientIndexes();
 
         // TODO why are we building these when the graph is built, shouldn't these (and others above) be covered by the transient index build?
-        transitLayer.buildStopTrees(null);
+        transitLayer.buildDistanceTables(null);
 
         // Create transfers
         new TransferFinder(transportNetwork).findTransfers();
@@ -391,22 +389,6 @@ public class TransportNetwork implements Serializable {
             return this;
         }
         return scenario.applyToTransportNetwork(this);
-    }
-
-    /**
-     * Currently this is intended for use by Modifications but not when building the network initially.
-     * If this is being used in a non-destructive Modification, the caller must already have made protective copies of
-     * all fields that will be modified.
-     * Really we should use the same function for modifications and when initially creating the TransportNetwork. This
-     * function would need to create the stop, link it to the street network, and make a stop tree for that stop.
-     */
-    public int addStop (String id, double lat, double lon) {
-        int newStopIndex = transitLayer.getStopCount();
-        int newStreetVertexIndex = streetLayer.getOrCreateVertexNear(lat, lon, StreetMode.WALK);
-        transitLayer.stopIdForIndex.add(id); // TODO check for uniqueness
-        transitLayer.streetVertexForStop.add(newStreetVertexIndex);
-        // TODO stop tree, any other stop-indexed arrays or lists
-        return newStopIndex;
     }
 
     /**

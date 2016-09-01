@@ -1,6 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.util.LambdaCounter;
@@ -10,6 +11,7 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import com.conveyal.r5.streets.EdgeStore.Edge;
+import gnu.trove.set.TIntSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,39 +22,18 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
- * A LinkedPointSet is a PointSet that has been pre-connected to a StreetLayer in a non-destructive, reversible way.
- *
- * This is a replacement for SampleSet.
- * It is a column store of locations that have not been permanently spliced into the graph.
- * We cannot just adapt the SampleSet constructor because it holds on to OTP Vertex objects. In the new system we have
- * only vertex indexes. Well, there are Vertex cursor objects but we're not going to save those.
- * Likewise for TimeSurfaces which are intersected with SampleSets. They are keyed on Vertex references so need to be replaced.
- *
- * Semi-obsolete notes:
- * Note that we don't ever need to traverse into a temporary vertex, only out of one, so temporary vertices do not
- * interfere at all with the permanent graph.
- * A temp vertex set can be used for a big set of vertices, but also for single origin and target vertices in
- * point to point searches.
- * Temp vertex sets can be persisted in the graph itself to save a worker the effort of loading street geometries and
- * re-linking stops.
- *
- * We can't use TempVertexSets to handle linking transit stops into the street network, because we want other
- * TempVertexSets to see the transit stop splitters as permanent and insert themselves between the intersection and the
- * transit stop splitter vertex.
- *
- * Searches always proceed outward from origins or targets (think StopTreeCache for the targets, which handles the last
- * mile from transit to targets). We can have completely temporary vertices that are not even recorded in the main
- * transport network store.
- * Keep in mind that if origins and destinations are pre-linked into the graph, the street geometries or even the
- * whole street layer can be dropped entirely, and it’s still useful for routing. So the TransportNetwork must be
- * serializable and usable with a null StreetLayer.
- *
+ * A LinkedPointSet is a PointSet that has been connected to a StreetLayer in a non-destructive, reversible way.
+ * For each feature in the PointSet, we record the closest edge and the distance to the vertices at the ends of that
+ * edge (like a Splice or a Sample in OTP).
  */
 public class LinkedPointSet {
 
     private static final Logger LOG = LoggerFactory.getLogger(LinkedPointSet.class);
 
-    // FIXME 1KM is really far to walk off a street.
+    /**
+     * The distance we search around each PointSet point for a road to link it to.
+     * FIXME 1KM is really far to walk off a street. But some places have offices in the middle of big parking lots.
+     */
     public static final int MAX_OFFSTREET_WALK_METERS = 1000;
 
     /**
@@ -85,10 +66,10 @@ public class LinkedPointSet {
     /** For each point, distance from the final vertex of the edge to the split point. */
     public int[] distances1_mm;
 
-    // For each transit stop, the distances to nearby streets as packed (vertex, distance) pairs.
-    public transient List<int[]> stopTrees;
+    /** For each transit stop, the distances to nearby PointSet points as packed (point_index, distance) pairs. */
+    public transient List<int[]> stopToPointDistanceTables;
 
-    /** it is preferred to specify a mode when linking TODO remove this. */
+    /** It is preferred to specify a mode when linking TODO remove this. */
     @Deprecated
     public LinkedPointSet(PointSet pointSet, StreetLayer streetLayer) {
         this(pointSet, streetLayer, null, null);
@@ -117,7 +98,7 @@ public class LinkedPointSet {
             edges = new int[nPoints];
             distances0_mm = new int[nPoints];
             distances1_mm = new int[nPoints];
-            stopTrees = new ArrayList<>();
+            stopToPointDistanceTables = new ArrayList<>();
         } else {
             // The caller has supplied an existing linkage for a scenario StreetLayer's base StreetLayer.
             // We want to re-use most of that that existing linkage to reduce linking time.
@@ -127,12 +108,12 @@ public class LinkedPointSet {
             assert baseLinkage.streetMode == streetMode;
             // Copy the supplied base linkage into this new LinkedPointSet.
             // The new linkage has the same PointSet as the base linkage, so the linkage arrays remain the same length
-            // as in the base linkage. However, if the TransitLayer was also modified by the scneario, the stopTrees
+            // as in the base linkage. However, if the TransitLayer was also modified by the scneario, the stopToVertexDistanceTables
             // list might need to grow.
             edges = Arrays.copyOf(baseLinkage.edges, nPoints);
             distances0_mm = Arrays.copyOf(baseLinkage.distances0_mm, nPoints);
             distances1_mm = Arrays.copyOf(baseLinkage.distances1_mm, nPoints);
-            stopTrees = new ArrayList<>(baseLinkage.stopTrees);
+            stopToPointDistanceTables = new ArrayList<>(baseLinkage.stopToPointDistanceTables);
             // TODO We need to determine which points to re-link and which stops should have their stop-to-point tables re-built.
             // This should be all the points within the (bird-fly) linking radius of any modified edge.
             // The stop-to-vertex trees should already be rebuilt elsewhere when applying the scenario.
@@ -144,18 +125,18 @@ public class LinkedPointSet {
             // and the trees to the points, because some existing stop-to-vertex trees might not include new splitter
             // vertices).
             relinkZone = streetLayer.scenarioEdgesBoundingGeometry(MAX_OFFSTREET_WALK_METERS);
-            treeRebuildZone = streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.STOP_TREE_DISTANCE_METERS);
+            treeRebuildZone = streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.DISTANCE_TABLE_SIZE_METERS);
         }
 
         // If dealing with a scenario, pad out the stop trees list from the base linkage to match the new stop count.
         // If dealing with a base network linkage, fill the stop trees list entirely with nulls.
-        while (stopTrees.size() < nStops) stopTrees.add(null);
+        while (stopToPointDistanceTables.size() < nStops) stopToPointDistanceTables.add(null);
 
         /* First, link the points in this PointSet to specific street vertices. */
         this.linkPointsToStreets(relinkZone);
 
         /* Second, make a table of distances from each transit stop to the points in this PointSet. */
-        this.makeStopTrees(treeRebuildZone);
+        this.makeStopToPointDistanceTables(treeRebuildZone);
 
     }
 
@@ -241,42 +222,39 @@ public class LinkedPointSet {
     /**
      * Given a table of distances to street vertices from a particular transit stop, create a table of distances to
      * points in this PointSet from the same transit stop.
+     * All points outside the distanceTableZone are skipped as an optimization.
      * @return A packed array of (pointIndex, distanceMillimeters)
      */
-    private int[] getStopTree (TIntIntMap stopTreeToVertices) {
-        TIntIntMap distanceToPoint = new TIntIntHashMap(edges.length, 0.5f, Integer.MAX_VALUE, Integer.MAX_VALUE);
+    private int[] extendDistanceTableToPoints(TIntIntMap distanceTableToVertices, Envelope distanceTableZone) {
+        int nPoints = this.size();
+        TIntIntMap distanceToPoint = new TIntIntHashMap(nPoints, 0.5f, Integer.MAX_VALUE, Integer.MAX_VALUE);
         Edge edge = streetLayer.edgeStore.getCursor();
-        // Iterate over all points. This is simpler than iterating over all the reached vertices.
-        // Iterating over the reached vertices requires additional indexes and I'm not sure it would be any faster.
-        // TODO iterating over all points seems excessive, only a few points will be close to the transit stop.
-        for (int p = 0; p < edges.length; p++) {
-
-            // An edge index of -1 indicates that this unlinked
-            if (edges[p] == -1) continue;
-
+        TIntSet relevantPoints = pointSet.spatialIndex.query(distanceTableZone);
+        relevantPoints.forEach(p -> {
+            // An edge index of -1 for a particular point indicates that this point is unlinked
+            if (edges[p] == -1) return true;
             edge.seek(edges[p]);
-
             int t1 = Integer.MAX_VALUE, t2 = Integer.MAX_VALUE;
-
             // TODO this is not strictly correct when there are turn restrictions onto the edge this is linked to
-            if (stopTreeToVertices.containsKey(edge.getFromVertex()))
-                t1 = stopTreeToVertices.get(edge.getFromVertex()) + distances0_mm[p];
-
-            if (stopTreeToVertices.containsKey(edge.getToVertex()))
-                t1 = stopTreeToVertices.get(edge.getToVertex()) + distances1_mm[p];
-
+            if (distanceTableToVertices.containsKey(edge.getFromVertex())) {
+                t1 = distanceTableToVertices.get(edge.getFromVertex()) + distances0_mm[p];
+            }
+            if (distanceTableToVertices.containsKey(edge.getToVertex())) {
+                t2 = distanceTableToVertices.get(edge.getToVertex()) + distances1_mm[p];
+            }
             int t = Math.min(t1, t2);
-
             if (t != Integer.MAX_VALUE) {
                 if (t < distanceToPoint.get(p)) {
                     distanceToPoint.put(p, t);
                 }
             }
-        }
+            return true; // Continue iteration.
+        });
         if (distanceToPoint.size() == 0) {
             return null;
         }
         // Convert a packed array of pairs.
+        // TODO don't put in a list and convert to array, just make an array.
         TIntList packed = new TIntArrayList(distanceToPoint.size() * 2);
         distanceToPoint.forEachEntry((point, distance) -> {
             packed.add(point);
@@ -288,23 +266,23 @@ public class LinkedPointSet {
 
     /**
      * For each transit stop in the associated TransportNetwork, make a table of distances to nearby points in this
-     * PointSet. These "trees" are stored in the LinkedPointSet because it provides enough context:
-     * points, streets, and transit together.
+     * PointSet.
      *
-     * At one point we experimented with doing the entire search within this method, from all transit stops all the way
-     * up to the points. However that takes too long when switching PointSets. So we pre-cache distances to all street
-     * vertices in the TransitNetwork, and then just extend that to the points in the PointSet.
+     * At one point we experimented with doing the entire search from the transit stops all the way up to the points
+     * within this method. However, that takes too long when switching PointSets. So we pre-cache distances to all street
+     * vertices in the TransitNetwork, and then just extend those tables to the points in the PointSet.
      *
-     * The street layer linked to this PointSet must already be associated with a transit layer.
-     * Serializing the trees makes the serialized graph about 3x bigger but should be faster.
-     * The packed format does not make the serialized size any smaller (the Trove serializers are already smart).
-     * However the packed representation uses less live memory: 665 vs 409 MB (including all other data) on Portland.
+     * This is one of the slowest steps in working with a new scenario. It takes about 50 seconds to link 400000 points.
+     * The run time is not shocking when you consider the complexity of the operation: there are nStops * nPoints
+     * iterations, which is 8000 * 400000 in the example case. This means 6 msec per transit stop, or 2e-8 sec per
+     * point iteration, which is not horribly slow. There are just too many iterations.
      *
      * @param treeRebuildZone only build trees for stops inside this geometry in FIXED POINT DEGREES,
      *                        leaving all the others alone. If null, build trees for all stops.
      */
-    public void makeStopTrees (Geometry treeRebuildZone) {
+    public void makeStopToPointDistanceTables(Geometry treeRebuildZone) {
         LOG.info("Creating distance tables from each transit stop to PointSet points.");
+        pointSet.createSpatialIndexAsNeeded();
         if (treeRebuildZone != null) {
             LOG.info("Selectively computing tables for only those stops that might be affected by the scenario.");
         }
@@ -314,22 +292,27 @@ public class LinkedPointSet {
                 "Computed distances to PointSet points from {} of {} transit stops.");
         // Create a distance table from each transit stop to the points in this PointSet in parallel.
         // When applying a scenario, keep the existing distance table for those stops that could not be affected.
-        stopTrees = IntStream.range(0, nStops).parallel().mapToObj(stopIndex -> {
+        stopToPointDistanceTables = IntStream.range(0, nStops).parallel().mapToObj(stopIndex -> {
+            Point stopPoint = transitLayer.getJTSPointForStopFixed(stopIndex);
             if (treeRebuildZone != null) {
-                Point stopPoint = transitLayer.getJTSPointForStopFixed(stopIndex);
                 if (stopPoint == null || !treeRebuildZone.contains(stopPoint)) {
-                    // This stop is not affected by the scenario. Return any existing stop tree.
+                    // This stop is not affected by the scenario. Return the existing distance table, if there is one.
                     // This should only return null for new stops created by the scenario that are unlinked,
                     // because all these new stops should be inside the relink zone.
-                    return stopIndex < stopTrees.size() ? stopTrees.get(stopIndex) : null;
+                    return stopIndex < stopToPointDistanceTables.size() ? stopToPointDistanceTables.get(stopIndex) : null;
                 }
             }
-            // Get the pre-computed tree from the stop to the street vertices, which we will extend out to the points.
-            TIntIntMap stopTreeToVertices = transitLayer.stopTrees.get(stopIndex);
-            // Extend the pre-computed tree (if it exists) out to the points in this PointSet.
+            // Get the pre-computed distance table from the stop to the street vertices,
+            // then extend that table out from the street vertices to the points in this PointSet.
+            TIntIntMap distanceTableToVertices = transitLayer.stopToVertexDistanceTables.get(stopIndex);
+            Envelope distanceTableZone = stopPoint.getEnvelopeInternal();
+            GeometryUtils.expandEnvelopeFixed(distanceTableZone, TransitLayer.DISTANCE_TABLE_SIZE_METERS);
+            int[] distancesToPoints = distanceTableToVertices == null ? null :
+                    extendDistanceTableToPoints(distanceTableToVertices, distanceTableZone);
             counter.increment();
-            return stopTreeToVertices != null ? getStopTree(stopTreeToVertices) : null;
+            return distancesToPoints;
         }).collect(Collectors.toList());
         counter.done();
     }
+
 }

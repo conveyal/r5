@@ -224,7 +224,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         // TODO add time and distance limits to routing, not just weight.
         // TODO apply walk and bike speeds and maxBike time.
-        streetRouter.distanceLimitMeters = TransitLayer.STOP_TREE_DISTANCE_METERS; // FIXME arbitrary, and account for bike or car access mode
+        streetRouter.distanceLimitMeters = TransitLayer.DISTANCE_TABLE_SIZE_METERS; // FIXME arbitrary, and account for bike or car access mode
         streetRouter.setOrigin(request.fromLat, request.fromLon);
         streetRouter.route();
         accessTimes = streetRouter.getReachedStops();
@@ -489,9 +489,9 @@ public class McRaptorSuboptimalPathProfileRouter {
         Arrays.fill(timesAtTargetsThisIteration, RaptorWorker.UNREACHED);
 
         for (int stop = 0; stop < network.transitLayer.getStopCount(); stop++) {
-            int[] stopTree = pointSet.stopTrees.get(stop);
+            int[] distanceTable = pointSet.stopToPointDistanceTables.get(stop);
 
-            if (stopTree == null) continue;
+            if (distanceTable == null) continue;
 
             // find the best state at the stop
             McRaptorStateBag bag = bestStates.get(stop);
@@ -516,9 +516,9 @@ public class McRaptorSuboptimalPathProfileRouter {
             if (best == null) continue; // stop is unreachable
 
             // jagged array
-            for (int i = 0; i < stopTree.length; i += 2) {
-                int target = stopTree[i];
-                int distance = stopTree[i + 1];
+            for (int i = 0; i < distanceTable.length; i += 2) {
+                int target = distanceTable[i];
+                int distance = distanceTable[i + 1];
 
                 int timeAtTarget = (int) (best.time + distance / request.walkSpeed / 1000);
 

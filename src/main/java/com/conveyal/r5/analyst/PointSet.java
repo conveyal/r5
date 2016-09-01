@@ -2,13 +2,14 @@ package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.streets.IntHashGrid;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
-import com.conveyal.r5.streets.VertexStore;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Point;
 import org.mapdb.Fun.Tuple2;
 
@@ -47,6 +48,13 @@ public abstract class PointSet {
                 }
             });
 
+
+    /**
+     * Makes it fast to get a set of all points within a given rectangle.
+     * This is useful when finding distances from transit stops to points.
+     */
+    public IntHashGrid spatialIndex;
+
     /**
      * Associate each feature in this PointSet with a nearby street edge in the StreetLayer of the supplied
      * TransportNetwork. This is a rather slow operation involving a lot of geometry calculations, so we cache these
@@ -74,6 +82,15 @@ public abstract class PointSet {
     /** Returns a new coordinate object for the feature at the given index in this set, or its centroid, in FIXED POINT DEGREES. */
     public Point getJTSPointFixed(int index) {
         return GeometryUtils.geometryFactory.createPoint(getCoordinateFixed(index));
+    }
+
+    public void createSpatialIndexAsNeeded() {
+        if (spatialIndex != null) return;
+        spatialIndex = new IntHashGrid();
+        for (int p = 0; p < this.featureCount(); p++) {
+            Envelope pointEnvelope = new Envelope(getCoordinateFixed(p));
+            spatialIndex.insert(pointEnvelope, p);
+        }
     }
 
 }

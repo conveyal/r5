@@ -1,12 +1,15 @@
 package com.conveyal.r5.common;
 
 import com.conveyal.r5.analyst.UnsupportedGeometryException;
+import com.conveyal.r5.streets.VertexStore;
 import com.vividsolutions.jts.geom.*;
 import org.apache.commons.math3.util.FastMath;
 import org.geojson.GeoJsonObject;
 import org.geojson.LngLatAlt;
 
 import java.util.List;
+
+import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
 /**
  * Reimplementation of OTP GeometryUtils, using copied code where there are not licensing concerns.
@@ -116,6 +119,22 @@ public class GeometryUtils {
         fixedLon  = (int) (fixedLon / cosLat);
         LineSegment seg = new LineSegment(fixedLon0, fixedLat0, fixedLon1, fixedLat1);
         return seg.segmentFraction(new Coordinate(fixedLon, fixedLat));
+    }
+
+    /**
+     * Given an envelope in fixed-point degrees, enlarge it by at least the given number of meters in all directions.
+     */
+    public static void expandEnvelopeFixed(Envelope envelope, double radiusMeters) {
+        // Intentionally overestimate by scaling for the latitude closest to the equator.
+        // convert latitude to floating for use with SphericalDistanceLibrary below
+        double floatingLat0 =
+                fixedDegreesToFloating(Math.min(Math.abs(envelope.getMaxY()), Math.abs(envelope.getMinY())));
+        double yExpansion =
+                VertexStore.floatingDegreesToFixed(SphericalDistanceLibrary.metersToDegreesLatitude(radiusMeters));
+        double xExpansion =
+                VertexStore.floatingDegreesToFixed(SphericalDistanceLibrary.metersToDegreesLongitude(radiusMeters, floatingLat0));
+        if (xExpansion < 0 || yExpansion < 0) throw new AssertionError("Buffer distance in geographic units is negative!");
+        envelope.expandBy(xExpansion, yExpansion);
     }
 
 }

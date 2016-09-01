@@ -33,7 +33,7 @@ public class StaticMain {
 
         LOG.info("Finding transport network.");
         TransportNetworkCache cache = new TransportNetworkCache(args[1]);
-        TransportNetwork net = cache.getNetwork(ssr.transportNetworkId);
+        TransportNetwork net = cache.getNetworkForScenario(ssr.transportNetworkId, ssr.request);
 
         LOG.info("Computing metadata");
         StaticMetadata metadata = new StaticMetadata(ssr, net);

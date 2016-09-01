@@ -243,7 +243,7 @@ public class LinkedPointSet {
                 t1 = distanceTableToVertices.get(edge.getFromVertex()) + distances0_mm[p];
 
             if (distanceTableToVertices.containsKey(edge.getToVertex()))
-                t1 = distanceTableToVertices.get(edge.getToVertex()) + distances1_mm[p];
+                t2 = distanceTableToVertices.get(edge.getToVertex()) + distances1_mm[p];
 
             int t = Math.min(t1, t2);
 

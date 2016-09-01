@@ -392,22 +392,6 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * Currently this is intended for use by Modifications but not when building the network initially.
-     * If this is being used in a non-destructive Modification, the caller must already have made protective copies of
-     * all fields that will be modified.
-     * Really we should use the same function for modifications and when initially creating the TransportNetwork. This
-     * function would need to create the stop, link it to the street network, and make a distance table for that stop.
-     */
-    public int addStop (String id, double lat, double lon) {
-        int newStopIndex = transitLayer.getStopCount();
-        int newStreetVertexIndex = streetLayer.getOrCreateVertexNear(lat, lon, StreetMode.WALK);
-        transitLayer.stopIdForIndex.add(id); // TODO check for uniqueness
-        transitLayer.streetVertexForStop.add(newStreetVertexIndex);
-        // TODO stop tree, any other stop-indexed arrays or lists
-        return newStopIndex;
-    }
-
-    /**
      * We want to apply Scenarios to TransportNetworks, yielding a new TransportNetwork without disrupting the original
      * one. The approach is to make a copy of the TransportNetwork, then apply all the Modifications in the Scenario
      * one by one to that same copy. Two very different modification strategies are used for the TransitLayer and the

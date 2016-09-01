@@ -1,6 +1,5 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.geojson.GeoJsonModule;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
@@ -10,7 +9,6 @@ import com.conveyal.osmlib.Way;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.common.GeometryUtils;
-import com.conveyal.r5.common.SphericalDistanceLibrary;
 import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
 import com.conveyal.r5.labeling.RoadPermission;
 import com.conveyal.r5.labeling.SpeedConfigurator;
@@ -29,7 +27,6 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TLongIntMap;
-import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.set.TIntSet;
@@ -1381,8 +1378,8 @@ public class StreetLayer implements Serializable, Cloneable {
         edgeStore.forEachTemporarilyAddedOrDeletedEdge(e -> {
             edge.seek(e);
             Envelope envelope = edge.getEnvelope();
-            Polygon expandedEnvelope = GeometryUtils.expandEnvelopeToPolygon(envelope, radiusMeters);
-            geoms.add(expandedEnvelope);
+            GeometryUtils.expandEnvelopeFixed(envelope, radiusMeters);
+            geoms.add((Polygon)GeometryUtils.geometryFactory.toGeometry(envelope));
         });
         // We can't just make a multipolygon as the component polygons may not be disjoint. Unions are pretty quick though.
         // The UnaryUnionOp gets its geometryFactory from the geometries it's operating on.

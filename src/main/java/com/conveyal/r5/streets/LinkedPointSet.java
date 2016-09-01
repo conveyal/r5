@@ -223,12 +223,13 @@ public class LinkedPointSet {
      * @return A packed array of (pointIndex, distanceMillimeters)
      */
     private int[] extendDistanceTableToPoints(TIntIntMap distanceTableToVertices) {
-        TIntIntMap distanceToPoint = new TIntIntHashMap(edges.length, 0.5f, Integer.MAX_VALUE, Integer.MAX_VALUE);
+        int nPoints = this.size();
+        TIntIntMap distanceToPoint = new TIntIntHashMap(nPoints, 0.5f, Integer.MAX_VALUE, Integer.MAX_VALUE);
         Edge edge = streetLayer.edgeStore.getCursor();
         // Iterate over all points. This is simpler than iterating over all the reached vertices.
         // Iterating over the reached vertices requires additional indexes and I'm not sure it would be any faster.
         // TODO iterating over all points seems excessive, only a few points will be close to the transit stop.
-        for (int p = 0; p < edges.length; p++) {
+        for (int p = 0; p < nPoints; p++) {
 
             // An edge index of -1 for a particular point indicates that this point is unlinked
             if (edges[p] == -1) continue;

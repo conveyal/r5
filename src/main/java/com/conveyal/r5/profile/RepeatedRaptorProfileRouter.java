@@ -121,7 +121,7 @@ public class RepeatedRaptorProfileRouter {
             streetRouter.streetMode = StreetMode.WALK;
             // When walking, to make the search symmetric at origins/destinations, we clamp max walk at the maximum stop tree size
             streetRouter.distanceLimitMeters =
-                    Math.min((int) (request.maxWalkTime * request.walkSpeed * 60), TransitLayer.STOP_TREE_DISTANCE_METERS);
+                    Math.min((int) (request.maxWalkTime * request.walkSpeed * 60), TransitLayer.DISTANCE_TABLE_SIZE_METERS);
         }
 
         streetRouter.profileRequest = request;

@@ -136,9 +136,9 @@ public abstract class Modification implements Serializable {
         // and build the stop trees immediately in stopSpec::resolve.
         // We used to do this after every modification, but now we do it once at the end of the scenario application process
         /*network.streetLayer.buildEdgeLists();
-        int firstNewStop = network.transitLayer.stopTrees.size();
+        int firstNewStop = network.transitLayer.stopToVertexDistanceTables.size();
         for (int intStopIndex = firstNewStop; intStopIndex < network.transitLayer.getStopCount(); intStopIndex++) {
-            network.transitLayer.stopTrees.add(network.transitLayer.buildOneStopTree(intStopIndex));
+            network.transitLayer.stopToVertexDistanceTables.add(network.transitLayer.buildOneDistanceTable(intStopIndex));
         }
         new TransferFinder(network).findTransfers();*/
         return intStopIds;

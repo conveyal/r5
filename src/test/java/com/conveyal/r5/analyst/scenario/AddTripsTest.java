@@ -13,7 +13,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -302,12 +301,12 @@ public class AddTripsTest {
 
         assertTrue(r.getReachedVertices().size() > 5);
 
-        // make sure it has a stop tree
-        TIntIntMap stopTree = mod.transitLayer.stopTrees.get(pattern.stops[1]);
-        assertNotNull(stopTree);
-        assertFalse(stopTree.isEmpty());
+        // Make sure a distance table exists for this stop.
+        TIntIntMap distanceTable = mod.transitLayer.stopToVertexDistanceTables.get(pattern.stops[1]);
+        assertNotNull(distanceTable);
+        assertFalse(distanceTable.isEmpty());
 
-        // make sure it has transfers
+        // Make sure this stop has transfers.
         TIntList transfers = mod.transitLayer.transfersForStop.get(pattern.stops[1]);
         assertNotNull(transfers);
         // make sure that s2 is a target of a transfer

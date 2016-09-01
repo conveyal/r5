@@ -1,10 +1,7 @@
 package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.gtfs.model.Route;
-import com.conveyal.gtfs.model.Service;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.transit.TripPattern;
-import com.conveyal.r5.transit.TripSchedule;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
@@ -12,10 +9,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
 import static org.junit.Assert.*;
@@ -104,26 +97,26 @@ public class RelinkingTest {
         }
         assertTrue(foundStops.contains(6));
 
-        // Check that stops s3 and s4 are included in the stop tree
+        // Check that stops s3 and s4 are included in the distance table
         // for stop 6 (the middle stop of the three new ones at indexes 5, 6, 7)
-        TIntIntMap tree = mod.transitLayer.stopTrees.get(6);
-        assertNotNull(tree);
+        TIntIntMap distanceTable = mod.transitLayer.stopToVertexDistanceTables.get(6);
+        assertNotNull(distanceTable);
         int s4streetVertexIndex = mod.transitLayer.streetVertexForStop.get(s4StopIndex);
-        assertTrue(tree.containsKey(s4streetVertexIndex));
+        assertTrue(distanceTable.containsKey(s4streetVertexIndex));
         int s3StopIndex = mod.transitLayer.indexForStopId.get("SINGLE_LINE:s3");
         int s3streetVertexIndex = mod.transitLayer.streetVertexForStop.get(s3StopIndex);
-        assertTrue(tree.containsKey(s3streetVertexIndex));
+        assertTrue(distanceTable.containsKey(s3streetVertexIndex));
 
         // Check that stop 6 (the middle stop of the three new ones at indexes 5, 6, 7)
-        // is included in the stop tree for stops s3 and s4
+        // is included in the distance table for stops s3 and s4
         int newStopStreetVertex = mod.transitLayer.streetVertexForStop.get(6);
         assertTrue(newStopStreetVertex > 2000);
-        tree = mod.transitLayer.stopTrees.get(s3StopIndex);
-        assertNotNull(tree);
-        assertTrue(tree.containsKey(newStopStreetVertex));
-        tree = mod.transitLayer.stopTrees.get(s4StopIndex);
-        assertNotNull(tree);
-        assertTrue(tree.containsKey(newStopStreetVertex));
+        distanceTable = mod.transitLayer.stopToVertexDistanceTables.get(s3StopIndex);
+        assertNotNull(distanceTable);
+        assertTrue(distanceTable.containsKey(newStopStreetVertex));
+        distanceTable = mod.transitLayer.stopToVertexDistanceTables.get(s4StopIndex);
+        assertNotNull(distanceTable);
+        assertTrue(distanceTable.containsKey(newStopStreetVertex));
 
         // TODO check that PointSets are properly relinked to the new street layer.
 

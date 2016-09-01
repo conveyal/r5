@@ -40,8 +40,11 @@ import java.util.stream.IntStream;
  */
 public class TransitLayer implements Serializable, Cloneable {
 
-    /** Distance limit for stop trees, meters. Set to 3.5 km to match OTP GraphIndex.MAX_WALK_METERS */
-    public static final int STOP_TREE_DISTANCE_METERS = 3500;
+    /**
+     * Maximum distance to record in distance tables, in meters.
+     * Set to 3.5 km to match OTP GraphIndex.MAX_WALK_METERS but TODO should probably be reduced after Kansas City project.
+     */
+    public static final int DISTANCE_TABLE_SIZE_METERS = 3500;
 
     /**
      * Distance limit for transfers, meters. Set to 1km which is slightly above OTP's 600m (which was specified as
@@ -51,7 +54,10 @@ public class TransitLayer implements Serializable, Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransitLayer.class);
 
-    //TransportNetwork timezone. It is read from GTFS agency. If it is invalid it is GMT
+    /**
+     * The time zone in which this TransportNetwork falls. It is read from a GTFS agency.
+     * It defaults to GMT if no valid time zone can be found.
+     */
     protected ZoneId timeZone;
 
     // Do we really need to store this? It does serve as a key into the GTFS MapDB.
@@ -106,14 +112,14 @@ public class TransitLayer implements Serializable, Cloneable {
     public boolean hasSchedules = false;
 
     /**
-     * For each transit stop, an int->int map giving the distance of every reachable street intersection from the
-     * origin stop. This is the result of running a distance-constrained street search from every stop in the graph.
+     * For each transit stop, an int->int map giving the distance of every reachable street vertex from that stop.
+     * This is the result of running a distance-constrained street search outward from every stop in the graph.
      *
-     * Avoiding the lengthy rebuild of stopTrees is as simple as making this non-transient and removing the call to
-     * buildStopTrees in TransportNetwork. That does make serialized networks much bigger (not a big deal when saving
-     * to S3) and makes our checks to ensure that scenario application does not damage base graphs very slow.
+     * Avoiding the lengthy rebuild of stopToVertexDistanceTables is as simple as making this non-transient and removing
+     * the call to buildDistanceTables in TransportNetwork. That does make serialized networks much bigger (not a big deal
+     * when saving to S3) and makes our checks to ensure that scenario application does not damage base graphs very slow.
      */
-    public transient List<TIntIntMap> stopTrees;
+    public transient List<TIntIntMap> stopToVertexDistanceTables;
 
     /**
      * The TransportNetwork containing this TransitLayer. This link up the object tree also allows us to access the
@@ -418,34 +424,34 @@ public class TransitLayer implements Serializable, Cloneable {
     /**
      * Run a distance-constrained street search from every transit stop in the graph.
      * Store the distance to every reachable street vertex for each of these origin stops.
-     * If a scenario has been applied, we need to build trees for any newly created stops and any stops within
-     * transfer or access/egress distance of those new stops. In that case a treeRebuildZone geometry should be
-     * supplied. If treeRebuildZone is null, a complete rebuild of trees will occur for all stops.
-     * @param treeRebuildZone the zone within which to rebuild trees in FIXED-POINT DEGREES, or null to build all trees.
+     * If a scenario has been applied, we need to build tables for any newly created stops and any stops within
+     * transfer distance or access/egress distance of those new stops. In that case a rebuildZone geometry should be
+     * supplied. If rebuildZone is null, a complete rebuild of all tables will occur for all stops.
+     * @param rebuildZone the zone within which to rebuild tables in FIXED-POINT DEGREES, or null to build all tables.
      */
-    public void buildStopTrees (Geometry treeRebuildZone) {
+    public void buildDistanceTables(Geometry rebuildZone) {
 
         LOG.info("Finding distances from transit stops to street vertices.");
-        if (treeRebuildZone != null) {
+        if (rebuildZone != null) {
             LOG.info("Selectively finding distances for only those stops potentially affected by scenario application.");
         }
 
         LambdaCounter buildCounter = new LambdaCounter(LOG, getStopCount(), 1000,
                 "Computed distances to street vertices from {} of {} transit stops.");
 
-        // Working in parallel, create a new list of stop trees for every stop index, optionally skipping stops falling
-        // outside a specified geometry.
-        stopTrees = IntStream.range(0, getStopCount()).parallel().mapToObj(stopIndex -> {
-            if (treeRebuildZone != null) {
+        // Working in parallel, create a new list containing one distance table for each stop index, optionally
+        // skipping stops falling outside the specified geometry.
+        stopToVertexDistanceTables = IntStream.range(0, getStopCount()).parallel().mapToObj(stopIndex -> {
+            if (rebuildZone != null) {
                 // Skip existing or new stops outside the zone that may be affected by the scenario.
                 Point p = getJTSPointForStopFixed(stopIndex);
-                if (p == null || !treeRebuildZone.contains(p)) {
+                if (p == null || !rebuildZone.contains(p)) {
                     // This stop can't be affected, return any existing one.
-                    return stopIndex < stopTrees.size() ? stopTrees.get(stopIndex) : null;
+                    return stopIndex < stopToVertexDistanceTables.size() ? stopToVertexDistanceTables.get(stopIndex) : null;
                 }
             }
             buildCounter.increment();
-            return this.buildOneStopTree(stopIndex);
+            return this.buildOneDistanceTable(stopIndex);
         }).collect(Collectors.toList());
         buildCounter.done();
     }
@@ -453,26 +459,26 @@ public class TransitLayer implements Serializable, Cloneable {
     /**
      * Perform a single on-street search from the specified transit stop.
      * Return the distance in millimeters to every reached street vertex.
-     * @param stop the internal integer stop ID for which to build a stop tree.
+     * @param stop the internal integer stop ID for which to build a distance table.
      * @return a map from street vertex numbers to distances in millimeters
      */
-    public TIntIntMap buildOneStopTree(int stop) {
+    public TIntIntMap buildOneDistanceTable(int stop) {
         int originVertex = streetVertexForStop.get(stop);
         if (originVertex == -1) {
             // -1 indicates that this stop is not linked to the street network.
-            LOG.warn("Stop {} has not been linked to the street network, cannot build stop tree.", stop);
+            LOG.warn("Stop {} has not been linked to the street network, cannot build a distance table for it.", stop);
             return null;
         }
         StreetRouter router = new StreetRouter(parentNetwork.streetLayer);
-        router.distanceLimitMeters = STOP_TREE_DISTANCE_METERS;
+        router.distanceLimitMeters = DISTANCE_TABLE_SIZE_METERS;
 
         // Dominate based on distance in millimeters, since (a) we're using a hard distance limit, and (b) we divide
-        // by a speed to get time when we use the stop trees.
+        // by a speed to get time when we use these tables.
         router.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
         router.setOrigin(originVertex);
         router.route();
 
-        // This will return distance in millimeters since that is our dominance function
+        // The values in this map will be distances in millimeters since that is our dominance function.
         return router.getReachedVertices();
     }
 
@@ -617,7 +623,7 @@ public class TransitLayer implements Serializable, Cloneable {
         copy.stopIdForIndex = new ArrayList<>(this.stopIdForIndex);
         copy.stopNames = new ArrayList<>(this.stopNames);
         copy.streetVertexForStop = new TIntArrayList(this.streetVertexForStop);
-        copy.stopTrees = new ArrayList<>(this.stopTrees);
+        copy.stopToVertexDistanceTables = new ArrayList<>(this.stopToVertexDistanceTables);
         copy.transfersForStop = new ArrayList<>(this.transfersForStop);
         copy.routes = new ArrayList<>(this.routes);
         return copy;

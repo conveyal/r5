@@ -227,13 +227,13 @@ public class RerouteTest {
         assertEquals(-83.007, v.getLon(), 1e-6);
         assertEquals(39.967, v.getLat(), 1e-6);
 
-        // does it have a stop tree?
-        TIntIntMap stopTree = mod.transitLayer.stopTrees.get(sidx);
-        assertNotNull(stopTree);
+        // Was a distance table built?
+        TIntIntMap distanceTable = mod.transitLayer.stopToVertexDistanceTables.get(sidx);
+        assertNotNull(distanceTable);
         // jagged array, should reach more than 10 vertices
-        assertTrue(stopTree.size() > 20);
+        assertTrue(distanceTable.size() > 20);
 
-        // does it have transfers?
+        // Does it have transfers?
         TIntList transfers = mod.transitLayer.transfersForStop.get(sidx);
         assertNotNull(transfers);
         // transfers is a jagged array, should have at least one stop

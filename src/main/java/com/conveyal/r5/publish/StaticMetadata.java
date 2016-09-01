@@ -110,8 +110,8 @@ public class StaticMetadata implements Runnable {
                     stopTrees[tree[i]] = new TIntArrayList();
                 }
 
-                // tree[i + 1] is distance
-                stopTrees[tree[i]].add(new int[] { stop, (int) (tree[i + 1] / 1300 / 60)});
+                // tree[i + 1] is distance, convert millimeters into minutes
+                stopTrees[tree[i]].add(new int[] { stop, (tree[i + 1] / 1300 / 60)});
             }
         }
 
@@ -133,7 +133,7 @@ public class StaticMetadata implements Runnable {
                     dos.writeInt(stopId - prevStopId);
                     prevStopId = stopId;
 
-                    int time = tree.get(i + 1) / 60;
+                    int time = tree.get(i + 1);
                     dos.writeInt(time - prevTime);
                     prevTime = time;
                 }

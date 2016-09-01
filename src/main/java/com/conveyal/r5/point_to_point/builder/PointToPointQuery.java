@@ -6,6 +6,7 @@ import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.ProfileOption;
 import com.conveyal.r5.api.util.StreetSegment;
 import com.conveyal.r5.profile.*;
+import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
@@ -428,6 +429,14 @@ public class PointToPointQuery {
             streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
         }
         if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
+            //if we can't find destination we can stop search before even trying
+            if (direct && !streetRouter.setDestination(request.toLat, request.toLon)) {
+                return null;
+            }
+            Split destinationSplit = streetRouter.getDestinationSplit();
+
+            //reset destinationSplit since we need it at the last part of routing
+            streetRouter.setDestination(null);
             streetRouter.route();
             //This finds all the nearest bicycle rent stations when walking
             TIntObjectMap<StreetRouter.State> bikeStations = streetRouter.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);

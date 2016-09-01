@@ -1,6 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.util.LambdaCounter;
@@ -10,6 +11,7 @@ import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import com.conveyal.r5.streets.EdgeStore.Edge;
+import gnu.trove.set.TIntSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -220,39 +222,34 @@ public class LinkedPointSet {
     /**
      * Given a table of distances to street vertices from a particular transit stop, create a table of distances to
      * points in this PointSet from the same transit stop.
+     * All points outside the distanceTableZone are skipped as an optimization.
      * @return A packed array of (pointIndex, distanceMillimeters)
      */
-    private int[] extendDistanceTableToPoints(TIntIntMap distanceTableToVertices) {
+    private int[] extendDistanceTableToPoints(TIntIntMap distanceTableToVertices, Envelope distanceTableZone) {
         int nPoints = this.size();
         TIntIntMap distanceToPoint = new TIntIntHashMap(nPoints, 0.5f, Integer.MAX_VALUE, Integer.MAX_VALUE);
         Edge edge = streetLayer.edgeStore.getCursor();
-        // Iterate over all points. This is simpler than iterating over all the reached vertices.
-        // Iterating over the reached vertices requires additional indexes and I'm not sure it would be any faster.
-        // TODO iterating over all points seems excessive, only a few points will be close to the transit stop.
-        for (int p = 0; p < nPoints; p++) {
-
+        TIntSet relevantPoints = pointSet.spatialIndex.query(distanceTableZone);
+        relevantPoints.forEach(p -> {
             // An edge index of -1 for a particular point indicates that this point is unlinked
-            if (edges[p] == -1) continue;
-
+            if (edges[p] == -1) return true;
             edge.seek(edges[p]);
-
             int t1 = Integer.MAX_VALUE, t2 = Integer.MAX_VALUE;
-
             // TODO this is not strictly correct when there are turn restrictions onto the edge this is linked to
-            if (distanceTableToVertices.containsKey(edge.getFromVertex()))
+            if (distanceTableToVertices.containsKey(edge.getFromVertex())) {
                 t1 = distanceTableToVertices.get(edge.getFromVertex()) + distances0_mm[p];
-
-            if (distanceTableToVertices.containsKey(edge.getToVertex()))
+            }
+            if (distanceTableToVertices.containsKey(edge.getToVertex())) {
                 t2 = distanceTableToVertices.get(edge.getToVertex()) + distances1_mm[p];
-
+            }
             int t = Math.min(t1, t2);
-
             if (t != Integer.MAX_VALUE) {
                 if (t < distanceToPoint.get(p)) {
                     distanceToPoint.put(p, t);
                 }
             }
-        }
+            return true; // Continue iteration.
+        });
         if (distanceToPoint.size() == 0) {
             return null;
         }
@@ -285,6 +282,7 @@ public class LinkedPointSet {
      */
     public void makeStopToPointDistanceTables(Geometry treeRebuildZone) {
         LOG.info("Creating distance tables from each transit stop to PointSet points.");
+        pointSet.createSpatialIndexAsNeeded();
         if (treeRebuildZone != null) {
             LOG.info("Selectively computing tables for only those stops that might be affected by the scenario.");
         }
@@ -295,8 +293,8 @@ public class LinkedPointSet {
         // Create a distance table from each transit stop to the points in this PointSet in parallel.
         // When applying a scenario, keep the existing distance table for those stops that could not be affected.
         stopToPointDistanceTables = IntStream.range(0, nStops).parallel().mapToObj(stopIndex -> {
+            Point stopPoint = transitLayer.getJTSPointForStopFixed(stopIndex);
             if (treeRebuildZone != null) {
-                Point stopPoint = transitLayer.getJTSPointForStopFixed(stopIndex);
                 if (stopPoint == null || !treeRebuildZone.contains(stopPoint)) {
                     // This stop is not affected by the scenario. Return the existing distance table, if there is one.
                     // This should only return null for new stops created by the scenario that are unlinked,
@@ -305,11 +303,16 @@ public class LinkedPointSet {
                 }
             }
             // Get the pre-computed distance table from the stop to the street vertices,
-            // which we will extend out from the vertices to the points.
+            // then extend that table out from the street vertices to the points in this PointSet.
             TIntIntMap distanceTableToVertices = transitLayer.stopToVertexDistanceTables.get(stopIndex);
+            Envelope distanceTableZone = stopPoint.getEnvelopeInternal();
+            GeometryUtils.expandEnvelopeFixed(distanceTableZone, TransitLayer.DISTANCE_TABLE_SIZE_METERS);
+            int[] distancesToPoints = distanceTableToVertices == null ? null :
+                    extendDistanceTableToPoints(distanceTableToVertices, distanceTableZone);
             counter.increment();
-            return distanceTableToVertices == null ? null : extendDistanceTableToPoints(distanceTableToVertices);
+            return distancesToPoints;
         }).collect(Collectors.toList());
         counter.done();
     }
+
 }

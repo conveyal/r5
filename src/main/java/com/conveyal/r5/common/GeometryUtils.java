@@ -122,11 +122,9 @@ public class GeometryUtils {
     }
 
     /**
-     * Given an envelope in fixed-point degrees, create a JTS Polygon that is at least the given number of meters
-     * bigger than the envelope in all directions.
+     * Given an envelope in fixed-point degrees, enlarge it by at least the given number of meters in all directions.
      */
-    public static Polygon expandEnvelopeToPolygon(Envelope envelope, double radiusMeters) {
-
+    public static void expandEnvelopeFixed(Envelope envelope, double radiusMeters) {
         // Intentionally overestimate by scaling for the latitude closest to the equator.
         // convert latitude to floating for use with SphericalDistanceLibrary below
         double floatingLat0 =
@@ -135,11 +133,8 @@ public class GeometryUtils {
                 VertexStore.floatingDegreesToFixed(SphericalDistanceLibrary.metersToDegreesLatitude(radiusMeters));
         double xExpansion =
                 VertexStore.floatingDegreesToFixed(SphericalDistanceLibrary.metersToDegreesLongitude(radiusMeters, floatingLat0));
-
         if (xExpansion < 0 || yExpansion < 0) throw new AssertionError("Buffer distance in geographic units is negative!");
         envelope.expandBy(xExpansion, yExpansion);
-        Geometry geometry = GeometryUtils.geometryFactory.toGeometry(envelope);
-        return (Polygon)geometry;
     }
 
 }

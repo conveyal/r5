@@ -1381,30 +1381,9 @@ public class StreetLayer implements Serializable, Cloneable {
         edgeStore.forEachTemporarilyAddedOrDeletedEdge(e -> {
             edge.seek(e);
             Envelope envelope = edge.getEnvelope();
-            // Intentionally overestimate by scaling for the latitude closest to the equator.
-            // convert latitude to floating for use with SphericalDistanceLibrary below
-            double floatingLat0 =
-                    fixedDegreesToFloating(Math.min(Math.abs(envelope.getMaxY()), Math.abs(envelope.getMinY())));
-            double yExpansion =
-                    VertexStore.floatingDegreesToFixed(SphericalDistanceLibrary.metersToDegreesLatitude(radiusMeters));
-            double xExpansion =
-                    VertexStore.floatingDegreesToFixed(SphericalDistanceLibrary.metersToDegreesLongitude(radiusMeters, floatingLat0));
-
-            if (xExpansion < 0 || yExpansion < 0) {
-                throw new IllegalStateException("Buffer distance in geographic units is negative!");
-            }
-
-            envelope.expandBy(xExpansion, yExpansion);
-            Geometry geometry = GeometryUtils.geometryFactory.toGeometry(envelope);
-
-            if (!(geometry instanceof Polygon)) {
-                throw new IllegalStateException(
-                    String.format("Envelope geometry %s is not a polygon!", geometry == null ? "null" : geometry.toString())
-                );
-            }
-            geoms.add((Polygon) geometry);
+            Polygon expandedEnvelope = GeometryUtils.expandEnvelopeToPolygon(envelope, radiusMeters);
+            geoms.add(expandedEnvelope);
         });
-
         // We can't just make a multipolygon as the component polygons may not be disjoint. Unions are pretty quick though.
         // The UnaryUnionOp gets its geometryFactory from the geometries it's operating on.
         // We need to supply one in case the list is empty, so it can return an empty geometry instead of null.

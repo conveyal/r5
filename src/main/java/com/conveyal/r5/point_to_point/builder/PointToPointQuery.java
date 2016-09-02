@@ -390,6 +390,7 @@ public class PointToPointQuery {
         if (!direct) {
             streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
         }
+        streetRouter.flagSearch = VertexStore.VertexFlag.BIKE_SHARING;
         if(streetRouter.setOrigin(request.fromLat, request.fromLon)) {
             //if we can't find destination we can stop search before even trying
             if (direct && !streetRouter.setDestination(request.toLat, request.toLon)) {
@@ -414,6 +415,7 @@ public class PointToPointQuery {
             bicycle.previousRouter = streetRouter;
             bicycle.streetMode = StreetMode.BICYCLE;
             bicycle.profileRequest = request;
+            bicycle.flagSearch = streetRouter.flagSearch;
             //Longer bike part if this is direct search
             if (direct) {
                 bicycle.timeLimitSeconds = request.streetTime * 60;

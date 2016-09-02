@@ -311,7 +311,8 @@ public class StreetRouter {
             // subtract 1 from -vertexIdx because -0 == 0
             State state = new State(vertexIdx, previousState.backEdge, streetMode);
             state.weight = previousState.weight+switchCost;
-            state.durationSeconds = previousState.durationSeconds+switchTime;
+            state.durationSeconds = previousState.durationSeconds;
+            state.incrementTimeInSeconds(switchTime);
             if (legMode == LegMode.BICYCLE_RENT) {
                 state.isBikeShare = true;
             }
@@ -722,7 +723,12 @@ public class StreetRouter {
         public int weight;
         public int backEdge;
 
+        //In simple search both those variables have same values
+        //But in complex search (P+R, Bike share) first variable have duration of all the legs
+        //and second, duration only in this leg
+        //this is used for limiting search time in VertexFlagVisitor
         protected int durationSeconds;
+        protected int durationFromOriginSeconds;
         //Distance in mm
         public int distance;
         public StreetMode streetMode;
@@ -747,6 +753,7 @@ public class StreetRouter {
             this.backState = backState;
             this.distance = backState.distance;
             this.durationSeconds = backState.durationSeconds;
+            this.durationFromOriginSeconds = backState.durationFromOriginSeconds;
             this.weight = backState.weight;
         }
 
@@ -757,6 +764,7 @@ public class StreetRouter {
             this.distance = 0;
             this.streetMode = streetMode;
             this.durationSeconds = 0;
+            this.durationFromOriginSeconds = 0;
         }
 
         public void incrementTimeInSeconds(long seconds) {
@@ -767,6 +775,7 @@ public class StreetRouter {
                 return;
             }
             durationSeconds += seconds;
+            durationFromOriginSeconds += seconds;
         }
 
         public int getDurationSeconds() {
@@ -926,7 +935,7 @@ public class StreetRouter {
             if (state.vertex < 0 ||
                 //skips origin states for bikeShare (since in cycle search for bikeShare origin states
                 //can be added to vertices otherwise since they could be traveled for minTravelTimeSeconds with different transport mode)
-                state.backState == null || state.durationSeconds < minTravelTimeSeconds) {
+                state.backState == null || state.durationFromOriginSeconds < minTravelTimeSeconds) {
                 return;
             }
             v.seek(state.vertex);

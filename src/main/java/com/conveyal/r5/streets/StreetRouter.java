@@ -471,6 +471,7 @@ public class StreetRouter {
 
                 if (routingVisitor.shouldBreakSearch()) {
                     LOG.debug("{} routing visitor stopped search", routingVisitor.getClass().getSimpleName());
+                    queue.clear();
                     break;
                 }
             }

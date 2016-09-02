@@ -124,12 +124,20 @@ public class StreetPath {
      * @param lastState
      */
     public void add(StreetRouter.State lastState) {
-/*
+        boolean first = true;
+        /*
          * Starting from latest (time-wise) state, copy states to the head of a list in reverse
          * chronological order. List indices will thus increase forward in time, and backEdges will
          * be chronologically 'back' relative to their state.
          */
         for (StreetRouter.State cur = lastState; cur != null; cur = cur.backState) {
+            //Skips duplicated state in multi searches P+R and B+R since both walk/cycle and car/walk
+            //have same state as stop state and start state of next search
+            if (first && firstState.vertex == cur.vertex) {
+                states.removeFirst();
+                edges.removeFirst();
+            }
+            first = false;
             states.addFirst(cur);
             if (cur.backEdge != -1 && cur.backState != null) {
                 edges.addFirst(cur.backEdge);

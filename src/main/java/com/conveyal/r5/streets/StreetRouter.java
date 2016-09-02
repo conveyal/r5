@@ -309,14 +309,17 @@ public class StreetRouter {
         previousStates.forEachEntry((vertexIdx, previousState) -> {
             // backEdge needs to be unique for each start state or they will wind up dominating each other.
             // subtract 1 from -vertexIdx because -0 == 0
-            State state = new State(vertexIdx, -vertexIdx - 1, streetMode);
+            State state = new State(vertexIdx, previousState.backEdge, streetMode);
             state.weight = previousState.weight+switchCost;
             state.durationSeconds = previousState.durationSeconds+switchTime;
             if (legMode == LegMode.BICYCLE_RENT) {
                 state.isBikeShare = true;
             }
             state.distance = previousState.distance;
-            queue.add(state);
+            if (!isDominated(state)) {
+                bestStatesAtEdge.put(state.backEdge, state);
+                queue.add(state);
+            }
             return true;
         });
 

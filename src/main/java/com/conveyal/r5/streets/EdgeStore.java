@@ -512,7 +512,10 @@ public class EdgeStore implements Serializable {
                 });
             }
 
-            if ((s0.backEdge >=0 ) && getFlag(EdgeFlag.LINK) && getCursor(s0.backEdge).getFlag(EdgeFlag.LINK))
+            //We allow two links in a row if this is a first state (negative back edge or no backState
+            //Since at least P+R stations are connected to graph with only LINK edges and otherwise search doesn't work
+            //Since backEdges are set from first part of multipart P+R search
+            if ((s0.backEdge >=0 ) && (s0.backState != null) && getFlag(EdgeFlag.LINK) && getCursor(s0.backEdge).getFlag(EdgeFlag.LINK))
                 // two link edges in a row, in other words a shortcut. Disallow this.
                 return null;
 

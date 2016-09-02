@@ -545,9 +545,10 @@ public class PointToPointQuery {
             }
 
             LOG.warn("{} stops found, using {} nearest", stopsFound, times.size());
-        }
+        } else {
 
-        LOG.info("{} stops found", stopsFound);
+            LOG.info("{} stops found", stopsFound);
+        }
 
         // return the times, not the weights
         return times;

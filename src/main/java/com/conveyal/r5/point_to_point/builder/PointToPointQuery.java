@@ -442,7 +442,7 @@ public class PointToPointQuery {
             StreetRouter end = new StreetRouter(transportNetwork.streetLayer);
             end.streetMode = StreetMode.WALK;
             end.profileRequest = request;
-            end.timeLimitSeconds = request.maxBikeTime * 60;
+            end.timeLimitSeconds = bicycle.timeLimitSeconds;
             if (!direct) {
                 end.transitStopSearch = true;
                 end.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;

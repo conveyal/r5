@@ -35,7 +35,7 @@ public class Scenario implements Serializable {
     /** Map from feed ID to feed CRC32 to ensure that we can't apply scenarios to the wrong feeds */
     public Map<String, Long> feedChecksums;
 
-    private static final boolean VERIFY_BASE_NETWORK_UNCHANGED = true;
+    private static final boolean VERIFY_BASE_NETWORK_UNCHANGED = false;
 
     /**
      * @return a copy of the supplied network with the modifications in this scenario non-destructively applied.

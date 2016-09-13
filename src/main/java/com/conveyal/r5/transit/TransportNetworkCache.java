@@ -216,7 +216,10 @@ public class TransportNetworkCache {
             network = buildNetworkFromBundleZip(networkId);
         }
 
-        // cache the network
+        // These networks are going to be used for analysis work. Pre-compute distance tables from stops to streets.
+        network.transitLayer.buildDistanceTables(null);
+
+        // Cache the network.
         String filename = networkId + "_" + R5Version.version + ".dat";
         File cacheLocation = new File(cacheDir, networkId + "_" + R5Version.version + ".dat");
         

@@ -6,15 +6,25 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.Kryo.DefaultInstantiatorStrategy;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import com.esotericsoftware.kryo.serializers.ExternalizableSerializer;
 import com.google.common.io.ByteStreams;
 import com.conveyal.r5.profile.GreedyFareCalculator;
 import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.geom.Envelope;
+import de.javakaffee.kryoserializers.BitSetSerializer;
+import gnu.trove.map.hash.TIntObjectHashMap;
+import org.nustaq.serialization.FSTConfiguration;
 import org.nustaq.serialization.FSTObjectInput;
 import org.nustaq.serialization.FSTObjectOutput;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
+import org.objenesis.strategy.SerializingInstantiatorStrategy;
+import org.objenesis.strategy.StdInstantiatorStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -51,20 +61,40 @@ public class TransportNetwork implements Serializable {
 
     public GreedyFareCalculator fareCalculator;
 
+    /**
+     * This ensures that the same classes are registered in the same order for serialization and deserialization.
+     */
+    private static Kryo getKryo() {
+        Kryo kryo = new Kryo();
+        // Kryo's default FieldSerializer has some problems deserializing TIntObjectHashMap due to inner class
+        // synthetic fields. Apparently with kryo.getFieldSerializerConfig().setIgnoreSyntheticFields(false) may
+        // solve this problem, but why take chances when TIntObjectHashMap has its own Externalizable implementation.
+        kryo.register(TIntObjectHashMap.class, new ExternalizableSerializer());
+        // BitSet has some fields inconveniently marked transient, use a custom serializer for it.
+        // https://github.com/magro/kryo-serializers
+        // There are probably more classes that need Externalizable or custom serializers.
+        kryo.register(BitSet.class, new BitSetSerializer());
+        // Oddly, by default Kryo expects every single class to have a zero-arg constructor.
+        // Fall back on the classic Serializable instantiation method when there is no zero-arg constructor.
+        kryo.setInstantiatorStrategy(new DefaultInstantiatorStrategy(new SerializingInstantiatorStrategy()));
+        return kryo;
+    }
+
     public void write (OutputStream stream) throws IOException {
         LOG.info("Writing transport network...");
-        FSTObjectOutput out = new FSTObjectOutput(stream);
-        out.writeObject(this, TransportNetwork.class);
-        out.close();
+        Output output = new Output(stream);
+        getKryo().writeObject(output, this);
+        output.close();
         LOG.info("Done writing.");
     }
 
     public static TransportNetwork read (InputStream stream) throws Exception {
         LOG.info("Reading transport network...");
-        FSTObjectInput in = new FSTObjectInput(stream);
-        TransportNetwork result = (TransportNetwork) in.readObject(TransportNetwork.class);
-        in.close();
+        Input input = new Input(stream);
+        TransportNetwork result = getKryo().readObject(input, TransportNetwork.class);
+        input.close();
         result.rebuildTransientIndexes();
+        // Shouldn't this transitLayer reference be serialized?
         if (result.fareCalculator != null) {
             result.fareCalculator.transitLayer = result.transitLayer;
         }
@@ -76,7 +106,6 @@ public class TransportNetwork implements Serializable {
         streetLayer.buildEdgeLists();
         streetLayer.indexStreets();
         transitLayer.rebuildTransientIndexes();
-        transitLayer.buildDistanceTables(null);
     }
 
     /**
@@ -172,9 +201,6 @@ public class TransportNetwork implements Serializable {
         // Edge lists must be built after all inter-layer linking has occurred.
         streetLayer.buildEdgeLists();
         transitLayer.rebuildTransientIndexes();
-
-        // TODO why are we building these when the graph is built, shouldn't these (and others above) be covered by the transient index build?
-        transitLayer.buildDistanceTables(null);
 
         // Create transfers
         new TransferFinder(transportNetwork).findTransfers();

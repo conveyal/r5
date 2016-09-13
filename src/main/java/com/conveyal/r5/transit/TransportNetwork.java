@@ -232,7 +232,12 @@ public class TransportNetwork implements Serializable {
                     LOG.warn("Skipping non-input file '{}'", file);
             }
         }
-        return fromFiles(osmFile.getAbsolutePath(), gtfsFiles, builderConfig);
+        if (osmFile == null) {
+            LOG.error("An OSM PBF file is required to build a network.");
+            return null;
+        } else {
+            return fromFiles(osmFile.getAbsolutePath(), gtfsFiles, builderConfig);
+        }
     }
 
     /**

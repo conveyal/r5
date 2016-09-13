@@ -294,13 +294,16 @@ public class LinkedPointSet {
         // When applying a scenario, keep the existing distance table for those stops that could not be affected.
         stopToPointDistanceTables = IntStream.range(0, nStops).parallel().mapToObj(stopIndex -> {
             Point stopPoint = transitLayer.getJTSPointForStopFixed(stopIndex);
-            if (treeRebuildZone != null) {
-                if (stopPoint == null || !treeRebuildZone.contains(stopPoint)) {
-                    // This stop is not affected by the scenario. Return the existing distance table, if there is one.
-                    // This should only return null for new stops created by the scenario that are unlinked,
-                    // because all these new stops should be inside the relink zone.
-                    return stopIndex < stopToPointDistanceTables.size() ? stopToPointDistanceTables.get(stopIndex) : null;
+            // If the stop is not linked to the street network, it should have no distance table.
+            if (stopPoint == null) return null;
+            if (treeRebuildZone != null && !treeRebuildZone.contains(stopPoint)) {
+                // This stop is not affected by the scenario. Return the existing distance table.
+                // All new stops created by a scenario should be inside the relink zone, so
+                // all stops outside the relink zone should already have a distance table entry.
+                if (stopIndex >= stopToPointDistanceTables.size()) {
+                    throw new AssertionError("A stop created by a scenario is located outside relink zone.");
                 }
+                return stopToPointDistanceTables.get(stopIndex);
             }
             // Get the pre-computed distance table from the stop to the street vertices,
             // then extend that table out from the street vertices to the points in this PointSet.

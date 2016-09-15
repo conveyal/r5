@@ -26,7 +26,7 @@ after_success:
   # On the other hand, the main un-shaded artifact will begin with the project name 'r5'.
   - aws s3 cp --recursive --exclude "*" --include "v*.jar" /home/travis/build/conveyal/r5/target s3://r5-builds
   # copy Javadoc to S3
-  - if [[ "$TRAVIS_PULL_REQUEST" = false ]]; then aws s3 cp --recursive /home/travis/build/conveyal/r5/target/site/apidocs s3://javadoc.conveyal.com/r5/${TRAVIS_BRANCH}; done
+  - if [[ "$TRAVIS_PULL_REQUEST" = false ]]; then aws s3 cp --recursive /home/travis/build/conveyal/r5/target/site/apidocs s3://javadoc.conveyal.com/r5/${TRAVIS_BRANCH}/; fi
 
 
 sudo: false

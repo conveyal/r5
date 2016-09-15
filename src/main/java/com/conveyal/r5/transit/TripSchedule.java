@@ -200,7 +200,7 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
         }
     }
 
-    /** @return whether it makes sense for the supplied trip to be served by the same vehicle as this trip. */
+    /** return whether it makes sense for the supplied trip to be served by the same vehicle as this trip. */
     public void chainTo (TripSchedule that) {
         // Check that chain is temporally coherent
         if (arrivals[arrivals.length - 1] <= that.departures[0]) {
@@ -220,7 +220,7 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
      * Once we support interlining, this will matter, as you might arrive at the first stop on an interline just inside the time window.
      *
      * @return whether any part of this occurs during the given time range (expressed in seconds after midnight).
-     * TODO --> frequencies <--
+     * TODO -- frequencies --
      */
     public boolean overlapsTimeRange (int fromTime, int toTime) {
         int firstStopTime, lastStopTime;

@@ -73,7 +73,7 @@ public class StreetRouter {
 
     /**
      * It uses all nonzero limit as a limit whichever gets hit first
-     * For example if distanceLimitMeters > 0 it is used as a limit. But if it isn't
+     * For example if distanceLimitMeters &gt; 0 it is used as a limit. But if it isn't
      * timeLimitSeconds is used if it is bigger then 0. If both limits are 0 or both are set
      * warning is shown and both are used.
      */
@@ -352,7 +352,7 @@ public class StreetRouter {
      * Call one of the setOrigin functions first before calling route().
      *
      * It uses all nonzero limit as a limit whichever gets hit first
-     * For example if distanceLimitMeters > 0 it is used a limit. But if it isn't
+     * For example if distanceLimitMeters &gt; 0 it is used a limit. But if it isn't
      * timeLimitSeconds is used if it is bigger then 0. If both limits are 0 or both are set
      * warning is shown and both are used.
      */

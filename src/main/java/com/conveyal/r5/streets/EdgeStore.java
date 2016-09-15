@@ -115,7 +115,7 @@ public class EdgeStore implements Serializable {
      * all lower indexes should be treated as immutable.
      * All edges from firstModifiableEdge up to nEdges() are temporary and are not in the spatial index.
      * This field also serves as an indication that a scenario is being applied and this EdgeStore is a protective copy,
-     * whenever firstModifiableEdge > 0.
+     * whenever firstModifiableEdge &gt; 0.
      */
     public int firstModifiableEdge = 0;
 

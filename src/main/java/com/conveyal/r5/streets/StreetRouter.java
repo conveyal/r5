@@ -73,7 +73,7 @@ public class StreetRouter {
 
     /**
      * It uses all nonzero limit as a limit whichever gets hit first
-     * For example if distanceLimitMeters > 0 it is used as a limit. But if it isn't
+     * For example if distanceLimitMeters &gt; 0 it is used as a limit. But if it isn't
      * timeLimitSeconds is used if it is bigger then 0. If both limits are 0 or both are set
      * warning is shown and both are used.
      */
@@ -271,9 +271,15 @@ public class StreetRouter {
         // at the origin.
         State startState0 = new State(split.vertex0, split.edge + 1, streetMode);
         State startState1 = new State(split.vertex1, split.edge, streetMode);
-        // TODO walk speed, assuming 1 m/sec currently.
-        startState0.weight = split.distance0_mm / 1000;
-        startState1.weight = split.distance1_mm / 1000;
+        EdgeStore.Edge  edge = streetLayer.edgeStore.getCursor(split.edge);
+        // Uses weight based on distance from end vertices and speed on edge which depends on transport mode
+        float speedms = edge.calculateSpeed(profileRequest, streetMode);
+        startState1.weight = (int) ((split.distance1_mm / 1000) / speedms);
+        edge.advance();
+        //speed can differ in different directions
+        speedms = edge.calculateSpeed(profileRequest, streetMode);
+        startState0.weight = (int) ((split.distance0_mm / 1000) / speedms);
+
         // NB not adding to bestStates, as it will be added when it comes out of the queue
         queue.add(startState0);
         queue.add(startState1);
@@ -346,7 +352,7 @@ public class StreetRouter {
      * Call one of the setOrigin functions first before calling route().
      *
      * It uses all nonzero limit as a limit whichever gets hit first
-     * For example if distanceLimitMeters > 0 it is used a limit. But if it isn't
+     * For example if distanceLimitMeters &gt; 0 it is used a limit. But if it isn't
      * timeLimitSeconds is used if it is bigger then 0. If both limits are 0 or both are set
      * warning is shown and both are used.
      */

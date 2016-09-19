@@ -41,8 +41,8 @@ public class VertexStore implements Serializable {
 
     /**
      * Add a vertex, specifying its coordinates in double-precision floating point degrees.
-     * @lat latitude in floating point degrees
-     * @lon longitude in floating point degrees
+     * @param lat latitude in floating point degrees
+     * @param lon longitude in floating point degrees
      * @return the index of the new vertex.
      */
     public int addVertex (double lat, double lon) {

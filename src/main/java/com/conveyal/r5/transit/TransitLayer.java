@@ -112,7 +112,7 @@ public class TransitLayer implements Serializable, Cloneable {
     public boolean hasSchedules = false;
 
     /**
-     * For each transit stop, an int->int map giving the distance of every reachable street vertex from that stop.
+     * For each transit stop, an int-int map giving the distance of every reachable street vertex from that stop.
      * This is the result of running a distance-constrained street search outward from every stop in the graph.
      *
      * Avoiding the lengthy rebuild of stopToVertexDistanceTables is as simple as making this non-transient and removing

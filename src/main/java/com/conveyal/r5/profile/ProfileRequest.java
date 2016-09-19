@@ -254,7 +254,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      * The algorithm divides up the number of draws into an equal number at each minute of the time window, then rounds up.
      * Note that the algorithm may actually take somewhat more draws than this, depending on the width of your time window.
      * As an extreme example, if your time window is 120 minutes and you request 121 draws, you will actually get 240, because
-     * 1 < 121 / 120 < 2.
+     * 1 &lt; 121 / 120 &lt; 2.
      */
     public int monteCarloDraws = 220;
 
@@ -280,7 +280,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      *
      * If date isn't set current date is used. Time is empty (one hour before midnight in UTC if +1 timezone is used)
      *
-     * uses {@link this#getFromTimeDateZD()}
+     * uses {@link #getFromTimeDateZD()}
      */
     @JsonIgnore
     public long getFromTimeDate() {

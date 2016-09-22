@@ -6,25 +6,15 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.Kryo.DefaultInstantiatorStrategy;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
-import com.esotericsoftware.kryo.serializers.ExternalizableSerializer;
 import com.google.common.io.ByteStreams;
 import com.conveyal.r5.profile.GreedyFareCalculator;
 import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.geom.Envelope;
-import de.javakaffee.kryoserializers.BitSetSerializer;
-import gnu.trove.map.hash.TIntObjectHashMap;
-import org.nustaq.serialization.FSTConfiguration;
-import org.nustaq.serialization.FSTObjectInput;
-import org.nustaq.serialization.FSTObjectOutput;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
-import org.objenesis.strategy.SerializingInstantiatorStrategy;
-import org.objenesis.strategy.StdInstantiatorStrategy;
+import org.mapdb.elsa.ElsaMaker;
+import org.mapdb.elsa.ElsaSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,37 +52,27 @@ public class TransportNetwork implements Serializable {
     public GreedyFareCalculator fareCalculator;
 
     /**
-     * This ensures that the same classes are registered in the same order for serialization and deserialization.
+     * This ensures that the same classes are registered with the serializer
+     * in the same order for serialization and deserialization.
+     * (This is a matter of form, currently nothing is registered.)
      */
-    private static Kryo getKryo() {
-        Kryo kryo = new Kryo();
-        // Kryo's default FieldSerializer has some problems deserializing TIntObjectHashMap due to inner class
-        // synthetic fields. Apparently with kryo.getFieldSerializerConfig().setIgnoreSyntheticFields(false) may
-        // solve this problem, but why take chances when TIntObjectHashMap has its own Externalizable implementation.
-        kryo.register(TIntObjectHashMap.class, new ExternalizableSerializer());
-        // BitSet has some fields inconveniently marked transient, use a custom serializer for it.
-        // https://github.com/magro/kryo-serializers
-        // There are probably more classes that need Externalizable or custom serializers.
-        kryo.register(BitSet.class, new BitSetSerializer());
-        // Oddly, by default Kryo expects every single class to have a zero-arg constructor.
-        // Fall back on the classic Serializable instantiation method when there is no zero-arg constructor.
-        kryo.setInstantiatorStrategy(new DefaultInstantiatorStrategy(new SerializingInstantiatorStrategy()));
-        return kryo;
+    private static ElsaSerializer getSerializer() {
+        return new ElsaMaker().make();
     }
 
     public void write (OutputStream stream) throws IOException {
         LOG.info("Writing transport network...");
-        Output output = new Output(stream);
-        getKryo().writeObject(output, this);
-        output.close();
+        DataOutputStream out = new DataOutputStream(new BufferedOutputStream(stream));
+        getSerializer().serialize(out, this);
+        out.close();
         LOG.info("Done writing.");
     }
 
     public static TransportNetwork read (InputStream stream) throws Exception {
         LOG.info("Reading transport network...");
-        Input input = new Input(stream);
-        TransportNetwork result = getKryo().readObject(input, TransportNetwork.class);
-        input.close();
+        DataInputStream in = new DataInputStream(new BufferedInputStream(stream));
+        TransportNetwork result = getSerializer().deserialize(in);
+        in.close();
         result.rebuildTransientIndexes();
         // Shouldn't this transitLayer reference be serialized?
         if (result.fareCalculator != null) {

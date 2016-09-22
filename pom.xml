@@ -279,16 +279,11 @@
       <artifactId>fst</artifactId>
       <version>2.34</version>
     </dependency>
-    <!-- Fast Serialization -->
+    <!-- Serialization -->
     <dependency>
-      <groupId>com.esotericsoftware</groupId>
-      <artifactId>kryo</artifactId>
-      <version>4.0.0</version>
-    </dependency>
-    <dependency>
-      <groupId>de.javakaffee</groupId>
-      <artifactId>kryo-serializers</artifactId>
-      <version>0.38</version>
+        <groupId>org.mapdb</groupId>
+        <artifactId>elsa</artifactId>
+        <version>3.0.0-M5</version>
     </dependency>
     <dependency>
       <groupId>com.amazonaws</groupId>

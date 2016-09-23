@@ -152,13 +152,15 @@ function centerMap(e) {
     my_map.panTo(e.latlng);
 }
 
+
+
 function getModeColor (mode) {
     if (mode === 'WALK') return '#484'
     if (mode === 'BICYCLE') return '#0073e5'
     if (mode === 'SUBWAY') return '#f00'
-    if (mode === 'RAIL') return '#b00'
+    if (mode === 'RAIL') return '#f50'
     if (mode === 'BUS') return '#080'
-    if (mode === 'TRAM') return '#800'
+    if (mode === 'TRAM') return '#f0c'
     if (mode === 'FERRY') return '#008'
     if (mode === 'CAR') return '#444'
     return '#aaa'

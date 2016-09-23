@@ -4,6 +4,8 @@ var MARIBOR_COOR = [46.562483, 15.643975];
 var layer = null;
 var graphqlResponse = null;
 var geojsonLayer = null;
+var bikeSharesLayer = null;
+var parkRidesLayer = null;
 
 function pad(number, length){
     var str = "" + number
@@ -35,6 +37,8 @@ var PlanConfig = function() {
     this.plan = requestPlan;
     this.showReachedStops = requestStops;
     this.showStops = false;
+    this.showPR = false;
+    this.showBS = false;
 };
 
 var template = "";
@@ -162,7 +166,7 @@ function getModeColor (mode) {
     if (mode === 'SUBWAY') return '#f00'
     if (mode === 'RAIL') return '#f50'
     if (mode === 'BUS') return '#080'
-    if (mode === 'TRAM') return '#f0c'
+    if (mode === 'TRAM') return '#a0f'
     if (mode === 'FERRY') return '#008'
     if (mode === 'CAR') return '#444'
     return '#aaa'
@@ -556,7 +560,7 @@ function makeModes(modeName, javaModeName) {
 }
 
 //Gets all the stops if zoom > 13 and showStops is checked in envelope which is visible map bounds
-function getStops() {
+function getStops(params) {
     if (geojsonLayer != null) {
         window.my_map.removeLayer(geojsonLayer);
     }
@@ -564,13 +568,6 @@ function getStops() {
     if (window.my_map.getZoom() < 13 || !planConfig.showStops) {
         return;
     }
-    var bbox = my_map.getBounds();
-    var params = {
-        n : bbox.getNorth(),
-        s : bbox.getSouth(),
-        e : bbox.getEast(),
-        w : bbox.getWest(),
-    };
 
     var url = hostname + "/seenStops";
     $.getJSON(url, params, function(data) {
@@ -580,10 +577,60 @@ function getStops() {
             alert(data.errors);
         }
         geojsonLayer = L.geoJson(data, {pointToLayer:function(feature, latlng) {
-            return L.circleMarker(latlng, { filColor:getModeColor(feature.properties.mode), weight:1});
+            return L.circleMarker(latlng, { weight:1});
         },
             style: styleStop, onEachFeature:onEachFeature});
         geojsonLayer.addTo(window.my_map);
+    });
+
+}
+
+function getParkRides(params) {
+    if (parkRidesLayer != null) {
+        window.my_map.removeLayer(parkRidesLayer);
+    }
+    //on zooms lower then 11 we are visiting too many spatial index cells on a server and don't get an answer
+    if (window.my_map.getZoom() < 11 || !planConfig.showPR) {
+        return;
+    }
+
+    var url = hostname + "/seenParkRides";
+    $.getJSON(url, params, function(data) {
+        /*console.log("Got data");*/
+        /*console.log(data);*/
+        if (data.errors) {
+            alert(data.errors);
+        }
+        parkRidesLayer = L.geoJson(data, {pointToLayer:function(feature, latlng) {
+            return L.circleMarker(latlng, { fillColor:'#f0f', opacity:0.8, radius:5, weight:1});
+        },
+             onEachFeature:onEachFeature});
+        parkRidesLayer.addTo(window.my_map);
+    });
+
+}
+
+function getBikeShares(params) {
+    if (bikeSharesLayer != null) {
+        window.my_map.removeLayer(bikeSharesLayer);
+    }
+    //on zooms lower then 13 we are visiting too many spatial index cells on a server and don't get an answer
+    if (window.my_map.getZoom() < 13 || !planConfig.showBS) {
+        return;
+    }
+
+    var url = hostname + "/seenBikeShares";
+    $.getJSON(url, params, function(data) {
+        /*console.log("Got data");*/
+        /*console.log(data);*/
+        if (data.errors) {
+            alert(data.errors);
+        }
+        bikeSharesLayer = L.geoJson(data, {pointToLayer:function(feature, latlng) {
+            return L.circleMarker(latlng, { fillColor:'#0ff', opacity:0.8, radius:5, weight:1});
+        },
+             onEachFeature:onEachFeature});
+        bikeSharesLayer.addTo(window.my_map);
     });
 
 }
@@ -766,6 +813,8 @@ $(document).ready(function() {
     gui.add(planConfig, "toLon").listen().onFinishChange(function(value) {moveMarker("to"); });
     gui.add(planConfig, "plan");
     gui.add(planConfig, "showStops");
+    gui.add(planConfig, "showPR");
+    gui.add(planConfig, "showBS");
     /*gui.add(planConfig, "showReachedStops");*/
 var sidebar = L.control.sidebar('sidebar').addTo(my_map);
     $('#resultTab').click(function (){
@@ -813,7 +862,16 @@ var sidebar = L.control.sidebar('sidebar').addTo(my_map);
     }
 
     my_map.on('moveend', function() {
-        getStops();
+        var bbox = my_map.getBounds();
+        var params = {
+            n : bbox.getNorth(),
+            s : bbox.getSouth(),
+            e : bbox.getEast(),
+            w : bbox.getWest(),
+        };
+        getStops(params);
+        getParkRides(params);
+        getBikeShares(params);
     });
 
 });

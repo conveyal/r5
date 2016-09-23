@@ -3,6 +3,7 @@ package com.conveyal.r5.point_to_point;
 import com.conveyal.r5.api.GraphQlRequest;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.api.util.Stop;
 import com.conveyal.r5.common.GeoJsonFeature;
 import com.conveyal.r5.common.GeometryUtils;
@@ -487,6 +488,77 @@ public class PointToPointRouterServer {
             });
 
             //LOG.info("Found {} stops", features.size());
+            featureCollection.put("features", features);
+
+            return featureCollection;
+        }, JsonUtilities.objectMapper::writeValueAsString);
+
+        get("/seenParkRides", (request, response) -> {
+            response.header("Content-Type", "application/json");
+            if (request.queryParams().size() < 4) {
+                response.status(400);
+                return "";
+            }
+            float north = request.queryMap("n").floatValue();
+            float south = request.queryMap("s").floatValue();
+            float east = request.queryMap("e").floatValue();
+            float west = request.queryMap("w").floatValue();
+
+            Envelope env = new Envelope(east, west,
+                south, north);
+
+            // write geojson to response
+            Map<String, Object> featureCollection = new HashMap<>(2);
+            featureCollection.put("type", "FeatureCollection");
+
+            List<ParkRideParking> parkRideParkings = transportNetwork.streetLayer.findParkRidesInEnvelope(env);
+            List<GeoJsonFeature> features = new ArrayList<>(parkRideParkings.size());
+
+            parkRideParkings.forEach(parkRideParking -> {
+                GeoJsonFeature feature = new GeoJsonFeature(parkRideParking.lon, parkRideParking.lat);
+                feature.addProperty("type", "P+R");
+                feature.addProperty("name", parkRideParking.name);
+                feature.addProperty("id", parkRideParking.id);
+                feature.addProperty("capacity", parkRideParking.capacity);
+                features.add(feature);
+            });
+
+            //LOG.info("Found {} ParkRides", features.size());
+            featureCollection.put("features", features);
+
+            return featureCollection;
+        }, JsonUtilities.objectMapper::writeValueAsString);
+
+        get("/seenBikeShares", (request, response) -> {
+            response.header("Content-Type", "application/json");
+            if (request.queryParams().size() < 4) {
+                response.status(400);
+                return "";
+            }
+            float north = request.queryMap("n").floatValue();
+            float south = request.queryMap("s").floatValue();
+            float east = request.queryMap("e").floatValue();
+            float west = request.queryMap("w").floatValue();
+
+            Envelope env = new Envelope(east, west,
+                south, north);
+
+            // write geojson to response
+            Map<String, Object> featureCollection = new HashMap<>(2);
+            featureCollection.put("type", "FeatureCollection");
+
+            List<BikeRentalStation> bikeRentalStations = transportNetwork.streetLayer.findBikeSharesInEnvelope(env);
+            List<GeoJsonFeature> features = new ArrayList<>(bikeRentalStations.size());
+
+            bikeRentalStations.forEach(bikeRentalStation -> {
+                GeoJsonFeature feature = new GeoJsonFeature(bikeRentalStation.lon, bikeRentalStation.lat);
+                feature.addProperty("type", "Bike share");
+                feature.addProperty("name", bikeRentalStation.name);
+                feature.addProperty("id", bikeRentalStation.id);
+                features.add(feature);
+            });
+
+            //LOG.info("Found {} bike shares", features.size());
             featureCollection.put("features", features);
 
             return featureCollection;

@@ -1407,4 +1407,67 @@ public class StreetLayer implements Serializable, Cloneable {
         }
     }
 
+    /**
+     * Finds all the P+R stations in given envelope
+     *
+     * Returns empty list if none are found or no P+R stations are in graph
+     *
+     * @param env Envelope in float degrees
+     * @return
+     */
+    public List<ParkRideParking> findParkRidesInEnvelope(Envelope env) {
+        List<ParkRideParking> parkingRides = new ArrayList<>();
+
+        if (parkRideLocationsMap != null) {
+            EdgeStore.Edge e = edgeStore.getCursor();
+            VertexStore.Vertex v = vertexStore.getCursor();
+            TIntSet nearbyEdges = spatialIndex.query(VertexStore.envelopeToFixed(env));
+            nearbyEdges.forEach(eidx -> {
+                e.seek(eidx);
+                if (e.getFlag(EdgeStore.EdgeFlag.LINK)) {
+                    v.seek(e.getFromVertex());
+                    if (v.getFlag(VertexStore.VertexFlag.PARK_AND_RIDE)) {
+                        ParkRideParking parkRideParking = parkRideLocationsMap.get(e.getFromVertex());
+                        parkingRides.add(parkRideParking);
+                    }
+                }
+                return true;
+            });
+        }
+        return parkingRides;
+    }
+
+    /**
+     * Finds all the bike share stations in given envelope
+     *
+     * Returns empty list if none are found or no bike stations are in graph
+     *
+     * @param env Envelope in float degrees
+     * @return
+     */
+    public List<BikeRentalStation> findBikeSharesInEnvelope(Envelope env) {
+        List<BikeRentalStation> bikeRentalStations = new ArrayList<>();
+
+        if (bikeRentalStationMap != null) {
+            EdgeStore.Edge e = edgeStore.getCursor();
+            VertexStore.Vertex v = vertexStore.getCursor();
+            TIntSet nearbyEdges = spatialIndex.query(VertexStore.envelopeToFixed(env));
+            nearbyEdges.forEach(eidx -> {
+                e.seek(eidx);
+                //TODO: for now bikeshares aren't connected with link edges to the graph
+                //if (e.getFlag(EdgeStore.EdgeFlag.LINK)) {
+                    v.seek(e.getFromVertex());
+
+                    if (v.getFlag(VertexStore.VertexFlag.BIKE_SHARING)) {
+                        BikeRentalStation bikeRentalStation = bikeRentalStationMap.get(e.getFromVertex());
+                        bikeRentalStations.add(bikeRentalStation);
+                    }
+                //}
+                return true;
+            });
+
+        }
+        return bikeRentalStations;
+    }
+
 }

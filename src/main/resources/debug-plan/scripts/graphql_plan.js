@@ -3,6 +3,7 @@ var my_map;
 var MARIBOR_COOR = [46.562483, 15.643975];
 var layer = null;
 var graphqlResponse = null;
+var geojsonLayer = null;
 
 function pad(number, length){
     var str = "" + number
@@ -33,6 +34,7 @@ var PlanConfig = function() {
     this.offset = offset;
     this.plan = requestPlan;
     this.showReachedStops = requestStops;
+    this.showStops = false;
 };
 
 var template = "";
@@ -182,13 +184,21 @@ function styleMode(feature) {
     };
 }
 function styleStop(feature) {
-    return {
+    var style = {
         color: getModeColor(feature.properties.mode),
         //weight:speedWeight(feature.properties.speed_ms),
         //radius:feature.properties.weight/10,
-        radius:weightSize(feature.properties.weight),
+        radius:6,
         opacity: 0.8
     };
+
+    //For variable radius for reached stops
+    if (feature.properties.weight) {
+        style.radius = weightSize(feature.properties.weight);
+    }
+
+
+    return style;
 }
 
 function onEachFeature(feature, layer) {
@@ -545,6 +555,40 @@ function makeModes(modeName, javaModeName) {
     return niceModes.join(",");
 }
 
+//Gets all the stops if zoom > 13 and showStops is checked in envelope which is visible map bounds
+function getStops() {
+    if (geojsonLayer != null) {
+        window.my_map.removeLayer(geojsonLayer);
+    }
+    //on zooms lower then 13 we are visiting too many spatial index cells on a server and don't get an answer
+    if (window.my_map.getZoom() < 13 || !planConfig.showStops) {
+        return;
+    }
+    var bbox = my_map.getBounds();
+    var params = {
+        n : bbox.getNorth(),
+        s : bbox.getSouth(),
+        e : bbox.getEast(),
+        w : bbox.getWest(),
+    };
+
+    var url = hostname + "/seenStops";
+    $.getJSON(url, params, function(data) {
+        /*console.log("Got data");*/
+        /*console.log(data);*/
+        if (data.errors) {
+            alert(data.errors);
+        }
+        geojsonLayer = L.geoJson(data, {pointToLayer:function(feature, latlng) {
+            return L.circleMarker(latlng, { filColor:getModeColor(feature.properties.mode), weight:1});
+        },
+            style: styleStop, onEachFeature:onEachFeature});
+        geojsonLayer.addTo(window.my_map);
+    });
+
+}
+
+
 function requestPlan() {
     $('#resultTab').removeClass("status-ok status-error").addClass("status-waiting");
     var request = template
@@ -721,6 +765,7 @@ $(document).ready(function() {
     gui.add(planConfig, "toLat").listen().onFinishChange(function(value) {moveMarker("to"); });
     gui.add(planConfig, "toLon").listen().onFinishChange(function(value) {moveMarker("to"); });
     gui.add(planConfig, "plan");
+    gui.add(planConfig, "showStops");
     /*gui.add(planConfig, "showReachedStops");*/
 var sidebar = L.control.sidebar('sidebar').addTo(my_map);
     $('#resultTab').click(function (){
@@ -766,6 +811,10 @@ var sidebar = L.control.sidebar('sidebar').addTo(my_map);
         addLast(toEvent);
 
     }
+
+    my_map.on('moveend', function() {
+        getStops();
+    });
 
 });
 

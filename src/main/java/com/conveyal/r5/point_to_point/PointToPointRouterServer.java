@@ -3,6 +3,7 @@ package com.conveyal.r5.point_to_point;
 import com.conveyal.r5.api.GraphQlRequest;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.api.util.Stop;
 import com.conveyal.r5.common.GeoJsonFeature;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.common.JsonUtilities;
@@ -455,6 +456,42 @@ public class PointToPointRouterServer {
             }
             return content;
         }, JsonUtilities.objectMapper::writeValueAsString);
+
+        get("/seenStops", (request, response) -> {
+            response.header("Content-Type", "application/json");
+            if (request.queryParams().size() < 4) {
+                response.status(400);
+                return "";
+            }
+            float north = request.queryMap("n").floatValue();
+            float south = request.queryMap("s").floatValue();
+            float east = request.queryMap("e").floatValue();
+            float west = request.queryMap("w").floatValue();
+
+            Envelope env = new Envelope(east, west,
+                south, north);
+
+            // write geojson to response
+            Map<String, Object> featureCollection = new HashMap<>(2);
+            featureCollection.put("type", "FeatureCollection");
+
+            Collection<Stop> stops = transportNetwork.transitLayer.findStopsInEnvelope(env);
+            List<GeoJsonFeature> features = new ArrayList<>(stops.size());
+
+            stops.forEach(stop -> {
+                GeoJsonFeature feature = new GeoJsonFeature(stop.lon, stop.lat);
+                feature.addProperty("name", stop.name);
+                feature.addProperty("stopId", stop.stopId);
+                feature.addProperty("mode", stop.mode);
+                features.add(feature);
+            });
+
+            //LOG.info("Found {} stops", features.size());
+            featureCollection.put("features", features);
+
+            return featureCollection;
+        }, JsonUtilities.objectMapper::writeValueAsString);
+
 
         get("debug/streetEdges", (request, response) -> {
             response.header("Content-Type", "application/json");

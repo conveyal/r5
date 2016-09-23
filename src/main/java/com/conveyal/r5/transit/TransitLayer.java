@@ -2,14 +2,19 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.*;
-import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.gtfs.model.Route;
+import com.conveyal.gtfs.model.Stop;
+import com.conveyal.gtfs.model.Trip;
+import com.conveyal.r5.api.util.*;
 import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.util.LambdaCounter;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.Point;
 import gnu.trove.list.TIntList;
@@ -627,6 +632,32 @@ public class TransitLayer implements Serializable, Cloneable {
         copy.transfersForStop = new ArrayList<>(this.transfersForStop);
         copy.routes = new ArrayList<>(this.routes);
         return copy;
+    }
+
+    /**
+     * Finds all the transit stops in given envelope and returns it.
+     *
+     * Stops also have mode which is mode of route in first pattern that this stop is found in
+     * @param env Envelope in float degrees
+     * @return
+     */
+    public Collection<com.conveyal.r5.api.util.Stop> findStopsInEnvelope(Envelope env) {
+        List<com.conveyal.r5.api.util.Stop> stops = new ArrayList<>();
+        EdgeStore.Edge e = this.parentNetwork.streetLayer.edgeStore.getCursor();
+        TIntSet nearbyEdges = this.parentNetwork.streetLayer.spatialIndex.query(VertexStore.envelopeToFixed(env));
+
+        nearbyEdges.forEach(eidx -> {
+            e.seek(eidx);
+            if (e.getFlag(EdgeStore.EdgeFlag.LINK) && stopForStreetVertex.containsKey(e.getFromVertex())) {
+                int stopIdx = stopForStreetVertex.get(e.getFromVertex());
+
+                com.conveyal.r5.api.util.Stop stop = new com.conveyal.r5.api.util.Stop(stopIdx, this, true);
+                stops.add(stop);
+            }
+            return true;
+        });
+
+        return stops;
     }
 
 }

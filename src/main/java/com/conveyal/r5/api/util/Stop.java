@@ -1,7 +1,7 @@
 package com.conveyal.r5.api.util;
 
 import com.conveyal.r5.streets.VertexStore;
-import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.*;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 /**
@@ -20,6 +20,8 @@ public class Stop {
     //Fare zone for stop
     public String zoneId;
     public Boolean wheelchairBoarding;
+    //Transit mode of route on first pattern that uses this stop
+    public TransitModes mode;
 
     /**
      * Sets stopId, stop name and latitude, longitude and wheelchairBoarding from transitLayer
@@ -28,6 +30,16 @@ public class Stop {
      * @param transitLayer Transit Layer
      */
     public Stop(int stopIdx, TransitLayer transitLayer) {
+        this(stopIdx, transitLayer, false);
+    }
+
+    /**
+     * Sets stopId, stop name and latitude, longitude and wheelchairBoarding from transitLayer
+     *  @param stopIdx index of stop in transitLayer
+     * @param transitLayer Transit Layer
+     * @param fillMode if true TransitMode is filled
+     */
+    public Stop(int stopIdx, TransitLayer transitLayer, boolean fillMode) {
         stopId = transitLayer.stopIdForIndex.get(stopIdx);
         name = transitLayer.stopNames.get(stopIdx);
         VertexStore.Vertex vertex = transitLayer.parentNetwork.streetLayer.vertexStore.getCursor();
@@ -35,5 +47,17 @@ public class Stop {
         lat = (float) vertex.getLat();
         lon = (float) vertex.getLon();
         wheelchairBoarding = transitLayer.stopsWheelchair.get(stopIdx);
+
+        if (fillMode) {
+            final int[] patternidx = new int[1];
+            transitLayer.patternsForStop.get(stopIdx).forEach(p -> {
+                patternidx[0] = p;
+                return false;
+            });
+
+            com.conveyal.r5.transit.TripPattern pattern = transitLayer.tripPatterns.get(patternidx[0]);
+            RouteInfo routeInfo = transitLayer.routes.get(pattern.routeIndex);
+            mode = TransitLayer.getTransitModes(routeInfo.route_type);
+        }
     }
 }

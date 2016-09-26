@@ -207,10 +207,11 @@ public class Broker implements Runnable {
             // chances are it won't be done in 30 seconds, but we want to poll frequently to avoid issues with phasing
             try {
                 response.setHeader("Retry-After", "30");
-                response.sendError(503,
-                        "No workers available in this category, please retry shortly.");
+                response.setStatus(202, "No workers available in this category, please retry shortly");
+                Writer resWriter = response.getWriter();
+                JsonUtilities.objectMapper.writeValue(resWriter, new ClusterStatus(ClusterStatus.Status.CLUSTER_STARTING_UP));
             } catch (IOException e) {
-                LOG.error("Could not finish high-priority 503 response", e);
+                LOG.error("Could not finish high-priority task, 202 response", e);
             }
         }
 

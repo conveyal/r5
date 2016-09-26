@@ -174,9 +174,10 @@ class BrokerHttpHandler extends HttpHandler {
                 // Copy the result back to the connection that was the source of the task.
                 try {
                     ByteStreams.copy(request.getInputStream(), suspendedProducerResponse.getOutputStream());
-                } catch (IOException ioex) {
+                } catch (IOException | IllegalStateException ioex) {
                     // Apparently the task producer did not wait to retrieve its result. Priority task result delivery
                     // is not guaranteed, we don't need to retry, this is not considered an error by the worker.
+                    // IllegalStateException can happen if we're in offline mode and we've already returned a 202.
                 }
                 response.setStatus(HttpStatus.OK_200);
                 suspendedProducerResponse.setStatus(HttpStatus.OK_200);

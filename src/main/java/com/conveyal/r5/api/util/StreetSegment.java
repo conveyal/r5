@@ -149,6 +149,7 @@ public class StreetSegment {
                 prev = current;
             }
         }
+        newEdges.add(prev);
         streetEdges = newEdges;
 
     }

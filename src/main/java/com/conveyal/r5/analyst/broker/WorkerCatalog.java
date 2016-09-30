@@ -23,6 +23,9 @@ public class WorkerCatalog {
     /** Keeps the workers sorted into categories depending on which network and R5 commit they are running. */
     Multimap<WorkerCategory, String> workersByCategory = HashMultimap.create();
 
+    /** Sort the workers by graph only (used in offline mode) */
+    Multimap<String, String> workersByGraph = HashMultimap.create();
+
     /**
      * Record the fact that a worker with a particular ID was just seen connecting to the broker.
      */
@@ -33,6 +36,7 @@ public class WorkerCatalog {
             workersByCategory.remove(oldObservation.category, workerId);
         }
         workersByCategory.put(category, workerId);
+        workersByGraph.put(category.graphId, workerId);
     }
 
     public synchronized void purgeDeadWorkers () {
@@ -43,6 +47,7 @@ public class WorkerCatalog {
         ancientObservations.forEach(observation -> {
             observationsByWorkerId.remove(observation.workerId);
             workersByCategory.remove(observation.category, observation.workerId);
+            workersByGraph.remove(observation.category.graphId, observation.workerId);
         });
     }
 

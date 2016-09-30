@@ -210,6 +210,7 @@ public class Broker implements Runnable {
                 response.setStatus(202, "No workers available in this category, please retry shortly");
                 Writer resWriter = response.getWriter();
                 JsonUtilities.objectMapper.writeValue(resWriter, new ClusterStatus(ClusterStatus.Status.CLUSTER_STARTING_UP));
+                resWriter.close();
             } catch (IOException e) {
                 LOG.error("Could not finish high-priority task, 202 response", e);
             }
@@ -221,7 +222,10 @@ public class Broker implements Runnable {
         if (workersAvailable || workOffline) {
             task.taskId = nextTaskId++;
             newHighPriorityTasks.put(task.getWorkerCategory(), task);
-            highPriorityResponses.put(task.taskId, response);
+
+            // workers aren't available, don't suspend the response
+            if (workersAvailable) highPriorityResponses.put(task.taskId, response);
+
             // wait 100ms to deliver to workers in case another request comes in almost simultaneously
             timer.schedule(new TimerTask() {
                 @Override
@@ -305,7 +309,12 @@ public class Broker implements Runnable {
     public boolean workersAvailable (WorkerCategory category) {
         // Ensure we don't assign work to dead workers.
         workerCatalog.purgeDeadWorkers();
-        return !workerCatalog.workersByCategory.get(category).isEmpty();
+
+        if (workOffline) {
+            return !workerCatalog.workersByGraph.get(category.graphId).isEmpty();
+        } else {
+            return !workerCatalog.workersByCategory.get(category).isEmpty();
+        }
     }
 
     /** Create workers for a given job, if need be */

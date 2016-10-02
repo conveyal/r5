@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.broker.WorkerCategory;
+import com.conveyal.r5.publish.StaticMetadata;
 import com.conveyal.r5.publish.StaticSiteRequest;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
@@ -16,7 +17,9 @@ import java.io.Serializable;
 @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include= JsonTypeInfo.As.PROPERTY, property="type")
 @JsonSubTypes({
         @JsonSubTypes.Type(name = "static", value = StaticSiteRequest.PointRequest.class),
-        @JsonSubTypes.Type(name = "analyst", value = AnalystClusterRequest.class)
+        @JsonSubTypes.Type(name = "analyst", value = AnalystClusterRequest.class),
+        @JsonSubTypes.Type(name = "static-metadata", value = StaticMetadata.MetadataRequest.class),
+        @JsonSubTypes.Type(name = "static-stop-trees", value = StaticMetadata.StopTreeRequest.class)
 })
 public abstract class GenericClusterRequest implements Serializable {
 

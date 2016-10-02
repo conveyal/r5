@@ -11,6 +11,8 @@ import com.conveyal.r5.common.R5Version;
 import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.publish.StaticComputer;
+import com.conveyal.r5.publish.StaticDataStore;
+import com.conveyal.r5.publish.StaticMetadata;
 import com.conveyal.r5.publish.StaticSiteRequest;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -26,6 +28,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.config.SocketConfig;
 import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.entity.ByteArrayEntity;
+import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.message.BasicHeader;
@@ -35,6 +38,7 @@ import com.conveyal.r5.profile.RepeatedRaptorProfileRouter;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
+import org.glassfish.grizzly.Transport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -371,6 +375,12 @@ public class AnalystWorker implements Runnable {
             else if (clusterRequest instanceof StaticSiteRequest.PointRequest) {
                 transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, ((StaticSiteRequest.PointRequest) clusterRequest).request.request);
                 this.handleStaticSiteRequest((StaticSiteRequest.PointRequest) clusterRequest, transportNetwork, ts);
+            } else if (clusterRequest instanceof StaticMetadata.MetadataRequest) {
+                transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, ((StaticMetadata.MetadataRequest) clusterRequest).request.request);
+                this.handleStaticMetadataRequest((StaticMetadata.MetadataRequest) clusterRequest, transportNetwork, ts);
+            } else if (clusterRequest instanceof StaticMetadata.StopTreeRequest) {
+                transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, ((StaticMetadata.StopTreeRequest) clusterRequest).request.request);
+                this.handleStaticStopTrees((StaticMetadata.StopTreeRequest) clusterRequest, transportNetwork, ts);
             }
             else
                 LOG.error("Unrecognized request type {}", clusterRequest.getClass());
@@ -381,18 +391,120 @@ public class AnalystWorker implements Runnable {
         } catch (Exception ex) {
             LOG.error("An error occurred while routing", ex);
         }
-
     }
 
     /** handle a fancy new-fangled static site request */
     private void handleStaticSiteRequest (StaticSiteRequest.PointRequest request, TransportNetwork transportNetwork, TaskStatistics ts) {
-        new StaticComputer(request, transportNetwork, ts).run();
+        StaticComputer computer = new StaticComputer(request, transportNetwork, ts);
+
+        if (request.request.bucket != null) computer.run();
+        else {
+            PipedInputStream pis;
+            PipedOutputStream pos;
+
+            try {
+                pis = new PipedInputStream();
+                pos = new PipedOutputStream(pis);
+            } catch (IOException e) {
+                LOG.error("Error creating pipe streams", e);
+                return;
+            }
+
+            new Thread(() -> {
+                try {
+                    computer.write(pos);
+                    pos.close();
+                } catch (IOException e) {
+                    LOG.error("Could not write static output to broker", e);
+                }
+            }).start();
+
+            finishPriorityTask(request, pis);
+        }
 
         // mark the task as complete
         deleteRequest(request);
     }
 
+    /** produce static metadata */
+    private void handleStaticMetadataRequest (StaticMetadata.MetadataRequest request, TransportNetwork transportNetwork, TaskStatistics ts) {
+        StaticMetadata staticMetadata = new StaticMetadata(request.request, transportNetwork); // TODO task statistics
+
+        if (request.request.bucket != null) {
+            try {
+                OutputStream os = StaticDataStore.getOutputStream(request.request, "query.json", "application/json");
+                staticMetadata.writeMetadata(os);
+            } catch (IOException e) {
+                LOG.error("Error creating static metadata", e);
+            }
+
+            deleteRequest(request);
+        } else {
+            PipedInputStream pis;
+            PipedOutputStream pos;
+
+            try {
+                pis = new PipedInputStream();
+                pos = new PipedOutputStream(pis);
+            } catch (IOException e) {
+                LOG.error("Error creating pipes", e);
+                return;
+            }
+
+            new Thread(() -> {
+                try {
+                    staticMetadata.writeMetadata(pos);
+                    pos.close();
+                } catch (IOException e) {
+                    LOG.error("Error writing static metadata to broker", e);
+                }
+            }).start();
+
+            finishPriorityTask(request, pis);
+        }
+    }
+
+    /** Produce static stop trees */
+    private void handleStaticStopTrees (StaticMetadata.StopTreeRequest request, TransportNetwork transportNetwork, TaskStatistics ts) {
+        StaticMetadata staticMetadata = new StaticMetadata(request.request, transportNetwork); // TODO task statistics
+
+        if (request.request.bucket != null) {
+            try {
+                OutputStream os = StaticDataStore.getOutputStream(request.request, "query.json", "application/octet-stream");
+                staticMetadata.writeStopTrees(os);
+                os.close();
+            } catch (IOException e) {
+                LOG.error("Error creating static metadata", e);
+            }
+
+            deleteRequest(request);
+        } else {
+            PipedInputStream pis;
+            PipedOutputStream pos;
+
+            try {
+                pis = new PipedInputStream();
+                pos = new PipedOutputStream(pis);
+            } catch (IOException e) {
+                LOG.error("Error creating pipes", e);
+                return;
+            }
+
+            new Thread(() -> {
+                try {
+                    staticMetadata.writeStopTrees(pos);
+                    pos.close();
+                } catch (IOException e) {
+                    LOG.error("Error writing static metadata to broker", e);
+                }
+            }).start();
+
+            finishPriorityTask(request, pis);
+        }
+    }
+
     /** Handle a stock Analyst request */
+    // TODO refactor into separate class
     private void handleAnalystRequest (AnalystClusterRequest clusterRequest, TaskStatistics ts) {
         long startTime = System.currentTimeMillis();
 
@@ -480,7 +592,31 @@ public class AnalystWorker implements Runnable {
         if (clusterRequest.outputLocation == null) {
             // No output location was provided. Instead of saving the result on S3,
             // return the result immediately via a connection held open by the broker and mark the task completed.
-            finishPriorityTask(clusterRequest, envelope);
+            PipedInputStream is = new PipedInputStream();
+
+            try {
+                PipedOutputStream pos = new PipedOutputStream(is);
+
+                final ResultEnvelope finalEnvelope = envelope; // dodge effectively final nonsense
+
+                new Thread(() -> {
+                    try {
+                        JsonUtilities.objectMapper.writeValue(pos, finalEnvelope);
+                    } catch (IOException e) {
+                        LOG.info("Error writing single-point result to broker", e);
+
+                        try {
+                            pos.close();
+                        } catch (IOException e2) {
+                            // do nothing
+                        }
+                    }
+                }).start();
+            } catch (IOException e) {
+                LOG.info("Error writing single-point result to broker", e);
+            }
+
+            finishPriorityTask(clusterRequest, is);
         } else {
             // Save the result on S3 for retrieval by the UI.
             saveBatchTaskResults(clusterRequest, envelope);
@@ -600,14 +736,13 @@ public class AnalystWorker implements Runnable {
     /**
      * Signal the broker that the given high-priority task is completed, providing a result.
      */
-    public void finishPriorityTask(GenericClusterRequest clusterRequest, Object result) {
+    public void finishPriorityTask(GenericClusterRequest clusterRequest, InputStream result) {
         String url = BROKER_BASE_URL + String.format("/complete/priority/%s", clusterRequest.taskId);
         HttpPost httpPost = new HttpPost(url);
         try {
             // TODO reveal any errors etc. that occurred on the worker.
-            // Really this should probably be done with an InputStreamEntity and a JSON writer thread.
-            byte[] serializedResult = objectMapper.writeValueAsBytes(result);
-            httpPost.setEntity(new ByteArrayEntity(serializedResult));
+
+            httpPost.setEntity(new InputStreamEntity(result));
             HttpResponse response = httpClient.execute(httpPost);
             // Signal the http client library that we're done with this response object, allowing connection reuse.
             EntityUtils.consumeQuietly(response.getEntity());

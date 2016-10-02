@@ -1,6 +1,7 @@
 package com.conveyal.r5.publish;
 
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
+import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -53,7 +54,8 @@ public class StaticMetadata implements Runnable {
             return;
         }
 
-        // write transitive data
+        // write transitive data (optional at this point but retains compatibility with older clients that don't get the
+        // transitive data from query.json)
         try {
             OutputStream os = StaticDataStore.getOutputStream(request, "transitive.json", "application/json");
             writeTransitiveData(os);
@@ -80,6 +82,7 @@ public class StaticMetadata implements Runnable {
         metadata.width = ps.width;
         metadata.height = ps.height;
         metadata.transportNetwork = request.transportNetworkId;
+        metadata.transitiveData = new TransitiveNetwork(network.transitLayer);
         metadata.request = request.request;
 
         JsonUtilities.objectMapper.writeValue(out, metadata);
@@ -167,5 +170,25 @@ public class StaticMetadata implements Runnable {
         public String transportNetwork;
 
         public ProfileRequest request;
+
+        public TransitiveNetwork transitiveData;
+    }
+
+    /** A request for the cluster to produce static metadata */
+    public static class MetadataRequest extends GenericClusterRequest {
+        public StaticSiteRequest request;
+
+        public String getType () {
+            return "static-metadata";
+        }
+    }
+
+    /** A request for the cluster to produce static stop trees */
+    public static class StopTreeRequest extends GenericClusterRequest {
+        public StaticSiteRequest request;
+
+        public String getType () {
+            return "static-stop-trees";
+        }
     }
 }

@@ -178,17 +178,13 @@ public class StaticMetadata implements Runnable {
     public static class MetadataRequest extends GenericClusterRequest {
         public StaticSiteRequest request;
 
-        public String getType () {
-            return "static-metadata";
-        }
+        public final String type = "static-metadata";
     }
 
     /** A request for the cluster to produce static stop trees */
     public static class StopTreeRequest extends GenericClusterRequest {
         public StaticSiteRequest request;
 
-        public String getType () {
-            return "static-stop-trees";
-        }
+        public final String type = "static-stop-trees";
     }
 }

@@ -31,6 +31,9 @@ after_success:
 
 sudo: false
 
+git:
+  depth: 150 # how many commits to clone, need to catch most recent tag for describe and 50 may not be enough
+
 cache:
   directories:
   - $HOME/.m2/repository

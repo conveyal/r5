@@ -23,9 +23,20 @@ public class RaptorState {
     /** Best times to reach stops, whether via a transfer or via transit directly */
     public int[] bestTimes;
 
+    /** wait time for transit, parallel to bestTimes */
+    public int[] waitTime;
+
+    /** in-vehicle travel time, parallel to bestTimes */
+    public int[] inVehicleTravelTime;
+
     /** The best times for reaching stops via transit rather than via a transfer from another stop */
     public int[] bestNonTransferTimes;
 
+    /** wait time for transit, parallel to bestNonTransferTimes */
+    public int[] nonTransferWaitTime;
+
+    /** in-vehicle travel time, parallel to bestNonTransferTimes */
+    public int[] nonTransferInVehicleTravelTime;
 
     /**
      * The previous pattern used to get to this stop, parallel to bestNonTransferTimes.
@@ -59,6 +70,11 @@ public class RaptorState {
         Arrays.fill(previousPatterns, -1);
         Arrays.fill(previousStop, -1);
         Arrays.fill(transferStop, -1);
+
+        this.inVehicleTravelTime = new int[nStops];
+        this.waitTime = new int[nStops];
+        this.nonTransferWaitTime = new int[nStops];
+        this.nonTransferInVehicleTravelTime = new int[nStops];
     }
 
     /**
@@ -70,6 +86,10 @@ public class RaptorState {
         this.previousPatterns = Arrays.copyOf(state.previousPatterns, state.previousPatterns.length);
         this.previousStop = Arrays.copyOf(state.previousStop, state.previousStop.length);
         this.transferStop = Arrays.copyOf(state.transferStop, state.transferStop.length);
+        this.waitTime = Arrays.copyOf(state.waitTime, state.waitTime.length);
+        this.inVehicleTravelTime = Arrays.copyOf(state.inVehicleTravelTime, state.inVehicleTravelTime.length);
+        this.nonTransferWaitTime = Arrays.copyOf(state.nonTransferWaitTime, state.nonTransferWaitTime.length);
+        this.nonTransferInVehicleTravelTime = Arrays.copyOf(state.nonTransferInVehicleTravelTime, state.nonTransferInVehicleTravelTime.length);
         this.departureTime = state.departureTime;
         this.previous = state;
     }
@@ -89,12 +109,18 @@ public class RaptorState {
             if (other.bestTimes[stop] <= this.bestTimes[stop]) {
                 this.bestTimes[stop] = other.bestTimes[stop];
                 this.transferStop[stop] = other.transferStop[stop];
+                this.inVehicleTravelTime[stop] = other.inVehicleTravelTime[stop];
+                // add in any additional wait at the beginning in the range raptor case.
+                this.waitTime[stop] = other.waitTime[stop] + (other.departureTime - this.departureTime);
             }
 
             if (other.bestNonTransferTimes[stop] <= this.bestNonTransferTimes[stop]) {
                 this.bestNonTransferTimes[stop] = other.bestNonTransferTimes[stop];
                 this.previousPatterns[stop] = other.previousPatterns[stop];
                 this.previousStop[stop] = other.previousStop[stop];
+                this.nonTransferInVehicleTravelTime[stop] = other.nonTransferInVehicleTravelTime[stop];
+                // add in any additional wait at the beginning in the range raptor case.
+                this.nonTransferWaitTime[stop] = other.nonTransferWaitTime[stop] + (other.departureTime - this.departureTime);
             }
         }
     }
@@ -126,5 +152,18 @@ public class RaptorState {
         }
 
         return ret;
+    }
+
+    public void setDepartureTime(int departureTime) {
+        int previousDepartureTime = this.departureTime;
+        this.departureTime = departureTime;
+
+        // handle updating wait
+        for (int stop = 0; stop < this.bestTimes.length; stop++) {
+            if (this.previousPatterns[stop] > -1) {
+                this.nonTransferWaitTime[stop] += previousDepartureTime - departureTime;
+                this.waitTime[stop] += previousDepartureTime - departureTime;
+            }
+        }
     }
 }

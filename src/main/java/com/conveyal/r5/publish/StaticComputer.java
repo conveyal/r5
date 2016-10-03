@@ -2,6 +2,7 @@ package com.conveyal.r5.publish;
 
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
+import com.conveyal.r5.profile.PathWithTimes;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.RaptorState;
@@ -11,6 +12,8 @@ import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.google.common.io.LittleEndianDataOutputStream;
+import gnu.trove.iterator.TIntIntIterator;
+import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
 import org.slf4j.Logger;
@@ -58,11 +61,20 @@ public class StaticComputer implements Runnable {
         StreetRouter sr = new StreetRouter(network.streetLayer);
         sr.distanceLimitMeters = 2000;
         sr.setOrigin(lat, lon);
+        sr.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
         sr.route();
 
         // tell the Raptor Worker that we want a travel time to each stop by leaving the point set null
         RaptorWorker worker = new RaptorWorker(network.transitLayer, null, req.request.request);
-        StaticPropagatedTimesStore pts = (StaticPropagatedTimesStore) worker.runRaptor(sr.getReachedStops(), null, ts);
+
+        TIntIntMap accessTimes = sr.getReachedStops();
+
+        for (TIntIntIterator it = accessTimes.iterator(); it.hasNext();) {
+            it.advance();
+            it.setValue(it.value() / (int) (req.request.request.walkSpeed * 1000));
+        }
+
+        StaticPropagatedTimesStore pts = (StaticPropagatedTimesStore) worker.runRaptor(accessTimes, null, ts);
 
         // get non-transit times
         // pointset around the search origin.
@@ -102,19 +114,37 @@ public class StaticComputer implements Runnable {
             TObjectIntMap<Path> paths = new TObjectIntHashMap<>();
             List<Path> pathList = new ArrayList<>();
 
+            int previousInVehicleTravelTime = 0;
+            int previousWaitTime = 0;
+
             for (int iter = 0; iter < iterations; iter++) {
+                RaptorState state = worker.statesEachIteration.get(iter);
+
                 int time = pts.times[iter][stop];
                 if (time == Integer.MAX_VALUE) time = -1;
+                else time /= 60;
 
                 out.writeInt(time - prev);
                 prev = time;
 
+                int inVehicleTravelTime = state.inVehicleTravelTime[stop] / 60;
+                out.writeInt(inVehicleTravelTime - previousInVehicleTravelTime);
+                previousInVehicleTravelTime = inVehicleTravelTime;
+
+                int waitTime = state.waitTime[stop] / 60;
+                out.writeInt(waitTime - previousWaitTime);
+                previousWaitTime = waitTime;
+
+                if (waitTime > 255) {
+                    LOG.info("detected excessive wait");
+                }
+
                 // write out which path to use, delta coded
                 int pathIdx = -1;
 
-                RaptorState state = worker.statesEachIteration.get(iter);
                 // only compute a path if this stop was reached
                 if (state.bestNonTransferTimes[stop] != RaptorWorker.UNREACHED) {
+                    // TODO reuse pathwithtimes?
                     Path path = new Path(state, stop);
                     if (!paths.containsKey(path)) {
                         paths.put(path, maxPathIdx++);

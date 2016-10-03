@@ -251,7 +251,7 @@ public class RaptorWorker {
 
             // Compensate for Java obnoxious policies on "effectively final" variables in closures
             final int departureTimeFinal = departureTime;
-            scheduleState.stream().forEach(rs -> rs.departureTime = departureTimeFinal);
+            scheduleState.stream().forEach(rs -> rs.setDepartureTime(departureTimeFinal));
 
             // Run the search on only the scheduled routes (not frequency-based routes) at this departure minute.
             this.runRaptorScheduled(initialStops, departureTime);
@@ -666,6 +666,11 @@ public class RaptorWorker {
                     if (remainOnBoardTime != Integer.MAX_VALUE && remainOnBoardTime < max_time) {
                         if (outputState.bestNonTransferTimes[stopIndex] > remainOnBoardTime) {
                             outputState.bestNonTransferTimes[stopIndex] = remainOnBoardTime;
+
+                            // save wait and travel time statistics
+                            outputState.nonTransferInVehicleTravelTime[stopIndex] = inputState.nonTransferInVehicleTravelTime[bestFreqBoardStopIndex] + remainOnBoardTime - bestFreqBoardTime;
+                            outputState.nonTransferWaitTime[stopIndex] = inputState.waitTime[bestFreqBoardStopIndex] + bestFreqBoardTime - inputState.bestTimes[bestFreqBoardStopIndex];
+
                             outputState.previousPatterns[stopIndex] = p;
                             outputState.previousStop[stopIndex] = bestFreqBoardStopIndex;
 
@@ -675,6 +680,8 @@ public class RaptorWorker {
                             if (outputState.bestTimes[stopIndex] > remainOnBoardTime) {
                                 outputState.bestTimes[stopIndex] = remainOnBoardTime;
                                 outputState.transferStop[stopIndex] = -1; // not reached via a transfer
+                                outputState.inVehicleTravelTime[stopIndex] = inputState.inVehicleTravelTime[bestFreqBoardStopIndex] + remainOnBoardTime - bestFreqBoardTime;
+                                outputState.waitTime[stopIndex] = inputState.waitTime[bestFreqBoardStopIndex] + bestFreqBoardTime - inputState.bestTimes[bestFreqBoardStopIndex];
                             }
 
                             if (outputState.bestNonTransferTimes[stopIndex] > inputState.bestNonTransferTimes[stopIndex] ||
@@ -703,6 +710,7 @@ public class RaptorWorker {
             TripSchedule onTrip = null;
             int onTripIdx = -1;
             int boardStopIndex = -1;
+            int boardTime = 0;
             stopPositionInPattern = -1;
             for (int stopIndex : timetable.stops) {
                 stopPositionInPattern += 1;
@@ -725,6 +733,7 @@ public class RaptorWorker {
                             onTrip = trip;
                             onTripIdx = tripIdx;
                             boardStopIndex = stopIndex;
+                            boardTime = dep;
                             break; // trips are sorted, we've found the earliest usable one
                         }
                     }
@@ -743,6 +752,13 @@ public class RaptorWorker {
                         outputState.bestNonTransferTimes[stopIndex] = arrivalTime;
                         outputState.previousPatterns[stopIndex] = p;
                         outputState.previousStop[stopIndex] = boardStopIndex;
+                        outputState.nonTransferInVehicleTravelTime[stopIndex] = inputState.inVehicleTravelTime[boardStopIndex] + arrivalTime - boardTime;
+                        outputState.nonTransferWaitTime[stopIndex] = inputState.waitTime[boardStopIndex] + boardTime - inputState.bestTimes[boardStopIndex];
+
+                        if (outputState.nonTransferWaitTime[stopIndex] > outputState.bestNonTransferTimes[stopIndex] - outputState.departureTime) {
+                            LOG.error("Wait time exceeds travel time:\n{}", outputState.dump(stopIndex));
+                            LOG.error("This is a bug");
+                        }
 
                         stopsTouchedThisRound.set(stopIndex);
                         stopsTouchedThisSearch.set(stopIndex);
@@ -750,6 +766,8 @@ public class RaptorWorker {
                         if (arrivalTime < outputState.bestTimes[stopIndex]) {
                             outputState.bestTimes[stopIndex] = arrivalTime;
                             outputState.transferStop[stopIndex] = -1; // not reached via transfer
+                            outputState.inVehicleTravelTime[stopIndex] = inputState.inVehicleTravelTime[boardStopIndex] + arrivalTime - boardTime;
+                            outputState.waitTime[stopIndex] = inputState.waitTime[boardStopIndex] + boardTime - inputState.bestTimes[boardStopIndex];
                         }
                     }
 
@@ -769,6 +787,7 @@ public class RaptorWorker {
                                 onTripIdx = bestTripIdx;
                                 onTrip = trip;
                                 boardStopIndex = stopIndex;
+                                boardTime = trip.departures[stopPositionInPattern];
                             } else {
                                 // This trip arrives at this stop too early. Trips are sorted by time, don't keep looking.
                                 break;
@@ -813,6 +832,8 @@ public class RaptorWorker {
                 int toTime = fromTime + distance / walkSpeedMillimetersPerSecond;
                 if (toTime < max_time && toTime < state.bestTimes[toStop]) {
                     state.bestTimes[toStop] = toTime;
+                    state.waitTime[toStop] = state.nonTransferWaitTime[stop];
+                    state.inVehicleTravelTime[toStop] = state.nonTransferInVehicleTravelTime[stop];
                     state.transferStop[toStop] = stop;
                     markPatternsForStop(toStop);
                 }

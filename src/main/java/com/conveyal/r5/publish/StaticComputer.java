@@ -1,5 +1,6 @@
 package com.conveyal.r5.publish;
 
+import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
 import com.conveyal.r5.profile.PathWithTimes;
@@ -10,12 +11,19 @@ import com.conveyal.r5.profile.RaptorWorker;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.StreetRouter;
+import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.google.common.io.LittleEndianDataOutputStream;
+import com.vividsolutions.jts.geom.Coordinate;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
+import org.geotools.geometry.jts.JTS;
+import org.geotools.referencing.CRS;
+import org.geotools.referencing.crs.DefaultGeographicCRS;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.referencing.operation.TransformException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,8 +77,25 @@ public class StaticComputer implements Runnable {
 
         TIntIntMap accessTimes = sr.getReachedStops();
 
+        int sumStreetDistanceMm = 0;
+        int sumCrowDistanceMm = 0;
+
+        VertexStore.Vertex cursor = network.streetLayer.vertexStore.getCursor();
+
         for (TIntIntIterator it = accessTimes.iterator(); it.hasNext();) {
             it.advance();
+            sumStreetDistanceMm += it.value();
+
+            cursor.seek(network.transitLayer.streetVertexForStop.get(it.key()));
+            Coordinate stopCoord = new Coordinate(cursor.getLon(), cursor.getLat());
+            Coordinate originCoord = new Coordinate(lon, lat);
+
+            try {
+                sumCrowDistanceMm += JTS.orthodromicDistance(originCoord, stopCoord, DefaultGeographicCRS.WGS84) * 1000;
+            } catch (TransformException te) {
+                // do nothing
+            }
+            
             it.setValue(it.value() / (int) (req.request.request.walkSpeed * 1000));
         }
 

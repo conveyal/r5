@@ -153,7 +153,7 @@ public abstract class TraversalPermissionLabeler {
 
     /**
      *  Adds Allows bike to backward direction if one of those is true:
-     *  - cycleway=opposite
+     *  - cycleway= starts with opposite (can be opposite_track or opposite_lane)
      *  - cycleway:left starts with opposite (can be opposite_track or opposite_lane)
      *  - cycleway:right starts with opposite (can be opposite_track or opposite_lane)
      * @param way
@@ -162,8 +162,9 @@ public abstract class TraversalPermissionLabeler {
     private void applyOppositeBicyclePermissions(Way way, EnumSet<EdgeStore.EdgeFlag> backward) {
         String cyclewayLeftTagValue = way.getTag("cycleway:left");
         String cyclewayRightTagValue = way.getTag("cycleway:right");
+        String cyclewayTagValue = way.getTag("cycleway");
         boolean addedBikePermissions = false;
-        if (way.hasTag("cycleway", "opposite")) {
+        if (cyclewayTagValue != null && cyclewayTagValue.startsWith("opposite")) {
             backward.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
             addedBikePermissions = true;
         } else if (cyclewayRightTagValue != null) {

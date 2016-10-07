@@ -76,6 +76,12 @@ public class TypeOfEdgeLabelerTest {
             {"directional cycleway", "highway=nobikenoped;cycleway:left=lane", TraversalPermissionLabelerTest.CAR, CAR_CYCLEWAY},
             {"directional cycleway", "highway=cycleway;oneway=true", PEDESTRIAN_BIKE_CYCLEWAY, TraversalPermissionLabelerTest.PEDESTRIAN},
             {"directional cycleway", "highway=cycleway", PEDESTRIAN_BIKE_CYCLEWAY, PEDESTRIAN_BIKE_CYCLEWAY},
+            {"oneway streets with opposite lane cycleway", "highway=residential;cycleway=opposite_lane;oneway=yes", EnumSet.of(
+                EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
+                EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR), PEDESTRIAN_BIKE_CYCLEWAY},
+            {"oneway reversed street with opposite lane cycleway", "highway=residential;cycleway=opposite_lane;oneway=-1", PEDESTRIAN_BIKE_CYCLEWAY, EnumSet.of(
+                EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
+                EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR)},
         } );
 
 

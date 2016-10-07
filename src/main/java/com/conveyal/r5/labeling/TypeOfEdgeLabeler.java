@@ -30,16 +30,29 @@ public class TypeOfEdgeLabeler {
             }
         }
 
-        //TODO: opposite_track and opposite_lane
+        boolean has_cycleway_opposite = way.hasTag("cycleway", "opposite_lane") || way.hasTag("cycleway", "opposite_track");
+
         if (back) {
             String cycleway_left = way.getTag("cycleway:left");
             if (cycleway_left != null && TraversalPermissionLabeler.Label.fromTag(cycleway_left) == TraversalPermissionLabeler.Label.YES) {
                 return true;
             }
+            //if Oneway=true and has cycleway=opposite_lane/track return true on backward edge
+            if (has_cycleway_opposite && way.hasTag("oneway")) {
+                if (TraversalPermissionLabeler.Label.fromTag(way.getTag("oneway")) == TraversalPermissionLabeler.Label.YES) {
+                    return true;
+                }
+            }
         } else {
             String cycleway_right = way.getTag("cycleway:right");
             if (cycleway_right != null && TraversalPermissionLabeler.Label.fromTag(cycleway_right) == TraversalPermissionLabeler.Label.YES) {
                 return true;
+            }
+            //if Oneway=reverse and has cycleway=opposite_lane/track return true on forward edge
+            if (has_cycleway_opposite && way.hasTag("oneway")) {
+                if (way.getTag("oneway").equals("-1") || way.getTag("oneway").equals("reverse")) {
+                    return true;
+                }
             }
         }
         return false;

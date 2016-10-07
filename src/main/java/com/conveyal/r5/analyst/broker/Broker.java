@@ -198,9 +198,10 @@ public class Broker implements Runnable {
     /**
      * Enqueue a task for execution ASAP, planning to return the response over the same HTTP connection.
      * Low-reliability, no re-delivery.
+     *
+     * Returns true if the task was delivered and the caller should suspend the response.
      */
-    public synchronized void enqueuePriorityTask (GenericClusterRequest task, Response response) {
-
+    public synchronized boolean enqueuePriorityTask (GenericClusterRequest task, Response response) {
         boolean workersAvailable = workersAvailable(task.getWorkerCategory());
         if (!workersAvailable) {
             createWorkersInCategory(task.getWorkerCategory());
@@ -211,6 +212,7 @@ public class Broker implements Runnable {
                 Writer resWriter = response.getWriter();
                 JsonUtilities.objectMapper.writeValue(resWriter, new ClusterStatus(ClusterStatus.Status.CLUSTER_STARTING_UP));
                 resWriter.close();
+                response.finish();
             } catch (IOException e) {
                 LOG.error("Could not finish high-priority task, 202 response", e);
             }
@@ -236,6 +238,9 @@ public class Broker implements Runnable {
         }
 
         // do not notify task delivery thread just yet as we haven't put anything in the task delivery queue yet.
+
+        // if workers were available, the caller should wait. Otherwise just return the 202
+        return workersAvailable;
     }
 
     /** Attempt to deliver high priority tasks via side channels, or move them into normal channels if need be. */

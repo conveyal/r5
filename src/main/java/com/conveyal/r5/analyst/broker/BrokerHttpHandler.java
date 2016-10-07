@@ -129,13 +129,14 @@ class BrokerHttpHandler extends HttpHandler {
                     // Enqueue a single priority task.
                     GenericClusterRequest task =
                             mapper.readValue(request.getInputStream(), GenericClusterRequest.class);
-                    broker.enqueuePriorityTask(task, response);
-                    // Enqueueing the priority task has set its internal taskId.
-                    // TODO move all removal listener registration into the broker functions.
-                    request.getRequest().getConnection()
-                            .addCloseListener((closeable, iCloseType) -> broker.deletePriorityTask(task.taskId));
-                    // The request object will be shelved and survive after the handler function exits.
-                    response.suspend();
+                    if (broker.enqueuePriorityTask(task, response)) {
+                        // Enqueueing the priority task has set its internal taskId.
+                        // TODO move all removal listener registration into the broker functions.
+                        request.getRequest().getConnection()
+                                .addCloseListener((closeable, iCloseType) -> broker.deletePriorityTask(task.taskId));
+                        // The request object will be shelved and survive after the handler function exits.
+                        response.suspend();
+                    }
                     return;
                 }
                 else if ("regional".equals(workType)) {

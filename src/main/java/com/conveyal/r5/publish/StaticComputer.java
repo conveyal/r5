@@ -77,25 +77,8 @@ public class StaticComputer implements Runnable {
 
         TIntIntMap accessTimes = sr.getReachedStops();
 
-        int sumStreetDistanceMm = 0;
-        int sumCrowDistanceMm = 0;
-
-        VertexStore.Vertex cursor = network.streetLayer.vertexStore.getCursor();
-
         for (TIntIntIterator it = accessTimes.iterator(); it.hasNext();) {
             it.advance();
-            sumStreetDistanceMm += it.value();
-
-            cursor.seek(network.transitLayer.streetVertexForStop.get(it.key()));
-            Coordinate stopCoord = new Coordinate(cursor.getLon(), cursor.getLat());
-            Coordinate originCoord = new Coordinate(lon, lat);
-
-            try {
-                sumCrowDistanceMm += JTS.orthodromicDistance(originCoord, stopCoord, DefaultGeographicCRS.WGS84) * 1000;
-            } catch (TransformException te) {
-                // do nothing
-            }
-            
             it.setValue(it.value() / (int) (req.request.request.walkSpeed * 1000));
         }
 

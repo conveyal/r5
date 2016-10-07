@@ -163,6 +163,9 @@ public class AnalystWorker implements Runnable {
      */
     private ThreadPoolExecutor highPriorityExecutor, batchExecutor;
 
+    /** Thread pool executor for delivering priority tasks. */
+    private ThreadPoolExecutor taskDeliveryExecutor;
+
     public AnalystWorker(Properties config) {
         // print out date on startup so that CloudWatch logs has a unique fingerprint
         LOG.info("Analyst worker starting at {}", LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
@@ -248,6 +251,10 @@ public class AnalystWorker implements Runnable {
         highPriorityExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         batchExecutor = new ThreadPoolExecutor(1, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(nP * 2));
         batchExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+
+        taskDeliveryExecutor = new ThreadPoolExecutor(1, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
+        // can't use CallerRunsPolicy as that would cause deadlocks, calling thread is writing to inputstream
+        taskDeliveryExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
 
         // If an initial graph ID was provided in the config file, build that TransportNetwork on startup.
         // Prebuilding the graph is necessary because, if the graph is not cached it can take several
@@ -399,27 +406,18 @@ public class AnalystWorker implements Runnable {
 
         if (request.request.bucket != null) computer.run();
         else {
-            PipedInputStream pis;
-            PipedOutputStream pos;
-
             try {
-                pis = new PipedInputStream();
-                pos = new PipedOutputStream(pis);
+                PipedInputStream pis = new PipedInputStream();
+                PipedOutputStream pos = new PipedOutputStream(pis);
+
+                // This will return immediately as the streaming is done in a new thread.
+                finishPriorityTask(request, pis);
+
+                computer.write(pos);
+                pos.close();
             } catch (IOException e) {
-                LOG.error("Error creating pipe streams", e);
-                return;
+                LOG.error("Could not write static output to broker", e);
             }
-
-            new Thread(() -> {
-                try {
-                    computer.write(pos);
-                    pos.close();
-                } catch (IOException e) {
-                    LOG.error("Could not write static output to broker", e);
-                }
-            }).start();
-
-            finishPriorityTask(request, pis);
         }
 
         // mark the task as complete
@@ -440,27 +438,18 @@ public class AnalystWorker implements Runnable {
 
             deleteRequest(request);
         } else {
-            PipedInputStream pis;
-            PipedOutputStream pos;
-
             try {
-                pis = new PipedInputStream();
-                pos = new PipedOutputStream(pis);
+                PipedInputStream pis = new PipedInputStream();
+                PipedOutputStream pos = new PipedOutputStream(pis);
+
+                finishPriorityTask(request, pis);
+
+                staticMetadata.writeMetadata(pos);
+                pos.close();
             } catch (IOException e) {
-                LOG.error("Error creating pipes", e);
-                return;
+                LOG.error("Error writing static metadata to broker", e);
             }
 
-            new Thread(() -> {
-                try {
-                    staticMetadata.writeMetadata(pos);
-                    pos.close();
-                } catch (IOException e) {
-                    LOG.error("Error writing static metadata to broker", e);
-                }
-            }).start();
-
-            finishPriorityTask(request, pis);
         }
     }
 
@@ -474,32 +463,22 @@ public class AnalystWorker implements Runnable {
                 staticMetadata.writeStopTrees(os);
                 os.close();
             } catch (IOException e) {
-                LOG.error("Error creating static metadata", e);
+                LOG.error("Error creating static stop trees", e);
             }
 
             deleteRequest(request);
         } else {
-            PipedInputStream pis;
-            PipedOutputStream pos;
-
             try {
-                pis = new PipedInputStream();
-                pos = new PipedOutputStream(pis);
+                PipedInputStream pis = new PipedInputStream();
+                PipedOutputStream pos = new PipedOutputStream(pis);
+
+                finishPriorityTask(request, pis);
+
+                staticMetadata.writeStopTrees(pos);
+                pos.close();
             } catch (IOException e) {
-                LOG.error("Error creating pipes", e);
-                return;
+                LOG.error("Error writing static stop trees to broker", e);
             }
-
-            new Thread(() -> {
-                try {
-                    staticMetadata.writeStopTrees(pos);
-                    pos.close();
-                } catch (IOException e) {
-                    LOG.error("Error writing static metadata to broker", e);
-                }
-            }).start();
-
-            finishPriorityTask(request, pis);
         }
     }
 
@@ -592,31 +571,20 @@ public class AnalystWorker implements Runnable {
         if (clusterRequest.outputLocation == null) {
             // No output location was provided. Instead of saving the result on S3,
             // return the result immediately via a connection held open by the broker and mark the task completed.
-            PipedInputStream is = new PipedInputStream();
-
             try {
+                PipedInputStream is = new PipedInputStream();
                 PipedOutputStream pos = new PipedOutputStream(is);
 
+                // this returns immediately and streams output to the server in a second thread
+                finishPriorityTask(clusterRequest, is);
+
                 final ResultEnvelope finalEnvelope = envelope; // dodge effectively final nonsense
-
-                new Thread(() -> {
-                    try {
-                        JsonUtilities.objectMapper.writeValue(pos, finalEnvelope);
-                    } catch (IOException e) {
-                        LOG.info("Error writing single-point result to broker", e);
-
-                        try {
-                            pos.close();
-                        } catch (IOException e2) {
-                            // do nothing
-                        }
-                    }
-                }).start();
+                JsonUtilities.objectMapper.writeValue(pos, finalEnvelope);
+                pos.close();
             } catch (IOException e) {
                 LOG.info("Error writing single-point result to broker", e);
             }
 
-            finishPriorityTask(clusterRequest, is);
         } else {
             // Save the result on S3 for retrieval by the UI.
             saveBatchTaskResults(clusterRequest, envelope);
@@ -734,29 +702,33 @@ public class AnalystWorker implements Runnable {
     }
 
     /**
-     * Signal the broker that the given high-priority task is completed, providing a result.
+     * Signal the broker that the given high-priority task is completed, providing a result. Runs in a new thread
+     * so that input stream can be written to by the calling thread. This avoid broken pipes because the calling thread
+     * died.
      */
     public void finishPriorityTask(GenericClusterRequest clusterRequest, InputStream result) {
         String url = BROKER_BASE_URL + String.format("/complete/priority/%s", clusterRequest.taskId);
         HttpPost httpPost = new HttpPost(url);
-        try {
-            // TODO reveal any errors etc. that occurred on the worker.
 
-            httpPost.setEntity(new InputStreamEntity(result));
-            HttpResponse response = httpClient.execute(httpPost);
-            // Signal the http client library that we're done with this response object, allowing connection reuse.
-            EntityUtils.consumeQuietly(response.getEntity());
-            if (response.getStatusLine().getStatusCode() == 200) {
-                LOG.info("Successfully marked task {} as completed.", clusterRequest.taskId);
-            } else if (response.getStatusLine().getStatusCode() == 404) {
-                LOG.info("Task {} was not marked as completed because it doesn't exist.", clusterRequest.taskId);
-            } else {
-                LOG.info("Failed to mark task {} as completed, ({}).", clusterRequest.taskId,
-                        response.getStatusLine());
+        // TODO reveal any errors etc. that occurred on the worker.
+        httpPost.setEntity(new InputStreamEntity(result));
+        taskDeliveryExecutor.execute(() -> {
+            try {
+                HttpResponse response = httpClient.execute(httpPost);
+                // Signal the http client library that we're done with this response object, allowing connection reuse.
+                EntityUtils.consumeQuietly(response.getEntity());
+                if (response.getStatusLine().getStatusCode() == 200) {
+                    LOG.info("Successfully marked task {} as completed.", clusterRequest.taskId);
+                } else if (response.getStatusLine().getStatusCode() == 404) {
+                    LOG.info("Task {} was not marked as completed because it doesn't exist.", clusterRequest.taskId);
+                } else {
+                    LOG.info("Failed to mark task {} as completed, ({}).", clusterRequest.taskId,
+                            response.getStatusLine());
+                }
+            } catch (Exception e) {
+                LOG.warn("Failed to mark task {} as completed.", clusterRequest.taskId, e);
             }
-        } catch (Exception e) {
-            LOG.warn("Failed to mark task {} as completed.", clusterRequest.taskId, e);
-        }
+        });
     }
 
     /**

@@ -668,7 +668,7 @@ public class RaptorWorker {
                             outputState.bestNonTransferTimes[stopIndex] = remainOnBoardTime;
 
                             // save wait and travel time statistics
-                            outputState.nonTransferInVehicleTravelTime[stopIndex] = inputState.nonTransferInVehicleTravelTime[bestFreqBoardStopIndex] + remainOnBoardTime - bestFreqBoardTime;
+                            outputState.nonTransferInVehicleTravelTime[stopIndex] = inputState.inVehicleTravelTime[bestFreqBoardStopIndex] + remainOnBoardTime - bestFreqBoardTime;
                             outputState.nonTransferWaitTime[stopIndex] = inputState.waitTime[bestFreqBoardStopIndex] + bestFreqBoardTime - inputState.bestTimes[bestFreqBoardStopIndex];
 
                             outputState.previousPatterns[stopIndex] = p;

@@ -6,20 +6,30 @@ jdk:
 install: true
 
 script: |
-  # only (attempt to) deploy non-pull request commits to the master branch
-  if [ "$TRAVIS_PULL_REQUEST" = false ] && [ "$TRAVIS_BRANCH" = master ]; then
+  # only (attempt to) deploy non-pull request commits to the master branch or to tags
+  if [[ "$TRAVIS_PULL_REQUEST" = false ]] && [[ "$TRAVIS_BRANCH" = master || ! -z "$TRAVIS_TAG" ]]; then
     mvn clean deploy
   else
     # otherwise, just run test suite
     mvn clean verify
   fi
+  
+after_success:
+  # Upload shaded JAR to S3. The un-shaded jar was deployed to our Maven repo during the main build.
+  # Ideally we'd use the Travis S3 deployer here instead of installing the AWS CLI software every time.
+  # See the analyst-server travis.yml for how to copy specific files to a subdirectory and deploy those.
+  - pip install --user awscli && export PATH=$PATH:~/.local/bin/
+  # Upload the shaded jar. It's named with git describe, so begins with the last tag name, so begins with the letter v.
+  # On the other hand, the main un-shaded artifact will begin with the project name 'r5'.
+  - aws s3 cp --recursive --exclude "*" --include "v*.jar" /home/travis/build/conveyal/r5/target s3://r5-builds
+  # copy Javadoc to S3
+  - if [[ "$TRAVIS_PULL_REQUEST" = false ]]; then mvn javadoc:javadoc; aws s3 cp --recursive /home/travis/build/conveyal/r5/target/site/apidocs s3://javadoc.conveyal.com/r5/${TRAVIS_BRANCH}/; fi
 
-env:
-  global:
-  - secure: co/cnAH0EYVS68v81DCv5xwBizBAsiLrUMM/mI/H6np11bVFR4Pxc0yrfkOdoznf6kW/huyQMsCULHZDP2XnAb9jUR6MWZ6t8xhmOBDscSuTDmgQkrwefRc64mJkbA7xqndh1j71oLUqvKGQpc6IvlfHc0yyzIFwA9eNmAive9R5H1MGb7M21LNAXO4ALh9kAVJOSi48xOZ8fcoWm2tJ+RNbVHSguyAdKpHSWuu1UkaPE4mUshXx6ZQFskZLu8YhazkajzKff5mGziaqhAB8BInwXRzpvu+0bMAkz/eBSgyeAtZ9p21bC3s0F5DRAwrrk640Ejkg3aa8eGPQi1ufD0xY4lUZNsva9tgQgmXfhe0NYWH130tr4Tr/gY0EmmDLAa/CjK2Fs8Qe16bs1LnUfb4/Bj5apK1qiKqp+dJdxgEGCTPzLTl/3pSbL4mTGllIkt8rf91XDwEW9EMs0K5JjjpJJTnzSA/DeKUivSzib735/vW5JLsxWToI2ER0QdXoDek7yejnvapMadCh7MjF/Ectw0qBVrjB16DLQbxk/Q5wxm2ZnYshjCO1f2phja/c18UAnalWfqbWWGtRKDHYhwBaVsbaeeRBIC2vHPfc8KS7ZbuXNcmyNjDoSoviwPo73TAYNM8rIz+wM0hZkBiHxcPBJ5Ne3WLEX1SB9haBWBM=
-  - secure: bgrdS1I9ByBYIB85ngcOoZ5DX8mLrEIg65xzHnzxSpFJ3xvd1VGMdjNZl2aO45+ghauxBJG3Q9INn5jdjllBkwjpv1MM1WF9vNLZQSGODjp1UFueBeLxtMzFm9PS/d58VLgofNnXMDDz4DG3ccqE+GjA6mWWuV1cr92Qj5jXgYcZXwGav/YY2J0erhgsOvkhYq05SqQyzHn+D2IL7hFaqI1Z2S4ygnoB3+TaI170f5rct7SWk0qItgsoE6d7KbW7z7gBzXGVOToSv7b7VMMAR/Fesw0DQYBudZaXe0pnjyNgIEwR60zUuDdwF2Z7UY1PLsdLfEW1V0IZIqkBTfqXBO5GnWLD8VAoi6eBvI1gnHeFLiHtN686RGOtsga/ghHovGWwGPgGTLStHkLA6UQRYJ6lHOftvqe/MXL2v1LiXeh1BjtRz01MPnYkP4jx1XFSmmJ21q9PAoNc1vZafqyjiXEg5S4641Y4YPHwARI03AjLEFKIgSJcoq5Np3K4tNqtao04u2uNQWew6zJznReJrdG1ALXlftPk2xddqRoGhZScAIRjtqEDXSCl66N1hlQ68QMW7+2eYMXcOywHCgik3BeZoXzaF3A12tifEe3R2iYWT6mJP9qHjEfx0Au7AgqFaVDjDR5xRaK79JQo57C/tf8QSciYPPth/eyBXB52wXo=
 
 sudo: false
+
+git:
+  depth: 150 # how many commits to clone, need to catch most recent tag for describe and 50 may not be enough
 
 cache:
   directories:
@@ -27,3 +37,9 @@ cache:
 
 notifications:
   slack: conveyal:vqrkN7708qU1OTL9XkbMqQFV
+
+env:
+  global:
+  # These are the credentials for an IAM account that is allowed to write to our Maven repo and R5-builds buckets on S3.
+  - secure: ti0pCe4W0mbc/wYrcAbemHYQFUGaCrPDPjHvaD2rU5Xyd7a1Z/p2aIPvApg+YtnUKXr7X718fFWGmz+U0kQgDfv05ZiRQeaSX8cQ2jWUxQurTax7EhqWjh6loxbKwZlKKjritDlcyS9/kwHxNQdTPNcmcHvM+7l+J8mndwhPs9Si9ln+FLALEgilDMRZwqqhpVkejZ3LQMJmvD7SGqz4kthlieSMo5m7AvwY3Kjs1o7d3ll9dRuOdt7rZHvIzXe7aH0RfhizrmDuxLLlLAxzonomxaPRtOj/qq3arpn+iVlXYjkO5A9nAAdJi6VYBO9Em+Ru0jMRuh57PjSpy6KngqywUBXvmZ6wTUyXthL0+VSqn/G4u6edQDewMINUQUfEfHiFY5y+oDUGlYll4J2T0T1eO6hTo03KfqUUF8Fz9T8dnIld8OLiqjF/uEAXmuOPWZIPtYekoZE4QSAaulDm8168ksXefWnUODBN/94kUxewNDFrpUVhL8QHTBU8oRlwMIhsudeFiCM3HZ+XlvjVSv4QoePiCOQVxdy5Od3M0xSNCFsgoW4fEzfQavjPUQm8HKUyLKjjMbxOQXjk2BdqBv3BdkMDja15wesf6BzFsZf/iSAKwKYW6OeeFPw+sXMvxtCi4xFD3y34tHeXYbaMtMpFDRKMlman56ujR/Cd+EI=
+  - secure: dw6bS2P1iaoUaJKo18EtfwpycfcjDWbo7uhUegrA5CGUXnk5o3D7j0yz9uNwvxUByOWq8qRWoz/Y6rUC6cwrV596O/H3mk8Z+YU8kYHUptBJOSch3NtpyBFdc8ry4tV7qtW4Fg4WAcZWzGyT7KiKA532vXLWweHKKv/YqxscLneSgchBOCT2DnG0+mvDoQ+TB8kODo4AjSaSpciIhpq0EqagrJppRUW0DL2m8MYOmqjnMURaPkPqv4XRIdRDQH0d1CUgNDOM4l3ZrCTRFdZHOeryiLujLLtiTF1K7d1bFC6kS7WVEdqLJzOs2NGwVS8s/4dgc4GVHOwx8SJLor3sfzduh4Jk1YT46SMBHwwP3K4vsAIaw2NOu0ewjufC/LH1ZjfBeouS5sx7R4cCcPsEJr0hmg1jgFtTOIJrvINNl936eMLAG4maICXveGOrWmKflFKL8EiaO5E3p1NRCJkL/Yt27BL+kNz5GLByIfLS+CqsSBySG3WM5QrUw2EKpjWE6gqRml7o0c1Jmn+9yDLQhWtJ0JLN7Y3pP4HDtBgCO1WgN/0YAWdCc0e968gY9NeSm1SYZkUmpkWSMYb88kpjjQRW6BlDh1O+jnYa66o1GgmpI2XoBc6edDLg998nKzsbGFCuiwkLPO+Ccqk3vAlED0ZpoDt44cUn4Pl9ZBcpFe0=

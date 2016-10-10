@@ -60,15 +60,25 @@ public abstract class TraversalPermissionLabeler {
 
         applySpecificPermissions(tree, way);
 
+        applyWheelchairPermissions(tree, way);
+
         EnumSet<EdgeStore.EdgeFlag> ret = EnumSet.noneOf(EdgeStore.EdgeFlag.class);
 
         Label walk = walk(tree, Node.FOOT);
         Label bicycle = walk(tree, Node.BICYCLE);
         Label car = walk(tree, Node.CAR);
+        Label wheelchair = walk(tree, Node.WHEELCHAIR);
         if (walk == Label.YES) {
             ret.add(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
         } else if (walk == Label.NO_THRU_TRAFFIC) {
             ret.add(EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_PEDESTRIAN);
+        }
+        if (wheelchair == Label.YES) {
+            ret.add(EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+        }
+
+        if (wheelchair == Label.LIMITED) {
+                ret.add(EdgeStore.EdgeFlag.LIMITED_WHEELCHAIR);
         }
         if (bicycle == Label.YES) {
             ret.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
@@ -119,8 +129,31 @@ public abstract class TraversalPermissionLabeler {
     }
 
     /**
+     * Applies wheelchair permissions
+     *
+     * Removes wheelchair permissions on steps
+     * and adds it on wheelchair=yes or ramp:wheelchair
+     * wheelchair=limited gets special tag LIMITED and is currently non routable for wheelchairs
+     * @param tree
+     * @param way
+     */
+    private void applyWheelchairPermissions(EnumMap<Node, Label> tree, Way way) {
+        if (way.hasTag("highway", "steps")) {
+            applyLabel(Node.WHEELCHAIR, Label.NO, tree);
+        }
+
+        //TODO: what to do with wheelchair:limited currently it is routable for wheelchairs
+        if (way.hasTag("wheelchair")) {
+            applyLabel(Node.WHEELCHAIR, Label.fromTag(way.getTag("wheelchair")), tree);
+        }
+        if (way.hasTag("ramp:wheelchair")) {
+            applyLabel(Node.WHEELCHAIR, Label.fromTag(way.getTag("ramp:wheelchair")), tree);
+        }
+    }
+
+    /**
      *  Adds Allows bike to backward direction if one of those is true:
-     *  - cycleway=opposite
+     *  - cycleway= starts with opposite (can be opposite_track or opposite_lane)
      *  - cycleway:left starts with opposite (can be opposite_track or opposite_lane)
      *  - cycleway:right starts with opposite (can be opposite_track or opposite_lane)
      * @param way
@@ -129,8 +162,9 @@ public abstract class TraversalPermissionLabeler {
     private void applyOppositeBicyclePermissions(Way way, EnumSet<EdgeStore.EdgeFlag> backward) {
         String cyclewayLeftTagValue = way.getTag("cycleway:left");
         String cyclewayRightTagValue = way.getTag("cycleway:right");
+        String cyclewayTagValue = way.getTag("cycleway");
         boolean addedBikePermissions = false;
-        if (way.hasTag("cycleway", "opposite")) {
+        if (cyclewayTagValue != null && cyclewayTagValue.startsWith("opposite")) {
             backward.add(EdgeStore.EdgeFlag.ALLOWS_BIKE);
             addedBikePermissions = true;
         } else if (cyclewayRightTagValue != null) {
@@ -204,9 +238,24 @@ public abstract class TraversalPermissionLabeler {
         // start from the root of the tree
         if (way.hasTag("access")) applyLabel(Node.ACCESS, Label.fromTag(way.getTag("access")), tree);
         if (way.hasTag("foot")) applyLabel(Node.FOOT, Label.fromTag(way.getTag("foot")), tree);
+        //Adds Walking permissions if street has any type of sidewalk (left,right,both)
+        if (way.hasTag("sidewalk")) {
+            String sidewalk = way.getTag("sidewalk");
+            //For sidewalk direction doesn't matter since pedestrians can walk in both directions on sidewalk
+            if ("both".equalsIgnoreCase(sidewalk) || "left".equalsIgnoreCase(sidewalk) || "right".equalsIgnoreCase(sidewalk)) {
+                applyLabel(Node.FOOT, Label.YES, tree);
+            }
+        }
         if (way.hasTag("vehicle")) applyLabel(Node.VEHICLE, Label.fromTag(way.getTag("vehicle")), tree);
         if (way.hasTag("bicycle")) applyLabel(Node.BICYCLE, Label.fromTag(way.getTag("bicycle")), tree);
-        if (way.hasTag("cycleway")) applyLabel(Node.BICYCLE, Label.fromTag(way.getTag("cycleway")), tree);
+        if (way.hasTag("cycleway")) {
+            Label label = Label.fromTag(way.getTag("cycleway"));
+            //cycleway:no just means that there is no
+            // cycleway on this road it doesn't mean it is forbidden to cycle there
+            if (label != Label.NO) {
+                applyLabel(Node.BICYCLE, label, tree);
+            }
+        }
         if (way.hasTag("cycleway:both")) applyLabel(Node.BICYCLE, Label.fromTag(way.getTag("cycleway:both")), tree);
         if (way.hasTag("motor_vehicle")) applyLabel(Node.CAR, Label.fromTag(way.getTag("motor_vehicle")), tree);
         // motorcar takes precedence over motor_vehicle
@@ -261,6 +310,10 @@ public abstract class TraversalPermissionLabeler {
      * For adding permissions for multiple tags.
      *
      * It splits tags on | and for each tag calls {@link #addPermission(String, String)}
+     *
+     * This method is a bit stringly-typed since it's really accepting pipe- or semicolon-separated lists crammed
+     * into Strings, but the tags are already being split on equals as well. Look at the places where this method is
+     * called to see that this compromise leads to more readable code.
      *
      * @param tags Tags are separated with | they can be specified with tag=value or just value where it is assumed that tag is highway.
      * @param traversalPermissions are separated with ; they are specified as tag=value
@@ -392,6 +445,7 @@ public abstract class TraversalPermissionLabeler {
     protected enum Node {
         ACCESS, // root
         FOOT, VEHICLE, // level 1
+        WHEELCHAIR, //child of foot
         BICYCLE, CAR; // children of VEHICLE. CAR is shorthand for MOTOR_VEHICLE as we don't separately support hazmat carriers, mopeds, etc.
 
         public Node getParent () {
@@ -402,6 +456,8 @@ public abstract class TraversalPermissionLabeler {
                 case BICYCLE:
                 case CAR:
                     return VEHICLE;
+                case WHEELCHAIR:
+                    return FOOT;
                 default:
                     return null;
             }
@@ -413,6 +469,8 @@ public abstract class TraversalPermissionLabeler {
                     return new Node[] { FOOT, VEHICLE };
                 case VEHICLE:
                     return new Node[] { BICYCLE, CAR };
+                case FOOT:
+                    return new Node[] { WHEELCHAIR };
                 default:
                     return null;
             }
@@ -421,7 +479,7 @@ public abstract class TraversalPermissionLabeler {
 
     /** What is the label of a particular node? */
     protected enum Label {
-        YES, NO, NO_THRU_TRAFFIC, UNKNOWN;
+        YES, NO, NO_THRU_TRAFFIC, UNKNOWN, LIMITED;
 
         private static boolean isTagTrue(String tagValue) {
             return ("yes".equals(tagValue) || "1".equals(tagValue) || "true".equals(tagValue));
@@ -471,6 +529,8 @@ public abstract class TraversalPermissionLabeler {
                 //Used in setting opposite cycling permissions
             } else if (tag.startsWith("opposite")) {
                 return UNKNOWN;
+            } else if ("limited".equals(tag)) {
+                return LIMITED;
             } else {
                 LOG.debug("Unknown access tag:{}", tag);
                 return UNKNOWN;

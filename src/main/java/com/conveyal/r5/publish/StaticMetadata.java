@@ -1,7 +1,7 @@
 package com.conveyal.r5.publish;
 
-import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
+import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -54,7 +54,8 @@ public class StaticMetadata implements Runnable {
             return;
         }
 
-        // write transitive data
+        // write transitive data (optional at this point but retains compatibility with older clients that don't get the
+        // transitive data from query.json)
         try {
             OutputStream os = StaticDataStore.getOutputStream(request, "transitive.json", "application/json");
             writeTransitiveData(os);
@@ -81,59 +82,64 @@ public class StaticMetadata implements Runnable {
         metadata.width = ps.width;
         metadata.height = ps.height;
         metadata.transportNetwork = request.transportNetworkId;
+        metadata.transitiveData = new TransitiveNetwork(network.transitLayer);
         metadata.request = request.request;
 
         JsonUtilities.objectMapper.writeValue(out, metadata);
     }
 
-    /** Write stop trees for this query */
+    /** Write distance tables from stops to PointSet points for this query. */
     public void writeStopTrees (OutputStream out) throws IOException {
-        // build the stop trees
+
+        // Build the distance tables.
         LinkedPointSet lps = network.getLinkedGridPointSet();
-        if (lps.stopTrees == null)
-            lps.makeStopTrees();
+        if (lps.stopToPointDistanceTables == null) {
+            // Null means make all trees, not just those in a certain geographic area.
+            lps.makeStopToPointDistanceTables(null);
+        }
 
-        // invert the stop trees
-        TIntList[] stopTrees = new TIntList[lps.pointSet.featureCount()];
+        // Invert the stop trees (points to stops rather than stops to points).
+        TIntList[] distanceTables = new TIntList[lps.pointSet.featureCount()];
 
-        // first increment will land at 0
+        // The first increment will bump stop to 0.
         int stop = -1;
-        for (int[] tree : lps.stopTrees) {
+        for (int[] table : lps.stopToPointDistanceTables) {
             // make sure stop always gets incremented
             stop++;
-            if (tree == null)
+            if (table == null) {
                 continue;
-
-            for (int i = 0; i < tree.length; i+= 2) {
-                // tree[i] is the target
-                if (stopTrees[tree[i]] == null) {
-                    stopTrees[tree[i]] = new TIntArrayList();
+            }
+            for (int i = 0; i < table.length; i+= 2) {
+                // table[i] is the target point index
+                if (distanceTables[table[i]] == null) {
+                    distanceTables[table[i]] = new TIntArrayList();
                 }
 
-                // tree[i + 1] is distance
-                stopTrees[tree[i]].add(new int[] { stop, tree[i + 1] });
+                // table[i + 1] is distance, convert millimeters into minutes
+                distanceTables[table[i]].add(new int[] { stop, (table[i + 1] / 1300 / 60)});
             }
         }
 
-        // write the trees
+        // Write the tables.
         LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(out);
 
         int prevStopId = 0;
         int prevTime = 0;
 
-        for (TIntList tree : stopTrees) {
-            if (tree == null) {
+        for (TIntList table : distanceTables) {
+            if (table == null) {
                 dos.writeInt(0);
             }
             else {
                 // divide by two because array is jagged, get number of stops
-                dos.writeInt(tree.size() / 2);
-                for (int i = 0; i < tree.size(); i += 2) {
-                    int stopId = tree.get(i);
+                dos.writeInt(table.size() / 2);
+                for (int i = 0; i < table.size(); i += 2) {
+                    int stopId = table.get(i);
                     dos.writeInt(stopId - prevStopId);
                     prevStopId = stopId;
 
-                    int time = tree.get(i + 1) / 60;
+                    int time = table.get(i + 1);
+
                     dos.writeInt(time - prevTime);
                     prevTime = time;
                 }
@@ -164,5 +170,21 @@ public class StaticMetadata implements Runnable {
         public String transportNetwork;
 
         public ProfileRequest request;
+
+        public TransitiveNetwork transitiveData;
+    }
+
+    /** A request for the cluster to produce static metadata */
+    public static class MetadataRequest extends GenericClusterRequest {
+        public StaticSiteRequest request;
+
+        public final String type = "static-metadata";
+    }
+
+    /** A request for the cluster to produce static stop trees */
+    public static class StopTreeRequest extends GenericClusterRequest {
+        public StaticSiteRequest request;
+
+        public final String type = "static-stop-trees";
     }
 }

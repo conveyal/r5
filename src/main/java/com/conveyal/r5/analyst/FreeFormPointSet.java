@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.common.SphericalDistanceLibrary;
-import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.StreetMode;
 import com.csvreader.CsvReader;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerationException;
@@ -59,7 +59,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * 
  * PointSets are one of the three main web analyst resources: Pointsets, Indicators, and TimeSurfaces
  */
-public class FreeFormPointSet implements Serializable, PointSet {
+public class FreeFormPointSet extends PointSet implements Serializable {
 
     private static final long serialVersionUID = -8962916330731463238L;
 
@@ -74,14 +74,13 @@ public class FreeFormPointSet implements Serializable, PointSet {
     /** A detailed textual description of this FreeFormPointSet */
     public String description;
 
+    /** TODO what is this? */
     public Map<String, PropertyMetadata> propMetadata = new HashMap<String, PropertyMetadata>();
+
     // TODO why is this concurrent? what two threads are modifying the hashmap simultaneously?
     public Map<String, int[]> properties = new ConcurrentHashMap<String, int[]>();
+
     public int capacity = 0; // The total number of features this FreeFormPointSet can hold.
-
-
-    // For TransportNetworks
-    Map<Fun.Tuple2<StreetLayer, Mode>, LinkedPointSet> linkageCache = new HashMap<>();
 
     /**
      * Map from string IDs to their array indices. This is a view into FreeFormPointSet.ids, namely its reverse mapping.
@@ -817,29 +816,6 @@ public class FreeFormPointSet implements Serializable, PointSet {
         }
 
         return ret;
-    }
-
-    /** Returns a new coordinate object for the feature at the given index in this set, or its centroid. */
-    @Override
-    public Coordinate getCoordinate(int index) {
-        return new Coordinate(lons[index], lats[index]);
-    }
-
-    /**
-     * Creates an object similar to a SampleSet but for the new TransitNetwork representation.
-     * Or returns one from the cache if this operation has already been performed.
-     * This is a somewhat slow operation involving a lot of geometry calculations. In some sense the point of making
-     * LinkedPointSets is to cache the relationship between the FreeFormPointSet and a StreetLayer, so we don't have to
-     * repeatedly do a lot of geometry calculations to temporarily connect the points to the streets.
-     */
-    @Override
-    public LinkedPointSet link(StreetLayer streetLayer, Mode mode) {
-        LinkedPointSet linkedPointSet = linkageCache.get(Fun.t2(streetLayer, mode));
-        if (linkedPointSet == null) {
-            linkedPointSet = new LinkedPointSet(this, streetLayer, mode);
-            linkageCache.put(Fun.t2(streetLayer, mode), linkedPointSet);
-        }
-        return linkedPointSet;
     }
 
     /**

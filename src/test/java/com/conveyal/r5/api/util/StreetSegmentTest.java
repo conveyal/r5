@@ -43,21 +43,77 @@ public class StreetSegmentTest {
 
     }
 
+    //Tests streetSegment which has 3 edges which are similar then 2 different edges
     @Test
-    public void testCompact() throws Exception {
+    public void testCompactSameDiff() throws Exception {
         StreetSegment streetSegment = loadFile("streetSegmentWALK.json");
+
+        //Gets part of 3 similar and 2 different edges
+        streetSegment.streetEdges = streetSegment.streetEdges.subList(3,9);
         Assert.assertNotNull(streetSegment);
-        Assert.assertEquals(24, streetSegment.streetEdges.size());
+        Assert.assertEquals(6, streetSegment.streetEdges.size());
+        int distanceBefore = streetSegment.streetEdges.stream().mapToInt(se -> se.distance).sum();
         /*LOG.info("BEFORE:");
         for (StreetEdgeInfo streetEdgeInfo: streetSegment.streetEdges) {
             LOG.info(streetEdgeInfo.toString());
         }*/
         streetSegment.compactEdges();
+        int distanceAfter = streetSegment.streetEdges.stream().mapToInt(se -> se.distance).sum();
         /*LOG.info("AFTER:");
         for (StreetEdgeInfo streetEdgeInfo: streetSegment.streetEdges) {
             LOG.info(streetEdgeInfo.toString());
         }*/
-        Assert.assertEquals(20, streetSegment.streetEdges.size());
+        Assert.assertEquals(3, streetSegment.streetEdges.size());
+        Assert.assertEquals(distanceBefore, distanceAfter);
+
+
+    }
+
+    //Tests streetSegment which has different edges then 3 edges which are similar then different edges
+    @Test
+    public void testCompactDiffSameDiff() throws Exception {
+        StreetSegment streetSegment = loadFile("streetSegmentWALK.json");
+        Assert.assertNotNull(streetSegment);
+        Assert.assertEquals(24, streetSegment.streetEdges.size());
+        int distanceBefore = streetSegment.streetEdges.stream().mapToInt(se -> se.distance).sum();
+        /*LOG.info("BEFORE:");
+        for (StreetEdgeInfo streetEdgeInfo: streetSegment.streetEdges) {
+            LOG.info(streetEdgeInfo.toString());
+        }*/
+        streetSegment.compactEdges();
+        int distanceAfter = streetSegment.streetEdges.stream().mapToInt(se -> se.distance).sum();
+        /*LOG.info("AFTER:");
+        for (StreetEdgeInfo streetEdgeInfo: streetSegment.streetEdges) {
+            LOG.info(streetEdgeInfo.toString());
+        }*/
+        Assert.assertEquals(21, streetSegment.streetEdges.size());
+        Assert.assertEquals(distanceBefore, distanceAfter);
+
+
+    }
+
+    //Tests streetSegment which has different edgen then 3 edges which are similar
+    @Test
+    public void testCompactDiffSame() throws Exception {
+        StreetSegment streetSegment = loadFile("streetSegmentWALK.json");
+
+        //Gets part of different and similar edges
+        streetSegment.streetEdges = streetSegment.streetEdges.subList(0,7);
+        int distanceBefore = streetSegment.streetEdges.stream().mapToInt(se -> se.distance).sum();
+        Assert.assertNotNull(streetSegment);
+        Assert.assertEquals(7, streetSegment.streetEdges.size());
+        /*LOG.info("BEFORE:");
+        for (StreetEdgeInfo streetEdgeInfo: streetSegment.streetEdges) {
+            LOG.info(streetEdgeInfo.toString());
+        }*/
+        streetSegment.compactEdges();
+        int distanceAfter = streetSegment.streetEdges.stream().mapToInt(se -> se.distance).sum();
+        /*LOG.info("AFTER:");
+        for (StreetEdgeInfo streetEdgeInfo: streetSegment.streetEdges) {
+            LOG.info(streetEdgeInfo.toString());
+        }*/
+        Assert.assertEquals(4, streetSegment.streetEdges.size());
+        Assert.assertEquals(distanceBefore, distanceAfter);
 
 
     }

@@ -1,6 +1,8 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.trove.TIntAugmentedList;
+import com.vividsolutions.jts.geom.CoordinateFilter;
+import com.vividsolutions.jts.geom.Geometry;
 import gnu.trove.list.TByteList;
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.list.TIntList;
@@ -39,8 +41,8 @@ public class VertexStore implements Serializable {
 
     /**
      * Add a vertex, specifying its coordinates in double-precision floating point degrees.
-     * @lat latitude in floating point degrees
-     * @lon longitude in floating point degrees
+     * @param lat latitude in floating point degrees
+     * @param lon longitude in floating point degrees
      * @return the index of the new vertex.
      */
     public int addVertex (double lat, double lon) {
@@ -137,13 +139,27 @@ public class VertexStore implements Serializable {
         return vertexFlags.size();
     }
 
-    //Used when converting fixed latitude and longitude to floating from Split
-    //It is in double type even though it is fixed
+    /**
+     * Used when converting fixed-point latitude and longitude to floating-point from Split.
+     * The parameter datatype is double even though it is a fixed-point representation.
+     */
     public static double fixedDegreesToFloating(double fixed) {
         return fixed / FIXED_FACTOR;
     }
 
-    /** Convert a JTS envelope to fixed degrees */
+    /**
+     * Given a Geometry in fixed-point latitude and longitude, return a copy converted to floating point latitude and
+     * longitude.
+     */
+    public static Geometry fixedDegreeGeometryToFloating(Geometry fixedGeometry) {
+        Geometry wgsResult = (Geometry)fixedGeometry.clone();
+        wgsResult.apply((CoordinateFilter) c -> {
+            c.x = fixedDegreesToFloating(c.x); c.y = fixedDegreesToFloating(c.y);
+        });
+        return wgsResult;
+    }
+
+    /** Convert a JTS envelope to fixed-point degrees. */
     public static Envelope envelopeToFixed(Envelope env) {
         return new Envelope(
                 floatingDegreesToFixed(env.getMinX()),
@@ -155,8 +171,7 @@ public class VertexStore implements Serializable {
 
     public enum VertexFlag {
 
-        /** this intersection has a traffic signal */
-        TRAFFIC_SIGNAL(0),
+        TRAFFIC_SIGNAL(0), // This intersection has a traffic signal
         PARK_AND_RIDE(1),
         BIKE_SHARING(2);
 
@@ -173,12 +188,17 @@ public class VertexStore implements Serializable {
     /**
      * Makes a copy of this VertexStore that can have vertices added to it, but cannot otherwise be modified.
      * This is done efficiently by wrapping the existing lists holding the various vertex characteristics.
+     *
+     * We don't use clone() to make sure every field is explicitly copied below, avoiding any unintentional
+     * shallow-copying of collections or referenced data structures.
      */
     public VertexStore extendOnlyCopy() {
-        VertexStore copy = new VertexStore(100);
+        VertexStore copy = new VertexStore(0);
         copy.fixedLats = new TIntAugmentedList(this.fixedLats);
         copy.fixedLons = new TIntAugmentedList(this.fixedLons);
-        copy.vertexFlags = null; // TODO change this to use one big int array of bit flags.
+        // This is a deep copy, we should do an extend-copy but need a new TByteArrayList class for that.
+        // I would like to make sure the extend-only system works well before proliferating classes of this kind.
+        copy.vertexFlags = new TByteArrayList(vertexFlags);
         return copy;
     }
 

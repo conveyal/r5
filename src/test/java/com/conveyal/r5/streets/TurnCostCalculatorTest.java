@@ -1,14 +1,10 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
-import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.algorithm.Angle;
 import com.vividsolutions.jts.geom.Coordinate;
-import junit.framework.TestCase;
-import org.junit.Before;
 import org.junit.Test;
 
-import static org.junit.Assert.*;
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -46,7 +42,7 @@ public class TurnCostCalculatorTest extends TurnTest {
     public void testCost () throws Exception {
         setUp(false);
         TurnCostCalculator calculator = new TurnCostCalculator(streetLayer, true);
-        assertEquals(calculator.LEFT_TURN, calculator.computeTurnCost(EE + 1, ES, Mode.CAR));
+        assertEquals(calculator.LEFT_TURN, calculator.computeTurnCost(EE + 1, ES, StreetMode.CAR));
     }
 
     /**

@@ -34,7 +34,7 @@ public class IsochroneFeature implements Serializable {
     // is just a bit shift (but who knows what the JVM will decide to optimize)
     public static final int SCALE_FACTOR = 4;
 
-    public Geometry geometry;
+    public MultiPolygon geometry;
     public int cutoffSec;
 
     public IsochroneFeature () { /* deserialization */ }
@@ -324,7 +324,9 @@ public class IsochroneFeature implements Serializable {
             if (hole.getValue().getArea() < 1e-6) continue;
 
             for (Map.Entry<LinearRing, Polygon> outer : polygonsForOuterRing.entrySet()) {
-                if (outer.getValue().contains(hole.getValue())) {
+                // fine to test membership of first coordinate only since shells and holes are disjoint, and holes
+                // nest completely in shells
+                if (outer.getValue().contains(hole.getKey().getPointN(0))) {
                     holesForRing.put(outer.getKey(), hole.getKey());
                     continue HOLES;
                 }

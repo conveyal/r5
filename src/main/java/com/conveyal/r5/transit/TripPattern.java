@@ -1,23 +1,18 @@
 package com.conveyal.r5.transit;
 
-import com.conveyal.r5.analyst.scenario.Modification;
-import com.conveyal.r5.analyst.scenario.RemoveTrip;
-import com.conveyal.r5.analyst.scenario.Scenario;
-import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
+import com.conveyal.gtfs.model.StopTime;
+import gnu.trove.list.TIntList;
+import gnu.trove.map.TObjectIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.BitSet;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /**
- * This is like a transmodel JourneyPattern.
+ * This is like a Transmodel JourneyPattern.
  * All the trips on the same Route that have the same sequence of stops, with the same pickup/dropoff options.
  */
 public class TripPattern implements Serializable, Cloneable {
@@ -52,18 +47,39 @@ public class TripPattern implements Serializable, Cloneable {
     /** index of this route in TransitLayer data. -1 if detailed route information has not been loaded */
     public int routeIndex = -1;
 
-    public TripPattern (TripPatternKey tripPatternKey) {
-        int nStops = tripPatternKey.stops.size();
+    /**
+     * Create a TripPattern based only on a list of internal integer stop IDs.
+     * This is used when creating brand new patterns in scenario modifications, rather than from GTFS.
+     * Pick up and drop off will be allowed at all stops.
+     */
+    public TripPattern (TIntList intStopIds) {
+        stops = intStopIds.toArray(); // Copy.
+        int nStops = stops.length;
+        pickups = new PickDropType[nStops];
+        dropoffs = new PickDropType[nStops];
+        wheelchairAccessible = new BitSet(nStops);
+        for (int s = 0; s < nStops; s++) {
+            pickups[s] = PickDropType.SCHEDULED;
+            dropoffs[s] = PickDropType.SCHEDULED;
+            wheelchairAccessible.set(s);
+        }
+        routeId = "SCENARIO_MODIFICATION";
+    }
+
+    public TripPattern(String routeId, Iterable<StopTime> stopTimes, TObjectIntMap<String> indexForUnscopedStopId) {
+        List<StopTime> stopTimeList = StreamSupport.stream(stopTimes.spliterator(), false).collect(Collectors.toList());
+        int nStops = stopTimeList.size();
         stops = new int[nStops];
         pickups = new PickDropType[nStops];
         dropoffs = new PickDropType[nStops];
         wheelchairAccessible = new BitSet(nStops);
         for (int s = 0; s < nStops; s++) {
-            stops[s] = tripPatternKey.stops.get(s);
-            pickups[s] = PickDropType.forGtfsCode(tripPatternKey.pickupTypes.get(s));
-            dropoffs[s] = PickDropType.forGtfsCode(tripPatternKey.dropoffTypes.get(s));
+            StopTime st = stopTimeList.get(s);
+            stops[s] = indexForUnscopedStopId.get(st.stop_id);
+            pickups[s] = PickDropType.forGtfsCode(st.pickup_type);
+            dropoffs[s] = PickDropType.forGtfsCode(st.drop_off_type);
         }
-        routeId = tripPatternKey.routeId;
+        this.routeId = routeId;
     }
 
     public void addTrip (TripSchedule tripSchedule) {
@@ -126,4 +142,26 @@ public class TripPattern implements Serializable, Cloneable {
         sb.append(Arrays.toString(stops));
         return sb.toString();
     }
+
+    public String toStringDetailed (TransitLayer transitLayer) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("TripPattern on route ");
+        sb.append(routeId);
+        sb.append(" with stops ");
+        for (int s : stops) {
+            sb.append(transitLayer.stopIdForIndex.get(s));
+            sb.append(" (");
+            sb.append(s);
+            sb.append(") ");
+        }
+        return sb.toString();
+    }
+
+    /**
+     * @return true when none of the supplied tripIds are on this pattern.
+     */
+    public boolean containsNoTrips(Set<String> tripIds) {
+        return this.tripSchedules.stream().noneMatch(ts -> tripIds.contains(ts.tripId));
+    }
+
 }

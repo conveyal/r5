@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -19,6 +20,7 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
     private static final Logger LOG = LoggerFactory.getLogger(TripSchedule.class);
 
     public String tripId;
+
     public int[] arrivals;
     public int[] departures;
 
@@ -31,28 +33,55 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
     /** end times for frequency entries */
     public int[] endTimes = null;
 
+    /** IDs for frequency entries */
+    public String[] frequencyEntryIds;
+
     public int flags;
     public int serviceCode;
     public TripSchedule nextInBlock = null;
 
-    public int[] phasedFromPattern = null;
-    public int[] phasedFromTrip = null;
-    public int[] phasedFromFrequencyEntry = null;
-    /** NB these are stop positions (0-based, incrementing by 1), NOT GTFS stop sequences */
-    public int[] phasedFromSourceStopPosition = null;
-    public int[] phasedAtTargetStopPosition = null;
-    public int[] phaseSeconds = null;
+    // Phasing information: how does this frequency-based trip schedule interact with others?
+
+    /**
+     * Frequency entry each frequency entry on this trip is phased from. If the array is null, no entries are phased;
+     * if any entry is null, that entry is not phased.
+     */
+    public String[] phaseFromId;
+
+    /**
+     * Scoped stop ID on this trip where this the phase is applied.
+     */
+    public String[] phaseAtStop;
+
+    /** Scoped stop ID on source (phased-from) trip where the phase is applied */
+    public String[] phaseFromStop;
+
+    /**
+     * Phase between trips. Applied to departure time except at last stop, where it is applied to arrival time.
+     *
+     * If the from and to trips have the same frequency, this is pretty straightforward. If they do not, it is slightly
+     * more complicated, and the guarantee of phasing is weaker. We will make it so that one of the trips on this frequency
+     * entry passes phaseSeconds after one of the trips on the other entry. We will also ensure that the headway of this
+     * frequency entry is a factor or constant multiple of the headway of the other.
+     *
+     * TODO this works in the abstract, however what happens when the time windows of frequency entries are small and do
+     * not start at the same time? I think there's a possibility that no trip would "fall into place" during the active
+     * period of the frequency entry.
+     */
+    public int[] phaseSeconds;
 
     /**
      * The stop sequences of this trip in the GTFS. Unfortunately we need to store this at the trip level as every
      * trip on a pattern could have different stop sequence numbers. We need to save the sequence numbers so we can
      * uniquely identify stop positions in patterns in SetPhasing modifications (this could potentially be ripped out
      * when we change how setting phasing is done, for example by not allowing changing phasing on existing routes at all)
+     *
+     * TODO phasing now works differently, is this still needed?
      */
     public int[] stopSequences;
 
     /** static factory so we can return null */
-    public static TripSchedule create (Trip trip, int[] arrivals, int[] departures, int[] stopSequences, int serviceCode) {
+    public static TripSchedule create (Trip trip, int[] arrivals, int[] departures, Collection<Frequency> frequencies, int[] stopSequences, int serviceCode) {
         // ensure that trip times are monotonically increasing, otherwise throw them out
         for (int i = 0; i < arrivals.length; i++) {
             if (departures[i] < arrivals[i]) {
@@ -66,23 +95,24 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
             }
         }
 
-        if (trip.frequencies != null && !trip.frequencies.isEmpty()) {
-            if (trip.frequencies.stream().allMatch(f -> f.end_time < f.start_time)) {
+        if (frequencies != null && !frequencies.isEmpty()) {
+            if (frequencies.stream().allMatch(f -> f.end_time < f.start_time)) {
                 LOG.error("All frequency entries on trip {} have end time before start time, excluding this trip.", trip.trip_id);
                 return null;
             }
         }
 
-        return new TripSchedule(trip, arrivals, departures, stopSequences, serviceCode);
+        return new TripSchedule(trip, arrivals, departures, frequencies, stopSequences, serviceCode);
     }
 
     // Maybe make a TripSchedule.Factory so we don't have to pass in serviceCode or map.
-    private TripSchedule(Trip trip, int[] arrivals, int[] departures, int[] stopSequences, int serviceCode) {
-        this.tripId = trip.trip_id;
-        if (trip.bikes_allowed > 0) {
+    private TripSchedule(Trip trip, int[] arrivals, int[] departures, Collection<Frequency> frequencies, int[] stopSequences, int serviceCode) {
+        String scopedTripId = String.join(":", trip.feed_id, trip.trip_id);
+        this.tripId = scopedTripId;
+        if (trip.bikes_allowed == 1) {
             setFlag(TripFlag.BICYCLE);
         }
-        if (trip.wheelchair_accessible > 0) {
+        if (trip.wheelchair_accessible == 1) {
             setFlag(TripFlag.WHEELCHAIR);
         }
         this.arrivals = arrivals;
@@ -92,11 +122,11 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
 
         // TODO handle exact times!
 
-        if (trip.frequencies != null && !trip.frequencies.isEmpty()) {
+        if (frequencies != null && !frequencies.isEmpty()) {
 
             // filter to valid frequencies
             // TODO some trips may have no service after this filter is applied
-            List<Frequency> frequencies = trip.frequencies.stream()
+            frequencies = frequencies.stream()
                     .filter(f -> {
                         if (f.start_time > f.end_time) {
                             LOG.warn("Frequency entry for trip {} has end time before start time; it will not be used. Perhaps this is an issue with overnight service?", trip.trip_id);
@@ -112,6 +142,7 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
                 this.headwaySeconds = new int[frequencies.size()];
                 this.startTimes = new int[frequencies.size()];
                 this.endTimes = new int[frequencies.size()];
+                this.frequencyEntryIds = new String[frequencies.size()];
 
                 // reset everything to zero-based on frequency-based trips
                 if (arrivals.length > 0) {
@@ -138,6 +169,10 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
                     this.headwaySeconds[fidx] = f.headway_secs;
                     this.endTimes[fidx] = f.end_time;
                     this.startTimes[fidx] = f.start_time;
+                    // feed scope frequency IDs
+                    this.frequencyEntryIds[fidx] = String.join(":", trip.feed_id, f.getId());
+
+                    fidx++;
                 }
             }
         }
@@ -165,7 +200,7 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
         }
     }
 
-    /** @return whether it makes sense for the supplied trip to be served by the same vehicle as this trip. */
+    /** return whether it makes sense for the supplied trip to be served by the same vehicle as this trip. */
     public void chainTo (TripSchedule that) {
         // Check that chain is temporally coherent
         if (arrivals[arrivals.length - 1] <= that.departures[0]) {
@@ -185,7 +220,7 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
      * Once we support interlining, this will matter, as you might arrive at the first stop on an interline just inside the time window.
      *
      * @return whether any part of this occurs during the given time range (expressed in seconds after midnight).
-     * TODO --> frequencies <--
+     * TODO -- frequencies --
      */
     public boolean overlapsTimeRange (int fromTime, int toTime) {
         int firstStopTime, lastStopTime;
@@ -216,6 +251,10 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
 
     public int getNStops() {
         return arrivals.length;
+    }
+
+    public int nFrequencyEntries() {
+        return headwaySeconds.length;
     }
 
 }

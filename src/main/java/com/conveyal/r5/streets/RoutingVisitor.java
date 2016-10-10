@@ -1,54 +1,22 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.r5.common.GeoJsonFeature;
-import com.conveyal.r5.profile.Mode;
-
-import java.util.ArrayList;
-import java.util.List;
-
 /**
- * Visitor for debugging purpose
+ * Interface for routing visitor
  *
- * It outputs full state graph in plan debugger
- * Created by mabu on 10.12.2015.
+ * Created by mabu on 23.8.2016.
  */
-public class RoutingVisitor {
-    private final Mode mode;
-
-    private List<GeoJsonFeature> features;
-    private final EdgeStore edgeStore;
+public interface RoutingVisitor {
+    /**
+     * Called after search algorithms dequeue a vertex
+     */
+    void visitVertex(StreetRouter.State state);
 
     /**
-     * Mode should be in the state itself
+     * Called right after visitVertex
      *
-     * @param edgeStore streetLayer edgeStore
-     * @param mode of this routing
+     * @return true if search should stop
      */
-    public RoutingVisitor(EdgeStore edgeStore, Mode mode) {
-        this.features = new ArrayList<>();
-        this.edgeStore = edgeStore;
-        this.mode = mode;
-    }
-
-    /**
-     * Saves current state geometry mode and weight as geoJSON feature properties
-     *
-     * in list of features. It is used in full state graph when debugging
-     * @param state
-     */
-    public void visitVertex(StreetRouter.State state) {
-        Integer edgeIdx = state.backEdge;
-        if (!(edgeIdx == null || edgeIdx == -1)) {
-            EdgeStore.Edge edge = edgeStore.getCursor(edgeIdx);
-            GeoJsonFeature feature = new GeoJsonFeature(edge.getGeometry());
-            feature.addProperty("weight", state.weight);
-            //FIXME: this is temporary until mode isn't in state itself
-            feature.addProperty("mode", mode);
-            features.add(feature);
-        }
-    }
-
-    public List<GeoJsonFeature> getFeatures() {
-        return features;
+    default boolean shouldBreakSearch() {
+        return false;
     }
 }

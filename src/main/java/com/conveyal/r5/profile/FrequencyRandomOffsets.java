@@ -62,56 +62,100 @@ public class FrequencyRandomOffsets {
             for (TIntObjectIterator<int[][]> it = offsets.iterator(); it.hasNext(); ) {
                 it.advance();
 
-                TripPattern tp = data.tripPatterns.get(it.key());
+                TripPattern pattern = data.tripPatterns.get(it.key());
                 int[][] val = it.value();
 
                 for (int tripScheduleIndex = 0; tripScheduleIndex < val.length; tripScheduleIndex++) {
-                    TripSchedule schedule = tp.tripSchedules.get(tripScheduleIndex);
+                    TripSchedule schedule = pattern.tripSchedules.get(tripScheduleIndex);
 
                     // it is possible to have both frequency and non-frequency trips on the same pattern. If this is a scehduled
                     // trip, don't set offset
                     if (schedule.headwaySeconds == null)
                         val[tripScheduleIndex] = null;
                     else {
-                        for (int tripIndex = 0; tripIndex < val[tripScheduleIndex].length; tripIndex++) {
-                            if (schedule.phasedFromPattern == null || schedule.phasedFromPattern[tripIndex] == -1) {
-                                // not phased. also, don't overwrite on each iteration, as other trips may be phased from this one
-                                if (val[tripScheduleIndex][tripIndex] == -1) {
-                                    val[tripScheduleIndex][tripIndex] = mt.nextInt(schedule.headwaySeconds[tripIndex]);
+                        for (int frequencyEntryIndex = 0; frequencyEntryIndex < val[tripScheduleIndex].length; frequencyEntryIndex++) {
+                            if (schedule.phaseFromId == null || schedule.phaseFromId[frequencyEntryIndex] == null) {
+                                // not phased. also, don't overwrite with new random number on each iteration, as other
+                                // trips may be phased from this one
+                                if (val[tripScheduleIndex][frequencyEntryIndex] == -1) {
+                                    val[tripScheduleIndex][frequencyEntryIndex] = mt.nextInt(schedule.headwaySeconds[frequencyEntryIndex]);
                                     remaining--;
                                 }
                             }
                             else {
-                                if (val[tripScheduleIndex][tripIndex] != -1) continue; // already randomized
+                                if (val[tripScheduleIndex][frequencyEntryIndex] != -1) continue; // already randomized
+
+                                // find source phase information
+                                int[] source = data.frequencyEntryIndexForId.get(schedule.phaseFromId[frequencyEntryIndex]);
+
+                                int sourcePatternIdx = source[0];
+                                int sourceTripScheduleIdx = source[1];
+                                int sourceFrequencyEntryIdx = source[2];
 
                                 // check if it's already been randomized
-                                int previousOffset = offsets.get(schedule.phasedFromPattern[tripIndex])[schedule.phasedFromTrip[tripIndex]][schedule.phasedFromFrequencyEntry[tripIndex]];
+                                int previousOffset = offsets.get(sourcePatternIdx)[sourceTripScheduleIdx][sourceFrequencyEntryIdx];
 
                                 if (previousOffset != -1) {
-                                    TripPattern phaseFromPattern = data.tripPatterns.get(schedule.phasedFromPattern[tripIndex]);
-                                    TripSchedule phaseFromSchedule = phaseFromPattern.tripSchedules.get(schedule.phasedFromTrip[tripIndex]);
+                                    TripPattern phaseFromPattern = data.tripPatterns.get(sourcePatternIdx);
+                                    TripSchedule phaseFromSchedule = phaseFromPattern.tripSchedules.get(sourceTripScheduleIdx);
+
+                                    // figure out stop indices
+                                    int sourceStopIndexInPattern = 0;
+                                    int sourceStopIndexInNetwork = data.indexForStopId.get(schedule.phaseFromStop[frequencyEntryIndex]);
+
+                                    // TODO check that stop IDs were found.
+
+                                    while (sourceStopIndexInPattern < phaseFromPattern.stops.length &&
+                                            phaseFromPattern.stops[sourceStopIndexInPattern] != sourceStopIndexInNetwork) {
+                                        sourceStopIndexInPattern++;
+                                    }
+
+                                    if (sourceStopIndexInPattern == phaseFromPattern.stops.length) {
+                                        throw new IllegalArgumentException(String.format("Stop %s was not found in source pattern!", schedule.phaseFromStop[frequencyEntryIndex]));
+                                    }
+
+                                    int targetStopIndexInPattern = 0;
+                                    int targetStopIndexInNetwork = data.indexForStopId.get(schedule.phaseAtStop[frequencyEntryIndex]);
+
+                                    while (targetStopIndexInPattern < pattern.stops.length &&
+                                            pattern.stops[targetStopIndexInPattern] != targetStopIndexInNetwork) {
+                                        targetStopIndexInPattern++;
+                                    }
+
+                                    // TODO This should really be checked also before modifications are applied.
+                                    if (targetStopIndexInPattern == pattern.stops.length) {
+                                        throw new IllegalArgumentException(String.format("Stop %s was not found in target pattern!", schedule.phaseAtStop[frequencyEntryIndex]));
+                                    }
+
+                                    // use arrivals at last stop
+                                    int[] sourceTravelTimes = sourceStopIndexInPattern < phaseFromPattern.stops.length - 1 ?
+                                            phaseFromSchedule.departures : phaseFromSchedule.arrivals;
 
                                     // figure out the offset if they were to pass the stops at the same time
-                                    int timeAtSourceStop = phaseFromSchedule.startTimes[tripIndex] +
-                                            phaseFromSchedule.arrivals[schedule.phasedFromSourceStopPosition[tripIndex]] +
+                                    int timeAtSourceStop = phaseFromSchedule.startTimes[sourceFrequencyEntryIdx] +
+                                            sourceTravelTimes[sourceStopIndexInPattern] +
                                             previousOffset;
 
+                                    // use arrivals at last stop
+                                    int[] targetTravelTimes = targetStopIndexInPattern < pattern.stops.length - 1 ?
+                                            schedule.departures : schedule.arrivals;
+
                                     // figure out when the target trip passes the stop if the offset were 0.
-                                    int timeAtTargetStop = schedule.startTimes[tripIndex] +
-                                            schedule.arrivals[schedule.phasedAtTargetStopPosition[tripIndex]];
+                                    int timeAtTargetStop = schedule.startTimes[frequencyEntryIndex] +
+                                            targetTravelTimes[targetStopIndexInPattern];
 
                                     int offset = timeAtSourceStop - timeAtTargetStop;
 
                                     // this is the offset so the trips arrive at the same time. We now add the desired phase.
-                                    offset += schedule.phaseSeconds[tripIndex];
+                                    offset += schedule.phaseSeconds[frequencyEntryIndex];
 
                                     // make sure it's positive
-                                    while (offset < 0) offset += schedule.headwaySeconds[tripIndex];
+                                    while (offset < 0) offset += schedule.headwaySeconds[frequencyEntryIndex];
 
                                     // make it as small as possible...
-                                    offset %= schedule.headwaySeconds[tripIndex];
+                                    offset %= schedule.headwaySeconds[frequencyEntryIndex];
 
-                                    val[tripScheduleIndex][tripIndex] = offset;
+                                    val[tripScheduleIndex][frequencyEntryIndex] = offset;
                                     remaining--;
                                 }
                             }

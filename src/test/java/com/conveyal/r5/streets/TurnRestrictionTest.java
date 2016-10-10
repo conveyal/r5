@@ -1,6 +1,6 @@
 package com.conveyal.r5.streets;
 
-import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.StreetMode;
 import org.junit.Test;
 
 public class TurnRestrictionTest extends TurnTest {
@@ -10,7 +10,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         StreetRouter r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
-        r.mode = Mode.CAR;
+        r.streetMode = StreetMode.CAR;
         r.setOrigin(VS);
         r.route();
 
@@ -21,7 +21,7 @@ public class TurnRestrictionTest extends TurnTest {
         restrictTurn(false, ES + 1, EW);
 
         r = new StreetRouter(streetLayer);
-        r.mode = Mode.CAR;
+        r.streetMode = StreetMode.CAR;
         r.setOrigin(VS);
         r.route();
 
@@ -35,7 +35,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         StreetRouter r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
-        r.mode = Mode.CAR;
+        r.streetMode = StreetMode.CAR;
         r.setOrigin(VS);
         r.route();
 
@@ -46,7 +46,7 @@ public class TurnRestrictionTest extends TurnTest {
         restrictTurn(true, ES + 1, EE);
 
         r = new StreetRouter(streetLayer);
-        r.mode = Mode.CAR;
+        r.streetMode = StreetMode.CAR;
         r.setOrigin(VS);
         r.route();
 
@@ -76,7 +76,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         StreetRouter r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
-        r.mode = Mode.CAR;
+        r.streetMode = StreetMode.CAR;
         r.setOrigin(VS);
         r.route();
 
@@ -89,7 +89,7 @@ public class TurnRestrictionTest extends TurnTest {
         restrictTurn(false, ES + 1, EW);
 
         r = new StreetRouter(streetLayer);
-        r.mode = Mode.CAR;
+        r.streetMode = StreetMode.CAR;
         r.setOrigin(VS);
         r.route();
 
@@ -102,7 +102,7 @@ public class TurnRestrictionTest extends TurnTest {
         setUp(false);
         StreetRouter r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
-        r.mode = Mode.CAR;
+        r.streetMode = StreetMode.CAR;
         assertTrue(r.setOrigin(37.3625, -122.123));
         r.route();
 
@@ -115,7 +115,7 @@ public class TurnRestrictionTest extends TurnTest {
         restrictTurn(false, ES + 1, EW);
 
         r = new StreetRouter(streetLayer);
-        r.mode = Mode.CAR;
+        r.streetMode = StreetMode.CAR;
         r.setOrigin(VS);
         r.route();
 
@@ -130,7 +130,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         StreetRouter r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
-        r.mode = Mode.CAR;
+        r.streetMode = StreetMode.CAR;
         r.setOrigin(VN);
         r.route();
 
@@ -138,7 +138,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
-        r.mode = Mode.CAR;
+        r.streetMode = StreetMode.CAR;
         r.setOrigin(VCENTER);
         r.route();
 
@@ -148,7 +148,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
-        r.mode = Mode.CAR;
+        r.streetMode = StreetMode.CAR;
         r.setOrigin(VN);
         r.route();
 
@@ -159,7 +159,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
-        r.mode = Mode.CAR;
+        r.streetMode = StreetMode.CAR;
         r.setOrigin(VCENTER);
         r.route();
 
@@ -175,7 +175,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         StreetRouter r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
-        r.mode = Mode.CAR;
+        r.streetMode = StreetMode.CAR;
         r.setOrigin(VN);
         r.route();
 
@@ -184,7 +184,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
-        r.mode = Mode.CAR;
+        r.streetMode = StreetMode.CAR;
         r.setOrigin(VCENTER);
         r.route();
 
@@ -196,7 +196,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
-        r.mode = Mode.CAR;
+        r.streetMode = StreetMode.CAR;
         r.setOrigin(VN);
         r.route();
 
@@ -207,7 +207,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
-        r.mode = Mode.CAR;
+        r.streetMode = StreetMode.CAR;
         r.setOrigin(VCENTER);
         r.route();
 
@@ -228,9 +228,8 @@ public class TurnRestrictionTest extends TurnTest {
         restrictTurn(false, EW, ENW);
         restrictTurn(false, EW + 1, ES);
 
-        RoutingVisitor countingVisitor = new RoutingVisitor(streetLayer.edgeStore, Mode.CAR) {
-            public int count;
-
+        RoutingVisitor countingVisitor = new RoutingVisitor() {
+            int count;
             @Override
             public void visitVertex (StreetRouter.State state) {
                 if (count++ > 1000) throw new CountExceededException();
@@ -239,7 +238,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         StreetRouter r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
-        r.mode = Mode.CAR;
+        r.streetMode = StreetMode.CAR;
         r.setRoutingVisitor(countingVisitor);
         r.setOrigin(VCENTER);
 

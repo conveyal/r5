@@ -1,7 +1,5 @@
 package com.conveyal.r5.api.util;
 
-import com.conveyal.r5.profile.Mode;
-import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.PathWithTimes;
 import com.conveyal.r5.transit.TransitLayer;
 import com.google.common.base.Joiner;
@@ -139,7 +137,7 @@ public class ProfileOption {
             stats.avg = currentTransitPath.avg;
             stats.num = currentTransitPath.length;
             addTransit(new TransitSegment(transitLayer, currentTransitPath, pathIndex, fromTimeDateZD, transitJourneyIDs));
-            LOG.info("Making new transit segment:{}", currentTransitPath);
+            LOG.debug("Making new transit segment:{}", currentTransitPath);
         } else {
             //Each transitSegment is for each part of transitPath. Since one path consist of multiple transfers.
             TransitSegment transitSegment = transit.get(pathIndex);
@@ -150,7 +148,7 @@ public class ProfileOption {
                 transitSegment
                     .addSegmentPattern(transitLayer, currentTransitPath, pathIndex, fromTimeDateZD,
                         transitJourneyIDs);
-                LOG.info("Adding segment pattern to existing transit");
+                LOG.debug("Adding segment pattern to existing transit");
             } else {
                 LOG.warn("Incorrect stop in pathIndex:{}", pathIndex);
             }

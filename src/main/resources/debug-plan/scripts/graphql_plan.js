@@ -3,6 +3,9 @@ var my_map;
 var MARIBOR_COOR = [46.562483, 15.643975];
 var layer = null;
 var graphqlResponse = null;
+var geojsonLayer = null;
+var bikeSharesLayer = null;
+var parkRidesLayer = null;
 
 function pad(number, length){
     var str = "" + number
@@ -29,9 +32,13 @@ var PlanConfig = function() {
     this.fromLon = "";
     this.toLat = "";
     this.toLon = "";
+    this.wheelchair = false;
     this.offset = offset;
     this.plan = requestPlan;
     this.showReachedStops = requestStops;
+    this.showStops = false;
+    this.showPR = false;
+    this.showBS = false;
 };
 
 var template = "";
@@ -151,13 +158,15 @@ function centerMap(e) {
     my_map.panTo(e.latlng);
 }
 
+
+
 function getModeColor (mode) {
     if (mode === 'WALK') return '#484'
     if (mode === 'BICYCLE') return '#0073e5'
     if (mode === 'SUBWAY') return '#f00'
-    if (mode === 'RAIL') return '#b00'
+    if (mode === 'RAIL') return '#f50'
     if (mode === 'BUS') return '#080'
-    if (mode === 'TRAM') return '#800'
+    if (mode === 'TRAM') return '#a0f'
     if (mode === 'FERRY') return '#008'
     if (mode === 'CAR') return '#444'
     return '#aaa'
@@ -179,13 +188,21 @@ function styleMode(feature) {
     };
 }
 function styleStop(feature) {
-    return {
+    var style = {
         color: getModeColor(feature.properties.mode),
         //weight:speedWeight(feature.properties.speed_ms),
         //radius:feature.properties.weight/10,
-        radius:weightSize(feature.properties.weight),
+        radius:6,
         opacity: 0.8
     };
+
+    //For variable radius for reached stops
+    if (feature.properties.weight) {
+        style.radius = weightSize(feature.properties.weight);
+    }
+
+
+    return style;
 }
 
 function onEachFeature(feature, layer) {
@@ -254,10 +271,16 @@ function requestStops() {
 }
 
 function getStopFeature(stop) {
+    var id;
+    if (stop.stopId != undefined) {
+        id = stop.stopId;
+    } else {
+        id = stop.id;
+    }
     var stopFeature = {
         "properties":{
             "name": stop.name,
-            "id": stop.stopId
+            "id": id
         },
         "type":"Feature",
         "geometry":{
@@ -343,6 +366,12 @@ function showItinerary(optionIdx, itineraryIdx) {
             features.features.push(bikeFeature);
             rentedBike = false;
         }
+        if (curStreetEdge.parkRide != null) {
+            /*console.log("Off: ", curStreetEdge.bikeRentalOffStation);*/
+            var parkRideFeature = getStopFeature(curStreetEdge.parkRide);
+            //parkRideFeature.properties.which = "OFF";
+            features.features.push(parkRideFeature);
+        }
         if (accessData.mode == "BICYCLE" && curStreetEdge.mode == "WALK") {
             curStreetEdgeFeature.properties.info = "WALK_BICYCLE";
         }
@@ -413,7 +442,23 @@ function secondsToTime(seconds) {
 
 function makeTextResponse(data) {
     var options = data.data.plan.options;
-    console.info("Options:", options.length);
+    var jsonPatterns = data.data.plan.patterns;
+    //This is currently used to get WheelchairAccessibility information for each used trip
+    //Transforms list of patterns to map where key is tripPatternIdx and value are tripPatternIdx
+    // and map of trips
+    var patterns = jsonPatterns.reduce(function(total, current) {
+        //Transforms list of trips wih map where key is tripId
+        // and value is tripInfo(tripId, serviceId,  wheelchairAccessible, bikesAllowed)
+        var trips = current.trips.reduce(function(totalTrips, currentTrip) {
+            totalTrips[currentTrip.tripId] = currentTrip;
+            return totalTrips;
+        }, {});
+        current.trips = trips;
+        total[current.tripPatternIdx] = current;
+        return total;
+    }, {});
+    //console.info("Patterns:", patterns);
+    //console.info("Options:", options.length);
     $(".response").html("");
     //Removes line from previous request
     if (layer != null) {
@@ -458,8 +503,13 @@ function makeTextResponse(data) {
                     }
                     var fromTime = patternInfo.fromDepartureTime[transitInfo.time];
                     var toTime = patternInfo.toArrivalTime[transitInfo.time];
-                    item+="<li>Mode: " + route.mode + "<br />From:"+transitData.from.name+" --> "+transitData.to.name+ "<br /> Pattern:";
-                    item+=patternInfo.patternId+ " Line:" + route.shortName + " " +fromTime+" --> " +toTime+ "</li>";
+                    var tripId = patternInfo.tripId[transitInfo.time];
+                    var pPatternInfo = patterns[patternInfo.patternIdx];
+                    var ptripInfo = pPatternInfo.trips[tripId];
+                    item+="<li>Mode: " + route.mode + "<br />From:"+transitData.from.name+" (<abbr title=\"Wheelchair accessible\">WA</abbr>: " + transitData.from.wheelchairBoarding +") --> ";
+                    item+=transitData.to.name+ " (<abbr title=\"Wheelchair accessible\">WA</abbr>: " + transitData.to.wheelchairBoarding +") <br /> Pattern:";
+                    item+=patternInfo.patternId+ " Line:" + route.shortName + " " +fromTime+" --> " +toTime + "<br />";
+                    item+= "<abbr title=\"Bikes Allowed\">BA</abbr>:" + ptripInfo.bikesAllowed + " <abbr title=\"Wheelchair accessible\">WA</abbr>:" + ptripInfo.wheelchairAccessible + " <abbr title=\"Service ID\">SID</abbr>:" + ptripInfo.serviceId + " Trip ID: " + ptripInfo.tripId +"</li>";
                     if (transitData["middle"] != null) {
                         var middleData = transitData["middle"]
                         item+="<li>Mode:"+middleData.mode+" Duration: " + secondsToTime(middleData.duration) + "Distance: "+middleData.distance/1000 + "m</li>";
@@ -515,6 +565,83 @@ function makeModes(modeName, javaModeName) {
     return niceModes.join(",");
 }
 
+//Gets all the stops if zoom > 13 and showStops is checked in envelope which is visible map bounds
+function getStops(params) {
+    if (geojsonLayer != null) {
+        window.my_map.removeLayer(geojsonLayer);
+    }
+    //on zooms lower then 13 we are visiting too many spatial index cells on a server and don't get an answer
+    if (window.my_map.getZoom() < 13 || !planConfig.showStops) {
+        return;
+    }
+
+    var url = hostname + "/seenStops";
+    $.getJSON(url, params, function(data) {
+        /*console.log("Got data");*/
+        /*console.log(data);*/
+        if (data.errors) {
+            alert(data.errors);
+        }
+        geojsonLayer = L.geoJson(data, {pointToLayer:function(feature, latlng) {
+            return L.circleMarker(latlng, { weight:1});
+        },
+            style: styleStop, onEachFeature:onEachFeature});
+        geojsonLayer.addTo(window.my_map);
+    });
+
+}
+
+function getParkRides(params) {
+    if (parkRidesLayer != null) {
+        window.my_map.removeLayer(parkRidesLayer);
+    }
+    //on zooms lower then 11 we are visiting too many spatial index cells on a server and don't get an answer
+    if (window.my_map.getZoom() < 11 || !planConfig.showPR) {
+        return;
+    }
+
+    var url = hostname + "/seenParkRides";
+    $.getJSON(url, params, function(data) {
+        /*console.log("Got data");*/
+        /*console.log(data);*/
+        if (data.errors) {
+            alert(data.errors);
+        }
+        parkRidesLayer = L.geoJson(data, {pointToLayer:function(feature, latlng) {
+            return L.circleMarker(latlng, { fillColor:'#f0f', opacity:0.8, radius:5, weight:1});
+        },
+             onEachFeature:onEachFeature});
+        parkRidesLayer.addTo(window.my_map);
+    });
+
+}
+
+function getBikeShares(params) {
+    if (bikeSharesLayer != null) {
+        window.my_map.removeLayer(bikeSharesLayer);
+    }
+    //on zooms lower then 13 we are visiting too many spatial index cells on a server and don't get an answer
+    if (window.my_map.getZoom() < 13 || !planConfig.showBS) {
+        return;
+    }
+
+    var url = hostname + "/seenBikeShares";
+    $.getJSON(url, params, function(data) {
+        /*console.log("Got data");*/
+        /*console.log(data);*/
+        if (data.errors) {
+            alert(data.errors);
+        }
+        bikeSharesLayer = L.geoJson(data, {pointToLayer:function(feature, latlng) {
+            return L.circleMarker(latlng, { fillColor:'#0ff', opacity:0.8, radius:5, weight:1});
+        },
+             onEachFeature:onEachFeature});
+        bikeSharesLayer.addTo(window.my_map);
+    });
+
+}
+
+
 function requestPlan() {
     $('#resultTab').removeClass("status-ok status-error").addClass("status-waiting");
     var request = template
@@ -527,6 +654,7 @@ function requestPlan() {
             'fromLon':planConfig.fromLon,
             'toLat': planConfig.toLat,
             'toLon':planConfig.toLon,
+            'wheelchair':planConfig.wheelchair,
             'fromTime':planConfig.date+"T"+planConfig.fromTime+planConfig.offset,
             'toTime':planConfig.date+"T"+planConfig.toTime+planConfig.offset
         };
@@ -534,6 +662,22 @@ function requestPlan() {
         'query': request,
         'variables': JSON.stringify(variables)
     };
+    
+    //This is object with variables copied into URL hash so requests can be shared
+    var filteredPlanConfig = {};
+    //Copies only variables from planConfig
+    Object.keys(planConfig)
+        .filter(function(varname) {
+            //Filters out functions
+            return !(varname == "plan" || varname == "showReachedStops")
+        })
+        .forEach(function(key) {
+            filteredPlanConfig[key] = planConfig[key];
+        });
+    var query = $.param(filteredPlanConfig);
+    var URL = location.pathname + "?" + query;
+
+    $("#requestLink").attr("href", URL);
 
     var compactedParams = JSON.stringify(params);
     //Removes useless spaces so that CURL CLI line is more compact
@@ -664,6 +808,7 @@ $(document).ready(function() {
     gui.add(planConfig, "egressModes");
     gui.add(planConfig, "directModes");
     gui.add(planConfig, "transitModes");
+    gui.add(planConfig, "wheelchair");
     gui.add(planConfig, "date");
     gui.add(planConfig, "fromTime");
     gui.add(planConfig, "toTime");
@@ -673,12 +818,67 @@ $(document).ready(function() {
     gui.add(planConfig, "toLat").listen().onFinishChange(function(value) {moveMarker("to"); });
     gui.add(planConfig, "toLon").listen().onFinishChange(function(value) {moveMarker("to"); });
     gui.add(planConfig, "plan");
+    gui.add(planConfig, "showStops");
+    gui.add(planConfig, "showPR");
+    gui.add(planConfig, "showBS");
     /*gui.add(planConfig, "showReachedStops");*/
 var sidebar = L.control.sidebar('sidebar').addTo(my_map);
     $('#resultTab').click(function (){
         $('#resultTab').removeClass("status-waiting status-ok status-error");
 
     })
+    //Sets GUI from hash values
+    if (location.search != "") {
+        
+        // init url params
+        urlParams = { };
+        var match,
+            pl     = /\+/g,  // Regex for replacing addition symbol with a space
+            search = /([^&=]+)=?([^&]*)/g,
+            decode = function (s) { return decodeURIComponent(s.replace(pl, " ")); },
+            query  = window.location.search.substring(1);
+
+        while (match = search.exec(query)) {
+            var value = decode(match[2]);
+            var key = decode(match[1]);
+
+            //fromLat,fromLon toLat and toLon are actually floats
+            if ((key.indexOf("toL") >= 0) || (key.indexOf("fromL") >= 0)) {
+                value = parseFloat(value);
+            //wheelchair needs to be boolean
+            } else if (key == "wheelchair") {
+                planConfig[key] = $.parseJSON(value.toLowerCase());
+            } else {
+                planConfig[key] = value;
+            }
+            //This is actually unnecessary except for latitudes and longitudes
+            urlParams[key] = value;
+        }
+
+        // updates all gui controllers since we changed the values
+        for (var i in gui.__controllers) {
+            gui.__controllers[i].updateDisplay();
+        }
+
+        var fromEvent = {'latlng': L.latLng(urlParams['fromLat'], urlParams['fromLon'])};
+        addFirst(fromEvent);
+        var toEvent = {'latlng': L.latLng(urlParams['toLat'], urlParams['toLon'])};
+        addLast(toEvent);
+
+    }
+
+    my_map.on('moveend', function() {
+        var bbox = my_map.getBounds();
+        var params = {
+            n : bbox.getNorth(),
+            s : bbox.getSouth(),
+            e : bbox.getEast(),
+            w : bbox.getWest(),
+        };
+        getStops(params);
+        getParkRides(params);
+        getBikeShares(params);
+    });
 
 });
 

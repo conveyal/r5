@@ -2,7 +2,7 @@ package com.conveyal.r5.publish;
 
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.common.JsonUtilities;
-import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
@@ -33,7 +33,7 @@ public class StaticMain {
 
         LOG.info("Finding transport network.");
         TransportNetworkCache cache = new TransportNetworkCache(args[1]);
-        TransportNetwork net = cache.getNetwork(ssr.transportNetworkId);
+        TransportNetwork net = cache.getNetworkForScenario(ssr.transportNetworkId, ssr.request);
 
         LOG.info("Computing metadata");
         StaticMetadata metadata = new StaticMetadata(ssr, net);
@@ -45,7 +45,7 @@ public class StaticMain {
         WebMercatorGridPointSet ps = net.getGridPointSet();
 
         // pre-link so it doesn't get done in every thread
-        LinkedPointSet lps = ps.link(net.streetLayer, Mode.WALK);
+        LinkedPointSet lps = ps.link(net.streetLayer, StreetMode.WALK);
 
         for (int x = 0; x < ps.width; x++) {
             for (int y = 0; y < ps.height; y++) {
@@ -63,7 +63,7 @@ public class StaticMain {
         for (int offset = 0; offset < nRequests; offset += 50000) {
             try {
                 HttpClient httpClient = HttpClients.createDefault();
-                HttpPost request = new HttpPost(args[2] + "/enqueue/jobs");
+                HttpPost request = new HttpPost(args[2] + "/enqueue/regional");
                 request.setHeader("Content-Type", "application/json");
                 List<StaticSiteRequest.PointRequest> subRequests = requests.subList(offset, Math.min(offset + 50000, nRequests));
                 request.setEntity(new StringEntity(JsonUtilities.objectMapper.writeValueAsString(subRequests)));

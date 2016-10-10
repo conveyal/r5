@@ -3,6 +3,8 @@ package com.conveyal.r5.analyst;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Polygon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -172,7 +174,60 @@ public class ResultSet implements Serializable{
     }
 
     public void writeIsochrones (JsonGenerator jgen) throws IOException {
-        throw new UnsupportedOperationException("Isochrone generation not supported in R5");
+        jgen.writeStringField("type", "FeatureCollection");
+        jgen.writeArrayFieldStart("features");
+
+        for (IsochroneFeature feature : this.isochrones) {
+            jgen.writeStartObject();
+
+            jgen.writeObjectFieldStart("properties");
+            jgen.writeNumberField("time", feature.cutoffSec);
+            jgen.writeEndObject();
+
+            jgen.writeObjectFieldStart("geometry");
+            jgen.writeStringField("type", "MultiPolygon");
+
+            jgen.writeArrayFieldStart("coordinates");
+            // TODO there has to be a better way to do this
+            for (int gidx = 0; gidx < feature.geometry.getNumGeometries(); gidx++) {
+                Polygon polygon = (Polygon) feature.geometry.getGeometryN(gidx);
+
+                jgen.writeStartArray();
+
+                // write outer ring
+                jgen.writeStartArray();
+
+                for (Coordinate coord : polygon.getExteriorRing().getCoordinates()) {
+                    jgen.writeStartArray();
+                    jgen.writeNumber(coord.x);
+                    jgen.writeNumber(coord.y);
+                    jgen.writeEndArray();
+                }
+
+                jgen.writeEndArray();
+
+                for (int ridx = 0; ridx < polygon.getNumInteriorRing(); ridx++) {
+                    jgen.writeStartArray();
+
+                    for (Coordinate coord : polygon.getInteriorRingN(ridx).getCoordinates()) {
+                        jgen.writeStartArray();
+                        jgen.writeNumber(coord.x);
+                        jgen.writeNumber(coord.y);
+                        jgen.writeEndArray();
+                    }
+
+                    jgen.writeEndArray();
+                }
+
+                jgen.writeEndArray();
+            }
+
+            jgen.writeEndArray(); // coords
+            jgen.writeEndObject(); // geometry
+            jgen.writeEndObject(); // feature
+        }
+
+        jgen.writeEndArray();
     }
 
     /** A set of result sets from profile routing: min, avg, max */;

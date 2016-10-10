@@ -67,14 +67,13 @@ public class StreetPath {
         //First streetPath is part of path from last bicycle station to the end destination on foot
         if (mode == LegMode.BICYCLE_RENT) {
             StreetRouter.State endCycling = getStates().getFirst();
-            StreetRouter bicycle = streetRouter.previous;
+            StreetRouter bicycle = streetRouter.previousRouter;
             lastState = bicycle.getStateAtVertex(endCycling.vertex);
             if (lastState != null) {
-                //Copies bikeshare setting
                 lastState.isBikeShare = endCycling.isBikeShare;
                 //Here part from first bikeshare to the last bikeshare on rented bike is created
                 add(lastState);
-                StreetRouter first = bicycle.previous;
+                StreetRouter first = bicycle.previousRouter;
                 StreetRouter.State startCycling = getStates().getFirst();
                 lastState = first.getStateAtVertex(startCycling.vertex);
                 if (lastState != null) {
@@ -90,8 +89,7 @@ public class StreetPath {
              //First state in walk part of CAR PARK is state where we ended driving
             StreetRouter.State carPark = getStates().getFirst();
             //So we need to search for driving part in previous streetRouter
-            StreetRouter.State carState = streetRouter.previous.getStateAtVertex(carPark.vertex);
-            //TODO: add car park info (name, etc)
+            StreetRouter.State carState = streetRouter.previousRouter.getStateAtVertex(carPark.vertex);
             if (carState != null) {
                 add(carState);
             } else {
@@ -131,12 +129,20 @@ public class StreetPath {
      * @param lastState
      */
     public void add(StreetRouter.State lastState) {
-/*
+        boolean first = true;
+        /*
          * Starting from latest (time-wise) state, copy states to the head of a list in reverse
          * chronological order. List indices will thus increase forward in time, and backEdges will
          * be chronologically 'back' relative to their state.
          */
         for (StreetRouter.State cur = lastState; cur != null; cur = cur.backState) {
+            //Skips duplicated state in multi searches P+R and B+R since both walk/cycle and car/walk
+            //have same state as stop state and start state of next search
+            if (first && firstState.vertex == cur.vertex) {
+                states.removeFirst();
+                edges.removeFirst();
+            }
+            first = false;
             states.addFirst(cur);
             if (cur.backEdge != -1 && cur.backState != null) {
                 edges.addFirst(cur.backEdge);

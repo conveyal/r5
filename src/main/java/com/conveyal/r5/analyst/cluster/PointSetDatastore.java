@@ -25,7 +25,8 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * TODO what does this do? Does it really need to be a subclass?
+ * This is a loading cache for pointsets that falls back on the filesystem then on S3 storage.
+ * TODO Merge with the largely empty superclass.
  */
 public class PointSetDatastore extends PointSetCache {
 
@@ -158,7 +159,7 @@ public class PointSetDatastore extends PointSetCache {
 				cachedFile = new File(POINT_DIR, pointSetId + ".json");
 			}
 			// Pointset file was already in the cache, or it has now been downloaded into the cache. Grab it.
-			LOG.info("Loading PointSet into cache from local file {}", cachedFile);
+			LOG.info("Loading PointSet into memory cache from local file cache at {}", cachedFile);
 			return FreeFormPointSet.fromGeoJson(cachedFile);
 		}
 	}

@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.common.MavenVersion;
+import com.conveyal.r5.common.R5Version;
 
 import java.io.Serializable;
 
@@ -116,7 +116,7 @@ public class TaskStatistics implements Serializable{
     public long computeDate;
 
     public TaskStatistics() {
-        otpCommit = MavenVersion.commit;
+        otpCommit = R5Version.commit;
         computeDate = System.currentTimeMillis();
     }
 }

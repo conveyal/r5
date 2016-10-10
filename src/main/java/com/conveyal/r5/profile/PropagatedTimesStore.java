@@ -34,7 +34,8 @@ import static org.apache.commons.math3.util.FastMath.toRadians;
  *
  * We could also conceivably store travel time histograms per destination, but this entails a loss of information due
  * to binning into minutes. These binned times could not be used to apply a smooth sigmoid cutoff which we usually
- * do at one-second resolution.
+ * do at one-second resolution. However, the data in the seconds portion is mostly random, so we could achieve roughly
+ * the same effect by jittering the stored values when applying the cutoff.
  *
  * When exploring single-point (one-to-many) query results it would be great to have all these stored or produced on
  * demand for visualization.
@@ -69,7 +70,7 @@ public class PropagatedTimesStore {
      * @param includeInAverages if includeInAverages[i] is true, include iteration i in averages. We calculate extrema
      *                          as well as samples when doing monte carlo, and extrema should not be included in averages.
      */
-    public void setFromArray(int[][] times, BitSet includeInAverages, ConfidenceCalculationMethod confidenceCalculationMethod) {
+    public void setFromArray(int[][] times, BitSet includeInAverages, ConfidenceCalculationMethod confidenceCalculationMethod, float reachabilityThreshold) {
         if (times.length == 0)
             // nothing to do
             return;
@@ -86,6 +87,12 @@ public class PropagatedTimesStore {
         // this is effectively a "random number generator" with phase 10007
         int[] randomNumbers = random.ints().limit(10007).map(Math::abs).toArray();
         int nextRandom = 0;
+
+        // use the cardinality of includeInAverages because some of the times are never included in averages
+        // and thus don't count towards meeting the reachability threshold.
+        // minCount should always be at least 1 even when reachability threshold is 0, because if a point is never
+        // reached it certainly shouldn't be included in the averages.
+        int minCount = Math.max((int) (includeInAverages.cardinality() * reachabilityThreshold), 1);
 
         // loop over stops on the outside so we can bootstrap
         STOPS: for (int stop = 0; stop < stops; stop++) {
@@ -111,7 +118,7 @@ public class PropagatedTimesStore {
                 }
             }
 
-            if (count == 0)
+            if (count < minCount)
                 continue STOPS;
 
             avgs[stop] = sum / count;

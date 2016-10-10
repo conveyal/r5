@@ -1,8 +1,8 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
-import com.conveyal.r5.profile.Mode;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.transit.TransportNetwork;
 import junit.framework.Assert;
@@ -10,8 +10,6 @@ import junit.framework.TestCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.Array;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -100,7 +98,7 @@ public class ReverseRoutingTest extends TestCase {
         StreetRouter streetRouter = new StreetRouter(streetLayer);
         streetRouter.profileRequest = profileRequest;
         profileRequest.reverseSearch = true;
-        streetRouter.mode = Mode.BICYCLE;
+        streetRouter.streetMode = StreetMode.BICYCLE;
         VertexStore.Vertex AVertex = streetLayer.vertexStore.getCursor(A);
         VertexStore.Vertex EVertex = streetLayer.vertexStore.getCursor(E);
         Split split = streetLayer.findSplit(AVertex.getLat(), AVertex.getLon(),500);

@@ -2,7 +2,6 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.r5.api.util.Fare;
 import com.conveyal.r5.profile.PathWithTimes;
-import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.fare.FareTable;
 import com.conveyal.r5.transit.fare.RideType;
 
@@ -100,7 +99,6 @@ public class DCFareCalculator {
         List<FareRide> fareRides = new ArrayList<>(pathWithTimes.length);
         FareRide prev = null;
         TransitLayer transitLayer = transportNetwork.transitLayer;
-        VertexStore.Vertex vertex = transportNetwork.streetLayer.vertexStore.getCursor();
         for (int pathIndex = 0; pathIndex < pathWithTimes.length; pathIndex++) {
             int pattern = pathWithTimes.patterns[pathIndex];
             TripPattern tripPattern = transitLayer.tripPatterns.get(pattern);
@@ -109,20 +107,8 @@ public class DCFareCalculator {
                 int boardStopIdx = pathWithTimes.boardStops[pathIndex];
                 int alightStopIdx = pathWithTimes.alightStops[pathIndex];
 
-                com.conveyal.r5.api.util.Stop from = new com.conveyal.r5.api.util.Stop(
-                    transitLayer.stopIdForIndex.get(boardStopIdx),
-                    transitLayer.stopNames.get(boardStopIdx));
-                com.conveyal.r5.api.util.Stop to = new com.conveyal.r5.api.util.Stop(
-                    transitLayer.stopIdForIndex.get(alightStopIdx),
-                    transitLayer.stopNames.get(alightStopIdx));
-
-                vertex.seek(transitLayer.streetVertexForStop.get(boardStopIdx));
-                from.lat = (float) vertex.getLat();
-                from.lon = (float) vertex.getLon();
-
-                vertex.seek(transitLayer.streetVertexForStop.get(alightStopIdx));
-                to.lat = (float) vertex.getLat();
-                to.lon = (float) vertex.getLon();
+                com.conveyal.r5.api.util.Stop from = new com.conveyal.r5.api.util.Stop(boardStopIdx, transitLayer);
+                com.conveyal.r5.api.util.Stop to = new com.conveyal.r5.api.util.Stop(alightStopIdx, transitLayer);
 
                 FareRide fareRide = new FareRide(from, to, routeInfo, prev);
                 if (prev != null && prev.type == fareRide.type) {

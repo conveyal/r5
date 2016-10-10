@@ -2,8 +2,6 @@ package com.conveyal.r5.analyst.broker;
 
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import gnu.trove.map.TObjectIntMap;
-import gnu.trove.map.hash.TObjectIntHashMap;
 
 import java.util.HashMap;
 import java.util.List;
@@ -11,74 +9,50 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- *
+ * A catalog of all the workers this broker has been contacted by recently.
+ * Ideally this would also manage target quantities of workers by category and migrate workers from one category to
+ * another. But for now we just leave workers on a single graph / r5 commit and don't migrate them.
  */
 public class WorkerCatalog {
 
+    public static final int WORKER_RECORD_DURATION_MSEC = 2 * 60 * 1000;
+
+    /** Keeps track of the last time a worker polled the broker for more tasks. */
     Map<String, WorkerObservation> observationsByWorkerId = new HashMap<>();
+
+    /** Keeps the workers sorted into categories depending on which network and R5 commit they are running. */
+    Multimap<WorkerCategory, String> workersByCategory = HashMultimap.create();
+
+    /** Sort the workers by graph only (used in offline mode) */
     Multimap<String, String> workersByGraph = HashMultimap.create();
 
-    // How many workers we would ideally like to have given the number of jobs and tasks
-    int targetWorkerCount;
-
-    // We want to store integral target worker counts rather than fractional proportions to avoid "hunting" behavior.
-    // The target quantities will all be integers so it is clear when they are reached.
-    TObjectIntMap<String> targetWorkerCountPerGraph = new TObjectIntHashMap<>();
-
-    // and function to update target counts based on jobs queue.
-
-    public synchronized void catalog (String workerId, String graphAffinity) {
-        WorkerObservation observation = new WorkerObservation(workerId, graphAffinity);
+    /**
+     * Record the fact that a worker with a particular ID was just seen connecting to the broker.
+     */
+    public synchronized void catalog (String workerId, WorkerCategory category) {
+        WorkerObservation observation = new WorkerObservation(workerId, category);
         WorkerObservation oldObservation = observationsByWorkerId.put(workerId, observation);
         if (oldObservation != null) {
-            workersByGraph.remove(oldObservation.graphAffinity, workerId);
+            workersByCategory.remove(oldObservation.category, workerId);
         }
-        workersByGraph.put(graphAffinity, workerId);
+        workersByCategory.put(category, workerId);
+        workersByGraph.put(category.graphId, workerId);
     }
 
     public synchronized void purgeDeadWorkers () {
         long now = System.currentTimeMillis();
-        long oldestAcceptable = now - 2 * 60 * 1000;
+        long oldestAcceptable = now - WORKER_RECORD_DURATION_MSEC;
         List<WorkerObservation> ancientObservations = observationsByWorkerId.values().stream()
-                .filter(o -> o.lastSeen < oldestAcceptable).collect(Collectors.toList());
-        ancientObservations.forEach(o -> {
-            observationsByWorkerId.remove(o.workerId);
-            workersByGraph.remove(o.graphAffinity, o.workerId);
+                .filter(observation -> observation.lastSeen < oldestAcceptable).collect(Collectors.toList());
+        ancientObservations.forEach(observation -> {
+            observationsByWorkerId.remove(observation.workerId);
+            workersByCategory.remove(observation.category, observation.workerId);
+            workersByGraph.remove(observation.category.graphId, observation.workerId);
         });
-    }
-
-    public synchronized void updateTargetWorkerCounts (Multimap<String, String> activeJobsPerGraph) {
-
-        final int activeWorkerCount = observationsByWorkerId.size(); // (plus outstanding instance requests)
-        final int activeJobsCount = activeJobsPerGraph.size();
-
-        // For now just distribute among all jobs equally, without weighting by users.
-        activeJobsPerGraph.asMap().forEach((g, js) -> {
-            targetWorkerCountPerGraph.put(g, js.size() * activeWorkerCount / activeJobsCount); // FIXME this will round down and waste workers
-        });
-
-    }
-
-    /** Returns true if it is OK to steal a worker toward this graphId. */
-    boolean notEnoughWorkers (String graphId) {
-        return targetWorkerCountPerGraph.get(graphId) > workersByGraph.get(graphId).size();
-    }
-
-    /** Returns true if it is OK to steal a worker _away_ from this graphId. */
-    boolean tooManyWorkers (String graphId) {
-        return targetWorkerCountPerGraph.get(graphId) < workersByGraph.get(graphId).size();
-    }
-
-    /**
-     * Returns a list of graphIds beginning with the supplied one, then moving on to any others that have too many
-     * workers on them.
-     */
-    public List<String> orderedStealingList(String graphId) {
-        return null;
     }
 
     public int size () {
-        return workersByGraph.size();
+        return workersByCategory.size();
     }
 
 }

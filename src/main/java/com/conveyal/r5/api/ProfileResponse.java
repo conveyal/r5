@@ -4,6 +4,7 @@ import com.conveyal.r5.api.util.*;
 import com.conveyal.r5.profile.*;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.DCFareCalculator;
+import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -79,7 +80,7 @@ public class ProfileResponse {
 
 
         if (profileOption.isEmpty()) {
-            LOG.info("Creating new profile option");
+            LOG.debug("Creating new profile option");
             options.add(profileOption);
         }
 
@@ -87,18 +88,21 @@ public class ProfileResponse {
         int endStopIndex = currentTransitPath.alightStops[currentTransitPath.length-1];
         int startVertexStopIndex = transportNetwork.transitLayer.streetVertexForStop.get(startStopIndex);
         int endVertexStopIndex = transportNetwork.transitLayer.streetVertexForStop.get(endStopIndex);
-        LOG.info("Filling response access paths:");
+        //LOG.info("Filling response access paths:");
         //TODO: update this so that each stopIndex and mode pair is changed to streetpath only once
         LegMode accessMode = stopModeAccessMap.get(startStopIndex);
+
         if (accessMode != null) {
             int accessPathIndex = profileOption.getAccessIndex(accessMode, startVertexStopIndex);
             if (accessPathIndex < 0) {
                 //Here accessRouter needs to have this access mode since stopModeAccessMap is filled from accessRouter
                 StreetRouter streetRouter = accessRouter.get(accessMode);
+                //FIXME: Must we really update this on every streetrouter?
+                streetRouter.profileRequest.reverseSearch = false;
                 StreetRouter.State state = streetRouter.getStateAtVertex(startVertexStopIndex);
                 if (state != null) {
                     StreetPath streetPath;
-                    if ((accessMode == LegMode.CAR_PARK || accessMode == LegMode.BICYCLE_RENT) && streetRouter.previous != null) {
+                    if ((accessMode == LegMode.CAR_PARK || accessMode == LegMode.BICYCLE_RENT) && streetRouter.previousRouter != null) {
                         streetPath = new StreetPath(state, streetRouter, accessMode,
                             transportNetwork);
                     } else {
@@ -115,13 +119,15 @@ public class ProfileResponse {
             LOG.warn("Mode is not in stopModeAccessMap for start stop:{}({})", startVertexStopIndex, startStopIndex);
         }
 
-        LOG.info("Filling response EGRESS paths:");
+        //LOG.info("Filling response EGRESS paths:");
         LegMode egressMode = stopModeEgressMap.get(endStopIndex);
         if (egressMode != null) {
             int egressPathIndex = profileOption.getEgressIndex(egressMode, endVertexStopIndex);
             if (egressPathIndex < 0) {
                 //Here egressRouter needs to have this egress mode since stopModeEgressMap is filled from egressRouter
                 StreetRouter streetRouter = egressRouter.get(egressMode);
+                //FIXME: Must we really update this on every streetrouter?
+                streetRouter.profileRequest.reverseSearch = true;
                 StreetRouter.State state = streetRouter.getStateAtVertex(endVertexStopIndex);
                 if (state != null) {
                     StreetPath streetPath = new StreetPath(state, transportNetwork, true);
@@ -177,13 +183,13 @@ public class ProfileResponse {
         //Groups transfers on alight stop so that StreetRouter is called only once per start stop
         Map<Integer, List<Transfer>> transfersWithSameStart = transferToOption.keySet().stream()
             .collect(Collectors.groupingBy(Transfer::getAlightStop));
-        LOG.info("Filling middle paths");
+        //LOG.info("Filling middle paths");
         for (Map.Entry<Integer, List<Transfer>> entry: transfersWithSameStart.entrySet()) {
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
-            streetRouter.mode = Mode.WALK;
+            streetRouter.streetMode = StreetMode.WALK;
             streetRouter.profileRequest = request;
             //TODO: make configurable distanceLimitMeters in middle
-            streetRouter.distanceLimitMeters = 2000;
+            streetRouter.distanceLimitMeters = TransitLayer.TRANSFER_DISTANCE_LIMIT;
             int stopIndex = transportNetwork.transitLayer.streetVertexForStop.get(entry.getKey());
             streetRouter.setOrigin(stopIndex);
             streetRouter.route();

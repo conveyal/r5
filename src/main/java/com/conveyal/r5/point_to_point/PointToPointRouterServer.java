@@ -2,12 +2,15 @@ package com.conveyal.r5.point_to_point;
 
 import com.conveyal.r5.api.GraphQlRequest;
 import com.conveyal.r5.api.util.BikeRentalStation;
+import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.api.util.ParkRideParking;
+import com.conveyal.r5.api.util.Stop;
 import com.conveyal.r5.common.GeoJsonFeature;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.point_to_point.builder.RouterInfo;
-import com.conveyal.r5.profile.Mode;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.streets.*;
@@ -27,7 +30,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.time.Instant;
 import java.util.*;
 
 import java.io.File;
@@ -160,8 +162,8 @@ public class PointToPointRouterServer {
             Map<String, Object> content = new HashMap<>(2);
             String queryMode = request.queryParams("mode");
 
-            Mode mode = Mode.valueOf(queryMode);
-            if (mode == null) {
+            StreetMode streetMode = StreetMode.valueOf(queryMode);
+            if (streetMode == null) {
                 content.put("errors", "Mode is wrong");
                 return content;
             }
@@ -179,8 +181,10 @@ public class PointToPointRouterServer {
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
 
             streetRouter.profileRequest = profileRequest;
-            streetRouter.mode = mode;
-            streetRouter.distanceLimitMeters = 2000;
+            streetRouter.streetMode = streetMode;
+            streetRouter.timeLimitSeconds = profileRequest.getTimeLimit(LegMode.valueOf(streetMode.toString()));
+            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+            streetRouter.transitStopSearch = true;
             if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
                 streetRouter.route();
                 streetRouter.getReachedStops().forEachEntry((stopIdx, weight) -> {
@@ -191,7 +195,7 @@ public class PointToPointRouterServer {
                     feature.addProperty("weight", weight);
                     feature.addProperty("name", transportNetwork.transitLayer.stopNames.get(stopIdx));
                     feature.addProperty("type", "stop");
-                    feature.addProperty("mode", mode.toString());
+                    feature.addProperty("mode", streetMode.toString());
                     if (state != null) {
                         feature.addProperty("distance_m", state.distance/1000);
                         feature.addProperty("duration_s", state.getDurationSeconds());
@@ -217,8 +221,8 @@ public class PointToPointRouterServer {
             Map<String, Object> content = new HashMap<>(2);
             String queryMode = request.queryParams("mode");
 
-            Mode mode = Mode.valueOf(queryMode);
-            if (mode == null) {
+            StreetMode streetMode = StreetMode.valueOf(queryMode);
+            if (streetMode == null) {
                 content.put("errors", "Mode is wrong");
                 return content;
             }
@@ -236,8 +240,11 @@ public class PointToPointRouterServer {
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
 
             streetRouter.profileRequest = profileRequest;
-            streetRouter.mode = mode;
-            streetRouter.distanceLimitMeters = 2000;
+            streetRouter.streetMode = streetMode;
+            streetRouter.timeLimitSeconds = profileRequest.getTimeLimit(LegMode.valueOf(streetMode.toString()));
+            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+            streetRouter.flagSearch = VertexStore.VertexFlag.BIKE_SHARING;
+            streetRouter.maxVertices = 50;
             if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
                 streetRouter.route();
                 streetRouter.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING).forEachEntry((vertexIdx, state) -> {
@@ -251,11 +258,60 @@ public class PointToPointRouterServer {
                         feature.addProperty("bikes", bikeRentalStation.bikesAvailable);
                         feature.addProperty("places", bikeRentalStation.spacesAvailable);
                     }
-                    feature.addProperty("type", "stop");
-                    feature.addProperty("mode", mode.toString());
+                    feature.addProperty("type", "bike_share");
                     if (state != null) {
                         feature.addProperty("distance_m", state.distance/1000);
                     }
+                    features.add(feature);
+                    return true;
+                });
+            } else {
+                content.put("errors", "Start point isn't found!");
+            }
+
+            LOG.info("Num features:{}", features.size());
+            featureCollection.put("features", features);
+            content.put("data", featureCollection);
+
+            return content;
+        }, JsonUtilities.objectMapper::writeValueAsString);
+
+
+        get("/reachedParkRide", (request, response) -> {
+            response.header("Content-Type", "application/json");
+
+            StreetMode streetMode = StreetMode.CAR;
+            Map<String, Object> content = new HashMap<>(2);
+            Float fromLat = request.queryMap("fromLat").floatValue();
+
+            Float fromLon = request.queryMap("fromLon").floatValue();
+
+            Map<String, Object> featureCollection = new HashMap<>(2);
+            featureCollection.put("type", "FeatureCollection");
+            List<GeoJsonFeature> features = new ArrayList<>();
+            ProfileRequest profileRequest = new ProfileRequest();
+            profileRequest.zoneId = transportNetwork.getTimeZone();
+            profileRequest.fromLat = fromLat;
+            profileRequest.fromLon = fromLon;
+            StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+
+            streetRouter.profileRequest = profileRequest;
+            streetRouter.streetMode = streetMode;
+            streetRouter.timeLimitSeconds = profileRequest.getTimeLimit(LegMode.valueOf(streetMode.toString()));
+            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+            streetRouter.flagSearch = VertexStore.VertexFlag.PARK_AND_RIDE;
+            streetRouter.maxVertices = 50;
+            if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
+                streetRouter.route();
+                streetRouter.getReachedVertices(VertexStore.VertexFlag.PARK_AND_RIDE).forEachEntry((vertexIdx, state) -> {
+                    VertexStore.Vertex stopVertex = transportNetwork.streetLayer.vertexStore.getCursor(vertexIdx);
+                    GeoJsonFeature feature = new GeoJsonFeature(stopVertex.getLon(), stopVertex.getLat());
+                    feature.addProperty("weight", state.weight);
+                    //feature.addProperty("name", transportNetwork.transitLayer.stopNames.get(stopIdx));
+                    feature.addProperty("type", "park_ride");
+                    feature.addProperty("mode", "CAR");
+                    feature.addProperty("distance_m", state.distance/1000);
+                    feature.addProperty("duration_s", state.getDurationSeconds());
                     features.add(feature);
                     return true;
                 });
@@ -275,8 +331,8 @@ public class PointToPointRouterServer {
             Map<String, Object> content = new HashMap<>();
             String queryMode = request.queryParams("mode");
 
-            Mode mode = Mode.valueOf(queryMode);
-            if (mode == null) {
+            StreetMode streetMode = StreetMode.valueOf(queryMode);
+            if (streetMode == null) {
                 content.put("errors", "Mode is wrong");
                 return content;
             }
@@ -288,7 +344,7 @@ public class PointToPointRouterServer {
             //TODO errorchecks
 
             Boolean fullStateList = request.queryMap("full").booleanValue();
-            RoutingVisitor routingVisitor = new RoutingVisitor(transportNetwork.streetLayer.edgeStore, mode);
+            DebugRoutingVisitor debugRoutingVisitor = new DebugRoutingVisitor(transportNetwork.streetLayer.edgeStore);
 
             if (fullStateList == null) {
                 fullStateList = false;
@@ -307,7 +363,7 @@ public class PointToPointRouterServer {
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
 
             streetRouter.profileRequest = profileRequest;
-            streetRouter.mode = mode;
+            streetRouter.streetMode = streetMode;
 
             // TODO use target pruning instead of a distance limit
             streetRouter.distanceLimitMeters = 100_000;
@@ -321,7 +377,7 @@ public class PointToPointRouterServer {
                 return content;
             }
             if (fullStateList) {
-                streetRouter.setRoutingVisitor(routingVisitor);
+                streetRouter.setRoutingVisitor(debugRoutingVisitor);
             }
 
             streetRouter.route();
@@ -330,7 +386,7 @@ public class PointToPointRouterServer {
             if (fullStateList) {
                 Map<String, Object> featureCollection = new HashMap<>(2);
                 featureCollection.put("type", "FeatureCollection");
-                List<GeoJsonFeature> features = routingVisitor.getFeatures();
+                List<GeoJsonFeature> features = debugRoutingVisitor.getFeatures();
 
                 LOG.info("Num features:{}", features.size());
                 featureCollection.put("features", features);
@@ -350,7 +406,7 @@ public class PointToPointRouterServer {
                 featureCollection.put("features", features);
                 content.put("data", featureCollection);
             } else {
-                Split originSplit = streetRouter.getOriginSplit();
+                Split destinationSplit = streetRouter.getDestinationSplit();
                 //FIXME: why are coordinates of vertex0 and vertex1 the same
                 //but distance to vertex and vertex idx differ
 
@@ -359,47 +415,47 @@ public class PointToPointRouterServer {
                  * - Point on end of edge that started the search
                  * - Closest point on edge to start coordinate
                  *
-                 * We also return outgoing edges from start and end points of edge that started the search
+                 * We also return incoming edges to end points of edge that should end the search
                  */
                 Map<String, Object> featureCollection = new HashMap<>(2);
                 featureCollection.put("type", "FeatureCollection");
                 List<GeoJsonFeature> features = new ArrayList<>(10);
                 GeoJsonFeature feature = new GeoJsonFeature(
-                    fixedDegreesToFloating(originSplit.fLon), fixedDegreesToFloating(originSplit.fLat));
+                    fixedDegreesToFloating(destinationSplit.fixedLon), fixedDegreesToFloating(destinationSplit.fixedLat));
                 feature.addProperty("type", "Point on edge");
 
                 features.add(feature);
 
-                VertexStore.Vertex vertex = transportNetwork.streetLayer.vertexStore.getCursor(originSplit.vertex0);
+                VertexStore.Vertex vertex = transportNetwork.streetLayer.vertexStore.getCursor(destinationSplit.vertex0);
                 feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
                 feature.addProperty("type", "Edge start point");
-                feature.addProperty("vertex_idx", originSplit.vertex0);
-                feature.addProperty("distance_to_vertex", originSplit.distance0_mm/1000);
+                feature.addProperty("vertex_idx", destinationSplit.vertex0);
+                feature.addProperty("distance_to_vertex", destinationSplit.distance0_mm/1000);
                 features.add(feature);
-                transportNetwork.streetLayer.getOutgoingEdges().get(originSplit.vertex0)
+                transportNetwork.streetLayer.incomingEdges.get(destinationSplit.vertex0)
                     .forEach(edge_idx -> {
                         EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edge_idx);
                         GeoJsonFeature edge_feature = new GeoJsonFeature(edge.getGeometry());
                         edge_feature.addProperty("idx", edge_idx);
                         edge_feature.addProperty("permissions", edge.getPermissionsAsString());
-                        edge_feature.addProperty("from", "vertex0");
+                        edge_feature.addProperty("to", "vertex0");
                         features.add(edge_feature);
                         return true;
                     });
 
-                transportNetwork.streetLayer.vertexStore.getCursor(originSplit.vertex1);
+                transportNetwork.streetLayer.vertexStore.getCursor(destinationSplit.vertex1);
                 feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
                 feature.addProperty("type", "Edge end point");
-                feature.addProperty("vertex_idx", originSplit.vertex1);
-                feature.addProperty("distance_to_vertex", originSplit.distance1_mm/1000);
+                feature.addProperty("vertex_idx", destinationSplit.vertex1);
+                feature.addProperty("distance_to_vertex", destinationSplit.distance1_mm/1000);
                 features.add(feature);
-                transportNetwork.streetLayer.getOutgoingEdges().get(originSplit.vertex1)
+                transportNetwork.streetLayer.incomingEdges.get(destinationSplit.vertex1)
                     .forEach(edge_idx -> {
                         EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edge_idx);
                         GeoJsonFeature edge_feature = new GeoJsonFeature(edge.getGeometry());
                         edge_feature.addProperty("idx", edge_idx);
                         edge_feature.addProperty("permissions", edge.getPermissionsAsString());
-                        edge_feature.addProperty("from", "vertex1");
+                        edge_feature.addProperty("to", "vertex1");
                         features.add(edge_feature);
                         return true;
                     });
@@ -410,6 +466,113 @@ public class PointToPointRouterServer {
             }
             return content;
         }, JsonUtilities.objectMapper::writeValueAsString);
+
+        get("/seenStops", (request, response) -> {
+            response.header("Content-Type", "application/json");
+            if (request.queryParams().size() < 4) {
+                response.status(400);
+                return "";
+            }
+            float north = request.queryMap("n").floatValue();
+            float south = request.queryMap("s").floatValue();
+            float east = request.queryMap("e").floatValue();
+            float west = request.queryMap("w").floatValue();
+
+            Envelope env = new Envelope(east, west,
+                south, north);
+
+            // write geojson to response
+            Map<String, Object> featureCollection = new HashMap<>(2);
+            featureCollection.put("type", "FeatureCollection");
+
+            Collection<Stop> stops = transportNetwork.transitLayer.findStopsInEnvelope(env);
+            List<GeoJsonFeature> features = new ArrayList<>(stops.size());
+
+            stops.forEach(stop -> {
+                GeoJsonFeature feature = new GeoJsonFeature(stop.lon, stop.lat);
+                feature.addProperty("name", stop.name);
+                feature.addProperty("stopId", stop.stopId);
+                feature.addProperty("mode", stop.mode);
+                features.add(feature);
+            });
+
+            //LOG.info("Found {} stops", features.size());
+            featureCollection.put("features", features);
+
+            return featureCollection;
+        }, JsonUtilities.objectMapper::writeValueAsString);
+
+        get("/seenParkRides", (request, response) -> {
+            response.header("Content-Type", "application/json");
+            if (request.queryParams().size() < 4) {
+                response.status(400);
+                return "";
+            }
+            float north = request.queryMap("n").floatValue();
+            float south = request.queryMap("s").floatValue();
+            float east = request.queryMap("e").floatValue();
+            float west = request.queryMap("w").floatValue();
+
+            Envelope env = new Envelope(east, west,
+                south, north);
+
+            // write geojson to response
+            Map<String, Object> featureCollection = new HashMap<>(2);
+            featureCollection.put("type", "FeatureCollection");
+
+            List<ParkRideParking> parkRideParkings = transportNetwork.streetLayer.findParkRidesInEnvelope(env);
+            List<GeoJsonFeature> features = new ArrayList<>(parkRideParkings.size());
+
+            parkRideParkings.forEach(parkRideParking -> {
+                GeoJsonFeature feature = new GeoJsonFeature(parkRideParking.lon, parkRideParking.lat);
+                feature.addProperty("type", "P+R");
+                feature.addProperty("name", parkRideParking.name);
+                feature.addProperty("id", parkRideParking.id);
+                feature.addProperty("capacity", parkRideParking.capacity);
+                features.add(feature);
+            });
+
+            //LOG.info("Found {} ParkRides", features.size());
+            featureCollection.put("features", features);
+
+            return featureCollection;
+        }, JsonUtilities.objectMapper::writeValueAsString);
+
+        get("/seenBikeShares", (request, response) -> {
+            response.header("Content-Type", "application/json");
+            if (request.queryParams().size() < 4) {
+                response.status(400);
+                return "";
+            }
+            float north = request.queryMap("n").floatValue();
+            float south = request.queryMap("s").floatValue();
+            float east = request.queryMap("e").floatValue();
+            float west = request.queryMap("w").floatValue();
+
+            Envelope env = new Envelope(east, west,
+                south, north);
+
+            // write geojson to response
+            Map<String, Object> featureCollection = new HashMap<>(2);
+            featureCollection.put("type", "FeatureCollection");
+
+            List<BikeRentalStation> bikeRentalStations = transportNetwork.streetLayer.findBikeSharesInEnvelope(env);
+            List<GeoJsonFeature> features = new ArrayList<>(bikeRentalStations.size());
+
+            bikeRentalStations.forEach(bikeRentalStation -> {
+                GeoJsonFeature feature = new GeoJsonFeature(bikeRentalStation.lon, bikeRentalStation.lat);
+                feature.addProperty("type", "Bike share");
+                feature.addProperty("name", bikeRentalStation.name);
+                feature.addProperty("id", bikeRentalStation.id);
+                features.add(feature);
+            });
+
+            //LOG.info("Found {} bike shares", features.size());
+            featureCollection.put("features", features);
+
+            return featureCollection;
+        }, JsonUtilities.objectMapper::writeValueAsString);
+
 
         get("debug/streetEdges", (request, response) -> {
             response.header("Content-Type", "application/json");
@@ -442,7 +605,7 @@ public class PointToPointRouterServer {
 
             Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
                 floatingDegreesToFixed(south), floatingDegreesToFixed(north));
-            TIntSet streets = transportNetwork.streetLayer.spatialIndex.query(env);
+            TIntSet streets = transportNetwork.streetLayer.findEdgesInEnvelope(env);
 
             if (streets.size() > 100_000) {
                 LOG.warn("Refusing to include more than 100,000 edges in result");
@@ -520,7 +683,7 @@ public class PointToPointRouterServer {
             if (request.queryParams().size() < 4) {
 
                 EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor();
-                for (int e = 0; e < transportNetwork.streetLayer.edgeStore.getnEdges(); e += 2) {
+                for (int e = 0; e < transportNetwork.streetLayer.edgeStore.nEdges(); e += 2) {
                     edge.seek(e);
 
                     try {
@@ -549,7 +712,7 @@ public class PointToPointRouterServer {
 
             Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
                 floatingDegreesToFixed(south), floatingDegreesToFixed(north));
-            TIntSet streets = transportNetwork.streetLayer.spatialIndex.query(env);
+            TIntSet streets = transportNetwork.streetLayer.findEdgesInEnvelope(env);
             //transportNetwork.streetLayer.edgeStore.getCursor()
 
             if (streets.size() > 100_000) {
@@ -591,7 +754,7 @@ public class PointToPointRouterServer {
             if (request.queryParams().size() < 4) {
 
                 EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor();
-                for (int e = 0; e < transportNetwork.streetLayer.edgeStore.getnEdges(); e += 2) {
+                for (int e = 0; e < transportNetwork.streetLayer.edgeStore.nEdges(); e += 2) {
                     edge.seek(e);
 
                     try {
@@ -615,7 +778,7 @@ public class PointToPointRouterServer {
 
             Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
                 floatingDegreesToFixed(south), floatingDegreesToFixed(north));
-            TIntSet streets = transportNetwork.streetLayer.spatialIndex.query(env);
+            TIntSet streets = transportNetwork.streetLayer.findEdgesInEnvelope(env);
 
             if (streets.size() > 100_000) {
                 LOG.warn("Refusing to include more than 100,000 edges in result");
@@ -652,6 +815,9 @@ public class PointToPointRouterServer {
 
             Integer edgeID = request.queryMap("edgeID").integerValue();
 
+            //If true returns all the OSM tags of this edge
+            Boolean wantTags = request.queryMap("tags").booleanValue();
+
             if (edgeID == null) {
                 content.put("errors", "edgeID is empty!");
             } else {
@@ -659,6 +825,13 @@ public class PointToPointRouterServer {
                 try {
                     edge.seek(edgeID);
                     content.put("data", edge.getGeometry().getEnvelopeInternal());
+
+                    if (wantTags != null && wantTags) {
+                        String osmTags = transportNetwork.streetLayer.getWayTags(edge);
+                        if (osmTags != null) {
+                            content.put("tags", osmTags);
+                        }
+                    }
                 } catch (Exception ex) {
                     content.put("errors", ex.getMessage());
                     LOG.error("Error getting edge:{}", ex);
@@ -758,30 +931,26 @@ public class PointToPointRouterServer {
      * @return
      */
     private static GeoJsonFeature getVertexFeature(VertexStore.Vertex vertex, TransportNetwork network) {
+        GeoJsonFeature feature = null;
         if (network.transitLayer.stopForStreetVertex.containsKey(vertex.index)) {
             // jitter transit stops slightly, in a deterministic way, so we can see if they're linked correctly
-            GeoJsonFeature feature = new GeoJsonFeature(GeometryUtils.geometryFactory.createPoint(jitter(vertex)));
-            feature.addProperty("vertex_id", vertex.index);
-            //TODO: add all flags (when there is more)
-            feature.addProperty("flags", VertexStore.VertexFlag.TRAFFIC_SIGNAL.toString());
-            return feature;
+            feature = new GeoJsonFeature(GeometryUtils.geometryFactory.createPoint(jitter(vertex)));
+            //Used for showing stop vertices in debug client
+            feature.addProperty("STOP", true);
+        } else {
+            feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
         }
 
-        if (vertex.getFlag(VertexStore.VertexFlag.TRAFFIC_SIGNAL)) {
-            GeoJsonFeature feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
-            feature.addProperty("vertex_id", vertex.index);
-            //TODO: add all flags (when there is more)
-            feature.addProperty("flags", VertexStore.VertexFlag.TRAFFIC_SIGNAL.toString());
-            return feature;
+        feature.addProperty("vertex_id", vertex.index);
+        //Needed for filtering flags
+        for (VertexStore.VertexFlag flag: VertexStore.VertexFlag.values()) {
+            if (vertex.getFlag(flag)) {
+                feature.addProperty(flag.toString(), true);
+            }
         }
-        if (vertex.getFlag(VertexStore.VertexFlag.BIKE_SHARING)) {
-            GeoJsonFeature feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
-            feature.addProperty("vertex_id", vertex.index);
-            //TODO: add all flags (when there is more)
-            feature.addProperty("flags", VertexStore.VertexFlag.BIKE_SHARING.toString());
-            return feature;
-        }
-        return null;
+        //feature.addProperty("flags", cursor.getFlagsAsString());
+
+        return feature;
     }
 
     /**
@@ -813,7 +982,7 @@ public class PointToPointRouterServer {
                     .getCursor(edgeIdx);
                 GeoJsonFeature feature = new GeoJsonFeature(edge.getGeometry());
                 feature.addProperty("weight", state.weight);
-                feature.addProperty("mode", state.mode);
+                feature.addProperty("mode", state.streetMode);
                 feature.addProperty("distance", state.distance/1000);
                 feature.addProperty("idx", stateIdx++);
                 feature.addProperty("stateIdx", state.idx);
@@ -853,6 +1022,7 @@ public class PointToPointRouterServer {
             VertexStore.Vertex v = network.streetLayer.vertexStore.getCursor(cursor.getToVertex());
             coords[coords.length - 1] = jitter(v);
         }
+        geometry = GeometryUtils.geometryFactory.createLineString(coords);
 
         GeoJsonFeature feature = new GeoJsonFeature(geometry);
         feature.addProperty("permission", cursor.getPermissionsAsString());

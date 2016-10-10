@@ -118,15 +118,17 @@ public class StaticComputer implements Runnable {
             int prev = 0;
             int prevPath = 0;
             int maxPathIdx = 0;
+            int previousInVehicleTravelTime = 0;
+            int previousWaitTime = 0;
 
             TObjectIntMap<Path> paths = new TObjectIntHashMap<>();
             List<Path> pathList = new ArrayList<>();
 
-            int previousInVehicleTravelTime = 0;
-            int previousWaitTime = 0;
+            for (int iter = 0, stateIteration = 0; iter < iterations; iter++, stateIteration++) {
+                // advance past states that are not included in averages
+                while (!worker.includeInAverages.get(stateIteration)) stateIteration++;
 
-            for (int iter = 0; iter < iterations; iter++) {
-                RaptorState state = worker.statesEachIteration.get(iter);
+                RaptorState state = worker.statesEachIteration.get(stateIteration);
 
                 int time = pts.times[iter][stop];
                 if (time == Integer.MAX_VALUE) time = -1;
@@ -143,8 +145,8 @@ public class StaticComputer implements Runnable {
                 out.writeInt(waitTime - previousWaitTime);
                 previousWaitTime = waitTime;
 
-                if (waitTime > 255) {
-                    LOG.info("detected excessive wait");
+                if (inVehicleTravelTime + waitTime > time && time != -1) {
+                    LOG.info("Wait and in vehicle travel time greater than total time");
                 }
 
                 // write out which path to use, delta coded

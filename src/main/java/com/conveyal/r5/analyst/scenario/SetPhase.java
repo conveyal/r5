@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
  * This allows us to set the phase between pure frequency routes provided in a GTFS feed.
  * This is really only intended for use in Indianapolis and will be immediately deprecated.
  */
+@Deprecated
 public class SetPhase extends Modification {
 
     /** The ID of the timetable entry on which to set the phase. */
@@ -76,11 +77,12 @@ public class SetPhase extends Modification {
             // At this point, we know there are frequency entries and one of them has the specified ID.
             // Update that particular entry with the supplied phase information.
             // If IDs do not exist, errors will be produced later when phasing is actually applied.
+            // Note that this only needs to work in Indianapolis, where the number of frequency entries is always 1.
             TripSchedule newTripSchedule = ts.clone();
-            newTripSchedule.phaseFromId[entryIndex] = phaseFromId;
-            newTripSchedule.phaseFromStop[entryIndex] = phaseFromStop;
-            newTripSchedule.phaseAtStop[entryIndex] = phaseStop;
-            newTripSchedule.phaseSeconds[entryIndex] = phaseSeconds;
+            newTripSchedule.phaseFromId = new String[] {phaseFromId};
+            newTripSchedule.phaseFromStop = new String[] {phaseFromStop};
+            newTripSchedule.phaseAtStop = new String[] {phaseStop};
+            newTripSchedule.phaseSeconds = new int[] {phaseSeconds};
             if (applied) {
                 warnings.add("A set-phase modification has been applied more than one entry in the network.");
             }

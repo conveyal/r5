@@ -16,7 +16,6 @@ import com.conveyal.r5.publish.StaticMetadata;
 import com.conveyal.r5.publish.StaticSiteRequest;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.CountingInputStream;
 import org.apache.http.HttpEntity;
@@ -28,7 +27,6 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.config.SocketConfig;
 import org.apache.http.conn.HttpHostConnectException;
-import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
@@ -39,7 +37,6 @@ import com.conveyal.r5.profile.RepeatedRaptorProfileRouter;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
-import org.glassfish.grizzly.Transport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -109,9 +106,6 @@ public class AnalystWorker implements Runnable {
 
     /** is there currently a channel open to the broker to receive single point jobs? */
     private volatile boolean sideChannelOpen = false;
-
-    /** Reads and writes JSON. */
-    ObjectMapper objectMapper;
 
     String BROKER_BASE_URL = "http://localhost:9001";
 
@@ -232,9 +226,6 @@ public class AnalystWorker implements Runnable {
 
         // The new request signing v4 requires you to know the region where the S3 objects are.
         s3.setRegion(awsRegion == null ? Region.getRegion(Regions.EU_WEST_1) : awsRegion);
-
-        /* The ObjectMapper (de)serializes JSON. */
-        objectMapper = JsonUtilities.objectMapper;
 
         instanceType = getInstanceType();
     }
@@ -638,7 +629,7 @@ public class AnalystWorker implements Runnable {
                 EntityUtils.consumeQuietly(entity);
                 return null;
             }
-            return objectMapper.readValue(entity.getContent(), new TypeReference<List<GenericClusterRequest>>() {});
+            return JsonUtilities.lenientObjectMapper.readValue(entity.getContent(), new TypeReference<List<GenericClusterRequest>>() {});
         } catch (JsonProcessingException e) {
             LOG.error("JSON processing exception while getting work", e);
         } catch (SocketTimeoutException stex) {
@@ -693,7 +684,7 @@ public class AnalystWorker implements Runnable {
             OutputStream gzipOutputStream = new GZIPOutputStream(outPipe);
             // We could do the writeValue() in a thread instead, in which case both the DELETE and S3 options
             // could consume it in the same way.
-            objectMapper.writeValue(gzipOutputStream, envelope);
+            JsonUtilities.objectMapper.writeValue(gzipOutputStream, envelope);
             gzipOutputStream.close();
             // Tell the broker the task has been handled and should not be redelivered to another worker.
             deleteRequest(clusterRequest);

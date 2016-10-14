@@ -629,6 +629,8 @@ public class AnalystWorker implements Runnable {
                 EntityUtils.consumeQuietly(entity);
                 return null;
             }
+
+            // Use the lenient object mapper here in case the broker belongs to a newer
             return JsonUtilities.lenientObjectMapper.readValue(entity.getContent(), new TypeReference<List<GenericClusterRequest>>() {});
         } catch (JsonProcessingException e) {
             LOG.error("JSON processing exception while getting work", e);

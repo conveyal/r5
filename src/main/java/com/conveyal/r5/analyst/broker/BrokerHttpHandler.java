@@ -174,7 +174,8 @@ class BrokerHttpHandler extends HttpHandler {
                 }
                 // Copy the result back to the connection that was the source of the task.
                 try {
-                    ByteStreams.copy(request.getInputStream(), suspendedProducerResponse.getOutputStream());
+                    long length = ByteStreams.copy(request.getInputStream(), suspendedProducerResponse.getOutputStream());
+                    LOG.info("Returning {} bytes to high-priority consumer for request {}", length, taskId);
                 } catch (IOException | IllegalStateException ioex) {
                     // Apparently the task producer did not wait to retrieve its result. Priority task result delivery
                     // is not guaranteed, we don't need to retry, this is not considered an error by the worker.

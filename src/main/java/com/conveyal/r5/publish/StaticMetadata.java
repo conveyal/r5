@@ -7,6 +7,7 @@ import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transitive.TransitiveNetwork;
+import com.google.common.io.CountingOutputStream;
 import com.google.common.io.LittleEndianDataOutputStream;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -90,7 +91,6 @@ public class StaticMetadata implements Runnable {
 
     /** Write distance tables from stops to PointSet points for this query. */
     public void writeStopTrees (OutputStream out) throws IOException {
-
         // Build the distance tables.
         LinkedPointSet lps = network.getLinkedGridPointSet();
         if (lps.stopToPointDistanceTables == null) {
@@ -121,7 +121,8 @@ public class StaticMetadata implements Runnable {
         }
 
         // Write the tables.
-        LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(out);
+        CountingOutputStream cos = new CountingOutputStream(out);
+        LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(cos);
 
         int prevStopId = 0;
         int prevTime = 0;
@@ -147,6 +148,9 @@ public class StaticMetadata implements Runnable {
         }
 
         dos.flush();
+        dos.close();
+
+        LOG.info("static stop trees were {} bytes", cos.getCount());
     }
 
     public static class Metadata implements Serializable {

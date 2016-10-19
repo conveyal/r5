@@ -79,36 +79,6 @@ public class TransportNetwork implements Serializable {
         transitLayer.buildDistanceTables(null);
     }
 
-    /**
-     * Test main method: Round-trip serialize the transit layer and test its speed after deserialization.
-     */
-    public static void main (String[] args) {
-        // TransportNetwork transportNetwork = TransportNetwork.fromFiles(args[0], args[1]);
-        TransportNetwork transportNetwork;
-        try {
-            transportNetwork = TransportNetwork.fromDirectory(new File("."));
-        } catch (DuplicateFeedException e) {
-            LOG.error("Duplicate feeds in directory", e);
-            return;
-        }
-
-        try {
-            OutputStream outputStream = new BufferedOutputStream(new FileOutputStream("network.dat"));
-            transportNetwork.write(outputStream);
-            outputStream.close();
-            // Be careful to release the original reference to be sure to have heap space
-            transportNetwork = null;
-            InputStream inputStream = new BufferedInputStream(new FileInputStream("network.dat"));
-            transportNetwork = TransportNetwork.read(inputStream);
-            inputStream.close();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-        transportNetwork.testRouting();
-        // transportNetwork.streetLayer.testRouting(false, transitLayer);
-        // transportNetwork.streetLayer.testRouting(true, transitLayer);
-    }
-
     /** Legacy method to load from a single GTFS file */
     public static TransportNetwork fromFiles (String osmSourceFile, String gtfsSourceFile, TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
         return fromFiles(osmSourceFile, Arrays.asList(gtfsSourceFile), tnBuilderConfig);
@@ -303,38 +273,6 @@ public class TransportNetwork implements Serializable {
             if (name.endsWith("network.dat")) return OUTPUT;
             return OTHER;
         }
-    }
-
-    /**
-     * Test combined street and transit routing.
-     */
-    public void testRouting () {
-        LOG.info("Street and transit routing from random street corners...");
-        StreetRouter streetRouter = new StreetRouter(streetLayer);
-        streetRouter.distanceLimitMeters = 1500;
-        TransitRouter transitRouter = new TransitRouter(transitLayer);
-        long startTime = System.currentTimeMillis();
-        final int N = 1_000;
-        final int nStreetIntersections = streetLayer.getVertexCount();
-        Random random = new Random();
-        for (int n = 0; n < N; n++) {
-            // Do one street search around a random origin and destination, initializing the transit router
-            // with the stops that were reached.
-            int from = random.nextInt(nStreetIntersections);
-            int to = random.nextInt(nStreetIntersections);
-            streetRouter.setOrigin(from);
-            streetRouter.route();
-            streetRouter.setOrigin(to);
-            streetRouter.route();
-            transitRouter.reset();
-            transitRouter.setOrigins(streetRouter.getReachedStops(), 8 * 60 * 60);
-            transitRouter.route();
-            if (n != 0 && n % 100 == 0) {
-                LOG.info("    {}/{} searches", n, N);
-            }
-        }
-        double eTime = System.currentTimeMillis() - startTime;
-        LOG.info("average response time {} msec", eTime / N);
     }
 
     /**

@@ -437,14 +437,16 @@ public class McRaptorSuboptimalPathProfileRouter {
     /** Perform transfers */
     private void doTransfers () {
         BitSet stopsTouchedByTransfer = new BitSet(network.transitLayer.getStopCount());
-
+        double walkSpeedMillimetersPerSecond = request.walkSpeed * 1000;
         for (int stop = touchedStops.nextSetBit(0); stop >= 0; stop = touchedStops.nextSetBit(stop + 1)) {
             TIntList transfers = network.transitLayer.transfersForStop.get(stop);
 
             for (McRaptorState state : bestStates.get(stop).getNonTransferStates()) {
                 for (int transfer = 0; transfer < transfers.size(); transfer += 2) {
                     int toStop = transfers.get(transfer);
-                    if (addState(toStop, -1, -1, state.time + transfers.get(transfer + 1), -1, -1, state)) {
+                    int distanceMillimeters = transfers.get(transfer + 1);
+                    int walkTimeSeconds = (int)(distanceMillimeters / walkSpeedMillimetersPerSecond);
+                    if (addState(toStop, -1, -1, state.time + walkTimeSeconds, -1, -1, state)) {
                         String to = network.transitLayer.stopNames.get(transfers.get(transfer));
                         //LOG.info("Transfer from {} to {} is optimal", from, to);
 

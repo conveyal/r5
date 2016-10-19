@@ -78,6 +78,7 @@ public class PathWithTimes extends Path {
         while (times[0][firstTrip][0] < req.fromTime + accessTime + RaptorWorker.BOARD_SLACK_SECONDS) firstTrip++;
 
         // now interleave times
+        double walkSpeedMillimetersPerSecond = req.walkSpeed * 1000;
         TIMES: while (firstTrip < times[0].length) {
             Itinerary itin = new Itinerary(this.patterns.length);
 
@@ -105,7 +106,8 @@ public class PathWithTimes extends Path {
 
                         for (int i = 0; i < transfers.size(); i += 2) {
                             if (transfers.get(i) == this.boardStops[patIdx + 1]) {
-                                transferTime = transfers.get(i + 1);
+                                int transferDistanceMillimeters = transfers.get(i + 1);
+                                transferTime = (int)(transferDistanceMillimeters / walkSpeedMillimetersPerSecond);
                                 break;
                             }
                         }

@@ -169,7 +169,7 @@ public class StreetRouter {
      * This uses stops found in {@link StopVisitor} if transitStopSearch is true
      * and DOESN'T search in found states for stops
      *
-     * @return a map from transit stop indexes to their distances from the origin.
+     * @return a map from transit stop indexes to their distances from the origin (or whatever the dominance variable is).
      * Note that the TransitLayer contains all the information about which street vertices are transit stops.
      */
     public TIntIntMap getReachedStops() {

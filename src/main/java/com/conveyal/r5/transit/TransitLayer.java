@@ -638,6 +638,11 @@ public class TransitLayer implements Serializable, Cloneable {
      * Finds all the transit stops in given envelope and returns it.
      *
      * Stops also have mode which is mode of route in first pattern that this stop is found in
+     *
+     * Stop coordinates are jittered {@link com.conveyal.r5.point_to_point.PointToPointRouterServer#jitter(VertexStore.Vertex)}. Meaning they are moved a little from their actual coordinate
+     * so that multiple stops at same coordinate can be seen
+     *
+     *
      * @param env Envelope in float degrees
      * @return
      */
@@ -651,7 +656,8 @@ public class TransitLayer implements Serializable, Cloneable {
             if (e.getFlag(EdgeStore.EdgeFlag.LINK) && stopForStreetVertex.containsKey(e.getFromVertex())) {
                 int stopIdx = stopForStreetVertex.get(e.getFromVertex());
 
-                com.conveyal.r5.api.util.Stop stop = new com.conveyal.r5.api.util.Stop(stopIdx, this, true);
+                com.conveyal.r5.api.util.Stop stop = new com.conveyal.r5.api.util.Stop(stopIdx, this, true,
+                    true);
                 stops.add(stop);
             }
             return true;

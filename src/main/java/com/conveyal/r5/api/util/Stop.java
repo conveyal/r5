@@ -1,8 +1,10 @@
 package com.conveyal.r5.api.util;
 
+import com.conveyal.r5.point_to_point.PointToPointRouterServer;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.*;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.vividsolutions.jts.geom.*;
 
 /**
  * Transit stop
@@ -30,22 +32,29 @@ public class Stop {
      * @param transitLayer Transit Layer
      */
     public Stop(int stopIdx, TransitLayer transitLayer) {
-        this(stopIdx, transitLayer, false);
+        this(stopIdx, transitLayer, false, false);
     }
 
     /**
      * Sets stopId, stop name and latitude, longitude and wheelchairBoarding from transitLayer
-     *  @param stopIdx index of stop in transitLayer
+     * @param stopIdx index of stop in transitLayer
      * @param transitLayer Transit Layer
      * @param fillMode if true TransitMode is filled
+     * @param jitterCoordinates if true stop coordinates are jittered with {@link PointToPointRouterServer#jitter(VertexStore.Vertex)}
      */
-    public Stop(int stopIdx, TransitLayer transitLayer, boolean fillMode) {
+    public Stop(int stopIdx, TransitLayer transitLayer, boolean fillMode, boolean jitterCoordinates) {
         stopId = transitLayer.stopIdForIndex.get(stopIdx);
         name = transitLayer.stopNames.get(stopIdx);
         VertexStore.Vertex vertex = transitLayer.parentNetwork.streetLayer.vertexStore.getCursor();
         vertex.seek(transitLayer.streetVertexForStop.get(stopIdx));
-        lat = (float) vertex.getLat();
-        lon = (float) vertex.getLon();
+        if (jitterCoordinates) {
+            com.vividsolutions.jts.geom.Coordinate jitteredCoordinates = PointToPointRouterServer.jitter(vertex);
+            lat = (float) jitteredCoordinates.y;
+            lon = (float) jitteredCoordinates.x;
+        } else {
+            lat = (float) vertex.getLat();
+            lon = (float) vertex.getLon();
+        }
         wheelchairBoarding = transitLayer.stopsWheelchair.get(stopIdx);
 
         if (fillMode) {

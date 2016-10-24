@@ -141,6 +141,12 @@ public class StreetRouter {
     // The best known value of the chosen dominance variable at the destination, used to prune the search.
     private int bestValueAtDestination = Integer.MAX_VALUE;
 
+
+    // This is maximal absolute latitude of origin, when there are multiple origin states
+    // it is used when calculating A* goal direction heuristic
+    private int maxAbsOriginLat = Integer.MIN_VALUE;
+
+
     /**
      * The preceding StreetRouter in a multi-router search.
      * For example if we are searching for P+R we need 2 street searches:
@@ -285,12 +291,18 @@ public class StreetRouter {
         queue.add(startState1);
         bestStatesAtEdge.put(startState0.backEdge, startState0);
         bestStatesAtEdge.put(startState1.backEdge, startState1);
+
+        maxAbsOriginLat = originSplit.fixedLat;
         return true;
     }
 
     public void setOrigin (int fromVertex) {
         bestStatesAtEdge.clear();
         queue.clear();
+
+        // sets maximal absolute origin latitude used for goal direction heuristic
+        VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor(fromVertex);
+        maxAbsOriginLat = vertex.getFixedLat();
 
         // NB backEdge of -1 is no problem as it is a special case that indicates that the origin was a vertex.
         State startState = new State(fromVertex, -1, streetMode);
@@ -311,6 +323,8 @@ public class StreetRouter {
     public void setOrigin(TIntObjectMap<State> previousStates, int switchTime, int switchCost, LegMode legMode) {
         bestStatesAtEdge.clear();
         queue.clear();
+        //Maximal origin latitude is used in goal direction heuristic.
+        final int[] maxOriginLatArr = { Integer.MIN_VALUE };
 
         previousStates.forEachEntry((vertexIdx, previousState) -> {
             // backEdge needs to be unique for each start state or they will wind up dominating each other.
@@ -326,9 +340,13 @@ public class StreetRouter {
             if (!isDominated(state)) {
                 bestStatesAtEdge.put(state.backEdge, state);
                 queue.add(state);
+                VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor(state.vertex);
+                int deltaLatFixed = vertex.getFixedLat();
+                maxOriginLatArr[0] = Math.max(maxOriginLatArr[0], Math.abs(deltaLatFixed));
             }
             return true;
         });
+        maxAbsOriginLat = maxOriginLatArr[0];
 
     }
 
@@ -374,7 +392,7 @@ public class StreetRouter {
             // We want to scale X distances by the cosine of the higher of the two latitudes to underestimate distances,
             // as required for the A* heuristic to be admissible.
             // TODO this should really use the max latitude of the whole street layer.
-            int maxAbsLatFixed = Math.max(Math.abs(destinationSplit.fixedLat), Math.abs(originSplit.fixedLat));
+            int maxAbsLatFixed = Math.max(Math.abs(destinationSplit.fixedLat), Math.abs(maxAbsOriginLat));
             double maxAbsLatRadians = Math.toRadians(VertexStore.fixedDegreesToFloating(maxAbsLatFixed));
             millimetersPerDegreeLonFixed = MM_PER_DEGREE_LAT_FIXED * Math.cos(maxAbsLatRadians);
             // FIXME account for speeds of individual street segments, not just speed in request

@@ -424,6 +424,7 @@ public class PointToPointQuery {
                 bicycle.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             }
             bicycle.setOrigin(bikeStations, BIKE_RENTAL_PICKUP_TIME_S, BIKE_RENTAL_PICKUP_COST, LegMode.BICYCLE_RENT);
+            bicycle.setDestination(destinationSplit);
             bicycle.route();
             TIntObjectMap<StreetRouter.State> cycledStations = bicycle.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
             LOG.info("BIKE RENT: Found {} cycled stations which are {} minutes away", cycledStations.size(), bicycle.timeLimitSeconds/60);

@@ -18,6 +18,7 @@ import java.io.Serializable;
 @JsonSubTypes({
         @JsonSubTypes.Type(name = "static", value = StaticSiteRequest.PointRequest.class),
         @JsonSubTypes.Type(name = "analyst", value = AnalystClusterRequest.class),
+        @JsonSubTypes.Type(name = "grid", value = GridRequest.class),
         @JsonSubTypes.Type(name = "static-metadata", value = StaticMetadata.MetadataRequest.class),
         @JsonSubTypes.Type(name = "static-stop-trees", value = StaticMetadata.StopTreeRequest.class)
 })

@@ -5,6 +5,8 @@ import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.conveyal.r5.analyst.GridCache;
+import com.conveyal.r5.analyst.GridComputer;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
@@ -131,6 +133,7 @@ public class AnalystWorker implements Runnable {
 
     // Of course this will eventually need to be shared between multiple AnalystWorker threads.
     PointSetDatastore pointSetDatastore;
+    GridCache gridCache;
 
     // Clients for communicating with Amazon web services
     AmazonS3 s3;
@@ -199,6 +202,7 @@ public class AnalystWorker implements Runnable {
         // graph this machine was intended to analyze.
         this.networkId = config.getProperty("initial-graph-id");
 
+        this.gridCache = new GridCache(config.getProperty("pointsets-bucket"));
         this.pointSetDatastore = new PointSetDatastore(10, null, false, config.getProperty("pointsets-bucket"));
         File cacheDir = new File(config.getProperty("cache-dir", "cache/graphs"));
         this.transportNetworkCache = new TransportNetworkCache(workOffline ? null : config.getProperty("graphs-bucket"), cacheDir);
@@ -380,6 +384,9 @@ public class AnalystWorker implements Runnable {
             } else if (clusterRequest instanceof StaticMetadata.StopTreeRequest) {
                 transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, ((StaticMetadata.StopTreeRequest) clusterRequest).request.request);
                 this.handleStaticStopTrees((StaticMetadata.StopTreeRequest) clusterRequest, transportNetwork, ts);
+            } else if (clusterRequest instanceof GridRequest) {
+                transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, ((GridRequest) clusterRequest).request);
+                this.handleGridRequest((GridRequest) clusterRequest, transportNetwork, ts);
             }
             else
                 LOG.error("Unrecognized request type {}", clusterRequest.getClass());
@@ -452,7 +459,7 @@ public class AnalystWorker implements Runnable {
 
         if (request.request.bucket != null) {
             try {
-                OutputStream os = StaticDataStore.getOutputStream(request.request, "query.json", "application/octet-stream");
+                OutputStream os = StaticDataStore.getOutputStream(request.request, "stop_trees.dat", "application/octet-stream");
                 staticMetadata.writeStopTrees(os);
                 os.close();
             } catch (IOException e) {
@@ -473,6 +480,18 @@ public class AnalystWorker implements Runnable {
                 LOG.error("Error writing static stop trees to broker", e);
             }
         }
+    }
+
+    /** Handle a request for access to a grid (used for regional analysis) */
+    private void handleGridRequest (GridRequest request, TransportNetwork network, TaskStatistics ts) {
+        try {
+            new GridComputer(request, gridCache, network).run();
+        } catch (IOException e) {
+            LOG.error("Error in grid computer", e);
+            return; // this causes the request to be retried, I think that's what we want
+        }
+
+        deleteRequest(request);
     }
 
     /** Handle a stock Analyst request */

@@ -24,18 +24,18 @@ public class WebMercatorGridPointSet extends PointSet {
     public final int zoom;
 
     /** westernmost pixel */
-    public final long west;
+    public final int west;
 
     /** northernmost pixel */
-    public final long north;
+    public final int north;
 
     /** width */
-    public final long width;
+    public final int width;
 
     /** height */
-    public final long height;
+    public final int height;
 
-    public WebMercatorGridPointSet(int zoom, long west, long north, long width, long height) {
+    public WebMercatorGridPointSet(int zoom, int west, int north, int width, int height) {
         this.zoom = zoom;
         this.west = west;
         this.north = north;
@@ -48,10 +48,10 @@ public class WebMercatorGridPointSet extends PointSet {
         LOG.info("Creating web mercator pointset for transport network with extents {}", transportNetwork.streetLayer.envelope);
 
         this.zoom = DEFAULT_ZOOM;
-        long west = lonToPixel(transportNetwork.streetLayer.envelope.getMinX());
-        long east = lonToPixel(transportNetwork.streetLayer.envelope.getMaxX());
-        long north = latToPixel(transportNetwork.streetLayer.envelope.getMaxY());
-        long south = latToPixel(transportNetwork.streetLayer.envelope.getMinY());
+        int west = lonToPixel(transportNetwork.streetLayer.envelope.getMinX());
+        int east = lonToPixel(transportNetwork.streetLayer.envelope.getMaxX());
+        int north = latToPixel(transportNetwork.streetLayer.envelope.getMaxY());
+        int south = latToPixel(transportNetwork.streetLayer.envelope.getMinY());
 
         this.west = west;
         this.north = north;
@@ -79,18 +79,18 @@ public class WebMercatorGridPointSet extends PointSet {
     // http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics
 
     /** convert longitude to pixel value */
-    public long lonToPixel (double lon) {
+    public int lonToPixel (double lon) {
         // factor of 256 is to get a pixel value not a tile number
-        return (long) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);
+        return (int) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);
     }
 
     /** convert latitude to pixel value */
-    public long latToPixel (double lat) {
+    public int latToPixel (double lat) {
         //
         double invCos = 1 / Math.cos(Math.toRadians(lat));
         double tan = Math.tan(Math.toRadians(lat));
         double ln = Math.log(tan + invCos);
-        return (long) ((1 - ln / Math.PI) * Math.pow(2, zoom - 1) * 256);
+        return (int) ((1 - ln / Math.PI) * Math.pow(2, zoom - 1) * 256);
     }
 
     public double pixelToLon (double x) {

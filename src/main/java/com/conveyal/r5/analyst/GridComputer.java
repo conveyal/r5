@@ -1,41 +1,25 @@
 package com.conveyal.r5.analyst;
 
-import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.sqs.AmazonSQS;
-import com.amazonaws.services.sqs.AmazonSQSAsync;
-import com.amazonaws.services.sqs.AmazonSQSAsyncClient;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.MessageAttributeValue;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
 import com.conveyal.r5.analyst.cluster.GridRequest;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
-import com.conveyal.r5.analyst.messages.OriginOuterClass;
 import com.conveyal.r5.api.util.LegMode;
-import com.conveyal.r5.profile.RaptorState;
 import com.conveyal.r5.profile.RaptorWorker;
-import com.conveyal.r5.profile.RepeatedRaptorProfileRouter;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
-import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.transit.TransportNetworkCache;
-import com.conveyal.r5.util.S3Util;
 import com.google.common.io.LittleEndianDataOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.PipedInputStream;
-import java.io.PipedOutputStream;
 import java.util.Base64;
-import java.util.Map;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
-import java.util.zip.GZIPOutputStream;
 
 /**
  * Computes accessibility to grids and dumps it to s3.

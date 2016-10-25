@@ -5,10 +5,6 @@ import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.Message;
-import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
-import com.amazonaws.services.sqs.model.ReceiveMessageResult;
-import com.conveyal.r5.analyst.cluster.GridRequest;
-import com.conveyal.r5.analyst.messages.AccessGridOuterClass.AccessGrid;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.LittleEndianDataInputStream;
 import com.google.common.io.LittleEndianDataOutputStream;
@@ -26,13 +22,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
-import java.nio.file.Files;
 import java.util.Base64;
-import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
-
-import static com.conveyal.gtfs.util.Util.human;
 
 /**
  * Assemble the results of GridComputer into AccessGrids.

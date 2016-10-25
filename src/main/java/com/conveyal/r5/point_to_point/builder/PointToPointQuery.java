@@ -416,6 +416,7 @@ public class PointToPointQuery {
             bicycle.streetMode = StreetMode.BICYCLE;
             bicycle.profileRequest = request;
             bicycle.flagSearch = streetRouter.flagSearch;
+            bicycle.maxVertices = Integer.MAX_VALUE;
             //Longer bike part if this is direct search
             if (direct) {
                 bicycle.timeLimitSeconds = request.streetTime * 60;

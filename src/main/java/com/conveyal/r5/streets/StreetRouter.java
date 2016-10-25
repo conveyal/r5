@@ -13,6 +13,8 @@ import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
+import gnu.trove.set.TIntSet;
+import gnu.trove.set.hash.TIntHashSet;
 import org.apache.commons.math3.util.FastMath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -938,6 +940,10 @@ public class StreetRouter {
 
         TIntObjectMap<State> vertices = new TIntObjectHashMap<>();
 
+        //Save vertices which are too close so that if they appear again (with longer path to them)
+        // they are also skipped 
+        TIntSet skippedVertices = new TIntHashSet();
+
         public VertexFlagVisitor(StreetLayer streetLayer, State.RoutingVariable dominanceVariable,
             VertexStore.VertexFlag wantedFlag, int maxVertices, int minTravelTimeSeconds) {
             this.minTravelTimeSeconds = minTravelTimeSeconds;
@@ -960,7 +966,15 @@ public class StreetRouter {
             if (state.vertex < 0 ||
                 //skips origin states for bikeShare (since in cycle search for bikeShare origin states
                 //can be added to vertices otherwise since they could be traveled for minTravelTimeSeconds with different transport mode)
-                state.backState == null || state.durationFromOriginSeconds < minTravelTimeSeconds) {
+                state.backState == null || state.durationFromOriginSeconds < minTravelTimeSeconds ||
+                skippedVertices.contains(state.vertex)
+                ) {
+                // Make sure that vertex to which you can come sooner then minTravelTimeSeconds won't be used
+                // if a path which uses more then minTravelTimeSeconds is found
+                // since this means we need to walk/cycle/drive longer then required
+                if (state.vertex > 0 && state.durationFromOriginSeconds < minTravelTimeSeconds) {
+                    skippedVertices.add(state.vertex);
+                }
                 return;
             }
             v.seek(state.vertex);

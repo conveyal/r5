@@ -32,6 +32,8 @@ var PlanConfig = function() {
     this.fromLon = "";
     this.toLat = "";
     this.toLon = "";
+    this.bikeTrafficStress = 4;
+    this.minBikeTime = 5;
     this.wheelchair = false;
     this.offset = offset;
     this.plan = requestPlan;
@@ -652,7 +654,9 @@ function requestPlan() {
             'toLon':planConfig.toLon,
             'wheelchair':planConfig.wheelchair,
             'fromTime':planConfig.date+"T"+planConfig.fromTime+planConfig.offset,
-            'toTime':planConfig.date+"T"+planConfig.toTime+planConfig.offset
+            'toTime':planConfig.date+"T"+planConfig.toTime+planConfig.offset,
+            'minBikeTime': planConfig.minBikeTime,
+            'bikeTrafficStress': planConfig.bikeTrafficStress
         };
     var params = {
         'query': request,
@@ -813,6 +817,8 @@ $(document).ready(function() {
     gui.add(planConfig, "fromLon").listen().onFinishChange(function(value) {moveMarker("from"); });
     gui.add(planConfig, "toLat").listen().onFinishChange(function(value) {moveMarker("to"); });
     gui.add(planConfig, "toLon").listen().onFinishChange(function(value) {moveMarker("to"); });
+    gui.add(planConfig, "bikeTrafficStress");
+    gui.add(planConfig, "minBikeTime");
     gui.add(planConfig, "plan");
     gui.add(planConfig, "showStops");
     gui.add(planConfig, "showPR");

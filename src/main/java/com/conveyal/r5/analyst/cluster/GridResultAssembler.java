@@ -29,7 +29,7 @@ import java.util.zip.GZIPOutputStream;
  * Assemble the results of GridComputer into AccessGrids.
  *
  * Access grids look like this:
- * Header (ASCII text "GRID") (note that the header is four bytes, so the full grid can be mapped into a Javascript
+ * Header (ASCII text "ACCESSGR") (note that the header is eight bytes, so the full grid can be mapped into a Javascript
  *   typed array if desired)
  * Version, 4-byte integer
  * (4 byte int) Web mercator zoom level
@@ -50,7 +50,7 @@ public class GridResultAssembler {
     public static final int ORIGIN_VERSION = 0;
 
     /** The offset to get to the data section of the access grid file */
-    public static final long DATA_OFFSET = 8 * 4;
+    public static final long DATA_OFFSET = 9 * 4;
 
     private static final AmazonSQS sqs = new AmazonSQSClient();
     private static final AmazonS3 s3 = new AmazonS3Client();
@@ -173,7 +173,7 @@ public class GridResultAssembler {
         FileOutputStream fos = new FileOutputStream(temporaryFile);
         LittleEndianDataOutputStream data = new LittleEndianDataOutputStream(fos);
 
-        for (char c : "GRID".toCharArray()) {
+        for (char c : "ACCESSGR".toCharArray()) {
             data.writeByte((byte) c);
         }
 

@@ -77,7 +77,7 @@ public class Grid {
     }
 
     /** Used when reading a saved grid. */
-    private Grid (int zoom, int width, int height, int north, int west) {
+    public Grid (int zoom, int width, int height, int north, int west) {
         this.zoom = zoom;
         this.width = width;
         this.height = height;

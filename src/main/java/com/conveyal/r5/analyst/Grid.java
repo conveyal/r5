@@ -1,17 +1,34 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.common.GeometryUtils;
+import com.google.common.io.CharSource;
+import com.google.common.io.CharStreams;
 import com.google.common.io.LittleEndianDataInputStream;
 import com.google.common.io.LittleEndianDataOutputStream;
+import com.google.common.primitives.Chars;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.Polygon;
+import org.geotools.coverage.grid.GridCoverage2D;
+import org.geotools.coverage.grid.GridCoverageFactory;
+import org.geotools.coverage.grid.io.AbstractGridFormat;
 import org.geotools.data.*;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
+import org.geotools.gce.geotiff.GeoTiffFormat;
+import org.geotools.gce.geotiff.GeoTiffWriteParams;
+import org.geotools.gce.geotiff.GeoTiffWriter;
+import org.geotools.geometry.jts.JTS;
+import org.geotools.geometry.jts.ReferencedEnvelope;
+import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
+import org.opengis.coverage.grid.GridCoverage;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
+import org.opengis.parameter.GeneralParameterValue;
+import org.opengis.parameter.ParameterValueGroup;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.referencing.operation.MathTransform;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -19,7 +36,9 @@ import java.awt.image.DataBufferByte;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.util.Locale;
 
 import static java.lang.Math.atan;
 import static java.lang.Math.cos;
@@ -155,6 +174,44 @@ public class Grid {
         out.close();
     }
 
+    /** Write this grid out in GeoTIFF format */
+    public void writeGeotiff (OutputStream out) {
+        try {
+            Coordinate topLeft = new Coordinate(pixelToLon(west, zoom), pixelToLat(north, zoom));
+            Coordinate bottomRight = new Coordinate(pixelToLon(west + width, zoom), pixelToLat(north + height, zoom));
+
+            Envelope envelopeWgs = new Envelope(topLeft, bottomRight);
+
+            // TODO fix projection
+            // This is not strictly correct, the data are not WGS 84. However, we're saying what the bounds are so
+            // the data will be stretched to fit; the only issue is the variation in scale over the map, which is
+            // small in the small areas we're working with. After two hours of trying to find/make an appropriate CRS
+            // for what we're doing, I resorted to this.
+            ReferencedEnvelope env = new ReferencedEnvelope(envelopeWgs, DefaultGeographicCRS.WGS84);
+
+            float[][] data = new float[height][width];
+
+            for (int x = 0; x < width; x++) {
+                for (int y = 0; y < height; y++) {
+                    data[y][x] = (float) grid[x][y];
+                }
+            }
+
+            GridCoverage2D coverage = new GridCoverageFactory().create("GRID", data, env);
+
+            GeoTiffWriteParams wp = new GeoTiffWriteParams();
+            wp.setCompressionMode(GeoTiffWriteParams.MODE_EXPLICIT);
+            wp.setCompressionType("LZW");
+            ParameterValueGroup params = new GeoTiffFormat().getWriteParameters();
+            params.parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString()).setValue(wp);
+            GeoTiffWriter writer = new GeoTiffWriter(out);
+            writer.write(coverage, (GeneralParameterValue[]) params.values().toArray(new GeneralParameterValue[1]));
+            writer.dispose();
+            out.close();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     public static Grid read (InputStream inputStream) throws  IOException {
         LittleEndianDataInputStream data = new LittleEndianDataInputStream(inputStream);

@@ -13,6 +13,8 @@ import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.google.common.io.LittleEndianDataOutputStream;
+import gnu.trove.iterator.TIntIntIterator;
+import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,32 +80,41 @@ public class GridComputer  {
 
         RaptorWorker router = new RaptorWorker(network.transitLayer, linkedTargets, request.request);
 
-        router.runRaptor(sr.getReachedStops(), linkedTargets.eval(sr::getTravelTimeToVertex), new TaskStatistics());
+        TIntIntMap reachedStops = sr.getReachedStops();
 
-        int[] accessibilityPerIteration = Stream.of(router.timesAtTargetsEachIteration)
-                .mapToInt(times -> {
-                    double access = 0;
+        int millimetersPerSecond = (int) (request.request.walkSpeed * 1000);
 
-                    // times in row-major order, convert to grid coordinates
-                    // TODO use consistent grids for all data in a project
-                    for (int gridy = 0; gridy < grid.height; gridy++) {
-                        int reqy = gridy + grid.north - request.north;
-                        if (reqy < 0 || reqy >= request.height) continue; // outside of project bounds
+        for (TIntIntIterator it = reachedStops.iterator(); it.hasNext();) {
+            it.advance();
+            it.setValue(it.value() / millimetersPerSecond);
+        }
 
-                        for (int gridx = 0; gridx < grid.width; gridx++) {
-                            int reqx = gridx + grid.west - request.west;
-                            if (reqx < 0 || reqx >= request.width) continue; // outside of project bounds
+        router.runRaptor(reachedStops, linkedTargets.eval(sr::getTravelTimeToVertex), new TaskStatistics());
 
-                            int index = reqy * request.width + reqx;
-                            if (times[index] < request.cutoffMinutes * 60) {
-                                access += grid.grid[gridx][gridy];
-                            }
-                        }
+        int[] accessibilityPerIteration = new int[router.includeInAverages.cardinality()];
+        for (int i = router.includeInAverages.nextSetBit(0), out = 0; i != -1; i = router.includeInAverages.nextSetBit(i + 1)) {
+            int[] times = router.timesAtTargetsEachIteration[i];
+            double access = 0;
+
+            // times in row-major order, convert to grid coordinates
+            // TODO use consistent grids for all data in a project
+            for (int gridy = 0; gridy < grid.height; gridy++) {
+                int reqy = gridy + grid.north - request.north;
+                if (reqy < 0 || reqy >= request.height) continue; // outside of project bounds
+
+                for (int gridx = 0; gridx < grid.width; gridx++) {
+                    int reqx = gridx + grid.west - request.west;
+                    if (reqx < 0 || reqx >= request.width) continue; // outside of project bounds
+
+                    int index = reqy * request.width + reqx;
+                    if (times[index] < request.cutoffMinutes * 60) {
+                        access += grid.grid[gridx][gridy];
                     }
+                }
+            }
 
-                    return (int) Math.round(access);
-                })
-                .toArray();
+            accessibilityPerIteration[out++] = (int) Math.round(access);
+        }
 
         // now construct the output
         // these things are tiny, no problem storing in memory

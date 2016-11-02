@@ -2,13 +2,22 @@ package com.conveyal.r5.transitive;
 
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
+import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
+import com.conveyal.r5.util.LocationIndexedLineInLocalCoordinateSystem;
+import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.LineString;
+import com.vividsolutions.jts.linearref.LinearLocation;
+import com.vividsolutions.jts.linearref.LocationIndexedLine;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.math3.geometry.euclidean.threed.Line;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,7 +39,7 @@ public class TransitiveNetwork {
 
     private static Hex hex = new Hex();
 
-    public TransitiveNetwork (TransitLayer layer) {
+    public TransitiveNetwork (TransitLayer layer, StreetLayer streetLayer) {
         // first write patterns, accumulating routes along the way
         TIntObjectMap<TransitiveRoute> routes = new TIntObjectHashMap<>();
 
@@ -62,7 +71,63 @@ public class TransitiveNetwork {
             tr.pattern_id = pattIdx + "";
             tr.pattern_name = routes.get(patt.routeIndex).route_short_name;
             tr.route_id = patt.routeIndex + "";
-            tr.stops = IntStream.of(patt.stops).mapToObj(s -> new TransitivePattern.StopIdRef(s + "")).collect(Collectors.toList());
+
+            tr.stops = new ArrayList<>();
+
+            if (patt.shape != null) {
+                LocationIndexedLine unprojectedLine = new LocationIndexedLine(patt.shape);
+
+                for (int stopPos = 0; stopPos < patt.stops.length; stopPos++) {
+
+                    LineString geometry = null;
+
+                    if (stopPos < patt.stops.length - 1) {
+                        LinearLocation from =
+                                new LinearLocation(patt.stopShapeSegment[stopPos], patt.stopShapeFraction[stopPos]);
+                        LinearLocation to =
+                                new LinearLocation(patt.stopShapeSegment[stopPos + 1], patt.stopShapeFraction[stopPos + 1]);
+                        geometry = (LineString) unprojectedLine.extractLine(from, to);
+                    }
+
+                    tr.stops.add(new TransitivePattern.StopIdRef(layer.stopIdForIndex.get(patt.stops[stopPos]), geometry));
+                }
+
+            } else {
+                VertexStore.Vertex v = streetLayer.vertexStore.getCursor();
+
+                Coordinate[] coords = IntStream.of(patt.stops)
+                        .mapToObj(sidx -> {
+                            v.seek(sidx);
+                            return new Coordinate(v.getLon(), v.getLat());
+                        })
+                        .toArray(Coordinate[]::new);
+
+                // fill in unlinked stops with nearest coordinate
+                Coordinate last = null;
+
+                for (int i = 0; i < coords.length; i++) {
+                    if (coords[i] == null) coords[i] = last;
+                    else last = coords[i];
+                }
+
+                last = null;
+
+                for (int i = coords.length - 1; i >= 0; i--) {
+                    if (coords[i] == null) coords[i] = last;
+                    else last = coords[i];
+                }
+
+                for (int stopPos = 0; stopPos < patt.stops.length; stopPos++) {
+                    LineString geometry = null;
+
+                    if (stopPos < patt.stops.length - 1) {
+                        geometry = GeometryUtils.geometryFactory.createLineString(new Coordinate[] { coords[stopPos], coords[stopPos + 1] });
+                    }
+
+                    tr.stops.add(new TransitivePattern.StopIdRef(layer.stopIdForIndex.get(patt.stops[stopPos]), geometry));
+                }
+            }
+
             patterns.add(tr);
         }
 

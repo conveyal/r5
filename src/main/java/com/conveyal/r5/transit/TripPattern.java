@@ -1,6 +1,9 @@
 package com.conveyal.r5.transit;
 
+import com.conveyal.gtfs.model.Shape;
 import com.conveyal.gtfs.model.StopTime;
+import com.vividsolutions.jts.geom.LineString;
+import com.vividsolutions.jts.linearref.LinearLocation;
 import gnu.trove.list.TIntList;
 import gnu.trove.map.TObjectIntMap;
 import org.slf4j.Logger;
@@ -34,6 +37,15 @@ public class TripPattern implements Serializable, Cloneable {
     public PickDropType[] dropoffs;
     public BitSet wheelchairAccessible; // One bit per stop
     public List<TripSchedule> tripSchedules = new ArrayList<>();
+
+    /** GTFS shape for this pattern. Should be left null in non-customer-facing applications */
+    public LineString shape;
+
+    /** What segment each stop is in */
+    public int[] stopShapeSegment;
+
+    /** How far along that segment it is */
+    public float[] stopShapeFraction;
 
     /** does this trip pattern have any frequency trips */
     public boolean hasFrequencies;

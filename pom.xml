@@ -329,5 +329,10 @@
       <artifactId>elsa</artifactId>
       <version>3.0.0-M5</version>
     </dependency>
+    <dependency>
+      <groupId>com.axiomalaska</groupId>
+      <artifactId>polyline-encoder</artifactId>
+      <version>0.1</version>
+    </dependency>
   </dependencies>
 </project>

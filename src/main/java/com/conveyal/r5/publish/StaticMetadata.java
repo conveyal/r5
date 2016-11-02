@@ -69,7 +69,7 @@ public class StaticMetadata implements Runnable {
     }
 
     public void writeTransitiveData(OutputStream os) throws IOException {
-        TransitiveNetwork net = new TransitiveNetwork(network.transitLayer);
+        TransitiveNetwork net = new TransitiveNetwork(network.transitLayer, network.streetLayer);
         JsonUtilities.objectMapper.writeValue(os, net);
     }
 
@@ -83,7 +83,7 @@ public class StaticMetadata implements Runnable {
         metadata.width = ps.width;
         metadata.height = ps.height;
         metadata.transportNetwork = request.transportNetworkId;
-        metadata.transitiveData = new TransitiveNetwork(network.transitLayer);
+        metadata.transitiveData = new TransitiveNetwork(network.transitLayer, network.streetLayer);
         metadata.request = request.request;
 
         JsonUtilities.objectMapper.writeValue(out, metadata);

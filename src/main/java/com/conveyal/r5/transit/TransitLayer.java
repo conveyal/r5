@@ -10,13 +10,16 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.util.LambdaCounter;
+import com.conveyal.r5.util.LocationIndexedLineInLocalCoordinateSystem;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.LineString;
 import com.vividsolutions.jts.geom.Point;
+import com.vividsolutions.jts.linearref.LinearLocation;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -37,7 +40,9 @@ import java.time.ZoneId;
 import java.time.zone.ZoneRulesException;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
+import java.util.stream.StreamSupport;
 
 
 /**
@@ -257,6 +262,62 @@ public class TransitLayer implements Serializable, Cloneable {
                     }
 
                     tripPattern.routeIndex = routeIndexForRoute.get(trip.route_id);
+
+                    if (trip.shape_id != null) {
+                        Shape shape = gtfs.getShape(trip.shape_id);
+                        if (shape == null) LOG.warn("Shape {} for trip {} was missing", trip.shape_id, trip.trip_id);
+                        else {
+                            // TODO this will not work if some trips in the pattern don't have shapes
+                            tripPattern.shape = shape.geometry;
+
+                            // project stops onto shape
+                            boolean stopsHaveShapeDistTraveled = StreamSupport.stream(stopTimes.spliterator(), false)
+                                    .noneMatch(st -> Double.isNaN(st.shape_dist_traveled));
+                            boolean shapePointsHaveDistTraveled = DoubleStream.of(shape.shape_dist_traveled)
+                                    .noneMatch(Double::isNaN);
+
+                            LinearLocation[] locations;
+
+                            if (stopsHaveShapeDistTraveled && shapePointsHaveDistTraveled) {
+                                // create linear locations from dist traveled
+                                locations = StreamSupport.stream(stopTimes.spliterator(), false)
+                                        .map(st -> {
+                                            double dist = st.shape_dist_traveled;
+
+                                            int segment = 0;
+
+                                            while (segment < shape.shape_dist_traveled.length - 2 &&
+                                                    dist > shape.shape_dist_traveled[segment + 1]
+                                                    ) segment++;
+
+                                            double endSegment = shape.shape_dist_traveled[segment + 1];
+                                            double beginSegment = shape.shape_dist_traveled[segment];
+                                            double proportion = (dist - beginSegment) / (endSegment - beginSegment);
+
+                                            return new LinearLocation(segment, proportion);
+                                        }).toArray(LinearLocation[]::new);
+                            } else {
+                                // naive snapping
+                                LocationIndexedLineInLocalCoordinateSystem line =
+                                        new LocationIndexedLineInLocalCoordinateSystem(shape.geometry.getCoordinates());
+
+                                locations = StreamSupport.stream(stopTimes.spliterator(), false)
+                                        .map(st -> {
+                                            Stop stop = gtfs.stops.get(st.stop_id);
+                                            return line.project(new Coordinate(stop.stop_lon, stop.stop_lat));
+                                        })
+                                        .toArray(LinearLocation[]::new);
+                            }
+
+                            tripPattern.stopShapeSegment = new int[locations.length];
+                            tripPattern.stopShapeFraction = new float[locations.length];
+
+                            for (int i = 0; i < locations.length; i++) {
+                                tripPattern.stopShapeSegment[i] = locations[i].getSegmentIndex();
+                                tripPattern.stopShapeFraction[i] = (float) locations[i].getSegmentFraction();
+                            }
+                        }
+                    }
                 }
 
                 tripPatternForPatternId.put(patternId, tripPattern);

@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import gnu.trove.list.TIntList;
@@ -22,10 +23,21 @@ public class PathWithTimes extends Path {
     /** Maximum travel time (seconds) */
     public int max;
 
+    public LegMode accessMode;
+
+    public LegMode egressMode;
+
     public List<Itinerary> itineraries = new ArrayList<>();
 
     public PathWithTimes(RaptorState state, int stop, TransportNetwork network, ProfileRequest req, TIntIntMap accessTimes, TIntIntMap egressTimes) {
         super(state, stop);
+        computeTimes(network, req, accessTimes, egressTimes);
+    }
+
+    public PathWithTimes(McRaptorSuboptimalPathProfileRouter.McRaptorState s, TransportNetwork network, ProfileRequest req, TIntIntMap accessTimes, TIntIntMap egressTimes) {
+        super(s);
+        this.accessMode = s.accessMode;
+        this.egressMode = s.egressMode;
         computeTimes(network, req, accessTimes, egressTimes);
     }
 
@@ -132,11 +144,6 @@ public class PathWithTimes extends Path {
         computeStatistics(req, accessTime, egressTime);
     }
 
-    public PathWithTimes(McRaptorSuboptimalPathProfileRouter.McRaptorState s, TransportNetwork network, ProfileRequest req, TIntIntMap accessTimes, TIntIntMap egressTimes) {
-        super(s);
-        computeTimes(network, req, accessTimes, egressTimes);
-    }
-
     /**
      * filter out itineraries that are dominated by other itineraries on this path
      * (e.g. when the first vehicle runs every 10 minutes, and the second every 60, no reason to include all possible trips
@@ -218,9 +225,22 @@ public class PathWithTimes extends Path {
         }
     }
 
+    public int hashCode () {
+        return super.hashCode() ^ (accessMode.hashCode() * 31 + egressMode.hashCode() * 29);
+    }
+
+    public boolean equals (Object o) {
+        if (o instanceof PathWithTimes) {
+            PathWithTimes p = (PathWithTimes) o;
+            return super.equals(p) && accessMode == p.accessMode && egressMode == p.egressMode;
+        }
+
+        return false;
+    }
+
     public String dump (TransportNetwork network) {
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format("min %d/avg %d/max %d ", min / 60, avg / 60, max / 60));
+        sb.append(String.format("min %d/avg %d/max %d %s ", min / 60, avg / 60, max / 60, accessMode.toString()));
 
         String[] routes = IntStream.of(patterns).mapToObj(p -> {
             int routeIdx = network.transitLayer.tripPatterns.get(p).routeIndex;
@@ -228,6 +248,9 @@ public class PathWithTimes extends Path {
         }).toArray(s -> new String[s]);
 
         sb.append(String.join(" -> ", routes));
+
+        sb.append(' ');
+        sb.append(egressMode.toString());
 
         return sb.toString();
     }

@@ -67,8 +67,8 @@ public class McRaptorSuboptimalPathProfileRouter {
     private TransportNetwork network;
     private ProfileRequest request;
     private AnalystClusterRequest clusterRequest;
-    private TIntIntMap accessTimes;
-    private TIntIntMap egressTimes = null;
+    private Map<LegMode, TIntIntMap> accessTimes;
+    private Map<LegMode, TIntIntMap> egressTimes = null;
 
     private FrequencyRandomOffsets offsets;
 
@@ -89,7 +89,7 @@ public class McRaptorSuboptimalPathProfileRouter {
     /** output from analyst algorithm will end up here */
     public PropagatedTimesStore propagatedTimesStore;
 
-    public McRaptorSuboptimalPathProfileRouter (TransportNetwork network, ProfileRequest req, TIntIntMap accessTimes, TIntIntMap egressTimes) {
+    public McRaptorSuboptimalPathProfileRouter (TransportNetwork network, ProfileRequest req, Map<LegMode, TIntIntMap> accessTimes, Map<LegMode, TIntIntMap> egressTimes) {
         this.network = network;
         this.request = req;
         this.accessTimes = accessTimes;
@@ -123,21 +123,18 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         if (accessTimes == null) computeAccessTimes();
 
-        LOG.info("Found {} access stops:\n{}", accessTimes.size(), dumpStops(accessTimes));
-        if (egressTimes != null) LOG.info("Found {} egress stops:\n{}", egressTimes.size(), dumpStops(egressTimes));
-
         long startTime = System.currentTimeMillis();
 
         // find patterns near destination
         // on the final round of the search we only explore these patterns
         if (this.egressTimes != null) {
-            this.egressTimes.forEachKey(s -> {
+            this.egressTimes.values().forEach(times -> times.forEachKey(s -> {
                 network.transitLayer.patternsForStop.get(s).forEach(p -> {
                     patternsNearDestination.set(p);
                     return true;
                 });
                 return true;
-            });
+            }));
 
             LOG.info("{} patterns found near the destination", patternsNearDestination.cardinality());
         }
@@ -166,12 +163,12 @@ public class McRaptorSuboptimalPathProfileRouter {
             final int finalDepartureTime = departureTime;
 
             // enqueue/relax access times
-            accessTimes.forEachEntry((stop, accessTime) -> {
-                if (addState(stop, -1, -1, finalDepartureTime + accessTime, -1, -1, null))
+            accessTimes.forEach((mode, times) -> times.forEachEntry((stop, accessTime) -> {
+                if (addState(stop, -1, -1, finalDepartureTime + accessTime, -1, -1, null, mode))
                     touchedStops.set(stop);
 
                 return true;
-            });
+            }));
 
             markPatterns();
 
@@ -209,17 +206,22 @@ public class McRaptorSuboptimalPathProfileRouter {
         return ret;
     }
 
-    /** compute access times based on the profile request */
+    /** compute access times based on the profile request. NB this does not do a search-per-mode */
     private void computeAccessTimes() {
         StreetRouter streetRouter = new StreetRouter(network.streetLayer);
 
         EnumSet<LegMode> modes = request.accessModes;
-        if (modes.contains(LegMode.CAR))
+        LegMode mode;
+        if (modes.contains(LegMode.CAR)) {
             streetRouter.streetMode = StreetMode.CAR;
-        else if (modes.contains(LegMode.BICYCLE))
+            mode = LegMode.CAR;
+        } else if (modes.contains(LegMode.BICYCLE)) {
             streetRouter.streetMode = StreetMode.BICYCLE;
-        else
+            mode = LegMode.BICYCLE;
+        } else {
             streetRouter.streetMode = StreetMode.WALK;
+            mode = LegMode.WALK;
+        }
 
         streetRouter.profileRequest = request;
 
@@ -228,7 +230,9 @@ public class McRaptorSuboptimalPathProfileRouter {
         streetRouter.distanceLimitMeters = TransitLayer.DISTANCE_TABLE_SIZE_METERS; // FIXME arbitrary, and account for bike or car access mode
         streetRouter.setOrigin(request.fromLat, request.fromLon);
         streetRouter.route();
-        accessTimes = streetRouter.getReachedStops();
+        streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+        accessTimes = new HashMap<>();
+        accessTimes.put(mode, streetRouter.getReachedStops());
     }
 
     /** dump out all stop names */
@@ -256,12 +260,14 @@ public class McRaptorSuboptimalPathProfileRouter {
         Map<PathWithTimes, PathWithTimes> paths = new HashMap<>();
 
         states.forEach(s -> {
-            PathWithTimes pwt = new PathWithTimes(s, network, request, accessTimes, egressTimes);
+            PathWithTimes pwt = new PathWithTimes(s, network, request, accessTimes.get(s.accessMode), egressTimes.get(s.egressMode));
 
             if (!paths.containsKey(pwt) || paths.get(pwt).avg > pwt.avg)
                 paths.put(pwt, pwt);
         });
         //states.forEach(s -> LOG.info("{}", s.dump(network)));
+
+        LOG.info("{} states led to {} paths", states.size(), paths.size());
 
         paths.values().forEach(p -> LOG.info("{}", p.dump(network)));
 
@@ -465,7 +471,7 @@ public class McRaptorSuboptimalPathProfileRouter {
     private Collection<McRaptorState> doPropagationToDestination() {
         McRaptorStateBag bag = createStateBag();
 
-        egressTimes.forEachEntry((stop, egressTime) -> {
+        egressTimes.forEach((mode, times) -> times.forEachEntry((stop, egressTime) -> {
             McRaptorStateBag bagAtStop = bestStates.get(stop);
             if (bagAtStop == null) return true;
 
@@ -476,14 +482,15 @@ public class McRaptorSuboptimalPathProfileRouter {
                 stateAtDest.pattern = -1;
                 stateAtDest.trip = -1;
                 stateAtDest.stop = -1;
+                stateAtDest.accessMode = state.accessMode;
+                stateAtDest.egressMode = mode;
                 stateAtDest.time = state.time + egressTime;
                 bag.add(stateAtDest);
             }
 
            return true;
-        });
+        }));
 
-        // there are no non-transfer states because the walk to the destination is a transfer
         return bag.getBestStates();
     }
 
@@ -550,8 +557,13 @@ public class McRaptorSuboptimalPathProfileRouter {
         this.touchedStops.clear();
     }
 
-    /** Add a state */
     private boolean addState (int stop, int boardStopPosition, int alightStopPosition, int time, int pattern, int trip, McRaptorState back) {
+        return addState(stop, boardStopPosition, alightStopPosition, time, pattern, trip, back, back.accessMode);
+    }
+
+
+        /** Add a state */
+    private boolean addState (int stop, int boardStopPosition, int alightStopPosition, int time, int pattern, int trip, McRaptorState back, LegMode accessMode) {
         /**
          * local pruning, and cutting off of excessively long searches
          * NB need to have cutoff be relative to toTime because otherwise when we do range-RAPTOR we'll have left over states
@@ -575,6 +587,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         state.trip = trip;
         state.back = back;
         state.round = round;
+        state.accessMode = accessMode;
 
         // sanity check (anecdotally, this has no noticeable effect on speed)
         if (boardStopPosition >= 0) {
@@ -624,10 +637,12 @@ public class McRaptorSuboptimalPathProfileRouter {
         boolean optimal = bag.add(state);
 
         // target pruning: keep track of best time at destination
+        /* temporarily disabled, not clear how this should work with multiple egress modes
         if (egressTimes != null && optimal && pattern != -1 && egressTimes.containsKey(stop)) {
             int timeAtDest = time + egressTimes.get(stop);
             if (timeAtDest < bestTimeAtTarget) bestTimeAtTarget = timeAtDest;
         }
+        */
 
         return optimal;
     }
@@ -689,6 +704,10 @@ public class McRaptorSuboptimalPathProfileRouter {
         public int[] patterns = EMPTY_INT_ARRAY;
 
         public int patternHash;
+
+        /** The mode used to access transit at the start of the trip implied by this state */
+        public LegMode accessMode;
+        public LegMode egressMode;
 
         public String dump(TransportNetwork network) {
             StringBuilder sb = new StringBuilder();
@@ -761,7 +780,8 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         public boolean equals (Object o) {
             if (o instanceof StatePatternKey) {
-                return Arrays.equals(state.patterns, ((StatePatternKey) o).state.patterns);
+                return Arrays.equals(state.patterns, ((StatePatternKey) o).state.patterns) &&
+                        state.accessMode == ((StatePatternKey) o).state.accessMode;
             }
 
             return false;

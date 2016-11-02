@@ -20,12 +20,6 @@ public class SuboptimalDominatingList implements DominatingList {
     private List<McRaptorSuboptimalPathProfileRouter.McRaptorState> list = new LinkedList<>();
 
     public boolean add (McRaptorSuboptimalPathProfileRouter.McRaptorState newState) {
-
-        // If the new state is later than the best known time plus the suboptimality parameter, then throw it away.
-        if (bestTime != Integer.MAX_VALUE && bestTime + suboptimalSeconds < newState.time) {
-            return false;
-        }
-
         // apply strict dominance if there is a state at the previous round on the same previous pattern arriving at this
         // stop (prevents reboarding/hopping between routes on common trunks)
         // For example, consider the red line in DC, which runs from Shady Grove to Glenmont. At rush hour, every other
@@ -59,9 +53,11 @@ public class SuboptimalDominatingList implements DominatingList {
 //            }
 //        }
 
-        // If there is any way to reach this location with less rides and the same or less time, throw away the new state.
-        for (McRaptorSuboptimalPathProfileRouter.McRaptorState oldState : list) {
-            if (oldState.round < newState.round && oldState.time <= newState.time) return false;
+        for (Iterator<McRaptorSuboptimalPathProfileRouter.McRaptorState> it = list.iterator(); it.hasNext(); ) {
+            McRaptorSuboptimalPathProfileRouter.McRaptorState oldState = it.next();
+
+            if (dominates(oldState, newState)) return false;
+            if (dominates(newState, oldState)) it.remove();
         }
 
         // Update the best time at this location to reflect the new state.
@@ -73,21 +69,23 @@ public class SuboptimalDominatingList implements DominatingList {
         return true;
     }
 
-    /** Prune dominated and excessive states. */
-    public void prune () {
-        // group states that have the same sequence of patterns, throwing out dominated states as we go
-        for (Iterator<McRaptorSuboptimalPathProfileRouter.McRaptorState> it = list.iterator(); it.hasNext();) {
-            if (it.next().time >= bestTime + suboptimalSeconds) {
-                it.remove();
-            }
-        }
+    public boolean dominates (McRaptorSuboptimalPathProfileRouter.McRaptorState newState, McRaptorSuboptimalPathProfileRouter.McRaptorState oldState) {
+        // only dominate states with same access mode
+        if (oldState.accessMode != newState.accessMode) return false;
+
+        // If there is any way to reach this location with less rides and the same or less time, throw away the old state.
+        if (newState.round < oldState.round && newState.time <= oldState.time) return true;
+
+        if (newState.time + suboptimalSeconds < oldState.time) return true;
+
+        return false;
     }
 
     public Collection<McRaptorSuboptimalPathProfileRouter.McRaptorState> getNonDominatedStates () {
         // We prune here. I've also tried pruning on add, but it slows the algorithm down due to all of the looping.
         // I also tried pruning once per round, but that also slows the algorithm down (perhaps because it's doing
         // so many pairwise comparisons).
-        prune();
+        //prune();
         return list;
     }
 }

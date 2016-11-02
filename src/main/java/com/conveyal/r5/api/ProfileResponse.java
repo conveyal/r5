@@ -100,7 +100,7 @@ public class ProfileResponse {
                     StreetPath streetPath;
                     if ((accessMode == LegMode.CAR_PARK || accessMode == LegMode.BICYCLE_RENT) && streetRouter.previousRouter != null) {
                         streetPath = new StreetPath(state, streetRouter, accessMode,
-                            transportNetwork);
+                            transportNetwork, false);
                     } else {
                         streetPath = new StreetPath(state, transportNetwork);
                     }

@@ -244,11 +244,12 @@ public class PointToPointQuery {
                     LOG.warn("Bike sharing trip requested but no bike sharing stations in the streetlayer");
                     continue;
                 }
-                streetRouter = findBikeRentalPath(request, streetRouter, true);
+                StreetRouter.State[] retState = new StreetRouter.State[1];
+                streetRouter = findBikeRentalPath(request, streetRouter, true, retState);
                 if (streetRouter != null) {
-                    StreetRouter.State lastState = streetRouter.getState(request.toLat, request.toLon);
+                    StreetRouter.State lastState = retState[0]; //streetRouter.getState(request.toLat, request.toLon);
                     if (lastState != null) {
-                        streetPath = new StreetPath(lastState, streetRouter, LegMode.BICYCLE_RENT, transportNetwork);
+                        streetPath = new StreetPath(lastState, streetRouter, LegMode.BICYCLE_RENT, transportNetwork, true);
 
                     } else {
                         LOG.warn("MODE:{}, Edge near the destination coordinate wasn't found. Routing didn't start!", mode);
@@ -309,7 +310,7 @@ public class PointToPointQuery {
                     LOG.warn("Bike sharing trip requested but no bike sharing stations in the streetlayer");
                     continue;
                 }
-                streetRouter = findBikeRentalPath(request, streetRouter, false);
+                streetRouter = findBikeRentalPath(request, streetRouter, false, null);
                 if (streetRouter != null) {
                     accessRouter.put(LegMode.BICYCLE_RENT, streetRouter);
                 } else {
@@ -380,10 +381,11 @@ public class PointToPointQuery {
      * @param request profileRequest from which from/to destination is used
      * @param streetRouter where profileRequest was already set
      * @param direct
+     * @param retState returns last state
      * @return null if path isn't found
      */
     private StreetRouter findBikeRentalPath(ProfileRequest request, StreetRouter streetRouter,
-        boolean direct) {
+        boolean direct, StreetRouter.State[] retState) {
         streetRouter.streetMode = StreetMode.WALK;
         // TODO add time and distance limits to routing, not just weight.
         streetRouter.timeLimitSeconds = request.maxWalkTime * 60;
@@ -409,26 +411,29 @@ public class PointToPointQuery {
                             LOG.info("   {} ({}m)", idx, state.distance);
                             return true;
                         });*/
-
-            //This finds best cycling path from best start bicycle station to end bicycle station
-            StreetRouter bicycle = new StreetRouter(transportNetwork.streetLayer);
-            bicycle.previousRouter = streetRouter;
-            bicycle.streetMode = StreetMode.BICYCLE;
-            bicycle.profileRequest = request;
-            bicycle.flagSearch = streetRouter.flagSearch;
-            bicycle.maxVertices = Integer.MAX_VALUE;
-            //Longer bike part if this is direct search
-            if (direct) {
-                bicycle.timeLimitSeconds = request.streetTime * 60;
-            } else {
-                bicycle.timeLimitSeconds = request.maxBikeTime * 60;
-                bicycle.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
-            }
-            bicycle.setOrigin(bikeStations, BIKE_RENTAL_PICKUP_TIME_S, BIKE_RENTAL_PICKUP_COST, LegMode.BICYCLE_RENT);
-            bicycle.setDestination(destinationSplit);
-            bicycle.route();
-            TIntObjectMap<StreetRouter.State> cycledStations = bicycle.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
-            LOG.info("BIKE RENT: Found {} cycled stations which are {} minutes away", cycledStations.size(), bicycle.timeLimitSeconds/60);
+            StreetRouter end;
+            if (!direct) {
+                //This finds best cycling path from best start bicycle station to end bicycle station
+                StreetRouter bicycle = new StreetRouter(transportNetwork.streetLayer);
+                bicycle.previousRouter = streetRouter;
+                bicycle.streetMode = StreetMode.BICYCLE;
+                bicycle.profileRequest = request;
+                bicycle.flagSearch = streetRouter.flagSearch;
+                bicycle.maxVertices = Integer.MAX_VALUE;
+                //Longer bike part if this is direct search
+                if (direct) {
+                    bicycle.timeLimitSeconds = request.streetTime * 60;
+                } else {
+                    bicycle.timeLimitSeconds = request.maxBikeTime * 60;
+                    bicycle.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+                }
+                bicycle.setOrigin(bikeStations, BIKE_RENTAL_PICKUP_TIME_S, BIKE_RENTAL_PICKUP_COST,
+                    LegMode.BICYCLE_RENT);
+                bicycle.setDestination(destinationSplit);
+                bicycle.route();
+                TIntObjectMap<StreetRouter.State> cycledStations = bicycle.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
+                LOG.info("BIKE RENT: Found {} cycled stations which are {} minutes away",
+                    cycledStations.size(), bicycle.timeLimitSeconds / 60);
                         /*LOG.info("Bike share to bike share:");
                         cycledStations.retainEntries((idx, state) -> {
                             if (bikeStations.containsKey(idx)) {
@@ -440,18 +445,94 @@ public class PointToPointQuery {
                             }
 
                         });*/
-            //This searches for walking path from end bicycle station to end point
-            StreetRouter end = new StreetRouter(transportNetwork.streetLayer);
-            end.streetMode = StreetMode.WALK;
-            end.profileRequest = request;
-            end.timeLimitSeconds = bicycle.timeLimitSeconds;
-            if (!direct) {
-                end.transitStopSearch = true;
-                end.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+                //This searches for walking path from end bicycle station to end point
+                end = new StreetRouter(transportNetwork.streetLayer);
+                end.streetMode = StreetMode.WALK;
+                end.profileRequest = request;
+                end.timeLimitSeconds = bicycle.timeLimitSeconds;
+                if (!direct) {
+                    end.transitStopSearch = true;
+                    end.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+                }
+                end.setOrigin(cycledStations, BIKE_RENTAL_DROPOFF_TIME_S, BIKE_RENTAL_DROPOFF_COST, LegMode.BICYCLE_RENT);
+                end.route();
+                end.previousRouter = bicycle;
+            } else {
+                //This searches for walking path from end point to all bicycle station
+                end = new StreetRouter(transportNetwork.streetLayer);
+                end.streetMode = StreetMode.WALK;
+                end.profileRequest = request;
+                end.timeLimitSeconds = request.maxWalkTime * 60;
+                if (!end.setOrigin(request.toLat, request.toLon)) {
+                    return null;
+                }
+                end.flagSearch = VertexStore.VertexFlag.BIKE_SHARING;
+
+                end.route();
+
+                //Cycled station from end point to the bike shares
+                TIntObjectMap<StreetRouter.State> endCycledStations = end.getReachedVertices(
+                    VertexStore.VertexFlag.BIKE_SHARING);
+                LOG.info("BIKE RENT: Found {} cycled stations from end coordinate which are {} minutes away",
+                    endCycledStations.size(), end.timeLimitSeconds / 60);
+                /*endCycledStations.forEachEntry((vidx, state) -> {
+                    BikeRentalStation bikeRentalStation = transportNetwork.streetLayer.bikeRentalStationMap.get(vidx);
+                    LOG.info("EE: {} W:{} S:{} SS", bikeRentalStation.id, state.weight, state.getDurationSeconds());
+                    return true;
+                });*/
+
+                //This finds best cycling path from best start bicycle station to end bicycle station
+                StreetRouter bicycle = new StreetRouter(transportNetwork.streetLayer);
+                bicycle.previousRouter = streetRouter;
+                bicycle.streetMode = StreetMode.BICYCLE;
+                bicycle.profileRequest = request;
+                bicycle.flagSearch = streetRouter.flagSearch;
+                bicycle.maxVertices = Integer.MAX_VALUE;
+                //Longer bike part if this is direct search
+                if (direct) {
+                    bicycle.timeLimitSeconds = request.streetTime * 60;
+                }
+                bicycle.setOrigin(bikeStations, BIKE_RENTAL_PICKUP_TIME_S, BIKE_RENTAL_PICKUP_COST,
+                    LegMode.BICYCLE_RENT);
+                 bicycle.route();
+                TIntObjectMap<StreetRouter.State> cycledStations = bicycle.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
+                LOG.info("BIKE RENT: Found {} cycled stations which are {} minutes away",
+                    cycledStations.size(), bicycle.timeLimitSeconds / 60);
+
+                //cycledStations.retainEntries((vidx, state) -> endCycledStations.containsKey(vidx));
+
+                final int[] minVertexIdx = { -1 };
+                final int[] minWeight = { Integer.MAX_VALUE };
+                cycledStations.forEachEntry((vidx, state) -> {
+                    //BikeRentalStation bikeRentalStation = transportNetwork.streetLayer.bikeRentalStationMap.get(vidx);
+                    if (endCycledStations.containsKey(vidx)) {
+                        StreetRouter.State endState = endCycledStations.get(vidx);
+                        //BikeRentalStation bikeRentalStation = transportNetwork.streetLayer.bikeRentalStationMap.get(vidx);
+                        int sum = state.weight+endState.weight;
+                        //LOG.info("{} W:{} EW:{} S:{}", bikeRentalStation.id, state.weight, endState.weight, sum);
+                        if (sum < minWeight[0]) {
+                            minWeight[0] = sum;
+                            minVertexIdx[0] = vidx;
+                        }
+                    }
+		   /* else {
+                        LOG.info("{} W:{} S:{} SS", bikeRentalStation.id, state.weight, state.getDurationSeconds());
+                    }*/
+                    return true;
+                });
+                //since there seems to be no path from start bikeshere and end bike share to end destination to bikeshares
+                //we didn't find the path
+                if (minVertexIdx[0] == -1) {
+                    return null;
+                }
+                StreetRouter.State endState = endCycledStations.get(minVertexIdx[0]);
+                StreetRouter.State state = cycledStations.get(minVertexIdx[0]);
+                //BikeRentalStation bikeRentalStation = transportNetwork.streetLayer.bikeRentalStationMap.get(minVertexIdx[0]);
+                //int sum = state.weight+endState.weight;
+                //LOG.info("MIN: {} W:{} EW:{} S:{} BicS:{} endS:{}", bikeRentalStation.id, state.weight, endState.weight, sum, state.getDurationSeconds(), endState.getDurationSeconds());
+                retState[0] = endState;
+                end.previousRouter = bicycle;
             }
-            end.setOrigin(cycledStations, BIKE_RENTAL_DROPOFF_TIME_S, BIKE_RENTAL_DROPOFF_COST, LegMode.BICYCLE_RENT);
-            end.route();
-            end.previousRouter = bicycle;
             return end;
         } else {
             return null;

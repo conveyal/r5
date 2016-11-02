@@ -4,6 +4,7 @@ import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.google.common.collect.Lists;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,15 +56,28 @@ public class StreetPath {
      * @param streetRouter last streetRouter (previus routers are read from previous variable)
      * @param mode BICYCLE_RENT is the only supported currently
      * @param transportNetwork
+     * @param directSearch true if this street path is from direct search
      */
     public StreetPath(StreetRouter.State lastState, StreetRouter streetRouter, LegMode mode,
-        TransportNetwork transportNetwork) {
+        TransportNetwork transportNetwork, boolean directSearch) {
         this(lastState, transportNetwork);
+        if (directSearch) {
+            Lists.reverse(edges);
+            Lists.reverse(states);
+            firstState = states.getFirst();
+        }
         //First streetPath is part of path from last bicycle station to the end destination on foot
         if (mode == LegMode.BICYCLE_RENT) {
             StreetRouter.State endCycling = getStates().getFirst();
+            if (directSearch) {
+                endCycling = getStates().getLast();
+            }
             StreetRouter bicycle = streetRouter.previousRouter;
             lastState = bicycle.getStateAtVertex(endCycling.vertex);
+            if (directSearch) {
+                distance += lastState.distance;
+                this.lastState.incrementTimeInSeconds(lastState.getDurationSeconds());
+            }
             if (lastState != null) {
                 lastState.isBikeShare = endCycling.isBikeShare;
                 //Here part from first bikeshare to the last bikeshare on rented bike is created

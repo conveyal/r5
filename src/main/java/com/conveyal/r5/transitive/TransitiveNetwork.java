@@ -89,7 +89,7 @@ public class TransitiveNetwork {
                         geometry = (LineString) unprojectedLine.extractLine(from, to);
                     }
 
-                    tr.stops.add(new TransitivePattern.StopIdRef(layer.stopIdForIndex.get(patt.stops[stopPos]), geometry));
+                    tr.stops.add(new TransitivePattern.StopIdRef(patt.stops[stopPos] + "", geometry));
                 }
 
             } else {

@@ -17,6 +17,7 @@ public class TransitivePattern {
 
     // TODO is this level of indirection necessary?
     public static class StopIdRef {
+        /** NB this is the stop index in the R5 graph, not the GTFS stop ID */
         public String stop_id;
 
         @JsonSerialize(using = EncodedPolylineSerializer.class)

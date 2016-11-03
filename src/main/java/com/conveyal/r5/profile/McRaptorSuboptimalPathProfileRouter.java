@@ -74,8 +74,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     private TIntObjectMap<McRaptorStateBag> bestStates = new TIntObjectHashMap<>();
 
-    /** target pruning as described in the RAPTOR paper: cut off states that can't possibly reach the target in time */
-    private int bestTimeAtTarget = Integer.MAX_VALUE;
+
 
     private int round = 0;
     // used in hashing
@@ -88,6 +87,9 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     /** output from analyst algorithm will end up here */
     public PropagatedTimesStore propagatedTimesStore;
+
+    /** In order to properly do target pruning we store the best times at each target _by access mode_, so car trips don't quash walk trips */
+    private TObjectIntMap<LegMode> bestTimesAtTargetByAccessMode = new TObjectIntHashMap<>(4, 0.95f, Integer.MAX_VALUE);
 
     public McRaptorSuboptimalPathProfileRouter (TransportNetwork network, ProfileRequest req, Map<LegMode, TIntIntMap> accessTimes, Map<LegMode, TIntIntMap> egressTimes) {
         this.network = network;
@@ -573,7 +575,9 @@ public class McRaptorSuboptimalPathProfileRouter {
         if (time > request.toTime + request.maxTripDurationMinutes * 60) return false;
 
         // local pruning iff in suboptimal point-to-point (Modeify) mode
-        if (request.maxFare < 0 && time - request.suboptimalMinutes * 60 > bestTimeAtTarget) return false;
+        if (request.maxFare < 0 && time - request.suboptimalMinutes * 60 > bestTimesAtTargetByAccessMode.get(accessMode)) {
+            return false;
+        }
 
         if (back != null && back.time > time)
             throw new IllegalStateException("Attempt to decrement time in state!");
@@ -637,12 +641,22 @@ public class McRaptorSuboptimalPathProfileRouter {
         boolean optimal = bag.add(state);
 
         // target pruning: keep track of best time at destination
-        /* temporarily disabled, not clear how this should work with multiple egress modes
-        if (egressTimes != null && optimal && pattern != -1 && egressTimes.containsKey(stop)) {
-            int timeAtDest = time + egressTimes.get(stop);
-            if (timeAtDest < bestTimeAtTarget) bestTimeAtTarget = timeAtDest;
+        if (egressTimes != null && optimal && pattern != -1) {
+            // Save the worst egress time by any egress mode and use this for target pruning
+            // we don't know what egress mode will be used when we do target pruning, above, so we just store the
+            // best time for each access mode and the slowest egress mode
+            int[] egressTimeWithSlowestEgressMode = new int[] { -1 };
+            egressTimes.forEach((mode, times) -> {
+                if (!times.containsKey(stop)) return;
+                int timeAtDest = time + times.get(stop);
+                egressTimeWithSlowestEgressMode[0] = Math.max(egressTimeWithSlowestEgressMode[0], timeAtDest);
+            });
+
+            if (egressTimeWithSlowestEgressMode[0] != -1 &&
+                    egressTimeWithSlowestEgressMode[0] < bestTimesAtTargetByAccessMode.get(accessMode)) {
+                bestTimesAtTargetByAccessMode.put(accessMode, egressTimeWithSlowestEgressMode[0]);
+            }
         }
-        */
 
         return optimal;
     }

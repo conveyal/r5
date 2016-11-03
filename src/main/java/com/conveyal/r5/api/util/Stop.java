@@ -52,6 +52,7 @@ public class Stop {
             lat = (float) jitteredCoordinates.y;
             lon = (float) jitteredCoordinates.x;
         } else if (vertex.index > -1) {
+            // TODO: proper way to handle this case is to use original stop lat/lon from the GTFS
             lat = (float) vertex.getLat();
             lon = (float) vertex.getLon();
         }

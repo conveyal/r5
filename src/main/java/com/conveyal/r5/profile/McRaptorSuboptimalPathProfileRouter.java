@@ -262,7 +262,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         states.forEach(s -> {
             PathWithTimes pwt = new PathWithTimes(s, network, request, accessTimes.get(s.accessMode), egressTimes.get(s.egressMode));
 
-            if (!paths.containsKey(pwt) || paths.get(pwt).avg > pwt.avg)
+            if (!paths.containsKey(pwt) || paths.get(pwt).stats.avg > pwt.stats.avg)
                 paths.put(pwt, pwt);
         });
         //states.forEach(s -> LOG.info("{}", s.dump(network)));

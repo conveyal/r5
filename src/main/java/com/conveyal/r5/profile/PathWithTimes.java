@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.api.util.Stats;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import gnu.trove.list.TIntList;
@@ -14,14 +15,15 @@ import java.util.stream.Stream;
  * A path that also includes itineraries and bounds for all possible trips on the paths (even those which may not be optimal)
  */
 public class PathWithTimes extends Path {
-    /** Minimum travel time (seconds) */
-    public int min;
+    /** Stats for the entire path */
+    public Stats stats;
 
-    /** Average travel time (including waiting) (seconds) */
-    public int avg;
+    /** Wait stats for each leg */
+    public Stats[] waitStats;
 
-    /** Maximum travel time (seconds) */
-    public int max;
+
+    /** Ride stats for each leg */
+    public Stats[] rideStats;
 
     public LegMode accessMode;
 
@@ -133,6 +135,7 @@ public class PathWithTimes extends Path {
                     // TODO should board slack be applied at the origin stop? Is this done in RaptorWorker?
                     // See also below in computeStatistics
                     time = times[patIdx][trip][1] + transferTime + RaptorWorker.BOARD_SLACK_SECONDS;
+                    itin.arriveAtBoardStopTimes[patIdx + 1] = time;
                 }
             }
 
@@ -173,39 +176,68 @@ public class PathWithTimes extends Path {
      * elegant theoretical way to do this, but I prefer pragmatism over theory.
      */
     private void computeStatistics (ProfileRequest req, int accessTime, int egressTime) {
-        int count = 0;
-        int sum = 0;
-        this.min = Integer.MAX_VALUE;
-        this.max = 0;
+        this.stats = new Stats();
+        this.rideStats = IntStream.range(0, this.patterns.length).mapToObj(i -> new Stats()).toArray(Stats[]::new);
+        this.waitStats = IntStream.range(0, this.patterns.length).mapToObj(i -> new Stats()).toArray(Stats[]::new);
 
         for (int start = req.fromTime; start < req.toTime; start += 60) {
             // TODO should board slack be applied at the origin stop? Is this done in RaptorWorker?
             int timeAtOriginStop = start + accessTime + RaptorWorker.BOARD_SLACK_SECONDS;
             int bestTimeAtDestinationStop = Integer.MAX_VALUE;
 
+            Itinerary bestItinerary = null;
             for (Itinerary itin : this.itineraries) {
                 // itinerary cannot be used at this time
                 if (itin.boardTimes[0] < timeAtOriginStop) continue;
 
-                if (itin.alightTimes[this.length - 1] < bestTimeAtDestinationStop)
+                if (itin.alightTimes[this.length - 1] < bestTimeAtDestinationStop) {
                     bestTimeAtDestinationStop = itin.alightTimes[this.length - 1];
+                    bestItinerary = itin;
+                }
             }
 
-            if (bestTimeAtDestinationStop == Integer.MAX_VALUE) continue; // cannot use this trip at this time
+            if (bestItinerary == null) continue; // cannot use this trip at this time
 
             int bestTimeAtDestination = bestTimeAtDestinationStop + egressTime;
 
             int travelTime = bestTimeAtDestination - start;
 
-            count++;
-            sum += travelTime;
-            min = Math.min(min, travelTime);
-            max = Math.max(max, travelTime);
+            stats.num++;
+            stats.avg += travelTime;
+            stats.min = Math.min(stats.min, travelTime);
+            stats.max = Math.max(stats.max, travelTime);
+
+            // accumulate stats for each leg
+            for (int leg = 0; leg < this.patterns.length; leg++) {
+                Stats ride = rideStats[leg];
+                int rideLen = bestItinerary.alightTimes[leg] - bestItinerary.boardTimes[leg];
+                ride.num++;
+                ride.avg += rideLen;
+                ride.min = Math.min(ride.min, rideLen);
+                ride.max = Math.max(ride.max, rideLen);
+
+                Stats wait = waitStats[leg];
+
+                int arriveAtStopTime = leg == 0 ? timeAtOriginStop : bestItinerary.arriveAtBoardStopTimes[leg];
+
+                int waitTime = bestItinerary.boardTimes[leg] - arriveAtStopTime;
+
+                wait.num++;
+                wait.avg += waitTime;
+                wait.min = Math.min(waitTime, wait.min);
+                wait.max = Math.max(waitTime, wait.max);
+            }
         }
 
-        if (count == 0) throw new IllegalStateException("No valid itineraries found for path computed in RaptorWorker");
+        if (stats.num == 0) throw new IllegalStateException("No valid itineraries found for path computed in RaptorWorker");
 
-        avg = sum / count;
+        stats.avg /= stats.num;
+
+        for (Stats[] statSet : new Stats[][] { rideStats, waitStats }) {
+            for (Stats stats : statSet) {
+                stats.avg /= stats.num;
+            }
+        }
     }
 
     /** itineraries for this path, which can be sorted by departure time */
@@ -213,10 +245,14 @@ public class PathWithTimes extends Path {
         public Itinerary(int size) {
             this.boardTimes = new int[size];
             this.alightTimes = new int[size];
+            this.arriveAtBoardStopTimes = new int[size];
         }
 
         public int[] boardTimes;
         public int[] alightTimes;
+
+        /** The time you arrive at the board stop before each pattern, left 0 on the first leg as it's undefined */
+        public int[] arriveAtBoardStopTimes;
 
         @Override
         public int compareTo(Itinerary o) {
@@ -240,7 +276,7 @@ public class PathWithTimes extends Path {
 
     public String dump (TransportNetwork network) {
         StringBuilder sb = new StringBuilder();
-        sb.append(String.format("min %d/avg %d/max %d %s ", min / 60, avg / 60, max / 60, accessMode.toString()));
+        sb.append(String.format("min %d/avg %d/max %d %s ", stats.min / 60, stats.avg / 60, stats.max / 60, accessMode.toString()));
 
         String[] routes = IntStream.of(patterns).mapToObj(p -> {
             int routeIdx = network.transitLayer.tripPatterns.get(p).routeIndex;

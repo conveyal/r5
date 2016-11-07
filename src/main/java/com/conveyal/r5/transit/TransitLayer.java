@@ -56,6 +56,8 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     public static final int DISTANCE_TABLE_SIZE_METERS = 3500;
 
+    public static final boolean SAVE_SHAPES = false;
+
     /**
      * Distance limit for transfers, meters. Set to 1km which is slightly above OTP's 600m (which was specified as
      * 1 m/s with 600s max time, which is actually somewhat less than 600m due to extra costs due to steps etc.
@@ -263,7 +265,7 @@ public class TransitLayer implements Serializable, Cloneable {
 
                     tripPattern.routeIndex = routeIndexForRoute.get(trip.route_id);
 
-                    if (trip.shape_id != null) {
+                    if (trip.shape_id != null && SAVE_SHAPES) {
                         Shape shape = gtfs.getShape(trip.shape_id);
                         if (shape == null) LOG.warn("Shape {} for trip {} was missing", trip.shape_id, trip.trip_id);
                         else {

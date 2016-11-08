@@ -70,13 +70,19 @@ public class SuboptimalDominatingList implements DominatingList {
     }
 
     public boolean dominates (McRaptorSuboptimalPathProfileRouter.McRaptorState newState, McRaptorSuboptimalPathProfileRouter.McRaptorState oldState) {
-        // only dominate states with same access mode
-        if (oldState.accessMode != newState.accessMode) return false;
+        boolean sameAccessMode = oldState.accessMode == newState.accessMode;
 
-        // If there is any way to reach this location with less rides and the same or less time, throw away the old state.
-        if (newState.round < oldState.round && newState.time <= oldState.time) return true;
+        // If there is any way to reach this location with less rides and the same or less time, throw away the old state
+        // iff they used the same access mode.
+        if (sameAccessMode && newState.round < oldState.round && newState.time <= oldState.time) return true;
 
-        if (newState.time + suboptimalSeconds < oldState.time) return true;
+        // looser dominance rules for states with different access modes
+        // this is more efficient than what we used to do, which was to treat different access modes as completely incomparable
+        // this eliminates a lot of trips that drive out into the sticks and take transit back in, which are slow to compute
+        // TODO this *5 nonsense is a huge clooge. Make the dominance parameter configurable.
+        int threshold = sameAccessMode ? suboptimalSeconds : suboptimalSeconds * 5;
+
+        if (newState.time + threshold < oldState.time) return true;
 
         return false;
     }

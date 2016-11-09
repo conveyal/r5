@@ -149,8 +149,10 @@ public class McRaptorSuboptimalPathProfileRouter {
         // multiply by two because E[random] = 1/2 * max
         int maxSamplingFrequency = 2 * (request.toTime - request.fromTime) / NUMBER_OF_SEARCHES;
 
-        // seed with last few digits of latitude so that requests are deterministic
-        MersenneTwister mersenneTwister = new MersenneTwister((int) (request.fromLat * 1e9));
+        // This random number generator will be seeded with a combination of time and the instance's identity hash code.
+        // This makes it truly random for all practical purposes. To make results repeatable from one run to the next,
+        // seed with some characteristic of the request itself, e.g. (int) (request.fromLat * 1e9)
+        MersenneTwister mersenneTwister = new MersenneTwister();
 
         for (int departureTime = request.toTime - 60, n = 0; departureTime > request.fromTime; departureTime -= mersenneTwister.nextInt(maxSamplingFrequency), n++) {
 

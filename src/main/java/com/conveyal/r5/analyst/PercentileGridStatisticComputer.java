@@ -5,6 +5,7 @@ import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.S3Object;
 import com.google.common.io.LittleEndianDataInputStream;
 import com.google.common.primitives.Ints;
+import org.apache.commons.math3.stat.descriptive.rank.Percentile;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -12,9 +13,10 @@ import java.util.stream.IntStream;
 import java.util.zip.GZIPInputStream;
 
 /**
- * Compute a particular percentile of a given regional analysis and return the results as a grid.
+ * Take an access grid, which is a grid containing a vector of accessibility at each origin, and collapse to grid of
+ * scalars containing a percentile of accessibility for each origin.
  */
-public class PercentileGridSampler {
+public class PercentileGridStatisticComputer {
     private static final AmazonS3 s3 = new AmazonS3Client();
 
     /** Version of the access grid format we read */

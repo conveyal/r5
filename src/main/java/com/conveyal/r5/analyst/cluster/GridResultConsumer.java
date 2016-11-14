@@ -21,7 +21,8 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
 
 /**
- * Listens to an SQS queue and manages grid results coming back.
+ * Listens to an SQS queue and manages grid results coming back; this runs in an independent thread for the lifetime
+ * of the listening process.
  */
 public class GridResultConsumer implements Runnable {
     private static final Logger LOG = LoggerFactory.getLogger(GridResultConsumer.class);

@@ -482,7 +482,7 @@ public class AnalystWorker implements Runnable {
         }
     }
 
-    /** Handle a request for access to a grid (used for regional analysis) */
+    /** Handle a request for access from a Web Mercator grid to a web mercator opportunity density grid (used for regional analysis) */
     private void handleGridRequest (GridRequest request, TransportNetwork network, TaskStatistics ts) {
         try {
             new GridComputer(request, gridCache, network).run();

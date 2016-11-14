@@ -64,10 +64,7 @@ public class Grid {
      */
     public final int north;
 
-    /**
-     * The pixel number of the northernmost pixel in this grid (smallest y value in web Mercator,
-     * because y increases from north to south in web Mercator).
-     */
+    /** The pixel number of the westernmost pixel in this grid (smallest x value). */
     public final int west;
 
     /** The width of the grid in web Mercator pixels. */
@@ -111,8 +108,10 @@ public class Grid {
      * all the web Mercator pixels that intersect it.
      */
     public void rasterize (Geometry geometry, double value) {
-        // TODO do we need to convert to a local coordinate system? I don't think so; although we scale differently
-        // in the two dimensions, the scale factor applied to each geometry should be consistent.
+        // No need to convert to a local coordinate system
+        // Both the supplied polygon and the web mercator pixel geometries are left in WGS84 geographic coordinates.
+        // Both are distorted equally along the X axis at a given latitude so the proportion of the geometry within
+        // each pixel is accurate, even though the surface area in WGS84 coordinates is not a usable value.
 
         double area = geometry.getArea();
         if (area < 1e-12) {

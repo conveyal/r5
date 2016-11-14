@@ -121,7 +121,7 @@ public class TransportNetworkCache {
             Scenario scenario;
             if (request.scenario == null && request.scenarioId != null) {
                 // resolve scenario
-                LOG.info("Retrieving scenario stored separately");
+                LOG.info("Retrieving scenario stored separately on S3 rather than in the ProfileRequest");
 
                 String scenarioKey = String.format("%s_%s.json", networkId, scenarioId);
                 File scenarioFile = new File(cacheDir, scenarioKey);

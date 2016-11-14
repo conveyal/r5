@@ -18,7 +18,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.zip.GZIPInputStream;
 
 /**
- * Cache grids.
+ * Cache opportunity density grids on S3, with a local cache for performance when reusing the same grids. Each instance
+ * works with a single S3 bucket.
  */
 public class GridCache {
     private static final Logger LOG = LoggerFactory.getLogger(GridCache.class);

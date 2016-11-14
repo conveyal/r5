@@ -5,7 +5,8 @@ import com.conveyal.r5.profile.ProfileRequest;
 import java.util.List;
 
 /**
- * Represents a request to compute accessibility to destinations stored as binary grids.
+ * Represents a request to compute accessibility to destinations located on a regular Web Mercator grid. The grid is
+ * loaded from a binary file on Amazon S3.
  */
 public class GridRequest extends GenericClusterRequest {
     /** The profile request to use */

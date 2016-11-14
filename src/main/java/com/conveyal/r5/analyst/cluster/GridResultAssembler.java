@@ -6,7 +6,6 @@ import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.Message;
 import com.google.common.io.ByteStreams;
-import com.google.common.io.LittleEndianDataInputStream;
 import com.google.common.io.LittleEndianDataOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,14 +22,20 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.util.Base64;
+import java.util.Locale;
 import java.util.zip.GZIPOutputStream;
 
 /**
  * Assemble the results of GridComputer into AccessGrids.
  *
+ * During distributed computation of access to gridded destinations, workers place raw accessibility results for single
+ * origins onto an Amazon SQS queue. These results contain one accessibility measurement per iteration (departure
+ * minutes and Monte Carlo draws) per origin grid cell. This class pulls results off the queue as they become available,
+ * and assembles them into a single large file containing a delta-coded version of the same data for all origin points.
+ *
  * Access grids look like this:
- * Header (ASCII text "ACCESSGR") (note that the header is eight bytes, so the full grid can be mapped into a Javascript
- *   typed array if desired)
+ * Header (ASCII text "ACCESSGR") (note that this header is eight bytes, so the full grid can be mapped into a
+ *   Javascript typed array if desired)
  * Version, 4-byte integer
  * (4 byte int) Web mercator zoom level
  * (4 byte int) west (x) edge of the grid, i.e. how many pixels this grid is east of the left edge of the world
@@ -70,6 +75,9 @@ public class GridResultAssembler {
     public int nTotal;
 
     private final String outputBucket;
+
+    /** Number of iterations for this grid request */
+    private int nIterations;
 
     public GridResultAssembler (GridRequest request, String outputBucket) {
         this.request = request;
@@ -115,60 +123,49 @@ public class GridResultAssembler {
         try {
             byte[] body = base64.decode(message.getBody());
             ByteArrayInputStream bais = new ByteArrayInputStream(body);
-            LittleEndianDataInputStream data = new LittleEndianDataInputStream(bais);
+            Origin origin = Origin.read(bais);
 
-            // ensure that it starts with ORIGIN
-            char[] header = new char[6];
-            for (int i = 0; i < 6; i++) {
-                header[i] = (char) data.readByte();
-            }
-
-            if (!"ORIGIN".equals(new String(header))) {
+            // if this is not the first request, make sure that we have the correct number of iterations
+            if (buffer != null && origin.accessibilityPerIteration.length != this.nIterations) {
+                LOG.error("Origin {}, {} has {} iterations, expected {}",
+                        origin.x, origin.y, origin.accessibilityPerIteration.length, this.nIterations);
                 error = true;
-                LOG.error("Origin not in proper format for query %s");
-                return;
             }
 
-            int version = data.readInt();
-
-            if (version != ORIGIN_VERSION) {
-                error = true;
-                LOG.error("Origin version mismatch for query %s, expected {}, found {}", ORIGIN_VERSION, version);
-            }
-
-            int x = data.readInt();
-            int y = data.readInt();
-            int iterations = data.readInt();
-
-            // convert the remainder to a delta coded byte array
-            ByteArrayOutputStream originData = new ByteArrayOutputStream(iterations * 4);
-            LittleEndianDataOutputStream origin = new LittleEndianDataOutputStream(originData);
-            for (int i = 0, prev = 0; i < iterations; i++) {
-                int current = data.readInt();
-                origin.writeInt(current - prev);
+            // convert to a delta coded byte array
+            ByteArrayOutputStream pixelByteOutputStream = new ByteArrayOutputStream(origin.accessibilityPerIteration.length * 4);
+            LittleEndianDataOutputStream pixelDataOutputStream = new LittleEndianDataOutputStream(pixelByteOutputStream);
+            for (int i = 0, prev = 0; i < origin.accessibilityPerIteration.length; i++) {
+                int current = origin.accessibilityPerIteration[i];
+                pixelDataOutputStream.writeInt(current - prev);
                 prev = current;
             }
-            origin.close();
+            pixelDataOutputStream.close();
 
-            // write to the buffer in a synchronized block to ensure no threading issues
+            // write to the proper subregion of the buffer for this origin
+            // use a synchronized block to ensure no threading issues
             synchronized (this) {
-                if (buffer == null) this.initialize(iterations);
+                if (buffer == null) this.initialize(origin.accessibilityPerIteration.length);
 
-                long offset = DATA_OFFSET + (y * request.width + x) * 4 * iterations;
+                long offset = DATA_OFFSET + (origin.y * request.width + origin.x) * 4 * nIterations;
                 buffer.seek(offset);
-                buffer.write(originData.toByteArray());
+                buffer.write(pixelByteOutputStream.toByteArray());
                 if (++nComplete == nTotal && !error) finish();
             }
         } catch (Exception e) {
             error = true; // the file is garbage TODO better resilience
-            LOG.error("Error assembling results for query %s", request.jobId, e);
+            LOG.error("Error assembling results for query {}", request.jobId, e);
             return;
         }
     }
 
     public void initialize (int nIterations) throws IOException {
+        this.nIterations = nIterations;
+
         // create a temporary file an fill it in with relevant data
         temporaryFile = File.createTempFile(request.jobId, ".access_grid");
+        temporaryFile.deleteOnExit(); // handle unclean broker shutdown
+
         // write the header
         FileOutputStream fos = new FileOutputStream(temporaryFile);
         LittleEndianDataOutputStream data = new LittleEndianDataOutputStream(fos);

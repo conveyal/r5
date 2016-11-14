@@ -26,7 +26,7 @@ import java.util.zip.GZIPInputStream;
  * Planning Using Interactive Accessibility Methods on Combined Schedule and Headway-Based Networks,” under review for the
  * the 96th Annual Meeting of the Transportation Research Board, January 2017.
  */
-public class AndrewOwenMeanGridSampler {
+public class AndrewOwenMeanGridStatisticComputer {
     private static final AmazonS3 s3 = new AmazonS3Client();
 
     /** Version of the access grid format we read */

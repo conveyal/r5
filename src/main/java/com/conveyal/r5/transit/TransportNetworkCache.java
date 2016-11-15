@@ -121,16 +121,29 @@ public class TransportNetworkCache {
             Scenario scenario;
             if (request.scenario == null && request.scenarioId != null) {
                 // resolve scenario
-                LOG.info("Retrieving scenario from S3");
-                // TODO offline mode
-                S3Object obj = s3.getObject(sourceBucket, String.format("%s_%s.json", networkId, scenarioId));
-                InputStream is = obj.getObjectContent();
+                LOG.info("Retrieving scenario stored separately on S3 rather than in the ProfileRequest");
+
+                String scenarioKey = String.format("%s_%s.json", networkId, scenarioId);
+                File scenarioFile = new File(cacheDir, scenarioKey);
+
+                if (!scenarioFile.exists()) {
+                    try {
+                        S3Object obj = s3.getObject(sourceBucket, scenarioKey);
+                        InputStream is = obj.getObjectContent();
+                        OutputStream os = new BufferedOutputStream(new FileOutputStream(scenarioFile));
+                        ByteStreams.copy(is, os);
+                        is.close();
+                        os.close();
+                    } catch (Exception e) {
+                        LOG.info("Error retrieving scenario from S3", e);
+                        return null;
+                    }
+                }
 
                 try {
-                    scenario = JsonUtilities.objectMapper.readValue(is, Scenario.class);
-                    is.close();
-                } catch (Exception e) {
-                    LOG.info("Error retrieving scenario from S3", e);
+                    scenario = JsonUtilities.objectMapper.readValue(scenarioFile, Scenario.class);
+                } catch (IOException e) {
+                    LOG.error("Could not read scenario {} from disk", scenarioId, e);
                     return null;
                 }
             } else if (request.scenario != null) {

@@ -219,6 +219,9 @@ public class TripPattern implements Serializable, Cloneable {
                 previousCoordinate = currentCoordinate;
             }
         }
+        if (geometries.size() != stops.length - 1) {
+            throw new AssertionError("This function should always generate one less geometry than there are stops.");
+        }
         return geometries;
     }
 

@@ -48,7 +48,7 @@ public class StaticServer {
         sm.writeStopTrees(sbaos);
         stopTrees = sbaos.toByteArray();
 
-        TransitiveNetwork tn = new TransitiveNetwork(network.transitLayer, network.streetLayer);
+        TransitiveNetwork tn = new TransitiveNetwork(network.transitLayer);
         ByteArrayOutputStream tnbaos = new ByteArrayOutputStream();
         JsonUtilities.objectMapper.writeValue(tnbaos, tn);
         transitive = tnbaos.toByteArray();

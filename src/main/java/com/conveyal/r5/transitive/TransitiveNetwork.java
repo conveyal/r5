@@ -1,60 +1,53 @@
 package com.conveyal.r5.transitive;
 
-import com.conveyal.gtfs.model.Route;
-import com.conveyal.gtfs.model.Stop;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
-import com.conveyal.r5.util.LocationIndexedLineInLocalCoordinateSystem;
 import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.LineString;
 import com.vividsolutions.jts.linearref.LinearLocation;
 import com.vividsolutions.jts.linearref.LocationIndexedLine;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
-import org.apache.commons.codec.binary.Hex;
-import org.apache.commons.math3.geometry.euclidean.threed.Line;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
- * A representation of a TransitLayer as a Transitive network.
+ * A representation of a TransitLayer as a Transitive.js network.
  * See https://github.com/conveyal/transitive.js/wiki/Transitive-Conceptual-Overview
+ * This class is intended to be serialized out as JSON for communication with web UIs that use Transitive.js.
  * @author mattwigway
  */
 public class TransitiveNetwork {
+
     public List<TransitiveRoute> routes = new ArrayList<>();
     public List<TransitiveStop> stops = new ArrayList<>();
     public List<TransitivePattern> patterns = new ArrayList<>();
-    // places, journeys not currently supported - these are added by the client.
-
-    private static Hex hex = new Hex();
+    // Transitive 'places' and 'journeys' are not currently included. These are added by the client.
 
     public TransitiveNetwork (TransitLayer layer, StreetLayer streetLayer) {
-        // first write patterns, accumulating routes along the way
-        TIntObjectMap<TransitiveRoute> routes = new TIntObjectHashMap<>();
 
-        for (int pattIdx = 0; pattIdx < layer.tripPatterns.size(); pattIdx++) {
-            TripPattern patt = layer.tripPatterns.get(pattIdx);
+        // Scan over all R5 trip patterns, converting them to Transitive patterns
+        // and creating Transitive Routes as they are encountered via the patterns.
+        TIntObjectMap<TransitiveRoute> transitiveRoutes = new TIntObjectHashMap<>();
+        for (int patternIdx = 0; patternIdx < layer.tripPatterns.size(); patternIdx++) {
+            TripPattern r5pattern = layer.tripPatterns.get(patternIdx);
 
-            if (!routes.containsKey(patt.routeIndex)) {
-                // create the route
+            // If this route has not been seen yet, create a Transitive route
+            if (!transitiveRoutes.containsKey(r5pattern.routeIndex)) {
                 // TODO save enough information to get rid of all of this boilerplate
+                // TODO ^ save it where?
                 TransitiveRoute route = new TransitiveRoute();
-                RouteInfo ri = layer.routes.get(patt.routeIndex);
+                RouteInfo ri = layer.routes.get(r5pattern.routeIndex);
                 route.agency_id = ri.agency_id;
                 route.route_short_name = ri.route_short_name;
                 route.route_long_name = ri.route_long_name;
-                route.route_id = patt.routeIndex + "";
+                route.route_id = r5pattern.routeIndex + "";
                 route.route_type = ri.route_type;
                 route.route_color = ri.color;
 
@@ -63,39 +56,40 @@ public class TransitiveNetwork {
                 if (route.route_long_name == null) route.route_long_name = "Route";
                 if (route.route_short_name == null) route.route_short_name = route.route_long_name.split("[^A-Za-z0-9]")[0];
 
-                routes.put(patt.routeIndex, route);
+                transitiveRoutes.put(r5pattern.routeIndex, route);
             }
 
-            TransitivePattern tr = new TransitivePattern();
+            // Create a new transitive Pattern corresponding to the current R5 pattern.
+            TransitivePattern transitivePattern = new TransitivePattern();
             // TODO boilerplate
-            tr.pattern_id = pattIdx + "";
-            tr.pattern_name = routes.get(patt.routeIndex).route_short_name;
-            tr.route_id = patt.routeIndex + "";
+            // TODO ^ why does this say boilerplate?
+            transitivePattern.pattern_id = patternIdx + "";
+            transitivePattern.pattern_name = transitiveRoutes.get(r5pattern.routeIndex).route_short_name;
+            transitivePattern.route_id = r5pattern.routeIndex + "";
+            transitivePattern.stops = new ArrayList<>();
 
-            tr.stops = new ArrayList<>();
+            if (r5pattern.shape != null) {
+                LocationIndexedLine unprojectedLine = new LocationIndexedLine(r5pattern.shape);
 
-            if (patt.shape != null) {
-                LocationIndexedLine unprojectedLine = new LocationIndexedLine(patt.shape);
-
-                for (int stopPos = 0; stopPos < patt.stops.length; stopPos++) {
+                for (int stopPos = 0; stopPos < r5pattern.stops.length; stopPos++) {
 
                     LineString geometry = null;
-
-                    if (stopPos < patt.stops.length - 1) {
+                    // Using shape segments and fractions stored when creating
+                    if (stopPos < r5pattern.stops.length - 1) {
                         LinearLocation from =
-                                new LinearLocation(patt.stopShapeSegment[stopPos], patt.stopShapeFraction[stopPos]);
+                                new LinearLocation(r5pattern.stopShapeSegment[stopPos], r5pattern.stopShapeFraction[stopPos]);
                         LinearLocation to =
-                                new LinearLocation(patt.stopShapeSegment[stopPos + 1], patt.stopShapeFraction[stopPos + 1]);
+                                new LinearLocation(r5pattern.stopShapeSegment[stopPos + 1], r5pattern.stopShapeFraction[stopPos + 1]);
                         geometry = (LineString) unprojectedLine.extractLine(from, to);
                     }
 
-                    tr.stops.add(new TransitivePattern.StopIdRef(Integer.toString(patt.stops[stopPos]), geometry));
+                    transitivePattern.stops.add(new TransitivePattern.StopIdRef(Integer.toString(r5pattern.stops[stopPos]), geometry));
                 }
 
             } else {
                 VertexStore.Vertex v = streetLayer.vertexStore.getCursor();
 
-                Coordinate[] coords = IntStream.of(patt.stops)
+                Coordinate[] coords = IntStream.of(r5pattern.stops)
                         .mapToObj(sidx -> {
                             v.seek(sidx);
                             return new Coordinate(v.getLon(), v.getLat());
@@ -117,20 +111,20 @@ public class TransitiveNetwork {
                     else last = coords[i];
                 }
 
-                for (int stopPos = 0; stopPos < patt.stops.length; stopPos++) {
+                for (int stopPos = 0; stopPos < r5pattern.stops.length; stopPos++) {
                     LineString geometry = null;
 
-                    if (stopPos < patt.stops.length - 1) {
+                    if (stopPos < r5pattern.stops.length - 1) {
                         geometry = GeometryUtils.geometryFactory.createLineString(new Coordinate[] { coords[stopPos], coords[stopPos + 1] });
                     }
-                    tr.stops.add(new TransitivePattern.StopIdRef(Integer.toString(patt.stops[stopPos]), geometry));
+                    transitivePattern.stops.add(new TransitivePattern.StopIdRef(Integer.toString(r5pattern.stops[stopPos]), geometry));
                 }
             }
 
-            patterns.add(tr);
+            patterns.add(transitivePattern);
         }
 
-        this.routes.addAll(routes.valueCollection());
+        this.routes.addAll(transitiveRoutes.valueCollection());
 
         VertexStore.Vertex v = layer.parentNetwork.streetLayer.vertexStore.getCursor();
 

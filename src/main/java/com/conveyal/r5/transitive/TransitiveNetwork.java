@@ -28,7 +28,7 @@ public class TransitiveNetwork {
     public List<TransitiveRoute> routes = new ArrayList<>();
     public List<TransitiveStop> stops = new ArrayList<>();
     public List<TransitivePattern> patterns = new ArrayList<>();
-    // Transitive 'places' and 'journeys' are not currently included. These are added by the client.
+    // Transitive 'places' and 'journeys' are not currently included. These are added by the Javascript client.
 
     public TransitiveNetwork (TransitLayer layer, StreetLayer streetLayer) {
 
@@ -66,60 +66,7 @@ public class TransitiveNetwork {
             transitivePattern.pattern_id = patternIdx + "";
             transitivePattern.pattern_name = transitiveRoutes.get(r5pattern.routeIndex).route_short_name;
             transitivePattern.route_id = r5pattern.routeIndex + "";
-            transitivePattern.stops = new ArrayList<>();
-
-            if (r5pattern.shape != null) {
-                LocationIndexedLine unprojectedLine = new LocationIndexedLine(r5pattern.shape);
-
-                for (int stopPos = 0; stopPos < r5pattern.stops.length; stopPos++) {
-
-                    LineString geometry = null;
-                    // Using shape segments and fractions stored when creating
-                    if (stopPos < r5pattern.stops.length - 1) {
-                        LinearLocation from =
-                                new LinearLocation(r5pattern.stopShapeSegment[stopPos], r5pattern.stopShapeFraction[stopPos]);
-                        LinearLocation to =
-                                new LinearLocation(r5pattern.stopShapeSegment[stopPos + 1], r5pattern.stopShapeFraction[stopPos + 1]);
-                        geometry = (LineString) unprojectedLine.extractLine(from, to);
-                    }
-
-                    transitivePattern.stops.add(new TransitivePattern.StopIdRef(Integer.toString(r5pattern.stops[stopPos]), geometry));
-                }
-
-            } else {
-                VertexStore.Vertex v = streetLayer.vertexStore.getCursor();
-
-                Coordinate[] coords = IntStream.of(r5pattern.stops)
-                        .mapToObj(sidx -> {
-                            v.seek(sidx);
-                            return new Coordinate(v.getLon(), v.getLat());
-                        })
-                        .toArray(Coordinate[]::new);
-
-                // fill in unlinked stops with nearest coordinate
-                Coordinate last = null;
-
-                for (int i = 0; i < coords.length; i++) {
-                    if (coords[i] == null) coords[i] = last;
-                    else last = coords[i];
-                }
-
-                last = null;
-
-                for (int i = coords.length - 1; i >= 0; i--) {
-                    if (coords[i] == null) coords[i] = last;
-                    else last = coords[i];
-                }
-
-                for (int stopPos = 0; stopPos < r5pattern.stops.length; stopPos++) {
-                    LineString geometry = null;
-
-                    if (stopPos < r5pattern.stops.length - 1) {
-                        geometry = GeometryUtils.geometryFactory.createLineString(new Coordinate[] { coords[stopPos], coords[stopPos + 1] });
-                    }
-                    transitivePattern.stops.add(new TransitivePattern.StopIdRef(Integer.toString(r5pattern.stops[stopPos]), geometry));
-                }
-            }
+            transitivePattern.stops = getStopRefs(r5pattern, streetLayer);
 
             patterns.add(transitivePattern);
         }
@@ -128,7 +75,7 @@ public class TransitiveNetwork {
 
         VertexStore.Vertex v = layer.parentNetwork.streetLayer.vertexStore.getCursor();
 
-        // write stops
+        // Convert R5 stops to Transitive stops.
         for (int sidx = 0; sidx < layer.getStopCount(); sidx++) {
             TransitiveStop ts = new TransitiveStop();
             int vidx = layer.streetVertexForStop.get(sidx);
@@ -151,4 +98,59 @@ public class TransitiveNetwork {
             stops.add(ts);
         }
     }
+
+    /**
+     * @param streetLayer for looking up stop coordinates when the R5 pattern does not have a geometry/shape.
+     * @return a list of Transitive stop references for all the stops in the supplied r5 pattern, including geometries
+     * for the path the vehicle takes after each stop.
+     */
+    public List<TransitivePattern.StopIdRef> getStopRefs (TripPattern r5pattern, StreetLayer streetLayer) {
+
+        List<TransitivePattern.StopIdRef> stopRefs = new ArrayList<>();
+
+        if (r5pattern.shape != null) {
+            // This pattern has a shape. Split that shape up into segments between each pair of stops.
+            LocationIndexedLine unprojectedLine = new LocationIndexedLine(r5pattern.shape);
+            for (int stopPos = 0; stopPos < r5pattern.stops.length; stopPos++) {
+                LineString geometry = null;
+                // Using shape segments and fractions stored when creating
+                if (stopPos < r5pattern.stops.length - 1) {
+                    LinearLocation from =
+                        new LinearLocation(r5pattern.stopShapeSegment[stopPos], r5pattern.stopShapeFraction[stopPos]);
+                    LinearLocation to =
+                        new LinearLocation(r5pattern.stopShapeSegment[stopPos + 1], r5pattern.stopShapeFraction[stopPos + 1]);
+                    geometry = (LineString) unprojectedLine.extractLine(from, to);
+                }
+                stopRefs.add(new TransitivePattern.StopIdRef(Integer.toString(r5pattern.stops[stopPos]), geometry));
+            }
+        } else {
+            // This pattern does not have a shape, but Transitive expects geometries. Use straight lines between stops.
+            VertexStore.Vertex v = streetLayer.vertexStore.getCursor();
+            Coordinate[] coords = IntStream.of(r5pattern.stops).mapToObj(sidx -> {
+                        v.seek(sidx);
+                        return new Coordinate(v.getLon(), v.getLat());
+                    }).toArray(Coordinate[]::new);
+
+            // fill in unlinked stops with nearest coordinate
+            Coordinate last = null;
+            for (int i = 0; i < coords.length; i++) {
+                if (coords[i] == null) coords[i] = last;
+                else last = coords[i];
+            }
+            last = null;
+            for (int i = coords.length - 1; i >= 0; i--) {
+                if (coords[i] == null) coords[i] = last;
+                else last = coords[i];
+            }
+            for (int stopPos = 0; stopPos < r5pattern.stops.length; stopPos++) {
+                LineString geometry = null;
+                if (stopPos < r5pattern.stops.length - 1) {
+                    geometry = GeometryUtils.geometryFactory.createLineString(new Coordinate[] { coords[stopPos], coords[stopPos + 1] });
+                }
+                stopRefs.add(new TransitivePattern.StopIdRef(Integer.toString(r5pattern.stops[stopPos]), geometry));
+            }
+        }
+        return stopRefs;
+    }
+
 }

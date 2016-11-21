@@ -1,11 +1,9 @@
 package com.conveyal.r5.transitive;
 
 import com.conveyal.r5.common.GeometryUtils;
-import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
-import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.LineString;
@@ -29,9 +27,9 @@ public class TransitiveNetwork {
     public final List<TransitivePattern> patterns;
     // Transitive 'places' and 'journeys' are not currently included. These are added by the Javascript client.
 
-    public TransitiveNetwork (TransitLayer transitLayer, StreetLayer streetLayer) {
+    public TransitiveNetwork (TransitLayer transitLayer) {
         routes = convertRoutes(transitLayer);
-        patterns = convertPatterns(transitLayer, streetLayer, routes);
+        patterns = convertPatterns(transitLayer, routes);
         stops = convertStops(transitLayer);
     }
 
@@ -61,7 +59,7 @@ public class TransitiveNetwork {
      * Convert R5 patterns to Transitive patterns.
      * @param routes just to get the normalized Transitive route names. Pull this out into a static method.
      */
-    private static List<TransitivePattern> convertPatterns (TransitLayer transitLayer, StreetLayer streetLayer, List<TransitiveRoute> routes) {
+    private static List<TransitivePattern> convertPatterns (TransitLayer transitLayer, List<TransitiveRoute> routes) {
         List<TransitivePattern> patterns = new ArrayList<>();
         for (int patternIdx = 0; patternIdx < transitLayer.tripPatterns.size(); patternIdx++) {
             TripPattern r5pattern = transitLayer.tripPatterns.get(patternIdx);
@@ -69,7 +67,7 @@ public class TransitiveNetwork {
             transitivePattern.pattern_id = patternIdx + "";
             transitivePattern.pattern_name = routes.get(r5pattern.routeIndex).route_short_name;
             transitivePattern.route_id = r5pattern.routeIndex + "";
-            transitivePattern.stops = getStopRefs(r5pattern, streetLayer);
+            transitivePattern.stops = getStopRefs(r5pattern, transitLayer.parentNetwork.streetLayer.vertexStore);
             patterns.add(transitivePattern);
         }
         return patterns;
@@ -97,11 +95,11 @@ public class TransitiveNetwork {
     }
 
     /**
-     * @param streetLayer for looking up stop coordinates when the R5 pattern does not have a geometry/shape.
+     * @param vertexStore for looking up stop coordinates when the R5 pattern does not have a geometry/shape.
      * @return a list of Transitive stop references for all the stops in the supplied r5 pattern, including geometries
      * for the path the vehicle takes after each stop.
      */
-    public static List<TransitivePattern.StopIdRef> getStopRefs (TripPattern r5pattern, StreetLayer streetLayer) {
+    public static List<TransitivePattern.StopIdRef> getStopRefs (TripPattern r5pattern, VertexStore vertexStore) {
 
         List<TransitivePattern.StopIdRef> stopRefs = new ArrayList<>();
 
@@ -122,7 +120,7 @@ public class TransitiveNetwork {
             }
         } else {
             // This pattern does not have a shape, but Transitive expects geometries. Use straight lines between stops.
-            VertexStore.Vertex v = streetLayer.vertexStore.getCursor();
+            VertexStore.Vertex v = vertexStore.getCursor();
             Coordinate[] coords = IntStream.of(r5pattern.stops).mapToObj(sidx -> {
                         v.seek(sidx);
                         return new Coordinate(v.getLon(), v.getLat());

@@ -77,23 +77,16 @@ public class TransitiveNetwork {
 
         // Convert R5 stops to Transitive stops.
         for (int sidx = 0; sidx < layer.getStopCount(); sidx++) {
-            TransitiveStop ts = new TransitiveStop();
             int vidx = layer.streetVertexForStop.get(sidx);
-
+            // Transitive requires coordinates for every stop,
+            // but currently R5 is not saving coordinates for unlinked stops.
+            // see https://github.com/conveyal/r5/issues/33
+            // As a stopgap, for unlinked stops use the location of the 0th stop.
+            v.seek(vidx < 0 ? 0 : vidx);
+            TransitiveStop ts = new TransitiveStop();
+            ts.stop_lat = v.getLat();
+            ts.stop_lon = v.getLon();
             ts.stop_id = sidx + "";
-
-            if (vidx != -1) {
-                v.seek(vidx);
-                ts.stop_lat = v.getLat();
-                ts.stop_lon = v.getLon();
-            } else {
-                // TODO this should actually know where unlinked stop are
-                // see issue 33
-                // at least put the stop in the map somewhere
-                v.seek(0);
-                ts.stop_lat = v.getLat();
-                ts.stop_lon = v.getLon();
-            }
             ts.stop_name = layer.stopNames.get(sidx);
             stops.add(ts);
         }

@@ -6,13 +6,13 @@ import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
 import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.LineString;
 import com.vividsolutions.jts.linearref.LinearLocation;
 import com.vividsolutions.jts.linearref.LocationIndexedLine;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.IntStream;
 
 /**
  * A representation of a TransitLayer as a Transitive.js network.
@@ -96,48 +96,15 @@ public class TransitiveNetwork {
 
     /**
      * @return a list of Transitive stop references for all the stops in the supplied r5 pattern, including geometries
-     * for the path the vehicle takes after each stop.
+     * for the path the vehicle takes after each stop (except the last one, which will be null).
      */
     public static List<TransitivePattern.StopIdRef> getStopRefs (TripPattern r5pattern, TransitLayer transitLayer) {
-
+        List<LineString> geometries = r5pattern.getHopGeometries(transitLayer);
         List<TransitivePattern.StopIdRef> stopRefs = new ArrayList<>();
-
-        if (r5pattern.shape != null) {
-            // This pattern has a shape. Split that shape up into segments between each pair of stops.
-            LocationIndexedLine unprojectedLine = new LocationIndexedLine(r5pattern.shape);
-            for (int stopPos = 0; stopPos < r5pattern.stops.length; stopPos++) {
-                LineString geometry = null;
-                // Using shape segments and fractions stored when creating
-                if (stopPos < r5pattern.stops.length - 1) {
-                    LinearLocation from =
-                        new LinearLocation(r5pattern.stopShapeSegment[stopPos], r5pattern.stopShapeFraction[stopPos]);
-                    LinearLocation to =
-                        new LinearLocation(r5pattern.stopShapeSegment[stopPos + 1], r5pattern.stopShapeFraction[stopPos + 1]);
-                    geometry = (LineString) unprojectedLine.extractLine(from, to);
-                }
-                stopRefs.add(new TransitivePattern.StopIdRef(Integer.toString(r5pattern.stops[stopPos]), geometry));
-            }
-        } else {
-            // This pattern does not have a shape, but Transitive expects geometries. Use straight lines between stops.
-            List<Coordinate> stopCoordinates = new ArrayList<>();
-            VertexStore.Vertex v = transitLayer.parentNetwork.streetLayer.vertexStore.getCursor();
-            for (int stopIndex : r5pattern.stops) {
-                int vertexIndex = transitLayer.streetVertexForStop.get(stopIndex);
-                // Unlinked stops don't have coordinates. See comment in stop conversion method.
-                // A better stopgap might be to reuse the previous coordinate.
-                // TODO We should really just make sure we have coordinates for all stops, then pass the stops list into getStopRefs.
-                if (vertexIndex < 0) vertexIndex = 0;
-                v.seek(vertexIndex);
-                stopCoordinates.add(new Coordinate(v.getLon(), v.getLat()));
-            }
-            for (int stopPos = 0; stopPos < r5pattern.stops.length; stopPos++) {
-                LineString geometry = null;
-                if (stopPos < r5pattern.stops.length - 1) {
-                    geometry = GeometryUtils.geometryFactory.createLineString(
-                            new Coordinate[] { stopCoordinates.get(stopPos), stopCoordinates.get(stopPos + 1) });
-                }
-                stopRefs.add(new TransitivePattern.StopIdRef(Integer.toString(r5pattern.stops[stopPos]), geometry));
-            }
+        for (int stopPos = 0; stopPos < r5pattern.stops.length; stopPos++) {
+            String transitiveStopId = Integer.toString(r5pattern.stops[stopPos]);
+            LineString hopGeometry = (stopPos < geometries.size()) ? geometries.get(stopPos) : null;
+            stopRefs.add(new TransitivePattern.StopIdRef(transitiveStopId, hopGeometry));
         }
         return stopRefs;
     }

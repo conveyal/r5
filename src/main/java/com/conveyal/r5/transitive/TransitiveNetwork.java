@@ -29,8 +29,8 @@ public class TransitiveNetwork {
 
     public TransitiveNetwork (TransitLayer transitLayer) {
         routes = convertRoutes(transitLayer);
-        patterns = convertPatterns(transitLayer, routes);
         stops = convertStops(transitLayer);
+        patterns = convertPatterns(transitLayer, routes);
     }
 
     /** Convert R5 routes to Transitive routes. */
@@ -67,7 +67,7 @@ public class TransitiveNetwork {
             transitivePattern.pattern_id = patternIdx + "";
             transitivePattern.pattern_name = routes.get(r5pattern.routeIndex).route_short_name;
             transitivePattern.route_id = r5pattern.routeIndex + "";
-            transitivePattern.stops = getStopRefs(r5pattern, transitLayer.parentNetwork.streetLayer.vertexStore);
+            transitivePattern.stops = getStopRefs(r5pattern, transitLayer);
             patterns.add(transitivePattern);
         }
         return patterns;
@@ -95,11 +95,10 @@ public class TransitiveNetwork {
     }
 
     /**
-     * @param vertexStore for looking up stop coordinates when the R5 pattern does not have a geometry/shape.
      * @return a list of Transitive stop references for all the stops in the supplied r5 pattern, including geometries
      * for the path the vehicle takes after each stop.
      */
-    public static List<TransitivePattern.StopIdRef> getStopRefs (TripPattern r5pattern, VertexStore vertexStore) {
+    public static List<TransitivePattern.StopIdRef> getStopRefs (TripPattern r5pattern, TransitLayer transitLayer) {
 
         List<TransitivePattern.StopIdRef> stopRefs = new ArrayList<>();
 
@@ -120,27 +119,22 @@ public class TransitiveNetwork {
             }
         } else {
             // This pattern does not have a shape, but Transitive expects geometries. Use straight lines between stops.
-            VertexStore.Vertex v = vertexStore.getCursor();
-            Coordinate[] coords = IntStream.of(r5pattern.stops).mapToObj(sidx -> {
-                        v.seek(sidx);
-                        return new Coordinate(v.getLon(), v.getLat());
-                    }).toArray(Coordinate[]::new);
-
-            // fill in unlinked stops with nearest coordinate
-            Coordinate last = null;
-            for (int i = 0; i < coords.length; i++) {
-                if (coords[i] == null) coords[i] = last;
-                else last = coords[i];
-            }
-            last = null;
-            for (int i = coords.length - 1; i >= 0; i--) {
-                if (coords[i] == null) coords[i] = last;
-                else last = coords[i];
+            List<Coordinate> stopCoordinates = new ArrayList<>();
+            VertexStore.Vertex v = transitLayer.parentNetwork.streetLayer.vertexStore.getCursor();
+            for (int stopIndex : r5pattern.stops) {
+                int vertexIndex = transitLayer.streetVertexForStop.get(stopIndex);
+                // Unlinked stops don't have coordinates. See comment in stop conversion method.
+                // A better stopgap might be to reuse the previous coordinate.
+                // TODO We should really just make sure we have coordinates for all stops, then pass the stops list into getStopRefs.
+                if (vertexIndex < 0) vertexIndex = 0;
+                v.seek(vertexIndex);
+                stopCoordinates.add(new Coordinate(v.getLon(), v.getLat()));
             }
             for (int stopPos = 0; stopPos < r5pattern.stops.length; stopPos++) {
                 LineString geometry = null;
                 if (stopPos < r5pattern.stops.length - 1) {
-                    geometry = GeometryUtils.geometryFactory.createLineString(new Coordinate[] { coords[stopPos], coords[stopPos + 1] });
+                    geometry = GeometryUtils.geometryFactory.createLineString(
+                            new Coordinate[] { stopCoordinates.get(stopPos), stopCoordinates.get(stopPos + 1) });
                 }
                 stopRefs.add(new TransitivePattern.StopIdRef(Integer.toString(r5pattern.stops[stopPos]), geometry));
             }

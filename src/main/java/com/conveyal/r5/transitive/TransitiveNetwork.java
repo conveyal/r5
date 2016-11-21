@@ -10,8 +10,6 @@ import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.LineString;
 import com.vividsolutions.jts.linearref.LinearLocation;
 import com.vividsolutions.jts.linearref.LocationIndexedLine;
-import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.hash.TIntObjectHashMap;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,50 +30,38 @@ public class TransitiveNetwork {
 
     public TransitiveNetwork (TransitLayer layer, StreetLayer streetLayer) {
 
-        // Scan over all R5 trip patterns, converting them to Transitive patterns
-        // and creating Transitive Routes as they are encountered via the patterns.
-        TIntObjectMap<TransitiveRoute> transitiveRoutes = new TIntObjectHashMap<>();
+        // Convert R5 routes to Transitive routes.
+        int routeIndex = 0;
+        for (RouteInfo r5route : layer.routes) {
+            TransitiveRoute transitiveRoute = new TransitiveRoute();
+            transitiveRoute.agency_id = r5route.agency_id;
+            transitiveRoute.route_short_name = r5route.route_short_name;
+            transitiveRoute.route_long_name = r5route.route_long_name;
+            transitiveRoute.route_id = Integer.toString(routeIndex++);
+            transitiveRoute.route_type = r5route.route_type;
+            transitiveRoute.route_color = r5route.color;
+            // Transitive always expects route short name to be defined, and the GTFS spec requires use of the empty
+            // string when the field is empty. GTFS lib converts that to null, convert it back.
+            if (transitiveRoute.route_long_name == null) transitiveRoute.route_long_name = "Route";
+            if (transitiveRoute.route_short_name == null) transitiveRoute.route_short_name =
+                    transitiveRoute.route_long_name.split("[^A-Za-z0-9]")[0];
+            routes.add(transitiveRoute);
+        }
+
+        // Convert R5 trip patterns to Transitive patterns.
         for (int patternIdx = 0; patternIdx < layer.tripPatterns.size(); patternIdx++) {
             TripPattern r5pattern = layer.tripPatterns.get(patternIdx);
-
-            // If this route has not been seen yet, create a Transitive route
-            if (!transitiveRoutes.containsKey(r5pattern.routeIndex)) {
-                // TODO save enough information to get rid of all of this boilerplate
-                // TODO ^ save it where?
-                TransitiveRoute route = new TransitiveRoute();
-                RouteInfo ri = layer.routes.get(r5pattern.routeIndex);
-                route.agency_id = ri.agency_id;
-                route.route_short_name = ri.route_short_name;
-                route.route_long_name = ri.route_long_name;
-                route.route_id = r5pattern.routeIndex + "";
-                route.route_type = ri.route_type;
-                route.route_color = ri.color;
-
-                // Transitive always expects route short name to be defined, and the GTFS spec requires use of the empty
-                // string when the field is empty. GTFS lib converts that to null, convert it back.
-                if (route.route_long_name == null) route.route_long_name = "Route";
-                if (route.route_short_name == null) route.route_short_name = route.route_long_name.split("[^A-Za-z0-9]")[0];
-
-                transitiveRoutes.put(r5pattern.routeIndex, route);
-            }
-
             // Create a new transitive Pattern corresponding to the current R5 pattern.
             TransitivePattern transitivePattern = new TransitivePattern();
-            // TODO boilerplate
-            // TODO ^ why does this say boilerplate?
             transitivePattern.pattern_id = patternIdx + "";
-            transitivePattern.pattern_name = transitiveRoutes.get(r5pattern.routeIndex).route_short_name;
+            transitivePattern.pattern_name = routes.get(r5pattern.routeIndex).route_short_name;
             transitivePattern.route_id = r5pattern.routeIndex + "";
             transitivePattern.stops = getStopRefs(r5pattern, streetLayer);
-
             patterns.add(transitivePattern);
         }
 
-        this.routes.addAll(transitiveRoutes.valueCollection());
-
-        VertexStore.Vertex v = layer.parentNetwork.streetLayer.vertexStore.getCursor();
-
         // Convert R5 stops to Transitive stops.
+        VertexStore.Vertex v = layer.parentNetwork.streetLayer.vertexStore.getCursor();
         for (int sidx = 0; sidx < layer.getStopCount(); sidx++) {
             int vidx = layer.streetVertexForStop.get(sidx);
             // Transitive requires coordinates for every stop,

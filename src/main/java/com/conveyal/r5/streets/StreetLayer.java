@@ -476,6 +476,11 @@ public class StreetLayer implements Serializable, Cloneable {
             parkRideLocationsMap.put(vidx, parkRideParking);
 
             int targetWalking = getOrCreateVertexNear(node.getLat(), node.getLon(), StreetMode.WALK);
+            if (targetWalking == -1) {
+                LOG.warn("Could not link park and ride node at ({}, {}) to the street network.",
+                        node.getLat(), node.getLon());
+                continue;
+            }
             EdgeStore.Edge created = edgeStore.addStreetPair(vidx, targetWalking, 1, -1);
 
             // allow link edges to be traversed by all, access is controlled by connected edges

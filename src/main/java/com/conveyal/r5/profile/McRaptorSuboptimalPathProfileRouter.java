@@ -388,8 +388,8 @@ public class McRaptorSuboptimalPathProfileRouter {
                                 }
                             }
                         } else if (pattern.hasFrequencies) {
-                            currentTrip++;
                             for (TripSchedule tripSchedule : pattern.tripSchedules) {
+                                currentTrip++;
                                 if (!servicesActive.get(tripSchedule.serviceCode) ||
                                     //Skip trips that can't be used with wheelchairs when wheelchair trip is requested
                                     (request.wheelchair && !tripSchedule.getFlag(TripFlag.WHEELCHAIR))) {

@@ -1,5 +1,6 @@
 package com.conveyal.r5.publish;
 
+import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import com.conveyal.r5.common.JsonUtilities;
@@ -14,6 +15,7 @@ import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Serializable;
@@ -121,8 +123,8 @@ public class StaticMetadata implements Runnable {
         }
 
         // Write the tables.
-        CountingOutputStream cos = new CountingOutputStream(out);
-        LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(cos);
+        CountingOutputStream cos = new CountingOutputStream(new BufferedOutputStream(out));
+        LittleEndianIntOutputStream dos = new LittleEndianIntOutputStream(cos);
 
         int prevStopId = 0;
         int prevTime = 0;

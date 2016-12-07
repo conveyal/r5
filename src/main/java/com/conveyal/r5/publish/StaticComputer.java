@@ -1,6 +1,7 @@
 package com.conveyal.r5.publish;
 
 import com.conveyal.gtfs.validator.service.GeoUtils;
+import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
 import com.conveyal.r5.profile.PathWithTimes;
@@ -28,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedOutputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
@@ -92,7 +94,7 @@ public class StaticComputer implements Runnable {
         LinkedPointSet subLinked = subPointSet.link(network.streetLayer, StreetMode.WALK);
         PointSetTimes nonTransitTimes = subLinked.eval(sr::getTravelTimeToVertex);
 
-        LittleEndianDataOutputStream out = new LittleEndianDataOutputStream(new BufferedOutputStream(os));
+        LittleEndianIntOutputStream out = new LittleEndianIntOutputStream(new BufferedOutputStream(os));
 
         // first write out the values for nearby pixels
         out.writeInt(20);

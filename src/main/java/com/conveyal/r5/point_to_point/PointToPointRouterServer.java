@@ -1,10 +1,8 @@
 package com.conveyal.r5.point_to_point;
 
+import com.conveyal.osmlib.Way;
 import com.conveyal.r5.api.GraphQlRequest;
-import com.conveyal.r5.api.util.BikeRentalStation;
-import com.conveyal.r5.api.util.LegMode;
-import com.conveyal.r5.api.util.ParkRideParking;
-import com.conveyal.r5.api.util.Stop;
+import com.conveyal.r5.api.util.*;
 import com.conveyal.r5.common.GeoJsonFeature;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.common.JsonUtilities;
@@ -15,11 +13,16 @@ import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.streets.*;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.SerializableString;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.vividsolutions.jts.geom.*;
+import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.operation.buffer.BufferParameters;
 import com.vividsolutions.jts.operation.buffer.OffsetCurveBuilder;
+import gnu.trove.iterator.TIntIterator;
+import gnu.trove.list.TIntList;
 import gnu.trove.set.TIntSet;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
@@ -392,10 +395,12 @@ public class PointToPointRouterServer {
                 Map<String, Object> featureCollection = new HashMap<>(2);
                 featureCollection.put("type", "FeatureCollection");
                 List<GeoJsonFeature> features = new ArrayList<>();
+                List<VertexInfo> vertices = new ArrayList<>();
 
-                fillFeature(transportNetwork, lastState, features);
+                fillFeature(transportNetwork, lastState, features, vertices);
                 featureCollection.put("features", features);
                 content.put("data", featureCollection);
+                content.put("vertices", vertices);
             } else {
                 Split destinationSplit = streetRouter.getDestinationSplit();
                 //FIXME: why are coordinates of vertex0 and vertex1 the same
@@ -959,7 +964,7 @@ public class PointToPointRouterServer {
 
 
     private static void fillFeature(TransportNetwork transportNetwork, StreetRouter.State lastState,
-        List<GeoJsonFeature> features) {
+        List<GeoJsonFeature> features, List<VertexInfo> vertices) {
         LinkedList<StreetRouter.State> states = new LinkedList<>();
 
                 /*
@@ -971,18 +976,104 @@ public class PointToPointRouterServer {
             states.addFirst(cur);
         }
 
-        //TODO: this can be improved since end and start vertices are the same in all the edges.
+        List<EdgeStore.Edge> edges = new ArrayList<>();
+        List<Integer> edgeIndices = new ArrayList<>();
         for (StreetRouter.State state : states) {
             Integer edgeIdx = state.backEdge;
             if (!(edgeIdx == -1 || edgeIdx == null)) {
-                EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore
-                    .getCursor(edgeIdx);
+                EdgeStore.Edge edge  = transportNetwork.streetLayer.edgeStore.getCursor(edgeIdx);
+                edges.add(edge); // retain edges for constructing the VertexInfo list
+                edgeIndices.add(edgeIdx);
+
+                Way way = transportNetwork.streetLayer.getWay(edge);
+
+                //TODO: this can be improved since end and start vertices are the same in all the edges.
                 GeoJsonFeature feature = new GeoJsonFeature(edge.getGeometry());
                 feature.addProperty("weight", state.weight);
                 feature.addProperty("mode", state.streetMode);
+                feature.addProperty("name", way.getTag("name"));
+                feature.addProperty("fromVertex", edge.getFromVertex());
+                feature.addProperty("toVertex", edge.getToVertex());
                 features.add(feature);
+
             }
         }
+
+        for (int i = 0; i < edges.size(); i++) {
+            EdgeStore.Edge edge = edges.get(i);
+
+            // always add the fromVertex; add the toVertex for the last edge only
+            vertices.add(getVertexInfo(edge.getFromVertex(), transportNetwork, edgeIndices));
+            if(i == edges.size() - 1) {
+                vertices.add(getVertexInfo(edge.getToVertex(), transportNetwork, edgeIndices));
+            }
+        }
+    }
+
+    public static VertexInfo getVertexInfo(int vertexIdx, TransportNetwork transportNetwork, List<Integer> pathEdgeIndices) {
+        VertexInfo vertexInfo = new VertexInfo();
+        vertexInfo.index = vertexIdx;
+        vertexInfo.incidentStreets = new LinkedList<>();
+
+        // create map of edge groups, where each group is collection of edges corresponding to a
+        // street segment (typically one or two edges depending on street directionality).
+        // Group key is of format "<way name>:<opp vertex index>" (e.g. "Main St:1234")
+        Map<String, List<EdgeStore.Edge>> incStreetEdgeGroups = new HashMap<>();
+
+        TIntList inEdges = transportNetwork.streetLayer.incomingEdges.get(vertexIdx);
+        for (int inEdgeIdx : inEdges.toArray()) {
+            EdgeStore.Edge inEdge = transportNetwork.streetLayer.edgeStore.getCursor(inEdgeIdx);
+            Way inWay = transportNetwork.streetLayer.getWay(inEdge);
+            String key = inWay.getTag("name") + ":" + inEdge.getFromVertex();
+            if(!incStreetEdgeGroups.containsKey(key)) incStreetEdgeGroups.put(key, new LinkedList<>());
+            incStreetEdgeGroups.get(key).add(inEdge);
+        }
+        TIntList outEdges = transportNetwork.streetLayer.outgoingEdges.get(vertexIdx);
+        for (int outEdgeIdx : outEdges.toArray()) {
+            EdgeStore.Edge outEdge = transportNetwork.streetLayer.edgeStore.getCursor(outEdgeIdx);
+            Way outWay = transportNetwork.streetLayer.getWay(outEdge);
+            String key = outWay.getTag("name") + ":" + outEdge.getToVertex();
+            if(!incStreetEdgeGroups.containsKey(key)) incStreetEdgeGroups.put(key, new LinkedList<>());
+            incStreetEdgeGroups.get(key).add(outEdge);
+        }
+
+        for (List<EdgeStore.Edge> edgeGroup : incStreetEdgeGroups.values()) {
+            // we can assume that any edge is representative of the group for segment properties
+            // such as name, highway class, and opposite vertex
+            EdgeStore.Edge anEdge = edgeGroup.get(0);
+            Way incWay = transportNetwork.streetLayer.getWay(anEdge);
+            StreetInfo street = new StreetInfo();
+            street.name = incWay.getTag("name");
+            street.highway = incWay.getTag("highway");
+            street.oppositeVertex = vertexIdx == anEdge.getFromVertex() ?
+                    anEdge.getToVertex() : anEdge.getFromVertex();
+
+            street.onPath = false;
+            // check if any of the edges corresponding to this segment are part of the path, and
+            // mark the segment's onPath property "true" if so
+            for(EdgeStore.Edge edge : edgeGroup) {
+                if(pathEdgeIndices.contains(edge.getEdgeIndex())) {
+                    street.onPath = true;
+                    break;
+                }
+            }
+
+            vertexInfo.incidentStreets.add(street);
+        }
+
+        return vertexInfo;
+    }
+
+    public static class VertexInfo {
+        public int index;
+        public List<StreetInfo> incidentStreets;
+    }
+
+    public static class StreetInfo {
+        public String name;
+        public String highway;
+        public int oppositeVertex;
+        public boolean onPath;
     }
 
     /**
@@ -1056,5 +1147,5 @@ public class PointToPointRouterServer {
     private static float roundSpeed(float speed) {
         return Math.round(speed * 1000) / 1000;
     }
-
 }
+

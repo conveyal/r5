@@ -373,6 +373,13 @@ public class StreetLayer implements Serializable, Cloneable {
         return name;
     }
 
+    public Way getWay(EdgeStore.Edge edge) {
+        if (osm == null) {
+            return null;
+        }
+        return osm.ways.get(edge.getOSMID());
+    }
+
     /**
      * Gets all the OSM tags of specified OSM way
      *

@@ -676,7 +676,7 @@ public class StreetRouter {
             Collection<State> states = bestStatesAtEdge.get(it.next());
             // NB this needs a state to copy turn restrictions into. We then don't use that state, which is fine because
             // we don't need the turn restrictions any more because we're at the end of the search
-            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge, s)))
+            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge, s), profileRequest.reverseSearch))
                     .map(s -> {
                         State ret = new State(-1, split.edge, s);
                         ret.streetMode = s.streetMode;
@@ -706,7 +706,7 @@ public class StreetRouter {
 
         for (TIntIterator it = edgeList.iterator(); it.hasNext();) {
             Collection<State> states = bestStatesAtEdge.get(it.next());
-            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge + 1, s)))
+            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge + 1, s), profileRequest.reverseSearch))
                     .map(s -> {
                         State ret = new State(-1, split.edge + 1, s);
                         ret.streetMode = s.streetMode;
@@ -915,6 +915,22 @@ public class StreetRouter {
             }
             out.append("END PATH DUMP\n");
 
+            return out.toString();
+        }
+
+        public String compactDump(boolean reverse) {
+            State state = this;
+            StringBuilder out = new StringBuilder();
+            String middle;
+            if (reverse) {
+                middle = "->";
+            } else {
+                middle = "<-";
+            }
+            while (state != null) {
+                out.append(String.format("%s %d ",middle, state.backEdge));
+                state = state.backState;
+            }
             return out.toString();
         }
 

@@ -60,8 +60,8 @@ public class AddTrips extends Modification {
 
     @Override
     public boolean resolve (TransportNetwork network) {
-        if (stops == null) {
-            warnings.add("You must provide some stops.");
+        if (stops == null || stops.size() < 2) {
+            warnings.add("You must provide at least two stops.");
         } else {
             for (PatternTimetable entry : frequencies) {
                 warnings.addAll(entry.validate(stops.size()));

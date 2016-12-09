@@ -5,6 +5,7 @@ import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.Message;
+import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.LittleEndianDataOutputStream;
 import org.slf4j.Logger;
@@ -168,11 +169,9 @@ public class GridResultAssembler {
 
         // write the header
         FileOutputStream fos = new FileOutputStream(temporaryFile);
-        LittleEndianDataOutputStream data = new LittleEndianDataOutputStream(fos);
+        LittleEndianIntOutputStream data = new LittleEndianIntOutputStream(fos);
 
-        for (char c : "ACCESSGR".toCharArray()) {
-            data.writeByte((byte) c);
-        }
+        data.writeAscii("ACCESSGR");
 
         data.writeInt(VERSION);
 

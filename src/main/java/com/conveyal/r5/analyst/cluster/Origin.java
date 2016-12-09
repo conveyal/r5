@@ -93,9 +93,9 @@ public class Origin {
 
         origin.accessibilityPerIteration = new int[data.readInt()];
 
-        for (int iteration = 0, prev = 0; iteration < origin.accessibilityPerIteration.length; iteration++) {
+        for (int iteration = 0; iteration < origin.accessibilityPerIteration.length; iteration++) {
             // de-delta-code the origin
-            origin.accessibilityPerIteration[iteration] = (prev += data.readInt());
+            origin.accessibilityPerIteration[iteration] = data.readInt();
         }
 
         data.close();

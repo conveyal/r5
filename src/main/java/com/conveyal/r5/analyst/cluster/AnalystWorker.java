@@ -165,6 +165,15 @@ public class AnalystWorker implements Runnable {
     private ThreadPoolExecutor taskDeliveryExecutor;
 
     public AnalystWorker(Properties config) {
+        // grr this() must be first call in constructor, even if previous statements do not have side effects.
+        // Thanks, Java.
+        this(config, new TransportNetworkCache(
+                Boolean.parseBoolean(config.getProperty("work-offline", "false"))
+                        ? null
+                        : config.getProperty("graphs-bucket"), new File(config.getProperty("cache-dir", "cache/graphs"))));
+    }
+
+    public AnalystWorker(Properties config, TransportNetworkCache cache) {
         // print out date on startup so that CloudWatch logs has a unique fingerprint
         LOG.info("Analyst worker starting at {}", LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
 
@@ -204,8 +213,7 @@ public class AnalystWorker implements Runnable {
 
         this.gridCache = new GridCache(config.getProperty("pointsets-bucket"));
         this.pointSetDatastore = new PointSetDatastore(10, null, false, config.getProperty("pointsets-bucket"));
-        File cacheDir = new File(config.getProperty("cache-dir", "cache/graphs"));
-        this.transportNetworkCache = new TransportNetworkCache(workOffline ? null : config.getProperty("graphs-bucket"), cacheDir);
+        this.transportNetworkCache = cache;
         Boolean autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown"));
         this.autoShutdown = autoShutdown == null ? false : autoShutdown;
 

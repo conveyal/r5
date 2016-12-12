@@ -60,6 +60,13 @@ public class TransportNetworkCache {
         this.osmCache = new OSMCache(sourceBucket, cacheDir);
     }
 
+    public TransportNetworkCache(GTFSCache gtfsCache, OSMCache osmCache) {
+        this.gtfsCache = gtfsCache;
+        this.osmCache = osmCache;
+        this.cacheDir = gtfsCache.cacheDir;
+        this.sourceBucket = gtfsCache.bucket;
+    }
+
     /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
     private boolean workOffline;
 

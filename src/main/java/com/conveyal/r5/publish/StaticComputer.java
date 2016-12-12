@@ -131,8 +131,6 @@ public class StaticComputer implements Runnable {
                 // advance past states that are not included in averages
                 while (!worker.includeInAverages.get(stateIteration)) stateIteration++;
 
-                RaptorState state = worker.statesEachIteration.get(stateIteration);
-
                 int time = pts.times[iter][stop];
                 if (time == Integer.MAX_VALUE) time = -1;
                 else time /= 60;
@@ -140,35 +138,42 @@ public class StaticComputer implements Runnable {
                 out.writeInt(time - prev);
                 prev = time;
 
-                int inVehicleTravelTime = state.inVehicleTravelTime[stop] / 60;
-                out.writeInt(inVehicleTravelTime - previousInVehicleTravelTime);
-                previousInVehicleTravelTime = inVehicleTravelTime;
+                if (worker.statesEachIteration != null) {
+                    RaptorState state = worker.statesEachIteration.get(stateIteration);
+                    int inVehicleTravelTime = state.inVehicleTravelTime[stop] / 60;
+                    out.writeInt(inVehicleTravelTime - previousInVehicleTravelTime);
+                    previousInVehicleTravelTime = inVehicleTravelTime;
 
-                int waitTime = state.waitTime[stop] / 60;
-                out.writeInt(waitTime - previousWaitTime);
-                previousWaitTime = waitTime;
+                    int waitTime = state.waitTime[stop] / 60;
+                    out.writeInt(waitTime - previousWaitTime);
+                    previousWaitTime = waitTime;
 
-                if (inVehicleTravelTime + waitTime > time && time != -1) {
-                    LOG.info("Wait and in vehicle travel time greater than total time");
-                }
-
-                // write out which path to use, delta coded
-                int pathIdx = -1;
-
-                // only compute a path if this stop was reached
-                if (state.bestNonTransferTimes[stop] != RaptorWorker.UNREACHED) {
-                    // TODO reuse pathwithtimes?
-                    Path path = new Path(state, stop);
-                    if (!paths.containsKey(path)) {
-                        paths.put(path, maxPathIdx++);
-                        pathList.add(path);
+                    if (inVehicleTravelTime + waitTime > time && time != -1) {
+                        LOG.info("Wait and in vehicle travel time greater than total time");
                     }
 
-                    pathIdx = paths.get(path);
-                }
+                    // write out which path to use, delta coded
+                    int pathIdx = -1;
 
-                out.writeInt(pathIdx - prevPath);
-                prevPath = pathIdx;
+                    // only compute a path if this stop was reached
+                    if (state.bestNonTransferTimes[stop] != RaptorWorker.UNREACHED) {
+                        // TODO reuse pathwithtimes?
+                        Path path = new Path(state, stop);
+                        if (!paths.containsKey(path)) {
+                            paths.put(path, maxPathIdx++);
+                            pathList.add(path);
+                        }
+
+                        pathIdx = paths.get(path);
+                    }
+
+                    out.writeInt(pathIdx - prevPath);
+                    prevPath = pathIdx;
+                } else {
+                    out.writeInt(-1); // In vehicle time
+                    out.writeInt(-1); // Walk time
+                    out.writeInt(-1); // path index
+                }
             }
 
             sum += pathList.size();

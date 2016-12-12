@@ -142,7 +142,7 @@ public class RaptorWorker {
         this.targets = targets;
 
         // targets== null implies a static site, save the results of each iteration
-        if (targets == null) this.statesEachIteration = new ArrayList<>();
+        //if (targets == null) this.statesEachIteration = new ArrayList<>();
 
         this.servicesActive = data.getActiveServicesForDate(req.date);
 

@@ -42,38 +42,49 @@ public class GridResultConsumer implements Runnable {
         while (true) {
             // TODO if no jobs are registered, don't waste money talking to SQS
 
-            ReceiveMessageRequest req = new ReceiveMessageRequest(sqsUrl);
-            req.setWaitTimeSeconds(20);
-            req.setMaxNumberOfMessages(10);
-            req.setMessageAttributeNames(Collections.singleton("jobId"));
-            ReceiveMessageResult res = sqs.receiveMessage(req);
+            try {
+                ReceiveMessageRequest req = new ReceiveMessageRequest(sqsUrl);
+                req.setWaitTimeSeconds(20);
+                req.setMaxNumberOfMessages(10);
+                req.setMessageAttributeNames(Collections.singleton("jobId"));
+                ReceiveMessageResult res = sqs.receiveMessage(req);
 
-            // parallelStream? ExecutorService?
-            List<DeleteMessageBatchRequestEntry> deleteRequests = res.getMessages().stream()
-                    .map(m -> {
-                        MessageAttributeValue jobIdAttr = m.getMessageAttributes().get("jobId");
-                        String jobId = jobIdAttr != null ? jobIdAttr.getStringValue() : null;
+                // parallelStream? ExecutorService?
+                List<DeleteMessageBatchRequestEntry> deleteRequests = res.getMessages().stream()
+                        .map(m -> {
+                            MessageAttributeValue jobIdAttr = m.getMessageAttributes().get("jobId");
+                            String jobId = jobIdAttr != null ? jobIdAttr.getStringValue() : null;
 
-                        if (jobId == null) {
-                            LOG.error("Message does not have a Job ID, silently discarding");
+                            if (jobId == null) {
+                                LOG.error("Message does not have a Job ID, silently discarding");
+                                return new DeleteMessageBatchRequestEntry(m.getMessageId(), m.getReceiptHandle());
+                            }
+
+                            if (!assemblers.containsKey(jobId)) {
+                                // TODO is this the right thing to do?
+                                LOG.warn("Received message for invalid job ID {}, returning to queue", jobId);
+                                return null;
+                            }
+
+                            assemblers.get(jobId).handleMessage(m);
+
                             return new DeleteMessageBatchRequestEntry(m.getMessageId(), m.getReceiptHandle());
-                        }
+                        })
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
 
-                        if (!assemblers.containsKey(jobId)) {
-                            // TODO is this the right thing to do?
-                            LOG.warn("Received message for invalid job ID {}, returning to queue", jobId);
-                            return null;
-                        }
-
-                        assemblers.get(jobId).handleMessage(m);
-
-                        return new DeleteMessageBatchRequestEntry(m.getMessageId(), m.getReceiptHandle());
-                    })
-                    .filter(Objects::nonNull)
-                    .collect(Collectors.toList());
-
-            if (!deleteRequests.isEmpty()) {
-                sqs.deleteMessageBatch(sqsUrl, deleteRequests);
+                if (!deleteRequests.isEmpty()) {
+                    sqs.deleteMessageBatch(sqsUrl, deleteRequests);
+                }
+            } catch (Exception e) {
+                // TODO figure out if exception is permanent
+                LOG.info("Error connecting to regional result queue. Assuming this is transient network issues. Retrying in 60s");
+                try {
+                    Thread.sleep(3600);
+                } catch (InterruptedException ie) {
+                    LOG.info("Interrupted, shutting down monitor thread");
+                    return;
+                }
             }
         }
     }

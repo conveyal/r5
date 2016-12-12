@@ -251,9 +251,13 @@ public class TransportNetworkCache {
             }
 
             // Upload the serialized TransportNetwork to S3
-            LOG.info("Uploading the serialized TransportNetwork to S3 for use by other workers.");
-            s3.putObject(sourceBucket, filename, cacheLocation);
-            LOG.info("Done uploading the serialized TransportNetwork to S3.");
+            if (sourceBucket != null) {
+                LOG.info("Uploading the serialized TransportNetwork to S3 for use by other workers.");
+                s3.putObject(sourceBucket, filename, cacheLocation);
+                LOG.info("Done uploading the serialized TransportNetwork to S3.");
+            } else {
+                LOG.info("Network saved to cache directory, not uploading to S3 while working offline.");
+            }
 
         } catch (Exception e) {
             // Don't break here as we do have a network to return, we just couldn't cache it.

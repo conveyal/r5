@@ -201,8 +201,7 @@ public class McRaptorSuboptimalPathProfileRouter {
             BitSet includeInAverages = new BitSet();
             includeInAverages.set(0, timesAtTargetsEachIteration.size());
             // TODO min/max not appropriate without explicitly calculated extrema in frequency search
-            propagatedTimesStore.setFromArray(timesAtTargetsEachIteration.toArray(new int[timesAtTargetsEachIteration.size()][]),
-                    includeInAverages, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX, request.reachabilityThreshold);
+            propagatedTimesStore.setFromArray(timesAtTargetsEachIteration.toArray(new int[timesAtTargetsEachIteration.size()][]), request.reachabilityThreshold);
         }
 
         LOG.info("McRAPTOR took {}ms", System.currentTimeMillis() - startTime);

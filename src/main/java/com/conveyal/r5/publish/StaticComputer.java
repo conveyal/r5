@@ -91,7 +91,7 @@ public class StaticComputer implements Runnable {
         // pointset around the search origin.
         WebMercatorGridPointSet subPointSet =
                 new WebMercatorGridPointSet(WebMercatorGridPointSet.DEFAULT_ZOOM, points.west + req.x - 20, points.north + req.y - 20, 41, 41);
-        LinkedPointSet subLinked = subPointSet.link(network.streetLayer, StreetMode.WALK);
+        LinkedPointSet subLinked = subPointSet.linkSubset(network.getLinkedGridPointSet());
         PointSetTimes nonTransitTimes = subLinked.eval(sr::getTravelTimeToVertex);
 
         LittleEndianIntOutputStream out = new LittleEndianIntOutputStream(new BufferedOutputStream(os));

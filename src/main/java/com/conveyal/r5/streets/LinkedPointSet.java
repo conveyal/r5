@@ -140,6 +140,22 @@ public class LinkedPointSet {
 
     }
 
+    /** used to create new linked pointsets that are subsets of existing ones */
+    public LinkedPointSet(int[] edges, int[] distances0_mm, int[] distances1_mm, PointSet pointSet,
+                          StreetLayer streetLayer, StreetMode streetMode) {
+        if (edges.length != distances0_mm.length || edges.length != distances1_mm.length ||
+                edges.length != pointSet.featureCount()) {
+            throw new IllegalArgumentException("Lengths of input pointset and linkages do not match!");
+        }
+
+        this.edges = edges;
+        this.distances0_mm = distances0_mm;
+        this.distances1_mm = distances1_mm;
+        this.pointSet = pointSet;
+        this.streetLayer = streetLayer;
+        this.streetMode = streetMode;
+    }
+
     /**
      * Associate the points in this PointSet with the street vertices at the ends of the closest street edge.
      * @param relinkZone only link points inside this geometry in FIXED POINT DEGREES, leaving all the others alone. If null, link all points.

@@ -356,8 +356,11 @@ public class TransportNetworkCache {
 
         network.transitLayer.parentNetwork = network;
         network.streetLayer.associateStops(network.transitLayer);
+        network.streetLayer.buildEdgeLists();
 
         network.rebuildTransientIndexes();
+
+        new TransferFinder(network).findTransfers();
 
         return network;
     }

@@ -137,6 +137,7 @@ public class TransportNetwork implements Serializable {
         // transitLayer.summarizeRoutesAndPatterns();
 
         // The street index is needed for associating transit stops with the street network.
+        // TODO why is this called twice?
         streetLayer.indexStreets();
         streetLayer.associateStops(transitLayer);
         // Edge lists must be built after all inter-layer linking has occurred.

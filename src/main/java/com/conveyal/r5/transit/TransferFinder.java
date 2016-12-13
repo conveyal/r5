@@ -19,7 +19,7 @@ import java.util.List;
  */
 public class TransferFinder {
 
-    private static Logger LOG = LoggerFactory.getLogger(TransferFinder.class);
+    private static final Logger LOG = LoggerFactory.getLogger(TransferFinder.class);
 
     // Optimization: use the same empty list for all stops with no transfers
     private static final TIntArrayList EMPTY_INT_LIST = new TIntArrayList();
@@ -39,6 +39,7 @@ public class TransferFinder {
     }
 
     public void findTransfers () {
+        int unconnectedStops = 0;
         // For each stop, store all transfers out of that stop as packed pairs of (toStopIndex, distance)
         final List<TIntList> transfersForStop = transitLayer.transfersForStop;
         // When applying scenarios we want to find transfers for only the newly added stops.
@@ -49,7 +50,7 @@ public class TransferFinder {
             // From each stop, run a street search looking for other transit stops.
             int originStreetVertex = transitLayer.streetVertexForStop.get(s);
             if (originStreetVertex == -1) {
-                LOG.warn("Stop {} is not connected to the street network.", s);
+                unconnectedStops++;
                 // Every iteration must add an array to transfersForStop to maintain the right length.
                 transfersForStop.add(EMPTY_INT_LIST);
                 continue;
@@ -101,7 +102,7 @@ public class TransferFinder {
         }
         // Store the transfers in the transit layer
         transitLayer.transfersForStop = transfersForStop;
-        LOG.info("Done finding transfers.");
+        LOG.info("Done finding transfers. {} stops are unlinked.", unconnectedStops);
     }
 
 

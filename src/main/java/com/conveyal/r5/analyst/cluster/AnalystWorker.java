@@ -729,20 +729,20 @@ public class AnalystWorker implements Runnable {
      * died.
      */
     public void finishPriorityTask(GenericClusterRequest clusterRequest, InputStream result) {
-        CountingInputStream is = new CountingInputStream(result);
+        //CountingInputStream is = new CountingInputStream(result);
 
         String url = BROKER_BASE_URL + String.format("/complete/priority/%s", clusterRequest.taskId);
         HttpPost httpPost = new HttpPost(url);
 
         // TODO reveal any errors etc. that occurred on the worker.
-        httpPost.setEntity(new InputStreamEntity(is));
+        httpPost.setEntity(new InputStreamEntity(result));
         taskDeliveryExecutor.execute(() -> {
             try {
                 HttpResponse response = httpClient.execute(httpPost);
                 // Signal the http client library that we're done with this response object, allowing connection reuse.
                 EntityUtils.consumeQuietly(response.getEntity());
 
-                LOG.info("Returned {} bytes to the broker for task {}", is.getCount(), clusterRequest.taskId);
+                //LOG.info("Returned {} bytes to the broker for task {}", is.getCount(), clusterRequest.taskId);
 
                 if (response.getStatusLine().getStatusCode() == 200) {
                     LOG.info("Successfully marked task {} as completed.", clusterRequest.taskId);

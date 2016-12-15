@@ -87,12 +87,18 @@ public class StaticComputer implements Runnable {
 
         StaticPropagatedTimesStore pts = (StaticPropagatedTimesStore) worker.runRaptor(accessTimes, null, ts);
 
+        long nonTransitStart = System.currentTimeMillis();
+
         // get non-transit times
         // pointset around the search origin.
         WebMercatorGridPointSet subPointSet =
                 new WebMercatorGridPointSet(WebMercatorGridPointSet.DEFAULT_ZOOM, points.west + req.x - 20, points.north + req.y - 20, 41, 41);
         LinkedPointSet subLinked = subPointSet.linkSubset(network.getLinkedGridPointSet());
         PointSetTimes nonTransitTimes = subLinked.eval(sr::getTravelTimeToVertex);
+
+        LOG.info("Sampling non-transit times took {}s", (System.currentTimeMillis() - nonTransitStart) / 1000);
+
+        long outputStart = System.currentTimeMillis();
 
         LittleEndianIntOutputStream out = new LittleEndianIntOutputStream(new BufferedOutputStream(os));
 
@@ -191,6 +197,7 @@ public class StaticComputer implements Runnable {
             }
         }
 
+        LOG.info("Writing output to broker took {}s", (System.currentTimeMillis() - outputStart) / 1000);
         LOG.info("Average of {} paths per destination stop", sum / stops);
 
         out.flush();

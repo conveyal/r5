@@ -1,6 +1,8 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.util.ShapefileReader;
+import com.csvreader.CsvReader;
 import com.google.common.io.CharSource;
 import com.google.common.io.CharStreams;
 import com.google.common.io.LittleEndianDataInputStream;
@@ -9,11 +11,14 @@ import com.google.common.primitives.Chars;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.MultiPolygon;
+import com.vividsolutions.jts.geom.Point;
 import com.vividsolutions.jts.geom.Polygon;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
 import org.geotools.data.*;
+import org.geotools.data.shapefile.files.ShpFiles;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.gce.geotiff.GeoTiffFormat;
 import org.geotools.gce.geotiff.GeoTiffWriteParams;
@@ -23,28 +28,46 @@ import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.opengis.coverage.grid.GridCoverage;
+import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
+import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.MathTransform;
+import org.opengis.referencing.operation.TransformException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
+import static com.conveyal.gtfs.util.Util.human;
+import static java.lang.Double.parseDouble;
 import static java.lang.Math.atan;
 import static java.lang.Math.cos;
 import static java.lang.Math.log;
 import static java.lang.Math.sinh;
 import static java.lang.Math.tan;
+import static spark.Spark.halt;
 
 /**
  * Class that represents a grid in the spherical Mercator "projection" at a given zoom level.
@@ -52,6 +75,7 @@ import static java.lang.Math.tan;
  * the edges of the world.
  */
 public class Grid {
+    public static final Logger LOG = LoggerFactory.getLogger(Grid.class);
 
     /** The web mercator zoom level for this grid. */
     public final int zoom;
@@ -334,5 +358,140 @@ public class Grid {
                 new Coordinate(maxLon, minLat),
                 new Coordinate(minLon, minLat)
         });
+    }
+
+    /** Create grids from a CSV file */
+    public static Map<String,Grid> fromCsv(File csvFile, String latField, String lonField, int zoom) throws IOException {
+        CsvReader reader = new CsvReader(new BufferedInputStream(new FileInputStream(csvFile)), Charset.forName("UTF-8"));
+        reader.readHeaders();
+
+        String[] headers = reader.getHeaders();
+        if (!Stream.of(headers).filter(h -> h.equals(latField)).findAny().isPresent()) {
+            LOG.info("Lat field not found!");
+            halt(400, "Lat field not found");
+        }
+
+        if (!Stream.of(headers).filter(h -> h.equals(lonField)).findAny().isPresent()) {
+            LOG.info("Lon field not found!");
+            halt(400, "Lon field not found");
+        }
+
+        Envelope envelope = new Envelope();
+
+        // Keep track of which fields contain numeric values
+        Set<String> numericColumns = Stream.of(headers).collect(Collectors.toCollection(HashSet::new));
+        numericColumns.remove(latField);
+        numericColumns.remove(lonField);
+
+        int i = 0;
+        while (reader.readRecord()) {
+            if (++i % 10000 == 0) LOG.info("{} records", human(i));
+
+            envelope.expandToInclude(parseDouble(reader.get(lonField)), parseDouble(reader.get(latField)));
+
+            for (Iterator<String> it = numericColumns.iterator(); it.hasNext();) {
+                String field = it.next();
+                String value = reader.get(field);
+                if (value == null || "".equals(value)) continue; // allow missing data
+                try {
+                    // TODO also exclude columns containing negatives?
+                    parseDouble(value);
+                } catch (NumberFormatException e) {
+                    it.remove();
+                }
+            }
+        }
+
+        reader.close();
+
+        // We now have an envelope and know which columns are numeric
+        // Make a grid for each numeric column
+        Map<String, Grid> grids = numericColumns.stream()
+                .collect(
+                        Collectors.toMap(
+                                c -> c,
+                                c -> new Grid(
+                                        zoom,
+                                        envelope.getMaxY(),
+                                        envelope.getMaxX(),
+                                        envelope.getMinY(),
+                                        envelope.getMinX()
+                                )));
+
+        // read it again, Sam - reread the CSV to get the actual values and populate the grids
+        reader = new CsvReader(new BufferedInputStream(new FileInputStream(csvFile)), Charset.forName("UTF-8"));
+        reader.readHeaders();
+
+        i = 0;
+        while (reader.readRecord()) {
+            if (++i % 10000 == 0) LOG.info("{} records", human(i));
+
+            double lat = parseDouble(reader.get(latField));
+            double lon = parseDouble(reader.get(lonField));
+
+            for (String field : numericColumns) {
+                String value = reader.get(field);
+
+                double val;
+
+                if (value == null || "".equals(value)) {
+                    val = 0;
+                } else {
+                    val = parseDouble(value);
+                }
+
+                grids.get(field).incrementPoint(lat, lon, val);
+            }
+        }
+
+        reader.close();
+
+        return grids;
+    }
+
+    public static Map<String, Grid> fromShapefile (File shapefile, int zoom) throws IOException, FactoryException, TransformException {
+        Map<String, Grid> grids = new HashMap<>();
+        ShapefileReader reader = new ShapefileReader(shapefile);
+
+        Envelope envelope = reader.wgs84Bounds();
+
+        reader.wgs84Stream().forEach(feat -> {
+            Geometry geom = (Geometry) feat.getDefaultGeometry();
+
+            for (Property p : feat.getProperties()) {
+                Object val = p.getValue();
+
+                if (val == null || !Number.class.isInstance(val)) continue;
+                double numericVal = ((Number) val).doubleValue();
+                if (numericVal == 0) continue;
+
+                String attributeName = p.getName().getLocalPart();
+
+                if (!grids.containsKey(attributeName)) {
+                    grids.put(attributeName, new Grid(
+                            zoom,
+                            envelope.getMaxY(),
+                            envelope.getMaxX(),
+                            envelope.getMinY(),
+                            envelope.getMinX()
+                    ));
+                }
+
+                Grid grid = grids.get(attributeName);
+
+                if (geom instanceof Point) {
+                    Point point = (Point) geom;
+                    // already in WGS 84
+                    grid.incrementPoint(point.getY(), point.getX(), numericVal);
+                } else if (geom instanceof Polygon || geom instanceof MultiPolygon) {
+                    grid.rasterize(geom, numericVal);
+                } else {
+                    throw new IllegalArgumentException("Unsupported geometry type");
+                }
+            }
+        });
+
+        reader.close();
+        return grids;
     }
 }

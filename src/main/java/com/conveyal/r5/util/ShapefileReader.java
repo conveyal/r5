@@ -1,5 +1,6 @@
 package com.conveyal.r5.util;
 
+import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
@@ -79,12 +80,17 @@ public class ShapefileReader {
         return stream().map(f -> {
             Geometry g = (Geometry) f.getDefaultGeometry();
             try {
+                // TODO does this leak beyond this function?
                 f.setDefaultGeometry(JTS.transform(g, transform));
             } catch (TransformException e) {
                 throw new RuntimeException(e);
             }
             return f;
         });
+    }
+
+    public Envelope wgs84Bounds () throws IOException, TransformException {
+        return JTS.transform(getBounds(), transform);
     }
 
 

@@ -283,6 +283,15 @@ public class StreetRouter {
         speedms = edge.calculateSpeed(profileRequest, streetMode);
         startState0.weight = (int) ((split.distance0_mm / 1000) / speedms);
 
+        if (profileRequest.reverseSearch) {
+             startState0.vertex = split.vertex1;
+             startState1.vertex = split.vertex0;
+        }
+
+        //We need to set turn restrictions if turn restriction starts in first edge
+        streetLayer.edgeStore.startTurnRestriction(streetMode, profileRequest.reverseSearch, startState0);
+        streetLayer.edgeStore.startTurnRestriction(streetMode, profileRequest.reverseSearch, startState1);
+
         // NB not adding to bestStates, as it will be added when it comes out of the queue
         queue.add(startState0);
         queue.add(startState1);

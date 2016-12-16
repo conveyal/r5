@@ -196,8 +196,9 @@ public class TurnRestrictionTest extends TurnTest {
         assertTrue(foundVE);
     }
 
+    //Tests if no turn works when Split is in destination
     @Test
-    public void testNoTurnWithSplit () {
+    public void testNoTurnWithSplitDestination () {
         setUp(false);
 
         StreetRouter r = new StreetRouter(streetLayer);
@@ -229,9 +230,48 @@ public class TurnRestrictionTest extends TurnTest {
         assertTrue(restrictedState.weight > state.weight);
     }
 
+    //Tests if turn restrictions works when start is split in reverse search
+    @Test
+    public void testNoTurnWithSplitOriginReverse () {
+        setUp(false);
+
+        VertexStore.Vertex vs = streetLayer.vertexStore.getCursor(VS);
+
+        StreetRouter r = new StreetRouter(streetLayer);
+        // turn restrictions only apply to cars
+        r.streetMode = StreetMode.CAR;
+        r.profileRequest.reverseSearch = true;
+        r.setOrigin(37.363, -122.1235); //location of split
+        r.route();
+
+        StreetRouter.State state = r.getStateAtVertex(VS); // getState(splitVS);
+        assertNotNull(state);
+
+        LOG.debug("Reverse with split:{}", state.compactDump(r.profileRequest.reverseSearch));
+
+
+        // create a turn restriction
+        restrictTurn(false, ES + 1, EW);
+
+        r = new StreetRouter(streetLayer);
+        r.streetMode = StreetMode.CAR;
+        r.profileRequest.reverseSearch = true;
+        r.setOrigin(37.363, -122.1235);
+        //r.setOrigin(VW);
+        r.route();
+
+        StreetRouter.State restrictedState =  r.getStateAtVertex(VS); // getState(splitVS);
+
+        LOG.debug("Reverse restricted with split:{}", restrictedState.compactDump(r.profileRequest.reverseSearch));
+
+        // weight should be greater because path should now include going past the intersection and making a U-turn back at it.
+        assertTrue(restrictedState.weight > state.weight);
+
+    }
+
     @Ignore("Turn restriction with splits aren't supported yet")
     @Test
-    public void testNoTurnWithSplitReverse () {
+    public void testNoTurnWithSplitReverse2 () {
         setUp(false);
 
         Split split = streetLayer.findSplit(37.363, -122.1235, 100);
@@ -243,7 +283,7 @@ public class TurnRestrictionTest extends TurnTest {
         // turn restrictions only apply to cars
         r.streetMode = StreetMode.CAR;
         r.profileRequest.reverseSearch = true;
-        r.setOrigin(37.363, -122.1235); //location of split
+        r.setOrigin(VW); //location of split
         r.route();
 
         StreetRouter.State state = r.getState(splitVS);
@@ -258,7 +298,7 @@ public class TurnRestrictionTest extends TurnTest {
         r = new StreetRouter(streetLayer);
         r.streetMode = StreetMode.CAR;
         r.profileRequest.reverseSearch = true;
-        r.setOrigin(37.363, -122.1235);
+        r.setOrigin(VW);
         //r.setOrigin(VW);
         r.route();
 
@@ -283,6 +323,8 @@ public class TurnRestrictionTest extends TurnTest {
         Split dest = streetLayer.findSplit(37.363, -122.1235, 100);
 
         StreetRouter.State state = r.getState(dest);
+
+        LOG.debug("Normal:{}", state.compactDump(r.profileRequest.reverseSearch));
         assertNotNull(state);
 
         // create a turn restriction
@@ -290,11 +332,46 @@ public class TurnRestrictionTest extends TurnTest {
 
         r = new StreetRouter(streetLayer);
         r.streetMode = StreetMode.CAR;
-        r.setOrigin(VS);
+        r.setOrigin(37.3625, -122.123);
         r.route();
 
+        StreetRouter.State restrictedState = r.getState(dest);
+
+        LOG.debug("Restricted:{}", restrictedState.compactDump(r.profileRequest.reverseSearch));
+
         // weight should be greater because path should now include going past the intersection and making a U-turn back at it.
-        assertTrue(r.getState(dest).weight > state.weight);
+        assertTrue(restrictedState.weight > state.weight);
+    }
+
+    //Tests no turn with split at origin and turn restriction at origin
+    @Test
+    public void testNoTurnSplitOriginTurnRestriction () {
+        setUp(false);
+        StreetRouter r = new StreetRouter(streetLayer);
+        // turn restrictions only apply to cars
+        r.streetMode = StreetMode.CAR;
+        assertTrue(r.setOrigin(37.3625, -122.123));
+        r.route();
+
+        StreetRouter.State state = r.getStateAtVertex(VW);
+
+        LOG.debug("Normal:{}", state.compactDump(r.profileRequest.reverseSearch));
+        assertNotNull(state);
+
+        // create a turn restriction
+        restrictTurn(false, ES + 1, EW);
+
+        r = new StreetRouter(streetLayer);
+        r.streetMode = StreetMode.CAR;
+        r.setOrigin(37.3625, -122.123);
+        r.route();
+
+        StreetRouter.State restrictedState = r.getStateAtVertex(VW);
+
+        LOG.debug("Restricted:{}", restrictedState.compactDump(r.profileRequest.reverseSearch));
+
+        // weight should be greater because path should now include going past the intersection and making a U-turn back at it.
+        assertTrue(restrictedState.weight > state.weight);
     }
 
     /** Test a no-U-turn with a via member */

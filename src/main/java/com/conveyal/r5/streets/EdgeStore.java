@@ -313,6 +313,43 @@ public class EdgeStore implements Serializable {
     }
 
     /**
+     * Sets turn restriction maps in state
+     * @param streetMode of previous state (since turn restrictions are set only in CAR mode)
+     * @param reverseSearch if this is reverse search
+     * @param s1 new state
+     */
+    void startTurnRestriction(StreetMode streetMode, boolean reverseSearch,
+        StreetRouter.State s1) {
+        if (reverseSearch) {
+            // add turn restrictions that start on this edge
+            // Turn restrictions only apply to cars for now. This is also coded in canTurnFrom, so change it both places
+            // if/when it gets changed.
+            if (streetMode == StreetMode.CAR && turnRestrictionsReverse.containsKey(s1.backEdge)) {
+                if (s1.turnRestrictions == null)
+                    s1.turnRestrictions = new TIntIntHashMap();
+                turnRestrictionsReverse.get(s1.backEdge).forEach(r -> {
+                    s1.turnRestrictions.put(r, 1); // we have traversed one edge
+                    return true; // continue iteration
+                });
+                //LOG.info("RRTADD: S1:{}|{}", s1.backEdge, s1.turnRestrictions);
+            }
+        } else {
+            // add turn restrictions that start on this edge
+            // Turn restrictions only apply to cars for now. This is also coded in canTurnFrom, so change it both places
+            // if/when it gets changed.
+            if (streetMode == StreetMode.CAR && turnRestrictions.containsKey(s1.backEdge)) {
+                if (s1.turnRestrictions == null)
+                    s1.turnRestrictions = new TIntIntHashMap();
+                turnRestrictions.get(s1.backEdge).forEach(r -> {
+                    s1.turnRestrictions.put(r, 1); // we have traversed one edge
+                    return true; // continue iteration
+                });
+                //LOG.info("TADD: S1:{}|{}", s1.backEdge, s1.turnRestrictions);
+            }
+        }
+    }
+
+    /**
      * Inner class that serves as a cursor: points to a single edge in this store, and can be moved to other indexes.
      * TODO make this a separate class so the outer class reference is explicit (useful in copy functions)
      */
@@ -512,33 +549,7 @@ public class EdgeStore implements Serializable {
 
             // figure out which turn res
 
-            if (req.reverseSearch) {
-                // add turn restrictions that start on this edge
-                // Turn restrictions only apply to cars for now. This is also coded in canTurnFrom, so change it both places
-                // if/when it gets changed.
-                if (s0.streetMode == StreetMode.CAR && turnRestrictionsReverse.containsKey(getEdgeIndex())) {
-                    if (s1.turnRestrictions == null)
-                        s1.turnRestrictions = new TIntIntHashMap();
-                    turnRestrictionsReverse.get(getEdgeIndex()).forEach(r -> {
-                        s1.turnRestrictions.put(r, 1); // we have traversed one edge
-                        return true; // continue iteration
-                    });
-                    //LOG.info("RRTADD: S1:{}|{}", s1.backEdge, s1.turnRestrictions);
-                }
-            } else {
-                // add turn restrictions that start on this edge
-                // Turn restrictions only apply to cars for now. This is also coded in canTurnFrom, so change it both places
-                // if/when it gets changed.
-                if (s0.streetMode == StreetMode.CAR && turnRestrictions.containsKey(getEdgeIndex())) {
-                    if (s1.turnRestrictions == null)
-                        s1.turnRestrictions = new TIntIntHashMap();
-                    turnRestrictions.get(getEdgeIndex()).forEach(r -> {
-                        s1.turnRestrictions.put(r, 1); // we have traversed one edge
-                        return true; // continue iteration
-                    });
-                    //LOG.info("TADD: S1:{}|{}", s1.backEdge, s1.turnRestrictions);
-                }
-            }
+            startTurnRestriction(s0.streetMode, req.reverseSearch, s1);
 
             //We allow two links in a row if this is a first state (negative back edge or no backState
             //Since at least P+R stations are connected to graph with only LINK edges and otherwise search doesn't work

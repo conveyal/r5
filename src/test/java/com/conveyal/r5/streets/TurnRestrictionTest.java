@@ -269,7 +269,7 @@ public class TurnRestrictionTest extends TurnTest {
 
     }
 
-    @Ignore("Turn restriction with splits aren't supported yet")
+    //Tests if splits on turn restriction on destination are supported
     @Test
     public void testNoTurnWithSplitReverse2 () {
         setUp(false);

@@ -676,7 +676,7 @@ public class StreetRouter {
 
         TIntList edgeList;
         if (profileRequest.reverseSearch) {
-            edgeList = streetLayer.outgoingEdges.get(split.vertex0);
+            edgeList = streetLayer.outgoingEdges.get(split.vertex1);
         } else {
             edgeList = streetLayer.incomingEdges.get(split.vertex0);
         }
@@ -708,7 +708,7 @@ public class StreetRouter {
         e.advance();
 
         if (profileRequest.reverseSearch) {
-            edgeList = streetLayer.outgoingEdges.get(split.vertex1);
+            edgeList = streetLayer.outgoingEdges.get(split.vertex0);
         } else {
             edgeList = streetLayer.incomingEdges.get(split.vertex1);
         }

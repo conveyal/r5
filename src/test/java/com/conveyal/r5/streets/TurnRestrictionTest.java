@@ -76,6 +76,38 @@ public class TurnRestrictionTest extends TurnTest {
         assertTrue(s1.weight > state.weight);
     }
 
+
+    @Test
+    public void testReverseTurnCosts() throws Exception {
+        setUp(false);
+
+        //Normal search
+        StreetRouter r = new StreetRouter(streetLayer);
+        // turn restrictions only apply to cars
+        r.streetMode = StreetMode.CAR;
+        r.setOrigin(VS);
+        r.route();
+
+        StreetRouter.State state = r.getStateAtVertex(VW);
+        assertNotNull(state);
+
+
+
+
+        //Same reverse search
+        new StreetRouter(streetLayer);
+        // turn restrictions only apply to cars
+        r.streetMode = StreetMode.CAR;
+        r.profileRequest.reverseSearch = true;
+        r.setOrigin(VW);
+        r.route();
+
+        StreetRouter.State reverseState = r.getStateAtVertex(VS);
+        assertNotNull(reverseState);
+        assertEquals(state.weight, reverseState.weight);
+
+    }
+
     @Test
     public void testSimpleOnlyTurn () {
         setUp(false);

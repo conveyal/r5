@@ -616,8 +616,14 @@ public class EdgeStore implements Serializable {
             int roundedTime = (int) Math.ceil(time);
 
             // Negative backEdge means this state is not the result of traversing an edge (it's the start of a search).
-            int turnCost = s0.backEdge >= 0 ?
-                    turnCostCalculator.computeTurnCost(s0.backEdge, getEdgeIndex(), streetMode) : 0;
+            int turnCost = 0;
+            if (s0.backEdge >= 0) {
+                if (req.reverseSearch) {
+                    turnCost = turnCostCalculator.computeTurnCost(getEdgeIndex(), s0.backEdge, streetMode);
+                } else {
+                    turnCost = turnCostCalculator.computeTurnCost(s0.backEdge, getEdgeIndex(), streetMode);
+                }
+            }
 
             // TODO add checks for negative increment values to these functions.
             s1.incrementTimeInSeconds(roundedTime + turnCost);

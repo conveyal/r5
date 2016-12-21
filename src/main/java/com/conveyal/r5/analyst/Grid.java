@@ -14,6 +14,13 @@ import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.MultiPolygon;
 import com.vividsolutions.jts.geom.Point;
 import com.vividsolutions.jts.geom.Polygon;
+import gnu.trove.iterator.TIntObjectIterator;
+import gnu.trove.iterator.TObjectDoubleIterator;
+import gnu.trove.map.TObjectDoubleMap;
+import gnu.trove.map.TObjectIntMap;
+import gnu.trove.map.hash.TObjectDoubleHashMap;
+import gnu.trove.map.hash.TObjectIntHashMap;
+import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
@@ -62,11 +69,11 @@ import java.util.stream.Stream;
 
 import static com.conveyal.gtfs.util.Util.human;
 import static java.lang.Double.parseDouble;
-import static java.lang.Math.atan;
-import static java.lang.Math.cos;
-import static java.lang.Math.log;
-import static java.lang.Math.sinh;
-import static java.lang.Math.tan;
+import static org.apache.commons.math3.util.FastMath.atan;
+import static org.apache.commons.math3.util.FastMath.cos;
+import static org.apache.commons.math3.util.FastMath.log;
+import static org.apache.commons.math3.util.FastMath.sinh;
+import static org.apache.commons.math3.util.FastMath.tan;
 import static spark.Spark.halt;
 
 /**
@@ -126,16 +133,14 @@ public class Grid {
         this.grid = new double[width][height];
     }
 
-    /**
-     * Do pycnoplactic mapping:
-     * the value associated with the supplied polygon a polygon will be split out proportionately to
-     * all the web Mercator pixels that intersect it.
-     */
-    public void rasterize (Geometry geometry, double value) {
+    /** Get the proportions of an input feature that overlap each grid cell, in the format [x, y] => weight */
+    public TObjectDoubleMap<int[]> getPixelWeights (Geometry geometry) {
         // No need to convert to a local coordinate system
         // Both the supplied polygon and the web mercator pixel geometries are left in WGS84 geographic coordinates.
         // Both are distorted equally along the X axis at a given latitude so the proportion of the geometry within
         // each pixel is accurate, even though the surface area in WGS84 coordinates is not a usable value.
+
+        TObjectDoubleMap<int[]> weights = new TObjectDoubleHashMap<>();
 
         double area = geometry.getArea();
         if (area < 1e-12) {
@@ -154,8 +159,26 @@ public class Grid {
                 Geometry pixel = getPixelGeometry(x + west, y + north, zoom);
                 Geometry intersection = pixel.intersection(geometry);
                 double weight = intersection.getArea() / area;
-                grid[x][y] += weight * value;
+                weights.put(new int[] { x, y }, weight);
             }
+        }
+
+        return weights;
+    }
+
+    /**
+     * Do pycnoplactic mapping:
+     * the value associated with the supplied polygon a polygon will be split out proportionately to
+     * all the web Mercator pixels that intersect it.
+     */
+    public void rasterize (Geometry geometry, double value) {
+        incrementFromPixelWeights(getPixelWeights(geometry), value);
+    }
+
+    public void incrementFromPixelWeights (TObjectDoubleMap<int[]> weights, double value) {
+        for (TObjectDoubleIterator<int[]> it = weights.iterator(); it.hasNext();) {
+            it.advance();
+            grid[it.key()[0]][it.key()[1]] += it.value() * value;
         }
     }
 
@@ -332,12 +355,12 @@ public class Grid {
     }
 
     public static int latToPixel (double lat, int zoom) {
-        double latRad = Math.toRadians(lat);
+        double latRad = FastMath.toRadians(lat);
         return (int) ((1 - log(tan(latRad) + 1 / cos(latRad)) / Math.PI) * Math.pow(2, zoom - 1) * 256);
     }
 
     public static double pixelToLat (double pixel, int zoom) {
-        return Math.toDegrees(atan(sinh(Math.PI - (pixel / 256d) / Math.pow(2, zoom) * 2 * Math.PI)));
+        return FastMath.toDegrees(atan(sinh(Math.PI - (pixel / 256d) / Math.pow(2, zoom) * 2 * Math.PI)));
     }
 
     /**

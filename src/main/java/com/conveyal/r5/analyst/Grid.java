@@ -133,7 +133,11 @@ public class Grid {
         this.grid = new double[width][height];
     }
 
-    /** Get the proportions of an input feature that overlap each grid cell, in the format [x, y] => weight */
+    /**
+     * Get the proportions of an input polygon feature that overlap each grid cell, in the format [x, y] => weight.
+     * This weight object can then be fed into the incrementFromPixelWeights function to actually burn a polygon into the
+     * grid.
+     */
     public TObjectDoubleMap<int[]> getPixelWeights (Geometry geometry) {
         // No need to convert to a local coordinate system
         // Both the supplied polygon and the web mercator pixel geometries are left in WGS84 geographic coordinates.
@@ -170,6 +174,11 @@ public class Grid {
      * Do pycnoplactic mapping:
      * the value associated with the supplied polygon a polygon will be split out proportionately to
      * all the web Mercator pixels that intersect it.
+     *
+     * If you are creating multiple grids of the same size for different attributes of the same input features, you should
+     * call getPixelWeights(geometry) once for each geometry on any one of the grids, and then pass the returned weights
+     * and the attribute value into incrementFromPixelWeights function; this will avoid duplicating expensive geometric
+     * math.
      */
     public void rasterize (Geometry geometry, double value) {
         incrementFromPixelWeights(getPixelWeights(geometry), value);

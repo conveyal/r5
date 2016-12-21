@@ -184,6 +184,7 @@ public class Grid {
         incrementFromPixelWeights(getPixelWeights(geometry), value);
     }
 
+    /** Using a grid of weights produced by getPixelWeights, burn the value of a polygon into the grid */
     public void incrementFromPixelWeights (TObjectDoubleMap<int[]> weights, double value) {
         for (TObjectDoubleIterator<int[]> it = weights.iterator(); it.hasNext();) {
             it.advance();

@@ -666,10 +666,10 @@ public class Broker implements Runnable {
 
     /**
      * Marks the specified priority request as completed, and returns the suspended Response object for the connection
-     * that submitted the priority request (the UI), which probably still waiting to receive a result back over the
-     * same connection. A HttpHandler thread can then pump data from the DELETE body back to the origin of the request,
+     * that submitted the priority request (the UI), which is probably still waiting to receive a result back over the
+     * same connection. A HttpHandler thread can then pump data from the worker back to the origin of the request,
      * without blocking the broker thread.
-     * TODO rename to "deregisterSuspendedProducer" and "deregisterSuspendedConsumer" ?
+     * TODO rename to "deregisterSuspendedTaskProducer" and "deregisterSuspendedTaskConsumer" ?
      */
     public synchronized Response deletePriorityTask (int taskId) {
         return highPriorityResponses.remove(taskId);

@@ -50,6 +50,7 @@ public class StaticComputer implements Runnable {
         this.taskStatistics = ts;
     }
 
+    // This completes the implementation of the Runnable interface so a StaticComputer can be run in a thread.
     public void run () {
         // dump the times in the described format. They're small enough to keep in memory for now.
         try {
@@ -61,6 +62,7 @@ public class StaticComputer implements Runnable {
         }
     }
 
+    // This does the main calculations.
     public void write (OutputStream os) throws IOException {
         WebMercatorGridPointSet points = network.getGridPointSet();
         double lat = points.pixelToLat(points.north + req.y);
@@ -75,16 +77,19 @@ public class StaticComputer implements Runnable {
         sr.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
         sr.route();
 
-        // tell the Raptor Worker that we want a travel time to each stop by leaving the point set null
+
+        // Create a new Raptor Worker.
+        // Tell it that we want a travel time to each stop by leaving the point set parameter null
         RaptorWorker worker = new RaptorWorker(network.transitLayer, null, req.request.request);
 
+        // Get the travel times to all stops reached in the initial on-street search. Convert distances to speeds.
         TIntIntMap accessTimes = sr.getReachedStops();
-
         for (TIntIntIterator it = accessTimes.iterator(); it.hasNext();) {
             it.advance();
             it.setValue(it.value() / (int) (req.request.request.walkSpeed * 1000));
         }
 
+        // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
         StaticPropagatedTimesStore pts = (StaticPropagatedTimesStore) worker.runRaptor(accessTimes, null, ts);
 
         long nonTransitStart = System.currentTimeMillis();
@@ -102,7 +107,7 @@ public class StaticComputer implements Runnable {
 
         LittleEndianIntOutputStream out = new LittleEndianIntOutputStream(new BufferedOutputStream(os));
 
-        // first write out the values for nearby pixels
+        // First write out the values for nearby pixels
         out.writeInt(20);
 
         int previous = 0;

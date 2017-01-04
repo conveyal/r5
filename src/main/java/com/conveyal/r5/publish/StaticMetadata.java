@@ -183,14 +183,20 @@ public class StaticMetadata implements Runnable {
     /** A request for the cluster to produce static metadata */
     public static class MetadataRequest extends GenericClusterRequest {
         public StaticSiteRequest request;
-
         public final String type = "static-metadata";
+        @Override
+        public ProfileRequest extractProfileRequest() {
+            return request.request;
+        }
     }
 
     /** A request for the cluster to produce static stop trees */
     public static class StopTreeRequest extends GenericClusterRequest {
         public StaticSiteRequest request;
-
         public final String type = "static-stop-trees";
+        @Override
+        public ProfileRequest extractProfileRequest() {
+            return request.request;
+        }
     }
 }

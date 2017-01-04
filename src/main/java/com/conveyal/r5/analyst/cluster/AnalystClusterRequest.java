@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.profile.ProfileRequest;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.io.Serializable;
 
@@ -59,4 +60,11 @@ public class AnalystClusterRequest extends GenericClusterRequest implements Seri
 
     /** Used for deserialization from JSON */
     public AnalystClusterRequest () { /* do nothing */ }
+
+    @Override
+    // Not named like a getter to avoid confusing the JSON serializer. This should not be serialized.
+    public ProfileRequest extractProfileRequest() {
+        return profileRequest;
+    }
+
 }

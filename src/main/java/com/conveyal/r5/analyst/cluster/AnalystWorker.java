@@ -1,12 +1,13 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.amazonaws.SDKGlobalConfiguration;
 import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.GridComputer;
+import com.conveyal.r5.analyst.error.ScenarioApplicationException;
+import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
@@ -16,10 +17,10 @@ import com.conveyal.r5.publish.StaticComputer;
 import com.conveyal.r5.publish.StaticDataStore;
 import com.conveyal.r5.publish.StaticMetadata;
 import com.conveyal.r5.publish.StaticSiteRequest;
+import com.conveyal.r5.util.ExceptionUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.io.ByteStreams;
-import com.google.common.io.CountingInputStream;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -29,6 +30,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.config.SocketConfig;
 import org.apache.http.conn.HttpHostConnectException;
+import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
@@ -351,7 +353,7 @@ public class AnalystWorker implements Runnable {
             if (random.nextInt(100) >= dryRunFailureRate) {
                 deleteRequest(clusterRequest);
             } else {
-                LOG.info("Intentionally failing to complete task {}", clusterRequest.taskId);
+                LOG.info("Intentionally failing to complete task for testing purposes {}", clusterRequest.taskId);
             }
             return;
         }
@@ -370,44 +372,58 @@ public class AnalystWorker implements Runnable {
             // Get the graph object for the ID given in the request, fetching inputs and building as needed.
             // All requests handled together are for the same graph, and this call is synchronized so the graph will
             // only be built once.
-            // FIXME this is causing the transportNetwork to be fetched twice, once here and once in handleAnalystRequest.
-            TransportNetwork transportNetwork = transportNetworkCache.getNetwork(clusterRequest.graphId);
             // Record graphId so we "stick" to this same graph on subsequent polls.
             // TODO allow for a list of multiple cached TransitNetworks.
             networkId = clusterRequest.graphId;
-            // FIXME this stats stuff needs to be moved to where the graph is actually built, or fetch the graph out here.
-            ts.graphBuild = (int) (System.currentTimeMillis() - graphStartTime);
-            // TODO lazy-initialize all additional indexes on transitLayer
-            // ts.graphTripCount = transportNetwork.transitLayer...
-            ts.graphStopCount = transportNetwork.transitLayer.getStopCount();
-
-            if (clusterRequest instanceof AnalystClusterRequest)
+            // TODO fetch the scenario-applied transportNetwork out here, maybe using OptionalResult instead of exceptions
+            TransportNetwork transportNetwork = null;
+            try {
+                // FIXME ideally we should just be passsing the scenario object into this function, and another separate function should get the scenario object from the cluster request.
+                transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, clusterRequest.extractProfileRequest());
+                // FIXME this stats stuff needs to be moved to where the graph is actually built, or fetch the graph out here.
+                ts.graphBuild = (int) (System.currentTimeMillis() - graphStartTime);
+                // FIXME this is causing the transportNetwork to be fetched twice, once here and once in handleAnalystRequest.
+                // TODO lazy-initialize all additional indexes on transitLayer
+                // ts.graphTripCount = transportNetwork.transitLayer...
+                ts.graphStopCount = transportNetwork.transitLayer.getStopCount();
+            } catch (ScenarioApplicationException scenarioException) {
+                // Handle exceptions specifically representing a failure to apply the scenario.
+                // These exceptions can be turned into structured JSON.
+                // Report the error back to the broker, which can then pass it back out to the client.
+                // Any other kinds of exceptions will be caught by the outer catch clause
+                reportTaskErrors(clusterRequest.taskId, scenarioException.taskErrors);
+                return;
+            }
+            // FIXME manually coded polymorphism
+            if (clusterRequest instanceof AnalystClusterRequest) {
                 this.handleAnalystRequest((AnalystClusterRequest) clusterRequest, ts);
-            else if (clusterRequest instanceof StaticSiteRequest.PointRequest) {
-                transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, ((StaticSiteRequest.PointRequest) clusterRequest).request.request);
+            } else if (clusterRequest instanceof StaticSiteRequest.PointRequest) {
                 this.handleStaticSiteRequest((StaticSiteRequest.PointRequest) clusterRequest, transportNetwork, ts);
             } else if (clusterRequest instanceof StaticMetadata.MetadataRequest) {
-                transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, ((StaticMetadata.MetadataRequest) clusterRequest).request.request);
                 this.handleStaticMetadataRequest((StaticMetadata.MetadataRequest) clusterRequest, transportNetwork, ts);
             } else if (clusterRequest instanceof StaticMetadata.StopTreeRequest) {
-                transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, ((StaticMetadata.StopTreeRequest) clusterRequest).request.request);
                 this.handleStaticStopTrees((StaticMetadata.StopTreeRequest) clusterRequest, transportNetwork, ts);
             } else if (clusterRequest instanceof GridRequest) {
-                transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, ((GridRequest) clusterRequest).request);
                 this.handleGridRequest((GridRequest) clusterRequest, transportNetwork, ts);
-            }
-            else
+            } else {
                 LOG.error("Unrecognized request type {}", clusterRequest.getClass());
-
+            }
             // Record information about the current task so we can analyze usage and efficiency over time.
             ts.total = (int) (System.currentTimeMillis() - startTime);
             taskStatisticsStore.store(ts);
         } catch (Exception ex) {
-            LOG.error("An error occurred while routing", ex);
+            // Catch any exceptions that were not handled by more specific catch clauses above.
+            // This ensures that some form of error message is passed all the way back up to the web UI.
+            TaskError taskError = new TaskError(ex);
+            LOG.error("An error occurred while routing: {}", ExceptionUtils.asString(ex));
+            reportTaskErrors(clusterRequest.taskId, Arrays.asList(taskError));
         }
     }
 
-    /** handle a fancy new-fangled static site request */
+    /**
+     * Handle a fancy new-fangled static site request.
+     * This is also the method that handles single-point requests in the new combined analysis+scenario editor interface.
+     */
     private void handleStaticSiteRequest (StaticSiteRequest.PointRequest request, TransportNetwork transportNetwork, TaskStatistics ts) {
         StaticComputer computer = new StaticComputer(request, transportNetwork, ts);
 
@@ -431,7 +447,7 @@ public class AnalystWorker implements Runnable {
         deleteRequest(request);
     }
 
-    /** produce static metadata */
+    /** produce static metadata TODO explain what static metadata is. */
     private void handleStaticMetadataRequest (StaticMetadata.MetadataRequest request, TransportNetwork transportNetwork, TaskStatistics ts) {
         StaticMetadata staticMetadata = new StaticMetadata(request.request, transportNetwork); // TODO task statistics
 
@@ -724,14 +740,19 @@ public class AnalystWorker implements Runnable {
     }
 
     /**
-     * Signal the broker that the given high-priority task is completed, providing a result. Runs in a new thread
-     * so that input stream can be written to by the calling thread. This avoid broken pipes because the calling thread
-     * died.
+     * We have two kinds of output from a worker: we can either write to an object in a bucket on S3, or we can stream
+     * output over HTTP to a waiting web service caller. This function handles the latter case. It connects to the
+     * cluster broker, signals that the task with a certain ID is being completed, and posts the result back through the
+     * broker. The broker then passes the result on to the original requester (usually the analysis web UI).
+     *
+     * This function will run the HTTP Post operation in a new thread so that this function can return, allowing its
+     * caller to write data to the input stream it passed in. This arrangement avoids broken pipes that can happen
+     * when the calling thread dies. TODO clarify when and how which thread can die.
      */
     public void finishPriorityTask(GenericClusterRequest clusterRequest, InputStream result) {
         //CountingInputStream is = new CountingInputStream(result);
 
-        String url = BROKER_BASE_URL + String.format("/complete/priority/%s", clusterRequest.taskId);
+        String url = BROKER_BASE_URL + String.format("/complete/success/%s", clusterRequest.taskId);
         HttpPost httpPost = new HttpPost(url);
 
         // TODO reveal any errors etc. that occurred on the worker.
@@ -756,6 +777,27 @@ public class AnalystWorker implements Runnable {
                 LOG.warn("Failed to mark task {} as completed.", clusterRequest.taskId, e);
             }
         });
+    }
+
+    /**
+     * Report to the broker that the task taskId could not be processed due to errors.
+     * The broker should then pass the errors back up to the client that enqueued that task.
+     * That objects are always the same type (TaskError) so the client knows what to expect.
+     */
+    public void reportTaskErrors(int taskId, List<TaskError> taskErrors) {
+        String url = BROKER_BASE_URL + String.format("/complete/error/%s", taskId);
+        try {
+            HttpPost httpPost = new HttpPost(url);
+            httpPost.setHeader("Content-type", "application/json");
+            byte[] errorsAsJson = JsonUtilities.objectMapper.writeValueAsBytes(taskErrors);
+            httpPost.setEntity(new ByteArrayEntity(errorsAsJson));
+            // Send the JSON serialized error object to the broker.
+            HttpResponse response = httpClient.execute(httpPost);
+            // Tell the http client library that we won't do anything with the broker's response, allowing connection reuse.
+            EntityUtils.consumeQuietly(response.getEntity());
+        } catch (Exception e) {
+            LOG.error("An exception occurred while attempting to report an error to the broker:\n" + e.getStackTrace());
+        }
     }
 
     /**

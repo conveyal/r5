@@ -6,6 +6,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.io.ByteStreams;
+import org.apache.http.entity.ContentType;
 import org.glassfish.grizzly.http.Method;
 import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.Request;
@@ -163,13 +164,31 @@ class BrokerHttpHandler extends HttpHandler {
                 }
             }
             else if (request.getMethod() == Method.POST && "complete".equals(command)) {
+                // Requests of the form: POST /complete/{success|error}/1234
                 // Mark a specific high-priority task as completed, and record its result.
                 // We were originally planning to do this with a DELETE request that has a body,
                 // but that is nonstandard enough to anger many libraries including Grizzly.
                 int taskId = Integer.parseInt(pathComponents[3]);
                 Response suspendedProducerResponse = broker.deletePriorityTask(taskId);
                 if (suspendedProducerResponse == null) {
+                    // Signal the source of the response (the worker) that no one is waiting for that response anymore.
                     response.setStatus(HttpStatus.NOT_FOUND_404);
+                    return;
+                }
+                String successOrError = pathComponents[2];
+                if ("success".equals(successOrError)) {
+                    // The worker did not find any obvious problems with the request and is streaming back what it
+                    // believes to be a reliable work result.
+                    suspendedProducerResponse.setStatus(HttpStatus.OK_200);
+                } else if ("error".equals(successOrError)) {
+                    // The worker is providing an error message because it spotted something wrong with the request.
+                    suspendedProducerResponse.setStatus(HttpStatus.BAD_REQUEST_400);
+                    suspendedProducerResponse.setCharacterEncoding("utf-8");
+                    suspendedProducerResponse.setContentType("application/json");
+                } else {
+                    // Signal the worker that the URL was malformed.
+                    response.setStatus(HttpStatus.NOT_FOUND_404);
+                    response.setDetailMessage("When marking a task complete, URL must indicate success or error.");
                     return;
                 }
                 // Copy the result back to the connection that was the source of the task.
@@ -177,17 +196,21 @@ class BrokerHttpHandler extends HttpHandler {
                     long length = ByteStreams.copy(request.getInputStream(), suspendedProducerResponse.getOutputStream());
                     LOG.info("Returning {} bytes to high-priority consumer for request {}", length, taskId);
                 } catch (IOException | IllegalStateException ioex) {
-                    // Apparently the task producer did not wait to retrieve its result. Priority task result delivery
-                    // is not guaranteed, we don't need to retry, this is not considered an error by the worker.
+                    // IOExceptions happens when the task producer did not wait to retrieve its result.
+                    // Priority task result delivery is not guaranteed, so we don't need to retry.
+                    // This is not an error from the worker's point of view.
                     // IllegalStateException can happen if we're in offline mode and we've already returned a 202.
                 }
-                response.setStatus(HttpStatus.OK_200);
-                suspendedProducerResponse.setStatus(HttpStatus.OK_200);
+                // Prepare to pipe data back to the original source of the task (the UI) from the worker.
+                // TODO clarify how it is that we were previously setting the status code of the suspended response after calling ByteStreams.copy. Is the body being buffered?
                 suspendedProducerResponse.resume();
+                // Tell source of the POSTed data (the worker) that the broker has handled it with no problems.
+                response.setStatus(HttpStatus.OK_200);
                 return;
             }
             else if (request.getMethod() == Method.DELETE) {
-                /* Used by workers to acknowledge completion of a task and remove it from queues, avoiding re-delivery. */
+                // Used by workers to acknowledge completion of a batch task and remove it from queues,
+                // avoiding re-delivery. Practically speaking this means the worker has put the result in a queue
                 String context = pathComponents[1];
                 String id = pathComponents[2];
                 if ("tasks".equalsIgnoreCase(context)) {

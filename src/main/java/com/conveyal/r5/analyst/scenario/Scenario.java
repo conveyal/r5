@@ -1,6 +1,8 @@
 package com.conveyal.r5.analyst.scenario;
 
 import com.beust.jcommander.internal.Lists;
+import com.conveyal.r5.analyst.error.ScenarioApplicationException;
+import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.transit.TransferFinder;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -9,6 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -87,21 +91,17 @@ public class Scenario implements Serializable {
         TransportNetwork copiedNetwork = originalNetwork.scenarioCopy(this);
         LOG.info("Resolving modifications against TransportNetwork and sanity checking.");
         // Check all the parameters before applying any modifications.
-        // FIXME might some parameters may become valid/invalid because of previous modifications in the list?
-        boolean errorsInScenario = false;
+        // Might some parameters may become valid/invalid because of previous modifications in the list?
+        List<Modification> badModifications = new ArrayList<>();
         for (Modification modification : modifications) {
             boolean errorsInModification = modification.resolve(copiedNetwork);
             if (errorsInModification) {
-                LOG.error("Errors were detected in a scenario modification of type {}:", modification.getType());
-                LOG.error("Modification comment is: {}", modification.comment);
-                for (String warning : modification.warnings) {
-                    LOG.error(warning);
-                }
-                errorsInScenario = true;
+                badModifications.add(modification);
             }
         }
-        if (errorsInScenario) {
-            throw new RuntimeException("Errors were found in the Scenario, bailing out.");
+        // Throw one big exception containing any errors that were detected.
+        if (!badModifications.isEmpty()) {
+            throw new ScenarioApplicationException(badModifications);
         }
         // Apply each modification in turn to the same extensible copy of the TransitNetwork.
         LOG.info("Applying modifications to TransportNetwork.");
@@ -109,17 +109,12 @@ public class Scenario implements Serializable {
             LOG.info("Applying modification of type {}", modification.getType());
             boolean errors = modification.apply(copiedNetwork);
             if (errors) {
-                LOG.error("Error while applying modification {}", modification);
-                LOG.error("Modification comment is: {}", modification.comment);
-                for (String warning : modification.warnings) {
-                    LOG.error(warning);
-                }
                 // Bail out at the first error, because modification application changes the underlying network and
                 // could lead to meaningless errors on subsequent modifications.
-                throw new RuntimeException("Errors occured while applying the Scenario to the TransportNetwork, bailing out.");
+                throw new ScenarioApplicationException(Arrays.asList(modification));
             }
         }
-        // FIXME can we do this once after all modifications are applied, or do we need to do it after every mod?
+        // Is it OK that we do this once after all modifications are applied, or do we need to do it after every mod?
         copiedNetwork.transitLayer.rebuildTransientIndexes();
 
         // Rebuild stop trees that are near street network changes

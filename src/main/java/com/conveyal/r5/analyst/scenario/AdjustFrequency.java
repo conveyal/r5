@@ -72,6 +72,9 @@ public class AdjustFrequency extends Modification {
 
     @Override
     public boolean resolve (TransportNetwork network) {
+        if (entries.isEmpty()) {
+            warnings.add("This modification should include at least one timetable/frequency entry.");
+        }
         for (PatternTimetable entry : entries) {
             warnings.addAll(entry.validate(-1));
         }

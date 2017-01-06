@@ -94,12 +94,6 @@ public class TransportNetworkCache {
             network = buildNetwork(networkId);
         }
 
-
-        // link the web mercator grid pointset that will be used for analysis
-        // this will never be used directly but will be the base of the linkages used when applying scenarios
-        // it took a while to figure this out, this may be the most expensive line of code in the whole project.
-        network.getLinkedGridPointSet();
-
         currentNetwork = network;
         currentNetworkId = networkId;
         scenarioNetworkCache.clear(); // We cache only scenario graphs built upon the currently active base graph.

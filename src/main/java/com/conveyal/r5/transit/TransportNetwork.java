@@ -36,14 +36,7 @@ public class TransportNetwork implements Serializable {
 
     public TransitLayer transitLayer;
 
-    /**
-     * Cache a grid point set that covers the extents of this transport network. The PointSet itself caches linkages to
-     * street networks.
-     *
-     * Eventually we should save this point set and linkage but it's a little tricky since there's a linkage cache with
-     * references to streetlayers, a spatial index, etc. in there.
-     */
-    private transient WebMercatorGridPointSet gridPointSet;
+    private WebMercatorGridPointSet gridPointSet;
 
     /**
      * A string uniquely identifying the contents of this TransportNetwork in the space of TransportNetwork objects.
@@ -361,7 +354,6 @@ public class TransportNetwork implements Serializable {
         TransportNetwork copy = new TransportNetwork();
         copy.networkId = scenario.id;
         copy.gridPointSet = this.gridPointSet;
-
         if (scenario.affectsTransitLayer()) {
             copy.transitLayer = this.transitLayer.scenarioCopy(copy);
         } else {

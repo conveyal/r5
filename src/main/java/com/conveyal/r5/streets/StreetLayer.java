@@ -428,6 +428,12 @@ public class StreetLayer implements Serializable, Cloneable {
 
             nearbyEdges.forEach(eidx -> {
                 e.seek(eidx);
+                // Connect only to edges that are good to link to (This skips tunnels)
+                // and skips link edges (that were used to link other stuff)
+                if (!e.getFlag(EdgeStore.EdgeFlag.LINKABLE)
+                    || e.getFlag(EdgeStore.EdgeFlag.LINK)) {
+                    return true;
+                }
                 LineString edgeGeometry = e.getGeometry();
 
                 if (edgeGeometry.intersects(g)) {

@@ -203,6 +203,9 @@ public class EdgeStore implements Serializable {
         //Set when OSM tags are wheelchair==limited currently unroutable
         LIMITED_WHEELCHAIR(19),
 
+        //If this edge is good idea to use for linking. Skips tunnels, covered and motorways for now
+        LINKABLE(20),
+
         // Bicycle level of traffic stress for this street.
         // See http://transweb.sjsu.edu/PDFs/research/1005-low-stress-bicycling-network-connectivity.pdf
         // Comments below pasted from that document.

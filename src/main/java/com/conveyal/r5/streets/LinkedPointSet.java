@@ -81,7 +81,6 @@ public class LinkedPointSet {
      * Besides they are useful for later processing of LinkedPointSets.
      */
     public LinkedPointSet(PointSet pointSet, StreetLayer streetLayer, StreetMode streetMode, LinkedPointSet baseLinkage) {
-
         LOG.info("Linking pointset to street network...");
         this.pointSet = pointSet;
         this.streetLayer = streetLayer;

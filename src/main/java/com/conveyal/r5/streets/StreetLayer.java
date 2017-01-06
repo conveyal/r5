@@ -95,6 +95,10 @@ public class StreetLayer implements Serializable, Cloneable {
     public transient List<TIntList> outgoingEdges;
     public transient List<TIntList> incomingEdges;
     public transient IntHashGrid spatialIndex = new IntHashGrid();
+
+    /** Spatial index of temporary edges from a scenario */
+    private transient IntHashGrid temporaryEdgeIndex;
+
     // Key is street vertex index, value is BikeRentalStation (with name, number of bikes, spaces id etc.)
     public TIntObjectMap<BikeRentalStation> bikeRentalStationMap;
     public TIntObjectMap<ParkRideParking> parkRideLocationsMap;
@@ -978,9 +982,12 @@ public class StreetLayer implements Serializable, Cloneable {
      */
     public TIntSet findEdgesInEnvelope (Envelope envelope) {
         TIntSet candidates = spatialIndex.query(envelope);
-        // Always include any temporary edges created in a scenario.
-        // This allows us to skip rebuilding the spatial index for scenarios since over-selection is allowed.
-        edgeStore.forEachTemporarilyAddedEdge(candidates::add);
+        // Include temporary edges
+        if (temporaryEdgeIndex != null) {
+            TIntSet temporaryCandidates = temporaryEdgeIndex.query(envelope);
+            candidates.addAll(temporaryCandidates);
+        }
+
         // Remove any edges that were temporarily deleted in a scenario.
         // This allows properly re-splitting the same edge in multiple places.
         if (edgeStore.temporarilyDeletedEdges != null) {
@@ -1095,6 +1102,14 @@ public class StreetLayer implements Serializable, Cloneable {
             EdgeStore.Edge newEdge0 = edgeStore.addStreetPair(edge.getFromVertex(), newVertexIndex, split.distance0_mm, edge.getOSMID());
             // Copy the flags and speeds for both directions, making the new edge like the existing one.
             newEdge0.copyPairFlagsAndSpeeds(edge);
+
+            // add to temp spatial index
+            // we need to build this on the fly so that it is possible to split a street multiple times; otherwise,
+            // once a street had been split once, the original edge would be removed from consideration
+            // (StreetLayer#getEdgesNear filters out edges that have been deleted) and the new edge would not yet be in
+            // the spatial index for consideration. Havoc would ensue.
+            temporaryEdgeIndex.insert(newEdge0.getEnvelope(), newEdge0.edgeIndex);
+
             // Exclude the original split edge from all future spatial index queries on this scenario copy.
             // This should allow proper re-splitting of a single edge for multiple new transit stops.
             edgeStore.temporarilyDeletedEdges.add(edge.edgeIndex);
@@ -1104,10 +1119,11 @@ public class StreetLayer implements Serializable, Cloneable {
         EdgeStore.Edge newEdge1 = edgeStore.addStreetPair(newVertexIndex, oldToVertex, split.distance1_mm, edge.getOSMID());
         // Copy the flags and speeds for both directions, making newEdge1 like the existing edge.
         newEdge1.copyPairFlagsAndSpeeds(edge);
-        // Insert the new edge into the spatial index if we are working on a baseline graph.
-        // If this is a scenario, all temporary edges will be included in every spatial index query result.
+        // Insert the new edge into the spatial index
         if (!edgeStore.isExtendOnlyCopy()) {
             spatialIndex.insert(newEdge1.getEnvelope(), newEdge1.edgeIndex);
+        } else {
+            temporaryEdgeIndex.insert(newEdge1.getEnvelope(), newEdge1.edgeIndex);
         }
 
         // don't allow the router to make ill-advised U-turns at splitter vertices
@@ -1331,6 +1347,7 @@ public class StreetLayer implements Serializable, Cloneable {
         copy.edgeStore = edgeStore.extendOnlyCopy();
         // The extend-only copy of the EdgeStore also contains a new extend-only copy of the VertexStore.
         copy.vertexStore = copy.edgeStore.vertexStore;
+        copy.temporaryEdgeIndex = new IntHashGrid();
         return copy;
     }
 

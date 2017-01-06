@@ -1,0 +1,23 @@
+// Represents acccessibility distributions from all origins to a single destination
+syntax = "proto2";
+package com.conveyal.r5.analyst.messages;
+
+message CellMinute {
+  // TODO delta code?
+  repeated int32 accessibility = 1;
+}
+
+message Cell {
+  repeated CellMinute minutes = 1;
+}
+
+message AccessGrid {
+  required int32 width = 1; // width of the grid
+  required int32 height = 2; // height of the grid
+  required int32 north = 3; // north side of the grid in web mercator pixels
+  required int32 west = 4; // west side of the grid in web mercator pixels
+  required int32 zoom = 5; // zoom level of the grid
+  required string key = 6; // the key of the field access is measured to
+
+  repeated Cell cells = 7; // cells in row-major order
+}

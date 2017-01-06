@@ -92,7 +92,7 @@ public class LinkedPointSet {
 
         // The regions within which we want to link points to edges, then connect transit stops to points.
         // Null means relink and rebuild everything, but this will be constrained below if a base linkage was supplied.
-        Geometry relinkZone = null, treeRebuildZone = null;
+        Geometry treeRebuildZone = null;
 
         if (baseLinkage == null) {
             edges = new int[nPoints];
@@ -106,6 +106,9 @@ public class LinkedPointSet {
             assert baseLinkage.pointSet == pointSet;
             assert baseLinkage.streetLayer == streetLayer.baseStreetLayer;
             assert baseLinkage.streetMode == streetMode;
+
+            LOG.info("Linking a subset of points and copying other linkages from base layer");
+
             // Copy the supplied base linkage into this new LinkedPointSet.
             // The new linkage has the same PointSet as the base linkage, so the linkage arrays remain the same length
             // as in the base linkage. However, if the TransitLayer was also modified by the scneario, the stopToVertexDistanceTables
@@ -124,7 +127,6 @@ public class LinkedPointSet {
             // transit stops, we still need to re-link points and rebuild stop trees (both the trees to the vertices
             // and the trees to the points, because some existing stop-to-vertex trees might not include new splitter
             // vertices).
-            relinkZone = streetLayer.scenarioEdgesBoundingGeometry(MAX_OFFSTREET_WALK_METERS);
             treeRebuildZone = streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.DISTANCE_TABLE_SIZE_METERS);
         }
 
@@ -132,8 +134,8 @@ public class LinkedPointSet {
         // If dealing with a base network linkage, fill the stop trees list entirely with nulls.
         while (stopToPointDistanceTables.size() < nStops) stopToPointDistanceTables.add(null);
 
-        /* First, link the points in this PointSet to specific street vertices. */
-        this.linkPointsToStreets(relinkZone);
+        /* First, link the points in this PointSet to specific street vertices. If there is no base linkage, link all streets. */
+        this.linkPointsToStreets(baseLinkage == null);
 
         /* Second, make a table of distances from each transit stop to the points in this PointSet. */
         this.makeStopToPointDistanceTables(treeRebuildZone);
@@ -158,25 +160,33 @@ public class LinkedPointSet {
 
     /**
      * Associate the points in this PointSet with the street vertices at the ends of the closest street edge.
-     * @param relinkZone only link points inside this geometry in FIXED POINT DEGREES, leaving all the others alone. If null, link all points.
+     * @param all If true, link all points, otherwise link only those that were previously connected to edges that have
+     *            been deleted (i.e. split).
+     *            We will need to change this behavior when we allow creating new edges rather than simply splitting
+     *            existing ones.
      */
-    private void linkPointsToStreets(Geometry relinkZone) {
+    private void linkPointsToStreets(boolean all) {
         LambdaCounter counter = new LambdaCounter(LOG, pointSet.featureCount(), 10000,
                 "Linked {} of {} PointSet points to streets.");
         // Perform linkage calculations in parallel, writing results to the shared parallel arrays.
         IntStream.range(0, pointSet.featureCount()).parallel().forEach(p -> {
-            // When working with a scenario, skip all points outside the zone that could be affected by new edges.
-            // The linkage from the original base StreetNetwork will be retained for these points.
-            if (relinkZone != null && !relinkZone.contains(pointSet.getJTSPointFixed(p))) return;
-            Split split = streetLayer.findSplit(pointSet.getLat(p), pointSet.getLon(p), MAX_OFFSTREET_WALK_METERS, streetMode);
-            if (split == null) {
-                edges[p] = -1;
-            } else {
-                edges[p] = split.edge;
-                distances0_mm[p] = split.distance0_mm;
-                distances1_mm[p] = split.distance1_mm;
+            // When working with a scenario, skip all points that are not linked to a deleted street (i.e. one that has
+            // been split). At the current time, the only street network modification we support is splitting existing streets,
+            // so the only way a point can need to be relinked is if it is connected to a street which was split (and therefore deleted).
+            // FIXME when we permit street network modifications beyond adding transit stops we will need to change how this works,
+            // we may be able to use some type of flood-fill algorithm in geographic space, expanding the relink envelope until we
+            // hit edges on all sides or reach some predefined maximum.
+            if (all || streetLayer.edgeStore.temporarilyDeletedEdges != null && streetLayer.edgeStore.temporarilyDeletedEdges.contains(edges[p])) {
+                Split split = streetLayer.findSplit(pointSet.getLat(p), pointSet.getLon(p), MAX_OFFSTREET_WALK_METERS, streetMode);
+                if (split == null) {
+                    edges[p] = -1;
+                } else {
+                    edges[p] = split.edge;
+                    distances0_mm[p] = split.distance0_mm;
+                    distances1_mm[p] = split.distance1_mm;
+                }
+                counter.increment();
             }
-            counter.increment();
         });
         long unlinked = Arrays.stream(edges).filter(e -> e == -1).count();
         counter.done();

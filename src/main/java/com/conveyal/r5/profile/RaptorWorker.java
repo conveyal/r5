@@ -175,6 +175,8 @@ public class RaptorWorker {
      * @param nonTransitTimes the time to reach all targets without transit. Targets can be vertices or points/samples.
      */
     public PropagatedTimesStore runRaptor (TIntIntMap accessTimes, PointSetTimes nonTransitTimes, TaskStatistics ts) {
+        LOG.warn("WARNING: USING A RAPTOR WORKER THAT HAS BEEN MODIFIED TO REMOVE OPTIMIZATIONS. EXPECT DELAYS.");
+
         long beginCalcTime = System.currentTimeMillis();
         TIntIntMap initialStops = new TIntIntHashMap(accessTimes);
         TIntIntIterator initialIterator = accessTimes.iterator();
@@ -246,6 +248,11 @@ public class RaptorWorker {
             if (minuteNumber++ % 15 == 0) {
                 LOG.info("minute {}", minuteNumber);
             }
+
+            // CIRCUMVENT RANGE RAPTOR OPTIMIZATION FOR COMPARISON PURPOSES
+            Arrays.fill(scheduledTimesAtTargets, UNREACHED);
+            scheduleState = new ArrayList<>();
+            this.scheduleState.add(new RaptorState(data.getStopCount()));
 
             // Compensate for Java obnoxious policies on "effectively final" variables in closures
             final int departureTimeFinal = departureTime;
@@ -412,7 +419,9 @@ public class RaptorWorker {
         // Run RAPTOR rounds repeatedly until a round has no effect (does not update the travel time to any stops),
         // or we are out of rounds. If maxRides is 7, this will get to round == 7, which is what we want as round 0
         // is the initial walk.
-        while (doOneRound(scheduleState.get(round - 1), scheduleState.get(round), false) && round < req.maxRides) {
+        // TODO WE ARE RANDOMIZING AND DOING A FULL FREQUENCY SEARCH HERE, THIS IS BOUND TO BE SLOW BUT IS INTENDED FOR COMPARISON PURPOSES
+        offsets.randomize();
+        while (doOneRound(scheduleState.get(round - 1), scheduleState.get(round), true) && round < req.maxRides) {
             advanceToNextRound();
         }
 

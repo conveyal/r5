@@ -244,92 +244,94 @@ public class RaptorWorker {
         int minuteNumber = 0; // How many different departure minutes have been hit so far, for display purposes.
 
         // FIXME this should be changed to tolerate a zero-width time range
-        for (int departureTime = req.toTime - DEPARTURE_STEP_SEC; departureTime >= req.fromTime; departureTime -= DEPARTURE_STEP_SEC) {
-            if (minuteNumber++ % 15 == 0) {
-                LOG.info("minute {}", minuteNumber);
-            }
+        while (iteration < iterations) {
+            for (int departureTime = req.toTime - DEPARTURE_STEP_SEC; departureTime >= req.fromTime; departureTime -= DEPARTURE_STEP_SEC) {
+                if (minuteNumber++ % 15 == 0) {
+                    LOG.info("minute {}", minuteNumber);
+                }
 
-            // CIRCUMVENT RANGE RAPTOR OPTIMIZATION FOR COMPARISON PURPOSES
-            Arrays.fill(scheduledTimesAtTargets, UNREACHED);
-            scheduleState = new ArrayList<>();
-            this.scheduleState.add(new RaptorState(data.getStopCount()));
+                // CIRCUMVENT RANGE RAPTOR OPTIMIZATION FOR COMPARISON PURPOSES
+                Arrays.fill(scheduledTimesAtTargets, UNREACHED);
+                scheduleState = new ArrayList<>();
+                this.scheduleState.add(new RaptorState(data.getStopCount()));
 
-            // Compensate for Java obnoxious policies on "effectively final" variables in closures
-            final int departureTimeFinal = departureTime;
-            scheduleState.stream().forEach(rs -> rs.setDepartureTime(departureTimeFinal));
+                // Compensate for Java obnoxious policies on "effectively final" variables in closures
+                final int departureTimeFinal = departureTime;
+                scheduleState.stream().forEach(rs -> rs.setDepartureTime(departureTimeFinal));
 
-            // Run the search on only the scheduled routes (not frequency-based routes) at this departure minute.
-            this.runRaptorScheduled(initialStops, departureTime);
+                // Run the search on only the scheduled routes (not frequency-based routes) at this departure minute.
+                this.runRaptorScheduled(initialStops, departureTime);
 
-            // If we're doing propagation from transit stops out to street vertices, do it now.
-            // If we are instead saving travel times to transit stops (not propagating out to the streets)
-            // we skip this step -- we'll just copy all the travel times at once after the frequency search.
-            if (doPropagation) {
-                this.doPropagation(scheduleState.get(round).bestNonTransferTimes, scheduledTimesAtTargets, departureTime);
+                // If we're doing propagation from transit stops out to street vertices, do it now.
+                // If we are instead saving travel times to transit stops (not propagating out to the streets)
+                // we skip this step -- we'll just copy all the travel times at once after the frequency search.
+                if (doPropagation) {
+                    this.doPropagation(scheduleState.get(round).bestNonTransferTimes, scheduledTimesAtTargets, departureTime);
 
-                // Copy in the travel times on the street network without boarding transit.
-                // We don't want to force people to ride transit instead of walking a block.
-                for (int i = 0; i < scheduledTimesAtTargets.length; i++) {
-                    int nonTransitTravelTime = nonTransitTimes.getTravelTimeToPoint(i);
-                    int nonTransitClockTime = nonTransitTravelTime + departureTime;
-                    if (nonTransitTravelTime != UNREACHED && nonTransitClockTime < scheduledTimesAtTargets[i]) {
-                        scheduledTimesAtTargets[i] = nonTransitClockTime;
+                    // Copy in the travel times on the street network without boarding transit.
+                    // We don't want to force people to ride transit instead of walking a block.
+                    for (int i = 0; i < scheduledTimesAtTargets.length; i++) {
+                        int nonTransitTravelTime = nonTransitTimes.getTravelTimeToPoint(i);
+                        int nonTransitClockTime = nonTransitTravelTime + departureTime;
+                        if (nonTransitTravelTime != UNREACHED && nonTransitClockTime < scheduledTimesAtTargets[i]) {
+                            scheduledTimesAtTargets[i] = nonTransitClockTime;
+                        }
                     }
                 }
-            }
 
-            // Run any searches on frequency-based routes.
-            if (data.hasFrequencies) {
+                // Run any searches on frequency-based routes.
+                if (data.hasFrequencies && false) {
 
 
-                for (int i = 0; i < monteCarloDraws; i++, iteration++) {
+                    for (int i = 0; i < monteCarloDraws; i++, iteration++) {
 
-                    RaptorState stateCopy;
-                    offsets.randomize();
-                    stateCopy = this.runRaptorFrequency(departureTime);
-                    // Only include travel times from randomized schedules (not the lower and upper bounds) in averages.
+                        RaptorState stateCopy;
+                        offsets.randomize();
+                        stateCopy = this.runRaptorFrequency(departureTime);
+                        // Only include travel times from randomized schedules (not the lower and upper bounds) in averages.
+                        includeInAverages.set(iteration);
+
+                        // Propagate travel times out to targets.
+                        int[] frequencyTimesAtTargets = timesAtTargetsEachIteration[iteration];
+                        if (doPropagation) {
+                            // copy scheduled times into frequency array so that we don't have to propagate them again, we'll
+                            // just update them where they've improved, see #137.
+                            System.arraycopy(scheduledTimesAtTargets, 0, frequencyTimesAtTargets, 0,
+                                    scheduledTimesAtTargets.length);
+                            // updates timesAtTargetsEachIteration directly because it has a reference into the array.
+                            this.doPropagation(stateCopy.bestNonTransferTimes, frequencyTimesAtTargets,
+                                    departureTime);
+                        } else {
+                            // copy times at stops into output (includes frequency and scheduled times because we copied the scheduled state)
+                            System.arraycopy(stateCopy.bestNonTransferTimes, 0, frequencyTimesAtTargets, 0, stateCopy.bestNonTransferTimes.length);
+                        }
+
+                        if (statesEachIteration != null) statesEachIteration.add(stateCopy.deepCopy());
+
+                        // convert to elapsed time
+                        for (int t = 0; t < frequencyTimesAtTargets.length; t++) {
+                            if (frequencyTimesAtTargets[t] != UNREACHED)
+                                frequencyTimesAtTargets[t] -= departureTime;
+                        }
+                    }
+                } else {
+                    // There were no frequency routes. We did no frequency draws, so propagate the scheduled times instead.
+                    final int dt = departureTime;
+                    final RaptorState state = scheduleState.get(round);
+                    // Either use the propagated result at the targets (if we calculated it) or the travel times at stops.
+                    // Static sites propagate to the final targets on the client, so we only store travel time to stops.
+                    timesAtTargetsEachIteration[iteration] = IntStream
+                            .of(doPropagation ? scheduledTimesAtTargets : state.bestNonTransferTimes)
+                            .map(i -> i != UNREACHED ? i - dt : i)
+                            .toArray();
                     includeInAverages.set(iteration);
-
-                    // Propagate travel times out to targets.
-                    int[] frequencyTimesAtTargets = timesAtTargetsEachIteration[iteration];
-                    if (doPropagation) {
-                        // copy scheduled times into frequency array so that we don't have to propagate them again, we'll
-                        // just update them where they've improved, see #137.
-                        System.arraycopy(scheduledTimesAtTargets, 0, frequencyTimesAtTargets, 0,
-                                scheduledTimesAtTargets.length);
-                        // updates timesAtTargetsEachIteration directly because it has a reference into the array.
-                        this.doPropagation(stateCopy.bestNonTransferTimes, frequencyTimesAtTargets,
-                                departureTime);
-                    } else {
-                        // copy times at stops into output (includes frequency and scheduled times because we copied the scheduled state)
-                        System.arraycopy(stateCopy.bestNonTransferTimes, 0, frequencyTimesAtTargets, 0, stateCopy.bestNonTransferTimes.length);
-                    }
-
-                    if (statesEachIteration != null) statesEachIteration.add(stateCopy.deepCopy());
-
-                    // convert to elapsed time
-                    for (int t = 0; t < frequencyTimesAtTargets.length; t++) {
-                        if (frequencyTimesAtTargets[t] != UNREACHED)
-                            frequencyTimesAtTargets[t] -= departureTime;
-                    }
+                    if (statesEachIteration != null) statesEachIteration.add(state.deepCopy());
+                    iteration++;
                 }
-            } else {
-                // There were no frequency routes. We did no frequency draws, so propagate the scheduled times instead.
-                final int dt = departureTime;
-                final RaptorState state = scheduleState.get(round);
-                // Either use the propagated result at the targets (if we calculated it) or the travel times at stops.
-                // Static sites propagate to the final targets on the client, so we only store travel time to stops.
-                timesAtTargetsEachIteration[iteration] = IntStream
-                        .of(doPropagation ? scheduledTimesAtTargets : state.bestNonTransferTimes)
-                        .map(i -> i != UNREACHED ? i - dt : i)
-                        .toArray();
-                includeInAverages.set(iteration);
-                if (statesEachIteration != null) statesEachIteration.add(state.deepCopy());
-                iteration++;
-            }
 
-            advanceToNextMinute();
-        } // END for loop over departure minutes
+                advanceToNextMinute();
+            } // END for loop over departure minutes
+        }
 
         // Sanity check:
         // Ensure that the output arrays were entirely filled.

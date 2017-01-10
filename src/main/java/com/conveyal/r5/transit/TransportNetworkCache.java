@@ -237,8 +237,9 @@ public class TransportNetworkCache {
             network = buildNetworkFromBundleZip(networkId);
         }
 
-        // These networks are going to be used for analysis work. Pre-compute distance tables from stops to streets.
-        network.transitLayer.buildDistanceTables(null);
+        // These networks are going to be used for analysis work.
+        // Pre-compute distance tables from stops to streets and pre-build a linked grid pointset for the whole region.
+        network.buildAnalysisIndexes();
 
         // Cache the network.
         String filename = networkId + "_" + R5Version.version + ".dat";

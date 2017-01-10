@@ -39,12 +39,12 @@ public class TransportNetwork implements Serializable {
 
     /**
      * Cache a grid point set that covers the extents of this transport network. The PointSet itself caches linkages to
-     * street networks.
-     *
-     * Eventually we should save this point set and linkage but it's a little tricky since there's a linkage cache with
-     * references to streetlayers, a spatial index, etc. in there.
+     * street networks. If they have been created, this point set and its linkage to the street network are serialized
+     * along with the network, which makes startup much faster. Note that there's a linkage cache with
+     * references to streetlayers, a spatial index, etc. in there so be careful not to serialize a bunch of things you
+     * don't mean to.
      */
-    private transient WebMercatorGridPointSet gridPointSet;
+    private WebMercatorGridPointSet gridPointSet;
 
     /**
      * A string uniquely identifying the contents of this TransportNetwork in the space of TransportNetwork objects.
@@ -60,7 +60,6 @@ public class TransportNetwork implements Serializable {
     public GreedyFareCalculator fareCalculator;
 
     public void write (File file) throws IOException {
-        //this.transitLayer.buildDistanceTables(null);
         LOG.info("Writing transport network...");
         ExpandingMMFBytez.writeObjectToFile(file, this);
         LOG.info("Done writing.");
@@ -70,6 +69,7 @@ public class TransportNetwork implements Serializable {
         LOG.info("Reading transport network...");
         TransportNetwork result = ExpandingMMFBytez.readObjectFromFile(file);
         LOG.info("Done reading.");
+        result.rebuildTransientIndexes();
         return result;
     }
 
@@ -81,6 +81,15 @@ public class TransportNetwork implements Serializable {
         streetLayer.buildEdgeLists();
         streetLayer.indexStreets();
         transitLayer.rebuildTransientIndexes();
+    }
+
+    /**
+     * Pre-build some things that will be used in analysis.
+     * Then they can serialized along with the network, which avoids building them when an analysis worker starts up.
+     */
+    public void buildAnalysisIndexes() {
+        this.transitLayer.buildDistanceTables(null);
+        this.getLinkedGridPointSet();
     }
 
     /** Legacy method to load from a single GTFS file */

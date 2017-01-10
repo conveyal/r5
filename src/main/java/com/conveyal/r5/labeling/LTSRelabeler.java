@@ -94,9 +94,7 @@ public class LTSRelabeler {
         if (netFile.isDirectory())
             network = TransportNetwork.fromDirectory(netFile);
         else {
-            InputStream is = new BufferedInputStream(new FileInputStream(netFile));
-            network = TransportNetwork.read(is);
-            is.close();
+            network = TransportNetwork.read(netFile);
         }
 
         Writer writer = new FileWriter(args[1]);

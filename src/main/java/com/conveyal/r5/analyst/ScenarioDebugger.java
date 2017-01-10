@@ -16,10 +16,7 @@ import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.io.BufferedInputStream;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.InputStream;
+import java.io.*;
 import java.time.LocalDate;
 import java.util.EnumSet;
 
@@ -39,9 +36,7 @@ public class ScenarioDebugger {
             InputStream scenarioInput = new FileInputStream("/Users/abyrd/r5nl/scenario.json");
             Scenario scenario = JsonUtilities.objectMapper.readValue(scenarioInput, Scenario.class);
             scenarioInput.close();
-            InputStream networkInput = new FileInputStream("/Users/abyrd/r5nl/network.dat");
-            TransportNetwork network = TransportNetwork.read(networkInput);
-            networkInput.close();
+            TransportNetwork network = TransportNetwork.read(new File("/Users/abyrd/r5nl/network.dat"));
             AnalystClusterRequest clusterRequest = new AnalystClusterRequest();
             clusterRequest.profileRequest = new ProfileRequest();
             clusterRequest.profileRequest.scenario = scenario;
@@ -53,10 +48,12 @@ public class ScenarioDebugger {
             clusterRequest.profileRequest.toTime = 2000;
             clusterRequest.profileRequest.date = LocalDate.now();
             network = network.applyScenario(clusterRequest.profileRequest.scenario);
-            RepeatedRaptorProfileRouter rrpr = new RepeatedRaptorProfileRouter(network, clusterRequest, linkedTargets, taskStats);
+            RepeatedRaptorProfileRouter rrpr =
+                    new RepeatedRaptorProfileRouter(network, clusterRequest, linkedTargets, taskStats);
             rrpr.route();
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
+
 }

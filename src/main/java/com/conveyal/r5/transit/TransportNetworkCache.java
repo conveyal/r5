@@ -216,12 +216,7 @@ public class TransportNetworkCache {
                 }
             }
             LOG.info("Loading cached transport network at {}", cacheLocation);
-            FileInputStream fis = new FileInputStream(cacheLocation);
-            try {
-                return TransportNetwork.read(fis);
-            } finally {
-                fis.close();
-            }
+            return TransportNetwork.read(cacheLocation);
         } catch (Exception e) {
             LOG.error("Exception occurred retrieving cached transport network", e);
             return null;
@@ -242,20 +237,16 @@ public class TransportNetworkCache {
             network = buildNetworkFromBundleZip(networkId);
         }
 
-        // cache the network
+        // These networks are going to be used for analysis work. Pre-compute distance tables from stops to streets.
+        network.transitLayer.buildDistanceTables(null);
+
+        // Cache the network.
         String filename = networkId + "_" + R5Version.version + ".dat";
         File cacheLocation = new File(cacheDir, networkId + "_" + R5Version.version + ".dat");
         
         try {
-
             // Serialize TransportNetwork to local cache on this worker
-            FileOutputStream fos = new FileOutputStream(cacheLocation);
-            try {
-                network.write(fos);
-            } finally {
-                fos.close();
-            }
-
+            network.write(cacheLocation);
             // Upload the serialized TransportNetwork to S3
             if (sourceBucket != null) {
                 LOG.info("Uploading the serialized TransportNetwork to S3 for use by other workers.");
@@ -264,7 +255,6 @@ public class TransportNetworkCache {
             } else {
                 LOG.info("Network saved to cache directory, not uploading to S3 while working offline.");
             }
-
         } catch (Exception e) {
             // Don't break here as we do have a network to return, we just couldn't cache it.
             LOG.error("Error saving cached network", e);

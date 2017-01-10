@@ -6,15 +6,16 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
-import com.google.common.io.ByteStreams;
+import com.conveyal.r5.util.ExpandingMMFBytez;
+import com.google.common.hash.HashCode;
+import com.google.common.hash.Hashing;
 import com.conveyal.r5.profile.GreedyFareCalculator;
 import com.conveyal.r5.profile.StreetMode;
+import com.google.common.io.Files;
 import com.vividsolutions.jts.geom.Envelope;
-import org.nustaq.serialization.FSTObjectInput;
-import org.nustaq.serialization.FSTObjectOutput;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
-import com.conveyal.r5.streets.StreetRouter;
+import org.nustaq.serialization.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,23 +59,16 @@ public class TransportNetwork implements Serializable {
 
     public GreedyFareCalculator fareCalculator;
 
-    public void write (OutputStream stream) throws IOException {
+    public void write (File file) throws IOException {
+        //this.transitLayer.buildDistanceTables(null);
         LOG.info("Writing transport network...");
-        FSTObjectOutput out = new FSTObjectOutput(stream);
-        out.writeObject(this, TransportNetwork.class);
-        out.close();
+        ExpandingMMFBytez.writeObjectToFile(file, this);
         LOG.info("Done writing.");
     }
 
-    public static TransportNetwork read (InputStream stream) throws Exception {
+    public static TransportNetwork read (File file) throws Exception {
         LOG.info("Reading transport network...");
-        FSTObjectInput in = new FSTObjectInput(stream);
-        TransportNetwork result = (TransportNetwork) in.readObject(TransportNetwork.class);
-        in.close();
-        result.rebuildTransientIndexes();
-        if (result.fareCalculator != null) {
-            result.fareCalculator.transitLayer = result.transitLayer;
-        }
+        TransportNetwork result = ExpandingMMFBytez.readObjectFromFile(file);
         LOG.info("Done reading.");
         return result;
     }
@@ -83,7 +77,6 @@ public class TransportNetwork implements Serializable {
         streetLayer.buildEdgeLists();
         streetLayer.indexStreets();
         transitLayer.rebuildTransientIndexes();
-        transitLayer.buildDistanceTables(null);
     }
 
     /** Legacy method to load from a single GTFS file */
@@ -152,9 +145,6 @@ public class TransportNetwork implements Serializable {
         // Edge lists must be built after all inter-layer linking has occurred.
         streetLayer.buildEdgeLists();
         transitLayer.rebuildTransientIndexes();
-
-        // TODO why are we building these when the graph is built, shouldn't these (and others above) be covered by the transient index build?
-        transitLayer.buildDistanceTables(null);
 
         // Create transfers
         new TransferFinder(transportNetwork).findTransfers();
@@ -385,16 +375,17 @@ public class TransportNetwork implements Serializable {
      */
     public long checksum () {
         LOG.info("Calculating transport network checksum...");
-        Checksum crc32 = new CRC32();
-        OutputStream out = new CheckedOutputStream(ByteStreams.nullOutputStream(), crc32);
         try {
-            this.write(out);
-            out.close();
+            File tempFile = File.createTempFile("r5-network-checksum-", ".dat");
+            tempFile.deleteOnExit();
+            this.write(tempFile);
+            HashCode crc32 = Files.hash(tempFile, Hashing.crc32());
+            tempFile.delete();
+            LOG.info("Network CRC is {}", crc32.hashCode());
+            return crc32.hashCode();
         } catch (IOException e) {
             throw new RuntimeException();
         }
-        LOG.info("Network CRC is {}", crc32.getValue());
-        return crc32.getValue();
     }
 
 }

@@ -126,12 +126,13 @@ public class TransitLayer implements Serializable, Cloneable {
     /**
      * For each transit stop, an int-int map giving the distance of every reachable street vertex from that stop.
      * This is the result of running a distance-constrained street search outward from every stop in the graph.
-     *
-     * Avoiding the lengthy rebuild of stopToVertexDistanceTables is as simple as making this non-transient and removing
-     * the call to buildDistanceTables in TransportNetwork. That does make serialized networks much bigger (not a big deal
-     * when saving to S3) and makes our checks to ensure that scenario application does not damage base graphs very slow.
+     * If these tables are present, we serialize them when persisting a network to disk to avoid recalculating them
+     * upon re-load. However, the tables are not computed when the network is first built, except in certain code
+     * paths used for analysis work. The tables are not necessary for basic routing.
+     * Serializing these tables makes files much bigger and makes our checks to ensure that scenario application
+     * does not damage base graphs slower.
      */
-    public transient List<TIntIntMap> stopToVertexDistanceTables;
+    public List<TIntIntMap> stopToVertexDistanceTables;
 
     /**
      * The TransportNetwork containing this TransitLayer. This link up the object tree also allows us to access the
@@ -437,7 +438,7 @@ public class TransitLayer implements Serializable, Cloneable {
         centerLon = lonSum / stops.size();
     }
 
-    /** (Re-)build transient indexes of this TripPattern, connecting stops to patterns etc. */
+    /** (Re-)build transient indexes of this TransitLayer, connecting stops to patterns etc. */
     public void rebuildTransientIndexes () {
         LOG.info("Rebuilding transient indices.");
 

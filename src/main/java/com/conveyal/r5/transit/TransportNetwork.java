@@ -73,6 +73,10 @@ public class TransportNetwork implements Serializable {
         return result;
     }
 
+    /**
+     * Build some simple derived index tables that are not serialized with the network.
+     * Distance tables and street spatial indexes are now serialized with the network.
+     */
     public void rebuildTransientIndexes() {
         streetLayer.buildEdgeLists();
         streetLayer.indexStreets();

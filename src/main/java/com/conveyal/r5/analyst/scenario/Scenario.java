@@ -118,10 +118,11 @@ public class Scenario implements Serializable {
         // Is it OK that we do this once after all modifications are applied, or do we need to do it after every mod?
         copiedNetwork.transitLayer.rebuildTransientIndexes();
 
-        // Rebuild stop trees that are near street network changes
-        // first rebuild edge lists
+        // Rebuild edge lists to account for changes from scenario application
         copiedNetwork.streetLayer.buildEdgeLists();
-        Geometry treeRebuildZone = copiedNetwork.streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.DISTANCE_TABLE_SIZE_METERS);
+        // Rebuild distance tables affected by street network changes
+        Geometry treeRebuildZone =
+                copiedNetwork.streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.DISTANCE_TABLE_SIZE_METERS);
         copiedNetwork.transitLayer.buildDistanceTables(treeRebuildZone);
         
         // find the transfers originating at or terminating at new stops.

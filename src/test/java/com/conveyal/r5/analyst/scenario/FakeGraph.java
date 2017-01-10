@@ -65,6 +65,7 @@ public class FakeGraph {
             }
 
             TransportNetwork net = TransportNetwork.fromFiles(osmFile.getAbsolutePath(), gtfsFiles, new TNBuilderConfig());
+            net.buildAnalysisIndexes();
 
             // clean up
             filesToDelete.forEach(f -> f.delete());

@@ -92,7 +92,9 @@ public class ExpandingMMFBytez extends MallocBytez {
      */
     @Override
     public BasicBytez newInstance(long size) {
-        size = this.length + StreamCoderFactory.MIN_SIZE_BYTES;
+        // Ignore the requested size from the caller and force linear size expansion.
+        // This works until you try to perform a write bigger than MIN_SIZE_BYTES.
+        // size = this.length + StreamCoderFactory.MIN_SIZE_BYTES;
         System.out.println("Resizing memory mapped buffer to " + size);
         try {
             munmap(baseAdress, length);

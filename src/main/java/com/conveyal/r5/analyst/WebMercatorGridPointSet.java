@@ -9,13 +9,15 @@ import org.mapdb.Fun;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * A linked pointset that represents a web mercator grid laid over the graph.
  */
-public class WebMercatorGridPointSet extends PointSet {
+public class WebMercatorGridPointSet extends PointSet implements Serializable {
+
     public static final Logger LOG = LoggerFactory.getLogger(WebMercatorGridPointSet.class);
 
     public static final int DEFAULT_ZOOM = 9;

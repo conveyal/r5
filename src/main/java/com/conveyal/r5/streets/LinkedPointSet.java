@@ -15,6 +15,7 @@ import gnu.trove.set.TIntSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -26,7 +27,7 @@ import java.util.stream.IntStream;
  * For each feature in the PointSet, we record the closest edge and the distance to the vertices at the ends of that
  * edge (like a Splice or a Sample in OTP).
  */
-public class LinkedPointSet {
+public class LinkedPointSet implements Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(LinkedPointSet.class);
 
@@ -248,6 +249,7 @@ public class LinkedPointSet {
      * Given a table of distances to street vertices from a particular transit stop, create a table of distances to
      * points in this PointSet from the same transit stop.
      * All points outside the distanceTableZone are skipped as an optimization.
+     * See JavaDoc on the caller makeStopToPointDistanceTables - this is one of the slowest parts of building a network.
      * @return A packed array of (pointIndex, distanceMillimeters)
      */
     private int[] extendDistanceTableToPoints(TIntIntMap distanceTableToVertices, Envelope distanceTableZone) {

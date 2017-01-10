@@ -13,11 +13,12 @@ import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Point;
 import org.mapdb.Fun.Tuple2;
 
+import java.io.Serializable;
 import java.util.concurrent.ExecutionException;
 
 import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
 
-public abstract class PointSet {
+public abstract class PointSet implements Serializable {
 
     /** Maximum number of street network linkages to cache per PointSet. Affects memory consumption. */
     public static int LINKAGE_CACHE_SIZE = 5;
@@ -33,27 +34,31 @@ public abstract class PointSet {
      */
     protected LoadingCache<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> linkageCache = CacheBuilder.newBuilder()
             .maximumSize(LINKAGE_CACHE_SIZE)
-            .build(new CacheLoader<Tuple2<StreetLayer, StreetMode>, LinkedPointSet>() {
-                @Override public LinkedPointSet load(Tuple2<StreetLayer, StreetMode> key) throws Exception {
-                    // If this StreetLayer is a part of a scenario and is therefore wrapping a base StreetLayer we need
-                    // to recursively fetch / create a linkage for that base StreetLayer so we don't duplicate work.
-                    // PointSet.this accesses the instance of the outer class.
-                    LinkedPointSet baseLinkage = null;
-                    if (key.a.isScenarioCopy()) {
-                        baseLinkage = PointSet.this.linkageCache.get(new Tuple2<>(key.a.baseStreetLayer, key.b));
-                    }
-                    // Build a new linkage from this PointSet to the supplied StreetNetwork,
-                    // initialized with the existing linkage to the base StreetNetwork when relevant.
-                    return new LinkedPointSet(PointSet.this, key.a, key.b, baseLinkage);
-                }
-            });
+            .build(new LinkageCacheLoader());
 
+    // This is pulled out into a named class because serializing the anonymous inner class was getting ugly.
+    private class LinkageCacheLoader extends CacheLoader<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> implements Serializable {
+        @Override
+        public LinkedPointSet load(Tuple2<StreetLayer, StreetMode> key) throws Exception {
+            // If this StreetLayer is a part of a scenario and is therefore wrapping a base StreetLayer we need
+            // to recursively fetch / create a linkage for that base StreetLayer so we don't duplicate work.
+            // PointSet.this accesses the instance of the outer class.
+            LinkedPointSet baseLinkage = null;
+            if (key.a.isScenarioCopy()) {
+                baseLinkage = PointSet.this.linkageCache.get(new Tuple2<>(key.a.baseStreetLayer, key.b));
+            }
+            // Build a new linkage from this PointSet to the supplied StreetNetwork,
+            // initialized with the existing linkage to the base StreetNetwork when relevant.
+            return new LinkedPointSet(PointSet.this, key.a, key.b, baseLinkage);
+        }
+    }
 
     /**
      * Makes it fast to get a set of all points within a given rectangle.
      * This is useful when finding distances from transit stops to points.
+     * FIXME we don't need a spatial index to do this on a gridded pointset. Make a specialized method on pointset subclasses.
      */
-    public IntHashGrid spatialIndex;
+    public transient IntHashGrid spatialIndex;
 
     /**
      * Associate each feature in this PointSet with a nearby street edge in the StreetLayer of the supplied
@@ -84,6 +89,9 @@ public abstract class PointSet {
         return GeometryUtils.geometryFactory.createPoint(getCoordinateFixed(index));
     }
 
+    /**
+     * If the spatial index of points in the pointset has not yet been made, create one.
+     */
     public void createSpatialIndexAsNeeded() {
         if (spatialIndex != null) return;
         spatialIndex = new IntHashGrid();

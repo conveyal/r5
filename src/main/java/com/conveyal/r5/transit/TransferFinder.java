@@ -46,6 +46,7 @@ public class TransferFinder {
         // We look at any existing list of transfers and do enough iterations to make it as long as the list of stops.
         int firstStopIndex = transfersForStop.size();
         LOG.info("Finding transfers through the street network from {} stops...", transitLayer.getStopCount() - transfersForStop.size());
+        // TODO Parallelize with streams. See distance table generation.
         for (int s = firstStopIndex; s < transitLayer.getStopCount(); s++) {
             // From each stop, run a street search looking for other transit stops.
             int originStreetVertex = transitLayer.streetVertexForStop.get(s);

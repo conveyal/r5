@@ -208,7 +208,8 @@ public class LinkedPointSet implements Serializable {
             // FIXME when we permit street network modifications beyond adding transit stops we will need to change how this works,
             // we may be able to use some type of flood-fill algorithm in geographic space, expanding the relink envelope until we
             // hit edges on all sides or reach some predefined maximum.
-            if (all || streetLayer.edgeStore.temporarilyDeletedEdges != null && streetLayer.edgeStore.temporarilyDeletedEdges.contains(edges[p])) {
+            if (all || (streetLayer.edgeStore.temporarilyDeletedEdges != null &&
+                        streetLayer.edgeStore.temporarilyDeletedEdges.contains(edges[p]))) {
                 Split split = streetLayer.findSplit(pointSet.getLat(p), pointSet.getLon(p), MAX_OFFSTREET_WALK_METERS, streetMode);
                 if (split == null) {
                     edges[p] = -1;

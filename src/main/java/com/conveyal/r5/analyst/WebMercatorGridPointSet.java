@@ -88,7 +88,6 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
 
     /** convert latitude to pixel value */
     public int latToPixel (double lat) {
-        //
         double invCos = 1 / Math.cos(Math.toRadians(lat));
         double tan = Math.tan(Math.toRadians(lat));
         double ln = Math.log(tan + invCos);
@@ -104,37 +103,4 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         return Math.toDegrees(Math.atan(Math.sinh(Math.PI - tile * Math.PI * 2 / Math.pow(2, zoom))));
     }
 
-    /** Copy the linkage from a LinkedPointSet of an encompassing pointset */
-    public LinkedPointSet linkSubset (LinkedPointSet superLinked) {
-        if (!WebMercatorGridPointSet.class.isInstance(superLinked.pointSet)) {
-            throw new IllegalArgumentException("Superset is not a gridded point set");
-        }
-
-        WebMercatorGridPointSet superSet = (WebMercatorGridPointSet) superLinked.pointSet;
-
-        if (superSet.zoom != zoom) throw new IllegalArgumentException("Zoom of superset does not match");
-
-        if (superSet.west > west || superSet.west + superSet.width < west + width ||
-                superSet.north > north || superSet.north + superSet.height < north + height) {
-            throw new IllegalArgumentException("Grids do not overlap");
-        }
-
-        int[] edges = new int[width * height];
-        int[] distances0_mm = new int[width * height];
-        int[] distances1_mm = new int[width * height];
-
-        // x, y, pixel refer to this point set
-        for (int y = 0, pixel = 0; y < height; y++) {
-            for (int x = 0; x < width; x++, pixel++) {
-                int sourceColumn = west + x - superSet.west;
-                int sourceRow = north + y - superSet.north;
-                int sourcePixel = sourceRow * superSet.width + sourceColumn;
-                edges[pixel] = superLinked.edges[sourcePixel];
-                distances0_mm[pixel] = superLinked.distances0_mm[sourcePixel];
-                distances1_mm[pixel] = superLinked.distances1_mm[sourcePixel];
-            }
-        }
-
-        return new LinkedPointSet(edges, distances0_mm, distances1_mm, this, superLinked.streetLayer, superLinked.streetMode);
-    }
 }

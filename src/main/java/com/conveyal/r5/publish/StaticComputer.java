@@ -94,11 +94,10 @@ public class StaticComputer implements Runnable {
 
         long nonTransitStart = System.currentTimeMillis();
 
-        // get non-transit times
-        // pointset around the search origin.
-        WebMercatorGridPointSet subPointSet =
-                new WebMercatorGridPointSet(WebMercatorGridPointSet.DEFAULT_ZOOM, points.west + req.x - 20, points.north + req.y - 20, 41, 41);
-        LinkedPointSet subLinked = subPointSet.linkSubset(network.getLinkedGridPointSet());
+        // Get non-transit times: a pointset around the search origin.
+        WebMercatorGridPointSet subPointSet = new WebMercatorGridPointSet(WebMercatorGridPointSet.DEFAULT_ZOOM,
+                points.west + req.x - 20, points.north + req.y - 20, 41, 41);
+        LinkedPointSet subLinked = new LinkedPointSet(network.getLinkedGridPointSet(), subPointSet);
         PointSetTimes nonTransitTimes = subLinked.eval(sr::getTravelTimeToVertex);
 
         LOG.info("Sampling non-transit times took {}s", (System.currentTimeMillis() - nonTransitStart) / 1000);

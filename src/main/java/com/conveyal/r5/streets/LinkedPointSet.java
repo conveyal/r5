@@ -1,6 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.profile.StreetMode;
@@ -142,21 +143,52 @@ public class LinkedPointSet implements Serializable {
 
     }
 
-    /** used to create new linked pointsets that are subsets of existing ones */
-    public LinkedPointSet(int[] edges, int[] distances0_mm, int[] distances1_mm, PointSet pointSet,
-                          StreetLayer streetLayer, StreetMode streetMode) {
-        if (edges.length != distances0_mm.length || edges.length != distances1_mm.length ||
-                edges.length != pointSet.featureCount()) {
-            throw new IllegalArgumentException("Lengths of input pointset and linkages do not match!");
+
+    /**
+     * Construct a new LinkedPointSet for a grid that falls entirely within an existing grid LinkedPointSet.
+     * @param sourceLinkage a LinkedPointSet whose PointSet must be a WebMercatorGridPointset
+     * @param subGrid the grid for which to create a linkage
+     */
+    public LinkedPointSet(LinkedPointSet sourceLinkage, WebMercatorGridPointSet subGrid) {
+
+        if (!(sourceLinkage.pointSet instanceof WebMercatorGridPointSet)) {
+            throw new IllegalArgumentException("Source linkage must be for a gridded point set.");
         }
 
-        this.edges = edges;
-        this.distances0_mm = distances0_mm;
-        this.distances1_mm = distances1_mm;
-        this.pointSet = pointSet;
-        this.streetLayer = streetLayer;
-        this.streetMode = streetMode;
+        WebMercatorGridPointSet superGrid = (WebMercatorGridPointSet) sourceLinkage.pointSet;
+        if (superGrid.zoom != subGrid.zoom) {
+            throw new IllegalArgumentException("Source and sub-grid zoom level do not match.");
+        }
+        if (superGrid.west > subGrid.west || superGrid.west + superGrid.width < subGrid.west + subGrid.width ||
+            superGrid.north > subGrid.north || superGrid.north + superGrid.height < subGrid.north + subGrid.height) {
+            throw new IllegalArgumentException("Sub-grid must lie fully inside the super-grid.");
+        }
+
+        // Initialize the fields of the new LinkedPointSet instance
+        pointSet = sourceLinkage.pointSet;
+        streetLayer = sourceLinkage.streetLayer;
+        streetMode = sourceLinkage.streetMode;
+
+        int nCells = subGrid.width * subGrid.height;
+        edges = new int[nCells];
+        distances0_mm = new int[nCells];
+        distances1_mm = new int[nCells];
+
+        // Copy values over from the source linkage to the new sub-linkage
+        // x, y, and pixel are relative to the new linkage
+        for (int y = 0, pixel = 0; y < subGrid.height; y++) {
+            for (int x = 0; x < subGrid.width; x++, pixel++) {
+                int sourceColumn = subGrid.west + x - superGrid.west;
+                int sourceRow = subGrid.north + y - superGrid.north;
+                int sourcePixel = sourceRow * superGrid.width + sourceColumn;
+                edges[pixel] = sourceLinkage.edges[sourcePixel];
+                distances0_mm[pixel] = sourceLinkage.distances0_mm[sourcePixel];
+                distances1_mm[pixel] = sourceLinkage.distances1_mm[sourcePixel];
+            }
+        }
+
     }
+
 
     /**
      * Associate the points in this PointSet with the street vertices at the ends of the closest street edge.

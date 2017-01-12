@@ -164,10 +164,11 @@ class BrokerHttpHandler extends HttpHandler {
                 }
             }
             else if (request.getMethod() == Method.POST && "complete".equals(command)) {
-                // Requests of the form: POST /complete/{success|error}/1234
+                // Requests of the form: POST /complete/{success|<httpErrorStatusCode>}/<taskId>
                 // Mark a specific high-priority task as completed, and record its result.
                 // We were originally planning to do this with a DELETE request that has a body,
                 // but that is nonstandard enough to anger many libraries including Grizzly.
+                String successOrError = pathComponents[2];
                 int taskId = Integer.parseInt(pathComponents[3]);
                 Response suspendedProducerResponse = broker.deletePriorityTask(taskId);
                 if (suspendedProducerResponse == null) {
@@ -175,21 +176,15 @@ class BrokerHttpHandler extends HttpHandler {
                     response.setStatus(HttpStatus.NOT_FOUND_404);
                     return;
                 }
-                String successOrError = pathComponents[2];
                 if ("success".equals(successOrError)) {
                     // The worker did not find any obvious problems with the request and is streaming back what it
                     // believes to be a reliable work result.
                     suspendedProducerResponse.setStatus(HttpStatus.OK_200);
-                } else if ("error".equals(successOrError)) {
+                } else {
                     // The worker is providing an error message because it spotted something wrong with the request.
-                    suspendedProducerResponse.setStatus(HttpStatus.BAD_REQUEST_400);
+                    suspendedProducerResponse.setStatus(Integer.parseInt(successOrError));
                     suspendedProducerResponse.setCharacterEncoding("utf-8");
                     suspendedProducerResponse.setContentType("application/json");
-                } else {
-                    // Signal the worker that the URL was malformed.
-                    response.setStatus(HttpStatus.NOT_FOUND_404);
-                    response.setDetailMessage("When marking a task complete, URL must indicate success or error.");
-                    return;
                 }
                 // Copy the result back to the connection that was the source of the task.
                 try {

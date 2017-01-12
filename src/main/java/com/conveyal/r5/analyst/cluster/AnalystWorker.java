@@ -41,6 +41,7 @@ import com.conveyal.r5.profile.RepeatedRaptorProfileRouter;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
+import org.eclipse.jetty.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -391,7 +392,7 @@ public class AnalystWorker implements Runnable {
                 // These exceptions can be turned into structured JSON.
                 // Report the error back to the broker, which can then pass it back out to the client.
                 // Any other kinds of exceptions will be caught by the outer catch clause
-                reportTaskErrors(clusterRequest.taskId, scenarioException.taskErrors);
+                reportTaskErrors(clusterRequest.taskId, HttpStatus.BAD_REQUEST_400, scenarioException.taskErrors);
                 return;
             }
             // FIXME manually coded polymorphism
@@ -416,7 +417,7 @@ public class AnalystWorker implements Runnable {
             // This ensures that some form of error message is passed all the way back up to the web UI.
             TaskError taskError = new TaskError(ex);
             LOG.error("An error occurred while routing: {}", ExceptionUtils.asString(ex));
-            reportTaskErrors(clusterRequest.taskId, Arrays.asList(taskError));
+            reportTaskErrors(clusterRequest.taskId, HttpStatus.INTERNAL_SERVER_ERROR_500, Arrays.asList(taskError));
         }
     }
 
@@ -784,8 +785,8 @@ public class AnalystWorker implements Runnable {
      * The broker should then pass the errors back up to the client that enqueued that task.
      * That objects are always the same type (TaskError) so the client knows what to expect.
      */
-    public void reportTaskErrors(int taskId, List<TaskError> taskErrors) {
-        String url = BROKER_BASE_URL + String.format("/complete/error/%s", taskId);
+    public void reportTaskErrors(int taskId, int httpStatusCode, List<TaskError> taskErrors) {
+        String url = BROKER_BASE_URL + String.format("/complete/%d/%s", httpStatusCode, taskId);
         try {
             HttpPost httpPost = new HttpPost(url);
             httpPost.setHeader("Content-type", "application/json");

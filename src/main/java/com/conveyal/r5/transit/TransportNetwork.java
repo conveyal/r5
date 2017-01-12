@@ -15,7 +15,6 @@ import com.google.common.io.Files;
 import com.vividsolutions.jts.geom.Envelope;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
-import org.nustaq.serialization.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -152,7 +151,7 @@ public class TransportNetwork implements Serializable {
         // transitLayer.summarizeRoutesAndPatterns();
 
         // The street index is needed for associating transit stops with the street network.
-        // TODO why is this called twice?
+        // FIXME indexStreets is called three times: in StreetLayer::loadFromOsm, just after loading the OSM, and here
         streetLayer.indexStreets();
         streetLayer.associateStops(transitLayer);
         // Edge lists must be built after all inter-layer linking has occurred.

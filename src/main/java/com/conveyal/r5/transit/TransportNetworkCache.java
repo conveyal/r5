@@ -319,7 +319,11 @@ public class TransportNetworkCache {
         return network;
     }
 
-    /** Build a network from a new style manifest JSON in S3 */
+    /**
+     * Build a network from a JSON manifest in S3.
+     * A manifest describes the locations of files used to create a bundle.
+     * It contains the unique IDs of the GTFS feeds and OSM extract.
+     */
     private TransportNetwork buildNetworkFromManifest (String networkId) {
         String manifestFileName = GTFSCache.cleanId(networkId) + ".json";
         File manifestFile = new File(cacheDir, manifestFileName);
@@ -345,6 +349,7 @@ public class TransportNetworkCache {
         network.streetLayer.parentNetwork = network;
         network.streetLayer.indexStreets();
 
+        // TODO this internal building logic should be encapsulated in a static method like Network.build(osm, gtfs1, gtfs2...) We currently have multiple copies of it.
         network.transitLayer = new TransitLayer();
 
         manifest.gtfsIds.stream()

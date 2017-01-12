@@ -214,12 +214,14 @@ public class RaptorWorker {
         // First, set the number of iterations to the number of departure minutes.
         int iterations = (req.toTime - req.fromTime - DEPARTURE_STEP_SEC) / DEPARTURE_STEP_SEC + 1;
 
-        // figure out how many monte carlo draws to do (if we end up doing monte carlo).
-        // this is defined outside the conditional because it is also used in the loop body.
+        // Figure out how many monte carlo draws to do (if we end up doing monte carlo).
+        // This is defined outside the conditional because it is also used in the loop body.
         // At this point the number of iterations is just the number of minutes.
         int monteCarloDraws = (int) Math.ceil((double) req.monteCarloDraws / iterations);
 
         // Now multiply the number of departure minutes by the number of Monte Carlo frequency draws per minute.
+        // We only do Monte Carlo draws when there are frequency-based routes.
+        // We no longer do the two additional iterations that find travel time bounds using zero and max boarding times.
         if (data.hasFrequencies) {
             iterations *= monteCarloDraws;
         }

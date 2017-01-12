@@ -403,6 +403,7 @@ public class Grid {
         numericColumns.remove(latField);
         numericColumns.remove(lonField);
 
+        // Detect which columns are completely numeric by iterating over all the rows and trying to parse the fields
         int i = 0;
         while (reader.readRecord()) {
             if (++i % 10000 == 0) LOG.info("{} records", human(i));

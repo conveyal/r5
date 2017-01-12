@@ -221,8 +221,7 @@ public class RaptorWorker {
 
         // Now multiply the number of departure minutes by the number of Monte Carlo frequency draws per minute.
         if (data.hasFrequencies) {
-            // We add 2 because we do two additional iterations for zero and maximal boarding times (not Monte Carlo draws).
-            iterations *= (monteCarloDraws);
+            iterations *= monteCarloDraws;
         }
 
         ts.searchCount = iterations;

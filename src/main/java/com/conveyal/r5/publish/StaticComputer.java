@@ -100,9 +100,8 @@ public class StaticComputer implements Runnable {
         LinkedPointSet subLinked = new LinkedPointSet(network.getLinkedGridPointSet(), subPointSet);
         PointSetTimes nonTransitTimes = subLinked.eval(sr::getTravelTimeToVertex);
 
-        LOG.info("Sampling non-transit times took {}s", (System.currentTimeMillis() - nonTransitStart) / 1000);
-
         long outputStart = System.currentTimeMillis();
+        LOG.info("Sampling non-transit times took {}s", (outputStart - nonTransitStart) / 1000);
 
         LittleEndianIntOutputStream out = new LittleEndianIntOutputStream(new BufferedOutputStream(os));
 

@@ -5,6 +5,7 @@ import com.vividsolutions.jts.geom.Geometry;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
 import org.geotools.data.FeatureSource;
+import org.geotools.data.Query;
 import org.geotools.feature.FeatureCollection;
 import org.geotools.feature.FeatureIterator;
 import org.geotools.geometry.jts.JTS;
@@ -96,5 +97,9 @@ public class ShapefileReader {
 
     public void close () {
         store.dispose();
+    }
+
+    public int getFeatureCount() throws IOException {
+        return source.getCount(Query.ALL);
     }
 }

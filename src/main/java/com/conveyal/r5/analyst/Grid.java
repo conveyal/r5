@@ -50,6 +50,9 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -382,6 +385,10 @@ public class Grid {
 
     /** Create grids from a CSV file */
     public static Map<String,Grid> fromCsv(File csvFile, String latField, String lonField, int zoom) throws IOException {
+        return fromCsv(csvFile, latField, lonField, zoom, null);
+    }
+
+    public static Map<String,Grid> fromCsv(File csvFile, String latField, String lonField, int zoom, BiConsumer<Integer, Integer> statusListener) throws IOException {
         CsvReader reader = new CsvReader(new BufferedInputStream(new FileInputStream(csvFile)), Charset.forName("UTF-8"));
         reader.readHeaders();
 
@@ -404,9 +411,9 @@ public class Grid {
         numericColumns.remove(lonField);
 
         // Detect which columns are completely numeric by iterating over all the rows and trying to parse the fields
-        int i = 0;
+        int total = 0;
         while (reader.readRecord()) {
-            if (++i % 10000 == 0) LOG.info("{} records", human(i));
+            if (++total % 10000 == 0) LOG.info("{} records", human(total));
 
             envelope.expandToInclude(parseDouble(reader.get(lonField)), parseDouble(reader.get(latField)));
 
@@ -424,6 +431,8 @@ public class Grid {
         }
 
         reader.close();
+
+        if (statusListener != null) statusListener.accept(0, total);
 
         // We now have an envelope and know which columns are numeric
         // Make a grid for each numeric column
@@ -443,9 +452,13 @@ public class Grid {
         reader = new CsvReader(new BufferedInputStream(new FileInputStream(csvFile)), Charset.forName("UTF-8"));
         reader.readHeaders();
 
-        i = 0;
+        int i = 0;
         while (reader.readRecord()) {
-            if (++i % 10000 == 0) LOG.info("{} records", human(i));
+            if (++i % 10000 == 0) {
+                LOG.info("{} records", human(i));
+            }
+
+            if (statusListener != null) statusListener.accept(i, total);
 
             double lat = parseDouble(reader.get(latField));
             double lon = parseDouble(reader.get(lonField));
@@ -471,10 +484,19 @@ public class Grid {
     }
 
     public static Map<String, Grid> fromShapefile (File shapefile, int zoom) throws IOException, FactoryException, TransformException {
+        return fromShapefile(shapefile, zoom, null);
+    }
+
+    public static Map<String, Grid> fromShapefile (File shapefile, int zoom, BiConsumer<Integer, Integer> statusListener) throws IOException, FactoryException, TransformException {
         Map<String, Grid> grids = new HashMap<>();
         ShapefileReader reader = new ShapefileReader(shapefile);
 
         Envelope envelope = reader.wgs84Bounds();
+        int total = reader.getFeatureCount();
+
+        if (statusListener != null) statusListener.accept(0, total);
+
+        AtomicInteger count = new AtomicInteger(0);
 
         reader.wgs84Stream().forEach(feat -> {
             Geometry geom = (Geometry) feat.getDefaultGeometry();
@@ -509,6 +531,14 @@ public class Grid {
                 } else {
                     throw new IllegalArgumentException("Unsupported geometry type");
                 }
+            }
+
+            int currentCount = count.incrementAndGet();
+
+            if (statusListener != null) statusListener.accept(currentCount, total);
+
+            if (currentCount % 10000 == 0) {
+                LOG.info("{} / {} features read", human(currentCount), human(total));
             }
         });
 

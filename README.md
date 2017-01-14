@@ -14,6 +14,10 @@ Please follow the Conveyal Java style guide at https://github.com/conveyal/JavaS
 R<sup>5</sup> grew out of several open-source projects. The focus on analytic applications, and the core development team behind R<sup>5</sup>,
 came from [OpenTripPlanner](http://opentripplanner.org). Many of the algorithms, as well as the name, came from [r4](https://github.com/bliksemlabs/rrrr).
 
+## Building a network
+
+R5 is developed primarily as a routing library for use in other projects (Conveyal Analysis, Modeify etc.) However for testing purposes there are commands to build a network and provide basic routing and visualization of network structure in a web interface. To build a network, place one or more GTFS feeds in a directory together with an OSM PBF file covering the same region. Then run `com.conveyal.r5.R5Main point --build /Users/me/path/to/inputs`, using the -Xmx switch to give the JVM a GB or two of memory if possible. This will create a file called `network.dat` in the same directory as the input files. Then run `com.conveyal.r5.R5Main point --graphs /path/to/input/files` to start up the web server. The routing interface should then be available at `http://localhost:8080/`, a somewhat more advanced interface at `http://localhost:8080/new.html` and a vector-based visualization for examining the contents of the network at `http://localhost:8080/debug.html`. For the debug visualization, you will need to zoom in fairly close before edges are loaded.
+
 ## Performing a Release
 
 We are not currently using the Maven release plugin. To do so, we'd have to make R5 depend only on non-SNAPSHOT repos. Anyway, we don't want to perform releases from our local machines and prefer to let Travis CI do this. It provides a consistent build environment and there is no risk of stray local commits getting into a release.

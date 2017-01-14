@@ -1,9 +1,11 @@
 package com.conveyal.r5.analyst.broker;
 
-import com.amazonaws.regions.Regions;
+import com.amazonaws.regions.*;
+import com.amazonaws.regions.Region;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.*;
+import com.conveyal.r5.analyst.cluster.EC2Info;
 import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import com.conveyal.r5.common.JsonUtilities;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -188,11 +190,14 @@ public class Broker implements Runnable {
 
         ec2 = new AmazonEC2Client();
 
-        // default to current region when running in EC2
-        com.amazonaws.regions.Region r = Regions.getCurrentRegion();
-
-        if (r != null)
-            ec2.setRegion(r);
+        // When running on an EC2 instance, default to the AWS region of that intance
+        Region region = null;
+        if (!workOffline) {
+            region = Regions.getCurrentRegion();
+        }
+        if (region != null) {
+            ec2.setRegion(region);
+        }
     }
 
     /**
@@ -404,14 +409,6 @@ public class Broker implements Runnable {
 
     /** Consumer long-poll operations are enqueued here. */
     public synchronized void registerSuspendedResponse(WorkerCategory category, Response response) {
-        // Add this worker to our catalog, tracking its graph affinity and the last time it was seen.
-        String workerId = response.getRequest().getHeader(AnalystWorker.WORKER_ID_HEADER);
-        if (workerId != null && !workerId.isEmpty()) {
-            workerCatalog.catalog(workerId, category);
-        } else {
-            LOG.error("Worker did not supply a unique ID for itself . Ignoring it.");
-            return;
-        }
         // Shelf this suspended response in a queue grouped by graph affinity.
         Deque<Response> deque = workersByCategory.get(category);
         if (deque == null) {
@@ -735,9 +732,9 @@ public class Broker implements Runnable {
         public final Response response;
         public final String machineId;
 
-        public WrappedResponse(Request request, Response response) {
+        public WrappedResponse(String machineId, Response response) {
+            this.machineId = machineId;
             this.response = response;
-            this.machineId = request.getHeader(AnalystWorker.WORKER_ID_HEADER);
         }
 
         @Override public int compareTo(WrappedResponse wrappedResponse) {

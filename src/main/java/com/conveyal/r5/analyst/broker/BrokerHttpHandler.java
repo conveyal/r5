@@ -1,12 +1,14 @@
 package com.conveyal.r5.analyst.broker;
 
+import com.conveyal.r5.analyst.cluster.AnalystWorker;
 import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
+import com.conveyal.r5.analyst.cluster.WorkerStatus;
 import com.conveyal.r5.common.JsonUtilities;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
-import org.apache.http.entity.ContentType;
 import org.glassfish.grizzly.http.Method;
 import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.Request;
@@ -94,16 +96,29 @@ class BrokerHttpHandler extends HttpHandler {
                 return;
             }
             else if (request.getMethod() == Method.POST && "dequeue".equals(command)) {
-                /* Workers use this command to fetch tasks from a work queue.
-                   They supply their R5 commit and network ID to make sure they always get the same category of work.
-                   The method is POST because unlike GETs it modifies the task queue on the server. */
-                String workType = pathComponents[2];
-                String graphId = pathComponents[3];
-                String workerCommit = pathComponents[4];
-                WorkerCategory category = new WorkerCategory(graphId, workerCommit);
+                /*
+                   Workers use this command to fetch tasks from a work queue.
+                   They supply their R5 commit, network ID, and a unique worker ID to make sure they always get the
+                   same category of work. Newer workers provide this information (and much more) in a JSON request body.
+                   Older workers will include a simplified version of it in the URL and headers.
+                   The method is POST because unlike GETs (which fetch status) it modifies the task queue on the server.
+                */
+                WorkerStatus workerStatus = JsonUtilities.objectFromRequestBody(request, WorkerStatus.class);
+                String workType = pathComponents[2]; // Worker specifies single point or regional polling
+                if (workerStatus == null) {
+                    // Older worker did not supply a JSON body. Fill in the status from URL and headers.
+                    workerStatus = new WorkerStatus();
+                    workerStatus.networks = Sets.newHashSet(pathComponents[3]);
+                    workerStatus.workerVersion = pathComponents[4];
+                    workerStatus.workerId = request.getHeader(AnalystWorker.WORKER_ID_HEADER);
+                }
+                // Assume one loaded graph (or preferred graph at startup) in the current system
+                // Add this worker to our catalog, tracking its graph affinity and the last time it was seen.
+                broker.workerCatalog.catalog(workerStatus);
+                WorkerCategory category = workerStatus.getWorkerCategory();
                 if ("single".equals(workType)) {
                     // Worker is polling for single point tasks.
-                    Broker.WrappedResponse wrappedResponse = new Broker.WrappedResponse(request, response);
+                    Broker.WrappedResponse wrappedResponse = new Broker.WrappedResponse(workerStatus.workerId, response);
                     request.getRequest().getConnection().addCloseListener(
                             (c, i) -> broker.removeSinglePointChannel(category, wrappedResponse));
                     // The request object will be shelved and survive after the handler function exits.
@@ -120,7 +135,7 @@ class BrokerHttpHandler extends HttpHandler {
                 }
                 else {
                     response.setStatus(HttpStatus.NOT_FOUND_404);
-                    response.setDetailMessage("Context not found; should be either 'jobs' or 'priority'");
+                    response.setDetailMessage("Context not found. Should be either 'single' or 'regional'.");
                 }
             }
             else if (request.getMethod() == Method.POST && "enqueue".equals(command)) {

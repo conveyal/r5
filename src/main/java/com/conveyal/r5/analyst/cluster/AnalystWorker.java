@@ -1,6 +1,5 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
@@ -24,17 +23,13 @@ import com.google.common.io.ByteStreams;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
-import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpDelete;
-import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.config.SocketConfig;
 import org.apache.http.conn.HttpHostConnectException;
-import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-import org.apache.http.message.BasicHeader;
 import org.apache.http.util.EntityUtils;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.profile.RepeatedRaptorProfileRouter;
@@ -47,7 +42,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.SocketTimeoutException;
-import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -79,6 +73,7 @@ public class AnalystWorker implements Runnable {
      * logger is.
      *
      * TODO use the per-thread slf4j ID feature
+     * Actually by setting the thread name / creating a new thread maybe we can get around this somehow.
      */
     public static final String machineId = UUID.randomUUID().toString().replaceAll("-", "");
 
@@ -89,7 +84,7 @@ public class AnalystWorker implements Runnable {
     public static final int POLL_TIMEOUT = 10 * 1000;
 
     /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
-    private final TransportNetworkCache transportNetworkCache;
+    final TransportNetworkCache transportNetworkCache;
 
     /**
      * If this value is non-negative, the worker will not actually do any work. It will just report all tasks
@@ -146,11 +141,8 @@ public class AnalystWorker implements Runnable {
 
     long startupTime, nextShutdownCheckTime;
 
-    /* The EC2 region this worker is running in, otherwise this will be null. */
-    Region awsRegion;
-
-    /** AWS instance type, or null if not running on AWS. */
-    private String instanceType;
+    /** Information about the EC2 instance (if any) this worker is running on. */
+    EC2Info ec2info;
 
     /** TODO what's this number? */
     long lastHighPriorityRequestProcessed = 0;
@@ -170,15 +162,15 @@ public class AnalystWorker implements Runnable {
     public AnalystWorker(Properties config) {
         // grr this() must be first call in constructor, even if previous statements do not have side effects.
         // Thanks, Java.
-        this(config, new TransportNetworkCache(
-                Boolean.parseBoolean(config.getProperty("work-offline", "false"))
-                        ? null
-                        : config.getProperty("graphs-bucket"), new File(config.getProperty("cache-dir", "cache/graphs"))));
+        this(config, new TransportNetworkCache(Boolean.parseBoolean(
+            config.getProperty("work-offline", "false")) ? null : config.getProperty("graphs-bucket"),
+            new File(config.getProperty("cache-dir", "cache/graphs"))));
     }
 
     public AnalystWorker(Properties config, TransportNetworkCache cache) {
         // print out date on startup so that CloudWatch logs has a unique fingerprint
-        LOG.info("Analyst worker starting at {}", LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
+        LOG.info("Analyst worker {} starting at {}", machineId,
+                LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
 
         // PARSE THE CONFIGURATION
 
@@ -224,13 +216,14 @@ public class AnalystWorker implements Runnable {
         startupTime = System.currentTimeMillis();
         nextShutdownCheckTime = startupTime + 55 * 60 * 1000;
 
-        // When running on an Amazon EC2 instance, discover what region the worker is running in.
-        // If the worker isn't running in Amazon EC2, then region will be null so we fall back on a default.
-        awsRegion = Regions.getCurrentRegion();
-        if (awsRegion == null) {
-            LOG.info("Unable to detect the region, this worker must not be running on EC2.");
+        // Discover information about what EC2 instance / region we're running on, if any.
+        // If the worker isn't running in Amazon EC2, then region will be unknown so fall back on a default, because
+        // the new request signing v4 requires you to know the region where the S3 objects are. FIXME but where is that done/used?
+        ec2info = new EC2Info();
+        if (workOffline) {
+            ec2info.region = Regions.EU_WEST_1.getName();
         } else {
-            LOG.info("Detected that this worker is running in region {}", awsRegion);
+            ec2info.fetchMetadata();
         }
 
         // When creating the S3 and SQS clients use the default credentials chain.
@@ -239,10 +232,6 @@ public class AnalystWorker implements Runnable {
         // http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/java-dg-roles.html
         s3 = new AmazonS3Client();
 
-        // The new request signing v4 requires you to know the region where the S3 objects are.
-        s3.setRegion(awsRegion == null ? Region.getRegion(Regions.EU_WEST_1) : awsRegion);
-
-        instanceType = getInstanceType();
     }
 
     /**
@@ -365,7 +354,7 @@ public class AnalystWorker implements Runnable {
 
             TaskStatistics ts = new TaskStatistics();
             ts.graphId = clusterRequest.graphId;
-            ts.awsInstanceType = instanceType;
+            ts.awsInstanceType = ec2info.instanceType;
             ts.jobId = clusterRequest.jobId;
             ts.workerId = machineId;
 
@@ -656,15 +645,15 @@ public class AnalystWorker implements Runnable {
     }
 
     public List<GenericClusterRequest> getSomeWork(WorkType type) {
-
-        // Run a POST request (long-polling for work) indicating which graph and r5 commit this worker has.
-        String url = String.join("/", BROKER_BASE_URL, "dequeue", type == WorkType.SINGLE ? "single" : "regional",
-                networkId, R5Version.describe);
+        // Run a POST request (long-polling for work)
+        // The graph and r5 commit of this worker are indicated in the request body.
+        String url = String.join("/", BROKER_BASE_URL, "dequeue", type == WorkType.SINGLE ? "single" : "regional");
         HttpPost httpPost = new HttpPost(url);
-        httpPost.setHeader(new BasicHeader(WORKER_ID_HEADER, machineId));
-        HttpResponse response = null;
+        WorkerStatus workerStatus = new WorkerStatus();
+        workerStatus.loadStatus(this);
+        httpPost.setEntity(JsonUtilities.objectToJsonHttpEntity(workerStatus));
         try {
-            response = httpClient.execute(httpPost);
+            HttpResponse response = httpClient.execute(httpPost);
             HttpEntity entity = response.getEntity();
             if (entity == null) {
                 return null;
@@ -673,7 +662,6 @@ public class AnalystWorker implements Runnable {
                 EntityUtils.consumeQuietly(entity);
                 return null;
             }
-
             // Use the lenient object mapper here in case the broker belongs to a newer
             return JsonUtilities.lenientObjectMapper.readValue(entity.getContent(), new TypeReference<List<GenericClusterRequest>>() {});
         } catch (JsonProcessingException e) {
@@ -790,8 +778,7 @@ public class AnalystWorker implements Runnable {
         try {
             HttpPost httpPost = new HttpPost(url);
             httpPost.setHeader("Content-type", "application/json");
-            byte[] errorsAsJson = JsonUtilities.objectMapper.writeValueAsBytes(taskErrors);
-            httpPost.setEntity(new ByteArrayEntity(errorsAsJson));
+            httpPost.setEntity(JsonUtilities.objectToJsonHttpEntity(taskErrors));
             // Send the JSON serialized error object to the broker.
             HttpResponse response = httpClient.execute(httpPost);
             // Tell the http client library that we won't do anything with the broker's response, allowing connection reuse.
@@ -818,33 +805,6 @@ public class AnalystWorker implements Runnable {
             }
         } catch (Exception e) {
             LOG.warn("Failed to delete task {}", clusterRequest.taskId, e);
-        }
-    }
-
-    /** Get the AWS instance type if applicable */
-    public String getInstanceType () {
-        try {
-            HttpGet get = new HttpGet();
-            // see http://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-metadata.html
-            // This seems very much not EC2-like to hardwire an IP address for getting instance metadata,
-            // but that's how it's done.
-            get.setURI(new URI("http://169.254.169.254/latest/meta-data/instance-type"));
-            get.setConfig(RequestConfig.custom()
-                    .setConnectTimeout(2000)
-                    .setSocketTimeout(2000)
-                    .build()
-            );
-
-            HttpResponse res = httpClient.execute(get);
-
-            InputStream is = res.getEntity().getContent();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(is));
-            String type = reader.readLine().trim();
-            reader.close();
-            return type;
-        } catch (Exception e) {
-            LOG.info("Could not retrieve EC2 instance type, this worker may be running outside of EC2.");
-            return null;
         }
     }
 
@@ -898,4 +858,5 @@ public class AnalystWorker implements Runnable {
     public static enum WorkType {
         SINGLE, REGIONAL;
     }
+
 }

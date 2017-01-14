@@ -13,14 +13,17 @@ import com.conveyal.r5.common.R5Version;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.streets.StreetLayer;
+import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -365,5 +368,14 @@ public class TransportNetworkCache {
         new TransferFinder(network).findTransfers();
 
         return network;
+    }
+
+    public Set<String> getLoadedNetworkIds() {
+        if (currentNetwork == null) return Collections.emptySet();
+        else return Sets.newHashSet(currentNetwork.scenarioId);
+    }
+
+    public Set<String> getAppliedScenarios() {
+        return scenarioNetworkCache.keySet();
     }
 }

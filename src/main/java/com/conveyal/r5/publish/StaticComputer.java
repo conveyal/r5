@@ -203,7 +203,7 @@ public class StaticComputer implements Runnable {
             }
         }
 
-        LOG.info("Writing output to broker took {}s", (System.currentTimeMillis() - outputStart) / 1000);
+        LOG.info("Writing output to broker took {}s", (System.currentTimeMillis() - outputStart) / 1000.0);
         LOG.info("Average of {} paths per destination stop", sum / stops);
 
         out.flush();

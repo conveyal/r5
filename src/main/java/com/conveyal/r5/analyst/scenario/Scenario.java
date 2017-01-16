@@ -39,7 +39,7 @@ public class Scenario implements Serializable {
     public Map<String, Long> feedChecksums;
 
     /** If this is true, expensive checks will be done to ensure that the original network was not damaged by the process. */
-    private static final boolean VERIFY_BASE_NETWORK_UNCHANGED = true;
+    private static final boolean VERIFY_BASE_NETWORK_UNCHANGED = false;
 
     /**
      * @return a copy of the supplied network with the modifications in this scenario non-destructively applied.

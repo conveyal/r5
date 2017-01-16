@@ -37,22 +37,23 @@ public class TransportNetwork implements Serializable {
     public TransitLayer transitLayer;
 
     /**
-     * Cache a grid point set that covers the extents of this transport network. The PointSet itself caches linkages to
-     * street networks. If they have been created, this point set and its linkage to the street network are serialized
-     * along with the network, which makes startup much faster. Note that there's a linkage cache with
-     * references to streetlayers, a spatial index, etc. in there so be careful not to serialize a bunch of things you
-     * don't mean to.
+     * A grid point set that covers the full extent of this transport network. The PointSet itself then caches linkages
+     * to street networks (the baseline street network, or ones with various scenarios applied). If they have been
+     * created, this point set and its linkage to the street network are serialized along with the network, which makes
+     * startup much faster. Note that there's a linkage cache with references to streetlayers in this GridPointSet,
+     * so you should usually only serialize a TransportNetwork right after it's built, when that cache contains only
+     * the baseline linkage.
      */
     private WebMercatorGridPointSet gridPointSet;
 
     /**
-     * A string uniquely identifying the contents of this TransportNetwork in the space of TransportNetwork objects.
-     * When a scenario has modified the base network to produce this layer, the networkId will be changed to the
-     * scenario ID. When no scenario has been applied, this field will contain the original base networkId.
-     * This allows proper caching of downstream data and results: we need a way to know what informatio is in the
-     * network independent of object identity.
+     * A string uniquely identifying the contents of this TransportNetwork in the space of TransportNetworks.
+     * When no scenario has been applied, this field will contain the original base networkId.
+     * When a scenario has modified a base network to produce this network, this field will be changed to the
+     * scenario ID. This allows proper caching of downstream data and results: we need a way to know what information
+     * is in the network independent of object identity, and after a round trip through serialization.
      */
-    public String networkId = null;
+    public String scenarioId = null;
 
     public static final String BUILDER_CONFIG_FILENAME = "build-config.json";
 
@@ -82,14 +83,6 @@ public class TransportNetwork implements Serializable {
         transitLayer.rebuildTransientIndexes();
     }
 
-    /**
-     * Pre-build some things that will be used in analysis.
-     * Then they can serialized along with the network, which avoids building them when an analysis worker starts up.
-     */
-    public void buildAnalysisIndexes() {
-        this.transitLayer.buildDistanceTables(null);
-        this.getLinkedGridPointSet();
-    }
 
     /** Legacy method to load from a single GTFS file */
     public static TransportNetwork fromFiles (String osmSourceFile, String gtfsSourceFile, TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
@@ -179,12 +172,6 @@ public class TransportNetwork implements Serializable {
     public static TransportNetwork fromFiles (String osmFile, List<String> gtfsFiles, TNBuilderConfig config) {
         return fromFiles(osmFile, gtfsFiles, null, config);
     }
-
-    /** Create a transport network from already loaded GTFS feeds */
-    public static TransportNetwork fromFeeds (String osmFile, List<GTFSFeed> feeds, TNBuilderConfig config) {
-        return fromFiles(osmFile, null, feeds, config);
-    }
-
 
     public static TransportNetwork fromDirectory (File directory) throws DuplicateFeedException {
         File osmFile = null;
@@ -287,7 +274,7 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * @return an efficient implicit grid PointSet for this TransportNetwork.
+     * @return an efficient implicit grid PointSet for this TransportNetwork. Lazy-initialized and cached.
      */
     public WebMercatorGridPointSet getGridPointSet() {
         if (this.gridPointSet == null) {
@@ -347,37 +334,27 @@ public class TransportNetwork implements Serializable {
 
     /**
      * We want to apply Scenarios to TransportNetworks, yielding a new TransportNetwork without disrupting the original
-     * one. The approach is to make a copy of the TransportNetwork, then apply all the Modifications in the Scenario
-     * one by one to that same copy. Two very different modification strategies are used for the TransitLayer and the
-     * StreetLayer.
-     * The TransitLayer has a hierarchy of collections, from patterns to trips to stoptimes. We can
+     * one. The approach is to make a copy of the TransportNetwork, then apply all the Modifications in the Scenario one
+     * by one to that same copy. Two very different modification strategies are used for the TransitLayer and the
+     * StreetLayer. The TransitLayer has a hierarchy of collections, from patterns to trips to stoptimes. We can
      * selectively copy-on-modify these collections without much impact on performance as long as they don't become too
      * large. This is somewhat inefficient but easy to reason about, considering we allow both additions and deletions.
-     * We don't use clone() here with the expectation that it will be more clear and maintainable to show exactly
-     * how each field is being copied.
-     * On the other hand, the StreetLayer contains a few very large lists which would be wasteful to copy.
-     * It is duplicated in such a way that it wraps the original lists, allowing them to be non-destructively extended.
-     * There will be some performance hit from wrapping these lists, but it's probably completely negligible.
-     * @return a semi-shallow copy of this TransportNetwork.
+     * We don't use clone() here with the expectation that it will be more clear and maintainable to show exactly how
+     * each field is being copied. On the other hand, the StreetLayer contains a few very large lists which would be
+     * wasteful to copy. It is duplicated in such a way that it wraps the original lists, allowing them to be
+     * non-destructively extended. There will be some performance hit from wrapping these lists, but it's probably
+     * negligible.
+     *
+     * @return a copy of this TransportNetwork that is partly shallow and partly deep.
      */
     public TransportNetwork scenarioCopy(Scenario scenario) {
         TransportNetwork copy = new TransportNetwork();
-        copy.networkId = scenario.id;
+        // It is important to set this before making the clones of the street and transit layers below.
+        copy.scenarioId = scenario.id;
         copy.gridPointSet = this.gridPointSet;
-
-        if (scenario.affectsTransitLayer()) {
-            copy.transitLayer = this.transitLayer.scenarioCopy(copy);
-        } else {
-            copy.transitLayer = this.transitLayer;
-        }
-        if (scenario.affectsStreetLayer()) {
-            copy.streetLayer = this.streetLayer.scenarioCopy(copy);
-        } else {
-            copy.streetLayer = this.streetLayer;
-        }
-
+        copy.transitLayer = this.transitLayer.scenarioCopy(copy, scenario.affectsTransitLayer());
+        copy.streetLayer = this.streetLayer.scenarioCopy(copy, scenario.affectsStreetLayer());
         copy.fareCalculator = this.fareCalculator;
-
         return copy;
     }
 

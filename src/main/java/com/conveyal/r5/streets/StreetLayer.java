@@ -134,6 +134,17 @@ public class StreetLayer implements Serializable, Cloneable {
      */
     public TransportNetwork parentNetwork = null;
 
+
+    /**
+     * A string uniquely identifying the contents of this StreetLayer among all StreetLayers.
+     * When no scenario has been applied, this field will contain the ID of the enclosing TransportNetwork.
+     * When a scenario has modified this StreetLayer, this field will be changed to that scenario's ID.
+     * We need a way to know what information is in the network independent of object identity, which is lost in a
+     * round trip through serialization. This also allows re-using cached linkages for several scenarios as long as
+     * they don't modify the street network.
+     */
+    public String scenarioId;
+
     /**
      * Some StreetLayers are created by applying a scenario to an existing StreetLayer. All the contents of the base
      * StreetLayer are not copied, they are wrapped to make them extensible. These are called "scenario copies".
@@ -1338,16 +1349,23 @@ public class StreetLayer implements Serializable, Cloneable {
      * We intentionally avoid using clone() on EdgeStore and VertexStore so all field copying is explicit and we can
      * clearly see whether we are accidentally shallow-copying any collections or data structures from the base graph.
      * StreetLayer has a lot more fields and most of them can be shallow-copied, so here we use clone() for convenience.
+     * @param willBeModified if false, do not make any changes to the new StreetLayer copy. Allows some optimizations.
      * @return a copy of this StreetLayer to which Scenarios can be applied without affecting the original StreetLayer.
      */
-    public StreetLayer scenarioCopy(TransportNetwork newScenarioNetwork) {
+    public StreetLayer scenarioCopy(TransportNetwork newScenarioNetwork, boolean willBeModified) {
         StreetLayer copy = this.clone();
-        copy.baseStreetLayer = this;
+        if (willBeModified) {
+            // Wrap all the edge and vertex storage in classes that make them extensible.
+            // Indicate that the content of the new StreetLayer will be changed by giving it the scenario's scenarioId.
+            // If the copy will not be modified, scenarioId remains unchanged to allow cached pointset linkage reuse.
+            copy.scenarioId = newScenarioNetwork.scenarioId;
+            copy.edgeStore = edgeStore.extendOnlyCopy();
+            // The extend-only copy of the EdgeStore also contains a new extend-only copy of the VertexStore.
+            copy.vertexStore = copy.edgeStore.vertexStore;
+            copy.temporaryEdgeIndex = new IntHashGrid();
+        }
         copy.parentNetwork = newScenarioNetwork;
-        copy.edgeStore = edgeStore.extendOnlyCopy();
-        // The extend-only copy of the EdgeStore also contains a new extend-only copy of the VertexStore.
-        copy.vertexStore = copy.edgeStore.vertexStore;
-        copy.temporaryEdgeIndex = new IntHashGrid();
+        copy.baseStreetLayer = this;
         return copy;
     }
 

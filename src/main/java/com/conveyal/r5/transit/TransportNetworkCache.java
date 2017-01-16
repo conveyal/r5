@@ -73,7 +73,10 @@ public class TransportNetworkCache {
     /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
     private boolean workOffline;
 
-    /** This stores any number of lightweight scenario networks built upon the current base network. */
+    /**
+     * This stores any number of lightweight scenario networks built upon the current base network.
+     * FIXME that sounds like a memory leak, should be a WeighingCache.
+     */
     private Map<String, TransportNetwork> scenarioNetworkCache = new HashMap<>();
 
     /**
@@ -228,6 +231,7 @@ public class TransportNetworkCache {
 
     /** If we did not find a cached network, build one */
     public TransportNetwork buildNetwork (String networkId) {
+
         TransportNetwork network;
 
         // check if we have a new-format bundle with a JSON manifest
@@ -239,15 +243,21 @@ public class TransportNetworkCache {
             LOG.warn("Detected old-format bundle stored as single ZIP file");
             network = buildNetworkFromBundleZip(networkId);
         }
+        network.scenarioId = networkId;
 
-        // These networks are going to be used for analysis work.
+        // Networks created in TransportNetworkCache are going to be used for analysis work.
         // Pre-compute distance tables from stops to streets and pre-build a linked grid pointset for the whole region.
-        network.buildAnalysisIndexes();
+        // They should be serialized along with the network, which avoids building them when an analysis worker starts.
+        // The pointset linkage will never be used directly, but serves as a basis for scenario linkages, making
+        // analysis much faster to start up.
+        // FIXME Note however that the linked pointset is not being serialized because the Guava cache implementation doesn't serialize its contents.
+        network.transitLayer.buildDistanceTables(null);
+        network.getLinkedGridPointSet();
 
         // Cache the network.
         String filename = networkId + "_" + R5Version.version + ".dat";
         File cacheLocation = new File(cacheDir, networkId + "_" + R5Version.version + ".dat");
-        
+
         try {
             // Serialize TransportNetwork to local cache on this worker
             network.write(cacheLocation);
@@ -264,7 +274,6 @@ public class TransportNetworkCache {
             LOG.error("Error saving cached network", e);
             cacheLocation.delete();
         }
-
         return network;
     }
 
@@ -317,7 +326,7 @@ public class TransportNetworkCache {
         }
 
         // Set the ID on the network and its layers to allow caching linkages and analysis results.
-        network.networkId = networkId;
+        network.scenarioId = networkId;
 
         return network;
     }
@@ -345,14 +354,17 @@ public class TransportNetworkCache {
             LOG.error("Error reading manifest", e);
             return null;
         }
+        // FIXME duplicate code. All internal building logic should be encapsulated in a method like TransportNetwork.build(osm, gtfs1, gtfs2...)
+        // We currently have multiple copies of it, in buildNetworkFromManifest and buildNetworkFromBundleZip
+        // So you've got to remember to do certain things like set the network ID of the network in multiple places in the code.
 
         TransportNetwork network = new TransportNetwork();
+        network.scenarioId = networkId;
         network.streetLayer = new StreetLayer(new TNBuilderConfig()); // TODO builderConfig
         network.streetLayer.loadFromOsm(osmCache.get(manifest.osmId));
         network.streetLayer.parentNetwork = network;
         network.streetLayer.indexStreets();
 
-        // TODO this internal building logic should be encapsulated in a static method like Network.build(osm, gtfs1, gtfs2...) We currently have multiple copies of it.
         network.transitLayer = new TransitLayer();
 
         manifest.gtfsIds.stream()

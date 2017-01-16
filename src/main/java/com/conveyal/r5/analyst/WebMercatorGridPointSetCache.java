@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * The cache does not have expiration, which is fine, because it exists on the workers which are short-lived.
  */
 public class WebMercatorGridPointSetCache {
+
     private Map<GridKey, WebMercatorGridPointSet> cache = new ConcurrentHashMap<>();
 
     public WebMercatorGridPointSet get (int zoom, int west, int north, int width, int height) {
@@ -54,4 +55,5 @@ public class WebMercatorGridPointSetCache {
             }
         }
     }
+
 }

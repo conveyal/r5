@@ -522,6 +522,7 @@ public class Broker implements Runnable {
             if (!workOffline) {
                 consumers = workersByCategory.get(workerCategory);
             } else {
+                // Working offline, just feed the task to any available worker on any category.
                 Optional<Deque<Response>> opt = workersByCategory.values().stream().filter(c -> !c.isEmpty()).findFirst();
                 if (opt.isPresent()) consumers = opt.get();
                 else consumers = null;

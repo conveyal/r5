@@ -2,7 +2,6 @@ package com.conveyal.r5.analyst.scenario;
 
 import com.beust.jcommander.internal.Lists;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
-import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.transit.TransferFinder;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -125,10 +124,12 @@ public class Scenario implements Serializable {
                 copiedNetwork.streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.DISTANCE_TABLE_SIZE_METERS);
         copiedNetwork.transitLayer.buildDistanceTables(treeRebuildZone);
         
-        // find the transfers originating at or terminating at new stops.
-        // TODO also rebuild transfers which are near street network changes but which do not connect to new stops
+        // Find the transfers originating at or terminating at new stops.
+        // TODO also rebuild transfers which are near street network changes but which do not connect to new stops.
         new TransferFinder(copiedNetwork).findTransfers();
 
+        // Update the linkage between the grid and the streets, considering whether the scenario changed any streets.
+        copiedNetwork.rebuildLinkedGridPointSet();
         if (VERIFY_BASE_NETWORK_UNCHANGED) {
             if (originalNetwork.checksum() != baseNetworkChecksum) {
                 LOG.error("Applying a scenario mutated the base transportation network. THIS IS A BUG.");

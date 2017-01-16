@@ -368,7 +368,7 @@ public class AnalystWorker implements Runnable {
             // TODO fetch the scenario-applied transportNetwork out here, maybe using OptionalResult instead of exceptions
             TransportNetwork transportNetwork = null;
             try {
-                // FIXME ideally we should just be passsing the scenario object into this function, and another separate function should get the scenario object from the cluster request.
+                // FIXME ideally we should just be passing the scenario object into this function, and another separate function should get the scenario object from the cluster request.
                 transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, clusterRequest.extractProfileRequest());
                 // FIXME this stats stuff needs to be moved to where the graph is actually built, or fetch the graph out here.
                 ts.graphBuild = (int) (System.currentTimeMillis() - graphStartTime);
@@ -548,7 +548,7 @@ public class AnalystWorker implements Runnable {
         final PointSet targets;
         if (isochrone) {
             // This is an isochrone request, search to a regular grid of points.
-            targets = transportNetwork.getGridPointSet();
+            targets = transportNetwork.gridPointSet;
         } else {
             // This is a detailed accessibility request. There is necessarily a destination point set supplied.
             targets = pointSetDatastore.get(clusterRequest.destinationPointsetId);

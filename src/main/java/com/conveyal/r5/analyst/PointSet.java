@@ -29,8 +29,6 @@ public abstract class PointSet implements Serializable {
      * of travel. We don't want to key this cache on the TransportNetwork or Scenario, only on the StreetNetwork.
      * This ensures linkages are re-used for multiple scenarios that have different transit characteristics but the
      * same street network.
-     * R5 is now smart enough to only clone the StreetLayer when it's really changed by a scenario, so we can key on
-     * the StreetLayer's identity rather than semantically.
      */
     protected LoadingCache<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> linkageCache = CacheBuilder.newBuilder()
             .maximumSize(LINKAGE_CACHE_SIZE)

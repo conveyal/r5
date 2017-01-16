@@ -69,7 +69,7 @@ public class LinkedPointSet implements Serializable {
     public int[] distances1_mm;
 
     /** For each transit stop, the distances to nearby PointSet points as packed (point_index, distance) pairs. */
-    public transient List<int[]> stopToPointDistanceTables;
+    public List<int[]> stopToPointDistanceTables;
 
     /** It is preferred to specify a mode when linking TODO remove this. */
     @Deprecated

@@ -2,6 +2,7 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
+import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
@@ -44,7 +45,14 @@ public class TransportNetwork implements Serializable {
      * so you should usually only serialize a TransportNetwork right after it's built, when that cache contains only
      * the baseline linkage.
      */
-    private WebMercatorGridPointSet gridPointSet;
+    public WebMercatorGridPointSet gridPointSet;
+
+    /**
+     * Our current system caches linkages within GridPointSets. Guava caches serialize their configuration but not
+     * their contents, which is actually pretty sane behavior for a cache. So if we want a particular linkage to be
+     * available on reload, we have to store it in its own field.
+     */
+    public LinkedPointSet linkedGridPointSet;
 
     /**
      * A string uniquely identifying the contents of this TransportNetwork in the space of TransportNetworks.
@@ -274,25 +282,16 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * @return an efficient implicit grid PointSet for this TransportNetwork. Lazy-initialized and cached.
+     * Build an efficient implicit grid PointSet for this TransportNetwork if it doesn't already exist. Then link that
+     * grid pointset to the street layer. This is called when a network is built for analysis purposes, and also after a
+     * scenario is applied to rebuild the grid pointset on the scenario copy of the network.
      */
-    public WebMercatorGridPointSet getGridPointSet() {
-        if (this.gridPointSet == null) {
-            synchronized (this) {
-                if (this.gridPointSet == null) {
-                    this.gridPointSet = new WebMercatorGridPointSet(this);
-                }
-            }
+    public void rebuildLinkedGridPointSet() {
+        if (gridPointSet == null) {
+            gridPointSet = new WebMercatorGridPointSet(this);
         }
-        return this.gridPointSet;
-    }
-
-    /**
-     * @return an efficient implicit grid PointSet for this TransportNetwork, pre-linked to the street layer.
-     */
-    public LinkedPointSet getLinkedGridPointSet() {
-        // TODO don't hardwire walk mode
-        return getGridPointSet().link(streetLayer, StreetMode.WALK);
+        // Here we are bypassing the GridPointSet's internal cache of linkages.
+        linkedGridPointSet = new LinkedPointSet(gridPointSet, streetLayer, StreetMode.WALK, linkedGridPointSet);
     }
 
     //TODO: add transit stops to envelope
@@ -348,10 +347,12 @@ public class TransportNetwork implements Serializable {
      * @return a copy of this TransportNetwork that is partly shallow and partly deep.
      */
     public TransportNetwork scenarioCopy(Scenario scenario) {
+        // Maybe we should be using clone() here but TransportNetwork has very few fields and most are overwritten.
         TransportNetwork copy = new TransportNetwork();
         // It is important to set this before making the clones of the street and transit layers below.
         copy.scenarioId = scenario.id;
         copy.gridPointSet = this.gridPointSet;
+        copy.linkedGridPointSet = this.linkedGridPointSet;
         copy.transitLayer = this.transitLayer.scenarioCopy(copy, scenario.affectsTransitLayer());
         copy.streetLayer = this.streetLayer.scenarioCopy(copy, scenario.affectsStreetLayer());
         copy.fareCalculator = this.fareCalculator;

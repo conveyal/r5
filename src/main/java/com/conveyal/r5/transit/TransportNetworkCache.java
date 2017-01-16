@@ -6,6 +6,7 @@ import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.osmlib.OSMCache;
+import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.BundleManifest;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
@@ -29,7 +30,7 @@ import java.util.zip.ZipInputStream;
 
 /**
  * This holds one or more TransportNetworks keyed on unique strings.
- * This is a replacement for ClusterGraphBuilder.
+ * Actually this currently only holds one single TransportNetwork, but that will eventually change.
  * TODO this should serialize any networks it builds, attempt to reload from disk, and copy serialized networks to S3.
  * Because (de)serialization is now about 2 orders of magnitude faster than building from scratch.
  */
@@ -70,9 +71,6 @@ public class TransportNetworkCache {
         this.sourceBucket = gtfsCache.bucket;
     }
 
-    /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
-    private boolean workOffline;
-
     /**
      * This stores any number of lightweight scenario networks built upon the current base network.
      * FIXME that sounds like a memory leak, should be a WeighingCache.
@@ -100,12 +98,6 @@ public class TransportNetworkCache {
             network = buildNetwork(networkId);
         }
 
-
-        // link the web mercator grid pointset that will be used for analysis
-        // this will never be used directly but will be the base of the linkages used when applying scenarios
-        // it took a while to figure this out, this may be the most expensive line of code in the whole project.
-        network.getLinkedGridPointSet();
-
         currentNetwork = network;
         currentNetworkId = networkId;
         scenarioNetworkCache.clear(); // We cache only scenario graphs built upon the currently active base graph.
@@ -114,7 +106,7 @@ public class TransportNetworkCache {
     }
 
     /**
-     * Find or create a TransportNetwork for the given
+     * Find or create a TransportNetwork for the given scenario ID.
      * By design a particular scenario is always defined relative to a single base graph (it's never applied to multiple
      * different base graphs). Therefore we can look up cached scenario networks based solely on their scenarioId
      * rather than a compound key of (networkId, scenarioId).
@@ -122,7 +114,7 @@ public class TransportNetworkCache {
      * The fact that scenario networks are cached means that PointSet linkages will be automatically reused when
      * the scenario is found by its ID and reused.
      *
-     * TODO LinkedPointSets keep a reference back to a StreetLayer which means that the network will not be completely garbage collected upon network switch
+     * TODO why are we passing in the request instead of the Scenario (which should contain its own ID)?
      */
     public synchronized TransportNetwork getNetworkForScenario (String networkId, ProfileRequest request) {
         String scenarioId = request.scenarioId != null ? request.scenarioId : request.scenario.id;
@@ -250,9 +242,8 @@ public class TransportNetworkCache {
         // They should be serialized along with the network, which avoids building them when an analysis worker starts.
         // The pointset linkage will never be used directly, but serves as a basis for scenario linkages, making
         // analysis much faster to start up.
-        // FIXME Note however that the linked pointset is not being serialized because the Guava cache implementation doesn't serialize its contents.
         network.transitLayer.buildDistanceTables(null);
-        network.getLinkedGridPointSet();
+        network.rebuildLinkedGridPointSet();
 
         // Cache the network.
         String filename = networkId + "_" + R5Version.version + ".dat";

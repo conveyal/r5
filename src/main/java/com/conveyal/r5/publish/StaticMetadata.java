@@ -78,7 +78,7 @@ public class StaticMetadata implements Runnable {
     /** Write metadata for this query */
     public void writeMetadata (OutputStream out) throws IOException {
         Metadata metadata = new Metadata();
-        WebMercatorGridPointSet ps = network.getGridPointSet();
+        WebMercatorGridPointSet ps = network.gridPointSet;
         metadata.zoom = ps.zoom;
         metadata.north = ps.north;
         metadata.west = ps.west;
@@ -94,7 +94,7 @@ public class StaticMetadata implements Runnable {
     /** Write distance tables from stops to PointSet points for this query. */
     public void writeStopTrees (OutputStream out) throws IOException {
         // Build the distance tables.
-        LinkedPointSet lps = network.getLinkedGridPointSet();
+        LinkedPointSet lps = network.linkedGridPointSet;
         if (lps.stopToPointDistanceTables == null) {
             // Null means make all trees, not just those in a certain geographic area.
             lps.makeStopToPointDistanceTables(null);

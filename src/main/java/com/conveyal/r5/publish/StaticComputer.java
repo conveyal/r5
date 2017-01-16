@@ -62,25 +62,23 @@ public class StaticComputer implements Runnable {
         }
     }
 
-    // This does the main calculations.
+    // This does the main calculations for a single origin point.
+    // It then writes out the travel times to all grid cells near the origin (walking or biking on-street) followed by
+    // the travel times to every reached stop in the network.
+    // TODO rename and/or refactor to reduce side effects (pull computation out of writing logic).
     public void write (OutputStream os) throws IOException {
-        WebMercatorGridPointSet points = network.getGridPointSet();
+        WebMercatorGridPointSet points = network.gridPointSet;
         double lat = points.pixelToLat(points.north + req.y);
         double lon = points.pixelToLon(points.west + req.x);
 
         TaskStatistics ts = new TaskStatistics();
 
-        // perform street search to find transit stops and non-transit times
+        // Perform street search to find transit stops and non-transit times.
         StreetRouter sr = new StreetRouter(network.streetLayer);
         sr.distanceLimitMeters = 2000;
         sr.setOrigin(lat, lon);
         sr.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
         sr.route();
-
-
-        // Create a new Raptor Worker.
-        // Tell it that we want a travel time to each stop by leaving the point set parameter null
-        RaptorWorker worker = new RaptorWorker(network.transitLayer, null, req.request.request);
 
         // Get the travel times to all stops reached in the initial on-street search. Convert distances to speeds.
         TIntIntMap accessTimes = sr.getReachedStops();
@@ -89,19 +87,24 @@ public class StaticComputer implements Runnable {
             it.setValue(it.value() / (int) (req.request.request.walkSpeed * 1000));
         }
 
+        // Create a new Raptor Worker.
+        // Tell it that we want a travel time to each stop by leaving the point set parameter null.
+        RaptorWorker worker = new RaptorWorker(network.transitLayer, null, req.request.request);
+
         // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
         StaticPropagatedTimesStore pts = (StaticPropagatedTimesStore) worker.runRaptor(accessTimes, null, ts);
 
         long nonTransitStart = System.currentTimeMillis();
 
         // Get non-transit times: a pointset around the search origin.
+        // FIXME we should not be using hard-coded grid sizes to allow different grid zoom levels.
         WebMercatorGridPointSet subPointSet = new WebMercatorGridPointSet(WebMercatorGridPointSet.DEFAULT_ZOOM,
                 points.west + req.x - 20, points.north + req.y - 20, 41, 41);
-        LinkedPointSet subLinked = new LinkedPointSet(network.getLinkedGridPointSet(), subPointSet);
+        LinkedPointSet subLinked = new LinkedPointSet(network.linkedGridPointSet, subPointSet);
         PointSetTimes nonTransitTimes = subLinked.eval(sr::getTravelTimeToVertex);
 
         long outputStart = System.currentTimeMillis();
-        LOG.info("Sampling non-transit times took {}s", (outputStart - nonTransitStart) / 1000);
+        LOG.info("Sampling non-transit times took {}s", (outputStart - nonTransitStart) / 1000.0);
 
         LittleEndianIntOutputStream out = new LittleEndianIntOutputStream(new BufferedOutputStream(os));
 

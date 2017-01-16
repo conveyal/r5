@@ -1,10 +1,15 @@
 package com.conveyal.r5.point_to_point;
 
+import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
+import com.conveyal.r5.analyst.cluster.ResultEnvelope;
+import com.conveyal.r5.analyst.cluster.TaskStatistics;
+import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.api.GraphQlRequest;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.api.util.Stop;
+import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.common.GeoJsonFeature;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.common.JsonUtilities;
@@ -12,6 +17,7 @@ import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.point_to_point.builder.RouterInfo;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.profile.RepeatedRaptorProfileRouter;
 import com.conveyal.r5.streets.*;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.core.JsonParseException;
@@ -29,6 +35,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
+import java.time.LocalDate;
 
 import java.io.File;
 
@@ -559,6 +566,49 @@ public class PointToPointRouterServer {
             });
 
             //LOG.info("Found {} bike shares", features.size());
+            featureCollection.put("features", features);
+
+            return featureCollection;
+        }, JsonUtilities.objectMapper::writeValueAsString);
+
+        get("/isochrone", (request, response) -> {
+            response.header("Content-Type", "application/json");
+
+            StreetMode streetMode = StreetMode.CAR;
+            Map<String, Object> content = new HashMap<>(2);
+            Float fromLat = request.queryMap("fromLat").floatValue();
+
+            Float fromLon = request.queryMap("fromLon").floatValue();
+
+            AnalystClusterRequest clusterRequest = new AnalystClusterRequest();
+            ProfileRequest profileRequest = new ProfileRequest();
+            clusterRequest.profileRequest = profileRequest;
+            clusterRequest.profileRequest.zoneId = transportNetwork.getTimeZone();
+            clusterRequest.profileRequest.fromLat = fromLat;
+            clusterRequest.profileRequest.fromLon = fromLon;
+            clusterRequest.profileRequest.date = LocalDate.now();
+            clusterRequest.profileRequest.fromTime = 7 * 3600;
+            clusterRequest.profileRequest.toTime = 9 * 3600;
+            clusterRequest.profileRequest.transitModes = EnumSet.of(TransitModes.TRANSIT);
+            clusterRequest.profileRequest.accessModes = EnumSet.of(LegMode.WALK);
+            clusterRequest.profileRequest.egressModes = EnumSet.of(LegMode.WALK);
+
+            PointSet targets = transportNetwork.getGridPointSet();
+            StreetMode mode = StreetMode.WALK;
+            final LinkedPointSet linkedTargets = targets.link(transportNetwork.streetLayer, mode);
+            RepeatedRaptorProfileRouter router = new RepeatedRaptorProfileRouter(transportNetwork,
+                clusterRequest,
+                linkedTargets,
+                new TaskStatistics());
+            ResultEnvelope result = router.route();
+
+            Map<String, Object> featureCollection = new HashMap<>(2);
+            featureCollection.put("type", "FeatureCollection");
+            List<GeoJsonFeature> features = new ArrayList<>();
+
+            result.avgCase.writeIsochrones(features);
+
+            LOG.info("Num features:{}", features.size());
             featureCollection.put("features", features);
 
             return featureCollection;

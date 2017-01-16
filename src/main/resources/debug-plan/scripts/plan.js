@@ -53,6 +53,7 @@ function enable_button() {
         $("#stopButton").prop('disabled', false);
         $("#bikeShareButton").prop('disabled', false);
         $("#prButton").prop('disabled', false);
+        $("#isochroneButton").prop('disabled', false);
     }
 }
 
@@ -247,6 +248,33 @@ function requestBikeShares() {
 
 }
 
+function requestIsochrone() {
+    var params = {
+        fromLat: m1.getLatLng().lat,
+        fromLon: m1.getLatLng().lng,
+        mode: $("#mode").val(),
+    }
+    console.log(params);
+    //make a request
+    $.ajax({
+        data: params,
+        url: hostname + "/isochrone",
+        success: function (data) {
+            console.log(data);
+            //Removes line from previous request
+            if (layer != null) {
+                layer.clearLayers();
+            }
+            if (data.errors) {
+                alert(data.errors);
+            }
+            if (data.data) {
+
+            }
+        }
+    });
+}
+
 function requestParkRide() {
     var params = {
         fromLat: m1.getLatLng().lat,
@@ -350,6 +378,7 @@ $(document).ready(function() {
     $("#stopButton").click(requestStops);
     $("#bikeShareButton").click(requestBikeShares);
     $("#prButton").click(requestParkRide);
+    $("#isochroneButton").click(requestIsochrone);
     $("#full").change(requestPlan);
     $("#fromLat").keyup(function(e) {
         //Enter pressed

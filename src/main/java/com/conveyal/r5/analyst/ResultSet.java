@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.r5.common.GeoJsonFeature;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,6 +13,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Serializable;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
 
@@ -228,6 +230,14 @@ public class ResultSet implements Serializable{
         }
 
         jgen.writeEndArray();
+    }
+
+    public void writeIsochrones(List<GeoJsonFeature> features) {
+        for (IsochroneFeature isochoneFeature : this.isochrones) {
+            GeoJsonFeature feature = new GeoJsonFeature(isochoneFeature.geometry);
+            feature.addProperty("time", isochoneFeature.cutoffSec);
+            features.add(feature);
+        }
     }
 
     /** A set of result sets from profile routing: min, avg, max */;

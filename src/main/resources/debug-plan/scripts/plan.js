@@ -232,6 +232,11 @@ function requestStops() {
         fromLon: m1.getLatLng().lng,
         mode: $("#mode").val(),
     }
+
+    if (params.mode === 'TRANSIT') {
+        return alert('Transit analysis only avaible with isochrones in this UI.')
+    }
+
     console.log(params);
     //make a request
     $.ajax({
@@ -268,6 +273,11 @@ function requestBikeShares() {
         fromLon: m1.getLatLng().lng,
         mode: $("#mode").val(),
     }
+
+    if (params.mode === 'TRANSIT') {
+        return alert('Transit analysis only avaible with isochrones in this UI.')
+    }
+
     console.log(params);
     //make a request
     $.ajax({
@@ -324,8 +334,9 @@ function requestIsochrone() {
                     onEachFeature: onEachFeature,
 
                     // default styling
-                    color: '#808080',
-                    weight: 1,
+                    stroke: false,
+                    /*color: '#808080',
+                    weight: 1,*/
                     fillOpacity: 0.4
                 });
                 layer.addTo(window.my_map);
@@ -340,6 +351,11 @@ function requestParkRide() {
         fromLon: m1.getLatLng().lng,
         mode: $("#mode").val(),
     }
+
+    if (params.mode === 'TRANSIT') {
+        return alert('Transit analysis only avaible with isochrones in this UI.')
+    }
+
     console.log(params);
     //make a request
     $.ajax({
@@ -379,6 +395,11 @@ function requestPlan() {
         mode: $("#mode").val(),
         full: $("#full").is(':checked')
     }
+
+    if (params.mode === 'TRANSIT') {
+        return alert('Transit analysis only avaible with isochrones in this UI.')
+    }
+
     console.log(params);
 
     //make a request

@@ -577,8 +577,8 @@ public class PointToPointRouterServer {
             StreetMode streetMode = StreetMode.CAR;
             Map<String, Object> content = new HashMap<>(2);
             Float fromLat = request.queryMap("fromLat").floatValue();
-
             Float fromLon = request.queryMap("fromLon").floatValue();
+            String queryMode = request.queryParams("mode");
 
             AnalystClusterRequest clusterRequest = new AnalystClusterRequest();
             ProfileRequest profileRequest = new ProfileRequest();
@@ -589,9 +589,13 @@ public class PointToPointRouterServer {
             profileRequest.date = LocalDate.now();
             profileRequest.fromTime = 7 * 3600;
             profileRequest.toTime = 9 * 3600;
-            profileRequest.transitModes = EnumSet.of(TransitModes.TRANSIT);
-            profileRequest.accessModes = EnumSet.of(LegMode.WALK);
-            profileRequest.egressModes = EnumSet.of(LegMode.WALK);
+            if (queryMode.equals("TRANSIT")) {
+                profileRequest.transitModes = EnumSet.of(TransitModes.TRANSIT);
+                profileRequest.accessModes = EnumSet.of(LegMode.WALK);
+                profileRequest.egressModes = EnumSet.of(LegMode.WALK);
+            } else {
+                profileRequest.directModes = EnumSet.of(LegMode.valueOf(queryMode));
+            }
             profileRequest.streetTime = 120;
             profileRequest.maxBikeTime = 120;
             profileRequest.maxWalkTime = 120;

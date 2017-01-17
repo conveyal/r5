@@ -5,6 +5,7 @@ import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.Polygon;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -232,11 +233,23 @@ public class ResultSet implements Serializable{
         jgen.writeEndArray();
     }
 
-    public void writeIsochrones(List<GeoJsonFeature> features) {
+    public void writeIsochrones(List<GeoJsonFeature> features, boolean returnDistinctAreas) {
+        Geometry traversedIsochrone = null;
         for (IsochroneFeature isochoneFeature : this.isochrones) {
-            GeoJsonFeature feature = new GeoJsonFeature(isochoneFeature.geometry);
+            Geometry isochroneGeometry;
+            if (returnDistinctAreas) {
+                if (traversedIsochrone == null) {
+                    isochroneGeometry = isochoneFeature.geometry;
+                } else {
+                    isochroneGeometry = isochoneFeature.geometry.difference(traversedIsochrone);
+                }
+            } else {
+                isochroneGeometry = isochoneFeature.geometry;
+            }
+            GeoJsonFeature feature = new GeoJsonFeature(isochroneGeometry);
             feature.addProperty("time", isochoneFeature.cutoffSec);
             features.add(feature);
+            traversedIsochrone = isochoneFeature.geometry;
         }
     }
 

@@ -148,6 +148,56 @@ function styleBikeShare(feature) {
     };
 }
 
+function styleIsochrone(feature) {
+    return {
+        fillColor: hslToHex((feature.properties.time * -0.017391304347826 + 125.217391304348) / 360, 1, 0.5)
+    }
+}
+
+/**
+ * Converts an HSL color value to RGB. Conversion formula
+ * adapted from http://en.wikipedia.org/wiki/HSL_color_space.
+ * Copied and modified from the following:
+ * - http://stackoverflow.com/a/9493060/269834
+ * - http://stackoverflow.com/a/5624139/269834
+ * Assumes h, s, and l are contained in the set [0, 1] and
+ * returns hex code.
+ *
+ * @param   {number}  h       The hue
+ * @param   {number}  s       The saturation
+ * @param   {number}  l       The lightness
+ * @return  {String}           The RGB representation
+ */
+function hslToHex(h, s, l){
+    var r, g, b;
+
+    if(s == 0){
+        r = g = b = l; // achromatic
+    }else{
+        var hue2rgb = function hue2rgb(p, q, t){
+            if(t < 0) t += 1;
+            if(t > 1) t -= 1;
+            if(t < 1/6) return p + (q - p) * 6 * t;
+            if(t < 1/2) return q;
+            if(t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+            return p;
+        }
+
+        var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        var p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1/3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1/3);
+    }
+
+    var componentToHex = function(c) {
+        var hex = c.toString(16);
+        return hex.length == 1 ? "0" + hex : hex;
+    }
+
+    return "#" + componentToHex(Math.round(r * 255)) + componentToHex(Math.round(g * 255)) + componentToHex(Math.round(b * 255));
+}
+
 function onEachFeature(feature, layer) {
     if (feature.properties) {
         var prop = feature.properties;
@@ -269,7 +319,16 @@ function requestIsochrone() {
                 alert(data.errors);
             }
             if (data.data) {
+                layer = L.geoJson(data.data, {
+                    style: styleIsochrone,
+                    onEachFeature: onEachFeature,
 
+                    // default styling
+                    color: '#808080',
+                    weight: 1,
+                    fillOpacity: 0.4
+                });
+                layer.addTo(window.my_map);
             }
         }
     });

@@ -582,16 +582,22 @@ public class PointToPointRouterServer {
 
             AnalystClusterRequest clusterRequest = new AnalystClusterRequest();
             ProfileRequest profileRequest = new ProfileRequest();
+
+            profileRequest.zoneId = transportNetwork.getTimeZone();
+            profileRequest.fromLat = fromLat;
+            profileRequest.fromLon = fromLon;
+            profileRequest.date = LocalDate.now();
+            profileRequest.fromTime = 7 * 3600;
+            profileRequest.toTime = 9 * 3600;
+            profileRequest.transitModes = EnumSet.of(TransitModes.TRANSIT);
+            profileRequest.accessModes = EnumSet.of(LegMode.WALK);
+            profileRequest.egressModes = EnumSet.of(LegMode.WALK);
+            profileRequest.streetTime = 120;
+            profileRequest.maxBikeTime = 120;
+            profileRequest.maxWalkTime = 120;
+            profileRequest.maxCarTime = 120;
+
             clusterRequest.profileRequest = profileRequest;
-            clusterRequest.profileRequest.zoneId = transportNetwork.getTimeZone();
-            clusterRequest.profileRequest.fromLat = fromLat;
-            clusterRequest.profileRequest.fromLon = fromLon;
-            clusterRequest.profileRequest.date = LocalDate.now();
-            clusterRequest.profileRequest.fromTime = 7 * 3600;
-            clusterRequest.profileRequest.toTime = 9 * 3600;
-            clusterRequest.profileRequest.transitModes = EnumSet.of(TransitModes.TRANSIT);
-            clusterRequest.profileRequest.accessModes = EnumSet.of(LegMode.WALK);
-            clusterRequest.profileRequest.egressModes = EnumSet.of(LegMode.WALK);
 
             PointSet targets = transportNetwork.getGridPointSet();
             StreetMode mode = StreetMode.WALK;
@@ -606,12 +612,13 @@ public class PointToPointRouterServer {
             featureCollection.put("type", "FeatureCollection");
             List<GeoJsonFeature> features = new ArrayList<>();
 
-            result.avgCase.writeIsochrones(features);
+            result.avgCase.writeIsochrones(features, true);
 
             LOG.info("Num features:{}", features.size());
             featureCollection.put("features", features);
+            content.put("data", featureCollection);
 
-            return featureCollection;
+            return content;
         }, JsonUtilities.objectMapper::writeValueAsString);
 
 

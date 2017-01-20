@@ -33,6 +33,7 @@ import graphql.GraphQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.util.*;
 import java.time.LocalDate;
@@ -633,6 +634,30 @@ public class PointToPointRouterServer {
 
             return content;
         }, JsonUtilities.objectMapper::writeValueAsString);
+
+        get("/grid", (request, response) -> {
+            response.header("Content-Encoding", "gzip");
+
+            Float fromLat = request.queryMap("fromLat").floatValue();
+            Float fromLon = request.queryMap("fromLon").floatValue();
+            String queryMode = request.queryParams("mode");
+
+            ResultEnvelope result = calculateIsochrone(transportNetwork,
+                makeClusterRequest(transportNetwork,
+                    fromLat,
+                    fromLon,
+                    queryMode));
+
+            HttpServletResponse raw = response.raw();
+            OutputStream out = raw.getOutputStream();
+
+            result.avgCase.writeGrid(out);
+
+            out.flush();
+            out.close();
+
+            return raw;
+        });
 
 
         get("debug/streetEdges", (request, response) -> {

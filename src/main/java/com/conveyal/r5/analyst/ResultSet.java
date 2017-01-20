@@ -46,13 +46,13 @@ public class ResultSet implements Serializable{
 
     /** Times to reach every feature, may be null */
     public int[] times;
-
+    public Grid grid;
     public IsochroneFeature[] isochrones;
 
     public ResultSet() {
     }
 
-    private void buildIsochrones (int[] times, PointSet targets) {
+    private void buildIsochronesAndGrid (int[] times, PointSet targets) {
         if (!WebMercatorGridPointSet.class.isInstance(targets))
             this.isochrones = null;
         else {
@@ -60,6 +60,14 @@ public class ResultSet implements Serializable{
             for (int cutoff = 5 * 60, i = 0; cutoff <= 120 * 60; cutoff += 5 * 60) {
                 this.isochrones[i++] = new IsochroneFeature(cutoff, (WebMercatorGridPointSet) targets, times);
             }
+            WebMercatorGridPointSet castedTargets = (WebMercatorGridPointSet) targets;
+            Grid grid = new Grid(castedTargets.zoom, castedTargets.width, castedTargets.height, castedTargets.north, castedTargets.west);
+            for (int y = 0, pixel = 0; y < castedTargets.height; y++) {
+                for (int x = 0; x < castedTargets.width; x++, pixel++) {
+                    grid.grid[x][y] = times[pixel];
+                }
+            }
+            this.grid = grid;
         }
     }
     
@@ -72,7 +80,7 @@ public class ResultSet implements Serializable{
             buildHistograms(times, targets);
 
         if (includeIsochrones)
-            buildIsochrones(times, targets);
+            buildIsochronesAndGrid(times, targets);
     }
 
     /** 
@@ -259,6 +267,10 @@ public class ResultSet implements Serializable{
             features.add(feature);
             traversedIsochrone = isochroneFeature.geometry;
         }
+    }
+
+    public void writeGrid(OutputStream out) throws IOException {
+        this.grid.write(out);
     }
 
     /** A set of result sets from profile routing: min, avg, max */;

@@ -571,46 +571,53 @@ public class PointToPointRouterServer {
             return featureCollection;
         }, JsonUtilities.objectMapper::writeValueAsString);
 
+        get("/calculateIsochrones", (request, response) -> {
+            response.header("Content-Type", "application/json");
+
+            Map<String, Object> content = new HashMap<>(2);
+            Float fromLat = request.queryMap("fromLat").floatValue();
+            Float fromLon = request.queryMap("fromLon").floatValue();
+
+            List<String> modes = Arrays.asList("CAR", "WALK", "BICYCLE", "TRANSIT");
+
+            Map<String, Object> modeMap = new HashMap<>();
+
+            modes.forEach(mode -> {
+                Map<String, Object> featureCollection = new HashMap<>(2);
+                featureCollection.put("type", "FeatureCollection");
+                List<GeoJsonFeature> features = new ArrayList<>();
+
+                ResultEnvelope result = calculateIsochrone(transportNetwork,
+                    makeClusterRequest(transportNetwork,
+                        fromLat,
+                        fromLon,
+                        mode));
+
+                result.avgCase.writeIsochrones(features, true);
+
+                LOG.info(mode, "Num features:{}", features.size());
+                featureCollection.put("features", features);
+                modeMap.put(mode, featureCollection);
+            });
+
+            content.put("data", modeMap);
+
+            return content;
+        }, JsonUtilities.objectMapper::writeValueAsString);
+
         get("/isochrone", (request, response) -> {
             response.header("Content-Type", "application/json");
 
-            StreetMode streetMode = StreetMode.CAR;
             Map<String, Object> content = new HashMap<>(2);
             Float fromLat = request.queryMap("fromLat").floatValue();
             Float fromLon = request.queryMap("fromLon").floatValue();
             String queryMode = request.queryParams("mode");
 
-            AnalystClusterRequest clusterRequest = new AnalystClusterRequest();
-            ProfileRequest profileRequest = new ProfileRequest();
-
-            profileRequest.zoneId = transportNetwork.getTimeZone();
-            profileRequest.fromLat = fromLat;
-            profileRequest.fromLon = fromLon;
-            profileRequest.date = LocalDate.now();
-            profileRequest.fromTime = 7 * 3600;
-            profileRequest.toTime = 9 * 3600;
-            if (queryMode.equals("TRANSIT")) {
-                profileRequest.transitModes = EnumSet.of(TransitModes.TRANSIT);
-                profileRequest.accessModes = EnumSet.of(LegMode.WALK);
-                profileRequest.egressModes = EnumSet.of(LegMode.WALK);
-            } else {
-                profileRequest.directModes = EnumSet.of(LegMode.valueOf(queryMode));
-            }
-            profileRequest.streetTime = 120;
-            profileRequest.maxBikeTime = 120;
-            profileRequest.maxWalkTime = 120;
-            profileRequest.maxCarTime = 120;
-
-            clusterRequest.profileRequest = profileRequest;
-
-            PointSet targets = transportNetwork.getGridPointSet();
-            StreetMode mode = StreetMode.WALK;
-            final LinkedPointSet linkedTargets = targets.link(transportNetwork.streetLayer, mode);
-            RepeatedRaptorProfileRouter router = new RepeatedRaptorProfileRouter(transportNetwork,
-                clusterRequest,
-                linkedTargets,
-                new TaskStatistics());
-            ResultEnvelope result = router.route();
+            ResultEnvelope result = calculateIsochrone(transportNetwork,
+                makeClusterRequest(transportNetwork,
+                    fromLat,
+                    fromLon,
+                    queryMode));
 
             Map<String, Object> featureCollection = new HashMap<>(2);
             featureCollection.put("type", "FeatureCollection");
@@ -1118,4 +1125,44 @@ public class PointToPointRouterServer {
         return Math.round(speed * 1000) / 1000;
     }
 
+    private static AnalystClusterRequest makeClusterRequest(TransportNetwork transportNetwork,
+                                                            float fromLat,
+                                                            float fromLon,
+                                                            String queryMode) {
+        AnalystClusterRequest clusterRequest = new AnalystClusterRequest();
+        ProfileRequest profileRequest = new ProfileRequest();
+
+        profileRequest.zoneId = transportNetwork.getTimeZone();
+        profileRequest.fromLat = fromLat;
+        profileRequest.fromLon = fromLon;
+        profileRequest.date = LocalDate.now();
+        profileRequest.fromTime = 7 * 3600;
+        profileRequest.toTime = 9 * 3600;
+        if (queryMode.equals("TRANSIT")) {
+            profileRequest.transitModes = EnumSet.of(TransitModes.TRANSIT);
+            profileRequest.accessModes = EnumSet.of(LegMode.WALK);
+            profileRequest.egressModes = EnumSet.of(LegMode.WALK);
+        } else {
+            profileRequest.directModes = EnumSet.of(LegMode.valueOf(queryMode));
+        }
+        profileRequest.streetTime = 120;
+        profileRequest.maxBikeTime = 120;
+        profileRequest.maxWalkTime = 120;
+        profileRequest.maxCarTime = 120;
+
+        clusterRequest.profileRequest = profileRequest;
+
+        return clusterRequest;
+    }
+
+    private static ResultEnvelope calculateIsochrone(TransportNetwork transportNetwork, AnalystClusterRequest clusterRequest) {
+        PointSet targets = transportNetwork.getGridPointSet();
+        StreetMode mode = StreetMode.WALK;
+        final LinkedPointSet linkedTargets = targets.link(transportNetwork.streetLayer, mode);
+        RepeatedRaptorProfileRouter router = new RepeatedRaptorProfileRouter(transportNetwork,
+            clusterRequest,
+            linkedTargets,
+            new TaskStatistics());
+        return router.route();
+    }
 }

@@ -636,6 +636,7 @@ public class PointToPointRouterServer {
         }, JsonUtilities.objectMapper::writeValueAsString);
 
         get("/grid", (request, response) -> {
+            response.header("Content-Type", "application/octet-stream");
             response.header("Content-Encoding", "gzip");
 
             Float fromLat = request.queryMap("fromLat").floatValue();
@@ -648,15 +649,7 @@ public class PointToPointRouterServer {
                     fromLon,
                     queryMode));
 
-            HttpServletResponse raw = response.raw();
-            OutputStream out = raw.getOutputStream();
-
-            result.avgCase.writeGrid(out);
-
-            out.flush();
-            out.close();
-
-            return raw;
+            return result.avgCase.writeGrid();
         });
 
 

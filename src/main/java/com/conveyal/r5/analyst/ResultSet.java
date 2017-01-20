@@ -12,13 +12,13 @@ import com.vividsolutions.jts.precision.GeometryPrecisionReducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.IntStream;
 
 /**
  * This holds the results of a one-to-many search from a single origin point to a whole set of destination points.
@@ -269,8 +269,10 @@ public class ResultSet implements Serializable{
         }
     }
 
-    public void writeGrid(OutputStream out) throws IOException {
-        this.grid.write(out);
+    public byte[] writeGrid() throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        this.grid.write(baos);
+        return baos.toByteArray();
     }
 
     /** A set of result sets from profile routing: min, avg, max */;

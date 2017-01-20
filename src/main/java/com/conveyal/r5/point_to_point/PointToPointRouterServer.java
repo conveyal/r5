@@ -572,6 +572,7 @@ public class PointToPointRouterServer {
         }, JsonUtilities.objectMapper::writeValueAsString);
 
         get("/calculateIsochrones", (request, response) -> {
+            LOG.info("/calculateIsochrones");
             response.header("Content-Type", "application/json");
 
             Map<String, Object> content = new HashMap<>(2);
@@ -583,6 +584,7 @@ public class PointToPointRouterServer {
             Map<String, Object> modeMap = new HashMap<>();
 
             modes.forEach(mode -> {
+                LOG.info("calculating isochrone for: " + mode);
                 Map<String, Object> featureCollection = new HashMap<>(2);
                 featureCollection.put("type", "FeatureCollection");
                 List<GeoJsonFeature> features = new ArrayList<>();

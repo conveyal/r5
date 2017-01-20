@@ -7,6 +7,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.Polygon;
+import com.vividsolutions.jts.geom.PrecisionModel;
+import com.vividsolutions.jts.precision.GeometryPrecisionReducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -235,21 +237,27 @@ public class ResultSet implements Serializable{
 
     public void writeIsochrones(List<GeoJsonFeature> features, boolean returnDistinctAreas) {
         Geometry traversedIsochrone = null;
-        for (IsochroneFeature isochoneFeature : this.isochrones) {
+        PrecisionModel precisionModel = new PrecisionModel(10000);
+        GeometryPrecisionReducer precisionReducer = new GeometryPrecisionReducer(precisionModel);
+
+        for (IsochroneFeature isochroneFeature : this.isochrones) {
             Geometry isochroneGeometry;
             if (returnDistinctAreas) {
+                // reduce geometry precision and buffer by 0 to avoid TopologyExceptions
+                Geometry curFeatureGeometry = precisionReducer.reduce(isochroneFeature.geometry).buffer(0);
+
                 if (traversedIsochrone == null) {
-                    isochroneGeometry = isochoneFeature.geometry;
+                    isochroneGeometry = curFeatureGeometry;
                 } else {
-                    isochroneGeometry = isochoneFeature.geometry.difference(traversedIsochrone);
+                    isochroneGeometry = curFeatureGeometry.difference(traversedIsochrone);
                 }
             } else {
-                isochroneGeometry = isochoneFeature.geometry;
+                isochroneGeometry = isochroneFeature.geometry;
             }
             GeoJsonFeature feature = new GeoJsonFeature(isochroneGeometry);
-            feature.addProperty("time", isochoneFeature.cutoffSec);
+            feature.addProperty("time", isochroneFeature.cutoffSec);
             features.add(feature);
-            traversedIsochrone = isochoneFeature.geometry;
+            traversedIsochrone = isochroneFeature.geometry;
         }
     }
 

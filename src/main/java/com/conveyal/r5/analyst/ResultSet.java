@@ -244,12 +244,12 @@ public class ResultSet implements Serializable{
             Geometry isochroneGeometry;
             if (returnDistinctAreas) {
                 // reduce geometry precision and buffer by 0 to avoid TopologyExceptions
-                Geometry curFeatureGeometry = precisionReducer.reduce(isochroneFeature.geometry).buffer(0);
+                Geometry curFeatureGeometry = precisionReducer.reduce(isochroneFeature.geometry);
 
                 if (traversedIsochrone == null) {
                     isochroneGeometry = curFeatureGeometry;
                 } else {
-                    isochroneGeometry = curFeatureGeometry.difference(traversedIsochrone);
+                    isochroneGeometry = curFeatureGeometry.difference(precisionReducer.reduce(traversedIsochrone));
                 }
             } else {
                 isochroneGeometry = isochroneFeature.geometry;

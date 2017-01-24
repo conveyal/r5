@@ -5,6 +5,7 @@ import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.ProfileOption;
 import com.conveyal.r5.api.util.StreetSegment;
 import com.conveyal.r5.profile.*;
+import com.conveyal.r5.streets.ParkRideRouter;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.streets.VertexStore;
@@ -65,7 +66,7 @@ public class PointToPointQuery {
     /** Cost of dropping-off a rented bike */
     private static final int BIKE_RENTAL_DROPOFF_COST = 30;
     /** Time to park car in P+R in seconds **/
-    private static final int CAR_PARK_DROPOFF_TIME_S = 120;
+    public static final int CAR_PARK_DROPOFF_TIME_S = 120;
 
     private static final int CAR_PARK_DROPOFF_COST = 120;
 
@@ -354,7 +355,12 @@ public class PointToPointQuery {
             streetRouter.route();
             TIntObjectMap<StreetRouter.State> carParks = streetRouter.getReachedVertices(VertexStore.VertexFlag.PARK_AND_RIDE);
             LOG.info("CAR PARK: Found {} car parks", carParks.size());
-            StreetRouter walking = new StreetRouter(transportNetwork.streetLayer);
+            ParkRideRouter parkRideRouter = new ParkRideRouter(streetRouter.streetLayer);
+            parkRideRouter.profileRequest = request;
+            parkRideRouter.addParks(carParks, transportNetwork.transitLayer);
+            parkRideRouter.previousRouter = streetRouter;
+            return parkRideRouter;
+            /*StreetRouter walking = new StreetRouter(transportNetwork.streetLayer);
             walking.streetMode = StreetMode.WALK;
             walking.profileRequest = request;
             walking.timeLimitSeconds = request.maxCarTime * 60;
@@ -363,7 +369,7 @@ public class PointToPointQuery {
             walking.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             walking.route();
             walking.previousRouter = streetRouter;
-            return walking;
+            return walking;*/
         } else {
             return null;
         }

@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
@@ -218,12 +219,14 @@ public class AnalystWorker implements Runnable {
 
         // Discover information about what EC2 instance / region we're running on, if any.
         // If the worker isn't running in Amazon EC2, then region will be unknown so fall back on a default, because
-        // the new request signing v4 requires you to know the region where the S3 objects are. FIXME but where is that done/used?
+        // the new request signing v4 requires you to know the region where the S3 objects are.
         ec2info = new EC2Info();
-        if (workOffline) {
-            ec2info.region = Regions.EU_WEST_1.getName();
-        } else {
+        if (!workOffline) {
             ec2info.fetchMetadata();
+        }
+        if (ec2info.region == null) {
+            // We're working offline and/or not running on EC2. Set a default region rather than detecting one.
+            ec2info.region = Regions.EU_WEST_1.getName();
         }
 
         // When creating the S3 and SQS clients use the default credentials chain.
@@ -231,7 +234,7 @@ public class AnalystWorker implements Runnable {
         // the auto-assigned IAM role if this code is running on an EC2 instance.
         // http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/java-dg-roles.html
         s3 = new AmazonS3Client();
-
+        s3.setRegion(Region.getRegion(Regions.fromName(ec2info.region)));
     }
 
     /**

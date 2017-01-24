@@ -93,6 +93,11 @@ public class TransportNetwork implements Serializable {
     }
 
 
+    /** Create a TransportNetwork from gtfs-lib feeds */
+    public static TransportNetwork fromFeeds (String osmSourceFile, List<GTFSFeed> feeds, TNBuilderConfig config) {
+        return fromFiles(osmSourceFile, null, feeds, config);
+    }
+
     /** Legacy method to load from a single GTFS file */
     public static TransportNetwork fromFiles (String osmSourceFile, String gtfsSourceFile, TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
         return fromFiles(osmSourceFile, Arrays.asList(gtfsSourceFile), tnBuilderConfig);

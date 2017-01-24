@@ -30,6 +30,11 @@ import java.nio.channels.FileChannel;
  *
  * This Bytez implementation implements all the methods needed for FST to expand it automatically.
  * The alternative is to map a huge file and truncate it when done writing.
+ *
+ * NOTE that this class is accessing private methods on built-in Java classes we do not control.
+ * This is generally a bad thing, but it appears to be the only way to get a long-addressable buffer to write into.
+ * Streaming FST serialization would be a better solution - there is a ticket for that.
+ * https://github.com/RuedigerMoeller/fast-serialization/issues/132
  */
 public class ExpandingMMFBytez extends MallocBytez {
 
@@ -170,7 +175,8 @@ public class ExpandingMMFBytez extends MallocBytez {
     /**
      * An instance of this object is passed to an FSTConfiguration when creating an FSTObjectInput or FSTObjectOutput.
      * It provides the functionality of serializing/deserializing to/from a file.
-     * It can handle huge objects up to about 4GB without eating much memory by using the memory mapped file mechanism.
+     * It can handle huge objects (up to about 4GB on Darwin, probably much bigger on Linux) without truly eating much
+     * memory by using the memory mapped file mechanism.
      */
     public static class StreamCoderFactory implements FSTConfiguration.StreamCoderFactory {
 

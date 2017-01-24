@@ -26,15 +26,17 @@ public abstract class PointSet implements Serializable {
     /**
      * When this PointSet is connected to the street network, the resulting data are cached in this Map to speed up
      * later reuse. Different linkages are produced for different street networks and for different on-street modes
-     * of travel. We don't want to key this cache on the TransportNetwork or Scenario, only on the StreetNetwork.
-     * This ensures linkages are re-used for multiple scenarios that have different transit characteristics but the
-     * same street network.
+     * of travel. At first we were careful to key this cache on the StreetNetwork itself (rather than the
+     * TransportNetwork or Scenario) to ensure that linkages were re-used for multiple scenarios that have the same
+     * street network. However, selectively re-linking to the street network is now usually fast, and StreetNetworks
+     * must be copied for every scenario due to references to their containing TransportNetwork.
+     * Note that this cache will be serialized with the PointSet, but serializing a Guava cache only serializes the
+     * cache instance and its settings, not the contents of the cache. We consider this sane behavior.
      */
     protected LoadingCache<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> linkageCache = CacheBuilder.newBuilder()
             .maximumSize(LINKAGE_CACHE_SIZE)
             .build(new LinkageCacheLoader());
 
-    // This is pulled out into a named class because serializing the anonymous inner class was getting ugly.
     private class LinkageCacheLoader extends CacheLoader<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> implements Serializable {
         @Override
         public LinkedPointSet load(Tuple2<StreetLayer, StreetMode> key) throws Exception {

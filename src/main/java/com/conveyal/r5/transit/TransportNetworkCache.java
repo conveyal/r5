@@ -30,9 +30,10 @@ import java.util.zip.ZipInputStream;
 
 /**
  * This holds one or more TransportNetworks keyed on unique strings.
+ * Because (de)serialization is now much faster than building networks from scratch, built graphs are cached on the
+ * local filesystem and on S3 for later re-use.
  * Actually this currently only holds one single TransportNetwork, but that will eventually change.
- * TODO this should serialize any networks it builds, attempt to reload from disk, and copy serialized networks to S3.
- * Because (de)serialization is now about 2 orders of magnitude faster than building from scratch.
+ * FIXME the synchronization is kind of primitive and will need to be more sophisticated when a worker has multiple loaded networks.
  */
 public class TransportNetworkCache {
 
@@ -73,7 +74,7 @@ public class TransportNetworkCache {
 
     /**
      * This stores any number of lightweight scenario networks built upon the current base network.
-     * FIXME that sounds like a memory leak, should be a WeighingCache.
+     * FIXME that sounds like a memory leak, should be a WeighingCache or at least size-limited.
      */
     private Map<String, TransportNetwork> scenarioNetworkCache = new HashMap<>();
 
@@ -106,15 +107,15 @@ public class TransportNetworkCache {
     }
 
     /**
-     * Find or create a TransportNetwork for the given scenario ID.
+     * Find or create a TransportNetwork for the scenario specified in a ProfileRequest.
+     * ProfileRequests may contain an embedded complete scenario, or it may contain only the ID of a scenario that
+     * must be fetched from S3.
      * By design a particular scenario is always defined relative to a single base graph (it's never applied to multiple
      * different base graphs). Therefore we can look up cached scenario networks based solely on their scenarioId
      * rather than a compound key of (networkId, scenarioId).
      *
      * The fact that scenario networks are cached means that PointSet linkages will be automatically reused when
-     * the scenario is found by its ID and reused.
-     *
-     * TODO why are we passing in the request instead of the Scenario (which should contain its own ID)?
+     * TODO it seems to me that this method should just take a Scenario as its second parameter, and that resolving the scenario against caches on S3 or local disk should be pulled out into a separate function
      */
     public synchronized TransportNetwork getNetworkForScenario (String networkId, ProfileRequest request) {
         String scenarioId = request.scenarioId != null ? request.scenarioId : request.scenario.id;

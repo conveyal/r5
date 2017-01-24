@@ -1349,8 +1349,13 @@ public class StreetLayer implements Serializable, Cloneable {
      * We intentionally avoid using clone() on EdgeStore and VertexStore so all field copying is explicit and we can
      * clearly see whether we are accidentally shallow-copying any collections or data structures from the base graph.
      * StreetLayer has a lot more fields and most of them can be shallow-copied, so here we use clone() for convenience.
-     * @param willBeModified if false, do not make any changes to the new StreetLayer copy. Allows some optimizations.
+     * @param willBeModified must be true if the scenario to be applied will make any changes to the new StreetLayer
+     *                       copy. This allows some optimizations (the lists in the StreetLayer will not be wrapped).
      * @return a copy of this StreetLayer to which Scenarios can be applied without affecting the original StreetLayer.
+     *
+     * It's questionable whether the willBeModified optimization actually affects routing speed, but in theory it
+     * saves a comparison and an extra dereference every time we use the edge/vertex stores.
+     * TODO check whether this actually affects speed. If not, just wrap the lists in every scenario copy.
      */
     public StreetLayer scenarioCopy(TransportNetwork newScenarioNetwork, boolean willBeModified) {
         StreetLayer copy = this.clone();

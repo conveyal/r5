@@ -48,9 +48,10 @@ public class TransportNetwork implements Serializable {
     public WebMercatorGridPointSet gridPointSet;
 
     /**
-     * Our current system caches linkages within GridPointSets. Guava caches serialize their configuration but not
+     * Linkages are cached within GridPointSets. Guava caches serialize their configuration but not
      * their contents, which is actually pretty sane behavior for a cache. So if we want a particular linkage to be
      * available on reload, we have to store it in its own field.
+     * TODO it would be more "normalized" to keep only this field, and access the unlinked gridPointSet via linkedGridPointSet.pointset.
      */
     public LinkedPointSet linkedGridPointSet;
 
@@ -290,7 +291,8 @@ public class TransportNetwork implements Serializable {
         if (gridPointSet == null) {
             gridPointSet = new WebMercatorGridPointSet(this);
         }
-        // Here we are bypassing the GridPointSet's internal cache of linkages.
+        // Here we are bypassing the GridPointSet's internal cache of linkages because we want this particular
+        // linkage to be serialized with the network. The internal cache does not serialize its contents.
         linkedGridPointSet = new LinkedPointSet(gridPointSet, streetLayer, StreetMode.WALK, linkedGridPointSet);
     }
 

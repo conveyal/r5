@@ -691,6 +691,7 @@ public class TransitLayer implements Serializable, Cloneable {
     }
 
     /**
+     * @param willBeModified must be true if the scenario to be applied will make any changes to the transit network.
      * @return a semi-shallow copy of this transit layer for use when applying scenarios.
      */
     public TransitLayer scenarioCopy(TransportNetwork newScenarioNetwork, boolean willBeModified) {

@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.broker.WorkerCategory;
+import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.publish.StaticMetadata;
 import com.conveyal.r5.publish.StaticSiteRequest;
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -43,5 +44,14 @@ public abstract class GenericClusterRequest implements Serializable {
     public WorkerCategory getWorkerCategory() {
         return new WorkerCategory(graphId, workerVersion);
     }
+
+    /**
+     * Should be overridden by subclasses to return the ProfileRequest nested within a particular type of cluster
+     * request.
+     * TODO Since all subtypes have a ProfileRequest, maybe there should just be a consistent field profileRequest in this superclass.
+     * Annoyingly this will get serialized if it's named like a "getter" method (named getX) and even adding an @JsonIgnore
+     * annotation does not help, perhaps you'd need to add the annotation to every single subclass.
+     */
+    public abstract ProfileRequest extractProfileRequest();
 
 }

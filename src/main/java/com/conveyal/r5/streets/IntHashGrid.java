@@ -28,6 +28,7 @@ import gnu.trove.set.hash.TLongHashSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -45,7 +46,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 
  * @author laurentg, abyrd
  */
-public class IntHashGrid {
+public class IntHashGrid implements Serializable {
 
     @SuppressWarnings("unused")
     private static final Logger LOG = LoggerFactory.getLogger(IntHashGrid.class);
@@ -64,7 +65,8 @@ public class IntHashGrid {
 
     public IntHashGrid(double binSizeDegrees) {
         yBinSize = VertexStore.floatingDegreesToFixed(binSizeDegrees);
-        xBinSize = (int)(yBinSize / 0.7); // Assume about 45 degrees latitude for now, cos(45deg)
+        // FIXME Assuming about 45 degrees latitude for now, cos(45deg)
+        xBinSize = (int)(yBinSize / 0.7);
         if (binSizeDegrees <= 0) {
             throw new IllegalStateException("bin size must be positive.");
         }

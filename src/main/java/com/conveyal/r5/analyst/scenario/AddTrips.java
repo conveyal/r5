@@ -63,6 +63,9 @@ public class AddTrips extends Modification {
         if (stops == null || stops.size() < 2) {
             warnings.add("You must provide at least two stops.");
         } else {
+            if (frequencies.isEmpty()) {
+                warnings.add("This modification should include at least one timetable/frequency entry.");
+            }
             for (PatternTimetable entry : frequencies) {
                 warnings.addAll(entry.validate(stops.size()));
             }

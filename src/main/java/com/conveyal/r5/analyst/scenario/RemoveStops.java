@@ -62,15 +62,19 @@ public class RemoveStops extends Modification {
     public boolean resolve (TransportNetwork network) {
         checkIds(routes, patterns, null, false, network);
         intStops = new TIntHashSet();
-        for (String stringStopId : stops) {
-            int intStopId = network.transitLayer.indexForStopId.get(stringStopId);
-            if (intStopId == -1) {
-                warnings.add("Could not find a stop with GTFS ID " + stringStopId);
-            } else {
-                intStops.add(intStopId);
+        if (stops == null || stops.isEmpty()) {
+            warnings.add("You must supply some stops to remove.");
+        } else {
+            for (String stringStopId : stops) {
+                int intStopId = network.transitLayer.indexForStopId.get(stringStopId);
+                if (intStopId == -1) {
+                    warnings.add("Could not find a stop with GTFS ID " + stringStopId);
+                } else {
+                    intStops.add(intStopId);
+                }
             }
+            LOG.info("Resolved stop IDs for removal. Strings {} resolved to integers {}.", stops, intStops);
         }
-        LOG.info("Resolved stop IDs for removal. Strings {} resolved to integers {}.", stops, intStops);
         return warnings.size() > 0; // TODO make a function for this on the superclass
     }
 

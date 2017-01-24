@@ -1,6 +1,5 @@
 package com.conveyal.r5.visualizer;
 
-import com.conveyal.r5.analyst.BoardingAssumption;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.PropagatedTimesStore;
@@ -71,7 +70,7 @@ public class InstrumentedRaptorWorker extends RaptorWorker {
     }
 
     @Override
-    public boolean doOneRound(RaptorState inputState, RaptorState outputState, boolean useFrequencies, BoardingAssumption boardingAssumption) {
+    public boolean doOneRound(RaptorState inputState, RaptorState outputState, boolean useFrequencies) {
         // copy in patterns that will be explored on the next round now that output tables have been created
         this.patternsExploredThisRound.clear();
         this.patternsExploredThisRound.or(patternsTouchedThisRound);
@@ -83,7 +82,7 @@ public class InstrumentedRaptorWorker extends RaptorWorker {
             this.patternsExploredThisMinuteFrequency.or(patternsTouchedThisRound);
         }
 
-        boolean val = super.doOneRound(inputState, outputState, useFrequencies, boardingAssumption);
+        boolean val = super.doOneRound(inputState, outputState, useFrequencies);
 
         raptorState = outputState;
 
@@ -121,7 +120,7 @@ public class InstrumentedRaptorWorker extends RaptorWorker {
     }
 
     @Override
-    public RaptorState runRaptorFrequency(int departureTime, BoardingAssumption boardingAssumption) {
+    public RaptorState runRaptorFrequency(int departureTime) {
         this.patternsExploredThisMinuteFrequency.clear();
         this.stopsTouchedThisMinuteFrequency.clear();
         this.allStopsTouchedThisMinute.clear();
@@ -132,7 +131,7 @@ public class InstrumentedRaptorWorker extends RaptorWorker {
         this.allStopsTouchedThisMinute.or(this.stopsTouchedThisMinuteScheduled);
 
         scheduledSearch = false;
-        RaptorState state = super.runRaptorFrequency(departureTime, boardingAssumption);
+        RaptorState state = super.runRaptorFrequency(departureTime);
         if (pauseAfterFrequencySearch) pause();
         return state;
     }

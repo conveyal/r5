@@ -126,12 +126,13 @@ public class TransitLayer implements Serializable, Cloneable {
     /**
      * For each transit stop, an int-int map giving the distance of every reachable street vertex from that stop.
      * This is the result of running a distance-constrained street search outward from every stop in the graph.
-     *
-     * Avoiding the lengthy rebuild of stopToVertexDistanceTables is as simple as making this non-transient and removing
-     * the call to buildDistanceTables in TransportNetwork. That does make serialized networks much bigger (not a big deal
-     * when saving to S3) and makes our checks to ensure that scenario application does not damage base graphs very slow.
+     * If these tables are present, we serialize them when persisting a network to disk to avoid recalculating them
+     * upon re-load. However, the tables are not computed when the network is first built, except in certain code
+     * paths used for analysis work. The tables are not necessary for basic routing.
+     * Serializing these tables makes files much bigger and makes our checks to ensure that scenario application
+     * does not damage base graphs slower.
      */
-    public transient List<TIntIntMap> stopToVertexDistanceTables;
+    public List<TIntIntMap> stopToVertexDistanceTables;
 
     /**
      * The TransportNetwork containing this TransitLayer. This link up the object tree also allows us to access the
@@ -142,6 +143,16 @@ public class TransitLayer implements Serializable, Cloneable {
 
     /** Map from feed ID to feed CRC32 to ensure that we can't apply scenarios to the wrong feeds */
     public Map<String, Long> feedChecksums = new HashMap<>();
+
+    /**
+     * A string uniquely identifying the contents of this TransitLayer among all TransitLayers.
+     * When no scenario has been applied, this field will contain the ID of the containing TransportNetwork.
+     * When a scenario has modified this StreetLayer, this field will be changed to the scenario's ID.
+     * We need a way to know what transit information is in the layer independent of object identity, which is lost in
+     * a round trip through serialization. This also allows re-using cached information for multiple scenarios that
+     * don't modify the transit network. (This never happens yet, but will when we allow street editing.)
+     */
+    public String scenarioId;
 
     /** Load a GTFS feed with full load level */
     public void loadFromGtfs (GTFSFeed gtfs) throws DuplicateFeedException {
@@ -437,7 +448,7 @@ public class TransitLayer implements Serializable, Cloneable {
         centerLon = lonSum / stops.size();
     }
 
-    /** (Re-)build transient indexes of this TripPattern, connecting stops to patterns etc. */
+    /** (Re-)build transient indexes of this TransitLayer, connecting stops to patterns etc. */
     public void rebuildTransientIndexes () {
         LOG.info("Rebuilding transient indices.");
 
@@ -680,20 +691,26 @@ public class TransitLayer implements Serializable, Cloneable {
     }
 
     /**
+     * @param willBeModified must be true if the scenario to be applied will make any changes to the transit network.
      * @return a semi-shallow copy of this transit layer for use when applying scenarios.
      */
-    public TransitLayer scenarioCopy(TransportNetwork newScenarioNetwork) {
+    public TransitLayer scenarioCopy(TransportNetwork newScenarioNetwork, boolean willBeModified) {
         TransitLayer copy = this.clone();
         copy.parentNetwork = newScenarioNetwork;
-        // Protectively copy all the lists that will be affected by adding new stops to the network
-        // See: StopSpec.materializeOne()
-        // We would really only need to do this for modifications that create new stops.
-        copy.stopIdForIndex = new ArrayList<>(this.stopIdForIndex);
-        copy.stopNames = new ArrayList<>(this.stopNames);
-        copy.streetVertexForStop = new TIntArrayList(this.streetVertexForStop);
-        copy.stopToVertexDistanceTables = new ArrayList<>(this.stopToVertexDistanceTables);
-        copy.transfersForStop = new ArrayList<>(this.transfersForStop);
-        copy.routes = new ArrayList<>(this.routes);
+        if (willBeModified) {
+            // Protectively copy all the lists that will be affected by adding new stops to the network.
+            // See StopSpec.materializeOne(). We would really only need to do this for modifications that create new stops.
+            copy.stopIdForIndex = new ArrayList<>(this.stopIdForIndex);
+            copy.stopNames = new ArrayList<>(this.stopNames);
+            copy.streetVertexForStop = new TIntArrayList(this.streetVertexForStop);
+            copy.stopToVertexDistanceTables = new ArrayList<>(this.stopToVertexDistanceTables);
+            copy.transfersForStop = new ArrayList<>(this.transfersForStop);
+            copy.routes = new ArrayList<>(this.routes);
+            // To indicate that this layer is different than the one it was copied from, record the scenarioId of
+            // the scenario that modified it. If the scenario will not affect the contents of the layer, its
+            // scenarioId remains unchanged as is done in StreetLayer.
+            copy.scenarioId = newScenarioNetwork.scenarioId;
+        }
         return copy;
     }
 

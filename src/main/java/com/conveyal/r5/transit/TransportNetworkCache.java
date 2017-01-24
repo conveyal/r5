@@ -6,6 +6,7 @@ import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.osmlib.OSMCache;
+import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.BundleManifest;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
@@ -13,22 +14,26 @@ import com.conveyal.r5.common.R5Version;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.streets.StreetLayer;
+import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 /**
  * This holds one or more TransportNetworks keyed on unique strings.
- * This is a replacement for ClusterGraphBuilder.
- * TODO this should serialize any networks it builds, attempt to reload from disk, and copy serialized networks to S3.
- * Because (de)serialization is now about 2 orders of magnitude faster than building from scratch.
+ * Because (de)serialization is now much faster than building networks from scratch, built graphs are cached on the
+ * local filesystem and on S3 for later re-use.
+ * Actually this currently only holds one single TransportNetwork, but that will eventually change.
+ * FIXME the synchronization is kind of primitive and will need to be more sophisticated when a worker has multiple loaded networks.
  */
 public class TransportNetworkCache {
 
@@ -67,10 +72,10 @@ public class TransportNetworkCache {
         this.sourceBucket = gtfsCache.bucket;
     }
 
-    /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
-    private boolean workOffline;
-
-    /** This stores any number of lightweight scenario networks built upon the current base network. */
+    /**
+     * This stores any number of lightweight scenario networks built upon the current base network.
+     * FIXME that sounds like a memory leak, should be a WeighingCache or at least size-limited.
+     */
     private Map<String, TransportNetwork> scenarioNetworkCache = new HashMap<>();
 
     /**
@@ -102,15 +107,15 @@ public class TransportNetworkCache {
     }
 
     /**
-     * Find or create a TransportNetwork for the given
+     * Find or create a TransportNetwork for the scenario specified in a ProfileRequest.
+     * ProfileRequests may contain an embedded complete scenario, or it may contain only the ID of a scenario that
+     * must be fetched from S3.
      * By design a particular scenario is always defined relative to a single base graph (it's never applied to multiple
      * different base graphs). Therefore we can look up cached scenario networks based solely on their scenarioId
      * rather than a compound key of (networkId, scenarioId).
      *
      * The fact that scenario networks are cached means that PointSet linkages will be automatically reused when
-     * the scenario is found by its ID and reused.
-     *
-     * TODO LinkedPointSets keep a reference back to a StreetLayer which means that the network will not be completely garbage collected upon network switch
+     * TODO it seems to me that this method should just take a Scenario as its second parameter, and that resolving the scenario against caches on S3 or local disk should be pulled out into a separate function
      */
     public synchronized TransportNetwork getNetworkForScenario (String networkId, ProfileRequest request) {
         String scenarioId = request.scenarioId != null ? request.scenarioId : request.scenario.id;
@@ -210,12 +215,7 @@ public class TransportNetworkCache {
                 }
             }
             LOG.info("Loading cached transport network at {}", cacheLocation);
-            FileInputStream fis = new FileInputStream(cacheLocation);
-            try {
-                return TransportNetwork.read(fis);
-            } finally {
-                fis.close();
-            }
+            return TransportNetwork.read(cacheLocation);
         } catch (Exception e) {
             LOG.error("Exception occurred retrieving cached transport network", e);
             return null;
@@ -224,6 +224,7 @@ public class TransportNetworkCache {
 
     /** If we did not find a cached network, build one */
     public TransportNetwork buildNetwork (String networkId) {
+
         TransportNetwork network;
 
         // check if we have a new-format bundle with a JSON manifest
@@ -235,21 +236,23 @@ public class TransportNetworkCache {
             LOG.warn("Detected old-format bundle stored as single ZIP file");
             network = buildNetworkFromBundleZip(networkId);
         }
+        network.scenarioId = networkId;
 
-        // cache the network
+        // Networks created in TransportNetworkCache are going to be used for analysis work.
+        // Pre-compute distance tables from stops to streets and pre-build a linked grid pointset for the whole region.
+        // They should be serialized along with the network, which avoids building them when an analysis worker starts.
+        // The pointset linkage will never be used directly, but serves as a basis for scenario linkages, making
+        // analysis much faster to start up.
+        network.transitLayer.buildDistanceTables(null);
+        network.rebuildLinkedGridPointSet();
+
+        // Cache the network.
         String filename = networkId + "_" + R5Version.version + ".dat";
         File cacheLocation = new File(cacheDir, networkId + "_" + R5Version.version + ".dat");
-        
+
         try {
-
             // Serialize TransportNetwork to local cache on this worker
-            FileOutputStream fos = new FileOutputStream(cacheLocation);
-            try {
-                network.write(fos);
-            } finally {
-                fos.close();
-            }
-
+            network.write(cacheLocation);
             // Upload the serialized TransportNetwork to S3
             if (sourceBucket != null) {
                 LOG.info("Uploading the serialized TransportNetwork to S3 for use by other workers.");
@@ -258,13 +261,11 @@ public class TransportNetworkCache {
             } else {
                 LOG.info("Network saved to cache directory, not uploading to S3 while working offline.");
             }
-
         } catch (Exception e) {
             // Don't break here as we do have a network to return, we just couldn't cache it.
             LOG.error("Error saving cached network", e);
             cacheLocation.delete();
         }
-
         return network;
     }
 
@@ -317,12 +318,16 @@ public class TransportNetworkCache {
         }
 
         // Set the ID on the network and its layers to allow caching linkages and analysis results.
-        network.networkId = networkId;
+        network.scenarioId = networkId;
 
         return network;
     }
 
-    /** Build a network from a new style manifest JSON in S3 */
+    /**
+     * Build a network from a JSON manifest in S3.
+     * A manifest describes the locations of files used to create a bundle.
+     * It contains the unique IDs of the GTFS feeds and OSM extract.
+     */
     private TransportNetwork buildNetworkFromManifest (String networkId) {
         String manifestFileName = GTFSCache.cleanId(networkId) + ".json";
         File manifestFile = new File(cacheDir, manifestFileName);
@@ -341,8 +346,12 @@ public class TransportNetworkCache {
             LOG.error("Error reading manifest", e);
             return null;
         }
+        // FIXME duplicate code. All internal building logic should be encapsulated in a method like TransportNetwork.build(osm, gtfs1, gtfs2...)
+        // We currently have multiple copies of it, in buildNetworkFromManifest and buildNetworkFromBundleZip
+        // So you've got to remember to do certain things like set the network ID of the network in multiple places in the code.
 
         TransportNetwork network = new TransportNetwork();
+        network.scenarioId = networkId;
         network.streetLayer = new StreetLayer(new TNBuilderConfig()); // TODO builderConfig
         network.streetLayer.loadFromOsm(osmCache.get(manifest.osmId));
         network.streetLayer.parentNetwork = network;
@@ -356,9 +365,21 @@ public class TransportNetworkCache {
 
         network.transitLayer.parentNetwork = network;
         network.streetLayer.associateStops(network.transitLayer);
+        network.streetLayer.buildEdgeLists();
 
         network.rebuildTransientIndexes();
 
+        new TransferFinder(network).findTransfers();
+
         return network;
+    }
+
+    public Set<String> getLoadedNetworkIds() {
+        if (currentNetwork == null) return Collections.emptySet();
+        else return Sets.newHashSet(currentNetwork.scenarioId);
+    }
+
+    public Set<String> getAppliedScenarios() {
+        return scenarioNetworkCache.keySet();
     }
 }

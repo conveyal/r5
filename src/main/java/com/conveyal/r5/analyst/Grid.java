@@ -1,15 +1,20 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.common.GeometryUtils;
-import com.google.common.io.CharSource;
-import com.google.common.io.CharStreams;
+import com.conveyal.r5.util.ShapefileReader;
+import com.csvreader.CsvReader;
 import com.google.common.io.LittleEndianDataInputStream;
 import com.google.common.io.LittleEndianDataOutputStream;
-import com.google.common.primitives.Chars;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.MultiPolygon;
+import com.vividsolutions.jts.geom.Point;
 import com.vividsolutions.jts.geom.Polygon;
+import gnu.trove.iterator.TObjectDoubleIterator;
+import gnu.trove.map.TObjectDoubleMap;
+import gnu.trove.map.hash.TObjectDoubleHashMap;
+import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
@@ -18,33 +23,47 @@ import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.gce.geotiff.GeoTiffFormat;
 import org.geotools.gce.geotiff.GeoTiffWriteParams;
 import org.geotools.gce.geotiff.GeoTiffWriter;
-import org.geotools.geometry.jts.JTS;
 import org.geotools.geometry.jts.ReferencedEnvelope;
-import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
-import org.opengis.coverage.grid.GridCoverage;
+import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
-import org.opengis.referencing.crs.CoordinateReferenceSystem;
-import org.opengis.referencing.operation.MathTransform;
+import org.opengis.referencing.FactoryException;
+import org.opengis.referencing.operation.TransformException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.util.Locale;
+import java.nio.charset.Charset;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
-import static java.lang.Math.atan;
-import static java.lang.Math.cos;
-import static java.lang.Math.log;
-import static java.lang.Math.sinh;
-import static java.lang.Math.tan;
+import static com.conveyal.gtfs.util.Util.human;
+import static java.lang.Double.parseDouble;
+import static org.apache.commons.math3.util.FastMath.atan;
+import static org.apache.commons.math3.util.FastMath.cos;
+import static org.apache.commons.math3.util.FastMath.log;
+import static org.apache.commons.math3.util.FastMath.sinh;
+import static org.apache.commons.math3.util.FastMath.tan;
+import static spark.Spark.halt;
 
 /**
  * Class that represents a grid in the spherical Mercator "projection" at a given zoom level.
@@ -52,6 +71,7 @@ import static java.lang.Math.tan;
  * the edges of the world.
  */
 public class Grid {
+    public static final Logger LOG = LoggerFactory.getLogger(Grid.class);
 
     /** The web mercator zoom level for this grid. */
     public final int zoom;
@@ -103,15 +123,17 @@ public class Grid {
     }
 
     /**
-     * Do pycnoplactic mapping:
-     * the value associated with the supplied polygon a polygon will be split out proportionately to
-     * all the web Mercator pixels that intersect it.
+     * Get the proportions of an input polygon feature that overlap each grid cell, in the format [x, y] => weight.
+     * This weight object can then be fed into the incrementFromPixelWeights function to actually burn a polygon into the
+     * grid.
      */
-    public void rasterize (Geometry geometry, double value) {
+    public TObjectDoubleMap<int[]> getPixelWeights (Geometry geometry) {
         // No need to convert to a local coordinate system
         // Both the supplied polygon and the web mercator pixel geometries are left in WGS84 geographic coordinates.
         // Both are distorted equally along the X axis at a given latitude so the proportion of the geometry within
         // each pixel is accurate, even though the surface area in WGS84 coordinates is not a usable value.
+
+        TObjectDoubleMap<int[]> weights = new TObjectDoubleHashMap<>();
 
         double area = geometry.getArea();
         if (area < 1e-12) {
@@ -130,8 +152,32 @@ public class Grid {
                 Geometry pixel = getPixelGeometry(x + west, y + north, zoom);
                 Geometry intersection = pixel.intersection(geometry);
                 double weight = intersection.getArea() / area;
-                grid[x][y] += weight * value;
+                weights.put(new int[] { x, y }, weight);
             }
+        }
+
+        return weights;
+    }
+
+    /**
+     * Do pycnoplactic mapping:
+     * the value associated with the supplied polygon a polygon will be split out proportionately to
+     * all the web Mercator pixels that intersect it.
+     *
+     * If you are creating multiple grids of the same size for different attributes of the same input features, you should
+     * call getPixelWeights(geometry) once for each geometry on any one of the grids, and then pass the returned weights
+     * and the attribute value into incrementFromPixelWeights function; this will avoid duplicating expensive geometric
+     * math.
+     */
+    public void rasterize (Geometry geometry, double value) {
+        incrementFromPixelWeights(getPixelWeights(geometry), value);
+    }
+
+    /** Using a grid of weights produced by getPixelWeights, burn the value of a polygon into the grid */
+    public void incrementFromPixelWeights (TObjectDoubleMap<int[]> weights, double value) {
+        for (TObjectDoubleIterator<int[]> it = weights.iterator(); it.hasNext();) {
+            it.advance();
+            grid[it.key()[0]][it.key()[1]] += it.value() * value;
         }
     }
 
@@ -308,12 +354,13 @@ public class Grid {
     }
 
     public static int latToPixel (double lat, int zoom) {
-        double latRad = Math.toRadians(lat);
+        double latRad = FastMath.toRadians(lat);
         return (int) ((1 - log(tan(latRad) + 1 / cos(latRad)) / Math.PI) * Math.pow(2, zoom - 1) * 256);
     }
 
+    // We're using FastMath here, because the built-in math functions were taking a laarge amount of time in profiling.
     public static double pixelToLat (double pixel, int zoom) {
-        return Math.toDegrees(atan(sinh(Math.PI - (pixel / 256d) / Math.pow(2, zoom) * 2 * Math.PI)));
+        return FastMath.toDegrees(atan(sinh(Math.PI - (pixel / 256d) / Math.pow(2, zoom) * 2 * Math.PI)));
     }
 
     /**
@@ -334,5 +381,168 @@ public class Grid {
                 new Coordinate(maxLon, minLat),
                 new Coordinate(minLon, minLat)
         });
+    }
+
+    /** Create grids from a CSV file */
+    public static Map<String,Grid> fromCsv(File csvFile, String latField, String lonField, int zoom) throws IOException {
+        return fromCsv(csvFile, latField, lonField, zoom, null);
+    }
+
+    public static Map<String,Grid> fromCsv(File csvFile, String latField, String lonField, int zoom, BiConsumer<Integer, Integer> statusListener) throws IOException {
+        CsvReader reader = new CsvReader(new BufferedInputStream(new FileInputStream(csvFile)), Charset.forName("UTF-8"));
+        reader.readHeaders();
+
+        String[] headers = reader.getHeaders();
+        if (!Stream.of(headers).filter(h -> h.equals(latField)).findAny().isPresent()) {
+            LOG.info("Lat field not found!");
+            halt(400, "Lat field not found");
+        }
+
+        if (!Stream.of(headers).filter(h -> h.equals(lonField)).findAny().isPresent()) {
+            LOG.info("Lon field not found!");
+            halt(400, "Lon field not found");
+        }
+
+        Envelope envelope = new Envelope();
+
+        // Keep track of which fields contain numeric values
+        Set<String> numericColumns = Stream.of(headers).collect(Collectors.toCollection(HashSet::new));
+        numericColumns.remove(latField);
+        numericColumns.remove(lonField);
+
+        // Detect which columns are completely numeric by iterating over all the rows and trying to parse the fields
+        int total = 0;
+        while (reader.readRecord()) {
+            if (++total % 10000 == 0) LOG.info("{} records", human(total));
+
+            envelope.expandToInclude(parseDouble(reader.get(lonField)), parseDouble(reader.get(latField)));
+
+            for (Iterator<String> it = numericColumns.iterator(); it.hasNext();) {
+                String field = it.next();
+                String value = reader.get(field);
+                if (value == null || "".equals(value)) continue; // allow missing data
+                try {
+                    // TODO also exclude columns containing negatives?
+                    parseDouble(value);
+                } catch (NumberFormatException e) {
+                    it.remove();
+                }
+            }
+        }
+
+        reader.close();
+
+        if (statusListener != null) statusListener.accept(0, total);
+
+        // We now have an envelope and know which columns are numeric
+        // Make a grid for each numeric column
+        Map<String, Grid> grids = numericColumns.stream()
+                .collect(
+                        Collectors.toMap(
+                                c -> c,
+                                c -> new Grid(
+                                        zoom,
+                                        envelope.getMaxY(),
+                                        envelope.getMaxX(),
+                                        envelope.getMinY(),
+                                        envelope.getMinX()
+                                )));
+
+        // read it again, Sam - reread the CSV to get the actual values and populate the grids
+        reader = new CsvReader(new BufferedInputStream(new FileInputStream(csvFile)), Charset.forName("UTF-8"));
+        reader.readHeaders();
+
+        int i = 0;
+        while (reader.readRecord()) {
+            if (++i % 10000 == 0) {
+                LOG.info("{} records", human(i));
+            }
+
+            if (statusListener != null) statusListener.accept(i, total);
+
+            double lat = parseDouble(reader.get(latField));
+            double lon = parseDouble(reader.get(lonField));
+
+            for (String field : numericColumns) {
+                String value = reader.get(field);
+
+                double val;
+
+                if (value == null || "".equals(value)) {
+                    val = 0;
+                } else {
+                    val = parseDouble(value);
+                }
+
+                grids.get(field).incrementPoint(lat, lon, val);
+            }
+        }
+
+        reader.close();
+
+        return grids;
+    }
+
+    public static Map<String, Grid> fromShapefile (File shapefile, int zoom) throws IOException, FactoryException, TransformException {
+        return fromShapefile(shapefile, zoom, null);
+    }
+
+    public static Map<String, Grid> fromShapefile (File shapefile, int zoom, BiConsumer<Integer, Integer> statusListener) throws IOException, FactoryException, TransformException {
+        Map<String, Grid> grids = new HashMap<>();
+        ShapefileReader reader = new ShapefileReader(shapefile);
+
+        Envelope envelope = reader.wgs84Bounds();
+        int total = reader.getFeatureCount();
+
+        if (statusListener != null) statusListener.accept(0, total);
+
+        AtomicInteger count = new AtomicInteger(0);
+
+        reader.wgs84Stream().forEach(feat -> {
+            Geometry geom = (Geometry) feat.getDefaultGeometry();
+
+            for (Property p : feat.getProperties()) {
+                Object val = p.getValue();
+
+                if (val == null || !Number.class.isInstance(val)) continue;
+                double numericVal = ((Number) val).doubleValue();
+                if (numericVal == 0) continue;
+
+                String attributeName = p.getName().getLocalPart();
+
+                if (!grids.containsKey(attributeName)) {
+                    grids.put(attributeName, new Grid(
+                            zoom,
+                            envelope.getMaxY(),
+                            envelope.getMaxX(),
+                            envelope.getMinY(),
+                            envelope.getMinX()
+                    ));
+                }
+
+                Grid grid = grids.get(attributeName);
+
+                if (geom instanceof Point) {
+                    Point point = (Point) geom;
+                    // already in WGS 84
+                    grid.incrementPoint(point.getY(), point.getX(), numericVal);
+                } else if (geom instanceof Polygon || geom instanceof MultiPolygon) {
+                    grid.rasterize(geom, numericVal);
+                } else {
+                    throw new IllegalArgumentException("Unsupported geometry type");
+                }
+            }
+
+            int currentCount = count.incrementAndGet();
+
+            if (statusListener != null) statusListener.accept(currentCount, total);
+
+            if (currentCount % 10000 == 0) {
+                LOG.info("{} / {} features read", human(currentCount), human(total));
+            }
+        });
+
+        reader.close();
+        return grids;
     }
 }

@@ -59,7 +59,7 @@ public class StaticMain {
         stopTreeRequest.jobId = ssr.jobId;
         requests.add(stopTreeRequest);
 
-        WebMercatorGridPointSet ps = net.getGridPointSet();
+        WebMercatorGridPointSet ps = net.gridPointSet;
 
         // pre-link so it doesn't get done in every thread
         LinkedPointSet lps = ps.link(net.streetLayer, StreetMode.WALK);

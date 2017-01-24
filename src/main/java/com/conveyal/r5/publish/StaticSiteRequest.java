@@ -55,5 +55,11 @@ public class StaticSiteRequest {
 
         /** StaticSiteRequest this is associated with */
         public StaticSiteRequest request;
+
+        @Override
+        public ProfileRequest extractProfileRequest() {
+            return request.request;
+        }
+
     }
 }

@@ -72,7 +72,24 @@ public class TransportNetwork implements Serializable {
 
     public void write (File file) throws IOException {
         LOG.info("Writing transport network...");
-        //ExpandingMMFBytez.writeObjectToFile(file, this);
+        ExpandingMMFBytez.writeObjectToFile(file, this);
+        LOG.info("Done writing.");
+    }
+
+    public static TransportNetwork read (File file) throws Exception {
+        LOG.info("Reading transport network...");
+        TransportNetwork result = ExpandingMMFBytez.readObjectFromFile(file);
+        LOG.info("Done reading.");
+        if (result.fareCalculator != null) {
+            result.fareCalculator.transitLayer = result.transitLayer;
+        }
+        result.rebuildTransientIndexes();
+        return result;
+    }
+
+    // Old method that has the advantage of not using hidden black magic memory map methods, but buffers entirely in memory
+    public void writeStream (File file) throws IOException {
+        LOG.info("Writing transport network...");
         OutputStream stream = new BufferedOutputStream(new FileOutputStream(file));
         FSTObjectOutput out = new FSTObjectOutput(stream);
         out.writeObject(this, TransportNetwork.class);
@@ -80,9 +97,9 @@ public class TransportNetwork implements Serializable {
         LOG.info("Done writing.");
     }
 
-    public static TransportNetwork read (File file) throws Exception {
+    // Old method that has the advantage of not using hidden black magic memory map methods, but buffers entirely in memory
+    public static TransportNetwork readStream (File file) throws Exception {
         LOG.info("Reading transport network...");
-        //TransportNetwork result = ExpandingMMFBytez.readObjectFromFile(file);
         InputStream stream = new BufferedInputStream(new FileInputStream(file));
         FSTObjectInput in = new FSTObjectInput(stream);
         TransportNetwork result = (TransportNetwork) in.readObject(TransportNetwork.class);
@@ -94,6 +111,7 @@ public class TransportNetwork implements Serializable {
         result.rebuildTransientIndexes();
         return result;
     }
+
 
     /**
      * Build some simple derived index tables that are not serialized with the network.

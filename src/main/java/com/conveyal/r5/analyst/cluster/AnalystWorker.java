@@ -255,17 +255,16 @@ public class AnalystWorker implements Runnable {
         // can't use CallerRunsPolicy as that would cause deadlocks, calling thread is writing to inputstream
         taskDeliveryExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
 
-        // If an initial graph ID was provided in the config file, build that TransportNetwork on startup.
-        // Prebuilding the graph is necessary because, if the graph is not cached it can take several
+        // If an initial graph ID was provided in the config file, build or load that TransportNetwork on startup.
+        // Pre-loading the graph is necessary because if the graph is not cached it can take several
         // minutes to build it. Even if the graph is cached, reconstructing the indices and stop trees
-        // can take up to a minute. The UI times out after 30 seconds, so the broker needs to return
-        // a 503 (Service Not Available) to tell it to try again later. It can't do that after it's
-        // sent a request to a worker, so the worker needs to not come online until it's ready to process
-        // requests.
+        // can take a while. The UI times out after 30 seconds, so the broker needs to return a response to tell it
+        // to try again later within that timespan. The broker can't do that after it's sent a request to a worker,
+        // so the worker needs to not come online until it's ready to process requests.
         if (networkId != null) {
-            LOG.info("Prebuilding graph {}", networkId);
+            LOG.info("Pre-loading or building network with ID {}", networkId);
             transportNetworkCache.getNetwork(networkId);
-            LOG.info("Done prebuilding graph {}", networkId);
+            LOG.info("Done pre-loading network {}", networkId);
         }
 
         // Start filling the work queues.

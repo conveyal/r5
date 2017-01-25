@@ -102,7 +102,10 @@ public class ExpandingMMFBytez extends MallocBytez {
         // size = this.length + StreamCoderFactory.MIN_SIZE_BYTES;
         System.out.println("Resizing memory mapped buffer to " + size);
         try {
-            munmap(baseAdress, length);
+            if (this.baseAdress != 0L) {
+                munmap(baseAdress, length);
+                this.baseAdress = 0L;
+            }
             randomAccessFile.setLength(size);
             baseAdress = mmap(fileChannel, MAP_READ_WRITE, 0L, size);
             length = size;
@@ -115,7 +118,10 @@ public class ExpandingMMFBytez extends MallocBytez {
     /** This implementation hides the inappropriate method on the malloc-based superclass. */
     public void free() {
         try {
-            munmap(baseAdress, length);
+            if (this.baseAdress != 0L) {
+                munmap(baseAdress, length);
+                this.baseAdress = 0L;
+            }
             fileChannel.close();
         } catch (Exception ex) {
             throw new RuntimeException(ex);
@@ -130,7 +136,10 @@ public class ExpandingMMFBytez extends MallocBytez {
      */
     public void truncateAndClose(long size) {
         try {
-            munmap(baseAdress, length);
+            if (this.baseAdress != 0L) {
+                munmap(baseAdress, length);
+                this.baseAdress = 0L;
+            }
             fileChannel.truncate(size);
             System.out.println("Closing memory mapped file after truncating to length of " + size);
             fileChannel.close();

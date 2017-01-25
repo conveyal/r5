@@ -16,6 +16,8 @@ import com.google.common.io.Files;
 import com.vividsolutions.jts.geom.Envelope;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
+import org.nustaq.serialization.FSTObjectInput;
+import org.nustaq.serialization.FSTObjectOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,14 +72,25 @@ public class TransportNetwork implements Serializable {
 
     public void write (File file) throws IOException {
         LOG.info("Writing transport network...");
-        ExpandingMMFBytez.writeObjectToFile(file, this);
+        //ExpandingMMFBytez.writeObjectToFile(file, this);
+        OutputStream stream = new BufferedOutputStream(new FileOutputStream(file));
+        FSTObjectOutput out = new FSTObjectOutput(stream);
+        out.writeObject(this, TransportNetwork.class);
+        out.close();
         LOG.info("Done writing.");
     }
 
     public static TransportNetwork read (File file) throws Exception {
         LOG.info("Reading transport network...");
-        TransportNetwork result = ExpandingMMFBytez.readObjectFromFile(file);
+        //TransportNetwork result = ExpandingMMFBytez.readObjectFromFile(file);
+        InputStream stream = new BufferedInputStream(new FileInputStream(file));
+        FSTObjectInput in = new FSTObjectInput(stream);
+        TransportNetwork result = (TransportNetwork) in.readObject(TransportNetwork.class);
+        in.close();
         LOG.info("Done reading.");
+        if (result.fareCalculator != null) {
+            result.fareCalculator.transitLayer = result.transitLayer;
+        }
         result.rebuildTransientIndexes();
         return result;
     }

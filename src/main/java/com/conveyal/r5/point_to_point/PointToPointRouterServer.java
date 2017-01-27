@@ -80,15 +80,11 @@ public class PointToPointRouterServer {
             //In memory doesn't save it to disk others do (build, preFlight)
             if (!inMemory) {
                 try {
-                    OutputStream outputStream = new BufferedOutputStream(
-                        new FileOutputStream(new File(dir, "network.dat")));
-                    transportNetwork.write(outputStream);
-                    outputStream.close();
-                } catch (IOException e) {
+                    transportNetwork.write(new File(dir, "network.dat"));
+                } catch (Exception e) {
                     LOG.error("An error occurred during saving transit networks. Exiting.", e);
                     System.exit(-1);
                 }
-
             }
         } else if ("--graphs".equals(commandArguments[0])) {
             File dir = new File(commandArguments[1]);
@@ -98,16 +94,11 @@ public class PointToPointRouterServer {
             }
             try {
                 LOG.info("Loading transit networks from: {}", dir);
-                InputStream inputStream = new BufferedInputStream(new FileInputStream(new File(dir, "network.dat")));
-                TransportNetwork transportNetwork = TransportNetwork.read(inputStream);
+                TransportNetwork transportNetwork = TransportNetwork.read(new File(dir, "network.dat"));
                 transportNetwork.readOSM(new File(dir, "osm.mapdb"));
                 run(transportNetwork);
-                inputStream.close();
-            } catch (IOException e) {
-                LOG.error("An error occurred during reading of transit networks", e);
-                System.exit(-1);
             } catch (Exception e) {
-                LOG.error("An error occurred during decoding of transit networks", e);
+                LOG.error("An error occurred during the reading or decoding of transit networks", e);
                 System.exit(-1);
             }
         } else if ("--help".equals(commandArguments[0])

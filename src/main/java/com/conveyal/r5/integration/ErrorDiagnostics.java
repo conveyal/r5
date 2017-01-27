@@ -31,7 +31,6 @@ import java.io.OutputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -80,9 +79,6 @@ public class ErrorDiagnostics implements RequestHandler<DiagnosticsRequest, Bool
                 RaptorWorker worker = new RaptorWorker(network.transitLayer, lps, req.request);
                 worker.runRaptor(sr.getReachedStops(), lps.eval(sr::getTravelTimeToVertex), new TaskStatistics());
 
-                BitSet include = new BitSet();
-                include.set(0);
-
                 // we now have the times at each point at each iteration. We use a propagated times store to get the
                 // accessibility at each iteration
                 // TODO exclude iterations that should not be included in averaged using worker.includeInAverages
@@ -94,7 +90,7 @@ public class ErrorDiagnostics implements RequestHandler<DiagnosticsRequest, Bool
                     int[] times = worker.timesAtTargetsEachIteration[iteration];
 
                     PropagatedTimesStore pts = new PropagatedTimesStore(times.length);
-                    pts.setFromArray(new int[][]{times}, include, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX, req.request.reachabilityThreshold);
+                    pts.setFromArray(new int[][]{times}, req.request.reachabilityThreshold);
                     req.results.add(pts.makeResults(pset, false, true, false).avgCase.histograms.get(req.pointsetField).sums);
                 }
             } else {
@@ -103,15 +99,12 @@ public class ErrorDiagnostics implements RequestHandler<DiagnosticsRequest, Bool
                 router.NUMBER_OF_SEARCHES = req.samples;
                 router.route();
 
-                BitSet include = new BitSet();
-                include.set(0);
-
                 req.results = new ArrayList<>();
 
                 for (int[] times : router.timesAtTargetsEachIteration) {
                     // everything is included in averages, we are not calculating bounds
                     PropagatedTimesStore pts = new PropagatedTimesStore(times.length);
-                    pts.setFromArray(new int[][]{times}, include, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX, req.request.reachabilityThreshold);
+                    pts.setFromArray(new int[][]{times}, req.request.reachabilityThreshold);
                     req.results.add(pts.makeResults(pset, false, true, false).avgCase.histograms.get(req.pointsetField).sums);
                 }
             }

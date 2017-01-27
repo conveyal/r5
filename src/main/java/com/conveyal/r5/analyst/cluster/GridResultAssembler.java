@@ -86,7 +86,7 @@ public class GridResultAssembler {
         nTotal = request.width * request.height;
     }
 
-    private void finish () {
+    private synchronized void finish () {
         // gzip and push up to S3
         LOG.info("Finished receiving data for regional analysis {}, uploading to S3", request.jobId);
 
@@ -107,7 +107,7 @@ public class GridResultAssembler {
                     temporaryFile.length() / 1024 / 1024,
                     gzipFile.length() / 1024 / 1024,
                     temporaryFile.length() / gzipFile.length()
-                    );
+            );
 
             s3.putObject(outputBucket, String.format("%s.access", request.jobId), gzipFile);
 
@@ -160,7 +160,7 @@ public class GridResultAssembler {
         }
     }
 
-    public void initialize (int nIterations) throws IOException {
+    public synchronized void initialize (int nIterations) throws IOException {
         this.nIterations = nIterations;
 
         // create a temporary file an fill it in with relevant data
@@ -193,5 +193,11 @@ public class GridResultAssembler {
         LOG.info("Allocated temporary file of {}mb to store query results", temporaryFile.length() / 1024 / 1024);
 
         this.buffer = new RandomAccessFile(temporaryFile, "rw");
+    }
+
+    /** Clean up and cancel a consumer */
+    public synchronized void terminate () throws IOException {
+        this.buffer.close();
+        temporaryFile.delete();
     }
 }

@@ -9,13 +9,15 @@ import org.mapdb.Fun;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * A linked pointset that represents a web mercator grid laid over the graph.
  */
-public class WebMercatorGridPointSet extends PointSet {
+public class WebMercatorGridPointSet extends PointSet implements Serializable {
+
     public static final Logger LOG = LoggerFactory.getLogger(WebMercatorGridPointSet.class);
 
     public static final int DEFAULT_ZOOM = 9;
@@ -86,7 +88,6 @@ public class WebMercatorGridPointSet extends PointSet {
 
     /** convert latitude to pixel value */
     public int latToPixel (double lat) {
-        //
         double invCos = 1 / Math.cos(Math.toRadians(lat));
         double tan = Math.tan(Math.toRadians(lat));
         double ln = Math.log(tan + invCos);
@@ -101,4 +102,5 @@ public class WebMercatorGridPointSet extends PointSet {
         double tile = y / 256d;
         return Math.toDegrees(Math.atan(Math.sinh(Math.PI - tile * Math.PI * 2 / Math.pow(2, zoom))));
     }
+
 }

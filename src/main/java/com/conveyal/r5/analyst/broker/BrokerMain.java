@@ -74,7 +74,7 @@ public class BrokerMain implements Runnable {
         httpServer.getServerConfiguration().addHttpHandler(new BrokerHttpHandler(broker), "/*");
         try {
             httpServer.start();
-            LOG.info("Broker running.");
+            LOG.info("Broker HTTP server running.");
             broker.run(); // run queue broker task pump in this thread
             Thread.currentThread().join();
         } catch (BindException be) {

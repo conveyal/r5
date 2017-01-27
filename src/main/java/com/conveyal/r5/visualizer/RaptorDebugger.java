@@ -51,8 +51,7 @@ public class RaptorDebugger {
 
         if (network.isDirectory()) network = new File(network, "network.dat");
 
-        InputStream inputStream = new BufferedInputStream(new FileInputStream(network));
-        RaptorDebugger.network = TransportNetwork.read(inputStream);
+        RaptorDebugger.network = TransportNetwork.read(network);
 
         port(4141);
         post("/api/plan", RaptorDebugger::plan, JsonUtilities.objectMapper::writeValueAsString);

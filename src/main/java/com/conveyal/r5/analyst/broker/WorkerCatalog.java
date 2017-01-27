@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.broker;
 
+import com.conveyal.r5.analyst.cluster.WorkerStatus;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 
@@ -29,14 +30,15 @@ public class WorkerCatalog {
     /**
      * Record the fact that a worker with a particular ID was just seen connecting to the broker.
      */
-    public synchronized void catalog (String workerId, WorkerCategory category) {
-        WorkerObservation observation = new WorkerObservation(workerId, category);
+    public synchronized void catalog (WorkerStatus workerStatus) {
+        String workerId = workerStatus.workerId;
+        WorkerObservation observation = new WorkerObservation(workerStatus);
         WorkerObservation oldObservation = observationsByWorkerId.put(workerId, observation);
         if (oldObservation != null) {
             workersByCategory.remove(oldObservation.category, workerId);
         }
-        workersByCategory.put(category, workerId);
-        workersByGraph.put(category.graphId, workerId);
+        workersByCategory.put(observation.category, workerId);
+        workersByGraph.put(observation.category.graphId, workerId);
     }
 
     public synchronized void purgeDeadWorkers () {

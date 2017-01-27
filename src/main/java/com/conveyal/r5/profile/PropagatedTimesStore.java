@@ -39,16 +39,15 @@ import static org.apache.commons.math3.util.FastMath.toRadians;
  *
  * When exploring single-point (one-to-many) query results it would be great to have all these stored or produced on
  * demand for visualization.
+ *
+ * TODO this class should probably be eliminated in r5 2.0 as we don't really do much with average travel times anymore.
  */
 public class PropagatedTimesStore {
 
     private static final Logger LOG = LoggerFactory.getLogger(PropagatedTimesStore.class);
 
-    // Four parallel arrays has worse locality than one big 4|V|-length flat array, but merging per-raptor-call values
-    // into this summary statistics storage is not the slow part of the algorithm. Optimization should concentrate on
-    // the propagation of minimum travel times from transit stops to the street vertices.
     int size;
-    int[] mins, maxs, avgs;
+    int[] avgs;
 
     // number of times to bootstrap the mean.
     public final int N_BOOTSTRAPS = 400;
@@ -57,20 +56,14 @@ public class PropagatedTimesStore {
 
     public PropagatedTimesStore(int size) {
         this.size = size;
-        mins = new int[size];
-        maxs = new int[size];
         avgs = new int[size];
         Arrays.fill(avgs, Integer.MAX_VALUE);
-        Arrays.fill(mins, Integer.MAX_VALUE);
-        Arrays.fill(maxs, Integer.MAX_VALUE);
     }
 
     /**
      * @param times for search (varying departure time), an array of travel times to each transit stop.
-     * @param includeInAverages if includeInAverages[i] is true, include iteration i in averages. We calculate extrema
-     *                          as well as samples when doing monte carlo, and extrema should not be included in averages.
      */
-    public void setFromArray(int[][] times, BitSet includeInAverages, ConfidenceCalculationMethod confidenceCalculationMethod, float reachabilityThreshold) {
+    public void setFromArray(int[][] times, float reachabilityThreshold) {
         if (times.length == 0)
             // nothing to do
             return;
@@ -92,7 +85,7 @@ public class PropagatedTimesStore {
         // and thus don't count towards meeting the reachability threshold.
         // minCount should always be at least 1 even when reachability threshold is 0, because if a point is never
         // reached it certainly shouldn't be included in the averages.
-        int minCount = Math.max((int) (includeInAverages.cardinality() * reachabilityThreshold), 1);
+        int minCount = Math.max((int) (times.length * reachabilityThreshold), 1);
 
         // loop over stops on the outside so we can bootstrap
         STOPS: for (int stop = 0; stop < stops; stop++) {
@@ -107,59 +100,16 @@ public class PropagatedTimesStore {
                     continue ITERATIONS;
 
                 // don't include extrema in averages
-                if (includeInAverages.get(i)) {
-                    sum += times[i][stop];
-                    count++;
-                }
+                sum += times[i][stop];
+                count++;
 
-                // only include extrema in the list of times if we are doing min-max, they're not relevant for percentages
-                if (includeInAverages.get(i) || confidenceCalculationMethod == ConfidenceCalculationMethod.MIN_MAX) {
-                    timeList.add(times[i][stop]);
-                }
+                timeList.add(times[i][stop]);
             }
 
             if (count < minCount)
                 continue STOPS;
 
             avgs[stop] = sum / count;
-
-            switch (confidenceCalculationMethod) {
-            case BOOTSTRAP:
-                // now bootstrap out a 95% confidence interval on the time
-                int[] bootMeans = new int[N_BOOTSTRAPS];
-                for (int boot = 0; boot < N_BOOTSTRAPS; boot++) {
-                    int bsum = 0;
-
-                    // sample from the Monte Carlo distribution with replacement
-                    for (int iter = 0; iter < count; iter++) {
-                        bsum += timeList
-                                .get(randomNumbers[nextRandom++ % randomNumbers.length] % count);
-                        //bsum += timeList.get(random.nextInt(count));
-                    }
-
-                    bootMeans[boot] = bsum / count;
-                }
-
-                Arrays.sort(bootMeans);
-                // 2.5 percentile of distribution of means
-                mins[stop] = bootMeans[N_BOOTSTRAPS / 40];
-                // 97.5 percentile of distribution of means
-                maxs[stop] = bootMeans[N_BOOTSTRAPS - N_BOOTSTRAPS / 40];
-                break;
-            case PERCENTILE:
-                timeList.sort();
-                mins[stop] = timeList.get(timeList.size() / 40);
-                maxs[stop] = timeList.get(39 * timeList.size() / 40);
-                break;
-            case NONE:
-                mins[stop] = maxs[stop] = avgs[stop];
-                break;
-            case MIN_MAX:
-            default:
-                mins[stop] = timeList.min();
-                maxs[stop] = timeList.max();
-                break;
-            }
         }
     }
 
@@ -170,52 +120,17 @@ public class PropagatedTimesStore {
      */
     public ResultEnvelope makeResults(PointSet pointSet, boolean includeTimes, boolean includeHistograms, boolean includeIsochrones) {
         ResultEnvelope envelope = new ResultEnvelope();
-        envelope.worstCase = new ResultSet(maxs, pointSet, includeTimes, includeHistograms, includeIsochrones);
         envelope.avgCase   = new ResultSet(avgs, pointSet, includeTimes, includeHistograms, includeIsochrones);
-        envelope.bestCase  = new ResultSet(mins, pointSet, includeTimes, includeHistograms, includeIsochrones);
         return envelope;
     }
 
     public int countTargetsReached() {
         int count = 0;
-        for (int min : mins) {
-            if (min != RaptorWorker.UNREACHED) {
+        for (int avg : avgs) {
+            if (avg != RaptorWorker.UNREACHED) {
                 count++;
             }
         }
         return count;
-    }
-
-    public static enum ConfidenceCalculationMethod {
-        /** Do not calculate confidence intervals */
-        NONE,
-
-        /**
-         * Calculate confidence intervals around the mean using the bootstrap. Note that this calculates
-         * the confidence that the mean is in fact the mean of all possible schedules, not the confidence
-         * that a particular but unknown schedule will behave a certain way.
-         *
-         * This is absolutely the correct approach in systems that are specified as frequencies both
-         * in the model and operationally, because the parameter of interest is the average accessibility
-         * afforded by every realization of transfer and wait time. This yields nice tiny confidence
-         * intervals around the mean, and allows us easily to measure changes in average accessibility.
-         *
-         * However, when you have a system that will eventually be scheduled, you are interested not
-         * in the distribution of the average accessibility over all possible schedules, but rather
-         * the distribution of the accessibility afforded by a particular but unknown schedule. This
-         * does not require bootstrapping; it's just taking percentiles on the output of the Monte
-         * Carlo simulation. Unfortunately this requires a lot more Monte Carlo samples, as of
-         * course the middle of the distribution will stabilize long before the extrema.
-         */
-        BOOTSTRAP,
-
-        /**
-         * Calculate confidence intervals based on percentiles, which is what you want to do when
-         * you have a scheduled network.
-         */
-        PERCENTILE,
-
-        /** Take the min and the max of the experienced of the experienced times. Only valid for scheduled services. */
-        MIN_MAX
     }
 }

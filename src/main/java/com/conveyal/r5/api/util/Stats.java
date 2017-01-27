@@ -10,7 +10,7 @@ public class Stats implements Cloneable {
      * Minimum travel time (seconds)
      * @notnull
      */
-    public int min = 0;
+    public int min = Integer.MAX_VALUE;
 
     /**
      * Average travel time (including waiting) (seconds)

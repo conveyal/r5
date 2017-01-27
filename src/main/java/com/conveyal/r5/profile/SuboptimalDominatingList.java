@@ -88,10 +88,10 @@ public class SuboptimalDominatingList implements DominatingList {
     }
 
     public Collection<McRaptorSuboptimalPathProfileRouter.McRaptorState> getNonDominatedStates () {
-        // We prune here. I've also tried pruning on add, but it slows the algorithm down due to all of the looping.
+        // We used to prune here, but now we prune on add.
+        // I've observed in the past that pruning on add slows the algorithm down due to all of the looping.
         // I also tried pruning once per round, but that also slows the algorithm down (perhaps because it's doing
         // so many pairwise comparisons).
-        //prune();
         return list;
     }
 }

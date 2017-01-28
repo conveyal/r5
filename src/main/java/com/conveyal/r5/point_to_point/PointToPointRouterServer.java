@@ -1,5 +1,6 @@
 package com.conveyal.r5.point_to_point;
 
+import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
 import com.conveyal.r5.analyst.cluster.ResultEnvelope;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
@@ -1149,7 +1150,7 @@ public class PointToPointRouterServer {
     }
 
     private static ResultEnvelope calculateIsochrone(TransportNetwork transportNetwork, AnalystClusterRequest clusterRequest) {
-        PointSet targets = transportNetwork.getGridPointSet();
+        PointSet targets = new WebMercatorGridPointSet(transportNetwork);
         StreetMode mode = StreetMode.WALK;
         final LinkedPointSet linkedTargets = targets.link(transportNetwork.streetLayer, mode);
         RepeatedRaptorProfileRouter router = new RepeatedRaptorProfileRouter(transportNetwork,

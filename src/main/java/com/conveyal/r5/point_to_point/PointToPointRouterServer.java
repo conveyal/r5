@@ -121,6 +121,8 @@ public class PointToPointRouterServer {
         ObjectReader graphQlRequestReader = mapper.reader(GraphQlRequest.class);
         ObjectReader mapReader = mapper.reader(HashMap.class);
         staticFileLocation("debug-plan");
+        transportNetwork.transitLayer.buildDistanceTables(null);
+        transportNetwork.rebuildLinkedGridPointSet();
         PointToPointQuery pointToPointQuery = new PointToPointQuery(transportNetwork);
 
         //TODO: executor strategies
@@ -1150,12 +1152,11 @@ public class PointToPointRouterServer {
     }
 
     private static ResultEnvelope calculateIsochrone(TransportNetwork transportNetwork, AnalystClusterRequest clusterRequest) {
-        PointSet targets = new WebMercatorGridPointSet(transportNetwork);
+        LinkedPointSet targets = transportNetwork.linkedGridPointSet;
         StreetMode mode = StreetMode.WALK;
-        final LinkedPointSet linkedTargets = targets.link(transportNetwork.streetLayer, mode);
         RepeatedRaptorProfileRouter router = new RepeatedRaptorProfileRouter(transportNetwork,
             clusterRequest,
-            linkedTargets,
+            targets,
             new TaskStatistics());
         return router.route();
     }

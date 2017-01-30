@@ -55,9 +55,9 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
 
         this.zoom = DEFAULT_ZOOM;
 
-        double latBuffer = SphericalDistanceLibrary.metersToDegreesLatitude(TransitLayer.DISTANCE_TABLE_SIZE_METERS);
+        double latBuffer = SphericalDistanceLibrary.metersToDegreesLatitude(LinkedPointSet.MAX_OFFSTREET_WALK_METERS);
         double lonBuffer = SphericalDistanceLibrary
-                .metersToDegreesLongitude(TransitLayer.DISTANCE_TABLE_SIZE_METERS, transportNetwork.streetLayer.envelope.centre().y);
+                .metersToDegreesLongitude(LinkedPointSet.MAX_OFFSTREET_WALK_METERS, transportNetwork.streetLayer.envelope.centre().y);
 
         int west = lonToPixel(transportNetwork.streetLayer.envelope.getMinX() - lonBuffer);
         int east = lonToPixel(transportNetwork.streetLayer.envelope.getMaxX() + lonBuffer);

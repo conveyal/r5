@@ -1,10 +1,14 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.r5.common.SphericalDistanceLibrary;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
+import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetLayer;
+import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Envelope;
 import org.mapdb.Fun;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,10 +54,15 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         LOG.info("Creating web mercator pointset for transport network with extents {}", transportNetwork.streetLayer.envelope);
 
         this.zoom = DEFAULT_ZOOM;
-        int west = lonToPixel(transportNetwork.streetLayer.envelope.getMinX());
-        int east = lonToPixel(transportNetwork.streetLayer.envelope.getMaxX());
-        int north = latToPixel(transportNetwork.streetLayer.envelope.getMaxY());
-        int south = latToPixel(transportNetwork.streetLayer.envelope.getMinY());
+
+        double latBuffer = SphericalDistanceLibrary.metersToDegreesLatitude(TransitLayer.DISTANCE_TABLE_SIZE_METERS);
+        double lonBuffer = SphericalDistanceLibrary
+                .metersToDegreesLongitude(TransitLayer.DISTANCE_TABLE_SIZE_METERS, transportNetwork.streetLayer.envelope.centre().y);
+
+        int west = lonToPixel(transportNetwork.streetLayer.envelope.getMinX() - lonBuffer);
+        int east = lonToPixel(transportNetwork.streetLayer.envelope.getMaxX() + lonBuffer);
+        int north = latToPixel(transportNetwork.streetLayer.envelope.getMaxY() + latBuffer);
+        int south = latToPixel(transportNetwork.streetLayer.envelope.getMinY() - latBuffer);
 
         this.west = west;
         this.north = north;

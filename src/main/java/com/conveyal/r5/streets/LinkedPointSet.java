@@ -161,7 +161,9 @@ public class LinkedPointSet implements Serializable {
         }
         if (superGrid.west > subGrid.west || superGrid.west + superGrid.width < subGrid.west + subGrid.width ||
             superGrid.north > subGrid.north || superGrid.north + superGrid.height < subGrid.north + subGrid.height) {
-            throw new IllegalArgumentException("Sub-grid must lie fully inside the super-grid.");
+            // we simply warn if it does not lie within the super grid. This used to throw an error but that prevents
+            // analyses with origins near the edge of the graph.
+            LOG.warn("Part of sub-grid does not lie with super grid");
         }
 
         // Initialize the fields of the new LinkedPointSet instance
@@ -174,10 +176,22 @@ public class LinkedPointSet implements Serializable {
         distances0_mm = new int[nCells];
         distances1_mm = new int[nCells];
 
+        // mark all points as unlinked, in case part of the subGrid lies outside the super grid. Points within the super
+        // grid will be overwritten below
+        Arrays.fill(edges, -1);
+
         // Copy values over from the source linkage to the new sub-linkage
         // x, y, and pixel are relative to the new linkage
         for (int y = 0, pixel = 0; y < subGrid.height; y++) {
+            int row = subGrid.north + y;
+            boolean rowWithinSuperGrid = row >= superGrid.north && row < superGrid.north + superGrid.height;
+            if (!rowWithinSuperGrid) continue;
+
             for (int x = 0; x < subGrid.width; x++, pixel++) {
+                int col = subGrid.west + x;
+                boolean colWithinSuperGrid = col >= superGrid.west && col < superGrid.west + superGrid.width;
+                if (!colWithinSuperGrid) continue;
+
                 int sourceColumn = subGrid.west + x - superGrid.west;
                 int sourceRow = subGrid.north + y - superGrid.north;
                 int sourcePixel = sourceRow * superGrid.width + sourceColumn;

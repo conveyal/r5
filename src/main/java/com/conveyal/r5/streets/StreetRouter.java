@@ -745,7 +745,7 @@ public class StreetRouter {
         return getState(split);
     }
 
-    public static class State implements Cloneable {
+    public static class State implements Cloneable,Serializable {
         public int vertex;
         public int weight;
         public int backEdge;

@@ -17,8 +17,6 @@ public class ParkRideRouter extends StreetRouter {
 
     TIntIntMap transitStopIndexDurationMap;
 
-    TIntIntMap transitStopStreetIndexParkRideIndexMap;
-
     TIntObjectMap<State> transitStopStreetIndexParkRideState;
 
     public ParkRideRouter(StreetLayer streetLayer) {
@@ -37,7 +35,6 @@ public class ParkRideRouter extends StreetRouter {
      */
     public void addParks(TIntObjectMap<State> carParks, TransitLayer transitLayer) {
         transitStopIndexDurationMap = new TIntIntHashMap(carParks.size() * 3);
-        transitStopStreetIndexParkRideIndexMap = new TIntIntHashMap(carParks.size() * 3);
         TIntObjectMap<ParkRideParking> parkRideLocationsMap = streetLayer.parkRideLocationsMap;
         transitStopStreetIndexParkRideState = new TIntObjectHashMap<>(carParks.size());
         final double walkSpeedMillimetersPerSecond = profileRequest.walkSpeed * 1000;
@@ -45,12 +42,11 @@ public class ParkRideRouter extends StreetRouter {
         carParks.forEachValue((state) -> {
             int parkRideStreetVertexIdx = state.vertex;
             int timeToParkRide = state.getDurationSeconds();
-            TIntList parkRideTransitStops = parkRideLocationsMap
+            TIntObjectMap<State> parkRideTransitStops = parkRideLocationsMap
                 .get(parkRideStreetVertexIdx).closestTransfers;
             // for each transit stop reached from this P+R
-            for (int i = 0; i < parkRideTransitStops.size(); i += 2) {
-                int toStop = parkRideTransitStops.get(i);
-                int distanceMillimeters = parkRideTransitStops.get(i + 1);
+            parkRideTransitStops.forEachEntry((toStop, pr_state) ->  {
+                int distanceMillimeters = pr_state.distance;
                 int stopStreetVertexIdx = transitLayer.streetVertexForStop.get(toStop);
                 int timeToStop = (int) (distanceMillimeters / walkSpeedMillimetersPerSecond);
                 int totalTime =
@@ -59,19 +55,18 @@ public class ParkRideRouter extends StreetRouter {
                 // if this is the first time we see the stop
                 if (!transitStopIndexDurationMap.containsKey(toStop)) {
                     transitStopIndexDurationMap.put(toStop, totalTime);
-                    transitStopStreetIndexParkRideIndexMap
-                        .put(stopStreetVertexIdx, parkRideStreetVertexIdx);
+                    transitStopStreetIndexParkRideState.put(stopStreetVertexIdx, pr_state);
                     // ELSE we only add time and update P+R if new time is shorter then previously saved one
                 } else {
                     int savedTime = transitStopIndexDurationMap.get(toStop);
                     if (totalTime < savedTime) {
                         transitStopIndexDurationMap.put(toStop, totalTime);
-                        transitStopStreetIndexParkRideIndexMap
-                            .put(stopStreetVertexIdx, parkRideStreetVertexIdx);
+                        transitStopStreetIndexParkRideState.put(stopStreetVertexIdx, pr_state);
                     }
                 }
 
-            }
+                return true;
+            });
 
             return true;
         });
@@ -94,32 +89,17 @@ public class ParkRideRouter extends StreetRouter {
      * Get a single best state at a vertex. NB this should not be used for propagating to samples, as you need to apply
      * turn costs/restrictions during propagation.
      * <p>
-     * Calculates path from P+R to requested stopStreetVertex index. If path was already requested it just returns it.
+     * Gets path from P+R to requested stop. (Path was found during graph build stage)
      *
      * @param vertexIndex
      */
     @Override
     public State getStateAtVertex(int vertexIndex) {
+        //TODO: calculate correct distance and duration since currently only walk part has distance and duration added
         if (this.transitStopStreetIndexParkRideState.containsKey(vertexIndex)) {
             return this.transitStopStreetIndexParkRideState.get(vertexIndex);
+        } else {
+            return null;
         }
-        // TODO: different limits?
-        StreetRouter walking = new StreetRouter(streetLayer);
-        walking.streetMode = StreetMode.WALK;
-        walking.profileRequest = profileRequest;
-        walking.timeLimitSeconds = profileRequest.maxCarTime * 60;
-        walking.dominanceVariable = State.RoutingVariable.DURATION_SECONDS;
-        //Which P+R was used to get to this Stop
-        int parkRideStreetIndex = this.transitStopStreetIndexParkRideIndexMap.get(vertexIndex);
-        walking.setOrigin(parkRideStreetIndex);
-        // TODO: setDestination
-        walking.route();
-        // TODO: We need to add time to switch to CAR PARK somehow
-        State state = walking.getStateAtVertex(vertexIndex);
-        //TODO: duration is probably only walking time
-        if (state != null) {
-            this.transitStopStreetIndexParkRideState.put(vertexIndex, state);
-        }
-        return state;
     }
 }

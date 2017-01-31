@@ -4,7 +4,9 @@ import com.conveyal.r5.api.util.ParkRideParking;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
+import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
+import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import com.conveyal.r5.streets.StreetLayer;
@@ -24,6 +26,9 @@ public class TransferFinder {
 
     // Optimization: use the same empty list for all stops with no transfers
     private static final TIntArrayList EMPTY_INT_LIST = new TIntArrayList();
+
+    // Optimization: use the same empty list for all stops with no transfers
+    private static final TIntObjectMap<StreetRouter.State> EMPTY_STATE_MAP = new TIntObjectHashMap<>();
 
     TransitLayer transitLayer;
 
@@ -64,18 +69,20 @@ public class TransferFinder {
             retainClosestStopsOnPatterns(distancesToReachedStops);
             // At this point we have the distances to all stops that are the closest one on some pattern.
             // Make transfers to them, packed as pairs of (target stop index, distance).
-            TIntList packedTransfers = new TIntArrayList();
+            TIntObjectMap<StreetRouter.State> pathToreachedStops = new TIntObjectHashMap<>(distancesToReachedStops.size());
             distancesToReachedStops.forEachEntry((targetStopIndex, distance) -> {
-                packedTransfers.add(targetStopIndex);
-                packedTransfers.add(distance);
+                int stopStreetVertexIdx = transitLayer.streetVertexForStop.get(targetStopIndex);
+                StreetRouter.State path = streetRouter.getStateAtVertex(stopStreetVertexIdx);
+                pathToreachedStops.put(targetStopIndex, path);
                 return true;
             });
+
             // Record this list of transfers as leading out of the stop with index s.
-            if (packedTransfers.size() > 0) {
-                parkRideParking.closestTransfers = packedTransfers;
+            if (pathToreachedStops.size() > 0) {
+                parkRideParking.closestTransfers = pathToreachedStops;
                 LOG.info("Found {} stops for P+R:{}", distancesToReachedStops.size(), parkRideParking.id);
             } else {
-                parkRideParking.closestTransfers = EMPTY_INT_LIST;
+                parkRideParking.closestTransfers = EMPTY_STATE_MAP;
                 LOG.info("Not found stops for Park ride:{}", parkRideParking.id);
             }
         }

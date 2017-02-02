@@ -236,6 +236,7 @@ public class ResultSet implements Serializable{
     }
 
     public void writeIsochrones(List<GeoJsonFeature> features, boolean returnDistinctAreas) {
+        int calcStartTime = (int) System.currentTimeMillis();
         Geometry traversedIsochrone = null;
         PrecisionModel precisionModel = new PrecisionModel(10000);
         GeometryPrecisionReducer precisionReducer = new GeometryPrecisionReducer(precisionModel);
@@ -259,6 +260,8 @@ public class ResultSet implements Serializable{
             features.add(feature);
             traversedIsochrone = isochroneFeature.geometry;
         }
+
+        LOG.info("isochrone > geojson conversion finished in {} seconds", (System.currentTimeMillis() - calcStartTime) / 1000.0);
     }
 
     /** A set of result sets from profile routing: min, avg, max */;

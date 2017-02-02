@@ -171,6 +171,7 @@ public class RepeatedRaptorProfileRouter {
         envelope = propagatedTimesStore.makeResults(targets.pointSet, clusterRequest.includeTimes, !isochrone, isochrone);
 
         ts.resultSets = (int) (System.currentTimeMillis() - resultSetStart);
+        LOG.info("ResultEnvelope calculation finished in {} seconds", (ts.resultSets) / 1000.0);
         return envelope;
     }
 }

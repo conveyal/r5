@@ -589,6 +589,8 @@ public class PointToPointRouterServer {
                         fromLon,
                         mode));
 
+                LOG.info("writing geojson");
+
                 result.avgCase.writeIsochrones(features, true);
 
                 LOG.info(mode, "Num features:{}", features.size());

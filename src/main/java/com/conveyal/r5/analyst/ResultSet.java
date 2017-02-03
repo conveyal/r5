@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -233,7 +234,26 @@ public class ResultSet implements Serializable{
         jgen.writeEndArray();
     }
 
-    public void writeIsochrones(List<GeoJsonFeature> features, boolean returnDistinctAreas) {
+    /**
+     * Reduces and simplifies (using DouglasPeuckerSimplifier) the inputted geometry.
+     *
+     * @param geometry  The geometry to modify
+     * @return          The new geometry that is simplified and then reduced
+     */
+    private Geometry reduceAndSimplifyGeometry(Geometry geometry) {
+        PrecisionModel precisionModel = new PrecisionModel(10000);
+        GeometryPrecisionReducer precisionReducer = new GeometryPrecisionReducer(precisionModel);
+        return precisionReducer.reduce(DouglasPeuckerSimplifier.simplify(geometry, .001));
+    }
+
+    /**
+     * Write GeoJSON features of the resulting isochrone
+     *
+     * @param returnDistinctAreas   if true, diff each polygon to obtain non-overlapping areas for each isochrone time-range.
+     * @return                      A list of GeoJSON features (multi-polygons).
+     */
+    public List<GeoJsonFeature> generateGeoJSONFeatures(boolean returnDistinctAreas) {
+        List<GeoJsonFeature> features = new ArrayList<>();
         int calcStartTime = (int) System.currentTimeMillis();
         Geometry traversedIsochrone = null;
 
@@ -258,12 +278,7 @@ public class ResultSet implements Serializable{
         }
 
         LOG.info("isochrone > geojson conversion finished in {} seconds", (System.currentTimeMillis() - calcStartTime) / 1000.0);
-    }
-
-    private Geometry reduceAndSimplifyGeometry(Geometry geometry) {
-        PrecisionModel precisionModel = new PrecisionModel(10000);
-        GeometryPrecisionReducer precisionReducer = new GeometryPrecisionReducer(precisionModel);
-        return precisionReducer.reduce(DouglasPeuckerSimplifier.simplify(geometry, .001));
+        return features;
     }
 
     /** A set of result sets from profile routing: min, avg, max */;

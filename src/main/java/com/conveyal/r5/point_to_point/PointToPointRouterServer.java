@@ -1172,6 +1172,11 @@ public class PointToPointRouterServer {
         clusterRequest.profileRequest = profileRequest;
 
         LinkedPointSet targets = transportNetwork.linkedGridPointSet;
+
+        if (clusterRequest.profileRequest.directModes != null && clusterRequest.profileRequest.directModes.contains(LegMode.CAR)) {
+            targets = targets.pointSet.link(transportNetwork.streetLayer, StreetMode.CAR);
+        }
+
         StreetMode mode = StreetMode.WALK;
         RepeatedRaptorProfileRouter router = new RepeatedRaptorProfileRouter(transportNetwork,
             clusterRequest,

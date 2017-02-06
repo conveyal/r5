@@ -30,7 +30,10 @@ public class IsochroneFeature implements Serializable {
     // maximum number of vertices in a ring
     public static final int MAX_RING_SIZE = 25000;
 
-    // scale factor for the grid. Making this a factor of 2 will theoretically make the algorithm fast as the averaging
+    /** The minimum ring size (to get rid of small rings). Should be at least 3 to ensure all rings are valid */
+    public static final int MIN_RING_SIZE = 12;
+
+    // scale factor for the grid. Making this a power of 2 will theoretically make the algorithm fast as the averaging
     // is just a bit shift (but who knows what the JVM will decide to optimize)
     public static final int SCALE_FACTOR = 4;
 
@@ -276,14 +279,12 @@ public class IsochroneFeature implements Serializable {
                         Coordinate end = ring.get(0);
                         ring.add(end);
 
-                        if (ring.size() != 2 && ring.size() != 3) {
+                        if (ring.size() > MIN_RING_SIZE) {
                             LinearRing lr = GeometryUtils.geometryFactory.createLinearRing(ring.toArray(new Coordinate[ring.size()]));
                             // direction less than 0 means clockwise (NB the y-axis is backwards), since value is to left it is an outer ring
                             if (direction > 0) outerRings.add(lr);
                             else innerRings.add(lr);
                         }
-                        else
-                            LOG.warn("Ring with two points, this should not happen");
 
                         break CELLS;
                     }
@@ -311,10 +312,16 @@ public class IsochroneFeature implements Serializable {
                 r -> GeometryUtils.geometryFactory.createPolygon(r)
         ));
 
+        // put the biggest ring first because most holes are in the biggest ring, reduces number of point in polygon tests below
+        outerRings.sort(Comparator.comparing(ring -> polygonsForOuterRing.get(ring).getArea()).reversed());
+
         // get rid of tiny shells
         for (Iterator<Polygon> it = polygonsForOuterRing.values().iterator(); it.hasNext();) {
             if (it.next().getArea() < 1e-6) it.remove();
         }
+
+
+        LOG.info("Found {} outer rings and {} inner rings for cutoff {}m", polygonsForOuterRing.size(), polygonsForInnerRing.size(), cutoffSec / 60);
 
         int holeIdx = -1;
         HOLES: for (Map.Entry<LinearRing, Polygon> hole : polygonsForInnerRing.entrySet()) {
@@ -323,11 +330,11 @@ public class IsochroneFeature implements Serializable {
             // get rid of tiny holes
             if (hole.getValue().getArea() < 1e-6) continue;
 
-            for (Map.Entry<LinearRing, Polygon> outer : polygonsForOuterRing.entrySet()) {
+            for (LinearRing ring : outerRings) {
                 // fine to test membership of first coordinate only since shells and holes are disjoint, and holes
                 // nest completely in shells
-                if (outer.getValue().contains(hole.getKey().getPointN(0))) {
-                    holesForRing.put(outer.getKey(), hole.getKey());
+                if (polygonsForOuterRing.get(ring).contains(hole.getKey().getPointN(0))) {
+                    holesForRing.put(ring, hole.getKey());
                     continue HOLES;
                 }
             }

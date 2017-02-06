@@ -4,11 +4,9 @@ import com.conveyal.r5.common.GeoJsonFeature;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.Polygon;
-import com.vividsolutions.jts.geom.PrecisionModel;
+import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.precision.GeometryPrecisionReducer;
+import com.vividsolutions.jts.simplify.DouglasPeuckerSimplifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,6 +14,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -243,21 +242,39 @@ public class ResultSet implements Serializable{
         jgen.writeEndArray();
     }
 
-    public void writeIsochrones(List<GeoJsonFeature> features, boolean returnDistinctAreas) {
-        Geometry traversedIsochrone = null;
+    /**
+     * Reduces and simplifies (using DouglasPeuckerSimplifier) the inputted geometry.
+     *
+     * @param geometry  The geometry to modify
+     * @return          The new geometry that is simplified and then reduced
+     */
+    private Geometry reduceAndSimplifyGeometry(Geometry geometry) {
         PrecisionModel precisionModel = new PrecisionModel(10000);
         GeometryPrecisionReducer precisionReducer = new GeometryPrecisionReducer(precisionModel);
+        return precisionReducer.reduce(DouglasPeuckerSimplifier.simplify(geometry, .001));
+    }
+
+    /**
+     * Write GeoJSON features of the resulting isochrone
+     *
+     * @param returnDistinctAreas   if true, diff each polygon to obtain non-overlapping areas for each isochrone time-range.
+     * @return                      A list of GeoJSON features (multi-polygons).
+     */
+    public List<GeoJsonFeature> generateGeoJSONFeatures(boolean returnDistinctAreas) {
+        List<GeoJsonFeature> features = new ArrayList<>();
+        int calcStartTime = (int) System.currentTimeMillis();
+        Geometry traversedIsochrone = null;
 
         for (IsochroneFeature isochroneFeature : this.isochrones) {
             Geometry isochroneGeometry;
             if (returnDistinctAreas) {
                 // reduce geometry precision and buffer by 0 to avoid TopologyExceptions
-                Geometry curFeatureGeometry = precisionReducer.reduce(isochroneFeature.geometry).buffer(0);
+                Geometry curFeatureGeometry = reduceAndSimplifyGeometry(isochroneFeature.geometry);
 
                 if (traversedIsochrone == null) {
                     isochroneGeometry = curFeatureGeometry;
                 } else {
-                    isochroneGeometry = curFeatureGeometry.difference(traversedIsochrone);
+                    isochroneGeometry = curFeatureGeometry.difference(reduceAndSimplifyGeometry(traversedIsochrone));
                 }
             } else {
                 isochroneGeometry = isochroneFeature.geometry;
@@ -267,6 +284,9 @@ public class ResultSet implements Serializable{
             features.add(feature);
             traversedIsochrone = isochroneFeature.geometry;
         }
+
+        LOG.info("isochrone > geojson conversion finished in {} seconds", (System.currentTimeMillis() - calcStartTime) / 1000.0);
+        return features;
     }
 
     public byte[] writeGrid() throws IOException {

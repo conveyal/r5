@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.ZoneId;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Class which will make point to point or profile queries on Transport network based on profileRequest
@@ -91,21 +92,13 @@ public class PointToPointQuery {
         profileResponse.addOption(option);
 
         if (request.hasTransit()) {
-            Map<LegMode, StreetRouter> accessRouter = new HashMap<>(request.accessModes.size());
-            Map<LegMode, StreetRouter> egressRouter = new HashMap<>(request.egressModes.size());
+            Map<LegMode, StreetRouter> accessRouter = findAccessPaths(request);
+            Map<LegMode, StreetRouter> egressRouter = findEgressPaths(request);
 
-            //This map saves which access mode was used to access specific stop in access mode
-            TIntObjectMap<LegMode> stopModeAccessMap = new TIntObjectHashMap<>();
-            //This map saves which egress mode was used to access specific stop in egress mode
-            TIntObjectMap<LegMode> stopModeEgressMap = new TIntObjectHashMap<>();
-
-            findAccessPaths(request, accessRouter);
-
-            findEgressPaths(request, egressRouter);
-
-            // fold access and egress times into single maps
-            TIntIntMap accessTimes = combineMultimodalRoutingAccessTimes(accessRouter, stopModeAccessMap, request);
-            TIntIntMap egressTimes = combineMultimodalRoutingAccessTimes(egressRouter, stopModeEgressMap, request);
+            Map<LegMode, TIntIntMap> accessTimes = accessRouter.entrySet().stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getReachedStops()));
+            Map<LegMode, TIntIntMap> egressTimes = egressRouter.entrySet().stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getReachedStops()));
 
             McRaptorSuboptimalPathProfileRouter router = new McRaptorSuboptimalPathProfileRouter(transportNetwork, request, accessTimes, egressTimes);
             List<PathWithTimes> usefullpathList = new ArrayList<>();
@@ -151,7 +144,7 @@ public class PointToPointQuery {
             int seen_paths = 0;
             int boardStop =-1, alightStop = -1;
             for (PathWithTimes path : usefullpathList) {
-                profileResponse.addTransitPath(accessRouter, egressRouter, stopModeAccessMap, stopModeEgressMap, path, transportNetwork, request.getFromTimeDateZD());
+                profileResponse.addTransitPath(accessRouter, egressRouter, path, transportNetwork, request.getFromTimeDateZD());
                 //LOG.info("Num patterns:{}", path.patterns.length);
                 //ProfileOption transit_option = new ProfileOption();
 
@@ -200,9 +193,9 @@ public class PointToPointQuery {
     /**
      * Finds all egress paths from to coordinate to end stop and adds routers to egressRouter
      * @param request
-     * @param egressRouter
      */
-    private void findEgressPaths(ProfileRequest request, Map<LegMode, StreetRouter> egressRouter) {
+    private Map<LegMode, StreetRouter> findEgressPaths(ProfileRequest request) {
+        Map<LegMode, StreetRouter> egressRouter = new HashMap<>();
         //For egress
         //TODO: this must be reverse search
         for(LegMode mode: request.egressModes) {
@@ -226,6 +219,8 @@ public class PointToPointQuery {
                 LOG.warn("MODE:{}, Edge near the origin coordinate wasn't found. Routing didn't start!", mode);
             }
         }
+
+        return egressRouter;
     }
 
     /**
@@ -288,10 +283,10 @@ public class PointToPointQuery {
     /**
      * Finds access paths from from coordinate in request and adds all routers with paths to accessRouter map
      * @param request
-     * @param accessRouter
      */
-    private void findAccessPaths(ProfileRequest request, Map<LegMode, StreetRouter> accessRouter) {
-        //Routes all access modes
+    private HashMap<LegMode, StreetRouter> findAccessPaths(ProfileRequest request) {
+        // Routes all access modes
+        HashMap<LegMode, StreetRouter> accessRouter = new HashMap<>();
         for(LegMode mode: request.accessModes) {
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
             streetRouter.profileRequest = request;
@@ -333,6 +328,8 @@ public class PointToPointQuery {
             }
 
         }
+
+        return accessRouter;
     }
 
     /**

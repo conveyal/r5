@@ -33,4 +33,10 @@ public class GridRequest extends GenericClusterRequest {
 
     /** Where should output of this job be saved? */
     public String outputQueue;
+
+    @Override
+    public ProfileRequest extractProfileRequest() {
+        return request;
+    }
+
 }

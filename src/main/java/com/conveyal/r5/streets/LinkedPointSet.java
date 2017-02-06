@@ -1,6 +1,7 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.profile.StreetMode;
@@ -15,6 +16,7 @@ import gnu.trove.set.TIntSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -26,7 +28,7 @@ import java.util.stream.IntStream;
  * For each feature in the PointSet, we record the closest edge and the distance to the vertices at the ends of that
  * edge (like a Splice or a Sample in OTP).
  */
-public class LinkedPointSet {
+public class LinkedPointSet implements Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(LinkedPointSet.class);
 
@@ -67,7 +69,7 @@ public class LinkedPointSet {
     public int[] distances1_mm;
 
     /** For each transit stop, the distances to nearby PointSet points as packed (point_index, distance) pairs. */
-    public transient List<int[]> stopToPointDistanceTables;
+    public List<int[]> stopToPointDistanceTables;
 
     /** It is preferred to specify a mode when linking TODO remove this. */
     @Deprecated
@@ -81,7 +83,6 @@ public class LinkedPointSet {
      * Besides they are useful for later processing of LinkedPointSets.
      */
     public LinkedPointSet(PointSet pointSet, StreetLayer streetLayer, StreetMode streetMode, LinkedPointSet baseLinkage) {
-
         LOG.info("Linking pointset to street network...");
         this.pointSet = pointSet;
         this.streetLayer = streetLayer;
@@ -92,7 +93,7 @@ public class LinkedPointSet {
 
         // The regions within which we want to link points to edges, then connect transit stops to points.
         // Null means relink and rebuild everything, but this will be constrained below if a base linkage was supplied.
-        Geometry relinkZone = null, treeRebuildZone = null;
+        Geometry treeRebuildZone = null;
 
         if (baseLinkage == null) {
             edges = new int[nPoints];
@@ -106,6 +107,9 @@ public class LinkedPointSet {
             assert baseLinkage.pointSet == pointSet;
             assert baseLinkage.streetLayer == streetLayer.baseStreetLayer;
             assert baseLinkage.streetMode == streetMode;
+
+            LOG.info("Linking a subset of points and copying other linkages from base layer");
+
             // Copy the supplied base linkage into this new LinkedPointSet.
             // The new linkage has the same PointSet as the base linkage, so the linkage arrays remain the same length
             // as in the base linkage. However, if the TransitLayer was also modified by the scneario, the stopToVertexDistanceTables
@@ -124,7 +128,6 @@ public class LinkedPointSet {
             // transit stops, we still need to re-link points and rebuild stop trees (both the trees to the vertices
             // and the trees to the points, because some existing stop-to-vertex trees might not include new splitter
             // vertices).
-            relinkZone = streetLayer.scenarioEdgesBoundingGeometry(MAX_OFFSTREET_WALK_METERS);
             treeRebuildZone = streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.DISTANCE_TABLE_SIZE_METERS);
         }
 
@@ -132,35 +135,91 @@ public class LinkedPointSet {
         // If dealing with a base network linkage, fill the stop trees list entirely with nulls.
         while (stopToPointDistanceTables.size() < nStops) stopToPointDistanceTables.add(null);
 
-        /* First, link the points in this PointSet to specific street vertices. */
-        this.linkPointsToStreets(relinkZone);
+        /* First, link the points in this PointSet to specific street vertices. If there is no base linkage, link all streets. */
+        this.linkPointsToStreets(baseLinkage == null);
 
         /* Second, make a table of distances from each transit stop to the points in this PointSet. */
         this.makeStopToPointDistanceTables(treeRebuildZone);
 
     }
 
+
+    /**
+     * Construct a new LinkedPointSet for a grid that falls entirely within an existing grid LinkedPointSet.
+     * @param sourceLinkage a LinkedPointSet whose PointSet must be a WebMercatorGridPointset
+     * @param subGrid the grid for which to create a linkage
+     */
+    public LinkedPointSet(LinkedPointSet sourceLinkage, WebMercatorGridPointSet subGrid) {
+
+        if (!(sourceLinkage.pointSet instanceof WebMercatorGridPointSet)) {
+            throw new IllegalArgumentException("Source linkage must be for a gridded point set.");
+        }
+
+        WebMercatorGridPointSet superGrid = (WebMercatorGridPointSet) sourceLinkage.pointSet;
+        if (superGrid.zoom != subGrid.zoom) {
+            throw new IllegalArgumentException("Source and sub-grid zoom level do not match.");
+        }
+        if (superGrid.west > subGrid.west || superGrid.west + superGrid.width < subGrid.west + subGrid.width ||
+            superGrid.north > subGrid.north || superGrid.north + superGrid.height < subGrid.north + subGrid.height) {
+            throw new IllegalArgumentException("Sub-grid must lie fully inside the super-grid.");
+        }
+
+        // Initialize the fields of the new LinkedPointSet instance
+        pointSet = sourceLinkage.pointSet;
+        streetLayer = sourceLinkage.streetLayer;
+        streetMode = sourceLinkage.streetMode;
+
+        int nCells = subGrid.width * subGrid.height;
+        edges = new int[nCells];
+        distances0_mm = new int[nCells];
+        distances1_mm = new int[nCells];
+
+        // Copy values over from the source linkage to the new sub-linkage
+        // x, y, and pixel are relative to the new linkage
+        for (int y = 0, pixel = 0; y < subGrid.height; y++) {
+            for (int x = 0; x < subGrid.width; x++, pixel++) {
+                int sourceColumn = subGrid.west + x - superGrid.west;
+                int sourceRow = subGrid.north + y - superGrid.north;
+                int sourcePixel = sourceRow * superGrid.width + sourceColumn;
+                edges[pixel] = sourceLinkage.edges[sourcePixel];
+                distances0_mm[pixel] = sourceLinkage.distances0_mm[sourcePixel];
+                distances1_mm[pixel] = sourceLinkage.distances1_mm[sourcePixel];
+            }
+        }
+
+    }
+
+
     /**
      * Associate the points in this PointSet with the street vertices at the ends of the closest street edge.
-     * @param relinkZone only link points inside this geometry in FIXED POINT DEGREES, leaving all the others alone. If null, link all points.
+     * @param all If true, link all points, otherwise link only those that were previously connected to edges that have
+     *            been deleted (i.e. split).
+     *            We will need to change this behavior when we allow creating new edges rather than simply splitting
+     *            existing ones.
      */
-    private void linkPointsToStreets(Geometry relinkZone) {
+    private void linkPointsToStreets(boolean all) {
         LambdaCounter counter = new LambdaCounter(LOG, pointSet.featureCount(), 10000,
                 "Linked {} of {} PointSet points to streets.");
         // Perform linkage calculations in parallel, writing results to the shared parallel arrays.
         IntStream.range(0, pointSet.featureCount()).parallel().forEach(p -> {
-            // When working with a scenario, skip all points outside the zone that could be affected by new edges.
-            // The linkage from the original base StreetNetwork will be retained for these points.
-            if (relinkZone != null && !relinkZone.contains(pointSet.getJTSPointFixed(p))) return;
-            Split split = streetLayer.findSplit(pointSet.getLat(p), pointSet.getLon(p), MAX_OFFSTREET_WALK_METERS, streetMode);
-            if (split == null) {
-                edges[p] = -1;
-            } else {
-                edges[p] = split.edge;
-                distances0_mm[p] = split.distance0_mm;
-                distances1_mm[p] = split.distance1_mm;
+            // When working with a scenario, skip all points that are not linked to a deleted street (i.e. one that has
+            // been split). At the current time, the only street network modification we support is splitting existing streets,
+            // so the only way a point can need to be relinked is if it is connected to a street which was split (and therefore deleted).
+            // FIXME when we permit street network modifications beyond adding transit stops we will need to change how this works,
+            // we may be able to use some type of flood-fill algorithm in geographic space, expanding the relink envelope until we
+            // hit edges on all sides or reach some predefined maximum.
+            if (all || (streetLayer.edgeStore.temporarilyDeletedEdges != null &&
+                        streetLayer.edgeStore.temporarilyDeletedEdges.contains(edges[p]))) {
+                Split split = streetLayer.findSplit(pointSet.getLat(p), pointSet.getLon(p), MAX_OFFSTREET_WALK_METERS, streetMode);
+                if (split == null) {
+                    edges[p] = -1;
+                } else {
+                    edges[p] = split.edge;
+                    distances0_mm[p] = split.distance0_mm;
+                    distances1_mm[p] = split.distance1_mm;
+                }
+                counter.increment();
             }
-            counter.increment();
         });
         long unlinked = Arrays.stream(edges).filter(e -> e == -1).count();
         counter.done();
@@ -223,6 +282,7 @@ public class LinkedPointSet {
      * Given a table of distances to street vertices from a particular transit stop, create a table of distances to
      * points in this PointSet from the same transit stop.
      * All points outside the distanceTableZone are skipped as an optimization.
+     * See JavaDoc on the caller makeStopToPointDistanceTables - this is one of the slowest parts of building a network.
      * @return A packed array of (pointIndex, distanceMillimeters)
      */
     private int[] extendDistanceTableToPoints(TIntIntMap distanceTableToVertices, Envelope distanceTableZone) {

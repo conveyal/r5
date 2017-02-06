@@ -1,10 +1,13 @@
 package com.conveyal.r5.analyst.broker;
 
+import com.conveyal.r5.analyst.cluster.AnalystWorker;
 import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
+import com.conveyal.r5.analyst.cluster.WorkerStatus;
 import com.conveyal.r5.common.JsonUtilities;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
 import org.glassfish.grizzly.http.Method;
 import org.glassfish.grizzly.http.server.HttpHandler;
@@ -93,16 +96,29 @@ class BrokerHttpHandler extends HttpHandler {
                 return;
             }
             else if (request.getMethod() == Method.POST && "dequeue".equals(command)) {
-                /* Workers use this command to fetch tasks from a work queue.
-                   They supply their R5 commit and network ID to make sure they always get the same category of work.
-                   The method is POST because unlike GETs it modifies the task queue on the server. */
-                String workType = pathComponents[2];
-                String graphId = pathComponents[3];
-                String workerCommit = pathComponents[4];
-                WorkerCategory category = new WorkerCategory(graphId, workerCommit);
+                /*
+                   Workers use this command to fetch tasks from a work queue.
+                   They supply their R5 commit, network ID, and a unique worker ID to make sure they always get the
+                   same category of work. Newer workers provide this information (and much more) in a JSON request body.
+                   Older workers will include a simplified version of it in the URL and headers.
+                   The method is POST because unlike GETs (which fetch status) it modifies the task queue on the server.
+                */
+                WorkerStatus workerStatus = JsonUtilities.objectFromRequestBody(request, WorkerStatus.class);
+                String workType = pathComponents[2]; // Worker specifies single point or regional polling
+                if (workerStatus == null) {
+                    // Older worker did not supply a JSON body. Fill in the status from URL and headers.
+                    workerStatus = new WorkerStatus();
+                    workerStatus.networks = Sets.newHashSet(pathComponents[3]);
+                    workerStatus.workerVersion = pathComponents[4];
+                    workerStatus.workerId = request.getHeader(AnalystWorker.WORKER_ID_HEADER);
+                }
+                // Assume one loaded graph (or preferred graph at startup) in the current system
+                // Add this worker to our catalog, tracking its graph affinity and the last time it was seen.
+                broker.workerCatalog.catalog(workerStatus);
+                WorkerCategory category = workerStatus.getWorkerCategory();
                 if ("single".equals(workType)) {
                     // Worker is polling for single point tasks.
-                    Broker.WrappedResponse wrappedResponse = new Broker.WrappedResponse(request, response);
+                    Broker.WrappedResponse wrappedResponse = new Broker.WrappedResponse(workerStatus.workerId, response);
                     request.getRequest().getConnection().addCloseListener(
                             (c, i) -> broker.removeSinglePointChannel(category, wrappedResponse));
                     // The request object will be shelved and survive after the handler function exits.
@@ -119,7 +135,7 @@ class BrokerHttpHandler extends HttpHandler {
                 }
                 else {
                     response.setStatus(HttpStatus.NOT_FOUND_404);
-                    response.setDetailMessage("Context not found; should be either 'jobs' or 'priority'");
+                    response.setDetailMessage("Context not found. Should be either 'single' or 'regional'.");
                 }
             }
             else if (request.getMethod() == Method.POST && "enqueue".equals(command)) {
@@ -163,31 +179,48 @@ class BrokerHttpHandler extends HttpHandler {
                 }
             }
             else if (request.getMethod() == Method.POST && "complete".equals(command)) {
+                // Requests of the form: POST /complete/{success|<httpErrorStatusCode>}/<taskId>
                 // Mark a specific high-priority task as completed, and record its result.
                 // We were originally planning to do this with a DELETE request that has a body,
                 // but that is nonstandard enough to anger many libraries including Grizzly.
+                String successOrError = pathComponents[2];
                 int taskId = Integer.parseInt(pathComponents[3]);
                 Response suspendedProducerResponse = broker.deletePriorityTask(taskId);
                 if (suspendedProducerResponse == null) {
+                    // Signal the source of the response (the worker) that no one is waiting for that response anymore.
                     response.setStatus(HttpStatus.NOT_FOUND_404);
                     return;
+                }
+                if ("success".equals(successOrError)) {
+                    // The worker did not find any obvious problems with the request and is streaming back what it
+                    // believes to be a reliable work result.
+                    suspendedProducerResponse.setStatus(HttpStatus.OK_200);
+                } else {
+                    // The worker is providing an error message because it spotted something wrong with the request.
+                    suspendedProducerResponse.setStatus(Integer.parseInt(successOrError));
+                    suspendedProducerResponse.setCharacterEncoding("utf-8");
+                    suspendedProducerResponse.setContentType("application/json");
                 }
                 // Copy the result back to the connection that was the source of the task.
                 try {
                     long length = ByteStreams.copy(request.getInputStream(), suspendedProducerResponse.getOutputStream());
                     LOG.info("Returning {} bytes to high-priority consumer for request {}", length, taskId);
                 } catch (IOException | IllegalStateException ioex) {
-                    // Apparently the task producer did not wait to retrieve its result. Priority task result delivery
-                    // is not guaranteed, we don't need to retry, this is not considered an error by the worker.
+                    // IOExceptions happens when the task producer did not wait to retrieve its result.
+                    // Priority task result delivery is not guaranteed, so we don't need to retry.
+                    // This is not an error from the worker's point of view.
                     // IllegalStateException can happen if we're in offline mode and we've already returned a 202.
                 }
-                response.setStatus(HttpStatus.OK_200);
-                suspendedProducerResponse.setStatus(HttpStatus.OK_200);
+                // Prepare to pipe data back to the original source of the task (the UI) from the worker.
+                // TODO clarify how it is that we were previously setting the status code of the suspended response after calling ByteStreams.copy. Is the body being buffered?
                 suspendedProducerResponse.resume();
+                // Tell source of the POSTed data (the worker) that the broker has handled it with no problems.
+                response.setStatus(HttpStatus.OK_200);
                 return;
             }
             else if (request.getMethod() == Method.DELETE) {
-                /* Used by workers to acknowledge completion of a task and remove it from queues, avoiding re-delivery. */
+                // Used by workers to acknowledge completion of a batch task and remove it from queues,
+                // avoiding re-delivery. Practically speaking this means the worker has put the result in a queue
                 String context = pathComponents[1];
                 String id = pathComponents[2];
                 if ("tasks".equalsIgnoreCase(context)) {

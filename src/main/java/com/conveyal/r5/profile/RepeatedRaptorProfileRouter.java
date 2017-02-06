@@ -155,10 +155,8 @@ public class RepeatedRaptorProfileRouter {
             // TODO skip the transit search inside the worker and avoid this conditional.
             propagatedTimesStore = new PropagatedTimesStore(nonTransitTimes.size());
             int[][] singleRoundResults = new int[][] {nonTransitTimes.travelTimes};
-            BitSet includeInAverages = new BitSet();
-            includeInAverages.set(0);
             // fine to set a reachability threshold of 0 here because the street network does not vary over time.
-            propagatedTimesStore.setFromArray(singleRoundResults, includeInAverages, PropagatedTimesStore.ConfidenceCalculationMethod.MIN_MAX, 0);
+            propagatedTimesStore.setFromArray(singleRoundResults, 0);
         }
         ts.targetsReached = propagatedTimesStore.countTargetsReached();
         ts.compute = (int) (System.currentTimeMillis() - computationStartTime);
@@ -173,6 +171,7 @@ public class RepeatedRaptorProfileRouter {
         envelope = propagatedTimesStore.makeResults(targets.pointSet, clusterRequest.includeTimes, !isochrone, isochrone);
 
         ts.resultSets = (int) (System.currentTimeMillis() - resultSetStart);
+        LOG.info("ResultEnvelope calculation finished in {} seconds", (ts.resultSets) / 1000.0);
         return envelope;
     }
 }

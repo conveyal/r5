@@ -47,6 +47,8 @@ public class GridComputer  {
 
     public final GridRequest request;
 
+    private static WebMercatorGridPointSetCache pointSetCache = new WebMercatorGridPointSetCache();
+
     public final TransportNetwork network;
 
     public GridComputer(GridRequest request, GridCache gridCache, TransportNetwork network) {
@@ -61,10 +63,9 @@ public class GridComputer  {
         // ensure they both have the same zoom level
         if (request.zoom != grid.zoom) throw new IllegalArgumentException("grid zooms do not match!");
 
-        // TODO cache these so they are not relinked? or is that fast enough it doesn't matter?
         // NB this will skip all destinations that lie outside query bounds. This is intentional.
         final WebMercatorGridPointSet targets =
-                new WebMercatorGridPointSet(request.zoom, request.west, request.north, request.width, request.height);
+                pointSetCache.get(request.zoom, request.west, request.north, request.width, request.height);
 
         // use the middle of the grid cell
         request.request.fromLat = Grid.pixelToLat(request.north + request.y + 0.5, request.zoom);

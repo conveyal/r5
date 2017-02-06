@@ -92,4 +92,13 @@ public class GridResultConsumer implements Runnable {
     public void registerJob (GridRequest request) {
         this.assemblers.put(request.jobId, new GridResultAssembler(request, outputBucket));
     }
+
+    public void deleteJob(String jobId) {
+        GridResultAssembler assembler = this.assemblers.remove(jobId);
+        try {
+            assembler.terminate();
+        } catch (Exception e) {
+            LOG.error("Could not terminate grid result assembler, this may waste disk space", e);
+        }
+    }
 }

@@ -3,7 +3,6 @@ package com.conveyal.r5.point_to_point;
 import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
 import com.conveyal.r5.analyst.cluster.ResultEnvelope;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
-import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.api.GraphQlRequest;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.LegMode;
@@ -33,8 +32,6 @@ import graphql.GraphQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.servlet.http.HttpServletResponse;
-import java.io.*;
 import java.util.*;
 import java.time.LocalDate;
 
@@ -81,15 +78,11 @@ public class PointToPointRouterServer {
             //In memory doesn't save it to disk others do (build, preFlight)
             if (!inMemory) {
                 try {
-                    OutputStream outputStream = new BufferedOutputStream(
-                        new FileOutputStream(new File(dir, "network.dat")));
-                    transportNetwork.write(outputStream);
-                    outputStream.close();
-                } catch (IOException e) {
+                    transportNetwork.write(new File(dir, "network.dat"));
+                } catch (Exception e) {
                     LOG.error("An error occurred during saving transit networks. Exiting.", e);
                     System.exit(-1);
                 }
-
             }
         } else if ("--graphs".equals(commandArguments[0])) {
             File dir = new File(commandArguments[1]);
@@ -99,16 +92,28 @@ public class PointToPointRouterServer {
             }
             try {
                 LOG.info("Loading transit networks from: {}", dir);
-                InputStream inputStream = new BufferedInputStream(new FileInputStream(new File(dir, "network.dat")));
-                TransportNetwork transportNetwork = TransportNetwork.read(inputStream);
+                TransportNetwork transportNetwork = TransportNetwork.read(new File(dir, "network.dat"));
                 transportNetwork.readOSM(new File(dir, "osm.mapdb"));
                 run(transportNetwork);
-                inputStream.close();
-            } catch (IOException e) {
-                LOG.error("An error occurred during reading of transit networks", e);
-                System.exit(-1);
             } catch (Exception e) {
-                LOG.error("An error occurred during decoding of transit networks", e);
+                LOG.error("An error occurred during the reading or decoding of transit networks", e);
+                System.exit(-1);
+            }
+        } else if ("--isochrones".equals(commandArguments[0])) {
+            File dir = new File(commandArguments[1]);
+
+            if (!dir.isDirectory() && dir.canRead()) {
+                LOG.error("'{}' is not a readable directory.", dir);
+            }
+            try {
+                LOG.info("Loading transit networks from: {}", dir);
+                TransportNetwork transportNetwork = TransportNetwork.read(new File(dir, "network.dat"));
+                transportNetwork.readOSM(new File(dir, "osm.mapdb"));
+                transportNetwork.transitLayer.buildDistanceTables(null);
+                transportNetwork.rebuildLinkedGridPointSet();
+                run(transportNetwork);
+            } catch (Exception e) {
+                LOG.error("An error occurred during the reading or decoding of transit networks", e);
                 System.exit(-1);
             }
         } else if ("--help".equals(commandArguments[0])
@@ -577,6 +582,12 @@ public class PointToPointRouterServer {
             response.header("Content-Type", "application/json");
 
             Map<String, Object> content = new HashMap<>(2);
+
+            if (transportNetwork.linkedGridPointSet == null) {
+                content.put("error", "point set not calculated.  Did you mean to run with isochrone option?");
+                return content;
+            }
+
             Float fromLat = request.queryMap("fromLat").floatValue();
             Float fromLon = request.queryMap("fromLon").floatValue();
 
@@ -586,17 +597,12 @@ public class PointToPointRouterServer {
 
             modes.forEach(mode -> {
                 LOG.info("calculating isochrone for: " + mode);
+                ResultEnvelope result = calculateIsochrone(transportNetwork, fromLat, fromLon, mode);
+
+                LOG.info("writing geojson");
                 Map<String, Object> featureCollection = new HashMap<>(2);
                 featureCollection.put("type", "FeatureCollection");
-                List<GeoJsonFeature> features = new ArrayList<>();
-
-                ResultEnvelope result = calculateIsochrone(transportNetwork,
-                    makeClusterRequest(transportNetwork,
-                        fromLat,
-                        fromLon,
-                        mode));
-
-                result.avgCase.writeIsochrones(features, true);
+                List<GeoJsonFeature> features = result.avgCase.generateGeoJSONFeatures(true);
 
                 LOG.info(mode, "Num features:{}", features.size());
                 featureCollection.put("features", features);
@@ -612,21 +618,21 @@ public class PointToPointRouterServer {
             response.header("Content-Type", "application/json");
 
             Map<String, Object> content = new HashMap<>(2);
+
+            if (transportNetwork.linkedGridPointSet == null) {
+                content.put("error", "point set not calculated.  Did you mean to run with isochrone option?");
+                return content;
+            }
+
             Float fromLat = request.queryMap("fromLat").floatValue();
             Float fromLon = request.queryMap("fromLon").floatValue();
             String queryMode = request.queryParams("mode");
 
-            ResultEnvelope result = calculateIsochrone(transportNetwork,
-                makeClusterRequest(transportNetwork,
-                    fromLat,
-                    fromLon,
-                    queryMode));
+            ResultEnvelope result = calculateIsochrone(transportNetwork, fromLat, fromLon, queryMode);
 
             Map<String, Object> featureCollection = new HashMap<>(2);
             featureCollection.put("type", "FeatureCollection");
-            List<GeoJsonFeature> features = new ArrayList<>();
-
-            result.avgCase.writeIsochrones(features, true);
+            List<GeoJsonFeature> features = result.avgCase.generateGeoJSONFeatures(true);
 
             LOG.info("Num features:{}", features.size());
             featureCollection.put("features", features);
@@ -643,11 +649,7 @@ public class PointToPointRouterServer {
             Float fromLon = request.queryMap("fromLon").floatValue();
             String queryMode = request.queryParams("mode");
 
-            ResultEnvelope result = calculateIsochrone(transportNetwork,
-                makeClusterRequest(transportNetwork,
-                    fromLat,
-                    fromLon,
-                    queryMode));
+            ResultEnvelope result = calculateIsochrone(transportNetwork, fromLat, fromLon, queryMode);
 
             return result.avgCase.writeGrid();
         });
@@ -1145,10 +1147,20 @@ public class PointToPointRouterServer {
         return Math.round(speed * 1000) / 1000;
     }
 
-    private static AnalystClusterRequest makeClusterRequest(TransportNetwork transportNetwork,
-                                                            float fromLat,
-                                                            float fromLon,
-                                                            String queryMode) {
+    /**
+     * Calcuate the isochrone on a particular transportNetwork at a given lat/lon for a given mode
+     *
+     * @param transportNetwork  A transportation network.  Must have the linkedGridPointSet initialised.
+     * @param fromLat           The latitude
+     * @param fromLon           The longitude
+     * @param queryMode         must be a valid mode
+     * @return                  the resulting ResultEnvelope
+     */
+    private static ResultEnvelope calculateIsochrone(TransportNetwork transportNetwork,
+                                                     float fromLat,
+                                                     float fromLon,
+                                                     String queryMode) {
+
         AnalystClusterRequest clusterRequest = new AnalystClusterRequest();
         ProfileRequest profileRequest = new ProfileRequest();
 
@@ -1172,16 +1184,11 @@ public class PointToPointRouterServer {
 
         clusterRequest.profileRequest = profileRequest;
 
-        return clusterRequest;
-    }
-
-    private static ResultEnvelope calculateIsochrone(TransportNetwork transportNetwork, AnalystClusterRequest clusterRequest) {
-        PointSet targets = transportNetwork.getGridPointSet();
+        LinkedPointSet targets = transportNetwork.linkedGridPointSet;
         StreetMode mode = StreetMode.WALK;
-        final LinkedPointSet linkedTargets = targets.link(transportNetwork.streetLayer, mode);
         RepeatedRaptorProfileRouter router = new RepeatedRaptorProfileRouter(transportNetwork,
             clusterRequest,
-            linkedTargets,
+            targets,
             new TaskStatistics());
         return router.route();
     }

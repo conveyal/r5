@@ -7,6 +7,8 @@ import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.geom.impl.PackedCoordinateSequence;
 import com.vividsolutions.jts.io.WKTWriter;
 import com.vividsolutions.jts.operation.union.UnaryUnionOp;
+import com.vividsolutions.jts.simplify.DouglasPeuckerSimplifier;
+import com.vividsolutions.jts.simplify.TopologyPreservingSimplifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -282,8 +284,13 @@ public class IsochroneFeature implements Serializable {
                         if (ring.size() > MIN_RING_SIZE) {
                             LinearRing lr = GeometryUtils.geometryFactory.createLinearRing(ring.toArray(new Coordinate[ring.size()]));
                             // direction less than 0 means clockwise (NB the y-axis is backwards), since value is to left it is an outer ring
-                            if (direction > 0) outerRings.add(lr);
-                            else innerRings.add(lr);
+                            if (direction > 0) {
+                                // simplify so point in polygon test is tractable
+                                lr = (LinearRing) TopologyPreservingSimplifier.simplify(lr, 1e-3);
+                                outerRings.add(lr);
+                            } else {
+                                innerRings.add(lr);
+                            }
                         }
 
                         break CELLS;
@@ -293,11 +300,6 @@ public class IsochroneFeature implements Serializable {
         }
 
         LOG.debug("{} components", outerRings.size());
-
-        // find the largest ring, more or less (ignoring lon scale distortion)
-        // FIXME this won't work
-        double maxArea = 0;
-        Geometry largestRing = EMPTY_POLYGON;
 
         Multimap<LinearRing, LinearRing> holesForRing = HashMultimap.create();
 
@@ -316,9 +318,6 @@ public class IsochroneFeature implements Serializable {
         outerRings.sort(Comparator.comparing(ring -> polygonsForOuterRing.get(ring).getArea()).reversed());
 
         // get rid of tiny shells
-        for (Iterator<Polygon> it = polygonsForOuterRing.values().iterator(); it.hasNext();) {
-            if (it.next().getArea() < 1e-6) it.remove();
-        }
 
 
         LOG.info("Found {} outer rings and {} inner rings for cutoff {}m", polygonsForOuterRing.size(), polygonsForInnerRing.size(), cutoffSec / 60);

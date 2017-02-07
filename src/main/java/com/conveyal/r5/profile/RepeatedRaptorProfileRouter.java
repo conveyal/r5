@@ -111,17 +111,22 @@ public class RepeatedRaptorProfileRouter {
         // default to heaviest mode
         // FIXME what does WALK,CAR even mean in this context
         EnumSet<LegMode> modes = transit ? request.accessModes : request.directModes;
+        // how fast do we assume a particualr mode travels off street?
+        int offstreetSpeedForChosenNonTransitModeMillimetersPerSecond;
         if (modes.contains(LegMode.CAR)) {
             streetRouter.streetMode = StreetMode.CAR;
             streetRouter.distanceLimitMeters = 100_000; // FIXME arbitrary
+            offstreetSpeedForChosenNonTransitModeMillimetersPerSecond = (int) (request.carSpeed * 1000);
         } else if (modes.contains(LegMode.BICYCLE)) {
             streetRouter.streetMode = StreetMode.BICYCLE;
             streetRouter.distanceLimitMeters = (int) (request.maxBikeTime * request.bikeSpeed * 60);
+            offstreetSpeedForChosenNonTransitModeMillimetersPerSecond = (int) (request.bikeSpeed * 1000);
         } else {
             streetRouter.streetMode = StreetMode.WALK;
             // When walking, to make the search symmetric at origins/destinations, we clamp max walk at the maximum stop tree size
             streetRouter.distanceLimitMeters =
                     Math.min((int) (request.maxWalkTime * request.walkSpeed * 60), TransitLayer.DISTANCE_TABLE_SIZE_METERS);
+            offstreetSpeedForChosenNonTransitModeMillimetersPerSecond = (int) (request.walkSpeed * 1000);
         }
 
         streetRouter.profileRequest = request;
@@ -140,7 +145,8 @@ public class RepeatedRaptorProfileRouter {
 
         // Find the travel time to every target without using any transit, based on the results in the StreetRouter.
         long walkSearchStart = System.currentTimeMillis();
-        PointSetTimes nonTransitTimes = targets.eval(streetRouter::getTravelTimeToVertex);
+        PointSetTimes nonTransitTimes =
+                targets.eval(streetRouter::getTravelTimeToVertex, offstreetSpeedForChosenNonTransitModeMillimetersPerSecond);
         // According to the Javadoc ts.walkSearch does in fact represent the elapsed time for a single eval call.
         ts.walkSearch = (int) (System.currentTimeMillis() - walkSearchStart);
 

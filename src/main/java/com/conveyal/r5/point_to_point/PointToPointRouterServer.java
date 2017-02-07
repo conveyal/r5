@@ -111,6 +111,7 @@ public class PointToPointRouterServer {
                 transportNetwork.readOSM(new File(dir, "osm.mapdb"));
                 transportNetwork.transitLayer.buildDistanceTables(null);
                 transportNetwork.rebuildLinkedGridPointSet();
+                transportNetwork.linkedGridPointSet.pointSet.link(transportNetwork.streetLayer, StreetMode.CAR);
                 run(transportNetwork);
             } catch (Exception e) {
                 LOG.error("An error occurred during the reading or decoding of transit networks", e);
@@ -1172,6 +1173,11 @@ public class PointToPointRouterServer {
         clusterRequest.profileRequest = profileRequest;
 
         LinkedPointSet targets = transportNetwork.linkedGridPointSet;
+
+        if (clusterRequest.profileRequest.directModes != null && clusterRequest.profileRequest.directModes.contains(LegMode.CAR)) {
+            targets = targets.pointSet.link(transportNetwork.streetLayer, StreetMode.CAR);
+        }
+
         StreetMode mode = StreetMode.WALK;
         RepeatedRaptorProfileRouter router = new RepeatedRaptorProfileRouter(transportNetwork,
             clusterRequest,

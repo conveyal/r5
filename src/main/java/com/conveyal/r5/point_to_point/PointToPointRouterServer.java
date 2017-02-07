@@ -111,6 +111,7 @@ public class PointToPointRouterServer {
                 transportNetwork.readOSM(new File(dir, "osm.mapdb"));
                 transportNetwork.transitLayer.buildDistanceTables(null);
                 transportNetwork.rebuildLinkedGridPointSet();
+                transportNetwork.linkedGridPointSet.pointSet.link(transportNetwork.streetLayer, StreetMode.CAR);
                 run(transportNetwork);
             } catch (Exception e) {
                 LOG.error("An error occurred during the reading or decoding of transit networks", e);

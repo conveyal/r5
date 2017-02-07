@@ -198,6 +198,7 @@ public class TransportNetwork implements Serializable {
 
         // Create transfers
         new TransferFinder(transportNetwork).findTransfers();
+        new TransferFinder(transportNetwork).findParkRideTransfer();
 
         transportNetwork.fareCalculator = tnBuilderConfig.analysisFareCalculator;
 

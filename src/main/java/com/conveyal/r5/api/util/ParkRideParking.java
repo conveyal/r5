@@ -1,6 +1,9 @@
 package com.conveyal.r5.api.util;
 
 import com.conveyal.osmlib.OSMEntity;
+import com.conveyal.r5.streets.StreetRouter;
+import gnu.trove.map.TIntObjectMap;
+import gnu.trove.map.hash.TIntObjectHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,6 +24,11 @@ public class ParkRideParking implements Serializable {
 
     public float lat;
     public float lon;
+
+    /**
+     * List of closest stop, time
+     */
+    public TIntObjectMap<StreetRouter.State> closestTransfers = new TIntObjectHashMap<>();
 
     public ParkRideParking(int vertexIdx, double lat, double lon, OSMEntity way) {
         id = vertexIdx;

@@ -1,9 +1,12 @@
 package com.conveyal.r5.transit;
 
+import com.conveyal.r5.api.util.ParkRideParking;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
+import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
+import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import com.conveyal.r5.streets.StreetLayer;
@@ -24,6 +27,9 @@ public class TransferFinder {
     // Optimization: use the same empty list for all stops with no transfers
     private static final TIntArrayList EMPTY_INT_LIST = new TIntArrayList();
 
+    // Optimization: use the same empty list for all stops with no transfers
+    private static final TIntObjectMap<StreetRouter.State> EMPTY_STATE_MAP = new TIntObjectHashMap<>();
+
     TransitLayer transitLayer;
 
     StreetLayer streetLayer;
@@ -36,6 +42,50 @@ public class TransferFinder {
     public TransferFinder(TransportNetwork network) {
         this.transitLayer = network.transitLayer;
         this.streetLayer = network.streetLayer;
+    }
+
+    public void findParkRideTransfer() {
+        int unconnectedParkRides = 0;
+        LOG.info("Finding closest stops to P+R for {} P+Rs", this.streetLayer.parkRideLocationsMap.size());
+        for (ParkRideParking parkRideParking : this.streetLayer.parkRideLocationsMap.valueCollection()) {
+            int originStreetVertex;
+            if (parkRideParking.id == null || parkRideParking.id < 0) {
+                unconnectedParkRides++;
+                continue;
+            } else {
+                originStreetVertex = parkRideParking.id;
+            }
+
+            StreetRouter streetRouter = new StreetRouter(streetLayer);
+            streetRouter.distanceLimitMeters = TransitLayer.PARKRIDE_DISTANCE_LIMIT;
+            streetRouter.setOrigin(originStreetVertex);
+            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+
+            streetRouter.transitStopSearch = true;
+            streetRouter.route();
+
+            TIntIntMap distancesToReachedStops = streetRouter.getReachedStops();
+            // FIXME the following is technically incorrect, measure that it's actually improving calculation speed
+            retainClosestStopsOnPatterns(distancesToReachedStops);
+            // At this point we have the distances to all stops that are the closest one on some pattern.
+            // Make transfers to them, packed as pairs of (target stop index, distance).
+            TIntObjectMap<StreetRouter.State> pathToreachedStops = new TIntObjectHashMap<>(distancesToReachedStops.size());
+            distancesToReachedStops.forEachEntry((targetStopIndex, distance) -> {
+                int stopStreetVertexIdx = transitLayer.streetVertexForStop.get(targetStopIndex);
+                StreetRouter.State path = streetRouter.getStateAtVertex(stopStreetVertexIdx);
+                pathToreachedStops.put(targetStopIndex, path);
+                return true;
+            });
+
+            // Record this list of transfers as leading out of the stop with index s.
+            if (pathToreachedStops.size() > 0) {
+                parkRideParking.closestTransfers = pathToreachedStops;
+                LOG.info("Found {} stops for P+R:{}", distancesToReachedStops.size(), parkRideParking.id);
+            } else {
+                parkRideParking.closestTransfers = EMPTY_STATE_MAP;
+                LOG.info("Not found stops for Park ride:{}", parkRideParking.id);
+            }
+        }
     }
 
     public void findTransfers () {

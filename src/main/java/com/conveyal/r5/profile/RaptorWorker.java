@@ -556,7 +556,8 @@ public class RaptorWorker {
             TripSchedule bestFreqTrip = null;
 
             // First look for a frequency entry.
-            if (useFrequencies) {
+            // Don't check timetables that don't have frequencies at all, this makes the search 6x faster anecdotally
+            if (useFrequencies && timetable.hasFrequencies) {
                 long startTime = System.currentTimeMillis();
                 for (int stopIndex : timetable.stops) {
                     stopPositionInPattern += 1;

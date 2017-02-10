@@ -575,11 +575,14 @@ public class RaptorWorker {
 
                     // This stop has been reached by some previous round. Try to board a vehicle here.
                     // This could be the first time we board a vehicle on this pattern in this round, but if already
-                    // on board a vehicle we also need to check whether it's possible to board an earlier one.
+                    // on board a vehicle we also need to check whether it's possible to board an earlier one if the
+                    // arrival time at this stop from the previous round is earlier than the arrival time from already
+                    // being on the vehicle. If we have not yet boarded, remainOnBoardTime will be Integer.MAX_VALUE so
+                    // the condition will still be true.
                     // TODO only attempt boarding when we have a non-UNREACHED value from the last round, not based on the bestTimes.
                     // To do this, in the frequency search we'd need to re-mark stops that were reached by the scheduled search in the previous round.
                     // stopsTouched could just be put into RaptorState.
-                    if (inputState.bestTimes[stopIndex] != UNREACHED) {
+                    if (inputState.bestTimes[stopIndex] < remainOnBoardTime) {
                         for (int tripScheduleIdx = 0; tripScheduleIdx < timetable.tripSchedules.size(); tripScheduleIdx++) {
                             TripSchedule ts = timetable.tripSchedules.get(tripScheduleIdx);
                             // TODO each pattern should be made to contain only scheduled or only frequency trips

@@ -591,6 +591,11 @@ public class PointToPointRouterServer {
 
             Float fromLat = request.queryMap("fromLat").floatValue();
             Float fromLon = request.queryMap("fromLon").floatValue();
+            boolean returnDistinctArea = false;
+            if (request.queryMap("returnDistinctAreas").hasValue()) {
+                returnDistinctArea = request.queryMap("returnDistinctAreas").booleanValue();
+            }
+            boolean finalReturnDistinctArea = returnDistinctArea;
 
             List<String> modes = Arrays.asList("CAR", "WALK", "BICYCLE", "TRANSIT");
 
@@ -603,7 +608,7 @@ public class PointToPointRouterServer {
                 LOG.info("writing geojson");
                 Map<String, Object> featureCollection = new HashMap<>(2);
                 featureCollection.put("type", "FeatureCollection");
-                List<GeoJsonFeature> features = result.avgCase.generateGeoJSONFeatures(true);
+                List<GeoJsonFeature> features = result.avgCase.generateGeoJSONFeatures(finalReturnDistinctArea);
 
                 LOG.info(mode, "Num features:{}", features.size());
                 featureCollection.put("features", features);
@@ -628,12 +633,16 @@ public class PointToPointRouterServer {
             Float fromLat = request.queryMap("fromLat").floatValue();
             Float fromLon = request.queryMap("fromLon").floatValue();
             String queryMode = request.queryParams("mode");
+            boolean returnDistinctArea = false;
+            if (request.queryMap("returnDistinctAreas").hasValue()) {
+                returnDistinctArea = request.queryMap("returnDistinctAreas").booleanValue();
+            }
 
             ResultEnvelope result = calculateIsochrone(transportNetwork, fromLat, fromLon, queryMode);
 
             Map<String, Object> featureCollection = new HashMap<>(2);
             featureCollection.put("type", "FeatureCollection");
-            List<GeoJsonFeature> features = result.avgCase.generateGeoJSONFeatures(true);
+            List<GeoJsonFeature> features = result.avgCase.generateGeoJSONFeatures(returnDistinctArea);
 
             LOG.info("Num features:{}", features.size());
             featureCollection.put("features", features);
@@ -958,7 +967,7 @@ public class PointToPointRouterServer {
     /**
      * Creates features from from and to vertices of provided edge
      * if they weren't alreade created and they have TRAFFIC_SIGNAL flag
-     * 
+     *
      * @param cursor
      * @param vcursor
      * @param seenVertices

@@ -119,7 +119,7 @@ function getModeColor (mode) {
     if (mode === 'FERRY') return '#008'
     if (mode === 'CAR') return '#444'
     return '#aaa'
-}; 
+};
 function styleMode(feature) {
     return {
         color: getModeColor(feature.properties.mode),
@@ -313,6 +313,7 @@ function requestIsochrone() {
         fromLat: m1.getLatLng().lat,
         fromLon: m1.getLatLng().lng,
         mode: $("#mode").val(),
+        returnDistinctAreas: true
     }
     console.log(params);
     //make a request

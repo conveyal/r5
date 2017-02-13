@@ -56,6 +56,12 @@ public class RaptorState {
     /** If this stop is optimally reached via a transfer, the stop we transferred from */
     public int[] transferStop;
 
+    /** Stops touched by transit search */
+    public BitSet nonTransferStopsTouched;
+
+    /** Stops touched by transit or transfers */
+    public BitSet bestStopsTouched;
+
     /** create a RaptorState for a network with a particular number of stops */
     public RaptorState (int nStops) {
         this.bestTimes = new int[nStops];
@@ -75,10 +81,12 @@ public class RaptorState {
         this.waitTime = new int[nStops];
         this.nonTransferWaitTime = new int[nStops];
         this.nonTransferInVehicleTravelTime = new int[nStops];
+        this.nonTransferStopsTouched = new BitSet(nStops);
+        this.bestStopsTouched = new BitSet(nStops);
     }
 
     /**
-     * copy constructor, use only when progressing from one round to the next to maintain consistent reachedThisRound data
+     * copy constructor, does not copy touchedStops data
      */
     private RaptorState(RaptorState state) {
         this.bestTimes = Arrays.copyOf(state.bestTimes, state.bestTimes.length);
@@ -91,7 +99,11 @@ public class RaptorState {
         this.nonTransferWaitTime = Arrays.copyOf(state.nonTransferWaitTime, state.nonTransferWaitTime.length);
         this.nonTransferInVehicleTravelTime = Arrays.copyOf(state.nonTransferInVehicleTravelTime, state.nonTransferInVehicleTravelTime.length);
         this.departureTime = state.departureTime;
+
         this.previous = state;
+
+        this.nonTransferStopsTouched = new BitSet(state.bestTimes.length);
+        this.bestStopsTouched = new BitSet(state.bestTimes.length);
     }
 
     /** Copy this raptor state to progress to the next round. Clears reachedThisRound so should be used only to progress to the next round. */
@@ -101,6 +113,7 @@ public class RaptorState {
 
     /**
      * Set this state to the min values found in this state or the other passed in (used in Range RAPTOR).
+     * Since this is used to progress between rounds, does not copy stopsTouched data.
      */
     public void min (RaptorState other) {
         int nStops = this.bestTimes.length;
@@ -123,6 +136,24 @@ public class RaptorState {
                 this.nonTransferWaitTime[stop] = other.nonTransferWaitTime[stop] + (other.departureTime - this.departureTime);
             }
         }
+    }
+
+    /** Set the time at a transit stop; if transit is true, this was reached via transfer/initial walk */
+    public boolean setTimeAtStop(int stop, int time, boolean transfer) {
+        boolean optimal = false;
+        if (!transfer && time < bestNonTransferTimes[stop]) {
+            bestNonTransferTimes[stop] = time;
+            nonTransferStopsTouched.set(stop);
+            optimal = true;
+        }
+
+        if (time < bestTimes[stop]) {
+            bestTimes[stop] = time;
+            bestStopsTouched.set(stop);
+            optimal = true;
+        }
+
+        return optimal;
     }
 
     /** dump this as a string */

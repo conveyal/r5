@@ -4,6 +4,7 @@ import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
+import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.PathWithTimes;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.Path;
@@ -89,10 +90,10 @@ public class StaticComputer implements Runnable {
 
         // Create a new Raptor Worker.
         // Tell it that we want a travel time to each stop by leaving the point set parameter null.
-        RaptorWorker worker = new RaptorWorker(network.transitLayer, null, req.request.request);
+        FastRaptorWorker worker = new FastRaptorWorker(network.transitLayer, req.request.request, accessTimes);
 
         // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
-        StaticPropagatedTimesStore pts = (StaticPropagatedTimesStore) worker.runRaptor(accessTimes, null, ts);
+        int[][] transitTravelTimes = worker.route();
 
         long nonTransitStart = System.currentTimeMillis();
 
@@ -119,8 +120,8 @@ public class StaticComputer implements Runnable {
             previous = time;
         }
 
-        int iterations = pts.times.length;
-        int stops = pts.times[0].length;
+        int iterations = transitTravelTimes.length;
+        int stops = transitTravelTimes[0].length;
 
         // number of stops
         out.writeInt(stops);
@@ -139,53 +140,22 @@ public class StaticComputer implements Runnable {
             TObjectIntMap<Path> paths = new TObjectIntHashMap<>();
             List<Path> pathList = new ArrayList<>();
 
-            for (int iter = 0, stateIteration = 0; iter < iterations; iter++, stateIteration++) {
+            for (int iter = 0; iter < iterations; iter++) {
                 // advance past states that are not included in averages
-                while (!worker.includeInAverages.get(stateIteration)) stateIteration++;
+                //while (!worker.includeInAverages.get(stateIteration)) stateIteration++;
 
-                int time = pts.times[iter][stop];
+                int time = transitTravelTimes[iter][stop];
                 if (time == Integer.MAX_VALUE) time = -1;
                 else time /= 60;
 
                 out.writeInt(time - prev);
                 prev = time;
 
-                if (worker.statesEachIteration != null) {
-                    RaptorState state = worker.statesEachIteration.get(stateIteration);
-                    int inVehicleTravelTime = state.inVehicleTravelTime[stop] / 60;
-                    out.writeInt(inVehicleTravelTime - previousInVehicleTravelTime);
-                    previousInVehicleTravelTime = inVehicleTravelTime;
+                // TODO paths and travel time components
+                out.writeInt(-1); // In vehicle time
+                out.writeInt(-1); // Walk time
+                out.writeInt(-1); // path index
 
-                    int waitTime = state.waitTime[stop] / 60;
-                    out.writeInt(waitTime - previousWaitTime);
-                    previousWaitTime = waitTime;
-
-                    if (inVehicleTravelTime + waitTime > time && time != -1) {
-                        LOG.info("Wait and in vehicle travel time greater than total time");
-                    }
-
-                    // write out which path to use, delta coded
-                    int pathIdx = -1;
-
-                    // only compute a path if this stop was reached
-                    if (state.bestNonTransferTimes[stop] != RaptorWorker.UNREACHED) {
-                        // TODO reuse pathwithtimes?
-                        Path path = new Path(state, stop);
-                        if (!paths.containsKey(path)) {
-                            paths.put(path, maxPathIdx++);
-                            pathList.add(path);
-                        }
-
-                        pathIdx = paths.get(path);
-                    }
-
-                    out.writeInt(pathIdx - prevPath);
-                    prevPath = pathIdx;
-                } else {
-                    out.writeInt(-1); // In vehicle time
-                    out.writeInt(-1); // Walk time
-                    out.writeInt(-1); // path index
-                }
             }
 
             sum += pathList.size();
@@ -203,10 +173,10 @@ public class StaticComputer implements Runnable {
             }
         }
 
+        out.flush();
+
         LOG.info("Writing output to broker took {}s", (System.currentTimeMillis() - outputStart) / 1000.0);
         LOG.info("Average of {} paths per destination stop", sum / stops);
-
-        out.flush();
     }
 
 }

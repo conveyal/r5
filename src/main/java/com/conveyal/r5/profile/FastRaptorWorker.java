@@ -215,12 +215,6 @@ public class FastRaptorWorker {
                 // Einstein was probably wrong; God does in fact play dice with the universe, and so do we
                 offsets.randomize();
 
-                // re-mark all access stops
-                accessStops.forEachEntry((stop, time) -> {
-                    frequencyState[0].bestStopsTouched.set(stop);
-                    return true;
-                });
-
                 for (int round = 1; round <= request.maxRides; round++) {
                     frequencyState[round].min(frequencyState[round - 1]);
 
@@ -263,48 +257,48 @@ public class FastRaptorWorker {
                 // when boarding
                 if (onTrip > -1) {
                     outputState.setTimeAtStop(stop, schedule.arrivals[stopPositionInPattern], false);
-                } else {
-                    // Don't attempt to board if this stop was not reached in the last round
-                    if (inputState.bestStopsTouched.get(stop)) {
-                        int earliestBoardTime = inputState.bestTimes[stop] + MINIMUM_BOARD_WAIT_SEC;
+                }
 
-                        // only attempt to board if the stop was touched
-                        if (onTrip == -1) {
-                            if (inputState.bestStopsTouched.get(stop)) {
-                                int candidateTripIndex = -1;
-                                EARLIEST_TRIP:
-                                for (TripSchedule candidateSchedule : pattern.tripSchedules) {
-                                    candidateTripIndex++;
+                // Don't attempt to board if this stop was not reached in the last round
+                if (inputState.bestStopsTouched.get(stop)) {
+                    int earliestBoardTime = inputState.bestTimes[stop] + MINIMUM_BOARD_WAIT_SEC;
 
-                                    if (!servicesActive.get(candidateSchedule.serviceCode) || candidateSchedule.headwaySeconds != null) {
-                                        // frequency trip or not running
-                                        continue;
-                                    }
+                    // only attempt to board if the stop was touched
+                    if (onTrip == -1) {
+                        if (inputState.bestStopsTouched.get(stop)) {
+                            int candidateTripIndex = -1;
+                            EARLIEST_TRIP:
+                            for (TripSchedule candidateSchedule : pattern.tripSchedules) {
+                                candidateTripIndex++;
 
-                                    if (earliestBoardTime < candidateSchedule.departures[stopPositionInPattern]) {
-                                        // board this vehicle
-                                        onTrip = candidateTripIndex;
-                                        schedule = candidateSchedule;
-                                        break EARLIEST_TRIP;
-                                    }
-                                }
-                            }
-                        } else {
-                            // check if we can back up to an earlier trip due to this stop being reached earlier
-                            int bestTripIdx = onTrip;
-                            while (--bestTripIdx >= 0) {
-                                TripSchedule trip = pattern.tripSchedules.get(bestTripIdx);
-                                if (trip.headwaySeconds != null || !servicesActive.get(trip.serviceCode)) {
-                                    // This is a frequency trip or it is not running on the day of the search.
+                                if (!servicesActive.get(candidateSchedule.serviceCode) || candidateSchedule.headwaySeconds != null) {
+                                    // frequency trip or not running
                                     continue;
                                 }
-                                if (trip.departures[stopPositionInPattern] > earliestBoardTime) {
-                                    onTrip = bestTripIdx;
-                                    schedule = trip;
-                                } else {
-                                    // this trip arrives too early, break loop since they are sorted by departure time
-                                    break;
+
+                                if (earliestBoardTime < candidateSchedule.departures[stopPositionInPattern]) {
+                                    // board this vehicle
+                                    onTrip = candidateTripIndex;
+                                    schedule = candidateSchedule;
+                                    break EARLIEST_TRIP;
                                 }
+                            }
+                        }
+                    } else {
+                        // check if we can back up to an earlier trip due to this stop being reached earlier
+                        int bestTripIdx = onTrip;
+                        while (--bestTripIdx >= 0) {
+                            TripSchedule trip = pattern.tripSchedules.get(bestTripIdx);
+                            if (trip.headwaySeconds != null || !servicesActive.get(trip.serviceCode)) {
+                                // This is a frequency trip or it is not running on the day of the search.
+                                continue;
+                            }
+                            if (trip.departures[stopPositionInPattern] > earliestBoardTime) {
+                                onTrip = bestTripIdx;
+                                schedule = trip;
+                            } else {
+                                // this trip arrives too early, break loop since they are sorted by departure time
+                                break;
                             }
                         }
                     }

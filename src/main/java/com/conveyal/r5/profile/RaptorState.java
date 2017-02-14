@@ -150,19 +150,22 @@ public class RaptorState {
     }
 
     /** Set the time at a transit stop; if transit is true, this was reached via transfer/initial walk */
-    public boolean setTimeAtStop(int stop, int time, boolean transfer) {
+    public boolean setTimeAtStop(int stop, int time, int fromPattern, int fromStop, boolean transfer) {
         if (time > departureTime + maxDurationSeconds) return false;
 
         boolean optimal = false;
         if (!transfer && time < bestNonTransferTimes[stop]) {
             bestNonTransferTimes[stop] = time;
             nonTransferStopsTouched.set(stop);
+            previousPatterns[stop] = fromPattern;
             optimal = true;
         }
 
         if (time < bestTimes[stop]) {
             bestTimes[stop] = time;
             bestStopsTouched.set(stop);
+            if (transfer) previousStop[stop] = fromStop;
+            else previousPatterns[stop] = fromPattern;
             optimal = true;
         }
 

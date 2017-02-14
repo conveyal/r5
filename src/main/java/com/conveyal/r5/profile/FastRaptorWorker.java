@@ -182,7 +182,7 @@ public class FastRaptorWorker {
         // add initial stops
         RaptorState initialState = scheduleState[0];
         accessStops.forEachEntry((stop, accessTime) -> {
-            initialState.setTimeAtStop(stop, accessTime + departureTime, true);
+            initialState.setTimeAtStop(stop, accessTime + departureTime, -1, -1, true);
             return true; // continue iteration
         });
     }
@@ -245,9 +245,10 @@ public class FastRaptorWorker {
 
     /** Perform a scheduled search */
     private void doScheduledSearchForRound(RaptorState inputState, RaptorState outputState) {
-        BitSet patternsTouched = getPatternsTouchedForStops(inputState.bestStopsTouched, scheduledIndexForOriginalPatternIndex);
+        BitSet patternsTouched = getPatternsTouchedForStops(inputState, scheduledIndexForOriginalPatternIndex);
 
         for (int patternIndex = patternsTouched.nextSetBit(0); patternIndex >= 0; patternIndex = patternsTouched.nextSetBit(patternIndex + 1)) {
+            int originalPatternIndex = originalPatternIndexForScheduledIndex[patternIndex];
             TripPattern pattern = runningScheduledPatterns[patternIndex];
             int onTrip = -1;
             TripSchedule schedule = null;
@@ -258,11 +259,16 @@ public class FastRaptorWorker {
                 // attempt to alight if we're on board, done above the board search so that we don't check for alighting
                 // when boarding
                 if (onTrip > -1) {
-                    outputState.setTimeAtStop(stop, schedule.arrivals[stopPositionInPattern], false);
+                    outputState.setTimeAtStop(stop, schedule.arrivals[stopPositionInPattern], originalPatternIndex, -1, false);
                 }
 
-                // Don't attempt to board if this stop was not reached in the last round
-                if (inputState.bestStopsTouched.get(stop)) {
+                int sourcePatternIndex = inputState.previousStop[stop] == -1 ?
+                        inputState.previousPatterns[stop] :
+                        inputState.previousPatterns[inputState.previousStop[stop]];
+
+                // Don't attempt to board if this stop was not reached in the last round, and don't attempt to
+                // reboard the same pattern
+                if (inputState.bestStopsTouched.get(stop) && sourcePatternIndex != originalPatternIndex) {
                     int earliestBoardTime = inputState.bestTimes[stop] + MINIMUM_BOARD_WAIT_SEC;
 
                     // only attempt to board if the stop was touched
@@ -310,7 +316,7 @@ public class FastRaptorWorker {
     }
 
     private void doFrequencySearchForRound(RaptorState inputState, RaptorState outputState, boolean bound) {
-        BitSet patternsTouched = getPatternsTouchedForStops(inputState.bestStopsTouched, frequencyIndexForOriginalPatternIndex);
+        BitSet patternsTouched = getPatternsTouchedForStops(inputState, frequencyIndexForOriginalPatternIndex);
 
         for (int patternIndex = patternsTouched.nextSetBit(0); patternIndex >= 0; patternIndex = patternsTouched.nextSetBit(patternIndex + 1)) {
             TripPattern pattern = runningFrequencyPatterns[patternIndex];
@@ -337,7 +343,7 @@ public class FastRaptorWorker {
                             // attempt to alight
                             int travelTime = schedule.arrivals[stopPositionInPattern] - schedule.departures[boardStopPositionInPattern];
                             int alightTime = boardTime + travelTime;
-                            outputState.setTimeAtStop(stop, alightTime, false);
+                            outputState.setTimeAtStop(stop, alightTime, originalPatternIndex, -1, false);
                         }
 
                         // attempt to board (even if already boarded, since this is a frequency trip and we could move back)
@@ -440,7 +446,7 @@ public class FastRaptorWorker {
                         // transfer length to stop is acceptable
                         int walkTimeToTargetStopSeconds = distanceToTargetStopMillimeters / walkSpeedMillimetersPerSecond;
                         int timeAtTargetStop = state.bestNonTransferTimes[stop] + walkTimeToTargetStopSeconds;
-                        state.setTimeAtStop(targetStop, timeAtTargetStop, true);
+                        state.setTimeAtStop(targetStop, timeAtTargetStop, -1, stop, true);
                     }
                 }
             }
@@ -448,13 +454,21 @@ public class FastRaptorWorker {
     }
 
     /** Get a list of the internal IDs of the patterns touched using the given index (frequency or scheduled) */
-    private BitSet getPatternsTouchedForStops(BitSet stopsTouched, int[] index) {
+    private BitSet getPatternsTouchedForStops(RaptorState state, int[] index) {
         BitSet patternsTouched = new BitSet();
 
-        for (int stop = stopsTouched.nextSetBit(0); stop >= 0; stop = stopsTouched.nextSetBit(stop + 1)) {
-            transit.patternsForStop.get(stop).forEach(pattern -> {
-                int originalPattern = index[pattern];
-                if (originalPattern > -1) patternsTouched.set(originalPattern);
+        for (int stop = state.bestStopsTouched.nextSetBit(0); stop >= 0; stop = state.bestStopsTouched.nextSetBit(stop + 1)) {
+            final int finalStop = stop;
+            transit.patternsForStop.get(stop).forEach(originalPattern -> {
+                int filteredPattern = index[originalPattern];
+
+                int sourcePatternIndex = state.previousStop[finalStop] == -1 ?
+                        state.previousPatterns[finalStop] :
+                        state.previousPatterns[state.previousStop[finalStop]];
+
+                if (filteredPattern > -1 && sourcePatternIndex != originalPattern) {
+                    patternsTouched.set(filteredPattern);
+                }
                 return true; // continue iteration
             });
         }

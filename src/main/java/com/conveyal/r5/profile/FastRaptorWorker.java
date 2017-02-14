@@ -250,31 +250,58 @@ public class FastRaptorWorker {
 
         for (int patternIndex = patternsTouched.nextSetBit(0); patternIndex >= 0; patternIndex = patternsTouched.nextSetBit(patternIndex + 1)) {
             TripPattern pattern = runningScheduledPatterns[patternIndex];
-            // TODO do we need to loop over every schedule here? Probably not. The existing RaptorWorker does not.
-            for (TripSchedule schedule : pattern.tripSchedules) {
-                // frequency trip or not running
-                if (!servicesActive.get(schedule.serviceCode) || schedule.headwaySeconds != null) continue;
+            int onTrip = -1;
+            TripSchedule schedule = null;
 
-                boolean onTrip = false; // will be set to true once we board
+            for (int stopPositionInPattern = 0; stopPositionInPattern < pattern.stops.length; stopPositionInPattern++) {
+                int stop = pattern.stops[stopPositionInPattern];
 
-                for (int stopPositionInPattern = 0; stopPositionInPattern < pattern.stops.length; stopPositionInPattern++) {
-                    int stop = pattern.stops[stopPositionInPattern];
-
-                    // attempt to alight if we're on board, done above the board search so that we don't check for alighting
-                    // when boarding
-                    if (onTrip) {
-                        outputState.setTimeAtStop(stop, schedule.arrivals[stopPositionInPattern], false);
-                    } else {
-                        // no need to check for boarding if we're already on this (scheduled) trip, it won't improve any
-                        // times down the line. This means that we board each trip at the earliest possible stop.
-                        // we may want to implement some transfer filtering to make this more sane if the transferfinder
-                        // doesn't already take care of that for us.
+                // attempt to alight if we're on board, done above the board search so that we don't check for alighting
+                // when boarding
+                if (onTrip > -1) {
+                    outputState.setTimeAtStop(stop, schedule.arrivals[stopPositionInPattern], false);
+                } else {
+                    // Don't attempt to board if this is not an optimal place to board
+                    if (inputState.bestStopsTouched.get(stop)) {
+                        int earliestBoardTime = inputState.bestTimes[stop] + MINIMUM_BOARD_WAIT_SEC;
 
                         // only attempt to board if the stop was touched
-                        if (inputState.bestStopsTouched.get(stop)) {
-                            if (inputState.bestTimes[stop] + MINIMUM_BOARD_WAIT_SEC < schedule.departures[stopPositionInPattern]) {
-                                // board this vehicle
-                                onTrip = true;
+                        if (onTrip == -1) {
+                            if (inputState.bestStopsTouched.get(stop)) {
+                                int candidateTripIndex = -1;
+                                EARLIEST_TRIP:
+                                for (TripSchedule candidateSchedule : pattern.tripSchedules) {
+                                    candidateTripIndex++;
+
+                                    if (!servicesActive.get(candidateSchedule.serviceCode) || candidateSchedule.headwaySeconds != null) {
+                                        // frequency trip or not running
+                                        continue;
+                                    }
+
+                                    if (earliestBoardTime < candidateSchedule.departures[stopPositionInPattern]) {
+                                        // board this vehicle
+                                        onTrip = candidateTripIndex;
+                                        schedule = candidateSchedule;
+                                        break EARLIEST_TRIP;
+                                    }
+                                }
+                            }
+                        } else {
+                            // check if we can back up to an earlier trip due to this stop being reached earlier
+                            int bestTripIdx = onTrip;
+                            while (--bestTripIdx >= 0) {
+                                TripSchedule trip = pattern.tripSchedules.get(bestTripIdx);
+                                if (trip.headwaySeconds != null || !servicesActive.get(trip.serviceCode)) {
+                                    // This is a frequency trip or it is not running on the day of the search.
+                                    continue;
+                                }
+                                if (trip.departures[stopPositionInPattern] > earliestBoardTime) {
+                                    onTrip = bestTripIdx;
+                                    schedule = trip;
+                                } else {
+                                    // this trip arrives too early, break look since they are sorted by departure time
+                                    break;
+                                }
                             }
                         }
                     }
@@ -387,9 +414,9 @@ public class FastRaptorWorker {
             // loop transfers are already included by virtue of those stops having been reached
             TIntList transfersFromStop = transit.transfersForStop.get(stop);
             if (transfersFromStop != null) {
-                for (TIntIterator it = transfersFromStop.iterator(); it.hasNext(); ) {
-                    int targetStop = it.next();
-                    int distanceToTargetStopMillimeters = it.next();
+                for (int stopIdx = 0; stopIdx < transfersFromStop.size(); stopIdx += 2) {
+                    int targetStop = transfersFromStop.get(stopIdx);
+                    int distanceToTargetStopMillimeters = transfersFromStop.get(stopIdx + 1);
 
                     if (distanceToTargetStopMillimeters < maxWalkMillimeters) {
                         // transfer length to stop is acceptable

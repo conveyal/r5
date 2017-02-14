@@ -108,6 +108,12 @@ public class RaptorWorker {
     public BitSet servicesActive;
 
     /**
+     * In interactive single-point analysis we don't need to save all the steps to reach the destination,
+     * only the travel times. For static sites, we want to retain all the states so we can reconstruct paths.
+     */
+    public boolean saveAllStates = false;
+
+    /**
      * After each iteration (search at a single departure time with a specific Monte Carlo draw of schedules for
      * frequency routes) we store the {@link RaptorState}. If null, states will not be saved (they are not needed
      * in analysis and chew gobs of memory, especially when monteCarloDraws is large).
@@ -139,8 +145,9 @@ public class RaptorWorker {
 
         this.targets = targets;
 
-        // targets== null implies a static site, save the results of each iteration
-        //if (targets == null) this.statesEachIteration = new ArrayList<>();
+        // targets == null implies a static site (i.e. the server will not intersect travel times with destination counts)
+        // However, now we use this 'static site' code path even for interactive single-point analysis so there's a switch.
+        if (targets == null && saveAllStates) this.statesEachIteration = new ArrayList<>();
 
         this.servicesActive = data.getActiveServicesForDate(req.date);
 

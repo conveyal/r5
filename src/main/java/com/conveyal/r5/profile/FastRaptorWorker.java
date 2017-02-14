@@ -198,6 +198,9 @@ public class FastRaptorWorker {
                 // transfers
                 scheduleState[round].min(scheduleState[round - 1]);
                 doScheduledSearchForRound(scheduleState[round - 1], scheduleState[round]);
+
+                // perform a frequency search using worst-case boarding time to provide a tighter upper bound
+                doFrequencySearchForRound(scheduleState[round - 1], scheduleState[round], true);
                 doTransfers(scheduleState[round]);
             }
         }
@@ -230,7 +233,7 @@ public class FastRaptorWorker {
                     // okay to destructively modify last round frequency state, it will not be used after this
                     frequencyState[round - 1].bestStopsTouched.or(scheduleState[round - 1].bestStopsTouched);
                     frequencyState[round - 1].nonTransferStopsTouched.or(scheduleState[round - 1].nonTransferStopsTouched);
-                    doFrequencySearchForRound(frequencyState[round - 1], frequencyState[round]);
+                    doFrequencySearchForRound(frequencyState[round - 1], frequencyState[round], false);
 
                     doTransfers(frequencyState[round]);
                 }
@@ -261,7 +264,7 @@ public class FastRaptorWorker {
                 if (onTrip > -1) {
                     outputState.setTimeAtStop(stop, schedule.arrivals[stopPositionInPattern], false);
                 } else {
-                    // Don't attempt to board if this is not an optimal place to board
+                    // Don't attempt to board if this stop was not reached in the last round
                     if (inputState.bestStopsTouched.get(stop)) {
                         int earliestBoardTime = inputState.bestTimes[stop] + MINIMUM_BOARD_WAIT_SEC;
 
@@ -299,7 +302,7 @@ public class FastRaptorWorker {
                                     onTrip = bestTripIdx;
                                     schedule = trip;
                                 } else {
-                                    // this trip arrives too early, break look since they are sorted by departure time
+                                    // this trip arrives too early, break loop since they are sorted by departure time
                                     break;
                                 }
                             }
@@ -310,7 +313,7 @@ public class FastRaptorWorker {
         }
     }
 
-    private void doFrequencySearchForRound(RaptorState inputState, RaptorState outputState) {
+    private void doFrequencySearchForRound(RaptorState inputState, RaptorState outputState, boolean bound) {
         BitSet patternsTouched = getPatternsTouchedForStops(inputState.bestStopsTouched, frequencyIndexForOriginalPatternIndex);
 
         for (int patternIndex = patternsTouched.nextSetBit(0); patternIndex >= 0; patternIndex = patternsTouched.nextSetBit(patternIndex + 1)) {
@@ -343,8 +346,11 @@ public class FastRaptorWorker {
 
                         // attempt to board (even if already boarded, since this is a frequency trip and we could move back)
                         if (inputState.bestStopsTouched.get(stop)) {
-                            int newBoardingDepartureTimeAtStop =
-                                    getFrequencyDepartureTime(schedule, stopPositionInPattern, offset, frequencyEntryIdx, inputState.bestTimes[stop] + MINIMUM_BOARD_WAIT_SEC);
+                            int earliestBoardTime = inputState.bestTimes[stop] + MINIMUM_BOARD_WAIT_SEC;
+
+                            int newBoardingDepartureTimeAtStop = bound ?
+                                    getRandomFrequencyDepartureTime(schedule, stopPositionInPattern, offset, frequencyEntryIdx, earliestBoardTime) :
+                                    getWorstCaseFrequencyDepartureTime(schedule, stopPositionInPattern, frequencyEntryIdx, earliestBoardTime);
 
                             int remainOnBoardDepartureTimeAtStop = Integer.MAX_VALUE;
 
@@ -367,7 +373,7 @@ public class FastRaptorWorker {
     }
 
     /** Get the earliest departure time on a particular scheduled frequency entry, or -1 if the frequency entry is not usable */
-    public int getFrequencyDepartureTime (TripSchedule schedule, int stopPositionInPattern, int offset, int frequencyEntryIdx, int earliestTime) {
+    public int getRandomFrequencyDepartureTime (TripSchedule schedule, int stopPositionInPattern, int offset, int frequencyEntryIdx, int earliestTime) {
         // earliest board time is start time plus travel time plus offset
         int earliestBoardTimeThisEntry = schedule.startTimes[frequencyEntryIdx] +
                 schedule.departures[stopPositionInPattern] +
@@ -402,6 +408,22 @@ public class FastRaptorWorker {
         } else {
             return -1;
         }
+    }
+
+    public int getWorstCaseFrequencyDepartureTime (TripSchedule schedule, int stopPositionInPattern, int frequencyEntryIdx, int earliestTime) {
+        int headway = schedule.headwaySeconds[frequencyEntryIdx];
+        int travelTimeFromStartOfTrip = schedule.departures[stopPositionInPattern];
+        // The last vehicle could leave the terminal as early as headwaySeconds before the end of the frequency entry.
+        int earliestEndTimeOfFrequencyEntry = schedule.endTimes[frequencyEntryIdx] - headway + travelTimeFromStartOfTrip;
+
+        if (earliestEndTimeOfFrequencyEntry < earliestTime) return -1;
+
+        // board pessimistically assuming the entry is already running
+        int latestBoardTimeAssumingEntryIsAlreadyRunning = earliestTime + headway;
+        // figure out the latest departure time of this trip at this stop
+        int latestBoardTimeOfFirstTrip = schedule.startTimes[frequencyEntryIdx] + headway + travelTimeFromStartOfTrip;
+        // return the max of those two
+        return Math.max(latestBoardTimeAssumingEntryIsAlreadyRunning, latestBoardTimeOfFirstTrip);
     }
 
     private void doTransfers (RaptorState state) {

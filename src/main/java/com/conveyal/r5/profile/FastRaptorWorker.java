@@ -45,8 +45,19 @@ public class FastRaptorWorker {
     /** Minimum wait for boarding to account for schedule variation */
     private static final int MINIMUM_BOARD_WAIT_SEC = 60;
 
-    // Variables to track time spent
+    // Variables to track time spent, all in nanoseconds (some of the operations we're timing are significantly submillisecond)
+    // (although I suppose using ms would be fine because the number of times we cross a millisecond boundary would be proportional
+    //  to the portion of a millisecond that operation took).
     public long startClockTime;
+    public long timeInScheduledSearch;
+    public long timeInScheduledSearchTransit;
+    public long timeInScheduledSearchFrequencyBounds;
+    public long timeInScheduledSearchTransfers;
+
+    public long timeInFrequencySearch;
+    public long timeInFrequencySearchFrequency;
+    public long timeInFrequencySearchScheduled;
+    public long timeInFrequencySearchTransfers;
 
     /** the transit layer to route on */
     private final TransitLayer transit;
@@ -95,7 +106,7 @@ public class FastRaptorWorker {
 
     /** For each iteration, return the travel time to each transit stop */
     public int[][] route () {
-        startClockTime = System.currentTimeMillis();
+        startClockTime = System.nanoTime();
         prefilterPatterns();
 
         // compute number of minutes for scheduled search
@@ -127,7 +138,15 @@ public class FastRaptorWorker {
             }
         }
 
-        LOG.info("Search completed in {}s", (System.currentTimeMillis() - startClockTime) / 1000d);
+        LOG.info("Search completed in {}s", (System.nanoTime() - startClockTime) / 1e9d);
+        LOG.info("Scheduled/bounds search: {}s", timeInScheduledSearch / 1e9d);
+        LOG.info("  - Scheduled search: {}s", timeInScheduledSearchTransit / 1e9d);
+        LOG.info("  - Frequency upper bounds: {}s", timeInScheduledSearchFrequencyBounds / 1e9d);
+        LOG.info("  - Transfers: {}s", timeInScheduledSearchTransfers / 1e9d);
+        LOG.info("Frequency search: {}s", timeInFrequencySearch / 1e9d);
+        LOG.info("  - Frequency component: {}s", timeInFrequencySearchFrequency / 1e9d);
+        LOG.info("  - Resulting updates to scheduled component: {}s", timeInFrequencySearchScheduled / 1e9d);
+        LOG.info("  - Transfers: {}s", timeInFrequencySearchTransfers / 1e9d);
 
         return results;
     }
@@ -192,6 +211,7 @@ public class FastRaptorWorker {
         // Run the scheduled search
         // round 0 is the street search
         if (transit.hasSchedules) {
+            long startTime = System.nanoTime();
             for (int round = 1; round <= request.maxRides; round++) {
                 // NB since we have transfer limiting not bothering to cut off search when there are no more transfers
                 // as that will be rare and complicates the code grabbing the results
@@ -199,15 +219,25 @@ public class FastRaptorWorker {
                 // prevent finding crazy multi-transfer ways to get somewhere when there is a quicker way with fewer
                 // transfers
                 scheduleState[round].min(scheduleState[round - 1]);
+
+                long scheduledStartTime = System.nanoTime();
                 doScheduledSearchForRound(scheduleState[round - 1], scheduleState[round]);
+                timeInScheduledSearchTransit += System.nanoTime() - scheduledStartTime;
 
                 // perform a frequency search using worst-case boarding time to provide a tighter upper bound
+                long frequencyStartTime = System.nanoTime();
                 doFrequencySearchForRound(scheduleState[round - 1], scheduleState[round], true);
+                timeInScheduledSearchFrequencyBounds += System.nanoTime() - frequencyStartTime;
+
+                long transferStartTime = System.nanoTime();
                 doTransfers(scheduleState[round]);
+                timeInScheduledSearchTransfers += System.nanoTime() - transferStartTime;
             }
+            timeInScheduledSearch += System.nanoTime() - startTime;
         }
 
         if (transit.hasFrequencies) {
+            long startTime = System.nanoTime();
             int[][] result = new int[iterationsPerMinute][];
             for (int iteration = 0; iteration < iterationsPerMinute; iteration++) {
                 // copy the state, with advancingRound = false
@@ -223,19 +253,28 @@ public class FastRaptorWorker {
                     // scheduled search: use only stops touched within this loop
                     // we need to repeat the scheduled search when we do frequency searches to handle combinations of schedules
                     // and frequencies
+                    long scheduledStart = System.nanoTime();
                     doScheduledSearchForRound(frequencyState[round - 1], frequencyState[round]);
+                    timeInFrequencySearchScheduled += System.nanoTime() - scheduledStart;
 
                     // frequency search: additionally use stops touched by scheduled search
                     // okay to destructively modify last round frequency state, it will not be used after this
+                    long frequencyStart = System.nanoTime();
                     frequencyState[round - 1].bestStopsTouched.or(scheduleState[round - 1].bestStopsTouched);
                     frequencyState[round - 1].nonTransferStopsTouched.or(scheduleState[round - 1].nonTransferStopsTouched);
                     doFrequencySearchForRound(frequencyState[round - 1], frequencyState[round], false);
+                    timeInFrequencySearchFrequency += System.nanoTime() - frequencyStart;
 
+                    long transferStart = System.nanoTime();
                     doTransfers(frequencyState[round]);
+                    timeInFrequencySearchTransfers += System.nanoTime() - transferStart;
                 }
 
                 result[iteration] = frequencyState[request.maxRides].bestNonTransferTimes;
             }
+
+            timeInFrequencySearch += System.nanoTime() - startTime;
+
             return result;
         } else {
             // no frequencies, return result of scheduled search

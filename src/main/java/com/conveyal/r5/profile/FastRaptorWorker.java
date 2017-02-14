@@ -39,6 +39,9 @@ public class FastRaptorWorker {
     /** Step for departure times */
     private static final int DEPARTURE_STEP_SEC = 60;
 
+    /** Maximum travel duration */
+    private static final int MAXIMUM_TRAVEL_DURATION_SEC = 120 * 60; // two hours
+
     /** Minimum wait for boarding to account for schedule variation */
     private static final int MINIMUM_BOARD_WAIT_SEC = 60;
 
@@ -74,7 +77,6 @@ public class FastRaptorWorker {
 
     private FrequencyRandomOffsets offsets;
 
-
     /** Services active on the date of the search */
     private final BitSet servicesActive;
 
@@ -87,7 +89,7 @@ public class FastRaptorWorker {
         this.servicesActive  = transit.getActiveServicesForDate(request.date);
         // we add one to request.maxRides, first state is result of initial walk
         this.scheduleState = IntStream.range(0, request.maxRides + 1)
-                .mapToObj((i) -> new RaptorState(transit.getStopCount())).toArray(RaptorState[]::new);
+                .mapToObj((i) -> new RaptorState(transit.getStopCount(), MAXIMUM_TRAVEL_DURATION_SEC)).toArray(RaptorState[]::new);
         offsets = new FrequencyRandomOffsets(transitLayer);
     }
 

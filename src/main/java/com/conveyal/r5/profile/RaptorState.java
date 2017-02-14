@@ -62,8 +62,16 @@ public class RaptorState {
     /** Stops touched by transit or transfers */
     public BitSet bestStopsTouched;
 
-    /** create a RaptorState for a network with a particular number of stops */
-    public RaptorState (int nStops) {
+    /** Maximum duration of trips stored by this RaptorState */
+    public int maxDurationSeconds;
+
+    @Deprecated
+    public RaptorState(int nStops) {
+        this(nStops, 7200);
+    }
+
+    /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
+    public RaptorState (int nStops, int maxDurationSeconds) {
         this.bestTimes = new int[nStops];
         this.bestNonTransferTimes = new int[nStops];
 
@@ -83,6 +91,7 @@ public class RaptorState {
         this.nonTransferInVehicleTravelTime = new int[nStops];
         this.nonTransferStopsTouched = new BitSet(nStops);
         this.bestStopsTouched = new BitSet(nStops);
+        this.maxDurationSeconds = maxDurationSeconds;
     }
 
     /**
@@ -104,6 +113,8 @@ public class RaptorState {
 
         this.nonTransferStopsTouched = new BitSet(state.bestTimes.length);
         this.bestStopsTouched = new BitSet(state.bestTimes.length);
+
+        this.maxDurationSeconds = state.maxDurationSeconds;
     }
 
     /** Copy this raptor state to progress to the next round. Clears reachedThisRound so should be used only to progress to the next round. */
@@ -140,6 +151,8 @@ public class RaptorState {
 
     /** Set the time at a transit stop; if transit is true, this was reached via transfer/initial walk */
     public boolean setTimeAtStop(int stop, int time, boolean transfer) {
+        if (time > departureTime + maxDurationSeconds) return false;
+
         boolean optimal = false;
         if (!transfer && time < bestNonTransferTimes[stop]) {
             bestNonTransferTimes[stop] = time;

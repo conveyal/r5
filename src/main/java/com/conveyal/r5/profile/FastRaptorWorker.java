@@ -28,9 +28,6 @@ import java.util.stream.Stream;
  * Delling, Daniel, Thomas Pajor, and Renato Werneck. “Round-Based Public Transit Routing,” January 1, 2012.
  *   http://research.microsoft.com/pubs/156567/raptor_alenex.pdf.
  *
- * Fast is a bit of a misnomer; it's currently slower than RaptorWorker. But I think that's mostly due to a naïeve
- * implementation of doScheduledRound. It is cleaner and more maintainable.
- *
  * There is currently no support for saving paths.
  */
 public class FastRaptorWorker {
@@ -194,6 +191,10 @@ public class FastRaptorWorker {
     private void updateDepartureTime (int departureTime) {
         for (RaptorState state : this.scheduleState) {
             state.setDepartureTime(departureTime);
+
+            // clear all touched stops to avoid constant reëxploration
+            state.bestStopsTouched.clear();
+            state.nonTransferStopsTouched.clear();
             // TODO prune trips that are now longer than max lengths to avoid biasing averages
         }
 

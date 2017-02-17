@@ -110,15 +110,17 @@ public class RaptorWorker {
     /**
      * In interactive single-point analysis we don't need to save all the steps to reach the destination,
      * only the travel times. For static sites, we want to retain all the states so we can reconstruct paths.
+     * In that case, this variable should be set to true before the raptor search is called.
      */
     public boolean saveAllStates = false;
 
     /**
      * After each iteration (search at a single departure time with a specific Monte Carlo draw of schedules for
-     * frequency routes) we store the {@link RaptorState}. If null, states will not be saved (they are not needed
-     * in analysis and chew gobs of memory, especially when monteCarloDraws is large).
+     * frequency routes) we store the {@link RaptorState}.
+     * States will not always be saved because they chew gobs of memory, especially when monteCarloDraws is large,
+     * and they are only needed for static sites to draw paths.
      */
-    public List<RaptorState> statesEachIteration = null;
+    public List<RaptorState> statesEachIteration;
 
     /**
      * After each iteration (search at a single departure time with a specific Monte Carlo draw of schedules for
@@ -136,21 +138,14 @@ public class RaptorWorker {
     public RaptorWorker (TransitLayer data, LinkedPointSet targets, ProfileRequest req) {
         this.data = data;
         int nStops = data.streetVertexForStop.size();
-
         stopsTouchedThisRound = new BitSet(nStops);
         patternsTouchedThisRound = new BitSet(data.tripPatterns.size());
         stopsTouchedThisSearch = new BitSet(nStops);
         this.scheduleState = new ArrayList<>();
         this.scheduleState.add(new RaptorState(nStops));
-
         this.targets = targets;
-
-        // targets == null implies a static site (i.e. the server will not intersect travel times with destination counts)
-        // However, now we use this 'static site' code path even for interactive single-point analysis so there's a switch.
-        if (targets == null && saveAllStates) this.statesEachIteration = new ArrayList<>();
-
+        this.statesEachIteration = new ArrayList<>();
         this.servicesActive = data.getActiveServicesForDate(req.date);
-
         this.req = req.clone();
         offsets = new FrequencyRandomOffsets(data);
     }
@@ -306,7 +301,7 @@ public class RaptorWorker {
                         System.arraycopy(stateCopy.bestNonTransferTimes, 0, frequencyTimesAtTargets, 0, stateCopy.bestNonTransferTimes.length);
                     }
 
-                    if (statesEachIteration != null) statesEachIteration.add(stateCopy.deepCopy());
+                    if (saveAllStates) statesEachIteration.add(stateCopy.deepCopy());
 
                     // convert to elapsed time
                     for (int t = 0; t < frequencyTimesAtTargets.length; t++) {
@@ -325,7 +320,7 @@ public class RaptorWorker {
                         .map(i -> i != UNREACHED ? i - dt : i)
                         .toArray();
                 includeInAverages.set(iteration);
-                if (statesEachIteration != null) statesEachIteration.add(state.deepCopy());
+                if (saveAllStates) statesEachIteration.add(state.deepCopy());
                 iteration++;
             }
 

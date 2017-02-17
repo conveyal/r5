@@ -205,6 +205,13 @@ public class RaptorState {
         int previousDepartureTime = this.departureTime;
         this.departureTime = departureTime;
 
+        // remove trips that are now too long
+        int maxClockTime = departureTime + maxDurationSeconds;
+        for (int i = 0; i < bestTimes.length; i++) {
+            if (bestTimes[i] > maxClockTime) bestTimes[i] = RaptorWorker.UNREACHED;
+            if (bestNonTransferTimes[i] > maxClockTime) bestNonTransferTimes[i] = RaptorWorker.UNREACHED;
+        }
+
         // handle updating wait
         for (int stop = 0; stop < this.bestTimes.length; stop++) {
             if (this.previousPatterns[stop] > -1) {

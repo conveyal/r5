@@ -145,7 +145,7 @@ public class AnalystWorker implements Runnable {
     /** Information about the EC2 instance (if any) this worker is running on. */
     EC2Info ec2info;
 
-    /** TODO what's this number? */
+    /** The time the last high priority request was processed, used to check if the machine should be shut down. */
     long lastHighPriorityRequestProcessed = 0;
 
     /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
@@ -421,6 +421,7 @@ public class AnalystWorker implements Runnable {
 
         if (request.request.bucket != null) computer.run();
         else {
+            lastHighPriorityRequestProcessed = System.currentTimeMillis();
             try {
                 PipedInputStream pis = new PipedInputStream();
                 PipedOutputStream pos = new PipedOutputStream(pis);
@@ -454,6 +455,7 @@ public class AnalystWorker implements Runnable {
 
             deleteRequest(request);
         } else {
+            lastHighPriorityRequestProcessed = System.currentTimeMillis();
             try {
                 PipedInputStream pis = new PipedInputStream();
                 PipedOutputStream pos = new PipedOutputStream(pis);
@@ -484,6 +486,7 @@ public class AnalystWorker implements Runnable {
 
             deleteRequest(request);
         } else {
+            lastHighPriorityRequestProcessed = System.currentTimeMillis();
             try {
                 PipedInputStream pis = new PipedInputStream();
                 PipedOutputStream pos = new PipedOutputStream(pis);

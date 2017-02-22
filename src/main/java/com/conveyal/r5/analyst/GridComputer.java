@@ -8,6 +8,8 @@ import com.conveyal.r5.analyst.cluster.GridRequest;
 import com.conveyal.r5.analyst.cluster.Origin;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
 import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.profile.FastRaptorWorker;
+import com.conveyal.r5.profile.Propagater;
 import com.conveyal.r5.profile.RaptorWorker;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -90,8 +92,6 @@ public class GridComputer  {
         sr.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
         sr.route();
 
-        RaptorWorker router = new RaptorWorker(network.transitLayer, linkedTargets, request.request);
-
         TIntIntMap reachedStops = sr.getReachedStops();
 
         // convert millimeters to seconds
@@ -101,20 +101,24 @@ public class GridComputer  {
             it.setValue(it.value() / millimetersPerSecond);
         }
 
+        FastRaptorWorker router = new FastRaptorWorker(network.transitLayer, request.request, reachedStops);
+
         // Run the raptor algorithm
-        router.runRaptor(reachedStops, linkedTargets.eval(sr::getTravelTimeToVertex), new TaskStatistics());
+        int[][] timesAtStopsEachIteration = router.route();
+
+        // Do propagation
+        int[] nonTransferTravelTimesToStops = linkedTargets.eval(sr::getTravelTimeToVertex).travelTimes;
+        Propagater propagater =
+                new Propagater(timesAtStopsEachIteration, nonTransferTravelTimesToStops, linkedTargets, request.request);
 
         // save the instantaneous accessibility at each minute/iteration, later we will use this to compute probabilities
         // of improvement.
         // This means we have the fungibility issue described in AndrewOwenMeanGridStatisticComputer.
-        int[] accessibilityPerIteration = new int[router.includeInAverages.cardinality()];
-
-        // skip the upper and lower bounds, as they should definitely not be used in probabilistic comparison,
-        // that would definitely constitute Dilbert statistics.
-        for (int i = router.includeInAverages.nextSetBit(0), out = 0; i != -1; i = router.includeInAverages.nextSetBit(i + 1)) {
-            int[] times = router.timesAtTargetsEachIteration[i];
-            double access = 0;
-
+        // NB if this is slow, we could add .parallel() before mapToInt, however in a full New York City network it currently
+        // takes less than 500ms. Also, this is only used in regional analysis mode so speed is less important, esp. since
+        // we are already distributing jobs across cores.
+        int[] accessibilityPerIteration = propagater.propagate(times -> {
+            int access = 0;
             // times in row-major order, convert to grid coordinates
             // TODO use consistent grids for all data in a project
             for (int gridy = 0; gridy < grid.height; gridy++) {
@@ -130,10 +134,10 @@ public class GridComputer  {
                         access += grid.grid[gridx][gridy];
                     }
                 }
-            }
 
-            accessibilityPerIteration[out++] = (int) Math.round(access);
-        }
+            }
+            return Math.round(access);
+        });
 
         // now construct the output
         // these things are tiny, no problem storing in memory

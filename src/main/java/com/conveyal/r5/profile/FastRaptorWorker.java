@@ -130,7 +130,9 @@ public class FastRaptorWorker {
             final int finalDepartureTime = departureTime;
             for (int[] resultsForIteration : resultsForMinute) {
                 // NB this copies the array, so we don't have issues with it being updated later
-                results[currentIteration++] = IntStream.of(resultsForIteration).map(r -> r - finalDepartureTime).toArray();
+                results[currentIteration++] = IntStream.of(resultsForIteration)
+                        .map(r -> r != RaptorWorker.UNREACHED ? r - finalDepartureTime : r)
+                        .toArray();
             }
         }
 

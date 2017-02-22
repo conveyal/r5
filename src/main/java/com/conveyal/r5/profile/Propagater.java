@@ -68,7 +68,7 @@ public class Propagater {
                     int timeToTargetIncludingTransit = travelTimeToStop + timeSeconds;
 
                     if (timeToTargetIncludingTransit < travelTimesToTargetsThisIteration[target]) {
-                        travelTimesToStopsThisIteration[target] = timeToTargetIncludingTransit;
+                        travelTimesToTargetsThisIteration[target] = timeToTargetIncludingTransit;
                     }
                 }
             }

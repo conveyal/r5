@@ -62,8 +62,9 @@ public class GridResultConsumer implements Runnable {
 
                             if (!assemblers.containsKey(jobId)) {
                                 // TODO is this the right thing to do?
-                                LOG.warn("Received message for invalid job ID {}, returning to queue", jobId);
-                                return null;
+                                // this is only an issue if multiple instances are using the same queue, which they shouldn't be
+                                LOG.warn("Received message for invalid job ID {}, discarding", jobId);
+                                return new DeleteMessageBatchRequestEntry(m.getMessageId(), m.getReceiptHandle());
                             }
 
                             assemblers.get(jobId).handleMessage(m);
@@ -78,7 +79,7 @@ public class GridResultConsumer implements Runnable {
                 }
             } catch (Exception e) {
                 // TODO figure out if exception is permanent
-                LOG.info("Error connecting to regional result queue. Assuming this is transient network issues. Retrying in 60s");
+                LOG.info("Error connecting to regional result queue. Assuming this is a transient network issue. Retrying in 60s");
                 try {
                     Thread.sleep(3600);
                 } catch (InterruptedException ie) {

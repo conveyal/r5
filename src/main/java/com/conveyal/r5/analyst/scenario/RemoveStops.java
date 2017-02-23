@@ -47,6 +47,14 @@ public class RemoveStops extends Modification {
     /** Stops to remove from the routes. */
     public Set<String> stops;
 
+    /**
+     * Number of seconds (in addition to dwell time, if any) to remove from the schedule at each removed stop,
+     * to account for acceleration, deceleration, merging, and so on.
+     *
+     * If removing this time would make the hop time between two stops that remain <= 0, an error will be surfaced.
+     */
+    public int secondsSavedAtEachStop = 0;
+
     /** Internal integer IDs for a specific transit network, converted from the string IDs. */
     private transient TIntSet intStops;
 
@@ -152,14 +160,24 @@ public class RemoveStops extends Modification {
                 int dwellTime = originalSchedule.departures[i] - originalSchedule.arrivals[i];
                 prevInputDeparture = originalSchedule.departures[i];
                 if (removeStop[i]) {
-                    // The current stop will not be included in the output. Record the travel time.
-                    accumulatedRideTime += rideTime;
+                    // The current stop will not be included in the output. Record the travel time and subtract off the
+                    // seconds saved. This may cause accumulatedRideTime to go negative, which may be fine since we're putting
+                    // all the time savings before the stop. After we've accumulated ride time for a whole segment,
+                    // we check to make sure it's positive.
+                    accumulatedRideTime += rideTime - secondsSavedAtEachStop;
                     if (j == 0) {
                         // Only accumulate dwell time at the beginning of the output trip, to preserve the time offset of
                         // the first arrival in the output. After that, dwells are not retained for skipped stops.
                         accumulatedRideTime += dwellTime;
                     }
                 } else {
+                    if (accumulatedRideTime + rideTime <= 0) {
+                        LOG.warn("Removing stop and time would cause zero or negative travel time before stop #{} on trip {}",
+                                i,
+                                originalSchedule.tripId);
+                        accumulatedRideTime = rideTime > 0 ? 1 - rideTime : -rideTime; // clamp this hop to 1 second, or 0 seconds if it was 0 previously
+                    }
+
                     newSchedule.arrivals[j] = prevOutputDeparture + accumulatedRideTime + rideTime;
                     newSchedule.departures[j] = newSchedule.arrivals[j] + dwellTime;
                     prevOutputDeparture = newSchedule.departures[j];

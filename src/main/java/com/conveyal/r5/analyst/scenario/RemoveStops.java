@@ -4,7 +4,6 @@ import com.conveyal.r5.transit.PickDropType;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
-import com.google.common.primitives.Booleans;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.slf4j.Logger;
@@ -16,6 +15,7 @@ import java.util.BitSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 /**
  * Remove stops and the associated dwell times from all trips in the given routes.
@@ -71,36 +71,36 @@ public class RemoveStops extends Modification {
         checkIds(routes, patterns, null, false, network);
         intStops = new TIntHashSet();
         if (stops == null || stops.isEmpty()) {
-            warnings.add("You must supply some stops to remove.");
+            errors.add("You must supply some stops to remove.");
         } else {
             for (String stringStopId : stops) {
                 int intStopId = network.transitLayer.indexForStopId.get(stringStopId);
                 if (intStopId == -1) {
-                    warnings.add("Could not find a stop with GTFS ID " + stringStopId);
+                    errors.add("Could not find a stop with GTFS ID " + stringStopId);
                 } else {
                     intStops.add(intStopId);
                 }
             }
             LOG.info("Resolved stop IDs for removal. Strings {} resolved to integers {}.", stops, intStops);
         }
-        return warnings.size() > 0; // TODO make a function for this on the superclass
+        return errors.size() > 0; // TODO make a function for this on the superclass
     }
 
     @Override
     public boolean apply(TransportNetwork network) {
         network.transitLayer.tripPatterns = network.transitLayer.tripPatterns.stream()
-                .map(this::processTripPattern)
+                .map(p -> this.processTripPattern(p, network))
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
         if (nPatternsAffected > 0) {
             LOG.info("Stops were removed from {} patterns.", nPatternsAffected);
         } else {
-            warnings.add("No patterns had any stops removed by this modification.");
+            errors.add("No patterns had any stops removed by this modification.");
         }
-        return warnings.size() > 0;
+        return errors.size() > 0;
     }
 
-    public TripPattern processTripPattern (TripPattern originalTripPattern) {
+    public TripPattern processTripPattern (TripPattern originalTripPattern, TransportNetwork network) {
         if (routes != null && !routes.contains(originalTripPattern.routeId)) {
             // Modification does not apply to the route this TripPattern is on, so TripPattern remains unchanged.
             return originalTripPattern;
@@ -155,6 +155,7 @@ public class RemoveStops extends Modification {
             int accumulatedRideTime = 0;
             int prevInputDeparture = 0;
             int prevOutputDeparture = 0;
+            int nStopsRemovedSinceLastStop = 0;
             for (int i = 0, j = 0; i < removeStop.length; i++) {
                 int rideTime = originalSchedule.arrivals[i] - prevInputDeparture;
                 int dwellTime = originalSchedule.departures[i] - originalSchedule.arrivals[i];
@@ -164,24 +165,53 @@ public class RemoveStops extends Modification {
                     // seconds saved. This may cause accumulatedRideTime to go negative, which may be fine since we're putting
                     // all the time savings before the stop. After we've accumulated ride time for a whole segment,
                     // we check to make sure it's positive.
-                    accumulatedRideTime += rideTime - secondsSavedAtEachStop;
+                    accumulatedRideTime += rideTime;
+                    nStopsRemovedSinceLastStop++;
                     if (j == 0) {
                         // Only accumulate dwell time at the beginning of the output trip, to preserve the time offset of
                         // the first arrival in the output. After that, dwells are not retained for skipped stops.
                         accumulatedRideTime += dwellTime;
                     }
                 } else {
-                    if (accumulatedRideTime + rideTime <= 0) {
-                        LOG.warn("Removing stop and time would cause zero or negative travel time before stop #{} on trip {}",
-                                i,
-                                originalSchedule.tripId);
-                        accumulatedRideTime = rideTime > 0 ? 1 - rideTime : -rideTime; // clamp this hop to 1 second, or 0 seconds if it was 0 previously
+                    accumulatedRideTime += rideTime;
+                    int secondsToRemove = secondsSavedAtEachStop * nStopsRemovedSinceLastStop;
+                    if (nStopsRemovedSinceLastStop > 0 && accumulatedRideTime < secondsToRemove) {
+                        // figure out which stops are causing the problem
+                        int[] problemStops = new int[nStopsRemovedSinceLastStop];
+                        for (int removedStop = i - 1, index = nStopsRemovedSinceLastStop - 1; removedStop >= i - nStopsRemovedSinceLastStop; removedStop--, index--) {
+                            problemStops[index] = originalTripPattern.stops[removedStop];
+                        }
+
+                        // map them back to names
+                        String problemStopNames = IntStream.of(problemStops)
+                                .mapToObj(problemStopIndex ->
+                                        String.format("%s (%s)",
+                                                network.transitLayer.stopNames.get(problemStopIndex),
+                                                network.transitLayer.stopIdForIndex.get(problemStopIndex)))
+                                .collect(Collectors.joining(", "));
+
+                        // figure out how many seconds we can remove
+                        // the rounding may cause this to be off a bit but that's okay
+                        int secondsWeWillActuallyRemovePerStop = (accumulatedRideTime - 1) / nStopsRemovedSinceLastStop;
+                        String warning = String.format(
+                                "Removing the requested %d seconds at stops %s on trip %s would cause negative travel time. Removing %d seconds at each instead.",
+                                secondsSavedAtEachStop,
+                                problemStopNames,
+                                originalSchedule.tripId,
+                                secondsWeWillActuallyRemovePerStop
+                        );
+
+                        warnings.add(warning);
+                        LOG.info(warning);
+
+                        secondsToRemove = accumulatedRideTime - 1;
                     }
 
-                    newSchedule.arrivals[j] = prevOutputDeparture + accumulatedRideTime + rideTime;
+                    newSchedule.arrivals[j] = prevOutputDeparture + accumulatedRideTime - secondsToRemove;
                     newSchedule.departures[j] = newSchedule.arrivals[j] + dwellTime;
                     prevOutputDeparture = newSchedule.departures[j];
                     accumulatedRideTime = 0;
+                    nStopsRemovedSinceLastStop = 0;
                     j++;
                 }
             }

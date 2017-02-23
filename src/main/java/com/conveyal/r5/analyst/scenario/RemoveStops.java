@@ -185,7 +185,7 @@ public class RemoveStops extends Modification {
                         // map them back to names
                         String problemStopNames = IntStream.of(problemStops)
                                 .mapToObj(problemStopIndex ->
-                                        String.format("%s (%s)",
+                                        String.format("\"%s\" (%s)",
                                                 network.transitLayer.stopNames.get(problemStopIndex),
                                                 network.transitLayer.stopIdForIndex.get(problemStopIndex)))
                                 .collect(Collectors.joining(", "));
@@ -194,7 +194,7 @@ public class RemoveStops extends Modification {
                         // the rounding may cause this to be off a bit but that's okay
                         int secondsWeWillActuallyRemovePerStop = (accumulatedRideTime - 1) / nStopsRemovedSinceLastStop;
                         String warning = String.format(
-                                "Removing the requested %d seconds at stops %s on trip %s would cause negative travel time. Removing %d seconds at each instead.",
+                                "Removing the requested %d seconds at stops %s on trip %s would cause negative travel time. Removing %d seconds at each instead, leaving 1 second of travel time for whole segment.",
                                 secondsSavedAtEachStop,
                                 problemStopNames,
                                 originalSchedule.tripId,

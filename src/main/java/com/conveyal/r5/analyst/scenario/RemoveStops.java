@@ -4,6 +4,7 @@ import com.conveyal.r5.transit.PickDropType;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
 import org.slf4j.Logger;
@@ -53,6 +54,8 @@ public class RemoveStops extends Modification {
      *
      * If removing this time would make the hop time between two stops that remain <= 0, an error will be surfaced.
      */
+    // Since not all versions of R5 can handle this parameter, don't include it if it is set at its default value
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
     public int secondsSavedAtEachStop = 0;
 
     /** Internal integer IDs for a specific transit network, converted from the string IDs. */

@@ -145,7 +145,10 @@ public class AnalystWorker implements Runnable {
     /** Information about the EC2 instance (if any) this worker is running on. */
     EC2Info ec2info;
 
-    /** The time the last high priority request was processed, used to check if the machine should be shut down. */
+    /**
+     * The time the last high priority request was processed, in milliseconds since the epoch, used to check if the
+     * machine should be shut down.
+     */
     long lastHighPriorityRequestProcessed = 0;
 
     /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
@@ -421,6 +424,7 @@ public class AnalystWorker implements Runnable {
 
         if (request.request.bucket != null) computer.run();
         else {
+            // if bucket is null, return results directly to consumer (high-priority request)
             lastHighPriorityRequestProcessed = System.currentTimeMillis();
             try {
                 PipedInputStream pis = new PipedInputStream();
@@ -455,6 +459,7 @@ public class AnalystWorker implements Runnable {
 
             deleteRequest(request);
         } else {
+            // if bucket is null, return results directly to consumer (high-priority request)
             lastHighPriorityRequestProcessed = System.currentTimeMillis();
             try {
                 PipedInputStream pis = new PipedInputStream();
@@ -486,6 +491,7 @@ public class AnalystWorker implements Runnable {
 
             deleteRequest(request);
         } else {
+            // if bucket is null, return results directly to consumer (high-priority request)
             lastHighPriorityRequestProcessed = System.currentTimeMillis();
             try {
                 PipedInputStream pis = new PipedInputStream();

@@ -69,7 +69,9 @@ public abstract class Modification implements Serializable {
     /**
      * Any warnings that should be presented to the user but which do not prevent scenario application should appear here.
      */
-    public transient final Set<String> warnings = new HashSet<>();
+    // TODO this should be transient as well but previously wasn't. R5 modifications are stored in MongoDB in regional
+    // analyses, which means that marking it transient causes deserialization headaches.
+    public final Set<String> warnings = new HashSet<>();
 
     /**
      * Apply this single modification to a TransportNetwork.

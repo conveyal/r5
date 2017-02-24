@@ -64,12 +64,12 @@ public abstract class Modification implements Serializable {
      * The "resolve" method is called on each Modification before it is applied. If any problems are detected, the
      * Modification should not be applied, and this Set should contain Strings describing all the problems.
      */
-    public final Set<String> errors = new HashSet<>();
+    public transient final Set<String> errors = new HashSet<>();
 
     /**
      * Any warnings that should be presented to the user but which do not prevent scenario application should appear here.
      */
-    public final Set<String> warnings = new HashSet<>();
+    public transient final Set<String> warnings = new HashSet<>();
 
     /**
      * Apply this single modification to a TransportNetwork.

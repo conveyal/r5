@@ -94,18 +94,18 @@ public class Scenario implements Serializable {
         LOG.info("Resolving modifications against TransportNetwork and sanity checking.");
         // Check all the parameters before applying any modifications.
         // Might some parameters may become valid/invalid because of previous modifications in the list?
-        List<Modification> badModifications = new ArrayList<>();
+        List<Modification> modificationsWithErrors = new ArrayList<>();
         List<Modification> modificationsWithWarnings = new ArrayList<>();
         for (Modification modification : modifications) {
             boolean errorsInModification = modification.resolve(copiedNetwork);
             if (errorsInModification) {
-                badModifications.add(modification);
+                modificationsWithErrors.add(modification);
             }
             // warning caught after modification application, to avoid duplicates
         }
         // Throw one big exception containing any errors that were detected.
-        if (!badModifications.isEmpty()) {
-            throw new ScenarioApplicationException(badModifications);
+        if (!modificationsWithErrors.isEmpty()) {
+            throw new ScenarioApplicationException(modificationsWithErrors);
         }
         // Apply each modification in turn to the same extensible copy of the TransitNetwork.
         LOG.info("Applying modifications to TransportNetwork.");

@@ -50,9 +50,9 @@ public class RemoveStops extends Modification {
 
     /**
      * Number of seconds (in addition to dwell time, if any) to remove from the schedule at each removed stop,
-     * to account for acceleration, deceleration, merging, and so on.
+     * to account for vehicle acceleration, deceleration, merging into traffic, and so on.
      *
-     * If removing this time would make the hop time between two stops that remain <= 0, an error will be surfaced.
+     * If removing this time would make the hop time between two stops that remain <= 0, a warning will be surfaced.
      */
     // Since not all versions of R5 can handle this parameter, don't include it if it is set at its default value
     @JsonInclude(JsonInclude.Include.NON_DEFAULT)
@@ -179,34 +179,20 @@ public class RemoveStops extends Modification {
                     accumulatedRideTime += rideTime;
                     int secondsToRemove = secondsSavedAtEachStop * nStopsRemovedSinceLastStop;
                     if (nStopsRemovedSinceLastStop > 0 && accumulatedRideTime < secondsToRemove) {
+                        // Warn the user if removing the requested amount of time would cause negative travel times,
+                        // and clamp travel time at 1 second.
                         // figure out which stops are causing the problem
                         int[] problemStops = new int[nStopsRemovedSinceLastStop];
                         for (int removedStop = i - 1, index = nStopsRemovedSinceLastStop - 1; removedStop >= i - nStopsRemovedSinceLastStop; removedStop--, index--) {
                             problemStops[index] = originalTripPattern.stops[removedStop];
                         }
 
-                        // map them back to names
-                        String problemStopNames = IntStream.of(problemStops)
-                                .mapToObj(problemStopIndex ->
-                                        String.format("\"%s\" (%s)",
-                                                network.transitLayer.stopNames.get(problemStopIndex),
-                                                network.transitLayer.stopIdForIndex.get(problemStopIndex)))
-                                .collect(Collectors.joining(", "));
-
                         // figure out how many seconds we can remove
                         // the rounding may cause this to be off a bit but that's okay
                         int secondsWeWillActuallyRemovePerStop = (accumulatedRideTime - 1) / nStopsRemovedSinceLastStop;
-                        String warning = String.format(
-                                "Removing the requested %d seconds at stops %s on trip %s would cause negative travel time. Removing %d seconds at each instead, leaving 1 second of travel time for whole segment.",
-                                secondsSavedAtEachStop,
-                                problemStopNames,
-                                originalSchedule.tripId,
-                                secondsWeWillActuallyRemovePerStop
-                        );
+                        generateNegativeTravelTimeWarning(problemStops, originalSchedule.tripId, secondsWeWillActuallyRemovePerStop, network);
 
-                        warnings.add(warning);
-                        LOG.info(warning);
-
+                        // clamp the new hop time to be nonzero and nonnegative
                         secondsToRemove = accumulatedRideTime - 1;
                     }
 
@@ -220,6 +206,29 @@ public class RemoveStops extends Modification {
             }
         }
         return pattern;
+    }
+
+    /** Format a warning about negative travel times and insert it into the warnings array */
+    private void generateNegativeTravelTimeWarning(int[] problemStops, String tripId, int secondsWeWillActuallyRemovePerStop, TransportNetwork network) {
+        // map them back to names
+        String problemStopNames = IntStream.of(problemStops)
+                .mapToObj(problemStopIndex ->
+                        String.format("\"%s\" (%s)",
+                                network.transitLayer.stopNames.get(problemStopIndex),
+                                network.transitLayer.stopIdForIndex.get(problemStopIndex)))
+                .collect(Collectors.joining(", "));
+
+        String warning = String.format(
+                "Removing the requested %d seconds at stops %s on trip %s would cause negative travel time. Removing %d seconds at each instead, leaving 1 second of travel time for whole segment.",
+                secondsSavedAtEachStop,
+                problemStopNames,
+                tripId,
+                secondsWeWillActuallyRemovePerStop
+        );
+
+        warnings.add(warning);
+        LOG.info(warning);
+
     }
 
     public int getSortOrder() { return 30; }

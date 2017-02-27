@@ -91,7 +91,7 @@ public class StaticServer {
         StaticSiteRequest.PointRequest pr = staticSiteRequest.getPointRequest(x, y);
         StaticComputer computer = new StaticComputer(pr, network, new TaskStatistics());
         try {
-            computer.write(baos);
+            computer.write(baos, true);
             return baos.toByteArray();
         } catch (Exception e) {
             throw new RuntimeException(e);

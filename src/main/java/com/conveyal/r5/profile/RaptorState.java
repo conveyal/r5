@@ -1,6 +1,8 @@
 package com.conveyal.r5.profile;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.BitSet;
@@ -13,6 +15,8 @@ import java.util.BitSet;
  * @author mattwigway
  */
 public class RaptorState {
+    private static final Logger LOG = LoggerFactory.getLogger(RaptorState.class);
+
     /** Previous state (one less transfer). Don't serialize and send to debug interface. */
     @JsonIgnore
     public RaptorState previous;
@@ -20,22 +24,30 @@ public class RaptorState {
     /** departure time for this state */
     public int departureTime;
 
-    /** Best times to reach stops, whether via a transfer or via transit directly */
+    /** Best times to reach stops, whether via a transfer or via transit directly. */
     public int[] bestTimes;
 
-    /** wait time for transit, parallel to bestTimes */
+    /**
+     * wait time for transit, parallel to bestTimes
+     * Deprecated because FastRaptorWorker does not need separate wait times for bestTimes and bestNonTransferTimes.
+     */
+    @Deprecated
     public int[] waitTime;
 
-    /** in-vehicle travel time, parallel to bestTimes */
+    /**
+     * in-vehicle travel time, parallel to bestTimes
+     * Deprecated because FastRaptorWorker does not need separate in vehicle times for bestTimes and bestNonTransferTimes.
+     */
+    @Deprecated
     public int[] inVehicleTravelTime;
 
     /** The best times for reaching stops via transit rather than via a transfer from another stop */
     public int[] bestNonTransferTimes;
 
-    /** wait time for transit, parallel to bestNonTransferTimes */
+    /** cumulative wait time for transit, parallel to bestNonTransferTimes */
     public int[] nonTransferWaitTime;
 
-    /** in-vehicle travel time, parallel to bestNonTransferTimes */
+    /** cumulative in-vehicle travel time, parallel to bestNonTransferTimes */
     public int[] nonTransferInVehicleTravelTime;
 
     /**
@@ -150,7 +162,7 @@ public class RaptorState {
     }
 
     /** Set the time at a transit stop; if transit is true, this was reached via transfer/initial walk */
-    public boolean setTimeAtStop(int stop, int time, int fromPattern, int fromStop, boolean transfer) {
+    public boolean setTimeAtStop(int stop, int time, int fromPattern, int fromStop, int waitTime, int inVehicleTime, boolean transfer) {
         if (time > departureTime + maxDurationSeconds) return false;
 
         boolean optimal = false;
@@ -158,14 +170,50 @@ public class RaptorState {
             bestNonTransferTimes[stop] = time;
             nonTransferStopsTouched.set(stop);
             previousPatterns[stop] = fromPattern;
+            previousStop[stop] = fromStop;
+
+            // wait time is not stored after transfers, so copy from pre-transfer
+            int totalWaitTime, totalInVehicleTime;
+
+            if (previous == null) {
+                // first round, there is no previous wait time or in vehicle time
+                totalWaitTime = waitTime;
+                totalInVehicleTime = inVehicleTime;
+            } else {
+                if (previous.transferStop[fromStop] != -1) {
+                    // previous stop is optimally reached via a transfer, so grab the wait and in vehicle time from
+                    // the stop we transferred from. Otherwise we'll be grabbing the wait time to get to the board stop
+                    // on a vehicle, which may be impossible at this round or may simply take longer.
+                    int preTransferStop = previous.transferStop[fromStop];
+                    totalWaitTime = previous.nonTransferWaitTime[preTransferStop] + waitTime;
+                    totalInVehicleTime = previous.nonTransferInVehicleTravelTime[preTransferStop] + inVehicleTime;
+                } else {
+                    // the stop we boarded at was not the result of a transfer from another stop, grab the cumulative
+                    // wait time from that stop
+                    totalWaitTime = previous.nonTransferWaitTime[fromStop] + waitTime;
+                    totalInVehicleTime = previous.nonTransferInVehicleTravelTime[fromStop] + inVehicleTime;
+                }
+            }
+
+            if (totalInVehicleTime + totalWaitTime > time - departureTime) {
+                LOG.error("Wait and travel time greater than total time.");
+            }
+
+            nonTransferWaitTime[stop] = totalWaitTime;
+            nonTransferInVehicleTravelTime[stop] = totalInVehicleTime;
             optimal = true;
         }
 
+        // nonTransferTimes upper bounds bestTimes so we don't need to update wait time and in-vehicle time here, if we
+        // enter this conditional it has already been updated.
         if (time < bestTimes[stop]) {
             bestTimes[stop] = time;
             bestStopsTouched.set(stop);
-            if (transfer) previousStop[stop] = fromStop;
-            else previousPatterns[stop] = fromPattern;
+            if (transfer) {
+                transferStop[stop] = fromStop;
+            } else {
+                transferStop[stop] = -1;
+            }
             optimal = true;
         }
 

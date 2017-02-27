@@ -56,7 +56,7 @@ public class StaticComputer implements Runnable {
         // dump the times in the described format. They're small enough to keep in memory for now.
         try {
             OutputStream os = StaticDataStore.getOutputStream(req.request, req.x + "/" + req.y + ".dat", "application/octet-stream");
-            write(os);
+            write(os, true);
             os.close();
         } catch (Exception e) {
             LOG.error("Error saving origin data", e);
@@ -67,12 +67,10 @@ public class StaticComputer implements Runnable {
     // It then writes out the travel times to all grid cells near the origin (walking or biking on-street) followed by
     // the travel times to every reached stop in the network.
     // TODO rename and/or refactor to reduce side effects (pull computation out of writing logic).
-    public void write (OutputStream os) throws IOException {
+    public void write (OutputStream os, boolean saveAllStates) throws IOException {
         WebMercatorGridPointSet points = network.gridPointSet;
         double lat = points.pixelToLat(points.north + req.y);
         double lon = points.pixelToLon(points.west + req.x);
-
-        TaskStatistics ts = new TaskStatistics();
 
         // Perform street search to find transit stops and non-transit times.
         StreetRouter sr = new StreetRouter(network.streetLayer);
@@ -91,6 +89,7 @@ public class StaticComputer implements Runnable {
         // Create a new Raptor Worker.
         // Tell it that we want a travel time to each stop by leaving the point set parameter null.
         FastRaptorWorker worker = new FastRaptorWorker(network.transitLayer, req.request.request, accessTimes);
+        worker.saveAllStates = saveAllStates;
 
         // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
         int[][] transitTravelTimes = worker.route();
@@ -151,11 +150,42 @@ public class StaticComputer implements Runnable {
                 out.writeInt(time - prev);
                 prev = time;
 
-                // TODO paths and travel time components
-                out.writeInt(-1); // In vehicle time
-                out.writeInt(-1); // Walk time
-                out.writeInt(-1); // path index
+                if (worker.saveAllStates) {
+                    RaptorState state = worker.statesEachIteration.get(iter);
+                    int inVehicleTravelTime = state.nonTransferInVehicleTravelTime[stop] / 60;
+                    out.writeInt(inVehicleTravelTime - previousInVehicleTravelTime);
+                    previousInVehicleTravelTime = inVehicleTravelTime;
 
+                    int waitTime = state.nonTransferWaitTime[stop] / 60;
+                    out.writeInt(waitTime - previousWaitTime);
+                    previousWaitTime = waitTime;
+
+                    if (inVehicleTravelTime + waitTime > time && time != -1) {
+                        LOG.info("Wait and in vehicle travel time greater than total time");
+                    }
+
+                    // write out which path to use, delta coded
+                    int pathIdx = -1;
+
+                    // only compute a path if this stop was reached
+                    if (state.bestNonTransferTimes[stop] != RaptorWorker.UNREACHED) {
+                        // TODO reuse pathwithtimes?
+                        Path path = new Path(state, stop);
+                        if (!paths.containsKey(path)) {
+                            paths.put(path, maxPathIdx++);
+                            pathList.add(path);
+                        }
+
+                        pathIdx = paths.get(path);
+                    }
+
+                    out.writeInt(pathIdx - prevPath);
+                    prevPath = pathIdx;
+                } else {
+                    out.writeInt(-1); // In vehicle time
+                    out.writeInt(-1); // Walk time
+                    out.writeInt(-1); // path index
+                }
             }
 
             sum += pathList.size();

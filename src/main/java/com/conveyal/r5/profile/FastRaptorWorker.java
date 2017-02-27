@@ -3,15 +3,16 @@ package com.conveyal.r5.profile;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
-import gnu.trove.iterator.TIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
+import java.util.List;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -87,6 +88,11 @@ public class FastRaptorWorker {
 
     private final RaptorState[] scheduleState;
 
+    /** set to true to save all states for path reconstruction */
+    public boolean saveAllStates = false;
+
+    public List<RaptorState> statesEachIteration;
+
     public FastRaptorWorker (TransitLayer transitLayer, ProfileRequest request, TIntIntMap accessStops) {
         this.transit = transitLayer;
         this.request = request;
@@ -96,12 +102,18 @@ public class FastRaptorWorker {
         this.scheduleState = IntStream.range(0, request.maxRides + 1)
                 .mapToObj((i) -> new RaptorState(transit.getStopCount(), request.maxTripDurationMinutes * 60))
                 .toArray(RaptorState[]::new);
+
+        for (int i = 1; i < this.scheduleState.length; i++) this.scheduleState[i].previous = this.scheduleState[i - 1];
+
         offsets = new FrequencyRandomOffsets(transitLayer);
     }
 
     /** For each iteration, return the travel time to each transit stop */
     public int[][] route () {
         startClockTime = System.nanoTime();
+
+        if (saveAllStates) statesEachIteration = new ArrayList<>();
+
         prefilterPatterns();
 
         // compute number of minutes for scheduled search
@@ -203,7 +215,7 @@ public class FastRaptorWorker {
         // add initial stops
         RaptorState initialState = scheduleState[0];
         accessStops.forEachEntry((stop, accessTime) -> {
-            initialState.setTimeAtStop(stop, accessTime + departureTime, -1, -1, true);
+            initialState.setTimeAtStop(stop, accessTime + departureTime, -1, -1, 0, 0, true);
             return true; // continue iteration
         });
     }
@@ -244,6 +256,7 @@ public class FastRaptorWorker {
             for (int iteration = 0; iteration < iterationsPerMinute; iteration++) {
                 // copy the state, with advancingRound = false
                 RaptorState[] frequencyState = Stream.of(scheduleState).map((s) -> s.copy()).toArray(RaptorState[]::new);
+                for (int i = 1; i < frequencyState.length; i++) frequencyState[i].previous = frequencyState[i - 1];
 
                 // take a new Monte Carlo draw
                 // Einstein was probably wrong; God does in fact play dice with the universe, and so do we
@@ -272,6 +285,8 @@ public class FastRaptorWorker {
                     timeInFrequencySearchTransfers += System.nanoTime() - transferStart;
                 }
 
+                // we are doing frequencies, this is already copy, no need for a protective copy
+                if (saveAllStates) statesEachIteration.add(frequencyState[request.maxRides]);
                 result[iteration] = frequencyState[request.maxRides].bestNonTransferTimes;
             }
 
@@ -280,6 +295,7 @@ public class FastRaptorWorker {
             return result;
         } else {
             // no frequencies, return result of scheduled search
+            if (saveAllStates) statesEachIteration.add(scheduleState[request.maxRides].deepCopy());
             return new int[][] { scheduleState[request.maxRides].bestNonTransferTimes };
         }
     }
@@ -292,6 +308,9 @@ public class FastRaptorWorker {
             int originalPatternIndex = originalPatternIndexForScheduledIndex[patternIndex];
             TripPattern pattern = runningScheduledPatterns[patternIndex];
             int onTrip = -1;
+            int waitTime = 0;
+            int boardTime = 0;
+            int boardStop = -1;
             TripSchedule schedule = null;
 
             for (int stopPositionInPattern = 0; stopPositionInPattern < pattern.stops.length; stopPositionInPattern++) {
@@ -300,7 +319,14 @@ public class FastRaptorWorker {
                 // attempt to alight if we're on board, done above the board search so that we don't check for alighting
                 // when boarding
                 if (onTrip > -1) {
-                    outputState.setTimeAtStop(stop, schedule.arrivals[stopPositionInPattern], originalPatternIndex, -1, false);
+                    int alightTime = schedule.arrivals[stopPositionInPattern];
+                    int onVehicleTime = alightTime - boardTime;
+
+                    if (waitTime + onVehicleTime + inputState.bestTimes[boardStop] > alightTime) {
+                        LOG.error("Components of travel time are larger than travel time!");
+                    }
+
+                    outputState.setTimeAtStop(stop, alightTime, originalPatternIndex, boardStop, waitTime, onVehicleTime, false);
                 }
 
                 int sourcePatternIndex = inputState.previousStop[stop] == -1 ?
@@ -329,6 +355,9 @@ public class FastRaptorWorker {
                                     // board this vehicle
                                     onTrip = candidateTripIndex;
                                     schedule = candidateSchedule;
+                                    boardTime = candidateSchedule.departures[stopPositionInPattern];
+                                    waitTime = boardTime - inputState.bestTimes[stop];
+                                    boardStop = stop;
                                     break EARLIEST_TRIP;
                                 }
                             }
@@ -345,6 +374,9 @@ public class FastRaptorWorker {
                             if (trip.departures[stopPositionInPattern] > earliestBoardTime) {
                                 onTrip = bestTripIdx;
                                 schedule = trip;
+                                boardTime = trip.departures[stopPositionInPattern];
+                                waitTime = boardTime - inputState.bestTimes[stop];
+                                boardStop = stop;
                             } else {
                                 // this trip arrives too early, break loop since they are sorted by departure time
                                 break;
@@ -375,6 +407,7 @@ public class FastRaptorWorker {
 
                     int boardTime = -1;
                     int boardStopPositionInPattern = -1;
+                    int waitTime = -1;
 
                     for (int stopPositionInPattern = 0; stopPositionInPattern < pattern.stops.length; stopPositionInPattern++) {
                         int stop = pattern.stops[stopPositionInPattern];
@@ -384,7 +417,8 @@ public class FastRaptorWorker {
                             // attempt to alight
                             int travelTime = schedule.arrivals[stopPositionInPattern] - schedule.departures[boardStopPositionInPattern];
                             int alightTime = boardTime + travelTime;
-                            outputState.setTimeAtStop(stop, alightTime, originalPatternIndex, -1, false);
+                            int boardStop = pattern.stops[boardStopPositionInPattern];
+                            outputState.setTimeAtStop(stop, alightTime, originalPatternIndex, boardStop, waitTime, travelTime, false);
                         }
 
                         // attempt to board (even if already boarded, since this is a frequency trip and we could move back)
@@ -406,6 +440,7 @@ public class FastRaptorWorker {
                             if (newBoardingDepartureTimeAtStop > -1 && newBoardingDepartureTimeAtStop < remainOnBoardDepartureTimeAtStop) {
                                 // board this trip
                                 boardTime = newBoardingDepartureTimeAtStop;
+                                waitTime = boardTime - inputState.bestTimes[stop];
                                 boardStopPositionInPattern = stopPositionInPattern;
                             }
                         }
@@ -487,7 +522,12 @@ public class FastRaptorWorker {
                         // transfer length to stop is acceptable
                         int walkTimeToTargetStopSeconds = distanceToTargetStopMillimeters / walkSpeedMillimetersPerSecond;
                         int timeAtTargetStop = state.bestNonTransferTimes[stop] + walkTimeToTargetStopSeconds;
-                        state.setTimeAtStop(targetStop, timeAtTargetStop, -1, stop, true);
+
+                        if (walkTimeToTargetStopSeconds < 0) {
+                            LOG.error("Negative transfer time!!");
+                        }
+
+                        state.setTimeAtStop(targetStop, timeAtTargetStop, -1, stop, 0, 0, true);
                     }
                 }
             }

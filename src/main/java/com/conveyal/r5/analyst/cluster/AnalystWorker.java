@@ -428,7 +428,7 @@ public class AnalystWorker implements Runnable {
                 // This will return immediately as the streaming is done in a new thread.
                 finishPriorityTask(request, pis);
 
-                computer.write(pos);
+                computer.write(pos, false); // don't include paths in interactive analysis mode
                 pos.close();
             } catch (IOException e) {
                 LOG.error("Could not write static output to broker", e);

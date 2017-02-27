@@ -195,6 +195,7 @@ class BrokerHttpHandler extends HttpHandler {
                     // The worker did not find any obvious problems with the request and is streaming back what it
                     // believes to be a reliable work result.
                     suspendedProducerResponse.setStatus(HttpStatus.OK_200);
+                    suspendedProducerResponse.setContentType(request.getContentType());
                 } else {
                     // The worker is providing an error message because it spotted something wrong with the request.
                     suspendedProducerResponse.setStatus(Integer.parseInt(successOrError));

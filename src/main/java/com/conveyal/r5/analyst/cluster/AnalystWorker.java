@@ -431,7 +431,7 @@ public class AnalystWorker implements Runnable {
                 PipedOutputStream pos = new PipedOutputStream(pis);
 
                 // This will return immediately as the streaming is done in a new thread.
-                finishPriorityTask(request, pis);
+                finishPriorityTask(request, pis, "application/octet-stream");
 
                 computer.write(pos);
                 pos.close();
@@ -465,7 +465,7 @@ public class AnalystWorker implements Runnable {
                 PipedInputStream pis = new PipedInputStream();
                 PipedOutputStream pos = new PipedOutputStream(pis);
 
-                finishPriorityTask(request, pis);
+                finishPriorityTask(request, pis, "application/json");
 
                 staticMetadata.writeMetadata(pos);
                 pos.close();
@@ -497,7 +497,7 @@ public class AnalystWorker implements Runnable {
                 PipedInputStream pis = new PipedInputStream();
                 PipedOutputStream pos = new PipedOutputStream(pis);
 
-                finishPriorityTask(request, pis);
+                finishPriorityTask(request, pis, "application/octet-stream");
 
                 staticMetadata.writeStopTrees(pos);
                 pos.close();
@@ -613,7 +613,7 @@ public class AnalystWorker implements Runnable {
                 PipedOutputStream pos = new PipedOutputStream(is);
 
                 // this returns immediately and streams output to the server in a second thread
-                finishPriorityTask(clusterRequest, is);
+                finishPriorityTask(clusterRequest, is, "application/json");
 
                 final ResultEnvelope finalEnvelope = envelope; // dodge effectively final nonsense
                 JsonUtilities.objectMapper.writeValue(pos, finalEnvelope);
@@ -749,7 +749,7 @@ public class AnalystWorker implements Runnable {
      * caller to write data to the input stream it passed in. This arrangement avoids broken pipes that can happen
      * when the calling thread dies. TODO clarify when and how which thread can die.
      */
-    public void finishPriorityTask(GenericClusterRequest clusterRequest, InputStream result) {
+    public void finishPriorityTask(GenericClusterRequest clusterRequest, InputStream result, String contentType) {
         //CountingInputStream is = new CountingInputStream(result);
 
         String url = BROKER_BASE_URL + String.format("/complete/success/%s", clusterRequest.taskId);
@@ -757,6 +757,7 @@ public class AnalystWorker implements Runnable {
 
         // TODO reveal any errors etc. that occurred on the worker.
         httpPost.setEntity(new InputStreamEntity(result));
+        httpPost.setHeader("Content-Type", contentType);
         taskDeliveryExecutor.execute(() -> {
             try {
                 HttpResponse response = httpClient.execute(httpPost);

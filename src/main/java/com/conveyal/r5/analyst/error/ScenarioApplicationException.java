@@ -25,7 +25,7 @@ public class ScenarioApplicationException extends RuntimeException {
     public ScenarioApplicationException(List<Modification> badModifications) {
         super("Errors occurred while applying a scenario to a network.");
         for (Modification modification : badModifications) {
-            taskErrors.add(new TaskError(modification));
+            taskErrors.add(new TaskError(modification, modification.errors));
         }
     }
 

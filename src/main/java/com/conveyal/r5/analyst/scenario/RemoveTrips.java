@@ -40,7 +40,7 @@ public class RemoveTrips extends Modification {
     public boolean resolve (TransportNetwork network) {
         int nDefined = 0;
         checkIds(routes, patterns, trips, true, network);
-        return warnings.size() > 0;
+        return errors.size() > 0;
     }
 
     @Override
@@ -67,7 +67,7 @@ public class RemoveTrips extends Modification {
         int nPatternsRemoved = nPatternsBefore - transitLayer.tripPatterns.size();
         LOG.info("Removed {} entire patterns. Removed {} individual trips specified by ID.", nPatternsRemoved, nTripsRemoved);
         if (nTripsRemoved == 0 && nPatternsRemoved == 0) {
-            warnings.add("No trips were removed.");
+            errors.add("No trips were removed.");
         }
         return false;
     }

@@ -4,6 +4,7 @@ import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
+import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
@@ -69,6 +70,9 @@ public class TransportNetwork implements Serializable {
     public static final String BUILDER_CONFIG_FILENAME = "build-config.json";
 
     public GreedyFareCalculator fareCalculator;
+
+    /** Non-fatal warnings encountered when applying the scenario, null on a base network */
+    public List<TaskError> scenarioApplicationWarnings;
 
     public void write (File file) throws IOException {
         LOG.info("Writing transport network...");

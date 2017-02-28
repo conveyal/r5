@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.scenario;
 
 import com.beust.jcommander.internal.Lists;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
+import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.transit.TransferFinder;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -14,6 +15,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
@@ -92,16 +94,18 @@ public class Scenario implements Serializable {
         LOG.info("Resolving modifications against TransportNetwork and sanity checking.");
         // Check all the parameters before applying any modifications.
         // Might some parameters may become valid/invalid because of previous modifications in the list?
-        List<Modification> badModifications = new ArrayList<>();
+        List<Modification> modificationsWithErrors = new ArrayList<>();
+        List<Modification> modificationsWithWarnings = new ArrayList<>();
         for (Modification modification : modifications) {
             boolean errorsInModification = modification.resolve(copiedNetwork);
             if (errorsInModification) {
-                badModifications.add(modification);
+                modificationsWithErrors.add(modification);
             }
+            // warning caught after modification application, to avoid duplicates
         }
         // Throw one big exception containing any errors that were detected.
-        if (!badModifications.isEmpty()) {
-            throw new ScenarioApplicationException(badModifications);
+        if (!modificationsWithErrors.isEmpty()) {
+            throw new ScenarioApplicationException(modificationsWithErrors);
         }
         // Apply each modification in turn to the same extensible copy of the TransitNetwork.
         LOG.info("Applying modifications to TransportNetwork.");
@@ -113,7 +117,16 @@ public class Scenario implements Serializable {
                 // could lead to meaningless errors on subsequent modifications.
                 throw new ScenarioApplicationException(Arrays.asList(modification));
             }
+
+            if (!modification.warnings.isEmpty()) {
+                modificationsWithWarnings.add(modification);
+            }
         }
+
+        copiedNetwork.scenarioApplicationWarnings = modificationsWithWarnings.stream()
+                .map(m -> new TaskError(m, m.warnings))
+                .collect(Collectors.toList());
+
         // Is it OK that we do this once after all modifications are applied, or do we need to do it after every mod?
         copiedNetwork.transitLayer.rebuildTransientIndexes();
 

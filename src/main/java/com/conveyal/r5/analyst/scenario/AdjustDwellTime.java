@@ -60,7 +60,7 @@ public class AdjustDwellTime extends Modification {
             for (String stringStopId : stops) {
                 int intStopId = network.transitLayer.indexForStopId.get(stringStopId);
                 if (intStopId == -1) {
-                    warnings.add("Could not find a stop to adjust with GTFS ID " + stringStopId);
+                    errors.add("Could not find a stop to adjust with GTFS ID " + stringStopId);
                 } else {
                     intStops.add(intStopId);
                 }
@@ -69,10 +69,10 @@ public class AdjustDwellTime extends Modification {
         }
         // Not bitwise operator: non-short-circuit logical XOR.
         if (!((dwellSecs >= 0) ^ (scale >= 0))) {
-            warnings.add("Dwell time or scaling factor must be specified, but not both.");
+            errors.add("Dwell time or scaling factor must be specified, but not both.");
         }
         checkIds(routes, patterns, trips, true, network);
-        return warnings.size() > 0;
+        return errors.size() > 0;
     }
 
     @Override
@@ -83,9 +83,9 @@ public class AdjustDwellTime extends Modification {
         if (nTripsAffected > 0) {
             LOG.info("Modified {} trips.", nTripsAffected);
         } else {
-            warnings.add("This modification did not affect any trips.");
+            errors.add("This modification did not affect any trips.");
         }
-        return warnings.size() > 0;
+        return errors.size() > 0;
     }
 
     private TripPattern processTripPattern (TripPattern originalPattern) {

@@ -43,7 +43,7 @@ public class StreetLayerTest extends TestCase {
         assertEquals(v, sl.edgeStore.getCursor(e0).getToVertex());
         assertEquals(v, sl.edgeStore.getCursor(e1).getFromVertex());
 
-        new TarjanIslandPruner(sl, 40, StreetMode.WALK).run();
+        sl.removeDisconnectedSubgraphs(40);
 
         // note: disconnected subgraphs are not removed, they are de-pedestrianized
         final EdgeStore.Edge edge = sl.edgeStore.getCursor();

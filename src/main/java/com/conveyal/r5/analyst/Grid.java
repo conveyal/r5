@@ -39,8 +39,10 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
 import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -545,4 +547,56 @@ public class Grid {
         reader.close();
         return grids;
     }
+
+    /** Perform various operations on grids
+     *  e.g. Grid sum grid1 grid2 ... output.grid
+     */
+    public static void main (String... args) throws IOException {
+        if ("sum".equals(args[0])) {
+            Grid[] inGrids = new Grid[args.length - 2];
+            for (int i = 1; i < args.length - 1; i++) {
+                InputStream is = new BufferedInputStream(new FileInputStream(args[i]));
+                Grid g = Grid.read(is);
+                is.close();
+
+                if (i > 1) {
+                    if (!g.hasSameZoomAndBoundsAs(inGrids[0])) {
+                        LOG.error("Grid {} does not have same bounds and zoom as grid {}", args[i], args[1]);
+                        System.exit(1);
+                    }
+                }
+
+                inGrids[i - 1] = g;
+            }
+
+            // sum in place
+            Grid result = inGrids[0];
+            for (int i = 1; i < inGrids.length; i++) {
+                Grid current = inGrids[i];
+                for (int x = 0; x < result.width; x++) {
+                    for (int y = 0; y < result.height; y++) {
+                        result.grid[x][y] += current.grid[x][y];
+                    }
+                }
+            }
+
+            OutputStream os = new BufferedOutputStream(new FileOutputStream(args[args.length - 1]));
+            result.write(os);
+            os.close();
+
+            os = new BufferedOutputStream(new FileOutputStream(args[args.length - 1] + ".png"));
+            result.writePng(os);
+            os.close();
+        }
+    }
+
+    /** Return true if this grid has the same zoom and bounds as the other grid */
+    public boolean hasSameZoomAndBoundsAs(Grid o) {
+        return zoom == o.zoom &&
+                width == o.width &&
+                height == o.height &&
+                north == o.north &&
+                west == o.west;
+    }
+
 }

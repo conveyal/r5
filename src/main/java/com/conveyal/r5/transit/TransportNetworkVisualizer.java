@@ -39,9 +39,7 @@ public class TransportNetworkVisualizer {
 
             // load serialized transportnetwork
             File in = new File(args[0]);
-            FileInputStream fis = new FileInputStream(in);
-            network = TransportNetwork.read(fis);
-            fis.close();
+            network = TransportNetwork.read(in);
 
             LOG.info("Done reading serialized transport network");
         }

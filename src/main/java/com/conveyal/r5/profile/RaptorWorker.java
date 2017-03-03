@@ -1,6 +1,5 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.analyst.BoardingAssumption;
 import com.conveyal.r5.publish.StaticPropagatedTimesStore;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransitLayer;
@@ -12,7 +11,6 @@ import gnu.trove.list.TIntList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
-import com.conveyal.r5.profile.PropagatedTimesStore.ConfidenceCalculationMethod;
 import com.conveyal.r5.streets.PointSetTimes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,11 +108,19 @@ public class RaptorWorker {
     public BitSet servicesActive;
 
     /**
-     * After each iteration (search at a single departure time with a specific Monte Carlo draw of schedules for
-     * frequency routes) we store the {@link RaptorState}. If null, states will not be saved (they are not needed
-     * in analysis and chew gobs of memory, especially when monteCarloDraws is large).
+     * In interactive single-point analysis we don't need to save all the steps to reach the destination,
+     * only the travel times. For static sites, we want to retain all the states so we can reconstruct paths.
+     * In that case, this variable should be set to true before the raptor search is called.
      */
-    public List<RaptorState> statesEachIteration = null;
+    public boolean saveAllStates = false;
+
+    /**
+     * After each iteration (search at a single departure time with a specific Monte Carlo draw of schedules for
+     * frequency routes) we store the {@link RaptorState}.
+     * States will not always be saved because they chew gobs of memory, especially when monteCarloDraws is large,
+     * and they are only needed for static sites to draw paths.
+     */
+    public List<RaptorState> statesEachIteration;
 
     /**
      * After each iteration (search at a single departure time with a specific Monte Carlo draw of schedules for
@@ -132,20 +138,14 @@ public class RaptorWorker {
     public RaptorWorker (TransitLayer data, LinkedPointSet targets, ProfileRequest req) {
         this.data = data;
         int nStops = data.streetVertexForStop.size();
-
         stopsTouchedThisRound = new BitSet(nStops);
         patternsTouchedThisRound = new BitSet(data.tripPatterns.size());
         stopsTouchedThisSearch = new BitSet(nStops);
         this.scheduleState = new ArrayList<>();
         this.scheduleState.add(new RaptorState(nStops));
-
         this.targets = targets;
-
-        // targets== null implies a static site, save the results of each iteration
-        if (targets == null) this.statesEachIteration = new ArrayList<>();
-
+        this.statesEachIteration = new ArrayList<>();
         this.servicesActive = data.getActiveServicesForDate(req.date);
-
         this.req = req.clone();
         offsets = new FrequencyRandomOffsets(data);
     }
@@ -216,15 +216,16 @@ public class RaptorWorker {
         // First, set the number of iterations to the number of departure minutes.
         int iterations = (req.toTime - req.fromTime - DEPARTURE_STEP_SEC) / DEPARTURE_STEP_SEC + 1;
 
-        // figure out how many monte carlo draws to do (if we end up doing monte carlo).
-        // this is defined outside the conditional because it is also used in the loop body.
+        // Figure out how many monte carlo draws to do (if we end up doing monte carlo).
+        // This is defined outside the conditional because it is also used in the loop body.
         // At this point the number of iterations is just the number of minutes.
         int monteCarloDraws = (int) Math.ceil((double) req.monteCarloDraws / iterations);
 
         // Now multiply the number of departure minutes by the number of Monte Carlo frequency draws per minute.
+        // We only do Monte Carlo draws when there are frequency-based routes.
+        // We no longer do the two additional iterations that find travel time bounds using zero and max boarding times.
         if (data.hasFrequencies) {
-            // We add 2 because we do two additional iterations for zero and maximal boarding times (not Monte Carlo draws).
-            iterations *= (monteCarloDraws + 2);
+            iterations *= monteCarloDraws;
         }
 
         ts.searchCount = iterations;
@@ -275,21 +276,15 @@ public class RaptorWorker {
 
             // Run any searches on frequency-based routes.
             if (data.hasFrequencies) {
-                for (int i = 0; i < monteCarloDraws + 2; i++, iteration++) {
+
+
+                for (int i = 0; i < monteCarloDraws; i++, iteration++) {
 
                     RaptorState stateCopy;
-                    if (i == 0) {
-                        stateCopy = this.runRaptorFrequency(departureTime, BoardingAssumption.BEST_CASE);
-                    }
-                    else if (i == 1) {
-                        stateCopy = this.runRaptorFrequency(departureTime, BoardingAssumption.WORST_CASE);
-                    }
-                    else {
-                        offsets.randomize();
-                        stateCopy = this.runRaptorFrequency(departureTime, BoardingAssumption.RANDOM);
-                        // Only include travel times from randomized schedules (not the lower and upper bounds) in averages.
-                        includeInAverages.set(iteration);
-                    }
+                    offsets.randomize();
+                    stateCopy = this.runRaptorFrequency(departureTime);
+                    // Only include travel times from randomized schedules (not the lower and upper bounds) in averages.
+                    includeInAverages.set(iteration);
 
                     // Propagate travel times out to targets.
                     int[] frequencyTimesAtTargets = timesAtTargetsEachIteration[iteration];
@@ -306,7 +301,7 @@ public class RaptorWorker {
                         System.arraycopy(stateCopy.bestNonTransferTimes, 0, frequencyTimesAtTargets, 0, stateCopy.bestNonTransferTimes.length);
                     }
 
-                    if (statesEachIteration != null) statesEachIteration.add(stateCopy.deepCopy());
+                    if (saveAllStates) statesEachIteration.add(stateCopy.deepCopy());
 
                     // convert to elapsed time
                     for (int t = 0; t < frequencyTimesAtTargets.length; t++) {
@@ -325,7 +320,7 @@ public class RaptorWorker {
                         .map(i -> i != UNREACHED ? i - dt : i)
                         .toArray();
                 includeInAverages.set(iteration);
-                if (statesEachIteration != null) statesEachIteration.add(state.deepCopy());
+                if (saveAllStates) statesEachIteration.add(state.deepCopy());
                 iteration++;
             }
 
@@ -367,7 +362,7 @@ public class RaptorWorker {
         // summarizes them (average, min, max).
         // We can use the MIN_MAX confidence calculation method here even when frequency draws were done, because we
         // include two pseudo-draws per departure minute for zero and maximal board times.
-        propagatedTimesStore.setFromArray(timesAtTargetsEachIteration, includeInAverages, ConfidenceCalculationMethod.MIN_MAX, req.reachabilityThreshold);
+        propagatedTimesStore.setFromArray(timesAtTargetsEachIteration, req.reachabilityThreshold);
         return propagatedTimesStore;
     }
 
@@ -420,7 +415,7 @@ public class RaptorWorker {
         // Run RAPTOR rounds repeatedly until a round has no effect (does not update the travel time to any stops),
         // or we are out of rounds. If maxRides is 7, this will get to round == 7, which is what we want as round 0
         // is the initial walk.
-        while (doOneRound(scheduleState.get(round - 1), scheduleState.get(round), false, null) && round < req.maxRides) {
+        while (doOneRound(scheduleState.get(round - 1), scheduleState.get(round), false) && round < req.maxRides) {
             advanceToNextRound();
         }
 
@@ -450,7 +445,7 @@ public class RaptorWorker {
      * departure minutes using the scheduled route, and we copy those results at each minute to apply the frequency
      * results on top of them.
      */
-    public RaptorState runRaptorFrequency (int departureTime, BoardingAssumption boardingAssumption) {
+    public RaptorState runRaptorFrequency (int departureTime) {
         long startClockTime = System.currentTimeMillis();
 
         // Do not consider any travel after this clock time. This is for algorithm speed and avoiding taking
@@ -490,7 +485,7 @@ public class RaptorWorker {
         // However, if we didn't run a scheduled search, don't apply this constraint
         // Don't do more rounds than we're allowed rides. This will get us to round == maxRides, which is what we want
         // since round 0 is the initial walk.
-        while ((doOneRound(previousRound, currentRound, true, boardingAssumption) ||
+        while ((doOneRound(previousRound, currentRound, true) ||
                 (scheduledRounds != -1 && round <= scheduledRounds)) &&
                 round < req.maxRides) {
             advanceToNextRound();
@@ -534,7 +529,7 @@ public class RaptorWorker {
      *
      * For more explanation see OpenTripPlanner #2072
      */
-    public boolean doOneRound (RaptorState inputState, RaptorState outputState, boolean useFrequencies, BoardingAssumption boardingAssumption) {
+    public boolean doOneRound (RaptorState inputState, RaptorState outputState, boolean useFrequencies) {
         // Clear any stops that were marked in the previous round.
         stopsTouchedThisRound.clear();
         PATTERNS: for (int p = patternsTouchedThisRound.nextSetBit(0); p >= 0; p = patternsTouchedThisRound.nextSetBit(p+1)) {
@@ -594,48 +589,25 @@ public class RaptorWorker {
                             int boardTime = Integer.MAX_VALUE;
                             FREQUENCY_ENTRIES:
                             for (int freqEntryIdx = 0; freqEntryIdx < ts.headwaySeconds.length; freqEntryIdx++) {
-                                int boardTimeThisEntry;
+                                // should not throw NPE, if it does something is messed up because these should
+                                // only be null for scheduled trips on a trip pattern with some frequency trips.
+                                // we shouldn't be considering scheduled trips here.
+                                int offset = offsets.offsets.get(p)[tripScheduleIdx][freqEntryIdx];
 
-                                if (boardingAssumption == BoardingAssumption.BEST_CASE) {
-                                    // Be optimistic and assume zero wait time to board every vehicle.
-                                    if (inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS > ts.endTimes[freqEntryIdx] + ts.departures[stopPositionInPattern])
-                                        continue FREQUENCY_ENTRIES; // it's too late, can't board.
+                                // earliest board time is start time plus travel time plus offset
+                                int boardTimeThisEntry = ts.startTimes[freqEntryIdx] +
+                                        ts.departures[stopPositionInPattern] +
+                                        offset;
 
-                                    // best case boarding time is now, or when this frequency entry starts _at this stop_,
-                                    // whichever is later
-                                    boardTimeThisEntry = Math.max(inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS, ts.startTimes[freqEntryIdx] + ts.departures[stopPositionInPattern]);
-                                }
-                                else if (boardingAssumption == BoardingAssumption.WORST_CASE) {
-                                    // Be pessimistic and assume a full headway wait before boarding any vehicle.
-                                    // worst case: cannot board this entry if there is not the full headway remaining before the end of the entry, we
-                                    // might miss the vehicle.
-                                    if (inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS > ts.endTimes[freqEntryIdx] + ts.departures[stopPositionInPattern] - ts.headwaySeconds[freqEntryIdx])
+                                while (boardTimeThisEntry < inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS) {
+                                    boardTimeThisEntry += ts.headwaySeconds[freqEntryIdx];
+
+                                    // subtract the travel time to this stop from the board time at this stop, this gives
+                                    // us the terminal departure. If the terminal departure is after the end time, the vehicle
+                                    // is not running.
+                                    if (boardTimeThisEntry - ts.departures[stopPositionInPattern] > ts.endTimes[freqEntryIdx]) {
+                                        // can't board this frequency entry
                                         continue FREQUENCY_ENTRIES;
-
-                                    boardTimeThisEntry = Math.max(inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS + ts.headwaySeconds[freqEntryIdx],
-                                            ts.startTimes[freqEntryIdx] + ts.departures[stopPositionInPattern] + ts.headwaySeconds[freqEntryIdx]);
-                                }
-                                else {
-                                    // should not throw NPE, if it does something is messed up because these should
-                                    // only be null for scheduled trips on a trip pattern with some frequency trips.
-                                    // we shouldn't be considering scheduled trips here.
-                                    int offset = offsets.offsets.get(p)[tripScheduleIdx][freqEntryIdx];
-
-                                    // earliest board time is start time plus travel time plus offset
-                                    boardTimeThisEntry = ts.startTimes[freqEntryIdx] +
-                                            ts.departures[stopPositionInPattern] +
-                                            offset;
-
-                                    while (boardTimeThisEntry < inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS) {
-                                        boardTimeThisEntry += ts.headwaySeconds[freqEntryIdx];
-
-                                        // subtract the travel time to this stop from the board time at this stop, this gives
-                                        // us the terminal departure. If the terminal departure is after the end time, the vehicle
-                                        // is not running.
-                                        if (boardTimeThisEntry - ts.departures[stopPositionInPattern] > ts.endTimes[freqEntryIdx]) {
-                                            // can't board this frequency entry
-                                            continue FREQUENCY_ENTRIES;
-                                        }
                                     }
                                 }
 
@@ -668,7 +640,7 @@ public class RaptorWorker {
                             outputState.bestNonTransferTimes[stopIndex] = remainOnBoardTime;
 
                             // save wait and travel time statistics
-                            outputState.nonTransferInVehicleTravelTime[stopIndex] = inputState.nonTransferInVehicleTravelTime[bestFreqBoardStopIndex] + remainOnBoardTime - bestFreqBoardTime;
+                            outputState.nonTransferInVehicleTravelTime[stopIndex] = inputState.inVehicleTravelTime[bestFreqBoardStopIndex] + remainOnBoardTime - bestFreqBoardTime;
                             outputState.nonTransferWaitTime[stopIndex] = inputState.waitTime[bestFreqBoardStopIndex] + bestFreqBoardTime - inputState.bestTimes[bestFreqBoardStopIndex];
 
                             outputState.previousPatterns[stopIndex] = p;

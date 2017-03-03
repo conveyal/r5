@@ -19,11 +19,7 @@ public class SuboptimalDominatingList implements DominatingList {
 
     private List<McRaptorSuboptimalPathProfileRouter.McRaptorState> list = new LinkedList<>();
 
-    public boolean add (McRaptorSuboptimalPathProfileRouter.McRaptorState state) {
-        // is this state dominated?
-        if (bestTime != Integer.MAX_VALUE && bestTime + suboptimalSeconds < state.time)
-            return false;
-
+    public boolean add (McRaptorSuboptimalPathProfileRouter.McRaptorState newState) {
         // apply strict dominance if there is a state at the previous round on the same previous pattern arriving at this
         // stop (prevents reboarding/hopping between routes on common trunks)
         // For example, consider the red line in DC, which runs from Shady Grove to Glenmont. At rush hour, every other
@@ -49,36 +45,53 @@ public class SuboptimalDominatingList implements DominatingList {
         // We only look back one pattern; the reason for this is that we want to avoid a lot of looping in a function
         // that gets called a lot, and it seems unlikely that there would be time to take two other patterns and still
         // slip into the window of suboptimality. I haven't tested it though to see its effect on response times.
-        if (state.pattern != -1 && state.patterns.length > 1) {
-            for (McRaptorSuboptimalPathProfileRouter.McRaptorState s : list) {
-                if (s.round == state.round - 1 && s.pattern == state.patterns[s.round - 1] && s.time <= state.time) {
-                    return false;
-                }
-            }
+//        if (state.pattern != -1 && state.patterns.length > 1) {
+//            for (McRaptorSuboptimalPathProfileRouter.McRaptorState s : list) {
+//                if (s.round == state.round - 1 && s.pattern == state.patterns[s.round - 1] && s.time <= state.time) {
+//                    return false;
+//                }
+//            }
+//        }
+
+        for (Iterator<McRaptorSuboptimalPathProfileRouter.McRaptorState> it = list.iterator(); it.hasNext(); ) {
+            McRaptorSuboptimalPathProfileRouter.McRaptorState oldState = it.next();
+
+            if (dominates(oldState, newState)) return false;
+            if (dominates(newState, oldState)) it.remove();
         }
 
-        if (state.time < bestTime) bestTime = state.time;
+        // Update the best time at this location to reflect the new state.
+        if (newState.time < bestTime) bestTime = newState.time;
 
-        // don't forget this
-        list.add(state);
+        // The new state is non-dominated. Keep it.
+        list.add(newState);
 
         return true;
     }
 
-    /** prune dominated and excessive states */
-    public void prune () {
-        // group states that have the same sequence of patterns, throwing out dominated states as we go
-        for (Iterator<McRaptorSuboptimalPathProfileRouter.McRaptorState> it = list.iterator(); it.hasNext();) {
-            if (it.next().time >= bestTime + suboptimalSeconds)
-                it.remove();
-        }
+    public boolean dominates (McRaptorSuboptimalPathProfileRouter.McRaptorState newState, McRaptorSuboptimalPathProfileRouter.McRaptorState oldState) {
+        boolean sameAccessMode = oldState.accessMode == newState.accessMode;
+
+        // If there is any way to reach this location with less rides and the same or less time, throw away the old state
+        // iff they used the same access mode.
+        if (sameAccessMode && newState.round < oldState.round && newState.time <= oldState.time) return true;
+
+        // looser dominance rules for states with different access modes
+        // this is more efficient than what we used to do, which was to treat different access modes as completely incomparable
+        // this eliminates a lot of trips that drive out into the sticks and take transit back in, which are slow to compute
+        // TODO this *5 nonsense is a huge clooge. Make the dominance parameter configurable.
+        int threshold = sameAccessMode ? suboptimalSeconds : suboptimalSeconds * 5;
+
+        if (newState.time + threshold < oldState.time) return true;
+
+        return false;
     }
 
     public Collection<McRaptorSuboptimalPathProfileRouter.McRaptorState> getNonDominatedStates () {
-        // We prune here. I've also tried pruning on add, but it slows the algorithm down due to all of the looping.
+        // We used to prune here, but now we prune on add.
+        // I've observed in the past that pruning on add slows the algorithm down due to all of the looping.
         // I also tried pruning once per round, but that also slows the algorithm down (perhaps because it's doing
         // so many pairwise comparisons).
-        prune();
         return list;
     }
 }

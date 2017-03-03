@@ -105,6 +105,11 @@ public class TypeOfEdgeLabeler {
             forwardFlags.add(EdgeStore.EdgeFlag.STAIRS);
             backFlags.add(EdgeStore.EdgeFlag.STAIRS);
         }
+        // If the road doesn't have those tags it's LINKABLE AKA it will be used for linking P+R (only currently)
+        if (!(way.hasTag("tunnel", "yes") || way.hasTag("covered", "yes") || way.hasTag("highway", "motorway"))) {
+            forwardFlags.add(EdgeStore.EdgeFlag.LINKABLE);
+            backFlags.add(EdgeStore.EdgeFlag.LINKABLE);
+        }
         if (forwardFlags.contains(EdgeStore.EdgeFlag.ALLOWS_BIKE) && isCycleway(way , false)) {
             forwardFlags.add(EdgeStore.EdgeFlag.BIKE_PATH);
         }

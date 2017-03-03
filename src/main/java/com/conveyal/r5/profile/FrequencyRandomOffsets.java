@@ -87,7 +87,12 @@ public class FrequencyRandomOffsets {
 
                                 // find source phase information
                                 int[] source = data.frequencyEntryIndexForId.get(schedule.phaseFromId[frequencyEntryIndex]);
-
+                                // Throw a meaningful error when invalid IDs are encountered instead of NPE.
+                                // Really this should be done when applying the modifications rather than during the search.
+                                if (source == null) {
+                                    throw new RuntimeException("This pattern ID specified in a scenario does not exist: "
+                                            + schedule.phaseFromId[frequencyEntryIndex]);
+                                }
                                 int sourcePatternIdx = source[0];
                                 int sourceTripScheduleIdx = source[1];
                                 int sourceFrequencyEntryIdx = source[2];

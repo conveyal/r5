@@ -5,6 +5,7 @@ import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.ProfileOption;
 import com.conveyal.r5.api.util.StreetSegment;
 import com.conveyal.r5.profile.*;
+import com.conveyal.r5.streets.ParkRideRouter;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.streets.VertexStore;
@@ -23,6 +24,7 @@ import org.slf4j.LoggerFactory;
 
 import java.time.ZoneId;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Class which will make point to point or profile queries on Transport network based on profileRequest
@@ -65,7 +67,7 @@ public class PointToPointQuery {
     /** Cost of dropping-off a rented bike */
     private static final int BIKE_RENTAL_DROPOFF_COST = 30;
     /** Time to park car in P+R in seconds **/
-    private static final int CAR_PARK_DROPOFF_TIME_S = 120;
+    public static final int CAR_PARK_DROPOFF_TIME_S = 120;
 
     private static final int CAR_PARK_DROPOFF_COST = 120;
 
@@ -91,22 +93,13 @@ public class PointToPointQuery {
         profileResponse.addOption(option);
 
         if (request.hasTransit()) {
-            Map<LegMode, StreetRouter> accessRouter = new HashMap<>(request.accessModes.size());
-            Map<LegMode, StreetRouter> egressRouter = new HashMap<>(request.egressModes.size());
+            Map<LegMode, StreetRouter> accessRouter = findAccessPaths(request);
+            Map<LegMode, StreetRouter> egressRouter = findEgressPaths(request);
 
-
-            //This map saves which access mode was used to access specific stop in access mode
-            TIntObjectMap<LegMode> stopModeAccessMap = new TIntObjectHashMap<>();
-            //This map saves which egress mode was used to access specific stop in egress mode
-            TIntObjectMap<LegMode> stopModeEgressMap = new TIntObjectHashMap<>();
-
-            findAccessPaths(request, accessRouter);
-
-            findEgressPaths(request, egressRouter);
-
-            // fold access and egress times into single maps
-            TIntIntMap accessTimes = combineMultimodalRoutingAccessTimes(accessRouter, stopModeAccessMap, request);
-            TIntIntMap egressTimes = combineMultimodalRoutingAccessTimes(egressRouter, stopModeEgressMap, request);
+            Map<LegMode, TIntIntMap> accessTimes = accessRouter.entrySet().stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getReachedStops()));
+            Map<LegMode, TIntIntMap> egressTimes = egressRouter.entrySet().stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getReachedStops()));
 
             McRaptorSuboptimalPathProfileRouter router = new McRaptorSuboptimalPathProfileRouter(transportNetwork, request, accessTimes, egressTimes);
             List<PathWithTimes> usefullpathList = new ArrayList<>();
@@ -152,7 +145,7 @@ public class PointToPointQuery {
             int seen_paths = 0;
             int boardStop =-1, alightStop = -1;
             for (PathWithTimes path : usefullpathList) {
-                profileResponse.addTransitPath(accessRouter, egressRouter, stopModeAccessMap, stopModeEgressMap, path, transportNetwork, request.getFromTimeDateZD());
+                profileResponse.addTransitPath(accessRouter, egressRouter, path, transportNetwork, request.getFromTimeDateZD());
                 //LOG.info("Num patterns:{}", path.patterns.length);
                 //ProfileOption transit_option = new ProfileOption();
 
@@ -201,9 +194,9 @@ public class PointToPointQuery {
     /**
      * Finds all egress paths from to coordinate to end stop and adds routers to egressRouter
      * @param request
-     * @param egressRouter
      */
-    private void findEgressPaths(ProfileRequest request, Map<LegMode, StreetRouter> egressRouter) {
+    private Map<LegMode, StreetRouter> findEgressPaths(ProfileRequest request) {
+        Map<LegMode, StreetRouter> egressRouter = new HashMap<>();
         //For egress
         //TODO: this must be reverse search
         request.reverseSearch = true;
@@ -228,6 +221,8 @@ public class PointToPointQuery {
                 LOG.warn("MODE:{}, Edge near the origin coordinate wasn't found. Routing didn't start!", mode);
             }
         }
+
+        return egressRouter;
     }
 
     /**
@@ -291,11 +286,11 @@ public class PointToPointQuery {
     /**
      * Finds access paths from from coordinate in request and adds all routers with paths to accessRouter map
      * @param request
-     * @param accessRouter
      */
-    private void findAccessPaths(ProfileRequest request, Map<LegMode, StreetRouter> accessRouter) {
+    private HashMap<LegMode, StreetRouter> findAccessPaths(ProfileRequest request) {
         request.reverseSearch = false;
-        //Routes all access modes
+        // Routes all access modes
+        HashMap<LegMode, StreetRouter> accessRouter = new HashMap<>();
         for(LegMode mode: request.accessModes) {
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
             streetRouter.profileRequest = request;
@@ -337,6 +332,8 @@ public class PointToPointQuery {
             }
 
         }
+
+        return accessRouter;
     }
 
     /**
@@ -358,7 +355,12 @@ public class PointToPointQuery {
             streetRouter.route();
             TIntObjectMap<StreetRouter.State> carParks = streetRouter.getReachedVertices(VertexStore.VertexFlag.PARK_AND_RIDE);
             LOG.info("CAR PARK: Found {} car parks", carParks.size());
-            StreetRouter walking = new StreetRouter(transportNetwork.streetLayer);
+            ParkRideRouter parkRideRouter = new ParkRideRouter(streetRouter.streetLayer);
+            parkRideRouter.profileRequest = request;
+            parkRideRouter.addParks(carParks, transportNetwork.transitLayer);
+            parkRideRouter.previousRouter = streetRouter;
+            return parkRideRouter;
+            /*StreetRouter walking = new StreetRouter(transportNetwork.streetLayer);
             walking.streetMode = StreetMode.WALK;
             walking.profileRequest = request;
             walking.timeLimitSeconds = request.maxCarTime * 60;
@@ -367,7 +369,7 @@ public class PointToPointQuery {
             walking.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             walking.route();
             walking.previousRouter = streetRouter;
-            return walking;
+            return walking;*/
         } else {
             return null;
         }
@@ -420,6 +422,7 @@ public class PointToPointQuery {
             bicycle.streetMode = StreetMode.BICYCLE;
             bicycle.profileRequest = request;
             bicycle.flagSearch = streetRouter.flagSearch;
+            bicycle.maxVertices = Integer.MAX_VALUE;
             //Longer bike part if this is direct search
             if (direct) {
                 bicycle.timeLimitSeconds = request.streetTime * 60;
@@ -428,6 +431,7 @@ public class PointToPointQuery {
                 bicycle.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             }
             bicycle.setOrigin(bikeStations, BIKE_RENTAL_PICKUP_TIME_S, BIKE_RENTAL_PICKUP_COST, LegMode.BICYCLE_RENT);
+            bicycle.setDestination(destinationSplit);
             bicycle.route();
             TIntObjectMap<StreetRouter.State> cycledStations = bicycle.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING);
             LOG.info("BIKE RENT: Found {} cycled stations which are {} minutes away", cycledStations.size(), bicycle.timeLimitSeconds/60);

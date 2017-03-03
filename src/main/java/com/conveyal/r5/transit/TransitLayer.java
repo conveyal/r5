@@ -10,13 +10,16 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.util.LambdaCounter;
+import com.conveyal.r5.util.LocationIndexedLineInLocalCoordinateSystem;
 import com.google.common.base.Strings;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.LineString;
 import com.vividsolutions.jts.geom.Point;
+import com.vividsolutions.jts.linearref.LinearLocation;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -37,7 +40,9 @@ import java.time.ZoneId;
 import java.time.zone.ZoneRulesException;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
+import java.util.stream.StreamSupport;
 
 
 /**
@@ -49,13 +54,20 @@ public class TransitLayer implements Serializable, Cloneable {
      * Maximum distance to record in distance tables, in meters.
      * Set to 3.5 km to match OTP GraphIndex.MAX_WALK_METERS but TODO should probably be reduced after Kansas City project.
      */
-    public static final int DISTANCE_TABLE_SIZE_METERS = 3500;
+    public static final int DISTANCE_TABLE_SIZE_METERS = 2000;
+
+    public static final boolean SAVE_SHAPES = false;
 
     /**
      * Distance limit for transfers, meters. Set to 1km which is slightly above OTP's 600m (which was specified as
      * 1 m/s with 600s max time, which is actually somewhat less than 600m due to extra costs due to steps etc.
      */
     public static final int TRANSFER_DISTANCE_LIMIT = 1000;
+
+    /**
+     * Distance limit from P+R to transit in meters
+     */
+    public static final int PARKRIDE_DISTANCE_LIMIT = 500;
 
     private static final Logger LOG = LoggerFactory.getLogger(TransitLayer.class);
 
@@ -119,12 +131,13 @@ public class TransitLayer implements Serializable, Cloneable {
     /**
      * For each transit stop, an int-int map giving the distance of every reachable street vertex from that stop.
      * This is the result of running a distance-constrained street search outward from every stop in the graph.
-     *
-     * Avoiding the lengthy rebuild of stopToVertexDistanceTables is as simple as making this non-transient and removing
-     * the call to buildDistanceTables in TransportNetwork. That does make serialized networks much bigger (not a big deal
-     * when saving to S3) and makes our checks to ensure that scenario application does not damage base graphs very slow.
+     * If these tables are present, we serialize them when persisting a network to disk to avoid recalculating them
+     * upon re-load. However, the tables are not computed when the network is first built, except in certain code
+     * paths used for analysis work. The tables are not necessary for basic routing.
+     * Serializing these tables makes files much bigger and makes our checks to ensure that scenario application
+     * does not damage base graphs slower.
      */
-    public transient List<TIntIntMap> stopToVertexDistanceTables;
+    public List<TIntIntMap> stopToVertexDistanceTables;
 
     /**
      * The TransportNetwork containing this TransitLayer. This link up the object tree also allows us to access the
@@ -135,6 +148,16 @@ public class TransitLayer implements Serializable, Cloneable {
 
     /** Map from feed ID to feed CRC32 to ensure that we can't apply scenarios to the wrong feeds */
     public Map<String, Long> feedChecksums = new HashMap<>();
+
+    /**
+     * A string uniquely identifying the contents of this TransitLayer among all TransitLayers.
+     * When no scenario has been applied, this field will contain the ID of the containing TransportNetwork.
+     * When a scenario has modified this StreetLayer, this field will be changed to the scenario's ID.
+     * We need a way to know what transit information is in the layer independent of object identity, which is lost in
+     * a round trip through serialization. This also allows re-using cached information for multiple scenarios that
+     * don't modify the transit network. (This never happens yet, but will when we allow street editing.)
+     */
+    public String scenarioId;
 
     /** Load a GTFS feed with full load level */
     public void loadFromGtfs (GTFSFeed gtfs) throws DuplicateFeedException {
@@ -257,6 +280,62 @@ public class TransitLayer implements Serializable, Cloneable {
                     }
 
                     tripPattern.routeIndex = routeIndexForRoute.get(trip.route_id);
+
+                    if (trip.shape_id != null && SAVE_SHAPES) {
+                        Shape shape = gtfs.getShape(trip.shape_id);
+                        if (shape == null) LOG.warn("Shape {} for trip {} was missing", trip.shape_id, trip.trip_id);
+                        else {
+                            // TODO this will not work if some trips in the pattern don't have shapes
+                            tripPattern.shape = shape.geometry;
+
+                            // project stops onto shape
+                            boolean stopsHaveShapeDistTraveled = StreamSupport.stream(stopTimes.spliterator(), false)
+                                    .noneMatch(st -> Double.isNaN(st.shape_dist_traveled));
+                            boolean shapePointsHaveDistTraveled = DoubleStream.of(shape.shape_dist_traveled)
+                                    .noneMatch(Double::isNaN);
+
+                            LinearLocation[] locations;
+
+                            if (stopsHaveShapeDistTraveled && shapePointsHaveDistTraveled) {
+                                // create linear locations from dist traveled
+                                locations = StreamSupport.stream(stopTimes.spliterator(), false)
+                                        .map(st -> {
+                                            double dist = st.shape_dist_traveled;
+
+                                            int segment = 0;
+
+                                            while (segment < shape.shape_dist_traveled.length - 2 &&
+                                                    dist > shape.shape_dist_traveled[segment + 1]
+                                                    ) segment++;
+
+                                            double endSegment = shape.shape_dist_traveled[segment + 1];
+                                            double beginSegment = shape.shape_dist_traveled[segment];
+                                            double proportion = (dist - beginSegment) / (endSegment - beginSegment);
+
+                                            return new LinearLocation(segment, proportion);
+                                        }).toArray(LinearLocation[]::new);
+                            } else {
+                                // naive snapping
+                                LocationIndexedLineInLocalCoordinateSystem line =
+                                        new LocationIndexedLineInLocalCoordinateSystem(shape.geometry.getCoordinates());
+
+                                locations = StreamSupport.stream(stopTimes.spliterator(), false)
+                                        .map(st -> {
+                                            Stop stop = gtfs.stops.get(st.stop_id);
+                                            return line.project(new Coordinate(stop.stop_lon, stop.stop_lat));
+                                        })
+                                        .toArray(LinearLocation[]::new);
+                            }
+
+                            tripPattern.stopShapeSegment = new int[locations.length];
+                            tripPattern.stopShapeFraction = new float[locations.length];
+
+                            for (int i = 0; i < locations.length; i++) {
+                                tripPattern.stopShapeSegment[i] = locations[i].getSegmentIndex();
+                                tripPattern.stopShapeFraction[i] = (float) locations[i].getSegmentFraction();
+                            }
+                        }
+                    }
                 }
 
                 tripPatternForPatternId.put(patternId, tripPattern);
@@ -374,7 +453,7 @@ public class TransitLayer implements Serializable, Cloneable {
         centerLon = lonSum / stops.size();
     }
 
-    /** (Re-)build transient indexes of this TripPattern, connecting stops to patterns etc. */
+    /** (Re-)build transient indexes of this TransitLayer, connecting stops to patterns etc. */
     public void rebuildTransientIndexes () {
         LOG.info("Rebuilding transient indices.");
 
@@ -617,20 +696,26 @@ public class TransitLayer implements Serializable, Cloneable {
     }
 
     /**
+     * @param willBeModified must be true if the scenario to be applied will make any changes to the transit network.
      * @return a semi-shallow copy of this transit layer for use when applying scenarios.
      */
-    public TransitLayer scenarioCopy(TransportNetwork newScenarioNetwork) {
+    public TransitLayer scenarioCopy(TransportNetwork newScenarioNetwork, boolean willBeModified) {
         TransitLayer copy = this.clone();
         copy.parentNetwork = newScenarioNetwork;
-        // Protectively copy all the lists that will be affected by adding new stops to the network
-        // See: StopSpec.materializeOne()
-        // We would really only need to do this for modifications that create new stops.
-        copy.stopIdForIndex = new ArrayList<>(this.stopIdForIndex);
-        copy.stopNames = new ArrayList<>(this.stopNames);
-        copy.streetVertexForStop = new TIntArrayList(this.streetVertexForStop);
-        copy.stopToVertexDistanceTables = new ArrayList<>(this.stopToVertexDistanceTables);
-        copy.transfersForStop = new ArrayList<>(this.transfersForStop);
-        copy.routes = new ArrayList<>(this.routes);
+        if (willBeModified) {
+            // Protectively copy all the lists that will be affected by adding new stops to the network.
+            // See StopSpec.materializeOne(). We would really only need to do this for modifications that create new stops.
+            copy.stopIdForIndex = new ArrayList<>(this.stopIdForIndex);
+            copy.stopNames = new ArrayList<>(this.stopNames);
+            copy.streetVertexForStop = new TIntArrayList(this.streetVertexForStop);
+            copy.stopToVertexDistanceTables = new ArrayList<>(this.stopToVertexDistanceTables);
+            copy.transfersForStop = new ArrayList<>(this.transfersForStop);
+            copy.routes = new ArrayList<>(this.routes);
+            // To indicate that this layer is different than the one it was copied from, record the scenarioId of
+            // the scenario that modified it. If the scenario will not affect the contents of the layer, its
+            // scenarioId remains unchanged as is done in StreetLayer.
+            copy.scenarioId = newScenarioNetwork.scenarioId;
+        }
         return copy;
     }
 
@@ -638,6 +723,11 @@ public class TransitLayer implements Serializable, Cloneable {
      * Finds all the transit stops in given envelope and returns it.
      *
      * Stops also have mode which is mode of route in first pattern that this stop is found in
+     *
+     * Stop coordinates are jittered {@link com.conveyal.r5.point_to_point.PointToPointRouterServer#jitter(VertexStore.Vertex)}. Meaning they are moved a little from their actual coordinate
+     * so that multiple stops at same coordinate can be seen
+     *
+     *
      * @param env Envelope in float degrees
      * @return
      */
@@ -651,7 +741,8 @@ public class TransitLayer implements Serializable, Cloneable {
             if (e.getFlag(EdgeStore.EdgeFlag.LINK) && stopForStreetVertex.containsKey(e.getFromVertex())) {
                 int stopIdx = stopForStreetVertex.get(e.getFromVertex());
 
-                com.conveyal.r5.api.util.Stop stop = new com.conveyal.r5.api.util.Stop(stopIdx, this, true);
+                com.conveyal.r5.api.util.Stop stop = new com.conveyal.r5.api.util.Stop(stopIdx, this, true,
+                    true);
                 stops.add(stop);
             }
             return true;

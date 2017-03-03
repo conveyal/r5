@@ -95,6 +95,10 @@ public class StreetLayer implements Serializable, Cloneable {
     public transient List<TIntList> outgoingEdges;
     public transient List<TIntList> incomingEdges;
     public transient IntHashGrid spatialIndex = new IntHashGrid();
+
+    /** Spatial index of temporary edges from a scenario */
+    private transient IntHashGrid temporaryEdgeIndex;
+
     // Key is street vertex index, value is BikeRentalStation (with name, number of bikes, spaces id etc.)
     public TIntObjectMap<BikeRentalStation> bikeRentalStationMap;
     public TIntObjectMap<ParkRideParking> parkRideLocationsMap;
@@ -129,6 +133,17 @@ public class StreetLayer implements Serializable, Cloneable {
      * references between the two layers.
      */
     public TransportNetwork parentNetwork = null;
+
+
+    /**
+     * A string uniquely identifying the contents of this StreetLayer among all StreetLayers.
+     * When no scenario has been applied, this field will contain the ID of the enclosing TransportNetwork.
+     * When a scenario has modified this StreetLayer, this field will be changed to that scenario's ID.
+     * We need a way to know what information is in the network independent of object identity, which is lost in a
+     * round trip through serialization. This also allows re-using cached linkages for several scenarios as long as
+     * they don't modify the street network.
+     */
+    public String scenarioId;
 
     /**
      * Some StreetLayers are created by applying a scenario to an existing StreetLayer. All the contents of the base
@@ -428,6 +443,12 @@ public class StreetLayer implements Serializable, Cloneable {
 
             nearbyEdges.forEach(eidx -> {
                 e.seek(eidx);
+                // Connect only to edges that are good to link to (This skips tunnels)
+                // and skips link edges (that were used to link other stuff)
+                if (!e.getFlag(EdgeStore.EdgeFlag.LINKABLE)
+                    || e.getFlag(EdgeStore.EdgeFlag.LINK)) {
+                    return true;
+                }
                 LineString edgeGeometry = e.getGeometry();
 
                 if (edgeGeometry.intersects(g)) {
@@ -476,6 +497,11 @@ public class StreetLayer implements Serializable, Cloneable {
             parkRideLocationsMap.put(vidx, parkRideParking);
 
             int targetWalking = getOrCreateVertexNear(node.getLat(), node.getLon(), StreetMode.WALK);
+            if (targetWalking == -1) {
+                LOG.warn("Could not link park and ride node at ({}, {}) to the street network.",
+                        node.getLat(), node.getLon());
+                continue;
+            }
             EdgeStore.Edge created = edgeStore.addStreetPair(vidx, targetWalking, 1, -1);
 
             // allow link edges to be traversed by all, access is controlled by connected edges
@@ -1003,9 +1029,12 @@ public class StreetLayer implements Serializable, Cloneable {
      */
     public TIntSet findEdgesInEnvelope (Envelope envelope) {
         TIntSet candidates = spatialIndex.query(envelope);
-        // Always include any temporary edges created in a scenario.
-        // This allows us to skip rebuilding the spatial index for scenarios since over-selection is allowed.
-        edgeStore.forEachTemporarilyAddedEdge(candidates::add);
+        // Include temporary edges
+        if (temporaryEdgeIndex != null) {
+            TIntSet temporaryCandidates = temporaryEdgeIndex.query(envelope);
+            candidates.addAll(temporaryCandidates);
+        }
+
         // Remove any edges that were temporarily deleted in a scenario.
         // This allows properly re-splitting the same edge in multiple places.
         if (edgeStore.temporarilyDeletedEdges != null) {
@@ -1120,6 +1149,14 @@ public class StreetLayer implements Serializable, Cloneable {
             EdgeStore.Edge newEdge0 = edgeStore.addStreetPair(edge.getFromVertex(), newVertexIndex, split.distance0_mm, edge.getOSMID());
             // Copy the flags and speeds for both directions, making the new edge like the existing one.
             newEdge0.copyPairFlagsAndSpeeds(edge);
+
+            // add to temp spatial index
+            // we need to build this on the fly so that it is possible to split a street multiple times; otherwise,
+            // once a street had been split once, the original edge would be removed from consideration
+            // (StreetLayer#getEdgesNear filters out edges that have been deleted) and the new edge would not yet be in
+            // the spatial index for consideration. Havoc would ensue.
+            temporaryEdgeIndex.insert(newEdge0.getEnvelope(), newEdge0.edgeIndex);
+
             // Exclude the original split edge from all future spatial index queries on this scenario copy.
             // This should allow proper re-splitting of a single edge for multiple new transit stops.
             edgeStore.temporarilyDeletedEdges.add(edge.edgeIndex);
@@ -1129,10 +1166,11 @@ public class StreetLayer implements Serializable, Cloneable {
         EdgeStore.Edge newEdge1 = edgeStore.addStreetPair(newVertexIndex, oldToVertex, split.distance1_mm, edge.getOSMID());
         // Copy the flags and speeds for both directions, making newEdge1 like the existing edge.
         newEdge1.copyPairFlagsAndSpeeds(edge);
-        // Insert the new edge into the spatial index if we are working on a baseline graph.
-        // If this is a scenario, all temporary edges will be included in every spatial index query result.
+        // Insert the new edge into the spatial index
         if (!edgeStore.isExtendOnlyCopy()) {
             spatialIndex.insert(newEdge1.getEnvelope(), newEdge1.edgeIndex);
+        } else {
+            temporaryEdgeIndex.insert(newEdge1.getEnvelope(), newEdge1.edgeIndex);
         }
 
         // don't allow the router to make ill-advised U-turns at splitter vertices
@@ -1347,15 +1385,28 @@ public class StreetLayer implements Serializable, Cloneable {
      * We intentionally avoid using clone() on EdgeStore and VertexStore so all field copying is explicit and we can
      * clearly see whether we are accidentally shallow-copying any collections or data structures from the base graph.
      * StreetLayer has a lot more fields and most of them can be shallow-copied, so here we use clone() for convenience.
+     * @param willBeModified must be true if the scenario to be applied will make any changes to the new StreetLayer
+     *                       copy. This allows some optimizations (the lists in the StreetLayer will not be wrapped).
      * @return a copy of this StreetLayer to which Scenarios can be applied without affecting the original StreetLayer.
+     *
+     * It's questionable whether the willBeModified optimization actually affects routing speed, but in theory it
+     * saves a comparison and an extra dereference every time we use the edge/vertex stores.
+     * TODO check whether this actually affects speed. If not, just wrap the lists in every scenario copy.
      */
-    public StreetLayer scenarioCopy(TransportNetwork newScenarioNetwork) {
+    public StreetLayer scenarioCopy(TransportNetwork newScenarioNetwork, boolean willBeModified) {
         StreetLayer copy = this.clone();
-        copy.baseStreetLayer = this;
+        if (willBeModified) {
+            // Wrap all the edge and vertex storage in classes that make them extensible.
+            // Indicate that the content of the new StreetLayer will be changed by giving it the scenario's scenarioId.
+            // If the copy will not be modified, scenarioId remains unchanged to allow cached pointset linkage reuse.
+            copy.scenarioId = newScenarioNetwork.scenarioId;
+            copy.edgeStore = edgeStore.extendOnlyCopy();
+            // The extend-only copy of the EdgeStore also contains a new extend-only copy of the VertexStore.
+            copy.vertexStore = copy.edgeStore.vertexStore;
+            copy.temporaryEdgeIndex = new IntHashGrid();
+        }
         copy.parentNetwork = newScenarioNetwork;
-        copy.edgeStore = edgeStore.extendOnlyCopy();
-        // The extend-only copy of the EdgeStore also contains a new extend-only copy of the VertexStore.
-        copy.vertexStore = copy.edgeStore.vertexStore;
+        copy.baseStreetLayer = this;
         return copy;
     }
 

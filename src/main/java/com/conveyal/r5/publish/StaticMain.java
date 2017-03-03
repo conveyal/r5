@@ -1,6 +1,7 @@
 package com.conveyal.r5.publish;
 
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
+import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -40,9 +41,25 @@ public class StaticMain {
         metadata.run();
 
         LOG.info("Enqueueing requests");
-        List<StaticSiteRequest.PointRequest> requests = new ArrayList<>();
 
-        WebMercatorGridPointSet ps = net.getGridPointSet();
+        List<GenericClusterRequest> requests = new ArrayList<>();
+
+        // create the metadata request
+        StaticMetadata.MetadataRequest metadataRequest = new StaticMetadata.MetadataRequest();
+        metadataRequest.request = ssr;
+        metadataRequest.workerVersion = ssr.workerVersion;
+        metadataRequest.graphId = ssr.transportNetworkId;
+        metadataRequest.jobId = ssr.jobId;
+        requests.add(metadataRequest);
+
+        StaticMetadata.StopTreeRequest stopTreeRequest = new StaticMetadata.StopTreeRequest();
+        stopTreeRequest.request = ssr;
+        stopTreeRequest.workerVersion = ssr.workerVersion;
+        stopTreeRequest.graphId = ssr.transportNetworkId;
+        stopTreeRequest.jobId = ssr.jobId;
+        requests.add(stopTreeRequest);
+
+        WebMercatorGridPointSet ps = net.gridPointSet;
 
         // pre-link so it doesn't get done in every thread
         LinkedPointSet lps = ps.link(net.streetLayer, StreetMode.WALK);
@@ -65,7 +82,7 @@ public class StaticMain {
                 HttpClient httpClient = HttpClients.createDefault();
                 HttpPost request = new HttpPost(args[2] + "/enqueue/regional");
                 request.setHeader("Content-Type", "application/json");
-                List<StaticSiteRequest.PointRequest> subRequests = requests.subList(offset, Math.min(offset + 50000, nRequests));
+                List<GenericClusterRequest> subRequests = requests.subList(offset, Math.min(offset + 50000, nRequests));
                 request.setEntity(new StringEntity(JsonUtilities.objectMapper.writeValueAsString(subRequests)));
                 HttpResponse res = httpClient.execute(request);
 

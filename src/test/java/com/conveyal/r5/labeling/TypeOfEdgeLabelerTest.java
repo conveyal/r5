@@ -22,7 +22,10 @@ import static org.junit.Assert.*;
 public class TypeOfEdgeLabelerTest {
 
     public static final EnumSet<EdgeStore.EdgeFlag> PLATFORM = EnumSet
-        .of(EdgeStore.EdgeFlag.PLATFORM, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR);
+        .of(EdgeStore.EdgeFlag.PLATFORM,
+            EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
+            EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR,
+            EdgeStore.EdgeFlag.LINKABLE);
 
     static TypeOfEdgeLabeler typeOfEdgeLabeler;
     static TraversalPermissionLabeler traversalPermissionLabeler;
@@ -51,37 +54,78 @@ public class TypeOfEdgeLabelerTest {
 
     @Parameterized.Parameters(name="{0} with tags:{1}")
     public static Collection<Object[]> data() {
+        EnumSet<EdgeStore.EdgeFlag> CAR = EnumSet.copyOf(TraversalPermissionLabelerTest.CAR);
+        CAR.add(EdgeStore.EdgeFlag.LINKABLE);
+
         EnumSet<EdgeStore.EdgeFlag> CAR_CYCLEWAY = EnumSet.copyOf(TraversalPermissionLabelerTest.BICYCLE_AND_CAR);
         CAR_CYCLEWAY.add(EdgeStore.EdgeFlag.BIKE_PATH);
+        CAR_CYCLEWAY.add(EdgeStore.EdgeFlag.LINKABLE);
+
+        EnumSet<EdgeStore.EdgeFlag> PEDESTRIAN = EnumSet.copyOf(TraversalPermissionLabelerTest.PEDESTRIAN);
+        PEDESTRIAN.add(EdgeStore.EdgeFlag.LINKABLE);
+
         EnumSet<EdgeStore.EdgeFlag> PEDESTRIAN_BIKE_CYCLEWAY = EnumSet.copyOf(TraversalPermissionLabelerTest.PEDESTRIAN_AND_BICYCLE);
         PEDESTRIAN_BIKE_CYCLEWAY.add(EdgeStore.EdgeFlag.BIKE_PATH);
+        PEDESTRIAN_BIKE_CYCLEWAY.add(EdgeStore.EdgeFlag.LINKABLE);
+
         return Arrays.asList(new Object[][] {
-            {"sidewalk", "highway=cycleway;foot=designated;oneway=yes", EnumSet.of(EdgeStore.EdgeFlag.SIDEWALK,
-                EdgeStore.EdgeFlag.BIKE_PATH, EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
-                EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR),
-                EnumSet.of(EdgeStore.EdgeFlag.SIDEWALK,  EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
-                    EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR)
+            {
+                "sidewalk",
+                "highway=cycleway;foot=designated;oneway=yes",
+                EnumSet.of(EdgeStore.EdgeFlag.SIDEWALK,
+                    EdgeStore.EdgeFlag.BIKE_PATH,
+                    EdgeStore.EdgeFlag.ALLOWS_BIKE,
+                    EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
+                    EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR,
+                    EdgeStore.EdgeFlag.LINKABLE),
+                EnumSet.of(EdgeStore.EdgeFlag.SIDEWALK,
+                    EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
+                    EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR,
+                    EdgeStore.EdgeFlag.LINKABLE)
             },
-            {"sidewalk", "highway=footway;footway=sidewalk", EnumSet.of(EdgeStore.EdgeFlag.SIDEWALK,
-                EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR), EnumSet.of(EdgeStore.EdgeFlag.SIDEWALK,
-                EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN, EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR)},
+            {
+                "sidewalk",
+                "highway=footway;footway=sidewalk",
+                EnumSet.of(EdgeStore.EdgeFlag.SIDEWALK,
+                    EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
+                    EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR,
+                    EdgeStore.EdgeFlag.LINKABLE),
+                EnumSet.of(EdgeStore.EdgeFlag.SIDEWALK,
+                    EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
+                    EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR,
+                    EdgeStore.EdgeFlag.LINKABLE)
+            },
             {"platform", "highway=platform", PLATFORM, PLATFORM},
             {"platform", "public_transport=platform", PLATFORM, PLATFORM},
             {"platform", "railway=platform", PLATFORM, PLATFORM},
             {"monodirectional cycleway", "highway=nobikenoped;cycleway=lane", CAR_CYCLEWAY, CAR_CYCLEWAY},
             {"monodirectional cycleway", "highway=nobikenoped;cycleway=track", CAR_CYCLEWAY, CAR_CYCLEWAY},
-            {"directional cycleway", "highway=nobikenoped;cycleway:right=track", CAR_CYCLEWAY, TraversalPermissionLabelerTest.CAR},
-            {"directional cycleway", "highway=nobikenoped;cycleway:left=track", TraversalPermissionLabelerTest.CAR, CAR_CYCLEWAY},
-            {"directional cycleway", "highway=nobikenoped;cycleway:right=lane", CAR_CYCLEWAY, TraversalPermissionLabelerTest.CAR},
-            {"directional cycleway", "highway=nobikenoped;cycleway:left=lane", TraversalPermissionLabelerTest.CAR, CAR_CYCLEWAY},
-            {"directional cycleway", "highway=cycleway;oneway=true", PEDESTRIAN_BIKE_CYCLEWAY, TraversalPermissionLabelerTest.PEDESTRIAN},
+            {"directional cycleway", "highway=nobikenoped;cycleway:right=track", CAR_CYCLEWAY, CAR},
+            {"directional cycleway", "highway=nobikenoped;cycleway:left=track", CAR, CAR_CYCLEWAY},
+            {"directional cycleway", "highway=nobikenoped;cycleway:right=lane", CAR_CYCLEWAY, CAR},
+            {"directional cycleway", "highway=nobikenoped;cycleway:left=lane", CAR, CAR_CYCLEWAY},
+            {"directional cycleway", "highway=cycleway;oneway=true", PEDESTRIAN_BIKE_CYCLEWAY, PEDESTRIAN},
             {"directional cycleway", "highway=cycleway", PEDESTRIAN_BIKE_CYCLEWAY, PEDESTRIAN_BIKE_CYCLEWAY},
-            {"oneway streets with opposite lane cycleway", "highway=residential;cycleway=opposite_lane;oneway=yes", EnumSet.of(
-                EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
-                EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR), PEDESTRIAN_BIKE_CYCLEWAY},
-            {"oneway reversed street with opposite lane cycleway", "highway=residential;cycleway=opposite_lane;oneway=-1", PEDESTRIAN_BIKE_CYCLEWAY, EnumSet.of(
-                EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR, EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
-                EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR)},
+            {
+                "oneway streets with opposite lane cycleway",
+                "highway=residential;cycleway=opposite_lane;oneway=yes",
+                EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_BIKE,
+                    EdgeStore.EdgeFlag.ALLOWS_CAR,
+                    EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
+                    EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR,
+                    EdgeStore.EdgeFlag.LINKABLE),
+                PEDESTRIAN_BIKE_CYCLEWAY
+            },
+            {
+                "oneway reversed street with opposite lane cycleway",
+                "highway=residential;cycleway=opposite_lane;oneway=-1",
+                PEDESTRIAN_BIKE_CYCLEWAY,
+                EnumSet.of(EdgeStore.EdgeFlag.ALLOWS_BIKE,
+                    EdgeStore.EdgeFlag.ALLOWS_CAR,
+                    EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN,
+                    EdgeStore.EdgeFlag.ALLOWS_WHEELCHAIR,
+                    EdgeStore.EdgeFlag.LINKABLE)
+            },
         } );
 
 

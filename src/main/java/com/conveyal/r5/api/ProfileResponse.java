@@ -65,15 +65,13 @@ public class ProfileResponse {
      * Access and egress paths are also inserted only once per mode and stopIndex.
      * @param accessRouter map of modes to each street router for access paths
      * @param egressRouter map of modes to each street router for access paths
-     * @param stopModeAccessMap map of stopIds to LegModes with which they are reached the fastest for access
-     * @param stopModeEgressMap map of stopIds to LegModes with which they are reached the fastest for egress
      * @param currentTransitPath transit path with transfers stops and times
      * @param transportNetwork which is used to get stop names, etc.
      * @param fromTimeDateZD this is used to get date
      */
     public void addTransitPath(Map<LegMode, StreetRouter> accessRouter,
-        Map<LegMode, StreetRouter> egressRouter, TIntObjectMap<LegMode> stopModeAccessMap,
-        TIntObjectMap<LegMode> stopModeEgressMap, PathWithTimes currentTransitPath, TransportNetwork transportNetwork, ZonedDateTime fromTimeDateZD) {
+                               Map<LegMode, StreetRouter> egressRouter, PathWithTimes currentTransitPath,
+                               TransportNetwork transportNetwork, ZonedDateTime fromTimeDateZD) {
 
         HashPath hashPath = new HashPath(currentTransitPath);
         ProfileOption profileOption = transitToOption.getOrDefault(hashPath, new ProfileOption());
@@ -90,8 +88,7 @@ public class ProfileResponse {
         int endVertexStopIndex = transportNetwork.transitLayer.streetVertexForStop.get(endStopIndex);
         //LOG.info("Filling response access paths:");
         //TODO: update this so that each stopIndex and mode pair is changed to streetpath only once
-        LegMode accessMode = stopModeAccessMap.get(startStopIndex);
-
+        LegMode accessMode = currentTransitPath.accessMode;
         if (accessMode != null) {
             int accessPathIndex = profileOption.getAccessIndex(accessMode, startVertexStopIndex);
             if (accessPathIndex < 0) {
@@ -120,7 +117,7 @@ public class ProfileResponse {
         }
 
         //LOG.info("Filling response EGRESS paths:");
-        LegMode egressMode = stopModeEgressMap.get(endStopIndex);
+        LegMode egressMode = currentTransitPath.egressMode;
         if (egressMode != null) {
             int egressPathIndex = profileOption.getEgressIndex(egressMode, endVertexStopIndex);
             if (egressPathIndex < 0) {

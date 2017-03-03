@@ -1,21 +1,26 @@
 package com.conveyal.r5.publish;
 
+import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
+import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transitive.TransitiveNetwork;
+import com.google.common.io.CountingOutputStream;
 import com.google.common.io.LittleEndianDataOutputStream;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * Create the per-query files for a static site request.
@@ -75,7 +80,7 @@ public class StaticMetadata implements Runnable {
     /** Write metadata for this query */
     public void writeMetadata (OutputStream out) throws IOException {
         Metadata metadata = new Metadata();
-        WebMercatorGridPointSet ps = network.getGridPointSet();
+        WebMercatorGridPointSet ps = network.gridPointSet;
         metadata.zoom = ps.zoom;
         metadata.north = ps.north;
         metadata.west = ps.west;
@@ -84,15 +89,15 @@ public class StaticMetadata implements Runnable {
         metadata.transportNetwork = request.transportNetworkId;
         metadata.transitiveData = new TransitiveNetwork(network.transitLayer);
         metadata.request = request.request;
+        metadata.scenarioApplicationWarnings = network.scenarioApplicationWarnings;
 
         JsonUtilities.objectMapper.writeValue(out, metadata);
     }
 
     /** Write distance tables from stops to PointSet points for this query. */
     public void writeStopTrees (OutputStream out) throws IOException {
-
         // Build the distance tables.
-        LinkedPointSet lps = network.getLinkedGridPointSet();
+        LinkedPointSet lps = network.linkedGridPointSet;
         if (lps.stopToPointDistanceTables == null) {
             // Null means make all trees, not just those in a certain geographic area.
             lps.makeStopToPointDistanceTables(null);
@@ -121,7 +126,8 @@ public class StaticMetadata implements Runnable {
         }
 
         // Write the tables.
-        LittleEndianDataOutputStream dos = new LittleEndianDataOutputStream(out);
+        CountingOutputStream cos = new CountingOutputStream(new BufferedOutputStream(out));
+        LittleEndianIntOutputStream dos = new LittleEndianIntOutputStream(cos);
 
         int prevStopId = 0;
         int prevTime = 0;
@@ -147,6 +153,9 @@ public class StaticMetadata implements Runnable {
         }
 
         dos.flush();
+        dos.close();
+
+        LOG.info("static stop trees were {} bytes", cos.getCount());
     }
 
     public static class Metadata implements Serializable {
@@ -172,19 +181,28 @@ public class StaticMetadata implements Runnable {
         public ProfileRequest request;
 
         public TransitiveNetwork transitiveData;
+
+        /** Non fatal warnings encountered applying the scenario */
+        public List<TaskError> scenarioApplicationWarnings;
     }
 
     /** A request for the cluster to produce static metadata */
     public static class MetadataRequest extends GenericClusterRequest {
         public StaticSiteRequest request;
-
         public final String type = "static-metadata";
+        @Override
+        public ProfileRequest extractProfileRequest() {
+            return request.request;
+        }
     }
 
     /** A request for the cluster to produce static stop trees */
     public static class StopTreeRequest extends GenericClusterRequest {
         public StaticSiteRequest request;
-
         public final String type = "static-stop-trees";
+        @Override
+        public ProfileRequest extractProfileRequest() {
+            return request.request;
+        }
     }
 }

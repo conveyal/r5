@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -24,6 +25,7 @@ public class StreetPath {
     private StreetRouter.State firstState;
     private TransportNetwork transportNetwork;
     private int distance;
+    private int duration;
 
     public StreetPath(StreetRouter.State s, TransportNetwork transportNetwork,
         boolean reverseSearch) {
@@ -50,6 +52,7 @@ public class StreetPath {
         }
         firstState = states.getFirst();
         distance = lastState.distance;
+        duration = lastState.getDurationSeconds();
     }
 
     /**
@@ -72,13 +75,13 @@ public class StreetPath {
             if (lastState != null) {
                 lastState.isBikeShare = endCycling.isBikeShare;
                 //Here part from first bikeshare to the last bikeshare on rented bike is created
-                add(lastState);
+                add(lastState, false);
                 StreetRouter first = bicycle.previousRouter;
                 StreetRouter.State startCycling = getStates().getFirst();
                 lastState = first.getStateAtVertex(startCycling.vertex);
                 if (lastState != null) {
                     lastState.isBikeShare = startCycling.isBikeShare;
-                    add(lastState);
+                    add(lastState, false);
                 } else {
                     LOG.warn("Start to cycle path missing");
                 }
@@ -91,7 +94,7 @@ public class StreetPath {
             //So we need to search for driving part in previous streetRouter
             StreetRouter.State carState = streetRouter.previousRouter.getStateAtVertex(carPark.vertex);
             if (carState != null) {
-                add(carState);
+                add(carState, true);
             } else {
                 LOG.warn("Missing CAR part of CAR_PARK trip in streetRouter!");
             }
@@ -110,7 +113,7 @@ public class StreetPath {
     }
 
     public int getDuration() {
-        return lastState.getDurationSeconds();
+        return duration;
     }
 
     //Gets distance in mm
@@ -127,8 +130,9 @@ public class StreetPath {
      *
      * it adds all the new states before existing ones. Since path is reconstructed from end to start
      * @param lastState
+     * @param updateDistanceTime
      */
-    public void add(StreetRouter.State lastState) {
+    public void add(StreetRouter.State lastState, boolean updateDistanceTime) {
         boolean first = true;
         /*
          * Starting from latest (time-wise) state, copy states to the head of a list in reverse
@@ -149,6 +153,11 @@ public class StreetPath {
             }
         }
         firstState = states.getFirst();
-        distance+=lastState.distance;
+        if (updateDistanceTime) {
+            LOG.debug("Will add {}m to {}m = {}m", lastState.distance / 1000, distance / 1000,
+                (distance + lastState.distance) / 1000);
+            distance += lastState.distance;
+            duration += lastState.getDurationSeconds()+ PointToPointQuery.CAR_PARK_DROPOFF_TIME_S;
+        }
     }
 }

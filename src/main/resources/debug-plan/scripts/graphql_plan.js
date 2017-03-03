@@ -32,6 +32,8 @@ var PlanConfig = function() {
     this.fromLon = "";
     this.toLat = "";
     this.toLon = "";
+    this.bikeTrafficStress = 4;
+    this.minBikeTime = 5;
     this.wheelchair = false;
     this.offset = offset;
     this.plan = requestPlan;
@@ -506,10 +508,12 @@ function makeTextResponse(data) {
                     var tripId = patternInfo.tripId[transitInfo.time];
                     var pPatternInfo = patterns[patternInfo.patternIdx];
                     var ptripInfo = pPatternInfo.trips[tripId];
-                    item+="<li>Mode: " + route.mode + "<br />From:"+transitData.from.name+" (<abbr title=\"Wheelchair accessible\">WA</abbr>: " + transitData.from.wheelchairBoarding +") --> ";
-                    item+=transitData.to.name+ " (<abbr title=\"Wheelchair accessible\">WA</abbr>: " + transitData.to.wheelchairBoarding +") <br /> Pattern:";
-                    item+=patternInfo.patternId+ " Line:" + route.shortName + " " +fromTime+" --> " +toTime + "<br />";
-                    item+= "<abbr title=\"Bikes Allowed\">BA</abbr>:" + ptripInfo.bikesAllowed + " <abbr title=\"Wheelchair accessible\">WA</abbr>:" + ptripInfo.wheelchairAccessible + " <abbr title=\"Service ID\">SID</abbr>:" + ptripInfo.serviceId + " Trip ID: " + ptripInfo.tripId +"</li>";
+                    item += "<li>Mode: " + route.mode + "<br/>"
+                    item += "From: " + transitData.from.name + " (" + transitData.from.stopId + " <abbr title=\"Wheelchair accessible\">WA</abbr>: " + transitData.from.wheelchairBoarding +")<br/>";
+                    item += "To: " + transitData.to.name + " (" + transitData.to.stopId + " <abbr title=\"Wheelchair accessible\">WA</abbr>: " + transitData.to.wheelchairBoarding +") <br />";
+                    item += "Pattern: ";
+                    item += patternInfo.patternId+ " Line:" + route.shortName + " " +fromTime+" --> " +toTime + "<br />";
+                    item += "<abbr title=\"Bikes Allowed\">BA</abbr>:" + ptripInfo.bikesAllowed + " <abbr title=\"Wheelchair accessible\">WA</abbr>:" + ptripInfo.wheelchairAccessible + " <abbr title=\"Service ID\">SID</abbr>:" + ptripInfo.serviceId + " Trip ID: " + ptripInfo.tripId +"</li>";
                     if (transitData["middle"] != null) {
                         var middleData = transitData["middle"]
                         item+="<li>Mode:"+middleData.mode+" Duration: " + secondsToTime(middleData.duration) + "Distance: "+middleData.distance/1000 + "m</li>";
@@ -656,7 +660,9 @@ function requestPlan() {
             'toLon':planConfig.toLon,
             'wheelchair':planConfig.wheelchair,
             'fromTime':planConfig.date+"T"+planConfig.fromTime+planConfig.offset,
-            'toTime':planConfig.date+"T"+planConfig.toTime+planConfig.offset
+            'toTime':planConfig.date+"T"+planConfig.toTime+planConfig.offset,
+            'minBikeTime': planConfig.minBikeTime,
+            'bikeTrafficStress': planConfig.bikeTrafficStress
         };
     var params = {
         'query': request,
@@ -817,6 +823,8 @@ $(document).ready(function() {
     gui.add(planConfig, "fromLon").listen().onFinishChange(function(value) {moveMarker("from"); });
     gui.add(planConfig, "toLat").listen().onFinishChange(function(value) {moveMarker("to"); });
     gui.add(planConfig, "toLon").listen().onFinishChange(function(value) {moveMarker("to"); });
+    gui.add(planConfig, "bikeTrafficStress");
+    gui.add(planConfig, "minBikeTime");
     gui.add(planConfig, "plan");
     gui.add(planConfig, "showStops");
     gui.add(planConfig, "showPR");

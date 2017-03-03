@@ -1,6 +1,5 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.analyst.BoardingAssumption;
 import com.conveyal.r5.analyst.scenario.Scenario;
 
 import java.time.*;
@@ -149,10 +148,6 @@ public class ProfileRequest implements Serializable, Cloneable {
      * The default is 0.5.
      */
     public float reachabilityThreshold = 0.5f;
-
-    /** Deprecated: code now always does a monte carlo simulation */
-    @Deprecated
-    public BoardingAssumption boardingAssumption;
 
     /* The relative importance of different factors when biking */
     /** The relative importance of maximizing safety when cycling */

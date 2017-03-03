@@ -60,15 +60,18 @@ public class AddTrips extends Modification {
 
     @Override
     public boolean resolve (TransportNetwork network) {
-        if (stops == null) {
-            warnings.add("You must provide some stops.");
+        if (stops == null || stops.size() < 2) {
+            errors.add("You must provide at least two stops.");
         } else {
+            if (frequencies.isEmpty()) {
+                errors.add("This modification should include at least one timetable/frequency entry.");
+            }
             for (PatternTimetable entry : frequencies) {
-                warnings.addAll(entry.validate(stops.size()));
+                errors.addAll(entry.validate(stops.size()));
             }
             intStopIds = findOrCreateStops(stops, network);
         }
-        return warnings.size() > 0;
+        return errors.size() > 0;
     }
 
     @Override
@@ -122,7 +125,7 @@ public class AddTrips extends Modification {
         for (PatternTimetable timetable : frequencies) {
             TripSchedule schedule = createSchedule(timetable, directionId, transitLayer.services);
             if (schedule == null) {
-                warnings.add("Failed to create a trip.");
+                errors.add("Failed to create a trip.");
                 continue;
             }
             pattern.addTrip(schedule);

@@ -16,14 +16,8 @@ public class StaticPropagatedTimesStore extends PropagatedTimesStore {
     }
 
     @Override
-    public void setFromArray(int[][] times, BitSet includeInAverages, ConfidenceCalculationMethod confidenceCalculationMethod, float reachabilityThreshold) {
-        super.setFromArray(times, includeInAverages, confidenceCalculationMethod, reachabilityThreshold);
-
-        // don't include extrema in the times we save.
-        this.times = new int[includeInAverages.cardinality()][];
-
-        for (int i = 0, pos = 0; i < times.length; i++) {
-            if (includeInAverages.get(i)) this.times[pos++] = times[i];
-        }
+    public void setFromArray(int[][] times, float reachabilityThreshold) {
+        // NB this no longer calls the superclass method to compute averages as they're not needed for static sites
+        this.times = times;
     }
 }

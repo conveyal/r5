@@ -76,7 +76,7 @@ public class AdjustSpeed extends Modification {
     @Override
     public boolean resolve(TransportNetwork network) {
         if (scale <= 0) {
-            warnings.add("Scaling factor must be a positive number.");
+            errors.add("Scaling factor must be a positive number.");
         }
 
         if (hops != null) {
@@ -84,17 +84,17 @@ public class AdjustSpeed extends Modification {
             hopToStops = new TIntArrayList(hops.size());
             for (String[] pair : hops) {
                 if (pair.length != 2) {
-                    warnings.add("Hops must all have exactly two stops.");
+                    errors.add("Hops must all have exactly two stops.");
                     continue;
                 }
                 int intFromId = network.transitLayer.indexForStopId.get(pair[0]);
                 int intToId = network.transitLayer.indexForStopId.get(pair[1]);
                 if (intFromId == -1) {
-                    warnings.add("Could not find hop origin stop " + pair[0]);
+                    errors.add("Could not find hop origin stop " + pair[0]);
                     continue;
                 }
                 if (intToId == -1) {
-                    warnings.add("Could not find hop destination stop " + pair[1]);
+                    errors.add("Could not find hop destination stop " + pair[1]);
                     continue;
                 }
                 hopFromStops.add(intFromId);
@@ -102,7 +102,7 @@ public class AdjustSpeed extends Modification {
             }
         }
         checkIds(routes, patterns, trips, true, network);
-        return warnings.size() > 0;
+        return errors.size() > 0;
     }
 
     @Override
@@ -113,9 +113,9 @@ public class AdjustSpeed extends Modification {
         if (nTripsAffected > 0) {
             LOG.info("Speed was changed on {} trips.", nTripsAffected);
         } else {
-            warnings.add("This modification did not cause any changes to the transport network.");
+            errors.add("This modification did not cause any changes to the transport network.");
         }
-        return warnings.size() > 0;
+        return errors.size() > 0;
     }
 
     private TripPattern processTripPattern (TripPattern originalPattern) {

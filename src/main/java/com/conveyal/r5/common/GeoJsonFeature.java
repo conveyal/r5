@@ -30,6 +30,9 @@ public class GeoJsonFeature {
         this(GeometryUtils.geometryFactory.createPoint(new Coordinate(lon, lat)));
     }
 
+    /** no-arg for deserialization */
+    public GeoJsonFeature () {}
+
     public String getType() {
         return type;
     }

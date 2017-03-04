@@ -1,6 +1,9 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.r5.common.GeoJsonFeature;
+import com.conveyal.r5.common.GeoJsonFeatureCollection;
 import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.util.ShapefileReader;
 import com.csvreader.CsvReader;
 import com.google.common.io.LittleEndianDataInputStream;
@@ -11,6 +14,7 @@ import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.MultiPolygon;
 import com.vividsolutions.jts.geom.Point;
 import com.vividsolutions.jts.geom.Polygon;
+import com.vividsolutions.jts.geom.Polygonal;
 import gnu.trove.iterator.TObjectDoubleIterator;
 import gnu.trove.map.TObjectDoubleMap;
 import gnu.trove.map.hash.TObjectDoubleHashMap;
@@ -587,7 +591,103 @@ public class Grid {
             os = new BufferedOutputStream(new FileOutputStream(args[args.length - 1] + ".png"));
             result.writePng(os);
             os.close();
+        } else if ("mask".equals(args[0])) {
+            InputStream is = new BufferedInputStream(new FileInputStream(args[1]));
+            Grid grid = Grid.read(is);
+            is.close();
+
+            // read the geojson
+            GeoJsonFeatureCollection features =
+                    JsonUtilities.lenientObjectMapper.readValue(new File(args[2]), GeoJsonFeatureCollection.class);
+
+            if (features.features.size() != 1) {
+                LOG.error("GeoJSON mask must have exactly one feature!");
+                System.exit(1);
+            }
+
+            Geometry geom = features.features.iterator().next().getGeometry();
+            if (!Polygonal.class.isInstance(geom)) {
+                LOG.error("GeoJSON mask must be a polygon or multipolygon!");
+                System.exit(1);
+            }
+
+            grid.mask(geom, false);
+
+            OutputStream os = new BufferedOutputStream(new FileOutputStream(args[3]));
+            grid.write(os);
+            os.close();
+
+            os = new BufferedOutputStream(new FileOutputStream(args[3] + ".png"));
+            grid.writePng(os);
+            os.close();
+        } else if ("crop".equals(args[0])) {
+            InputStream is = new BufferedInputStream(new FileInputStream(args[1]));
+            Grid grid = Grid.read(is);
+            is.close();
+
+            is = new BufferedInputStream(new FileInputStream(args[2]));
+            Grid cropGrid = Grid.read(is);
+            is.close();
+
+            Grid cropped = grid.crop(cropGrid);
+
+            OutputStream os = new BufferedOutputStream(new FileOutputStream(args[3]));
+            cropped.write(os);
+            os.close();
+
+            os = new BufferedOutputStream(new FileOutputStream(args[3] + ".png"));
+            cropped.writePng(os);
+            os.close();
         }
+    }
+
+    /** Clear all pixels that do not fall inside the mask. If invert is true, clears all pixel that do fall within the mask */
+    private void mask(Geometry mask, boolean invert) {
+        for (int x = 0; x < width; x++) {
+            int worldx = x + west;
+            double longitude = pixelToLon(worldx, zoom);
+
+            for (int y = 0; y < height; y++) {
+                int worldy = y + north;
+                double latitude = pixelToLat(worldy, zoom);
+
+                Coordinate coord = new Coordinate(longitude, latitude);
+                // TODO do we have to make a point here?
+                // might it be more efficient to rasterize the geometry?
+                // ^ is xor, if we're inverting, the contains needs to be true,
+                // otherwise false
+                if (invert ^ !mask.contains(GeometryUtils.geometryFactory.createPoint(coord))) {
+                    this.grid[x][y] = 0;
+                }
+            }
+        }
+    }
+
+    /** Clip this grid to be the same size as another grid */
+    public Grid crop (Grid other) {
+        if (other.zoom != zoom) {
+            throw new IllegalArgumentException("Zooms do not match!");
+        }
+
+        if (other.west < west ||
+                other.north < north ||
+                other.west + other.width > west + width ||
+                other.north + other.height > north + height) {
+            throw new IllegalArgumentException("Grid must be contained within this grid!");
+        }
+
+        Grid newGrid = new Grid(zoom, other.width, other.height, other.north, other.west);
+
+        int fromx = other.west - this.west;
+        int fromy = other.north - this.north;
+
+        for (int inx = fromx, outx = 0; outx < other.width; outx++, inx++) {
+            for (int iny = fromy, outy = 0; outy < other.height; outy++, iny++) {
+                newGrid.grid[outx][outy] = grid[inx][iny];
+            }
+        }
+
+        return newGrid;
     }
 
     /** Return true if this grid has the same zoom and bounds as the other grid */

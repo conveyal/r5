@@ -18,6 +18,7 @@ import com.vividsolutions.jts.geom.Polygonal;
 import gnu.trove.iterator.TObjectDoubleIterator;
 import gnu.trove.map.TObjectDoubleMap;
 import gnu.trove.map.hash.TObjectDoubleHashMap;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
@@ -29,6 +30,7 @@ import org.geotools.gce.geotiff.GeoTiffWriteParams;
 import org.geotools.gce.geotiff.GeoTiffWriter;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
+import org.opengis.feature.Feature;
 import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
@@ -63,6 +65,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.conveyal.gtfs.util.Util.human;
+import static java.lang.Double.NaN;
 import static java.lang.Double.parseDouble;
 import static org.apache.commons.math3.util.FastMath.atan;
 import static org.apache.commons.math3.util.FastMath.cos;
@@ -199,6 +202,19 @@ public class Grid {
             grid[x][y] += amount;
         } else {
             // Warn that an attempt was made to increment outside the grid
+        }
+    }
+
+    /** Get value at a particulate location */
+    public double retrievePoint (double lat, double lon, double noData) {
+        int worldx = lonToPixel(lon, zoom);
+        int worldy = latToPixel(lat, zoom);
+        int x = worldx - west;
+        int y = worldy - north;
+        if (x >= 0 && x < width && y >= 0 && y < height) {
+            return grid[x][y];
+        } else {
+            return noData;
         }
     }
 
@@ -638,6 +654,33 @@ public class Grid {
             os = new BufferedOutputStream(new FileOutputStream(args[3] + ".png"));
             cropped.writePng(os);
             os.close();
+        } else if ("sample".equals(args[0])) {
+            // Read a GeoJSON file of points and write a new GeoJSON file with the values at those points in the chosen grid
+            // usage: sample in.json grid1 [grid2 grid3...] out.json
+            // read the geojson
+            GeoJsonFeatureCollection features =
+                    JsonUtilities.lenientObjectMapper.readValue(new File(args[1]), GeoJsonFeatureCollection.class);
+
+            Map<String, Grid> grids = new HashMap<>();
+
+            for (int i = 2; i < args.length - 1; i++) {
+                InputStream is = new BufferedInputStream(new FileInputStream(args[i]));
+                Grid grid = Grid.read(is);
+                is.close();
+
+                grids.put(FilenameUtils.getBaseName(args[i]), grid);
+            }
+
+            for (GeoJsonFeature feature : features.features) {
+                Coordinate centroid = feature.getGeometry().getCoordinate();
+
+                grids.forEach((key, grid) -> {
+                    double val = grid.retrievePoint(centroid.y, centroid.x, NaN);
+                    feature.addProperty(String.format("%s_accessibility", key), val);
+                });
+            }
+
+            JsonUtilities.lenientObjectMapper.writeValue(new File(args[args.length - 1]), features);
         }
     }
 

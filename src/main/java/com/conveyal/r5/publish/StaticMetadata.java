@@ -3,6 +3,7 @@ package com.conveyal.r5.publish;
 import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
+import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -19,6 +20,7 @@ import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.Serializable;
+import java.util.List;
 
 /**
  * Create the per-query files for a static site request.
@@ -87,6 +89,7 @@ public class StaticMetadata implements Runnable {
         metadata.transportNetwork = request.transportNetworkId;
         metadata.transitiveData = new TransitiveNetwork(network.transitLayer);
         metadata.request = request.request;
+        metadata.scenarioApplicationWarnings = network.scenarioApplicationWarnings;
 
         JsonUtilities.objectMapper.writeValue(out, metadata);
     }
@@ -178,6 +181,9 @@ public class StaticMetadata implements Runnable {
         public ProfileRequest request;
 
         public TransitiveNetwork transitiveData;
+
+        /** Non fatal warnings encountered applying the scenario */
+        public List<TaskError> scenarioApplicationWarnings;
     }
 
     /** A request for the cluster to produce static metadata */

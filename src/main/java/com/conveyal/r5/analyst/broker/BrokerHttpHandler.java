@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst.broker;
 import com.conveyal.r5.analyst.cluster.AnalystWorker;
 import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import com.conveyal.r5.analyst.cluster.WorkerStatus;
+import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -65,6 +66,10 @@ class BrokerHttpHandler extends HttpHandler {
         if (pathComponents.length < 2) {
             response.setStatus(HttpStatus.BAD_REQUEST_400);
             response.setDetailMessage("path should have at least one part");
+            TaskError error = new TaskError(null, "Path should have at least one part", "");
+            OutputStream os = response.getOutputStream();
+            mapper.writeValue(os, new TaskError[] { error });
+            return;
         }
 
         String command = pathComponents[1];
@@ -167,6 +172,10 @@ class BrokerHttpHandler extends HttpHandler {
                             !task.workerVersion.equals(exemplar.workerVersion)) {
                             response.setStatus(HttpStatus.BAD_REQUEST_400);
                             response.setDetailMessage("All tasks must be for the same graph, job, and worker commit.");
+                            TaskError error = new TaskError(null, "All tasks must be for the same graph, job, and worker commit.", "");
+                            OutputStream os = response.getOutputStream();
+                            mapper.writeValue(os, new TaskError[] { error });
+                            os.close();
                             return;
                         }
                     }
@@ -195,6 +204,7 @@ class BrokerHttpHandler extends HttpHandler {
                     // The worker did not find any obvious problems with the request and is streaming back what it
                     // believes to be a reliable work result.
                     suspendedProducerResponse.setStatus(HttpStatus.OK_200);
+                    suspendedProducerResponse.setContentType(request.getContentType());
                 } else {
                     // The worker is providing an error message because it spotted something wrong with the request.
                     suspendedProducerResponse.setStatus(Integer.parseInt(successOrError));
@@ -242,14 +252,27 @@ class BrokerHttpHandler extends HttpHandler {
                 } else {
                     response.setStatus(HttpStatus.BAD_REQUEST_400);
                     response.setDetailMessage("Delete is only allowed for tasks and jobs.");
+                    TaskError error = new TaskError(null, "Delete is only allowed for tasks and jobs", "");
+                    OutputStream os = response.getOutputStream();
+                    mapper.writeValue(os, new TaskError[] { error });
+                    os.close();
                 }
             } else {
                 response.setStatus(HttpStatus.BAD_REQUEST_400);
                 response.setDetailMessage("Unrecognized combination of HTTP method and command.");
+                TaskError error = new TaskError(null, "Unrecognized combination of HTTP method and command.", "");
+                OutputStream os = response.getOutputStream();
+                mapper.writeValue(os, new TaskError[] { error });
+                os.close();
             }
         } catch (JsonProcessingException jpex) {
             response.setStatus(HttpStatus.BAD_REQUEST_400);
             response.setDetailMessage("Could not decode/encode JSON payload. " + jpex.getMessage());
+            TaskError error = new TaskError(null, "Could not decode/encode JSON payload. ", jpex.getMessage());
+            OutputStream os = response.getOutputStream();
+            mapper.writeValue(os, new TaskError[] { error });
+            os.close();
+            
             LOG.info("Error processing JSON from client", jpex);
         } catch (Exception ex) {
             response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR_500);

@@ -89,7 +89,9 @@ public class StaticComputer implements Runnable {
         // Create a new Raptor Worker.
         // Tell it that we want a travel time to each stop by leaving the point set parameter null.
         FastRaptorWorker worker = new FastRaptorWorker(network.transitLayer, req.request.request, accessTimes);
+        // Also tell it to retain all the intermediate states rather than just the travel times, so we can draw paths.
         worker.saveAllStates = saveAllStates;
+
 
         // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
         int[][] transitTravelTimes = worker.route();
@@ -153,6 +155,7 @@ public class StaticComputer implements Runnable {
                 if (worker.saveAllStates) {
                     RaptorState state = worker.statesEachIteration.get(iter);
                     int inVehicleTravelTime = state.nonTransferInVehicleTravelTime[stop] / 60;
+
                     out.writeInt(inVehicleTravelTime - previousInVehicleTravelTime);
                     previousInVehicleTravelTime = inVehicleTravelTime;
 

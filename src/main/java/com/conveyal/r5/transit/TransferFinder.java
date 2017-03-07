@@ -46,6 +46,7 @@ public class TransferFinder {
 
     public void findParkRideTransfer() {
         int unconnectedParkRides = 0;
+        int parkRidesWithoutStops = 0;
         LOG.info("Finding closest stops to P+R for {} P+Rs", this.streetLayer.parkRideLocationsMap.size());
         for (ParkRideParking parkRideParking : this.streetLayer.parkRideLocationsMap.valueCollection()) {
             int originStreetVertex;
@@ -80,12 +81,14 @@ public class TransferFinder {
             // Record this list of transfers as leading out of the stop with index s.
             if (pathToreachedStops.size() > 0) {
                 parkRideParking.closestTransfers = pathToreachedStops;
-                LOG.info("Found {} stops for P+R:{}", distancesToReachedStops.size(), parkRideParking.id);
+                LOG.debug("Found {} stops for P+R:{}", distancesToReachedStops.size(), parkRideParking.id);
             } else {
                 parkRideParking.closestTransfers = EMPTY_STATE_MAP;
-                LOG.info("Not found stops for Park ride:{}", parkRideParking.id);
+                LOG.debug("Not found stops for Park ride:{}", parkRideParking.id);
+                parkRidesWithoutStops++;
             }
         }
+        LOG.info("Found {} unconnected P+Rs and {} P+Rs without closest stop in {} m", unconnectedParkRides, parkRidesWithoutStops, TransitLayer.PARKRIDE_DISTANCE_LIMIT);
     }
 
     public void findTransfers () {

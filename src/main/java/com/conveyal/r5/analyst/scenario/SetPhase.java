@@ -47,9 +47,9 @@ public class SetPhase extends Modification {
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
         if (!applied) {
-            warnings.add("A set-phase modification was not applied. The frequency entry was not found: " + phaseId);
+            errors.add("A set-phase modification was not applied. The frequency entry was not found: " + phaseId);
         }
-        return warnings.size() > 0;
+        return errors.size() > 0;
     }
 
     @Override
@@ -64,7 +64,7 @@ public class SetPhase extends Modification {
             return originalPattern;
         }
         if (originalPattern.tripSchedules.size() != 1) {
-            warnings.add("In Indianapolis, all updated schedules are expected to be the only schedule on a pattern.");
+            errors.add("In Indianapolis, all updated schedules are expected to be the only schedule on a pattern.");
         }
         TripPattern newTripPattern = originalPattern.clone();
         newTripPattern.tripSchedules = originalPattern.tripSchedules.stream().map(ts -> {
@@ -72,7 +72,7 @@ public class SetPhase extends Modification {
             int entryIndex = Arrays.asList(ts.frequencyEntryIds).indexOf(phaseId);
             if (entryIndex == -1) return ts;
             if (ts.frequencyEntryIds.length != 1) {
-                warnings.add("In Indianapolis, all updated entries are expected to be the only entry on a schedule.");
+                errors.add("In Indianapolis, all updated entries are expected to be the only entry on a schedule.");
             }
             // At this point, we know there are frequency entries and one of them has the specified ID.
             // Update that particular entry with the supplied phase information.
@@ -84,7 +84,7 @@ public class SetPhase extends Modification {
             newTripSchedule.phaseAtStop = new String[] {phaseStop};
             newTripSchedule.phaseSeconds = new int[] {phaseSeconds};
             if (applied) {
-                warnings.add("A set-phase modification has been applied more than one entry in the network.");
+                errors.add("A set-phase modification has been applied more than one entry in the network.");
             }
             applied = true;
             return newTripSchedule;

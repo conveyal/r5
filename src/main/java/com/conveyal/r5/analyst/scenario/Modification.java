@@ -1,6 +1,5 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.r5.transit.TransferFinder;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
@@ -65,7 +64,14 @@ public abstract class Modification implements Serializable {
      * The "resolve" method is called on each Modification before it is applied. If any problems are detected, the
      * Modification should not be applied, and this Set should contain Strings describing all the problems.
      */
-    public final Set<String> warnings = new HashSet<String>();
+    public transient final Set<String> errors = new HashSet<>();
+
+    /**
+     * Any warnings that should be presented to the user but which do not prevent scenario application should appear here.
+     */
+    // TODO this should be transient as well but previously wasn't. R5 modifications are stored in MongoDB in regional
+    // analyses, which means that marking it transient causes deserialization headaches.
+    public final Set<String> warnings = new HashSet<>();
 
     /**
      * Apply this single modification to a TransportNetwork.
@@ -88,7 +94,7 @@ public abstract class Modification implements Serializable {
      * to store the canonical parameter representations and resolved IDs in instance fields of Modification subclasses.
      * We return a boolean rather than throwing an exception to provide cleaner program flow. This also allows
      * accumulation of error messages, rather than reporting only the first error encountered. Messages describing
-     * the errors encountered should be added to the list of Strings in the Modification field "warnings".
+     * the errors encountered should be added to the list of Strings in the Modification field "errors".
      *
      * The resolve step could conceivably be folded into the actual application of the modification to the network,
      * but by resolving all the modifications up front before applying any, we are able to accumulate multiple errors
@@ -120,7 +126,7 @@ public abstract class Modification implements Serializable {
     /**
      * For each StopSpec in the supplied list, find or create and link a stop in the given TransportNetwork.
      * This method is shared by all modifications that need to find or create stops based on a list of StopSpecs.
-     * Any warnings or error messages are stored in the warnings list of this Modification.
+     * Any warnings or error messages are stored in the errors list of this Modification.
      * Any Modification that calls this method can potentially affect both the street and transit layers of the network.
      * @return the integer stop IDs of all stops that were found or created
      */
@@ -128,7 +134,7 @@ public abstract class Modification implements Serializable {
         // Create or find the stops referenced by the new trips.
         TIntList intStopIds = new TIntArrayList();
         for (StopSpec stopSpec : stops) {
-            int intStopId = stopSpec.resolve(network, warnings);
+            int intStopId = stopSpec.resolve(network, errors);
             intStopIds.add(intStopId);
         }
         // Adding the stops changes the street network but does not rebuild the edge lists.
@@ -180,14 +186,14 @@ public abstract class Modification implements Serializable {
         }
         if (nDefined != 1) {
             if (allowTrips) {
-                warnings.add("Exactly one of routes, patterns, or trips must be provided.");
+                errors.add("Exactly one of routes, patterns, or trips must be provided.");
             } else {
-                warnings.add("Either routes or patterns must be provided, but not both.");
+                errors.add("Either routes or patterns must be provided, but not both.");
             }
         }
         if (!allowTrips && trips != null) {
             // This cannot happen yet, but it will if (TODO) we pull these fields up to the Modification class.
-            warnings.add("This modification type does not allow specifying individual trips by ID.");
+            errors.add("This modification type does not allow specifying individual trips by ID.");
         }
 
         // TODO pull the network field up into the Modification class.
@@ -198,10 +204,10 @@ public abstract class Modification implements Serializable {
             }
         }
         if (unmatchedRoutes.size() > 0) {
-            warnings.add("These route IDs could not be found: " + unmatchedRoutes.toString());
+            errors.add("These route IDs could not be found: " + unmatchedRoutes.toString());
         }
         if (unmatchedTrips.size() > 0) {
-            warnings.add("These trip IDs could not be found: " + unmatchedTrips.toString());
+            errors.add("These trip IDs could not be found: " + unmatchedTrips.toString());
         }
 
     }

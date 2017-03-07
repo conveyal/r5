@@ -32,7 +32,7 @@ public class IsochroneFeature implements Serializable {
     // maximum number of vertices in a ring
     public static final int MAX_RING_SIZE = 25000;
 
-    /** The minimum ring size (to get rid of small rings). Should be at least 3 to ensure all rings are valid */
+    /** The minimum ring size (to get rid of small rings). Should be at least 4 to ensure all rings are valid */
     public static final int MIN_RING_SIZE = 12;
 
     // scale factor for the grid. Making this a power of 2 will theoretically make the algorithm fast as the averaging

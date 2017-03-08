@@ -299,7 +299,10 @@ public class StreetLayer implements Serializable, Cloneable {
         buildEdgeLists();
         stressLabeler.applyIntersectionCosts(this);
         if (removeIslands) {
-            removeDisconnectedSubgraphs(MIN_SUBGRAPH_SIZE);
+            new TarjanIslandPruner(this, MIN_SUBGRAPH_SIZE, StreetMode.CAR).run();
+            // due to bike walking, walk must go before bike, see comment in TarjanIslandPruner javadoc
+            new TarjanIslandPruner(this, MIN_SUBGRAPH_SIZE, StreetMode.WALK).run();
+            new TarjanIslandPruner(this, MIN_SUBGRAPH_SIZE, StreetMode.BICYCLE).run();
         }
 
         // index the streets, we need the index to connect things to them.
@@ -1274,77 +1277,6 @@ public class StreetLayer implements Serializable, Cloneable {
 
     public int getVertexCount() {
         return vertexStore.getVertexCount();
-    }
-
-    /**
-     * Eliminate disconnected subgraphs in the street network that appear to be caused by OSM editing mistakes.
-     * We try to keep any true islands (places like airports that are walkable but have no pedestrian access).
-     * Islands with more than minSubgraphSize vertices are assumed to be intentional features in OSM.
-     *
-     * We don't actually remove the vertices and edges because different islands may exist from the point of view of
-     * different street modes, and because the total number of vertices and edges involved in islands is usually quite
-     * small relative to the full network so leaving them in does not waste a significant amount of space.
-     *
-     * Instead we remove pedestrian permissions. TODO re-run the searches removing bicycle and car permissions.
-     */
-    public void removeDisconnectedSubgraphs(int minSubgraphSize) {
-        LOG.info("Removing subgraphs with fewer than {} vertices", minSubgraphSize);
-
-        boolean edgeListsBuilt = incomingEdges != null;
-        if (!edgeListsBuilt) {
-            buildEdgeLists();
-        }
-
-        TIntSet verticesExplored = new TIntHashSet();
-        int nSearches = 0;
-        int nSubgraphsRemoved = 0;
-        int nSubgraphsRetained = 0;
-        final Edge edge = edgeStore.getCursor(); // This edge cursor is reused on all subgraphs.
-        for (int vertex = 0; vertex < vertexStore.getVertexCount(); vertex++) {
-            if (verticesExplored.contains(vertex)) {
-                continue;
-            }
-            StreetRouter r = new StreetRouter(this);
-            r.streetMode = StreetMode.WALK;
-            r.setOrigin(vertex);
-            // Walk as far as possible within this subgraph.
-            r.distanceLimitMeters = 0;
-            r.route();
-            TIntIntMap reachedVertices = r.getReachedVertices();
-            nSearches++;
-            if (nSearches % 10000 == 0) {
-                LOG.info("Searched from vertex number {}, {} total searches performed.", vertex, nSearches);
-            }
-            verticesExplored.addAll(reachedVertices.keySet());
-            if (reachedVertices.size() >= minSubgraphSize) {
-                // This subgraph is big, it's probably literally an island (or airport) rather than bad OSM data.
-                nSubgraphsRetained++;
-                continue;
-            }
-            // Remove pedestrian permissions from all edges coming into and out of all vertices in this subgraph.
-            reachedVertices.put(vertex, 0); // Is this necessary or is origin vertex included?
-            reachedVertices.forEachKey(v -> {
-                incomingEdges.get(v).forEach(e -> {
-                    edge.seek(e);
-                    edge.clearFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-                    return true; // Iteration should continue.
-                });
-                outgoingEdges.get(v).forEach(e -> {
-                    edge.seek(e);
-                    edge.clearFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
-                    return true; // Iteration should continue.
-                });
-                return true; // Iteration should continue.
-            });
-            nSubgraphsRemoved++;
-        }
-
-        LOG.info("Retained {} large disconnected subgraphs.", nSubgraphsRetained);
-        if (nSubgraphsRemoved > 0) {
-            LOG.info("Removed {} small disconnected subgraphs.", nSubgraphsRemoved);
-        } else {
-            LOG.info("Found no subgraphs to remove, congratulations for having clean OSM data.");
-        }
     }
 
     public Envelope getEnvelope() {

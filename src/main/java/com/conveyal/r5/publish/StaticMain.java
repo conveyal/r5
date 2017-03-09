@@ -67,12 +67,23 @@ public class StaticMain {
 
         List<GenericClusterRequest> requests = new ArrayList<>();
 
-        int east = lonToPixel(ssr.east, ps.zoom);
-        int west = lonToPixel(ssr.west, ps.zoom);
-        int north = latToPixel(ssr.north, ps.zoom);
-        int south = latToPixel(ssr.south, ps.zoom);;
+        int east, west, north, south;
+
+        if (!Double.isNaN(ssr.east)) {
+            east = lonToPixel(ssr.east, ps.zoom);
+            west = lonToPixel(ssr.west, ps.zoom);
+            north = latToPixel(ssr.north, ps.zoom);
+            south = latToPixel(ssr.south, ps.zoom);
+        } else {
+            west = ps.west;
+            north = ps.north;
+            south = ps.north + ps.height;
+            east = ps.west + ps.width;
+        }
         int width = east - west;
-        int height = north - south;
+        int height = south - north;
+
+        LOG.info("Width: {}, height: {}", width, height);
 
         // now clear the bounds of the staticsiterequest so they are not serialized, to maintain backwards compatibility
         // with older brokers/workers

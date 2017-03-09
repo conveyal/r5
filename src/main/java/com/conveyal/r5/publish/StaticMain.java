@@ -1,5 +1,6 @@
 package com.conveyal.r5.publish;
 
+import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import com.conveyal.r5.common.JsonUtilities;
@@ -10,6 +11,7 @@ import com.conveyal.r5.transit.TransportNetworkCache;
 import com.conveyal.r5.util.S3Util;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.Files;
+import com.vividsolutions.jts.geom.Envelope;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
@@ -22,6 +24,9 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+
+import static com.conveyal.r5.analyst.Grid.latToPixel;
+import static com.conveyal.r5.analyst.Grid.lonToPixel;
 
 /**
  * Main class to compute a static site based on configuration JSON.
@@ -55,13 +60,23 @@ public class StaticMain {
         TransportNetworkCache cache = new TransportNetworkCache(args[1], Files.createTempDir());
         TransportNetwork net = cache.getNetworkForScenario(ssr.transportNetworkId, ssr.request);
 
-        LOG.info("Computing metadata");
-        StaticMetadata metadata = new StaticMetadata(ssr, net);
-        metadata.run();
+        WebMercatorGridPointSet ps = net.gridPointSet;
+        LinkedPointSet lps = ps.link(net.streetLayer, StreetMode.WALK);
 
         LOG.info("Enqueueing requests");
 
         List<GenericClusterRequest> requests = new ArrayList<>();
+
+        int east = lonToPixel(ssr.east, ps.zoom);
+        int west = lonToPixel(ssr.west, ps.zoom);
+        int north = latToPixel(ssr.north, ps.zoom);
+        int south = latToPixel(ssr.south, ps.zoom);;
+        int width = east - west;
+        int height = north - south;
+
+        // now clear the bounds of the staticsiterequest so they are not serialized, to maintain backwards compatibility
+        // with older brokers/workers
+        ssr.west = ssr.east = ssr.north = ssr.south = Double.NaN;
 
         // create the metadata request
         StaticMetadata.MetadataRequest metadataRequest = new StaticMetadata.MetadataRequest();
@@ -78,19 +93,32 @@ public class StaticMain {
         stopTreeRequest.jobId = ssr.jobId;
         requests.add(stopTreeRequest);
 
-        WebMercatorGridPointSet ps = net.gridPointSet;
+        boolean requestIsNotFullyContainedWithinTransportNetwork = false;
 
-        // pre-link so it doesn't get done in every thread
-        LinkedPointSet lps = ps.link(net.streetLayer, StreetMode.WALK);
-
-        for (int x = 0; x < ps.width; x++) {
-            for (int y = 0; y < ps.height; y++) {
-
-                if (lps.edges[y * (int) ps.width + x] == -1)
-                    continue; // don't store unlinked points
-
-                requests.add(ssr.getPointRequest(x, y));
+        for (int queryX = 0; queryX < width; queryX++) {
+            int networkX = queryX + west - ps.west;
+            
+            if (networkX < 0 || networkX >= ps.width) {
+                requestIsNotFullyContainedWithinTransportNetwork = true;
+                continue;
             }
+            
+            for (int queryY = 0; queryY < height; queryY++) {
+                int networkY = queryY + north - ps.north;
+
+                if (networkY < 0 || networkY >= ps.height) {
+                    requestIsNotFullyContainedWithinTransportNetwork = true;
+                    continue;
+                }
+
+                if (lps.edges[networkY * ps.width + networkX] == -1) continue; // unlinked
+
+                requests.add(ssr.getPointRequest(networkX, networkY));
+            }
+        }
+
+        if (requestIsNotFullyContainedWithinTransportNetwork) {
+            LOG.warn("Extents of static site request were not completely contained within transport network.");
         }
 
         int nRequests = requests.size();

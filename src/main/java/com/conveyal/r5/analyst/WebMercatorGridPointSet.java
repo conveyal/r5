@@ -83,24 +83,20 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     /** convert longitude to pixel value */
     public int lonToPixel (double lon) {
         // factor of 256 is to get a pixel value not a tile number
-        return (int) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);
+        return Grid.lonToPixel(lon, zoom);
     }
 
     /** convert latitude to pixel value */
     public int latToPixel (double lat) {
-        double invCos = 1 / Math.cos(Math.toRadians(lat));
-        double tan = Math.tan(Math.toRadians(lat));
-        double ln = Math.log(tan + invCos);
-        return (int) ((1 - ln / Math.PI) * Math.pow(2, zoom - 1) * 256);
+        return Grid.latToPixel(lat, zoom);
     }
 
     public double pixelToLon (double x) {
-        return x / (Math.pow(2, zoom) * 256) * 360 - 180;
+        return Grid.pixelToLon(x, zoom);
     }
 
     public double pixelToLat (double y) {
-        double tile = y / 256d;
-        return Math.toDegrees(Math.atan(Math.sinh(Math.PI - tile * Math.PI * 2 / Math.pow(2, zoom))));
+        return Grid.pixelToLat(y, zoom);
     }
 
 }

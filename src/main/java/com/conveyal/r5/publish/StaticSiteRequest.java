@@ -2,8 +2,11 @@ package com.conveyal.r5.publish;
 
 import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.util.UUID;
+
+import static java.lang.Double.NaN;
 
 /**
  * Configuration object for a static site, deserialized from JSON.
@@ -23,6 +26,16 @@ public class StaticSiteRequest {
 
     /** Prefix for result output */
     public String prefix;
+
+    /** Bounds; if left NaN, will be computed based on transport network */
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+    public double north = NaN;
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+    public double east = NaN;
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+    public double south = NaN;
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+    public double west = NaN;
 
     public final String jobId = UUID.randomUUID().toString().replace("-", "");
 
@@ -47,10 +60,10 @@ public class StaticSiteRequest {
         /** no-arg constructor for deserialization */
         public PointRequest () { /* do nothing */ }
 
-        /** x pixel, relative to west side of transport network */
+        /** x pixel, relative to west side of request */
         public int x;
 
-        /** y pixel, relative to north edge of transport network */
+        /** y pixel, relative to north edge of request */
         public int y;
 
         /** StaticSiteRequest this is associated with */

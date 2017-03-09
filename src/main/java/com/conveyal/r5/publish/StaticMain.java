@@ -7,7 +7,9 @@ import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
+import com.conveyal.r5.util.S3Util;
 import com.google.common.io.ByteStreams;
+import com.google.common.io.Files;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
@@ -19,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Main class to compute a static site based on configuration JSON.
@@ -32,8 +35,24 @@ public class StaticMain {
         File in = new File(args[0]);
         StaticSiteRequest ssr = JsonUtilities.objectMapper.readValue(in, StaticSiteRequest.class);
 
+        // Store the scenario on S3 so it is not duplicated in every request
+        if (ssr.request.scenario.modifications != null && !ssr.request.scenario.modifications.isEmpty()) {
+            LOG.info("Storing scenario on S3");
+            String scenarioId = ssr.request.scenario.id != null
+                    ? ssr.request.scenario.id
+                    : UUID.randomUUID().toString();
+            String fileName = String.format("%s_%s.json", ssr.transportNetworkId, scenarioId);
+            File scenarioFile = File.createTempFile("scenario", ".json");
+            JsonUtilities.objectMapper.writeValue(scenarioFile, ssr.request.scenario);
+            S3Util.s3.putObject(args[1], fileName, scenarioFile);
+            scenarioFile.delete();
+            ssr.request.scenario = null;
+            ssr.request.scenarioId = scenarioId;
+        }
+
         LOG.info("Finding transport network.");
-        TransportNetworkCache cache = new TransportNetworkCache(args[1]);
+        // use temporary directory so as not to pollute a shared cache
+        TransportNetworkCache cache = new TransportNetworkCache(args[1], Files.createTempDir());
         TransportNetwork net = cache.getNetworkForScenario(ssr.transportNetworkId, ssr.request);
 
         LOG.info("Computing metadata");

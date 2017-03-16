@@ -300,7 +300,7 @@ public class AnalystWorker implements Runnable {
 
             // Enqueue high-priority (interactive) tasks first to ensure they are enqueued
             // even if the low-priority batch queue blocks.
-            tasks.stream().filter(AnalystWorker::isHighPriorityTask)
+            tasks.stream().filter(GenericClusterRequest::isHighPriority)
                     .forEach(t -> highPriorityExecutor.execute(() -> {
                         LOG.warn("Handling single point request via normal channel, side channel should open shortly.");
                         this.handleOneRequest(t);
@@ -308,7 +308,7 @@ public class AnalystWorker implements Runnable {
 
             // Enqueue low-priority (batch) tasks; note that this may block anywhere in the process
             logQueueStatus();
-            tasks.stream().filter(t -> !isHighPriorityTask(t))
+            tasks.stream().filter(t -> !t.isHighPriority())
                 .forEach(t -> {
                     // attempt to enqueue, waiting if the queue is full
                     while (true) {
@@ -335,7 +335,7 @@ public class AnalystWorker implements Runnable {
      * It may be called several times simultaneously on different executor threads.
      */
     private void handleOneRequest(GenericClusterRequest clusterRequest) {
-        if (isHighPriorityTask(clusterRequest)) {
+        if (clusterRequest.isHighPriority()) {
             lastHighPriorityRequestProcessed = System.currentTimeMillis();
             if (!sideChannelOpen) {
                 openSideChannel();
@@ -819,20 +819,6 @@ public class AnalystWorker implements Runnable {
     /** log queue status */
     private void logQueueStatus() {
         LOG.debug("Waiting tasks: high priority: {}, batch: {}", highPriorityExecutor.getQueue().size(), batchExecutor.getQueue().size());
-    }
-
-    public static boolean isHighPriorityTask (GenericClusterRequest req) {
-        if (req instanceof StaticMetadata.MetadataRequest) {
-            return ((StaticMetadata.MetadataRequest) req).request.bucket == null;
-        } else if (req instanceof StaticMetadata.StopTreeRequest) {
-            return ((StaticMetadata.StopTreeRequest) req).request.bucket == null;
-        } else if (req instanceof StaticSiteRequest.PointRequest) {
-            return ((StaticSiteRequest.PointRequest) req).request.bucket == null;
-        } else if (req instanceof AnalystClusterRequest){
-            return ((AnalystClusterRequest) req).outputLocation == null;
-        } else {
-            return false;
-        }
     }
 
     /**

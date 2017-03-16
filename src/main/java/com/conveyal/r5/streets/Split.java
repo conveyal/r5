@@ -118,6 +118,8 @@ public class Split {
             return null;
         }
 
+        LOG.info("Linked point to edge {}", best.edge);
+
         // We found an edge. Iterate over its segments again, accumulating distances along its geometry.
         // The distance calculations involve square roots so are deferred to happen here, only on the selected edge.
         // TODO accumulate before/after geoms. Split point can be passed over since it's not an intermediate.

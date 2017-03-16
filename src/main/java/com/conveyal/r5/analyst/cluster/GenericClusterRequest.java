@@ -54,4 +54,10 @@ public abstract class GenericClusterRequest implements Serializable {
      */
     public abstract ProfileRequest extractProfileRequest();
 
+    /**
+     * Should be overridden by subclasses to determine whether they are high priority or not.
+     */
+    @JsonIgnore
+    public abstract boolean isHighPriority();
+
 }

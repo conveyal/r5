@@ -181,6 +181,8 @@ public class ProfileResponse {
         Map<Integer, List<Transfer>> transfersWithSameStart = transferToOption.keySet().stream()
             .collect(Collectors.groupingBy(Transfer::getAlightStop));
         //LOG.info("Filling middle paths");
+        boolean prevReverseSearch = request.reverseSearch;
+        request.reverseSearch = false;
         for (Map.Entry<Integer, List<Transfer>> entry: transfersWithSameStart.entrySet()) {
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
             streetRouter.streetMode = StreetMode.WALK;
@@ -206,5 +208,6 @@ public class ProfileResponse {
                 }
             }
         }
+        request.reverseSearch = prevReverseSearch;
     }
 }

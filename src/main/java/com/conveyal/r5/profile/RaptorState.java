@@ -161,7 +161,12 @@ public class RaptorState {
         }
     }
 
-    /** Set the time at a transit stop; if transit is true, this was reached via transfer/initial walk */
+    /**
+     * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the nonTransferTime
+     *
+     * @param transfer if true, this was reached via transfer/initial walk
+     * @return if the time was optimal
+     */
     public boolean setTimeAtStop(int stop, int time, int fromPattern, int fromStop, int waitTime, int inVehicleTime, boolean transfer) {
         if (time > departureTime + maxDurationSeconds) return false;
 

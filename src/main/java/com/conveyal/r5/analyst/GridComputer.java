@@ -114,9 +114,6 @@ public class GridComputer  {
         // save the instantaneous accessibility at each minute/iteration, later we will use this to compute probabilities
         // of improvement.
         // This means we have the fungibility issue described in AndrewOwenMeanGridStatisticComputer.
-        // NB if this is slow, we could add .parallel() before mapToInt, however in a full New York City network it currently
-        // takes less than 500ms. Also, this is only used in regional analysis mode so speed is less important, esp. since
-        // we are already distributing jobs across cores.
         int[] accessibilityPerIteration = propagater.propagate(times -> {
             int access = 0;
             // times in row-major order, convert to grid coordinates

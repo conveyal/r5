@@ -18,7 +18,8 @@ import java.util.stream.Stream;
 
 /**
  * RaptorWorker is fast, but FastRaptorWorker is knock-your-socks-off fast, and also more maintainable.
- * It is also simpler; all propagation code has been removed and will be performed elsewhere if desired.
+ * It is also simpler, as it only focuses on the transit network; see the Propagater class for the methods that extend
+ * the travel times from the final transit stop of a trip out to the individual targets.
  *
  * The algorithm used herein is described in
  *
@@ -133,10 +134,8 @@ public class FastRaptorWorker {
              departureTime >= request.fromTime; departureTime -= DEPARTURE_STEP_SEC, minute--) {
             if (minute % 15 == 0) LOG.info("  minute {}", minute);
 
-            updateDepartureTime(departureTime);
-
             // run the search
-            int[][] resultsForMinute = runRaptorForMinute(monteCarloDrawsPerMinute);
+            int[][] resultsForMinute = runRaptorForMinute(departureTime, monteCarloDrawsPerMinute);
 
             // effectively final nonsense
             final int finalDepartureTime = departureTime;
@@ -200,10 +199,13 @@ public class FastRaptorWorker {
                 transit.tripPatterns.size(), frequencyPatterns.size(), scheduledPatterns.size());
     }
 
-    /** Set the departure time in the scheduled search to the given departure time */
-    private void updateDepartureTime (int departureTime) {
+    /**
+     * Set the departure time in the scheduled search to the given departure time,
+     * and prepare for the scheduled search at the next-earlier minute
+     */
+    private void advanceScheduledSearchToPreviousMinute (int nextMinuteDepartureTime) {
         for (RaptorState state : this.scheduleState) {
-            state.setDepartureTime(departureTime);
+            state.setDepartureTime(nextMinuteDepartureTime);
 
             // clear all touched stops to avoid constant reëxploration
             state.bestStopsTouched.clear();
@@ -215,15 +217,29 @@ public class FastRaptorWorker {
         // add initial stops
         RaptorState initialState = scheduleState[0];
         accessStops.forEachEntry((stop, accessTime) -> {
-            initialState.setTimeAtStop(stop, accessTime + departureTime, -1, -1, 0, 0, true);
+            initialState.setTimeAtStop(stop, accessTime + nextMinuteDepartureTime, -1, -1, 0, 0, true);
             return true; // continue iteration
         });
     }
 
-    /** Perform one minute of a RAPTOR search */
-    private int[][] runRaptorForMinute(int iterationsPerMinute) {
+    /**
+     * Perform one minute of a RAPTOR search.
+     *
+     * @param departureTime When this search departs.
+     * @param iterationsPerMinute When frequencies are present, we perform multiple searches per departure minute using
+     *                            different randomly-generated schedules (Monte Carlo search); this parameter controls
+     *                            how many.
+     * @return an array of length iterationsPerMinute, containing the arrival (clock) times at each stop for each iteration.
+     */
+    private int[][] runRaptorForMinute (int departureTime, int iterationsPerMinute) {
+        advanceScheduledSearchToPreviousMinute(departureTime);
+
         // Run the scheduled search
         // round 0 is the street search
+        // We are using the Range-RAPTOR extension described in Delling, Daniel, Thomas Pajor, and Renato Werneck.
+        // “Round-Based Public Transit Routing,” January 1, 2012. http://research.microsoft.com/pubs/156567/raptor_alenex.pdf.
+        // ergo, we re-use the arrival times found in searches that have already occurred that depart later, because
+        // the arrival time given departure at time t is upper-bounded by the arrival time given departure at minute t + 1.
         if (transit.hasSchedules) {
             long startTime = System.nanoTime();
             for (int round = 1; round <= request.maxRides; round++) {
@@ -250,6 +266,10 @@ public class FastRaptorWorker {
             timeInScheduledSearch += System.nanoTime() - startTime;
         }
 
+        // now run frequency searches using randomized schedules for all frequency lines. We use the scheduled search
+        // and the worst-case boarding time of all frequency routes as an upper bound on the frequency search, so we are
+        // copying the arrival times from the just completed search. This is our key innovation, described in
+        // Conway, Byrd and van der Linden 2017.
         if (transit.hasFrequencies) {
             long startTime = System.nanoTime();
             int[][] result = new int[iterationsPerMinute][];
@@ -534,20 +554,33 @@ public class FastRaptorWorker {
         }
     }
 
-    /** Get a list of the internal IDs of the patterns touched using the given index (frequency or scheduled) */
+    /**
+     * Get a list of the internal IDs of the patterns "touched" using the given index (frequency or scheduled)
+     * "touched" means they were reached in the last round, and the index maps from the original pattern index to the
+     * local index of the filtered patterns.
+     */
     private BitSet getPatternsTouchedForStops(RaptorState state, int[] index) {
         BitSet patternsTouched = new BitSet();
 
         for (int stop = state.bestStopsTouched.nextSetBit(0); stop >= 0; stop = state.bestStopsTouched.nextSetBit(stop + 1)) {
+            // copy stop to a new final variable to get around Java 8 "effectively final" nonsense
             final int finalStop = stop;
             transit.patternsForStop.get(stop).forEach(originalPattern -> {
                 int filteredPattern = index[originalPattern];
+
+                if (filteredPattern < 0) {
+                    return true; // this pattern does not exist in the local subset of patterns, continue iteration
+                }
 
                 int sourcePatternIndex = state.previousStop[finalStop] == -1 ?
                         state.previousPatterns[finalStop] :
                         state.previousPatterns[state.previousStop[finalStop]];
 
-                if (filteredPattern > -1 && sourcePatternIndex != originalPattern) {
+                if (sourcePatternIndex != originalPattern) {
+                    // don't re-explore the same pattern we used to reach this stop
+                    // we forbid riding the same pattern twice in a row in the search code above, this will prevent
+                    // us even having to loop over the stops in the pattern if potential board stops were only reached
+                    // using this pattern.
                     patternsTouched.set(filteredPattern);
                 }
                 return true; // continue iteration

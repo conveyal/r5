@@ -67,4 +67,9 @@ public class AnalystClusterRequest extends GenericClusterRequest implements Seri
         return profileRequest;
     }
 
+    @Override
+    public boolean isHighPriority() {
+        return outputLocation == null; // return results directly to client over HTTP
+    }
+
 }

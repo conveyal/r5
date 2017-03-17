@@ -62,8 +62,8 @@ public class GridResultConsumer implements Runnable {
 
                             if (!assemblers.containsKey(jobId)) {
                                 // TODO is this the right thing to do?
-                                LOG.warn("Received message for invalid job ID {}, returning to queue", jobId);
-                                return null;
+                                LOG.warn("Received message for invalid job ID {}, silently discarding", jobId);
+                                return new DeleteMessageBatchRequestEntry(m.getMessageId(), m.getReceiptHandle());
                             }
 
                             assemblers.get(jobId).handleMessage(m);

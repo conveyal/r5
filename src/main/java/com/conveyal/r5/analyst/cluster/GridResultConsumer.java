@@ -78,7 +78,7 @@ public class GridResultConsumer implements Runnable {
                 }
             } catch (Exception e) {
                 // TODO figure out if exception is permanent
-                LOG.info("Error connecting to regional result queue. Assuming this is transient network issues. Retrying in 60s");
+                LOG.info("Error connecting to regional result queue. Assuming this is a transient network issue. Retrying in 60s");
                 try {
                     Thread.sleep(3600);
                 } catch (InterruptedException ie) {

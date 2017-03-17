@@ -62,8 +62,7 @@ public class GridResultConsumer implements Runnable {
 
                             if (!assemblers.containsKey(jobId)) {
                                 // TODO is this the right thing to do?
-                                // this is only an issue if multiple instances are using the same queue, which they shouldn't be
-                                LOG.warn("Received message for invalid job ID {}, discarding", jobId);
+                                LOG.warn("Received message for invalid job ID {}, silently discarding", jobId);
                                 return new DeleteMessageBatchRequestEntry(m.getMessageId(), m.getReceiptHandle());
                             }
 

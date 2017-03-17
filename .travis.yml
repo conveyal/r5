@@ -26,7 +26,7 @@ after_success:
   - if [[ "$TRAVIS_PULL_REQUEST" = false ]]; then mvn javadoc:javadoc; aws s3 cp --recursive /home/travis/build/conveyal/r5/target/site/apidocs s3://javadoc.conveyal.com/r5/${TRAVIS_BRANCH}/; fi
 
 
-sudo: false
+sudo: true # sudo: true gets us more memory, which we need, at the expense of slower builds
 
 git:
   depth: 150 # how many commits to clone, need to catch most recent tag for describe and 50 may not be enough

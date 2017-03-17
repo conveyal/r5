@@ -39,4 +39,8 @@ public class GridRequest extends GenericClusterRequest {
         return request;
     }
 
+    @Override
+    public boolean isHighPriority() {
+        return false; // grid requests only used in regional analysis, never high priority
+    }
 }

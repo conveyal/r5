@@ -152,6 +152,7 @@ public class StaticComputer implements Runnable {
                 out.writeInt(time - prev);
                 prev = time;
 
+
                 if (worker.saveAllStates) {
                     RaptorState state = worker.statesEachIteration.get(iter);
                     int inVehicleTravelTime = state.nonTransferInVehicleTravelTime[stop] / 60;

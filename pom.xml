@@ -150,12 +150,12 @@
     <repository>
       <id>central2</id>
       <name>check central first to avoid a lot of not found warnings</name>
-      <url>http://repo1.maven.org/maven2</url>
+      <url>https://repo1.maven.org/maven2</url>
     </repository>
     <repository>
       <id>conveyal</id>
       <name>conveyal</name>
-      <url>http://maven.conveyal.com</url>
+      <url>https://maven.conveyal.com</url>
     </repository>
     <repository>
       <id>osgeo</id>
@@ -168,7 +168,7 @@
       </snapshots>
       <id>boundless</id>
       <name>Boundless Maven Repository</name>
-      <url>http://repo.boundlessgeo.com/main</url>
+      <url>https://repo.boundlessgeo.com/main</url>
     </repository>
     <!-- Needed  for graphql-java-->
     <repository>
@@ -177,7 +177,7 @@
       </snapshots>
       <id>bintray-andimarek-graphql-java</id>
       <name>bintray</name>
-      <url>http://dl.bintray.com/andimarek/graphql-java</url>
+      <url>https://dl.bintray.com/andimarek/graphql-java</url>
     </repository>
   </repositories>
 

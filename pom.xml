@@ -1,49 +1,70 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.conveyal</groupId>
-  <artifactId>r5</artifactId>
-  <packaging>jar</packaging>
-  <version>2.1.0-SNAPSHOT</version>
+
   <name>r5</name>
+  <description>Next-generation fast routing library for spatial analysis applications</description>
   <url>https://github.com/conveyal/r5</url>
 
+  <groupId>com.conveyal</groupId>
+  <artifactId>r5</artifactId>
+  <version>2.1.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <licenses>
+    <license>
+      <name>MIT</name>
+      <url>https://opensource.org/licenses/MIT</url>
+    </license>
+  </licenses>
+
+  <!-- Developer entries are provided for primary developers.
+ For other contributors, see https://github.com/conveyal/r5/graphs/contributors -->
+  <developers>
+    <developer>
+      <name>Matt Conway</name>
+      <email>mconway@conveyal.com</email>
+      <organization>Conveyal</organization>
+      <organizationUrl>http://conveyal.com/</organizationUrl>
+    </developer>
+    <developer>
+      <name>Andrew Byrd</name>
+      <email>abyrd@conveyal.com</email>
+      <organization>Conveyal</organization>
+      <organizationUrl>http://conveyal.com/</organizationUrl>
+    </developer>
+    <developer>
+      <name>Marko Burjek</name>
+      <email></email>
+      <organization>Kodanta</organization>
+    </developer>
+  </developers>
+
+  <!-- Define where the source code for this project lives -->
   <scm>
     <connection>scm:git:https://github.com/conveyal/r5.git</connection>
     <developerConnection>scm:git:https://github.com/conveyal/r5.git</developerConnection>
+    <url>https://github.com/conveyal/r5</url>
   </scm>
 
+  <!-- Define some variables to be used elsewhere in the build. -->
   <properties>
     <geotools.version>14.0</geotools.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
   </properties>
 
-  <!-- Specify the repo where we will deploy JARs of R5 -->
+  <!-- Define where the artifacts produced by this build will be deployed -->
   <distributionManagement>
-    <repository>
-      <!-- This repository will also be used as the snapshotRepository by default -->
-      <id>conveyal-maven-repo</id>
-      <name>Conveyal Maven Repository</name>
-      <url>s3://maven.conveyal.com/</url>
-    </repository>
+    <!-- We are using Sonatype Nexus Staging instead of Maven Release plugin.
+         Only a snapshot repo should be configured. Releases are done from that snapshot staging repo. -->
+    <snapshotRepository>
+      <id>ossrh</id>
+      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+    </snapshotRepository>
   </distributionManagement>
 
-  <!-- use Java 8 -->
   <build>
-    <!-- "Wagon" necessary for uploading/deploying artifacts to the Conveyal Maven repo on Amazon S3. -->
-    <extensions>
-      <!--
-        The Spring S3 Wagon throws ResourceDoesNotExistException when it is asked to put a directory.
-        The site contains a lot of subdirectories, so use the kuali s3 wagon which handles directories.
-        This is only important if you're deploying the OTP site to an S3 bucket as a static web site,
-        which is not a bad idea.
-      -->
-      <extension>
-        <groupId>org.kuali.maven.wagons</groupId>
-        <artifactId>maven-s3-wagon</artifactId>
-        <version>1.2.1</version>
-      </extension>
-    </extensions>
+
     <resources>
       <resource>
         <!-- This allows Maven to substitute build and version details into a properties file for use at runtime. -->
@@ -56,90 +77,154 @@
         </includes>
       </resource>
     </resources>
-  <plugins>
-    <plugin>
-      <groupId>org.apache.maven.plugins</groupId>
-      <artifactId>maven-compiler-plugin</artifactId>
-      <version>3.3</version>
-      <configuration>
-        <source>1.8</source>
-        <target>1.8</target>
-      </configuration>
-    </plugin>
-    <plugin>
-      <groupId>pl.project13.maven</groupId>
-      <artifactId>git-commit-id-plugin</artifactId>
-      <version>2.2.1</version>
-      <executions>
-        <execution>
-          <goals>
-            <goal>revision</goal>
-          </goals>
-        </execution>
-      </executions>
-      <configuration>
-        <dotGitDirectory>${project.basedir}/.git</dotGitDirectory>
-      </configuration>
-    </plugin>
-    <plugin>
-      <groupId>org.apache.maven.plugins</groupId>
-      <artifactId>maven-shade-plugin</artifactId>
-      <version>2.2</version>
-      <executions>
+
+    <plugins>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.3</version>
+        <configuration>
+          <!-- use Java 8 -->
+          <source>1.8</source>
+          <target>1.8</target>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>pl.project13.maven</groupId>
+        <artifactId>git-commit-id-plugin</artifactId>
+        <version>2.2.1</version>
+        <executions>
           <execution>
-            <phase>package</phase>
-            <goals><goal>shade</goal></goals>
-            <configuration>
-              <!-- Name the shaded JAR after the git describe string. This makes it uniquely identifiable so we can
-                   run analysis workers with a specific commit or tag of R5. The shaded JAR is not "attached" to
-                   deployments because this will cause it to be renamed to the standard timestamped name and sorted
-                   into a Maven repo directory by version number. -->
-              <finalName>${git.commit.id.describe}</finalName>
-              <transformers>
-                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                  <manifestEntries>
-                    <Main-Class>com.conveyal.r5.R5Main</Main-Class>
-                  </manifestEntries>
-                </transformer>
-                <!-- files overwrite each other and geotools does not function without this.
-                     http://docs.geotools.org/latest/userguide/faq.html#how-do-i-create-an-executable-jar-for-my-geotools-app -->
-                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
-              </transformers>
-              <!-- signature files from included jars cause problems: http://stackoverflow.com/questions/999489 -->
-              <filters>
-                <filter>
-                  <artifact>*:*</artifact>
-                  <excludes>
-                    <exclude>META-INF/*.SF</exclude>
-                    <exclude>META-INF/*.DSA</exclude>
-                    <exclude>META-INF/*.RSA</exclude>
-                  </excludes>
-                </filter>
-              </filters>
-            </configuration>
+            <goals>
+              <goal>revision</goal>
+            </goals>
           </execution>
-      </executions>
-    </plugin>
-    <plugin>
-      <groupId>org.apache.maven.plugins</groupId>
-      <artifactId>maven-javadoc-plugin</artifactId>
-      <version>2.10.4</version>
-      <configuration>
-        <tags>
-          <tag>
-            <name>notnull</name>
-            <placement>a</placement>
-            <head>Not null</head>
-          </tag>
-          <tag>
-            <name>default</name>
-            <placement>a</placement>
-            <head>Default:</head>
-          </tag>
-        </tags>
-      </configuration>
-    </plugin>
-  </plugins>
+        </executions>
+        <configuration>
+          <dotGitDirectory>${project.basedir}/.git</dotGitDirectory>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>2.2</version>
+        <!-- Create a version of the JAR that includes all dependencies.
+             We don't want this to be attached and deployed, but we'll have Travis upload it to S3. -->
+        <executions>
+            <execution>
+              <phase>package</phase>
+              <goals><goal>shade</goal></goals>
+              <configuration>
+                <!-- Name the shaded JAR after the git describe string. This makes it uniquely identifiable so we can
+                     run analysis workers with a specific commit or tag of R5. The shaded JAR is not "attached" to
+                     deployments because this will cause it to be renamed to the standard timestamped name and sorted
+                     into a Maven repo directory by version number. -->
+                <finalName>${git.commit.id.describe}</finalName>
+                <transformers>
+                  <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                    <manifestEntries>
+                      <Main-Class>com.conveyal.r5.R5Main</Main-Class>
+                    </manifestEntries>
+                  </transformer>
+                  <!-- files overwrite each other and geotools does not function without this.
+                       http://docs.geotools.org/latest/userguide/faq.html#how-do-i-create-an-executable-jar-for-my-geotools-app -->
+                  <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
+                </transformers>
+                <!-- signature files from included jars cause problems: http://stackoverflow.com/questions/999489 -->
+                <filters>
+                  <filter>
+                    <artifact>*:*</artifact>
+                    <excludes>
+                      <exclude>META-INF/*.SF</exclude>
+                      <exclude>META-INF/*.DSA</exclude>
+                      <exclude>META-INF/*.RSA</exclude>
+                    </excludes>
+                  </filter>
+                </filters>
+              </configuration>
+            </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <!-- Recommended way to deploy to OSSRH -->
+        <groupId>org.sonatype.plugins</groupId>
+        <artifactId>nexus-staging-maven-plugin</artifactId>
+        <version>1.6.7</version>
+        <extensions>true</extensions>
+        <configuration>
+          <serverId>ossrh</serverId>
+          <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+          <!-- Release versions will be synced to Maven Central automatically. -->
+          <autoReleaseAfterClose>true</autoReleaseAfterClose>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <!-- Allow attaching Javadoc during releases -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>2.10.4</version>
+        <configuration>
+          <!-- Turn off Java 8 strict Javadoc checking -->
+          <additionalparam>-Xdoclint:none</additionalparam>
+          <tags>
+            <tag>
+              <name>notnull</name>
+              <placement>a</placement>
+              <head>Not null</head>
+            </tag>
+            <tag>
+              <name>default</name>
+              <placement>a</placement>
+              <head>Default:</head>
+            </tag>
+          </tags>
+        </configuration>
+        <executions>
+          <!-- Compress Javadoc into JAR and include that JAR when deploying. -->
+          <execution>
+            <id>attach-javadocs</id>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <!-- Include zipped source code in releases -->
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <goals>
+              <goal>jar-no-fork</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-gpg-plugin</artifactId>
+        <version>1.5</version>
+        <executions>
+          <execution>
+            <id>sign-artifacts</id>
+            <!-- We sign in the verify phase, which means it will happen for install and deploy but not package. -->
+            <phase>verify</phase>
+            <goals>
+              <goal>sign</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
   </build>
 
   <repositories>
@@ -252,7 +337,6 @@
       <artifactId>gt-geotiff</artifactId>
       <version>${geotools.version}</version>
     </dependency>
-
     <dependency>
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-math3</artifactId>
@@ -271,12 +355,12 @@
     <dependency>
       <groupId>com.conveyal</groupId>
       <artifactId>gtfs-lib</artifactId>
-      <version>1.3.0</version>
+      <version>2.1.0</version>
     </dependency>
     <dependency>
       <groupId>com.conveyal</groupId>
       <artifactId>osm-lib</artifactId>
-      <version>1.1.0</version>
+      <version>1.1.1</version>
     </dependency>
     <dependency>
       <groupId>com.amazonaws</groupId>

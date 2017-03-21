@@ -22,9 +22,9 @@ cat > /etc/awslogs.conf <<EOF
 state_file = /var/awslogs/state/agent-state
 
 [otp]
-file = ${LOGFILE}
+file = $LOGFILE
 log_group_name = {1}
-log_stream_name = {instance_id}
+log_stream_name = \{instance_id\}
 datetime_format = %Y-%m-%dT%H:%M:%S%z
 time_zone = UTC
 EOF

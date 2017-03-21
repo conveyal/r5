@@ -46,7 +46,7 @@ public class StreetPath {
          */
         for (StreetRouter.State cur = lastState; cur != null; cur = cur.backState) {
             states.addFirst(cur);
-            if (cur.backEdge != -1 && cur.backState != null) {
+            if (cur.backEdge != -1) {
                 edges.addFirst(cur.backEdge);
             }
         }
@@ -144,11 +144,12 @@ public class StreetPath {
             //have same state as stop state and start state of next search
             if (first && firstState.vertex == cur.vertex) {
                 states.removeFirst();
+                //FIXME: First edge needs to be removed in bikeshare but not in PR search
                 edges.removeFirst();
             }
             first = false;
             states.addFirst(cur);
-            if (cur.backEdge != -1 && cur.backState != null) {
+            if (cur.backEdge != -1) {
                 edges.addFirst(cur.backEdge);
             }
         }

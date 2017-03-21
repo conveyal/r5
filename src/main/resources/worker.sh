@@ -1,9 +1,10 @@
 #!/bin/bash
 # Downloads and runs an analyst worker.
-# This will be run through string.format, and the following items will be available:
-# {0}: the URL to grab the worker JAR from
-# {1}: the AWS log group to use
-# {2}: the worker configuration to use
+# This will be run through Java MessageFormat, and the following items will be available by wrapping
+# the relevant index in curly braces
+# 0: the URL to grab the worker JAR from
+# 1: the AWS log group to use
+# 2: the worker configuration to use
 
 # prep the system: install log agent, java
 yum -y install awslogs java-1.8.0-openjdk

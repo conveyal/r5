@@ -144,8 +144,12 @@ public class StreetPath {
             //have same state as stop state and start state of next search
             if (first && firstState.vertex == cur.vertex) {
                 states.removeFirst();
-                //FIXME: First edge needs to be removed in bikeshare but not in PR search
-                edges.removeFirst();
+                //First edge needs to be removed in bikeshare but not in PR search
+                //Basically it needs to be removed if it is the same as current since mode changes here.
+                //And even if we go in and out on the same way edge ids are different because of different direction.
+                if (edges.getFirst() == cur.backEdge) {
+                    edges.removeFirst();
+                }
             }
             first = false;
             states.addFirst(cur);

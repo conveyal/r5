@@ -384,7 +384,7 @@ public class Broker implements Runnable {
 
         // Read in the startup script
         try {
-            InputStream scriptIs = this.getClass().getClassLoader().getResourceAsStream("worker.sh");
+            InputStream scriptIs = this.getClass().getClassLoader().getResourceAsStream("/worker.sh");
             ByteArrayOutputStream scriptBaos = new ByteArrayOutputStream();
             ByteStreams.copy(scriptIs, scriptBaos);
             scriptIs.close();

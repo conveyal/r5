@@ -4,6 +4,7 @@ import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
+import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.PathWithTimes;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.Path;
@@ -55,7 +56,7 @@ public class StaticComputer implements Runnable {
         // dump the times in the described format. They're small enough to keep in memory for now.
         try {
             OutputStream os = StaticDataStore.getOutputStream(req.request, req.x + "/" + req.y + ".dat", "application/octet-stream");
-            write(os);
+            write(os, true);
             os.close();
         } catch (Exception e) {
             LOG.error("Error saving origin data", e);
@@ -66,12 +67,10 @@ public class StaticComputer implements Runnable {
     // It then writes out the travel times to all grid cells near the origin (walking or biking on-street) followed by
     // the travel times to every reached stop in the network.
     // TODO rename and/or refactor to reduce side effects (pull computation out of writing logic).
-    public void write (OutputStream os) throws IOException {
+    public void write (OutputStream os, boolean saveAllStates) throws IOException {
         WebMercatorGridPointSet points = network.gridPointSet;
         double lat = points.pixelToLat(points.north + req.y);
         double lon = points.pixelToLon(points.west + req.x);
-
-        TaskStatistics ts = new TaskStatistics();
 
         // Perform street search to find transit stops and non-transit times.
         StreetRouter sr = new StreetRouter(network.streetLayer);
@@ -89,12 +88,13 @@ public class StaticComputer implements Runnable {
 
         // Create a new Raptor Worker.
         // Tell it that we want a travel time to each stop by leaving the point set parameter null.
-        RaptorWorker worker = new RaptorWorker(network.transitLayer, null, req.request.request);
+        FastRaptorWorker worker = new FastRaptorWorker(network.transitLayer, req.request.request, accessTimes);
         // Also tell it to retain all the intermediate states rather than just the travel times, so we can draw paths.
-        worker.saveAllStates = true;
+        worker.saveAllStates = saveAllStates;
+
 
         // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
-        StaticPropagatedTimesStore pts = (StaticPropagatedTimesStore) worker.runRaptor(accessTimes, null, ts);
+        int[][] transitTravelTimes = worker.route();
 
         long nonTransitStart = System.currentTimeMillis();
 
@@ -121,8 +121,8 @@ public class StaticComputer implements Runnable {
             previous = time;
         }
 
-        int iterations = pts.times.length;
-        int stops = pts.times[0].length;
+        int iterations = transitTravelTimes.length;
+        int stops = transitTravelTimes[0].length;
 
         // number of stops
         out.writeInt(stops);
@@ -141,24 +141,26 @@ public class StaticComputer implements Runnable {
             TObjectIntMap<Path> paths = new TObjectIntHashMap<>();
             List<Path> pathList = new ArrayList<>();
 
-            for (int iter = 0, stateIteration = 0; iter < iterations; iter++, stateIteration++) {
+            for (int iter = 0; iter < iterations; iter++) {
                 // advance past states that are not included in averages
-                while (!worker.includeInAverages.get(stateIteration)) stateIteration++;
+                //while (!worker.includeInAverages.get(stateIteration)) stateIteration++;
 
-                int time = pts.times[iter][stop];
+                int time = transitTravelTimes[iter][stop];
                 if (time == Integer.MAX_VALUE) time = -1;
                 else time /= 60;
 
                 out.writeInt(time - prev);
                 prev = time;
 
+
                 if (worker.saveAllStates) {
-                    RaptorState state = worker.statesEachIteration.get(stateIteration);
-                    int inVehicleTravelTime = state.inVehicleTravelTime[stop] / 60;
+                    RaptorState state = worker.statesEachIteration.get(iter);
+                    int inVehicleTravelTime = state.nonTransferInVehicleTravelTime[stop] / 60;
+
                     out.writeInt(inVehicleTravelTime - previousInVehicleTravelTime);
                     previousInVehicleTravelTime = inVehicleTravelTime;
 
-                    int waitTime = state.waitTime[stop] / 60;
+                    int waitTime = state.nonTransferWaitTime[stop] / 60;
                     out.writeInt(waitTime - previousWaitTime);
                     previousWaitTime = waitTime;
 
@@ -205,10 +207,10 @@ public class StaticComputer implements Runnable {
             }
         }
 
+        out.flush();
+
         LOG.info("Writing output to broker took {}s", (System.currentTimeMillis() - outputStart) / 1000.0);
         LOG.info("Average of {} paths per destination stop", sum / stops);
-
-        out.flush();
     }
 
 }

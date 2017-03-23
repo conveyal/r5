@@ -51,7 +51,8 @@ public class Stop {
             com.vividsolutions.jts.geom.Coordinate jitteredCoordinates = PointToPointRouterServer.jitter(vertex);
             lat = (float) jitteredCoordinates.y;
             lon = (float) jitteredCoordinates.x;
-        } else {
+        } else if (vertex.index > -1) {
+            // TODO: proper way to handle this case is to use original stop lat/lon from the GTFS
             lat = (float) vertex.getLat();
             lon = (float) vertex.getLon();
         }

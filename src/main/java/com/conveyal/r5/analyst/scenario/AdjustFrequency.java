@@ -208,9 +208,7 @@ public class AdjustFrequency extends Modification {
                     newSchedule.headwaySeconds = new int[]{entry.headwaySecs};
                     newSchedule.startTimes = new int[]{entry.startTime};
                     newSchedule.endTimes = new int[]{entry.endTime};
-
                     entry.applyPhasing(newSchedule);
-
                     newPattern.tripSchedules.add(newSchedule);
                     nTripSchedulesCreated += 1;
                     newPattern.hasFrequencies = true;
@@ -221,7 +219,8 @@ public class AdjustFrequency extends Modification {
             // Whether or not the current TripSchedule's trip was mentioned in any PatternTimetable (and has therefore
             // been mutated and copied to the output as a new frequency or scheduled trip), we may or may not want to
             // retain that original trip in the output TripPattern.
-            // By default (when retainTripsOutsideFrequencyEntries is false) we don't want to retain any of these original trips.
+            // By default (when retainTripsOutsideFrequencyEntries is false) we don't want to retain any of these
+            // original trips, which is to say we don't copy them into the tripSchedules list of the copied pattern.
             // But if retainTripsOutsideFrequencyEntries is true, we want to retain those trips that are outside the
             // times ranges where the frequency PatternTimetables are active. Scheduled PatternTimetables are considered
             // to have a zero width, so all existing trips are considered to be outside their active time period.

@@ -61,5 +61,10 @@ public class StaticSiteRequest {
             return request.request;
         }
 
+        @Override
+        public boolean isHighPriority() {
+            return request.bucket == null; // null bucket means will be returned directly over HTTP
+        }
+
     }
 }

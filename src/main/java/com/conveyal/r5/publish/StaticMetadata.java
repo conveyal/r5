@@ -111,6 +111,7 @@ public class StaticMetadata implements Runnable {
         for (int[] table : lps.stopToPointDistanceTables) {
             // make sure stop always gets incremented
             stop++;
+
             if (table == null) {
                 continue;
             }
@@ -194,6 +195,11 @@ public class StaticMetadata implements Runnable {
         public ProfileRequest extractProfileRequest() {
             return request.request;
         }
+
+        @Override
+        public boolean isHighPriority() {
+            return request.bucket == null; // null bucket, results will be returned over HTTP
+        }
     }
 
     /** A request for the cluster to produce static stop trees */
@@ -203,6 +209,11 @@ public class StaticMetadata implements Runnable {
         @Override
         public ProfileRequest extractProfileRequest() {
             return request.request;
+        }
+
+        @Override
+        public boolean isHighPriority() {
+            return request.bucket == null; // null bucket, results will be returned over HTTP
         }
     }
 }

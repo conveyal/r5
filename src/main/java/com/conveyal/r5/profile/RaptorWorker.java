@@ -96,8 +96,14 @@ public class RaptorWorker {
     /** Clock time spent on frequency searches */
     private long frequencySearchTime = 0;
 
+    /** Clock time spent on the frequency portion of scheduled service rather than the scheduled search that is updated */
+    private long frequencyOnlySearchTime = 0;
+
     /** Clock time spent on scheduled searches */
     private long scheduledSearchTime = 0;
+
+    /** Keep a count of how many frequency patterns were explored */
+    int frequencyPatternsExplored = 0;
 
     private FrequencyRandomOffsets offsets;
 
@@ -353,6 +359,8 @@ public class RaptorWorker {
         LOG.info("  raptor {}sec", (calcTime - totalPropagationTime) / 1000.0);
         LOG.info("    scheduled {}", scheduledSearchTime / 1000.0);
         LOG.info("    frequency {}", frequencySearchTime / 1000.0);
+        LOG.info("      {} frequency search exploring {} patterns", frequencyOnlySearchTime / 1000.0, frequencyPatternsExplored);
+        LOG.info("      {} resulting updates to schedule search", (frequencySearchTime - frequencyOnlySearchTime) / 1000.0);
         LOG.info("  requested {} monte carlo draws, ran {}", req.monteCarloDraws, monteCarloDraws * minuteNumber);
         LOG.info("{} rounds", round);
         ts.propagation = (int) totalPropagationTime;
@@ -550,7 +558,9 @@ public class RaptorWorker {
             TripSchedule bestFreqTrip = null;
 
             // First look for a frequency entry.
-            if (useFrequencies) {
+            // Don't check timetables that don't have frequencies at all, this makes the search 6x faster anecdotally
+            if (useFrequencies && timetable.hasFrequencies) {
+                long startTime = System.currentTimeMillis();
                 for (int stopIndex : timetable.stops) {
                     stopPositionInPattern += 1;
 
@@ -567,11 +577,14 @@ public class RaptorWorker {
 
                     // This stop has been reached by some previous round. Try to board a vehicle here.
                     // This could be the first time we board a vehicle on this pattern in this round, but if already
-                    // on board a vehicle we also need to check whether it's possible to board an earlier one.
+                    // on board a vehicle we also need to check whether it's possible to board an earlier one if the
+                    // arrival time at this stop from the previous round is earlier than the arrival time from already
+                    // being on the vehicle. If we have not yet boarded, remainOnBoardTime will be Integer.MAX_VALUE so
+                    // the condition will still be true.
                     // TODO only attempt boarding when we have a non-UNREACHED value from the last round, not based on the bestTimes.
                     // To do this, in the frequency search we'd need to re-mark stops that were reached by the scheduled search in the previous round.
                     // stopsTouched could just be put into RaptorState.
-                    if (inputState.bestTimes[stopIndex] != UNREACHED) {
+                    if (inputState.bestTimes[stopIndex] < remainOnBoardTime) {
                         for (int tripScheduleIdx = 0; tripScheduleIdx < timetable.tripSchedules.size(); tripScheduleIdx++) {
                             TripSchedule ts = timetable.tripSchedules.get(tripScheduleIdx);
                             // TODO each pattern should be made to contain only scheduled or only frequency trips
@@ -595,24 +608,37 @@ public class RaptorWorker {
                                 int offset = offsets.offsets.get(p)[tripScheduleIdx][freqEntryIdx];
 
                                 // earliest board time is start time plus travel time plus offset
-                                int boardTimeThisEntry = ts.startTimes[freqEntryIdx] +
+                                int earliestBoardTimeThisEntry = ts.startTimes[freqEntryIdx] +
                                         ts.departures[stopPositionInPattern] +
                                         offset;
 
-                                while (boardTimeThisEntry < inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS) {
-                                    boardTimeThisEntry += ts.headwaySeconds[freqEntryIdx];
+                                // compute the number of trips on this entry
+                                // We take the difference between the end time and the start time including the offset
+                                // to get the time between the first trip and the last possible trip. We int-divide by the
+                                // headway and add one to correct for the fencepost problem.
+                                int numberOfTripsThisEntry = (ts.endTimes[freqEntryIdx] - (ts.startTimes[freqEntryIdx] + offset)) / ts.headwaySeconds[freqEntryIdx] + 1;
 
-                                    // subtract the travel time to this stop from the board time at this stop, this gives
-                                    // us the terminal departure. If the terminal departure is after the end time, the vehicle
-                                    // is not running.
-                                    if (boardTimeThisEntry - ts.departures[stopPositionInPattern] > ts.endTimes[freqEntryIdx]) {
-                                        // can't board this frequency entry
-                                        continue FREQUENCY_ENTRIES;
-                                    }
+                                // the earliest time we can leave this stop based on when we arrived
+                                // We subtract one because we find trips that have departure time > this time, not
+                                // >=
+                                int lowerBoundBoardTime = inputState.bestTimes[stopIndex] + BOARD_SLACK_SECONDS - 1;
+                                int earliestFeasibleTripIndexThisEntry;
+                                if (lowerBoundBoardTime <= earliestBoardTimeThisEntry) {
+                                    earliestFeasibleTripIndexThisEntry = 0;
+                                } else {
+                                    // find earliest trip later than the lower bound on board time
+                                    // We add one because int math floors the result.
+                                    // This is why we subtracted one second above, so that if the earliest board time
+                                    // is exactly the second when the trip arrives, we will find that trip rather than the
+                                    // next trip when we add one.
+                                    earliestFeasibleTripIndexThisEntry =
+                                            (lowerBoundBoardTime - earliestBoardTimeThisEntry) / ts.headwaySeconds[freqEntryIdx] + 1;
                                 }
 
-                                // if we haven't continued the outer loop yet, we could potentially board this stop
-                                boardTime = Math.min(boardTime, boardTimeThisEntry);
+                                if (earliestFeasibleTripIndexThisEntry < numberOfTripsThisEntry) {
+                                    // if we haven't continued the outer loop yet, we could potentially board this stop
+                                    boardTime = Math.min(boardTime, earliestBoardTimeThisEntry + earliestFeasibleTripIndexThisEntry * ts.headwaySeconds[freqEntryIdx]);
+                                }
                             }
 
                             if (boardTime != Integer.MAX_VALUE && boardTime < remainOnBoardTime) {
@@ -667,6 +693,9 @@ public class RaptorWorker {
                         }
                     }
                 }
+
+                frequencyOnlySearchTime += System.currentTimeMillis() - startTime;
+                frequencyPatternsExplored++;
 
                 // don't mix frequencies and timetables
                 // TODO should we have this condition here?

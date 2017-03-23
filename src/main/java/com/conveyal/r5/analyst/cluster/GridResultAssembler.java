@@ -23,6 +23,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.util.Base64;
+import java.util.BitSet;
 import java.util.Locale;
 import java.util.zip.GZIPOutputStream;
 
@@ -58,7 +59,6 @@ public class GridResultAssembler {
     /** The offset to get to the data section of the access grid file */
     public static final long DATA_OFFSET = 9 * 4;
 
-    private static final AmazonSQS sqs = new AmazonSQSClient();
     private static final AmazonS3 s3 = new AmazonS3Client();
 
     private Base64.Decoder base64 = Base64.getDecoder();
@@ -70,8 +70,15 @@ public class GridResultAssembler {
 
     private boolean error = false;
 
-    /** this does not need to be an atomic int as it's incremented in a synchronized block */
+    /**
+     * The number of results received for unique origin points (i.e. two results for the same origin should only
+     * increment this once). It does not need to be an atomic int as it's incremented in a synchronized block.
+     */
     public int nComplete = 0;
+
+    // We need to keep track of which specific origins are completed, to avoid double counting if we receive more than
+    // one result for the same origin.
+    private BitSet originsReceived;
 
     public int nTotal;
 
@@ -84,6 +91,7 @@ public class GridResultAssembler {
         this.request = request;
         this.outputBucket = outputBucket;
         nTotal = request.width * request.height;
+        originsReceived = new BitSet(nTotal);
     }
 
     private synchronized void finish () {
@@ -147,11 +155,18 @@ public class GridResultAssembler {
             // use a synchronized block to ensure no threading issues
             synchronized (this) {
                 if (buffer == null) this.initialize(origin.accessibilityPerIteration.length);
-
-                long offset = DATA_OFFSET + (origin.y * request.width + origin.x) * 4 * nIterations;
+                // The origins we receive have 2d coordinates.
+                // Flatten them to compute file offsets and for the origin checklist.
+                int index1d = origin.y * request.width + origin.x;
+                long offset = DATA_OFFSET + index1d * 4 * nIterations;
                 buffer.seek(offset);
                 buffer.write(pixelByteOutputStream.toByteArray());
-                if (++nComplete == nTotal && !error) finish();
+                // Don't double-count origins if we receive them more than once.
+                if (!originsReceived.get(index1d)) {
+                    originsReceived.set(index1d);
+                    nComplete += 1;
+                }
+                if (nComplete == nTotal && !error) finish();
             }
         } catch (Exception e) {
             error = true; // the file is garbage TODO better resilience

@@ -300,7 +300,7 @@ public class AnalystWorker implements Runnable {
 
             // Enqueue high-priority (interactive) tasks first to ensure they are enqueued
             // even if the low-priority batch queue blocks.
-            tasks.stream().filter(t -> t instanceof AnalystClusterRequest && ((AnalystClusterRequest) t).outputLocation == null)
+            tasks.stream().filter(GenericClusterRequest::isHighPriority)
                     .forEach(t -> highPriorityExecutor.execute(() -> {
                         LOG.warn("Handling single point request via normal channel, side channel should open shortly.");
                         this.handleOneRequest(t);
@@ -308,7 +308,7 @@ public class AnalystWorker implements Runnable {
 
             // Enqueue low-priority (batch) tasks; note that this may block anywhere in the process
             logQueueStatus();
-            tasks.stream().filter(t -> !(t instanceof AnalystClusterRequest) || ((AnalystClusterRequest) t).outputLocation != null)
+            tasks.stream().filter(t -> !t.isHighPriority())
                 .forEach(t -> {
                     // attempt to enqueue, waiting if the queue is full
                     while (true) {
@@ -335,6 +335,12 @@ public class AnalystWorker implements Runnable {
      * It may be called several times simultaneously on different executor threads.
      */
     private void handleOneRequest(GenericClusterRequest clusterRequest) {
+        if (clusterRequest.isHighPriority()) {
+            lastHighPriorityRequestProcessed = System.currentTimeMillis();
+            if (!sideChannelOpen) {
+                openSideChannel();
+            }
+        }
 
         if (dryRunFailureRate >= 0) {
             // This worker is running in test mode.
@@ -425,7 +431,6 @@ public class AnalystWorker implements Runnable {
         if (request.request.bucket != null) computer.run();
         else {
             // if bucket is null, return results directly to consumer (high-priority request)
-            lastHighPriorityRequestProcessed = System.currentTimeMillis();
             try {
                 PipedInputStream pis = new PipedInputStream();
                 PipedOutputStream pos = new PipedOutputStream(pis);
@@ -433,7 +438,7 @@ public class AnalystWorker implements Runnable {
                 // This will return immediately as the streaming is done in a new thread.
                 finishPriorityTask(request, pis, "application/octet-stream");
 
-                computer.write(pos);
+                computer.write(pos, false); // don't include paths in interactive analysis mode
                 pos.close();
             } catch (IOException e) {
                 LOG.error("Could not write static output to broker", e);
@@ -460,7 +465,6 @@ public class AnalystWorker implements Runnable {
             deleteRequest(request);
         } else {
             // if bucket is null, return results directly to consumer (high-priority request)
-            lastHighPriorityRequestProcessed = System.currentTimeMillis();
             try {
                 PipedInputStream pis = new PipedInputStream();
                 PipedOutputStream pos = new PipedOutputStream(pis);
@@ -492,7 +496,6 @@ public class AnalystWorker implements Runnable {
             deleteRequest(request);
         } else {
             // if bucket is null, return results directly to consumer (high-priority request)
-            lastHighPriorityRequestProcessed = System.currentTimeMillis();
             try {
                 PipedInputStream pis = new PipedInputStream();
                 PipedOutputStream pos = new PipedOutputStream(pis);
@@ -530,13 +533,6 @@ public class AnalystWorker implements Runnable {
         // or a job task (where the result is saved to output location on S3).
         boolean isochrone = (clusterRequest.destinationPointsetId == null);
         boolean singlePoint = (clusterRequest.outputLocation == null);
-
-        if (singlePoint) {
-            lastHighPriorityRequestProcessed = startTime;
-            if (!sideChannelOpen) {
-                openSideChannel();
-            }
-        }
 
         ts.lon = clusterRequest.profileRequest.fromLon;
         ts.lat = clusterRequest.profileRequest.fromLat;

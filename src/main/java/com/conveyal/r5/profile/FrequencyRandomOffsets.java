@@ -47,10 +47,13 @@ public class FrequencyRandomOffsets {
     public void randomize () {
         int remaining = 0;
 
-        // first clear old offsets
+        // First, initialize all offsets for all trips and entries on this pattern with -1s
         for (TIntObjectIterator<int[][]> it = offsets.iterator(); it.hasNext(); ) {
             it.advance();
             for (int[] offsetsPerEntry : it.value()) {
+                // If this pattern has mixed schedule and frequency trips, and this is a scheduled trip,
+                // it doesn't need to be randomized and there is no offsets array in this position.
+                if (offsetsPerEntry == null) continue;
                 Arrays.fill(offsetsPerEntry, -1);
                 remaining += offsetsPerEntry.length;
             }
@@ -68,11 +71,11 @@ public class FrequencyRandomOffsets {
                 for (int tripScheduleIndex = 0; tripScheduleIndex < val.length; tripScheduleIndex++) {
                     TripSchedule schedule = pattern.tripSchedules.get(tripScheduleIndex);
 
-                    // it is possible to have both frequency and non-frequency trips on the same pattern. If this is a scehduled
-                    // trip, don't set offset
-                    if (schedule.headwaySeconds == null)
+                    // It is possible to have both frequency and non-frequency (scheduled) trips on the same pattern.
+                    // If this is a scheduled trip, don't set offset.
+                    if (schedule.headwaySeconds == null) {
                         val[tripScheduleIndex] = null;
-                    else {
+                    } else {
                         for (int frequencyEntryIndex = 0; frequencyEntryIndex < val[tripScheduleIndex].length; frequencyEntryIndex++) {
                             if (schedule.phaseFromId == null || schedule.phaseFromId[frequencyEntryIndex] == null) {
                                 // not phased. also, don't overwrite with new random number on each iteration, as other

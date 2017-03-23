@@ -36,7 +36,7 @@ public class LinkedPointSet implements Serializable {
      * The distance we search around each PointSet point for a road to link it to.
      * FIXME 1KM is really far to walk off a street. But some places have offices in the middle of big parking lots.
      */
-    public static final int MAX_OFFSTREET_WALK_METERS = 1000;
+    public static final int MAX_OFFSTREET_WALK_METERS = 4000;
 
     /**
      * LinkedPointSets are long-lived and not extremely numerous, so we keep references to the objects it was built from.
@@ -246,14 +246,15 @@ public class LinkedPointSet implements Serializable {
         public int getTravelTime (int vertexId);
     }
 
-    /**
-     * Determine the travel time to every temporary vertex in this set.
-     * The parameter is a function from street vertex indexes to elapsed travel times.
-     *
-     * TODO: Departure times and walking speeds should be supplied.
-     * @return a list of travel times to each point in the PointSet. Integer.MAX_VALUE means a vertex was unreachable.
-     */
+
+    @Deprecated
     public PointSetTimes eval (TravelTimeFunction travelTimeForVertex) {
+        // R5 used to not differentiate between seconds and meters, preserve that behavior in this deprecated function
+        // by using 1 m / s
+        return eval(travelTimeForVertex, 1000);
+    }
+
+    public PointSetTimes eval (TravelTimeFunction travelTimeForVertex, int offstreetTravelSpeedMillimetersPerSecond) {
         int[] travelTimes = new int[edges.length];
         // Iterate over all locations in this temporary vertex list.
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
@@ -268,10 +269,10 @@ public class LinkedPointSet implements Serializable {
 
             // TODO apply walk speed
             if (time0 != Integer.MAX_VALUE) {
-                time0 += distances0_mm[i] / 1000;
+                time0 += distances0_mm[i] / offstreetTravelSpeedMillimetersPerSecond;
             }
             if (time1 != Integer.MAX_VALUE) {
-                time1 += distances1_mm[i] / 1000;
+                time1 += distances1_mm[i] / offstreetTravelSpeedMillimetersPerSecond;
             }
             travelTimes[i] = time0 < time1 ? time0 : time1;
         }

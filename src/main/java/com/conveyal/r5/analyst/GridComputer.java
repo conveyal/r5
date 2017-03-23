@@ -18,12 +18,16 @@ import com.conveyal.r5.transit.TransportNetwork;
 import com.google.common.io.LittleEndianDataOutputStream;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
+import org.apache.commons.math3.random.MersenneTwister;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Base64;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.DoubleStream;
 import java.util.stream.Stream;
 
 /**
@@ -39,6 +43,9 @@ import java.util.stream.Stream;
  */
 public class GridComputer  {
     private static final Logger LOG = LoggerFactory.getLogger(GridComputer.class);
+
+    /** The number of iterations used to bootstrap the sampling distribution of the percentiles */
+    public static final int BOOTSTRAP_ITERATIONS = 99;
 
     /** SQS client. TODO: async? */
     private static final AmazonSQS sqs = new AmazonSQSClient();
@@ -111,36 +118,84 @@ public class GridComputer  {
         Propagater propagater =
                 new Propagater(timesAtStopsEachIteration, nonTransferTravelTimesToStops, linkedTargets, request.request);
 
-        // save the instantaneous accessibility at each minute/iteration, later we will use this to compute probabilities
-        // of improvement.
-        // This means we have the fungibility issue described in AndrewOwenMeanGridStatisticComputer.
-        int[] accessibilityPerIteration = propagater.propagate(times -> {
-            int access = 0;
-            // times in row-major order, convert to grid coordinates
-            // TODO use consistent grids for all data in a project
-            for (int gridy = 0; gridy < grid.height; gridy++) {
-                int reqy = gridy + grid.north - request.north;
-                if (reqy < 0 || reqy >= request.height) continue; // outside of project bounds
+        // We store a count of the number of iterations where each destination was reached within the specified time,
+        // and use this to calculate percentiles.
+        // This is equivalent to calculating a median and seeing if it is above or below the cutoff, but much faster
+        // as it does not require storing and sorting all travel times.
+        // We do this many times, using a different draw from the travel times each time, because we are creating a
+        // bootstrapped sampling distribution of the percentile of interest.
+        int[][] countsPerDestination = new int[BOOTSTRAP_ITERATIONS + 1][linkedTargets.size()];
 
-                for (int gridx = 0; gridx < grid.width; gridx++) {
-                    int reqx = gridx + grid.west - request.west;
-                    if (reqx < 0 || reqx >= request.width) continue; // outside of project bounds
+        // This has the number of times to include each iteration in each bootstrapped median.
+        // So if we are generating, say, 100 bootstraps on the median,
+        int[][] iterationWeightsForBootstrap = new int[BOOTSTRAP_ITERATIONS + 1][timesAtStopsEachIteration.length];
 
-                    int index = reqy * request.width + reqx;
-                    if (times[index] < request.cutoffMinutes * 60) {
-                        access += grid.grid[gridx][gridy];
+        // Create the bootstrap iteration weights
+        // the first bootstrap iteration is the sample median, weight every iteration equally
+        Arrays.fill(iterationWeightsForBootstrap[0], 1);
+
+        // the Mersenne Twister is a high-quality RNG well-suited to Monte Carlo situations
+        MersenneTwister twister = new MersenneTwister();
+
+        for (int i = 1; i < BOOTSTRAP_ITERATIONS + 1; i++) {
+            int[] weightsForThisBootstrap = iterationWeightsForBootstrap[i];
+
+            // Sample with replacement, the same iteration can be chosen multiple times
+            for (int draw = 0; draw < weightsForThisBootstrap.length; draw++) {
+                weightsForThisBootstrap[twister.nextInt(weightsForThisBootstrap.length)]++;
+            }
+        }
+
+        AtomicInteger currentIteration = new AtomicInteger(0);
+
+        propagater.propagate(times -> {
+            int iteration = currentIteration.getAndIncrement();
+            for (int target = 0; target < times.length; target++) {
+                if (times[target] < request.cutoffMinutes * 60) {
+                    for (int bootstrap = 0; bootstrap < iterationWeightsForBootstrap.length; bootstrap++) {
+                        countsPerDestination[bootstrap][target] += iterationWeightsForBootstrap[bootstrap][iteration];
                     }
                 }
-
             }
-            return Math.round(access);
+
+            return 0; // we're not using the per-iteration output of the propagater
         });
+
+        // compute the percentiles
+        double[] samples = new double[BOOTSTRAP_ITERATIONS + 1];
+
+        // TODO should not be hardwired to median
+        int minCount = timesAtStopsEachIteration.length / 2;
+
+        for (int gridx = 0; gridx < grid.width; gridx++) {
+            int reqx = gridx + grid.west - request.west;
+            if (reqx < 0 || reqx >= request.width) continue;
+            for (int gridy = 0; gridy < grid.height; gridy++) {
+                int reqy = gridy + grid.north - request.north;
+                if (reqy < 0 || reqy >= request.width) continue;
+
+                double value = grid.grid[gridx][gridy];
+                int targetIndex = reqy * request.width + reqx;
+
+                for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS + 1; bootstrap++) {
+                    if (countsPerDestination[bootstrap][targetIndex] > minCount) {
+                        samples[bootstrap] += value;
+                    }
+                }
+            }
+        }
+
+        int[] intSamples = DoubleStream.of(samples).mapToInt(d -> (int) Math.round(d)).toArray();
 
         // now construct the output
         // these things are tiny, no problem storing in memory
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
-        new Origin(request, accessibilityPerIteration).write(baos);
+        if (intSamples[0] > 200000) {
+            LOG.info("connected!");
+        }
+
+        new Origin(request, intSamples).write(baos);
 
         // send this origin to an SQS queue as a binary payload; it will be consumed by GridResultConsumer
         // and GridResultAssembler

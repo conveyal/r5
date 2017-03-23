@@ -1,6 +1,5 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.publish.StaticSiteRequest;
 import com.google.common.io.LittleEndianDataInputStream;
 import com.google.common.io.LittleEndianDataOutputStream;
 import org.slf4j.Logger;
@@ -26,14 +25,14 @@ public class Origin {
     /** Y coordinate of origin within regional analysis */
     public int y;
 
-    /** The instantaneous accessibility for each iteration */
-    public int[] accessibilityPerIteration;
+    /** Percentiles of accessibility, from first (index 0) up to 100th (index 99). 50th percentile (median) is index 49. */
+    public int[] samples;
 
     /** Construct an origin given a grid request and the instantaneous accessibility computed for each iteration */
-    public Origin (GridRequest request, int[] accessibilityPerIteration) {
+    public Origin (GridRequest request, int[] samples) {
         this.x = request.x;
         this.y = request.y;
-        this.accessibilityPerIteration = accessibilityPerIteration;
+        this.samples = samples;
     }
 
     /** allow construction of blank origin for static read method */
@@ -56,9 +55,9 @@ public class Origin {
         data.writeInt(y);
 
         // write the number of iterations
-        data.writeInt(accessibilityPerIteration.length);
+        data.writeInt(samples.length);
 
-        for (int i : accessibilityPerIteration) {
+        for (int i : samples) {
             // don't bother to delta code, these are small and we're not gzipping
             data.writeInt(i);
         }
@@ -91,11 +90,11 @@ public class Origin {
         origin.x = data.readInt();
         origin.y = data.readInt();
 
-        origin.accessibilityPerIteration = new int[data.readInt()];
+        origin.samples = new int[data.readInt()];
 
-        for (int iteration = 0; iteration < origin.accessibilityPerIteration.length; iteration++) {
+        for (int iteration = 0; iteration < origin.samples.length; iteration++) {
             // de-delta-code the origin
-            origin.accessibilityPerIteration[iteration] = data.readInt();
+            origin.samples[iteration] = data.readInt();
         }
 
         data.close();

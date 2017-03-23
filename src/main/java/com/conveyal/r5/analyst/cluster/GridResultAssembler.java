@@ -2,8 +2,6 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
-import com.amazonaws.services.sqs.AmazonSQS;
-import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.Message;
 import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import com.google.common.io.ByteStreams;
@@ -24,7 +22,6 @@ import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.util.Base64;
 import java.util.BitSet;
-import java.util.Locale;
 import java.util.zip.GZIPOutputStream;
 
 /**
@@ -135,17 +132,17 @@ public class GridResultAssembler {
             Origin origin = Origin.read(bais);
 
             // if this is not the first request, make sure that we have the correct number of iterations
-            if (buffer != null && origin.accessibilityPerIteration.length != this.nIterations) {
+            if (buffer != null && origin.samples.length != this.nIterations) {
                 LOG.error("Origin {}, {} has {} iterations, expected {}",
-                        origin.x, origin.y, origin.accessibilityPerIteration.length, this.nIterations);
+                        origin.x, origin.y, origin.samples.length, this.nIterations);
                 error = true;
             }
 
             // convert to a delta coded byte array
-            ByteArrayOutputStream pixelByteOutputStream = new ByteArrayOutputStream(origin.accessibilityPerIteration.length * 4);
+            ByteArrayOutputStream pixelByteOutputStream = new ByteArrayOutputStream(origin.samples.length * 4);
             LittleEndianDataOutputStream pixelDataOutputStream = new LittleEndianDataOutputStream(pixelByteOutputStream);
-            for (int i = 0, prev = 0; i < origin.accessibilityPerIteration.length; i++) {
-                int current = origin.accessibilityPerIteration[i];
+            for (int i = 0, prev = 0; i < origin.samples.length; i++) {
+                int current = origin.samples[i];
                 pixelDataOutputStream.writeInt(current - prev);
                 prev = current;
             }
@@ -154,7 +151,7 @@ public class GridResultAssembler {
             // write to the proper subregion of the buffer for this origin
             // use a synchronized block to ensure no threading issues
             synchronized (this) {
-                if (buffer == null) this.initialize(origin.accessibilityPerIteration.length);
+                if (buffer == null) this.initialize(origin.samples.length);
                 // The origins we receive have 2d coordinates.
                 // Flatten them to compute file offsets and for the origin checklist.
                 int index1d = origin.y * request.width + origin.x;

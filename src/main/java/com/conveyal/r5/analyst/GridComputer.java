@@ -165,14 +165,14 @@ public class GridComputer  {
         int minCount = timesAtStopsEachIteration.length / 2;
 
         for (int gridx = 0; gridx < grid.width; gridx++) {
-            int reqx = gridx + grid.west - request.west;
-            if (reqx < 0 || reqx >= request.width) continue;
-            for (int gridy = 0; gridy < grid.height; gridy++) {
-                int reqy = gridy + grid.north - request.north;
-                if (reqy < 0 || reqy >= request.width) continue;
+            int netx = gridx + grid.west - network.gridPointSet.west;
+            if (netx < 0 || netx >= network.gridPointSet.width) continue;
+            for (int gridy = 0; gridy < network.gridPointSet.height; gridy++) {
+                int nety = gridy + grid.north - network.gridPointSet.north;
+                if (nety < 0 || nety >= network.gridPointSet.width) continue;
 
                 double value = grid.grid[gridx][gridy];
-                int targetIndex = reqy * request.width + reqx;
+                int targetIndex = nety * network.gridPointSet.width + netx;
 
                 for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS + 1; bootstrap++) {
                     if (countsPerDestination[bootstrap][targetIndex] > minCount) {

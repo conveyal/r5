@@ -72,10 +72,6 @@ public class GridComputer  {
         // ensure they both have the same zoom level
         if (request.zoom != grid.zoom) throw new IllegalArgumentException("grid zooms do not match!");
 
-        // NB this will skip all destinations that lie outside query bounds. This is intentional.
-        final WebMercatorGridPointSet targets =
-                pointSetCache.get(request.zoom, request.west, request.north, request.width, request.height);
-
         // use the middle of the grid cell
         request.request.fromLat = Grid.pixelToLat(request.north + request.y + 0.5, request.zoom);
         request.request.fromLon = Grid.pixelToLon(request.west + request.x + 0.5, request.zoom);
@@ -91,7 +87,8 @@ public class GridComputer  {
         LOG.info("Maximum number of rides: {}", request.request.maxRides);
         LOG.info("Maximum trip duration: {}", request.request.maxTripDurationMinutes);
 
-        final LinkedPointSet linkedTargets = targets.link(network.streetLayer, mode);
+        // use the linked point set of the full network so the full destination dataset is used even on smaller queries
+        final LinkedPointSet linkedTargets = network.linkedGridPointSet;
 
         StreetRouter sr = new StreetRouter(network.streetLayer);
         sr.distanceLimitMeters = 2000;

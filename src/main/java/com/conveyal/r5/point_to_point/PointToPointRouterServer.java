@@ -25,6 +25,7 @@ import com.fasterxml.jackson.databind.ObjectReader;
 import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.operation.buffer.BufferParameters;
 import com.vividsolutions.jts.operation.buffer.OffsetCurveBuilder;
+import gnu.trove.TIntCollection;
 import gnu.trove.set.TIntSet;
 import graphql.ExecutionResult;
 import graphql.GraphQL;
@@ -649,6 +650,128 @@ public class PointToPointRouterServer {
             content.put("data", featureCollection);
 
             return content;
+        }, JsonUtilities.objectMapper::writeValueAsString);
+
+        get("debug/turns", (request, response) -> {
+            response.header("Content-Type", "application/json");
+            if (request.queryParams().size() < 4) {
+                response.status(400);
+                return "";
+            }
+            float north = request.queryMap("n").floatValue();
+            float south = request.queryMap("s").floatValue();
+            float east = request.queryMap("e").floatValue();
+            float west = request.queryMap("w").floatValue();
+            Boolean iboth = request.queryMap("both").booleanValue();
+            Boolean idetail = request.queryMap("detail").booleanValue();
+            boolean both, detail;
+
+            if (iboth == null) {
+                both = false;
+            } else {
+                both = iboth;
+            }
+
+            if (idetail == null) {
+                detail = false;
+            } else {
+                detail = idetail;
+            }
+
+            String layer = "turns"; // request.params(":layer");
+
+            Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
+                floatingDegreesToFixed(south), floatingDegreesToFixed(north));
+            TIntSet streets = transportNetwork.streetLayer.findEdgesInEnvelope(env);
+
+            if (streets.size() > 100_000) {
+                LOG.warn("Refusing to include more than 100,000 edges in result");
+                response.status(401);
+                return "";
+            }
+
+            // write geojson to response
+            Map<String, Object> featureCollection = new HashMap<>(2);
+            featureCollection.put("type", "FeatureCollection");
+            List<GeoJsonFeature> features = new ArrayList<>(streets.size());
+
+            EdgeStore.Edge cursor = transportNetwork.streetLayer.edgeStore.getCursor();
+
+            BufferParameters bufParams = new BufferParameters();
+            bufParams.setSingleSided(true);
+            bufParams.setJoinStyle(BufferParameters.JOIN_BEVEL);
+            OffsetCurveBuilder offsetBuilder = new OffsetCurveBuilder(new PrecisionModel(),
+                bufParams);
+            float distance = -0.00005f;
+
+            Set<Integer> seenVertices = new HashSet<>(streets.size());
+
+            if ("turns".equals(layer)) {
+                streets.forEach(s -> {
+                    try {
+                        if (transportNetwork.streetLayer.edgeStore.turnRestrictions
+                            .containsKey(s)) {
+
+                            List<TurnRestriction> edge_restrictions = new ArrayList<>();
+                            transportNetwork.streetLayer.edgeStore.turnRestrictions.get(s)
+                                .forEach(turn_restriction_idx -> {
+                                    edge_restrictions.add(
+                                        transportNetwork.streetLayer.turnRestrictions
+                                            .get(turn_restriction_idx));
+                                    return true;
+                                });
+                            for (TurnRestriction turnRestriction : edge_restrictions) {
+                                //TurnRestriction.fromEdge isn't necessary correct
+                                //If edge on which from is is splitted then fromEdge is different but isn't updated in TurnRestriction
+                                cursor.seek(s);
+
+                                GeoJsonFeature feature = getEdgeFeature(both, cursor, offsetBuilder,
+                                    distance, transportNetwork);
+
+                                feature.addProperty("only", turnRestriction.only);
+                                feature.addProperty("edge", "FROM");
+
+                                features.add(feature);
+
+                                if (turnRestriction.viaEdges.length > 0) {
+                                    for (int via_edge_index : turnRestriction.viaEdges) {
+                                        cursor.seek(via_edge_index);
+
+                                        feature = getEdgeFeature(both, cursor, offsetBuilder,
+                                            distance, transportNetwork);
+
+                                        feature.addProperty("only", turnRestriction.only);
+                                        feature.addProperty("edge", "VIA");
+
+                                        features.add(feature);
+                                    }
+
+                                }
+                                cursor.seek(turnRestriction.toEdge);
+
+                                feature = getEdgeFeature(both, cursor, offsetBuilder, distance,
+                                    transportNetwork);
+
+                                feature.addProperty("only", turnRestriction.only);
+                                feature.addProperty("edge", "TO");
+
+                                features.add(feature);
+                            }
+
+                        }
+
+                        return true;
+                    } catch (Exception e) {
+                        response.status(500);
+                        LOG.error("Exception:", e);
+                        return false;
+                    }
+                });
+            }
+
+            featureCollection.put("features", features);
+
+            return featureCollection;
         }, JsonUtilities.objectMapper::writeValueAsString);
 
 

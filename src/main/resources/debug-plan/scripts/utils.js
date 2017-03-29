@@ -163,9 +163,15 @@ function getStyle(type) {
     console.info(type);
     console.log(text);
     style = clone(mapbox_style);
-    style.sources["perm"].data = full_url;
+    if (type == "turns") {
+        current_layer = "turns";
+    } else {
+        current_layer = "streetEdges";
+    }
+    request_url = url + '/' + current_layer;
+    full_url = request_url;
     flag_filters = ["any"];
-    if (type == "permissions") {
+    if (type == "permissions" || type == "turns") {
         $.each(permission_colors, function(name, color) {
             var nice_name = name.replace(',', '_');
             var permission_layer = {

@@ -167,7 +167,7 @@ public class GridComputer  {
         for (int gridx = 0; gridx < grid.width; gridx++) {
             int netx = gridx + grid.west - network.gridPointSet.west;
             if (netx < 0 || netx >= network.gridPointSet.width) continue;
-            for (int gridy = 0; gridy < network.gridPointSet.height; gridy++) {
+            for (int gridy = 0; gridy < grid.height; gridy++) {
                 int nety = gridy + grid.north - network.gridPointSet.north;
                 if (nety < 0 || nety >= network.gridPointSet.width) continue;
 

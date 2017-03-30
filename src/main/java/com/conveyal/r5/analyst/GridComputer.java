@@ -85,8 +85,8 @@ public class GridComputer  {
                         "    #                           #\n"+
                         "    #############################" +
                 "HARDWIRING REQUEST LOCATION TO PROBLEMATIC ORIGIN IN ATLANTA. THIS WORKER SHOULD NOT BE USED IN PRODUCTION.");
-        request.request.fromLat = Grid.pixelToLat(request.north + 77 + 0.5, request.zoom);
-        request.request.fromLon = Grid.pixelToLon(request.west + 64 + 0.5, request.zoom);
+        request.request.fromLat = Grid.pixelToLat(52469.5, 9);
+        request.request.fromLon = Grid.pixelToLon(34826.5, 9);
 
         // Run the raptor algorithm to get times at each destination for each iteration
 

@@ -73,8 +73,20 @@ public class GridComputer  {
         if (request.zoom != grid.zoom) throw new IllegalArgumentException("grid zooms do not match!");
 
         // use the middle of the grid cell
-        request.request.fromLat = Grid.pixelToLat(request.north + request.y + 0.5, request.zoom);
-        request.request.fromLon = Grid.pixelToLon(request.west + request.x + 0.5, request.zoom);
+        LOG.error(
+                        "                  #     \n" +
+                        "                #   #              \n" +
+                        "              #  ##   #             \n" +
+                        "            #    ##     #               \n" +
+                        "          #      ##       #              \n" +
+                        "        #        ##         #            \n" +
+                        "      #                       #        \n" +
+                        "    #            ##             #       \n" +
+                        "    #                           #\n"+
+                        "    #############################" +
+                "HARDWIRING REQUEST LOCATION TO PROBLEMATIC ORIGIN IN ATLANTA. THIS WORKER SHOULD NOT BE USED IN PRODUCTION.");
+        request.request.fromLat = Grid.pixelToLat(request.north + 77 + 0.5, request.zoom);
+        request.request.fromLon = Grid.pixelToLon(request.west + 64 + 0.5, request.zoom);
 
         // Run the raptor algorithm to get times at each destination for each iteration
 

@@ -147,18 +147,10 @@ public class GridComputer  {
 
         int[] currentIteration = new int[1];
 
-        BitSet nonEmptyTargets = new BitSet();
-
-        for (int y = 0, targetIdx = 0; y < targets.height; y++) {
-            for (int x = 0; x < targets.width; x++, targetIdx++) {
-                if (grid.grid[x][y] > 1e-6) nonEmptyTargets.set(targetIdx);
-            }
-        }
-
         propagater.propagate(times -> {
             int iteration = currentIteration[0]++;
             for (int target = 0; target < times.length; target++) {
-                if (nonEmptyTargets.get(target) && times[target] < request.cutoffMinutes * 60) {
+                if (times[target] < request.cutoffMinutes * 60) {
                     for (int bootstrap = 0; bootstrap < iterationWeightsForBootstrap[0].length; bootstrap++) {
                         countsPerDestination[target][bootstrap] += iterationWeightsForBootstrap[iteration][bootstrap];
                     }
@@ -176,8 +168,6 @@ public class GridComputer  {
 
         for (int gridy = 0, targetIdx = 0; gridy < grid.height; gridy++) {
             for (int gridx = 0; gridx < grid.width; gridx++, targetIdx++) {
-                if (!nonEmptyTargets.get(targetIdx)) continue;
-
                 double value = grid.grid[gridx][gridy];
 
                 for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS + 1; bootstrap++) {

@@ -1139,6 +1139,12 @@ public class StreetLayer implements Serializable, Cloneable {
         EdgeStore.Edge newEdge1 = edgeStore.addStreetPair(newVertexIndex, oldToVertex, split.distance1_mm, edge.getOSMID());
         // Copy the flags and speeds for both directions, making newEdge1 like the existing edge.
         newEdge1.copyPairFlagsAndSpeeds(edge);
+
+        // clean up any turn restrictions that exist
+        // turn restrictions on the forward edge go to the new edge's forward edge. Turn restrictions on the back edge stay
+        // where they are
+        edgeStore.turnRestrictions.removeAll(split.edge).forEach(ridx -> edgeStore.turnRestrictions.put(newEdge1.edgeIndex, ridx));
+
         // Insert the new edge into the spatial index
         if (!edgeStore.isExtendOnlyCopy()) {
             spatialIndex.insert(newEdge1.getEnvelope(), newEdge1.edgeIndex);

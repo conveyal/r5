@@ -26,6 +26,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.BitSet;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.DoubleStream;
 import java.util.stream.Stream;
@@ -87,8 +88,11 @@ public class GridComputer  {
         LOG.info("Maximum number of rides: {}", request.request.maxRides);
         LOG.info("Maximum trip duration: {}", request.request.maxTripDurationMinutes);
 
-        // use the linked point set of the full network so the full destination dataset is used even on smaller queries
-        final LinkedPointSet linkedTargets = network.linkedGridPointSet;
+        // Use the extent of the grid as the targets; this avoids having to convert between coordinate systems,
+        // and avoids including thousands of extra points in the weeds where there happens to be a transit stop.
+        WebMercatorGridPointSet targets = pointSetCache.get(grid);
+        // TODO recast using egress mode
+        final LinkedPointSet linkedTargets = targets.link(network.streetLayer, mode);
 
         StreetRouter sr = new StreetRouter(network.streetLayer);
         sr.distanceLimitMeters = 2000;
@@ -121,11 +125,11 @@ public class GridComputer  {
         // as it does not require storing and sorting all travel times.
         // We do this many times, using a different draw from the travel times each time, because we are creating a
         // bootstrapped sampling distribution of the percentile of interest.
-        int[][] countsPerDestination = new int[BOOTSTRAP_ITERATIONS + 1][linkedTargets.size()];
+        int[][] countsPerDestination = new int[linkedTargets.size()][BOOTSTRAP_ITERATIONS + 1];
 
         // This has the number of times to include each iteration in each bootstrapped median.
         // So if we are generating, say, 100 bootstraps on the median,
-        int[][] iterationWeightsForBootstrap = new int[BOOTSTRAP_ITERATIONS + 1][timesAtStopsEachIteration.length];
+        int[][] iterationWeightsForBootstrap = new int[timesAtStopsEachIteration.length][BOOTSTRAP_ITERATIONS + 1];
 
         // Create the bootstrap iteration weights
         // the first bootstrap iteration is the sample median, weight every iteration equally
@@ -135,22 +139,28 @@ public class GridComputer  {
         MersenneTwister twister = new MersenneTwister();
 
         for (int i = 1; i < BOOTSTRAP_ITERATIONS + 1; i++) {
-            int[] weightsForThisBootstrap = iterationWeightsForBootstrap[i];
-
             // Sample with replacement, the same iteration can be chosen multiple times
-            for (int draw = 0; draw < weightsForThisBootstrap.length; draw++) {
-                weightsForThisBootstrap[twister.nextInt(weightsForThisBootstrap.length)]++;
+            for (int draw = 0; draw < iterationWeightsForBootstrap.length; draw++) {
+                iterationWeightsForBootstrap[twister.nextInt(iterationWeightsForBootstrap.length)][i]++;
             }
         }
 
-        AtomicInteger currentIteration = new AtomicInteger(0);
+        int[] currentIteration = new int[1];
+
+        BitSet nonEmptyTargets = new BitSet();
+
+        for (int y = 0, targetIdx = 0; y < targets.height; y++) {
+            for (int x = 0; x < targets.width; x++, targetIdx++) {
+                if (grid.grid[x][y] > 1e-6) nonEmptyTargets.set(targetIdx);
+            }
+        }
 
         propagater.propagate(times -> {
-            int iteration = currentIteration.getAndIncrement();
+            int iteration = currentIteration[0]++;
             for (int target = 0; target < times.length; target++) {
-                if (times[target] < request.cutoffMinutes * 60) {
-                    for (int bootstrap = 0; bootstrap < iterationWeightsForBootstrap.length; bootstrap++) {
-                        countsPerDestination[bootstrap][target] += iterationWeightsForBootstrap[bootstrap][iteration];
+                if (nonEmptyTargets.get(target) && times[target] < request.cutoffMinutes * 60) {
+                    for (int bootstrap = 0; bootstrap < iterationWeightsForBootstrap[0].length; bootstrap++) {
+                        countsPerDestination[target][bootstrap] += iterationWeightsForBootstrap[iteration][bootstrap];
                     }
                 }
             }
@@ -164,18 +174,14 @@ public class GridComputer  {
         // TODO should not be hardwired to median
         int minCount = timesAtStopsEachIteration.length / 2;
 
-        for (int gridx = 0; gridx < grid.width; gridx++) {
-            int netx = gridx + grid.west - network.gridPointSet.west;
-            if (netx < 0 || netx >= network.gridPointSet.width) continue;
-            for (int gridy = 0; gridy < grid.height; gridy++) {
-                int nety = gridy + grid.north - network.gridPointSet.north;
-                if (nety < 0 || nety >= network.gridPointSet.width) continue;
+        for (int gridy = 0, targetIdx = 0; gridy < grid.height; gridy++) {
+            for (int gridx = 0; gridx < grid.width; gridx++, targetIdx++) {
+                if (!nonEmptyTargets.get(targetIdx)) continue;
 
                 double value = grid.grid[gridx][gridy];
-                int targetIndex = nety * network.gridPointSet.width + netx;
 
                 for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS + 1; bootstrap++) {
-                    if (countsPerDestination[bootstrap][targetIndex] > minCount) {
+                    if (countsPerDestination[targetIdx][bootstrap] > minCount) {
                         samples[bootstrap] += value;
                     }
                 }

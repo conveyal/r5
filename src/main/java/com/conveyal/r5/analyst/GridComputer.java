@@ -117,7 +117,7 @@ public class GridComputer  {
         // Do propagation
         int[] nonTransferTravelTimesToStops = linkedTargets.eval(sr::getTravelTimeToVertex).travelTimes;
         Propagater propagater =
-                new Propagater(timesAtStopsEachIteration, nonTransferTravelTimesToStops, linkedTargets, request.request);
+                new Propagater(timesAtStopsEachIteration, nonTransferTravelTimesToStops, linkedTargets, request.request, request.cutoffMinutes * 60);
 
         // We store a count of the number of iterations where each destination was reached within the specified time,
         // and use this to calculate percentiles.

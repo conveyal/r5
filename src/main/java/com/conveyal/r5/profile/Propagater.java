@@ -25,17 +25,21 @@ public class Propagater {
     /** Times at targets using the street network */
     public final int[] nonTransferTravelTimesToTargets;
 
+    /** The maximum allowable travel time in this regional analysis, to avoid propagating things that won't be useful */
+    public final int cutoffSeconds;
+
     /** The linked targets */
     public final LinkedPointSet targets;
 
     /** the profilerequest (used for walk speed etc.) */
     public final ProfileRequest request;
 
-    public Propagater (int[][] travelTimesToStopsEachIteration, int[] nonTransferTravelTimesToTargets, LinkedPointSet targets, ProfileRequest request) {
+    public Propagater (int[][] travelTimesToStopsEachIteration, int[] nonTransferTravelTimesToTargets, LinkedPointSet targets, ProfileRequest request, int cutoffSeconds) {
         this.travelTimesToStopsEachIteration = travelTimesToStopsEachIteration;
         this.nonTransferTravelTimesToTargets = nonTransferTravelTimesToTargets;
         this.targets = targets;
         this.request = request;
+        this.cutoffSeconds = cutoffSeconds;
     }
 
     /**
@@ -56,8 +60,12 @@ public class Propagater {
         // iteration to the next, but that requires working on clock times, so we'd have to pass more information down
         // into this function; I'm not sure it's worth it.
         int[] result = new int[travelTimesToStopsEachIteration.length];
+        int[] travelTimesToTargetsThisIteration = new int[nonTransferTravelTimesToTargets.length];
         for (int iteration = 0; iteration < travelTimesToStopsEachIteration.length; iteration++) {
-            int[] travelTimesToTargetsThisIteration = Arrays.copyOf(nonTransferTravelTimesToTargets, nonTransferTravelTimesToTargets.length);
+            for (int i = 0; i < travelTimesToTargetsThisIteration.length; i++) {
+                travelTimesToTargetsThisIteration[i] = nonTransferTravelTimesToTargets[i];
+            }
+
             int[] travelTimesToStopsThisIteration = travelTimesToStopsEachIteration[iteration];
 
             // avoid float math in loop below
@@ -70,7 +78,9 @@ public class Propagater {
             for (int stop = 0; stop < travelTimesToStopsThisIteration.length; stop++) {
                 int travelTimeToStop = travelTimesToStopsThisIteration[stop];
 
-                if (travelTimeToStop == RaptorWorker.UNREACHED) continue;
+                // don't bother to even propagate stops that take too long to get to
+                // this will also skip unreached stops
+                if (travelTimeToStop > cutoffSeconds) continue;
 
                 int[] stopToTargetTree = targets.stopToPointDistanceTables.get(stop);
                 if (stopToTargetTree == null) continue; // stop is unlinked

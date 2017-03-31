@@ -6,8 +6,7 @@ import junit.framework.TestCase;
 /**
  * Base class for tests of turn costs and restrictions..
  */
-public abstract class TurnTest extends TestCase {
-    public StreetLayer streetLayer;
+public abstract class TurnTest extends TurnTestUtils {
 
     // center vertex index, n/s/e/w vertex indices, n/s/e/w edge indices (always starting from center).
     public int VCENTER, VN, VS, VE, VW, VNE, VNW, EN, ES, EE, EW, ENE, ENW;
@@ -51,15 +50,4 @@ public abstract class TurnTest extends TestCase {
         streetLayer.buildEdgeLists();
     }
 
-    /** create a turn restriction */
-    public void restrictTurn (boolean onlyTurn, int from, int to, int... via) {
-        TurnRestriction restriction = new TurnRestriction();
-        restriction.fromEdge = from;
-        restriction.toEdge = to;
-        restriction.only = onlyTurn;
-        restriction.viaEdges = via;
-        int ridx = streetLayer.turnRestrictions.size();
-        streetLayer.turnRestrictions.add(restriction);
-        streetLayer.edgeStore.turnRestrictions.put(restriction.fromEdge, ridx);
-    }
 }

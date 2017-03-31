@@ -3,6 +3,11 @@ package com.conveyal.r5.streets;
 import com.conveyal.r5.profile.StreetMode;
 import org.junit.Test;
 
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertEquals;
+
 public class TurnRestrictionTest extends TurnTest {
     @Test
     public void testSimpleNoTurn () {

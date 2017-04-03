@@ -122,7 +122,7 @@ public class GridComputer  {
                 new PerTargetPropagater(timesAtStopsEachIteration, nonTransferTravelTimesToStops, linkedTargets, request.request, request.cutoffMinutes * 60);
 
         // the Mersenne Twister is a high-quality RNG well-suited to Monte Carlo situations
-        MersenneTwister twister = new XORSh();
+        MersenneTwister twister = new MersenneTwister();
 
         // compute the percentiles
         double[] samples = new double[BOOTSTRAP_ITERATIONS + 1];

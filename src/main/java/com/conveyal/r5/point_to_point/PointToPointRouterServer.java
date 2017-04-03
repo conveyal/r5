@@ -734,7 +734,8 @@ public class PointToPointRouterServer {
                                 features.add(feature);
 
                                 if (turnRestriction.viaEdges.length > 0) {
-                                    for (int via_edge_index : turnRestriction.viaEdges) {
+                                    for (int idx = 0; idx < turnRestriction.viaEdges.length; idx++) {
+                                        int via_edge_index = turnRestriction.viaEdges[idx];
                                         cursor.seek(via_edge_index);
 
                                         feature = getEdgeFeature(both, cursor, offsetBuilder,
@@ -742,6 +743,7 @@ public class PointToPointRouterServer {
 
                                         feature.addProperty("only", turnRestriction.only);
                                         feature.addProperty("edge", "VIA");
+                                        feature.addProperty("via_edge_idx", idx);
 
                                         features.add(feature);
                                     }

@@ -31,6 +31,7 @@ import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
+import org.apache.commons.lang.ArrayUtils;
 import org.geotools.geojson.geom.GeometryJSON;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -679,6 +680,9 @@ public class StreetLayer implements Serializable, Cloneable {
             int index = turnRestrictions.size();
             turnRestrictions.add(out);
             edgeStore.turnRestrictions.put(out.fromEdge, index);
+            for(int edgeId: out.viaEdges) {
+                edgeStore.turnRestrictionsVia.put(edgeId, index);
+            }
         } else {
             // via member(s) are ways, which is more tricky
             // do a little street search constrained to the ways in question
@@ -869,6 +873,9 @@ public class StreetLayer implements Serializable, Cloneable {
             int index = turnRestrictions.size();
             turnRestrictions.add(out);
             edgeStore.turnRestrictions.put(out.fromEdge, index);
+            for(int edgeId: out.viaEdges) {
+                edgeStore.turnRestrictionsVia.put(edgeId, index);
+            }
 
             // take a deep breath
         }
@@ -1145,6 +1152,22 @@ public class StreetLayer implements Serializable, Cloneable {
         // where they are
         edgeStore.turnRestrictions.removeAll(split.edge).forEach(ridx -> edgeStore.turnRestrictions.put(newEdge1.edgeIndex, ridx));
 
+        //Turn restrictions that are on via edge should be updated. Since we now have 2 via edges from one, because we split one
+        if (edgeStore.turnRestrictionsVia.containsKey(split.edge)) {
+
+            edgeStore.turnRestrictionsVia.get(split.edge).forEach(turnRestrictionIndex -> {
+                TurnRestriction tr = turnRestrictions.get(turnRestrictionIndex);
+                int currentViaEdgeIndex =  ArrayUtils.indexOf(tr.viaEdges, split.edge);
+                //New via edge index is added as the next edge in viaEdges list
+                //noinspection UnnecessaryLocalVariable
+                int[] newViaEdges = ArrayUtils.add(tr.viaEdges, currentViaEdgeIndex+1, newEdge1.edgeIndex);
+                tr.viaEdges = newViaEdges;
+                //Also updates turnRestrictionsViaList
+                edgeStore.turnRestrictionsVia.put(newEdge1.edgeIndex, turnRestrictionIndex);
+                return true;
+            });
+        }
+
         // Insert the new edge into the spatial index
         if (!edgeStore.isExtendOnlyCopy()) {
             spatialIndex.insert(newEdge1.getEnvelope(), newEdge1.edgeIndex);
@@ -1198,6 +1221,22 @@ public class StreetLayer implements Serializable, Cloneable {
         // turn restrictions on the forward edge go to the new edge's forward edge. Turn restrictions on the back edge stay
         // where they are
         edgeStore.turnRestrictions.removeAll(split.edge).forEach(ridx -> edgeStore.turnRestrictions.put(newEdge.edgeIndex, ridx));
+
+        //Turn restrictions that are on via edge should be updated. Since we now have 2 via edges from one, because we split one
+        if (edgeStore.turnRestrictionsVia.containsKey(split.edge)) {
+
+            edgeStore.turnRestrictionsVia.get(split.edge).forEach(turnRestrictionIndex -> {
+                TurnRestriction tr = turnRestrictions.get(turnRestrictionIndex);
+                int currentViaEdgeIndex =  ArrayUtils.indexOf(tr.viaEdges, split.edge);
+                //New via edge index is added as the next edge in viaEdges list
+                //noinspection UnnecessaryLocalVariable
+                int[] newViaEdges = ArrayUtils.add(tr.viaEdges, currentViaEdgeIndex+1, newEdge.edgeIndex);
+                tr.viaEdges = newViaEdges;
+                //Also updates turnRestrictionsViaList
+                edgeStore.turnRestrictionsVia.put(newEdge.edgeIndex, turnRestrictionIndex);
+                return true;
+            });
+        }
 
         return newVertexIndex;
         // TODO store street-to-stop distance in a table in TransitLayer. This also allows adjusting for subway entrances etc.

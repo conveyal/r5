@@ -142,6 +142,11 @@ public class EdgeStore implements Serializable {
     /** Turn restrictions for turning _out of_ each edge */
     public TIntIntMultimap turnRestrictions;
 
+    /** Via edges to turn restrictions link. Used when splitting edges
+     * FIXME: Can be probably transient since it's used only when building graph in getOrCreateVertexNear
+     * But I'm not sure what is with scenarios (materializeOne function)*/
+    public TIntIntMultimap turnRestrictionsVia;
+
     public StreetLayer layer;
 
     public static final transient EnumSet<EdgeFlag> PERMISSION_FLAGS = EnumSet
@@ -166,6 +171,7 @@ public class EdgeStore implements Serializable {
         inAngles = new TByteArrayList(initialEdgePairs);
         outAngles = new TByteArrayList(initialEdgePairs);
         turnRestrictions = new TIntIntHashMultimap();
+        turnRestrictionsVia = new TIntIntHashMultimap();
     }
 
     /**
@@ -1007,6 +1013,7 @@ public class EdgeStore implements Serializable {
         copy.outAngles = new TByteArrayList(outAngles);
         // We don't expect to add/change any turn restrictions.
         copy.turnRestrictions = turnRestrictions;
+        copy.turnRestrictionsVia = turnRestrictionsVia;
         return copy;
     }
 

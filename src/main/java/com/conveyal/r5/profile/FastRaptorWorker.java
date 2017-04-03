@@ -40,6 +40,8 @@ public class FastRaptorWorker {
 
     /** Minimum wait for boarding to account for schedule variation */
     private static final int MINIMUM_BOARD_WAIT_SEC = 60;
+    public final int nMinutes;
+    public final int monteCarloDrawsPerMinute;
 
     // Variables to track time spent, all in nanoseconds (some of the operations we're timing are significantly submillisecond)
     // (although I suppose using ms would be fine because the number of times we cross a millisecond boundary would be proportional
@@ -107,6 +109,12 @@ public class FastRaptorWorker {
         for (int i = 1; i < this.scheduleState.length; i++) this.scheduleState[i].previous = this.scheduleState[i - 1];
 
         offsets = new FrequencyRandomOffsets(transitLayer);
+
+        // compute number of minutes for scheduled search
+        nMinutes = (request.toTime - request.fromTime) / DEPARTURE_STEP_SEC;
+
+        // how many monte carlo draws per minute of scheduled search to get desired total iterations?
+        monteCarloDrawsPerMinute = (int) Math.ceil((double) request.monteCarloDraws / nMinutes);
     }
 
     /** For each iteration, return the travel time to each transit stop */
@@ -116,12 +124,6 @@ public class FastRaptorWorker {
         if (saveAllStates) statesEachIteration = new ArrayList<>();
 
         prefilterPatterns();
-
-        // compute number of minutes for scheduled search
-        int nMinutes = (request.toTime - request.fromTime) / DEPARTURE_STEP_SEC;
-
-        // how many monte carlo draws per minute of scheduled search to get desired total iterations?
-        int monteCarloDrawsPerMinute = (int) Math.ceil((double) request.monteCarloDraws / nMinutes);
 
         LOG.info("Performing {} scheduled iterations each with {} Monte Carlo draws for a total of {} iterations",
                 nMinutes, monteCarloDrawsPerMinute, nMinutes * monteCarloDrawsPerMinute);

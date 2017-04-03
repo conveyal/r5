@@ -71,6 +71,9 @@ public class LinkedPointSet implements Serializable {
     /** For each transit stop, the distances to nearby PointSet points as packed (point_index, distance) pairs. */
     public List<int[]> stopToPointDistanceTables;
 
+    /** For each pointset point, the reachable stops, as a map from StopID to distance in millimeters */
+    public transient List<TIntIntMap> pointToStopDistanceTables;
+
     /** It is preferred to specify a mode when linking TODO remove this. */
     @Deprecated
     public LinkedPointSet(PointSet pointSet, StreetLayer streetLayer) {
@@ -378,5 +381,30 @@ public class LinkedPointSet implements Serializable {
         }).collect(Collectors.toList());
         counter.done();
     }
+
+    public synchronized void makePointToStopDistanceTablesIfNeeded () {
+        if (pointToStopDistanceTables != null) return;
+
+        synchronized (this) {
+            // check again in case they were built while waiting on this synchronized block
+            if (pointToStopDistanceTables != null) return;
+            if (stopToPointDistanceTables == null) makeStopToPointDistanceTables(null);
+            TIntIntMap[] result = new TIntIntMap[size()];
+
+            for (int stop = 0; stop < stopToPointDistanceTables.size(); stop++) {
+                int[] stopToPointDistanceTable = stopToPointDistanceTables.get(stop);
+                if (stopToPointDistanceTable == null) continue;
+
+                for (int idx = 0; idx < stopToPointDistanceTable.length; idx += 2) {
+                    int point = stopToPointDistanceTable[idx];
+                    int distance = stopToPointDistanceTable[idx + 1];
+                    if (result[point] == null) result[point] = new TIntIntHashMap();
+                    result[point].put(stop, distance);
+                }
+            }
+            pointToStopDistanceTables = Arrays.asList(result);
+        }
+    }
+
 
 }

@@ -9,6 +9,7 @@ import com.conveyal.r5.analyst.cluster.Origin;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.profile.FastRaptorWorker;
+import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.profile.Propagater;
 import com.conveyal.r5.profile.RaptorWorker;
 import com.conveyal.r5.profile.StreetMode;
@@ -19,6 +20,7 @@ import com.google.common.io.LittleEndianDataOutputStream;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
 import org.apache.commons.math3.random.MersenneTwister;
+import org.apache.commons.math3.random.
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -116,67 +118,32 @@ public class GridComputer  {
 
         // Do propagation
         int[] nonTransferTravelTimesToStops = linkedTargets.eval(sr::getTravelTimeToVertex).travelTimes;
-        Propagater propagater =
-                new Propagater(timesAtStopsEachIteration, nonTransferTravelTimesToStops, linkedTargets, request.request, request.cutoffMinutes * 60);
-
-        // We store a count of the number of iterations where each destination was reached within the specified time,
-        // and use this to calculate percentiles.
-        // This is equivalent to calculating a median and seeing if it is above or below the cutoff, but much faster
-        // as it does not require storing and sorting all travel times.
-        // We do this many times, using a different draw from the travel times each time, because we are creating a
-        // bootstrapped sampling distribution of the percentile of interest.
-        int[][] countsPerDestination = new int[linkedTargets.size()][BOOTSTRAP_ITERATIONS + 1];
-
-        // This has the number of times to include each iteration in each bootstrapped median.
-        // So if we are generating, say, 100 bootstraps on the median,
-        int[][] iterationWeightsForBootstrap = new int[timesAtStopsEachIteration.length][BOOTSTRAP_ITERATIONS + 1];
-
-        // Create the bootstrap iteration weights
-        // the first bootstrap iteration is the sample median, weight every iteration equally
-        Arrays.fill(iterationWeightsForBootstrap[0], 1);
+        PerTargetPropagater propagater =
+                new PerTargetPropagater(timesAtStopsEachIteration, nonTransferTravelTimesToStops, linkedTargets, request.request, request.cutoffMinutes * 60);
 
         // the Mersenne Twister is a high-quality RNG well-suited to Monte Carlo situations
-        MersenneTwister twister = new MersenneTwister();
-
-        for (int i = 1; i < BOOTSTRAP_ITERATIONS + 1; i++) {
-            // Sample with replacement, the same iteration can be chosen multiple times
-            for (int draw = 0; draw < iterationWeightsForBootstrap.length; draw++) {
-                iterationWeightsForBootstrap[twister.nextInt(iterationWeightsForBootstrap.length)][i]++;
-            }
-        }
-
-        int[] currentIteration = new int[1];
-
-        propagater.propagate(times -> {
-            int iteration = currentIteration[0]++;
-            for (int target = 0; target < times.length; target++) {
-                if (times[target] < request.cutoffMinutes * 60) {
-                    for (int bootstrap = 0; bootstrap < iterationWeightsForBootstrap[0].length; bootstrap++) {
-                        countsPerDestination[target][bootstrap] += iterationWeightsForBootstrap[iteration][bootstrap];
-                    }
-                }
-            }
-
-            return 0; // we're not using the per-iteration output of the propagater
-        });
+        MersenneTwister twister = new XORSh();
 
         // compute the percentiles
         double[] samples = new double[BOOTSTRAP_ITERATIONS + 1];
 
-        // TODO should not be hardwired to median
-        int minCount = timesAtStopsEachIteration.length / 2;
+        propagater.propagate((target, times) -> {
+            for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS; bootstrap++) {
+                int count = 0;
+                for (int minute = 0; minute < router.nMinutes; minute++) {
+                    int monteCarloDrawToUse = twister.nextInt(router.monteCarloDrawsPerMinute);
+                    int iteration = minute * router.monteCarloDrawsPerMinute + monteCarloDrawToUse;
 
-        for (int gridy = 0, targetIdx = 0; gridy < grid.height; gridy++) {
-            for (int gridx = 0; gridx < grid.width; gridx++, targetIdx++) {
-                double value = grid.grid[gridx][gridy];
-
-                for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS + 1; bootstrap++) {
-                    if (countsPerDestination[targetIdx][bootstrap] > minCount) {
-                        samples[bootstrap] += value;
-                    }
+                    if (times[iteration] < request.cutoffMinutes * 60) count++;
+                }
+                if (count > router.nMinutes / 2) {
+                    int gridx = target % grid.width;
+                    int gridy = target / grid.width;
+                    samples[bootstrap] += grid.grid[gridx][gridy];
                 }
             }
-        }
+        });
+
 
         int[] intSamples = DoubleStream.of(samples).mapToInt(d -> (int) Math.round(d)).toArray();
 

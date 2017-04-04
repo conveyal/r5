@@ -185,6 +185,8 @@ public class PointToPointQuery {
             profileResponse.generateStreetTransfers(transportNetwork, request);
         }
 
+        profileResponse.recomputeStats(request);
+
         LOG.info("Returned {} options", profileResponse.getOptions().size());
         LOG.info("Took {} ms", System.currentTimeMillis() - startRouting);
 

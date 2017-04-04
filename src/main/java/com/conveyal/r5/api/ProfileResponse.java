@@ -200,4 +200,9 @@ public class ProfileResponse {
             }
         }
     }
+
+    /** Recompute stats for all options, should be done once all options have been added */
+    public void recomputeStats (ProfileRequest request) {
+        this.options.forEach(o -> o.recomputeStats(request));
+    }
 }

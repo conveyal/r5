@@ -306,8 +306,8 @@ public class ProfileOption {
                         req,
                         // TODO is this intended to handle multiple access modes to the same stop?
                         // do these ever have more or less than one value?
-                        accessIndexes.values().stream().findFirst().orElse(null),
-                        egressIndexes.values().stream().findFirst().orElse(null),
+                        access.get(0).duration,
+                        egress.get(0).duration,
                         transit.size(),
                         fullItineraries);
 

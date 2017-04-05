@@ -19,7 +19,8 @@ import com.conveyal.r5.transit.TransportNetwork;
 import com.google.common.io.LittleEndianDataOutputStream;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
-import org.apache.commons.math3.random.MersenneTwister;
+import org.apache.commons.rng.UniformRandomProvider;
+import org.apache.commons.rng.simple.RandomSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -120,25 +121,27 @@ public class GridComputer  {
         PerTargetPropagater propagater =
                 new PerTargetPropagater(timesAtStopsEachIteration, nonTransferTravelTimesToStops, linkedTargets, request.request, request.cutoffMinutes * 60);
 
-        // the Mersenne Twister is a high-quality RNG well-suited to Monte Carlo situations
-        MersenneTwister twister = new MersenneTwister();
+        // XorShift is reasonably high quality, and blazingly fast, RNG
+        UniformRandomProvider rng = RandomSource.create(RandomSource.XOR_SHIFT_1024_S);
 
         // compute the percentiles
         double[] samples = new double[BOOTSTRAP_ITERATIONS + 1];
 
         propagater.propagate((target, times) -> {
-            for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS; bootstrap++) {
+            BOOTSTRAP: for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS + 1; bootstrap++) {
                 int count = 0;
-                for (int minute = 0; minute < router.nMinutes; minute++) {
-                    int monteCarloDrawToUse = twister.nextInt(router.monteCarloDrawsPerMinute);
-                    int iteration = minute * router.monteCarloDrawsPerMinute + monteCarloDrawToUse;
+                for (int sample = 0; sample < timesAtStopsEachIteration.length; sample++) {
+                    int iteration = bootstrap == 0 ? sample : rng.nextInt(timesAtStopsEachIteration.length);
 
-                    if (times[iteration] < request.cutoffMinutes * 60) count++;
-                }
-                if (count > router.nMinutes / 2) {
-                    int gridx = target % grid.width;
-                    int gridy = target / grid.width;
-                    samples[bootstrap] += grid.grid[gridx][gridy];
+                    if (times[iteration] < request.cutoffMinutes * 60) {
+                        count++;
+                        if (count > timesAtStopsEachIteration.length / 2) {
+                            int gridx = target % grid.width;
+                            int gridy = target / grid.width;
+                            samples[bootstrap] += grid.grid[gridx][gridy];
+                            continue BOOTSTRAP;
+                        }
+                    }
                 }
             }
         });

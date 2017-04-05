@@ -27,21 +27,26 @@ public class StreetPath {
     private int distance;
     private int duration;
 
-    public StreetPath(StreetRouter.State s, TransportNetwork transportNetwork) {
+    public StreetPath(StreetRouter.State s, TransportNetwork transportNetwork,
+        boolean reverseSearch) {
         edges = new LinkedList<>();
         states = new LinkedList<>();
         this.transportNetwork = transportNetwork;
 
         lastState = s;
 
+        if (reverseSearch) {
+            this.lastState = s.reverse(transportNetwork);
+        }
+
         /*
          * Starting from latest (time-wise) state, copy states to the head of a list in reverse
          * chronological order. List indices will thus increase forward in time, and backEdges will
          * be chronologically 'back' relative to their state.
          */
-        for (StreetRouter.State cur = s; cur != null; cur = cur.backState) {
+        for (StreetRouter.State cur = lastState; cur != null; cur = cur.backState) {
             states.addFirst(cur);
-            if (cur.backEdge != -1 && cur.backState != null) {
+            if (cur.backEdge != -1) {
                 edges.addFirst(cur.backEdge);
             }
         }
@@ -61,7 +66,7 @@ public class StreetPath {
      */
     public StreetPath(StreetRouter.State lastState, StreetRouter streetRouter, LegMode mode,
         TransportNetwork transportNetwork) {
-        this(lastState, transportNetwork);
+        this(lastState, transportNetwork, false);
         //First streetPath is part of path from last bicycle station to the end destination on foot
         if (mode == LegMode.BICYCLE_RENT) {
             StreetRouter.State endCycling = getStates().getFirst();
@@ -139,11 +144,16 @@ public class StreetPath {
             //have same state as stop state and start state of next search
             if (first && firstState.vertex == cur.vertex) {
                 states.removeFirst();
-                edges.removeFirst();
+                //First edge needs to be removed in bikeshare but not in PR search
+                //Basically it needs to be removed if it is the same as current since mode changes here.
+                //And even if we go in and out on the same way edge ids are different because of different direction.
+                if (edges.getFirst() == cur.backEdge) {
+                    edges.removeFirst();
+                }
             }
             first = false;
             states.addFirst(cur);
-            if (cur.backEdge != -1 && cur.backState != null) {
+            if (cur.backEdge != -1) {
                 edges.addFirst(cur.backEdge);
             }
         }

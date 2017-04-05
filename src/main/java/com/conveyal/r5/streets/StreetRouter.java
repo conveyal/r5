@@ -9,6 +9,9 @@ import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.util.TIntObjectHashMultimap;
 import com.conveyal.r5.util.TIntObjectMultimap;
 import gnu.trove.iterator.TIntIterator;
+import com.conveyal.r5.transit.TransportNetwork;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
@@ -288,6 +291,15 @@ public class StreetRouter {
         speedms = edge.calculateSpeed(profileRequest, streetMode);
         startState0.weight = (int) ((split.distance0_mm / 1000) / speedms);
 
+        if (profileRequest.reverseSearch) {
+             startState0.vertex = split.vertex1;
+             startState1.vertex = split.vertex0;
+        }
+
+        //We need to set turn restrictions if turn restriction starts in first edge
+        streetLayer.edgeStore.startTurnRestriction(streetMode, profileRequest.reverseSearch, startState0);
+        streetLayer.edgeStore.startTurnRestriction(streetMode, profileRequest.reverseSearch, startState1);
+
         // NB not adding to bestStates, as it will be added when it comes out of the queue
         queue.add(startState0);
         queue.add(startState1);
@@ -514,8 +526,14 @@ public class StreetRouter {
                 }
             }
 
-            // Traverse all edges leading out of the vertex where this state is located.
-            streetLayer.outgoingEdges.get(s0.vertex).forEach(eidx -> {
+            TIntList edgeList;
+            if (profileRequest.reverseSearch) {
+                edgeList = streetLayer.incomingEdges.get(s0.vertex);
+            } else {
+                edgeList = streetLayer.outgoingEdges.get(s0.vertex);
+            }
+            // explore edges leaving this vertex
+            edgeList.forEach(eidx -> {
                 edge.seek(eidx);
                 State s1 = edge.traverse(s0, streetMode, profileRequest, turnCostCalculator);
                 if (s1 != null && s1.distance <= distanceLimitMm && s1.getDurationSeconds() < tmpTimeLimitSeconds) {
@@ -634,7 +652,14 @@ public class StreetRouter {
     public State getStateAtVertex (int vertexIndex) {
         State ret = null;
 
-        for (TIntIterator it = streetLayer.incomingEdges.get(vertexIndex).iterator(); it.hasNext();) {
+        TIntList edgeList;
+        if (profileRequest.reverseSearch) {
+            edgeList = streetLayer.outgoingEdges.get(vertexIndex);
+        } else {
+            edgeList = streetLayer.incomingEdges.get(vertexIndex);
+        }
+
+        for (TIntIterator it = edgeList.iterator(); it.hasNext();) {
             int eidx = it.next();
 
             State state = getStateAtEdge(eidx);
@@ -669,11 +694,18 @@ public class StreetRouter {
 
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor(split.edge);
 
-        for (TIntIterator it = streetLayer.incomingEdges.get(split.vertex0).iterator(); it.hasNext();) {
+        TIntList edgeList;
+        if (profileRequest.reverseSearch) {
+            edgeList = streetLayer.outgoingEdges.get(split.vertex1);
+        } else {
+            edgeList = streetLayer.incomingEdges.get(split.vertex0);
+        }
+
+        for (TIntIterator it = edgeList.iterator(); it.hasNext();) {
             Collection<State> states = bestStatesAtEdge.get(it.next());
             // NB this needs a state to copy turn restrictions into. We then don't use that state, which is fine because
             // we don't need the turn restrictions any more because we're at the end of the search
-            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge, s)))
+            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge, s), profileRequest.reverseSearch))
                     .map(s -> {
                         State ret = new State(-1, split.edge, s);
                         ret.streetMode = s.streetMode;
@@ -695,9 +727,15 @@ public class StreetRouter {
         // advance to back edge
         e.advance();
 
-        for (TIntIterator it = streetLayer.incomingEdges.get(split.vertex1).iterator(); it.hasNext();) {
+        if (profileRequest.reverseSearch) {
+            edgeList = streetLayer.outgoingEdges.get(split.vertex0);
+        } else {
+            edgeList = streetLayer.incomingEdges.get(split.vertex1);
+        }
+
+        for (TIntIterator it = edgeList.iterator(); it.hasNext();) {
             Collection<State> states = bestStatesAtEdge.get(it.next());
-            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge + 1, s)))
+            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge + 1, s), profileRequest.reverseSearch))
                     .map(s -> {
                         State ret = new State(-1, split.edge + 1, s);
                         ret.streetMode = s.streetMode;
@@ -758,6 +796,7 @@ public class StreetRouter {
         protected int durationFromOriginSeconds;
         //Distance in mm
         public int distance;
+        public int idx;
         public StreetMode streetMode;
         public State backState; // previous state in the path chain
         public boolean isBikeShare = false; //is true if vertex in this state is Bike sharing station where mode switching occurs
@@ -782,6 +821,7 @@ public class StreetRouter {
             this.durationSeconds = backState.durationSeconds;
             this.durationFromOriginSeconds = backState.durationFromOriginSeconds;
             this.weight = backState.weight;
+            this.idx = backState.idx+1;
         }
 
         public State(int atVertex, int viaEdge, StreetMode streetMode) {
@@ -792,6 +832,73 @@ public class StreetRouter {
             this.streetMode = streetMode;
             this.durationSeconds = 0;
             this.durationFromOriginSeconds = 0;
+            this.idx = 0;
+        }
+
+        protected State clone() {
+            State ret;
+            try {
+                ret = (State) super.clone();
+            } catch (CloneNotSupportedException e) {
+                throw new IllegalStateException("This is not happening");
+            }
+            return ret;
+        }
+
+        /**
+         * Reverses order of states in arriveBy=true searches. Because start and target are reversed there
+         * @param transportNetwork this is used for getting from/to vertex in backEdge
+         * @return last edge in reversed order
+         */
+        public State reverse(TransportNetwork transportNetwork) {
+            State orig = this;
+            State ret = orig.reversedClone();
+            int edge = -1;
+            while (orig.backState != null) {
+                //LOG.info("START ORIG:{} RET:{}", orig, ret);
+                edge = orig.backEdge;
+                State child = ret.clone();
+                child.backState = ret;
+                child.backEdge = edge;
+                boolean traversingBackward = false;
+                EdgeStore.Edge origBackEdge = transportNetwork.streetLayer.edgeStore.getCursor(orig.backEdge);
+                if (origBackEdge.getFromVertex() == origBackEdge.getToVertex()
+                    && ret.vertex == origBackEdge.getFromVertex()) {
+                    traversingBackward = true;
+                    child.vertex = origBackEdge.getToVertex();
+                    //LOG.info("Case 1");
+                } else if (ret.vertex == origBackEdge.getFromVertex()) {
+                    child.vertex = origBackEdge.getToVertex();
+                    traversingBackward = false;
+                    //LOG.info("Case 2");
+                }else if (ret.vertex == origBackEdge.getToVertex()) {
+                    child.vertex = origBackEdge.getFromVertex();
+                    traversingBackward = true;
+                    //LOG.info("Case 3");
+                }
+                //LOG.info("State idx:{} tra:{}", orig.idx, traversingBackward);
+                /*
+                if (traversingBackward != ret.getOptions().arriveBy) {
+                    LOG.error("Actual traversal direction does not match traversal direction in TraverseOptions.");
+                    //defectiveTraversal = true;
+                }*/
+                child.incrementWeight(orig.weight-orig.backState.weight);
+                child.durationSeconds += orig.durationSeconds - orig.backState.durationSeconds;
+                if (orig.backState != null) {
+                    child.distance += Math.abs(orig.distance-orig.backState.distance);
+                }
+                child.streetMode = orig.streetMode;
+                //LOG.info("CHILD:{}", child);
+                ret = child;
+                orig = orig.backState;
+            }
+            return ret;
+        }
+
+        public State reversedClone() {
+            State newState = new State(this.vertex, -1, this.streetMode);
+            newState.idx = idx;
+            return newState;
         }
 
         public void incrementTimeInSeconds(long seconds) {
@@ -801,8 +908,22 @@ public class StreetRouter {
                 //defectiveTraversal = true;
                 return;
             }
+/*
             durationSeconds += seconds;
-            durationFromOriginSeconds += seconds;
+            time += seconds;
+*/
+            //TODO: decrease time
+            if (false) {
+
+                durationSeconds-=seconds;
+                durationFromOriginSeconds -= seconds;
+            } else {
+
+                durationSeconds+=seconds;
+                durationFromOriginSeconds += seconds;
+            }
+
+
         }
 
         public int getDurationSeconds() {
@@ -824,6 +945,36 @@ public class StreetRouter {
             out.append("END PATH DUMP\n");
 
             return out.toString();
+        }
+
+        public String compactDump(boolean reverse) {
+            State state = this;
+            StringBuilder out = new StringBuilder();
+            String middle;
+            if (reverse) {
+                middle = "->";
+            } else {
+                middle = "<-";
+            }
+            while (state != null) {
+                out.append(String.format("%s %d ",middle, state.backEdge));
+                state = state.backState;
+            }
+            return out.toString();
+        }
+
+
+        @Override
+        public String toString() {
+            final StringBuilder sb = new StringBuilder("State{");
+            sb.append("vertex=").append(vertex);
+            sb.append(", weight=").append(weight);
+            sb.append(", backEdge=").append(backEdge);
+            sb.append(", durationSeconds=").append(durationSeconds);
+            sb.append(", distance=").append(distance);
+            sb.append(", idx=").append(idx);
+            sb.append('}');
+            return sb.toString();
         }
 
         public int getRoutingVariable (RoutingVariable variable) {

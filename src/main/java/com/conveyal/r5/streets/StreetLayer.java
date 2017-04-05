@@ -680,6 +680,8 @@ public class StreetLayer implements Serializable, Cloneable {
             int index = turnRestrictions.size();
             turnRestrictions.add(out);
             edgeStore.turnRestrictions.put(out.fromEdge, index);
+            addReverseTurnRestriction(out, index);
+            //TODO: add remapped via edges
             for(int edgeId: out.viaEdges) {
                 edgeStore.turnRestrictionsVia.put(edgeId, index);
             }
@@ -873,11 +875,42 @@ public class StreetLayer implements Serializable, Cloneable {
             int index = turnRestrictions.size();
             turnRestrictions.add(out);
             edgeStore.turnRestrictions.put(out.fromEdge, index);
+            addReverseTurnRestriction(out, index);
+            //TODO: add remapped via edges
             for(int edgeId: out.viaEdges) {
                 edgeStore.turnRestrictionsVia.put(edgeId, index);
             }
 
+
             // take a deep breath
+        }
+    }
+
+    /**
+     * Adding turn restrictions for reverse search is a little tricky.
+     *
+     * First because we are adding toEdge to turnRestrictionReverse map and second because ONLY TURNs aren't supported
+     *
+     * Since ONLY TURN restrictions aren't supported ONLY TURN restrictions
+     * are created with NO TURN restrictions and added to turnRestrictions and edgeStore turnRestrictionsReverse
+     *
+     * if NO TURN restriction is added it's just added with correct toEdge (instead of from since
+     * we are searching from the back)
+     * @param turnRestriction
+     * @param index
+     */
+    void addReverseTurnRestriction(TurnRestriction turnRestriction, int index) {
+        if (turnRestriction.only) {
+            //From Only turn restrictions create multiple NO TURN restrictions which means the same
+            //Since only turn restrictions aren't supported in reverse street search
+            List<TurnRestriction> remapped = turnRestriction.remap(this);
+            for (TurnRestriction remapped_restriction: remapped) {
+                index = turnRestrictions.size();
+                turnRestrictions.add(remapped_restriction);
+                edgeStore.turnRestrictionsReverse.put(remapped_restriction.toEdge, index);
+            }
+        } else {
+            edgeStore.turnRestrictionsReverse.put(turnRestriction.toEdge, index);
         }
     }
 

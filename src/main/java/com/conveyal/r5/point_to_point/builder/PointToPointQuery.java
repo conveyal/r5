@@ -199,6 +199,7 @@ public class PointToPointQuery {
         Map<LegMode, StreetRouter> egressRouter = new HashMap<>();
         //For egress
         //TODO: this must be reverse search
+        request.reverseSearch = true;
         for(LegMode mode: request.egressModes) {
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
             streetRouter.transitStopSearch = true;
@@ -230,6 +231,7 @@ public class PointToPointQuery {
      * @param option
      */
     private void findDirectPaths(ProfileRequest request, ProfileOption option) {
+        request.reverseSearch = false;
         //For direct modes
         for(LegMode mode: request.directModes) {
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
@@ -268,7 +270,7 @@ public class PointToPointQuery {
                         LOG.warn("Direct mode {} last state wasn't found", mode);
                         continue;
                     }
-                    streetPath = new StreetPath(lastState, transportNetwork);
+                    streetPath = new StreetPath(lastState, transportNetwork, false);
                 } else {
                     LOG.warn("Direct mode {} origin wasn't found!", mode);
                     continue;
@@ -286,6 +288,7 @@ public class PointToPointQuery {
      * @param request
      */
     private HashMap<LegMode, StreetRouter> findAccessPaths(ProfileRequest request) {
+        request.reverseSearch = false;
         // Routes all access modes
         HashMap<LegMode, StreetRouter> accessRouter = new HashMap<>();
         for(LegMode mode: request.accessModes) {

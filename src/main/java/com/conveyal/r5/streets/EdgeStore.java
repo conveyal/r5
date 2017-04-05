@@ -142,6 +142,9 @@ public class EdgeStore implements Serializable {
     /** Turn restrictions for turning _out of_ each edge */
     public TIntIntMultimap turnRestrictions;
 
+    /** Turn restrictions for turning _in of_ each edge */
+    public TIntIntMultimap turnRestrictionsReverse;
+
     public StreetLayer layer;
 
     public static final transient EnumSet<EdgeFlag> PERMISSION_FLAGS = EnumSet
@@ -166,6 +169,7 @@ public class EdgeStore implements Serializable {
         inAngles = new TByteArrayList(initialEdgePairs);
         outAngles = new TByteArrayList(initialEdgePairs);
         turnRestrictions = new TIntIntHashMultimap();
+        turnRestrictionsReverse = new TIntIntHashMultimap();
     }
 
     /**
@@ -309,6 +313,43 @@ public class EdgeStore implements Serializable {
         //angles needs to be calculated here since some edges don't get additional geometry (P+R, transit, etc.)
         edge.calculateAngles();
         return edge;
+    }
+
+    /**
+     * Sets turn restriction maps in state
+     * @param streetMode of previous state (since turn restrictions are set only in CAR mode)
+     * @param reverseSearch if this is reverse search
+     * @param s1 new state
+     */
+    void startTurnRestriction(StreetMode streetMode, boolean reverseSearch,
+        StreetRouter.State s1) {
+        if (reverseSearch) {
+            // add turn restrictions that start on this edge
+            // Turn restrictions only apply to cars for now. This is also coded in canTurnFrom, so change it both places
+            // if/when it gets changed.
+            if (streetMode == StreetMode.CAR && turnRestrictionsReverse.containsKey(s1.backEdge)) {
+                if (s1.turnRestrictions == null)
+                    s1.turnRestrictions = new TIntIntHashMap();
+                turnRestrictionsReverse.get(s1.backEdge).forEach(r -> {
+                    s1.turnRestrictions.put(r, 1); // we have traversed one edge
+                    return true; // continue iteration
+                });
+                //LOG.info("RRTADD: S1:{}|{}", s1.backEdge, s1.turnRestrictions);
+            }
+        } else {
+            // add turn restrictions that start on this edge
+            // Turn restrictions only apply to cars for now. This is also coded in canTurnFrom, so change it both places
+            // if/when it gets changed.
+            if (streetMode == StreetMode.CAR && turnRestrictions.containsKey(s1.backEdge)) {
+                if (s1.turnRestrictions == null)
+                    s1.turnRestrictions = new TIntIntHashMap();
+                turnRestrictions.get(s1.backEdge).forEach(r -> {
+                    s1.turnRestrictions.put(r, 1); // we have traversed one edge
+                    return true; // continue iteration
+                });
+                //LOG.info("TADD: S1:{}|{}", s1.backEdge, s1.turnRestrictions);
+            }
+        }
     }
 
     /**
@@ -492,28 +533,26 @@ public class EdgeStore implements Serializable {
         }
 
         public StreetRouter.State traverse (StreetRouter.State s0, StreetMode streetMode, ProfileRequest req, TurnCostCalculator turnCostCalculator) {
-            StreetRouter.State s1 = new StreetRouter.State(getToVertex(), edgeIndex, s0);
+            int vertex;
+
+            if (req.reverseSearch) {
+                vertex = getFromVertex();
+            } else {
+                vertex = getToVertex();
+            }
+            StreetRouter.State s1 = new StreetRouter.State(vertex, edgeIndex, s0);
             float speedms = calculateSpeed(req, streetMode);
             float time = (float) (getLengthM() / speedms);
             float weight = 0;
 
-            if (!canTurnFrom(s0, s1)) return null;
+            if (!canTurnFrom(s0, s1, req.reverseSearch)) return null;
 
             // clear out turn restrictions if they're empty
             if (s1.turnRestrictions != null && s1.turnRestrictions.isEmpty()) s1.turnRestrictions = null;
 
             // figure out which turn res
 
-            // add turn restrictions that start on this edge
-            // Turn restrictions only apply to cars for now. This is also coded in canTurnFrom, so change it both places
-            // if/when it gets changed.
-            if (s0.streetMode == StreetMode.CAR && turnRestrictions.containsKey(getEdgeIndex())) {
-                if (s1.turnRestrictions == null) s1.turnRestrictions = new TIntIntHashMap();
-                turnRestrictions.get(getEdgeIndex()).forEach(r -> {
-                    s1.turnRestrictions.put(r, 1); // we have traversed one edge
-                    return true; // continue iteration
-                });
-            }
+            startTurnRestriction(s0.streetMode, req.reverseSearch, s1);
 
             //We allow two links in a row if this is a first state (negative back edge or no backState
             //Since at least P+R stations are connected to graph with only LINK edges and otherwise search doesn't work
@@ -580,8 +619,14 @@ public class EdgeStore implements Serializable {
             int roundedTime = (int) Math.ceil(time);
 
             // Negative backEdge means this state is not the result of traversing an edge (it's the start of a search).
-            int turnCost = s0.backEdge >= 0 ?
-                    turnCostCalculator.computeTurnCost(s0.backEdge, getEdgeIndex(), streetMode) : 0;
+            int turnCost = 0;
+            if (s0.backEdge >= 0) {
+                if (req.reverseSearch) {
+                    turnCost = turnCostCalculator.computeTurnCost(getEdgeIndex(), s0.backEdge, streetMode);
+                } else {
+                    turnCost = turnCostCalculator.computeTurnCost(s0.backEdge, getEdgeIndex(), streetMode);
+                }
+            }
 
             // TODO add checks for negative increment values to these functions.
             s1.incrementTimeInSeconds(roundedTime + turnCost);
@@ -597,7 +642,8 @@ public class EdgeStore implements Serializable {
         }
 
         /** Can we turn onto this edge from this state? Also copies still-applicable restrictions forward. */
-        public boolean canTurnFrom (StreetRouter.State s0, StreetRouter.State s1) {
+        public boolean canTurnFrom(StreetRouter.State s0, StreetRouter.State s1,
+            boolean reverseSearch) {
             // Turn restrictions only apply to cars for now. This is also coded in traverse, so change it both places
             // if/when it gets changed.
             if (s0.turnRestrictions != null && s0.streetMode == StreetMode.CAR) {
@@ -612,9 +658,19 @@ public class EdgeStore implements Serializable {
                     // check via ways if applicable
                     // subtract 1 because the first (fromEdge) is not a via edge
                     int posInRestriction = it.value() - 1;
+                    int toEdge = restriction.toEdge;
+                    int[] viaEdges = restriction.viaEdges;
 
-                    if (posInRestriction < restriction.viaEdges.length) {
-                        if (getEdgeIndex() != restriction.viaEdges[posInRestriction]) {
+                    if (reverseSearch) {
+                        //In reverse search order of from/to and viaEdges is changed since we search from toEdge to fromEdge
+                        toEdge = restriction.fromEdge;
+                        if (viaEdges.length > 1) {
+                            TurnRestriction.reverse(viaEdges);
+                        }
+                    }
+
+                    if (posInRestriction < viaEdges.length) {
+                        if (s1.backEdge != restriction.viaEdges[posInRestriction]) {
                             // we have exited the restriction
                             if (restriction.only) return false;
                             else {
@@ -628,7 +684,7 @@ public class EdgeStore implements Serializable {
                         }
                     }
                     else {
-                        if (restriction.toEdge != getEdgeIndex()) {
+                        if (toEdge != s1.backEdge) {
                             // we have exited the restriction
                             if (restriction.only)
                                 return false;
@@ -1007,6 +1063,7 @@ public class EdgeStore implements Serializable {
         copy.outAngles = new TByteArrayList(outAngles);
         // We don't expect to add/change any turn restrictions.
         copy.turnRestrictions = turnRestrictions;
+        copy.turnRestrictionsReverse = turnRestrictionsReverse;
         return copy;
     }
 

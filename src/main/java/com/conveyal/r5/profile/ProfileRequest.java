@@ -234,6 +234,10 @@ public class ProfileRequest implements Serializable, Cloneable {
     //If this is profile or point to point route request
     private boolean profile = false;
 
+    //If true current search is reverse search AKA we are looking for a path from destination to origin in reverse
+    //It differs from searchType because it is used as egress search
+    public boolean reverseSearch = false;
+
     /** maximum fare. If nonnegative, fares will be used in routing. */
     public int maxFare = -1;
 
@@ -256,6 +260,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     public boolean isProfile() {
         return profile;
     }
+
 
     public ProfileRequest clone () {
         try {

@@ -48,7 +48,7 @@ public class GridComputer  {
     private static final Logger LOG = LoggerFactory.getLogger(GridComputer.class);
 
     /** The number of iterations used to bootstrap the sampling distribution of the percentiles */
-    public static final int BOOTSTRAP_ITERATIONS = 1000;
+    public static final int BOOTSTRAP_ITERATIONS = 0;
 
     /** SQS client. TODO: async? */
     private static final AmazonSQS sqs = new AmazonSQSClient();
@@ -75,9 +75,19 @@ public class GridComputer  {
         // ensure they both have the same zoom level
         if (request.zoom != grid.zoom) throw new IllegalArgumentException("grid zooms do not match!");
 
+        // make it obvious that this worker has been hot-wired to perform analysis at a particular cell
+        LOG.error(" _ _  __        ___    ____  _   _ ___ _   _  ____   _ _ \n" +
+                "| | | \\ \\      / / \\  |  _ \\| \\ | |_ _| \\ | |/ ___| | | |\n" +
+                "| | |  \\ \\ /\\ / / _ \\ | |_) |  \\| || ||  \\| | |  _  | | |\n" +
+                "|_|_|   \\ V  V / ___ \\|  _ <| |\\  || || |\\  | |_| | |_|_|\n" +
+                "(_|_)    \\_/\\_/_/   \\_\\_| \\_\\_| \\_|___|_| \\_|\\____| (_|_)" +
+                "This worker is hardwired to perform analysis at one specific cell in Atlanta. It should not be used in production.");
+
         // use the middle of the grid cell
-        request.request.fromLat = Grid.pixelToLat(request.north + request.y + 0.5, request.zoom);
-        request.request.fromLon = Grid.pixelToLon(request.west + request.x + 0.5, request.zoom);
+        request.request.fromLat = Grid.pixelToLat(52469.5, 9);
+        request.request.fromLon = Grid.pixelToLon(34826.5, 9);
+        //request.request.fromLat = Grid.pixelToLat(request.north + request.y + 0.5, request.zoom);
+        //request.request.fromLon = Grid.pixelToLon(request.west + request.x + 0.5, request.zoom);
 
         // Run the raptor algorithm to get times at each destination for each iteration
 

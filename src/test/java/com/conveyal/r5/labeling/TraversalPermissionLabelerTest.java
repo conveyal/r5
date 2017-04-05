@@ -149,6 +149,23 @@ public class TraversalPermissionLabelerTest {
     }
 
     @Test
+    public void testPrivateRoadWithFootBicyclePermissions() {
+        //Private road which can be only used as destination for motor vehicles but can be used normally for pedestrian and bicycle traffic
+        Way osmWay = makeOSMWayFromTags("access=private;bicycle=designated;foot=yes;highway=service;motor_vehicle=private");
+
+        EnumSet<EdgeStore.EdgeFlag> NO_THRU_CAR_PEDESTRIAN_BICYCLE = EnumSet.copyOf(PEDESTRIAN_AND_BICYCLE);
+        NO_THRU_CAR_PEDESTRIAN_BICYCLE.add(EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
+
+
+        RoadPermission roadPermission = roadFlagComparision(osmWay, NO_THRU_CAR_PEDESTRIAN_BICYCLE, NO_THRU_CAR_PEDESTRIAN_BICYCLE);
+
+        //Doesn't insert edges which don't have any permissions forward and backward
+        Assert.assertFalse(
+            Collections.disjoint(roadPermission.forward, ALLPERMISSIONS) && Collections
+                .disjoint(roadPermission.backward, ALLPERMISSIONS));
+    }
+
+    @Test
     public void testSkippingRoadsWithNoPermissions() throws Exception {
         Way osmWay = makeOSMWayFromTags("bicycle=no;foot=no;highway=primary;lanes=2;maxspeed=70;oneway=yes;ref=1");
         RoadPermission roadPermission = roadFlagComparision(osmWay, CAR, NONE);

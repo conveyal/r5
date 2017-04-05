@@ -6,7 +6,8 @@ var otp_config = {
 //Those are layers and name of properties in a layer if detail=true
 var layers = {
     streetEdges:["edge_id", "permission", "speed_ms", "flags"],
-    permEdges:["name", "edge_id", "label"]
+    permEdges:["name", "edge_id", "label"],
+    turns:["edge_id", "permission", "speed_ms", "flags", "only", "edge", "via_edge_idx"]
 };
 var current_layer = "streetEdges";
 var url = otp_config.hostname + '/' + otp_config.restService;

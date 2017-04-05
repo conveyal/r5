@@ -301,22 +301,24 @@ public class ProfileOption {
 
     /** recompute wait and ride stats for all transit itineraries, should be done once all transit paths are added */
     public void recomputeStats (ProfileRequest req) {
-        StatsCalculator.StatsCollection collection =
-                StatsCalculator.computeStatistics(
-                        req,
-                        // TODO is this intended to handle multiple access modes to the same stop?
-                        // do these ever have more or less than one value?
-                        access.get(0).duration,
-                        egress.get(0).duration,
-                        transit.size(),
-                        fullItineraries);
+        if (!fullItineraries.isEmpty()) {
+            StatsCalculator.StatsCollection collection =
+                    StatsCalculator.computeStatistics(
+                            req,
+                            // TODO is this intended to handle multiple access modes to the same stop?
+                            // do these ever have more or less than one value?
+                            access.get(itinerary.get(0).connection.access).duration,
+                            egress.get(itinerary.get(0).connection.egress).duration,
+                            transit.size(),
+                            fullItineraries);
 
-        this.stats = collection.stats;
+            this.stats = collection.stats;
 
-        for (int leg = 0; leg < transit.size(); leg++) {
-            TransitSegment segment = transit.get(leg);
-            segment.rideStats = collection.rideStats[leg];
-            segment.waitStats = collection.waitStats[leg];
+            for (int leg = 0; leg < transit.size(); leg++) {
+                TransitSegment segment = transit.get(leg);
+                segment.rideStats = collection.rideStats[leg];
+                segment.waitStats = collection.waitStats[leg];
+            }
         }
     }
 

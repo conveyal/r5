@@ -17,6 +17,13 @@ import java.util.Arrays;
  */
 public class R5Main {
     public static void main (String... args) throws Exception {
+        System.out.println("__________________\n" +
+                "___  __ \\__  ____/\n" +
+                "__  /_/ /_____ \\  \n" +
+                "_  _, _/ ____/ /  \n" +
+                "/_/ |_| /_____/   \n" +
+                "                ");
+
         // Pull argument 0 off as the sub-command,
         // then pass the remaining args (1..n) on to that subcommand.
         String command = args[0];

@@ -127,13 +127,16 @@ public class GridComputer  {
         double[] samples = new double[BOOTSTRAP_ITERATIONS + 1];
 
         propagater.propagate((target, times) -> {
-            for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS; bootstrap++) {
+            for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS + 1; bootstrap++) {
                 int count = 0;
+                // include all departure minutes, but create a sample of the same size as the original
                 for (int minute = 0; minute < router.nMinutes; minute++) {
-                    int monteCarloDrawToUse = twister.nextInt(router.monteCarloDrawsPerMinute);
-                    int iteration = minute * router.monteCarloDrawsPerMinute + monteCarloDrawToUse;
+                    for (int draw = 0; draw < router.monteCarloDrawsPerMinute; draw++) {
+                        int monteCarloDrawToUse = bootstrap == 0 ? draw : twister.nextInt(router.monteCarloDrawsPerMinute);
+                        int iteration = minute * router.monteCarloDrawsPerMinute + monteCarloDrawToUse;
 
-                    if (times[iteration] < request.cutoffMinutes * 60) count++;
+                        if (times[iteration] < request.cutoffMinutes * 60) count++;
+                    }
                 }
                 if (count > router.nMinutes / 2) {
                     int gridx = target % grid.width;

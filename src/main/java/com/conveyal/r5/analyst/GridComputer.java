@@ -137,7 +137,7 @@ public class GridComputer  {
         double[] samples = new double[BOOTSTRAP_ITERATIONS + 1];
 
         propagater.propagate((target, times) -> {
-            for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS + 1; bootstrap++) {
+            BOOTSTRAP: for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS + 1; bootstrap++) {
                 int count = 0;
                 // include all departure minutes, but create a sample of the same size as the original
                 for (int iteration = 0; iteration < times.length; iteration++) {
@@ -146,6 +146,7 @@ public class GridComputer  {
                         int gridx = target % grid.width;
                         int gridy = target / grid.width;
                         samples[bootstrap] += grid.grid[gridx][gridy];
+                        continue BOOTSTRAP;
                     }
                 }
             }

@@ -115,13 +115,23 @@ public class GridComputer  {
         // Run the raptor algorithm
         int[][] timesAtStopsEachIteration = router.route();
 
+        // compute bootstrap weights
+        // the Mersenne Twister is a high-quality RNG well-suited to Monte Carlo situations
+        MersenneTwister twister = new MersenneTwister();
+        int[][] bootstrapWeights = new int[BOOTSTRAP_ITERATIONS + 1][router.nMinutes * router.monteCarloDrawsPerMinute];
+
+        Arrays.fill(bootstrapWeights[0], 1); // equal weight to all observations (sample mean) for first sample
+
+        for (int bootstrap = 1; bootstrap < bootstrapWeights.length; bootstrap++) {
+            for (int draw = 0; draw < timesAtStopsEachIteration.length; draw++) {
+                bootstrapWeights[bootstrap][twister.nextInt(timesAtStopsEachIteration.length)]++;
+            }
+        }
+
         // Do propagation
         int[] nonTransferTravelTimesToStops = linkedTargets.eval(sr::getTravelTimeToVertex).travelTimes;
         PerTargetPropagater propagater =
                 new PerTargetPropagater(timesAtStopsEachIteration, nonTransferTravelTimesToStops, linkedTargets, request.request, request.cutoffMinutes * 60);
-
-        // the Mersenne Twister is a high-quality RNG well-suited to Monte Carlo situations
-        MersenneTwister twister = new MersenneTwister();
 
         // compute the percentiles
         double[] samples = new double[BOOTSTRAP_ITERATIONS + 1];
@@ -130,18 +140,13 @@ public class GridComputer  {
             for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS + 1; bootstrap++) {
                 int count = 0;
                 // include all departure minutes, but create a sample of the same size as the original
-                for (int minute = 0; minute < router.nMinutes; minute++) {
-                    for (int draw = 0; draw < router.monteCarloDrawsPerMinute; draw++) {
-                        int monteCarloDrawToUse = bootstrap == 0 ? draw : twister.nextInt(router.monteCarloDrawsPerMinute);
-                        int iteration = minute * router.monteCarloDrawsPerMinute + monteCarloDrawToUse;
-
-                        if (times[iteration] < request.cutoffMinutes * 60) count++;
+                for (int iteration = 0; iteration < times.length; iteration++) {
+                    if (times[iteration] < request.cutoffMinutes * 60) count += bootstrapWeights[bootstrap][iteration];
+                    if (count > timesAtStopsEachIteration.length / 2) {
+                        int gridx = target % grid.width;
+                        int gridy = target / grid.width;
+                        samples[bootstrap] += grid.grid[gridx][gridy];
                     }
-                }
-                if (count > router.nMinutes / 2) {
-                    int gridx = target % grid.width;
-                    int gridy = target / grid.width;
-                    samples[bootstrap] += grid.grid[gridx][gridy];
                 }
             }
         });

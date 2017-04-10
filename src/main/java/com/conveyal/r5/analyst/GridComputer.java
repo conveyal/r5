@@ -8,7 +8,6 @@ import com.conveyal.r5.analyst.cluster.GridRequest;
 import com.conveyal.r5.analyst.cluster.Origin;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
 import com.conveyal.r5.api.util.LegMode;
-import com.conveyal.r5.common.Xorshift;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.profile.Propagater;
@@ -118,14 +117,14 @@ public class GridComputer  {
 
         // compute bootstrap weights
         // the Mersenne Twister is a high-quality RNG well-suited to Monte Carlo situations
-        Xorshift rng = new Xorshift(timesAtStopsEachIteration.length);
+        MersenneTwister twister = new MersenneTwister();
         int[][] bootstrapWeights = new int[BOOTSTRAP_ITERATIONS + 1][router.nMinutes * router.monteCarloDrawsPerMinute];
 
         Arrays.fill(bootstrapWeights[0], 1); // equal weight to all observations (sample mean) for first sample
 
         for (int bootstrap = 1; bootstrap < bootstrapWeights.length; bootstrap++) {
             for (int draw = 0; draw < timesAtStopsEachIteration.length; draw++) {
-                bootstrapWeights[bootstrap][rng.nextInt()]++;
+                bootstrapWeights[bootstrap][twister.nextInt(timesAtStopsEachIteration.length)]++;
             }
         }
 

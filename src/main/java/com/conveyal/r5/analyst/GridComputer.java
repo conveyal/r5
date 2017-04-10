@@ -20,8 +20,6 @@ import com.google.common.io.LittleEndianDataOutputStream;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
 import org.apache.commons.math3.random.MersenneTwister;
-import org.apache.commons.rng.UniformRandomProvider;
-import org.apache.commons.rng.simple.RandomSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -119,14 +117,14 @@ public class GridComputer  {
 
         // compute bootstrap weights
         // the Mersenne Twister is a high-quality RNG well-suited to Monte Carlo situations
-        UniformRandomProvider rng = RandomSource.create(RandomSource.XOR_SHIFT_1024_S);
+        MersenneTwister twister = new MersenneTwister();
         int[][] bootstrapWeights = new int[BOOTSTRAP_ITERATIONS + 1][router.nMinutes * router.monteCarloDrawsPerMinute];
 
         Arrays.fill(bootstrapWeights[0], 1); // equal weight to all observations (sample mean) for first sample
 
         for (int bootstrap = 1; bootstrap < bootstrapWeights.length; bootstrap++) {
             for (int draw = 0; draw < timesAtStopsEachIteration.length; draw++) {
-                bootstrapWeights[bootstrap][rng.nextInt(timesAtStopsEachIteration.length)]++;
+                bootstrapWeights[bootstrap][twister.nextInt(timesAtStopsEachIteration.length)]++;
             }
         }
 

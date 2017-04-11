@@ -48,9 +48,15 @@ public class PerTargetPropagater {
         int speedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
 
         for (int targetIdx = 0; targetIdx < targets.size(); targetIdx++) {
-            int[] perIterationResults = new int[travelTimesToStopsEachIteration.length];
+            boolean[] perIterationResults = new boolean[travelTimesToStopsEachIteration.length];
             // fill with non-transit time as upper bound on travel time
-            Arrays.fill(perIterationResults, nonTransferTravelTimesToTargets[targetIdx]);
+            Arrays.fill(perIterationResults, nonTransferTravelTimesToTargets[targetIdx] < cutoffSeconds);
+
+            if (perIterationResults[0]) {
+                // reachable on foot, no need to even check if it's reachable via transit
+                reducer.accept(targetIdx, perIterationResults);
+                continue;
+            }
 
             TIntIntMap pointToStopDistanceTable = targets.pointToStopDistanceTables.get(targetIdx);
 
@@ -70,12 +76,13 @@ public class PerTargetPropagater {
 
                         int timeAtTargetThisStop = timeAtStop + distanceMm / speedMillimetersPerSecond;
 
-                        if (timeAtTargetThisStop < perIterationResults[effectivelyFinalIteration] && timeAtTargetThisStop < cutoffSeconds) {
-                            perIterationResults[effectivelyFinalIteration] = timeAtTargetThisStop;
+                        if (timeAtTargetThisStop < cutoffSeconds) {
+                            perIterationResults[effectivelyFinalIteration] = true;
                             targetEverReached[0] = true;
+                            return false; // stop iteration over stops
+                        } else {
+                            return true; // continue iteration
                         }
-
-                        return true; // continue iteration
                     });
                 }
             }
@@ -93,6 +100,6 @@ public class PerTargetPropagater {
     }
 
     public static interface Reducer {
-        public void accept (int targetIndex, int[] travelTimesForTarget);
+        public void accept (int targetIndex, boolean[] travelTimesForTarget);
     }
 }

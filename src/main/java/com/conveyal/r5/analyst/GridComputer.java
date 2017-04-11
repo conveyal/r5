@@ -136,17 +136,13 @@ public class GridComputer  {
         // compute the percentiles
         double[] samples = new double[BOOTSTRAP_ITERATIONS + 1];
 
-        propagater.propagate((target, times) -> {
+        propagater.propagate((target, reachable) -> {
             boolean foundAbove = false;
             boolean foundBelow = false;
 
-            boolean[] withinCutoff = new boolean[times.length];
-
-            for (int i = 0; i < times.length; i++) {
-                boolean reachable = times[i] < request.cutoffMinutes * 60;
-                if (!reachable) foundAbove = true;
+            for (boolean currentReachable : reachable) {
+                if (!currentReachable) foundAbove = true;
                 else foundBelow = true;
-                withinCutoff[i] = reachable;
             }
 
             int gridx = target % grid.width;
@@ -159,8 +155,8 @@ public class GridComputer  {
                 for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS + 1; bootstrap++) {
                     int count = 0;
                     // include all departure minutes, but create a sample of the same size as the original
-                    for (int iteration = 0; iteration < times.length; iteration++) {
-                        if (withinCutoff[iteration])
+                    for (int iteration = 0; iteration < reachable.length; iteration++) {
+                        if (reachable[iteration])
                             count += bootstrapWeights[bootstrap][iteration];
                         if (count > timesAtStopsEachIteration.length / 2) {
                             samples[bootstrap] += grid.grid[gridx][gridy];

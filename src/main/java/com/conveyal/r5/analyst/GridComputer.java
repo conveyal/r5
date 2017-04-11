@@ -118,9 +118,11 @@ public class GridComputer  {
         // compute bootstrap weights
         // the Mersenne Twister is a high-quality RNG well-suited to Monte Carlo situations
         MersenneTwister twister = new MersenneTwister();
-        int[][] bootstrapWeights = new int[BOOTSTRAP_ITERATIONS + 1][router.nMinutes * router.monteCarloDrawsPerMinute];
 
-        Arrays.fill(bootstrapWeights[0], 1); // equal weight to all observations (sample mean) for first sample
+        // use shorts in hopes of getting more into CPU cache
+        short[][] bootstrapWeights = new short[BOOTSTRAP_ITERATIONS + 1][router.nMinutes * router.monteCarloDrawsPerMinute];
+
+        Arrays.fill(bootstrapWeights[0], (short) 1); // equal weight to all observations (sample mean) for first sample
 
         for (int bootstrap = 1; bootstrap < bootstrapWeights.length; bootstrap++) {
             for (int draw = 0; draw < timesAtStopsEachIteration.length; draw++) {

@@ -140,9 +140,13 @@ public class GridComputer  {
             boolean foundAbove = false;
             boolean foundBelow = false;
 
-            for (int time : times) {
-                if (time > request.cutoffMinutes * 60) foundAbove = true;
-                if (time < request.cutoffMinutes * 60) foundBelow = true;
+            boolean[] withinCutoff = new boolean[times.length];
+
+            for (int i = 0; i < times.length; i++) {
+                boolean reachable = times[i] < request.cutoffMinutes * 60;
+                if (!reachable) foundAbove = true;
+                else foundBelow = true;
+                withinCutoff[i] = reachable;
             }
 
             int gridx = target % grid.width;
@@ -156,7 +160,7 @@ public class GridComputer  {
                     int count = 0;
                     // include all departure minutes, but create a sample of the same size as the original
                     for (int iteration = 0; iteration < times.length; iteration++) {
-                        if (times[iteration] < request.cutoffMinutes * 60)
+                        if (withinCutoff[iteration])
                             count += bootstrapWeights[bootstrap][iteration];
                         if (count > timesAtStopsEachIteration.length / 2) {
                             samples[bootstrap] += grid.grid[gridx][gridy];

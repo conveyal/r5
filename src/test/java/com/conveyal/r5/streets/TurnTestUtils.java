@@ -16,5 +16,6 @@ public class TurnTestUtils {
         int ridx = streetLayer.turnRestrictions.size();
         streetLayer.turnRestrictions.add(restriction);
         streetLayer.edgeStore.turnRestrictions.put(restriction.fromEdge, ridx);
+        streetLayer.addReverseTurnRestriction(restriction, ridx);
     }
 }

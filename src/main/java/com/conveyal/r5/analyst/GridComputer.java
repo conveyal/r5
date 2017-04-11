@@ -137,6 +137,12 @@ public class GridComputer  {
         double[] samples = new double[BOOTSTRAP_ITERATIONS + 1];
 
         propagater.propagate((target, reachable) -> {
+            int gridx = target % grid.width;
+            int gridy = target / grid.width;
+            double opportunityCountAtTarget = grid.grid[gridx][gridy];
+
+            if (opportunityCountAtTarget < 1e-6) return; // don't bother with destinations that contain no opportunities
+
             boolean foundAbove = false;
             boolean foundBelow = false;
 
@@ -144,9 +150,6 @@ public class GridComputer  {
                 if (!currentReachable) foundAbove = true;
                 else foundBelow = true;
             }
-
-            int gridx = target % grid.width;
-            int gridy = target / grid.width;
 
             if (foundAbove && foundBelow) {
                 // This origin is sometimes reachable within the time window, do bootstrapping to determine
@@ -159,7 +162,7 @@ public class GridComputer  {
                         if (reachable[iteration])
                             count += bootstrapWeights[bootstrap][iteration];
                         if (count > timesAtStopsEachIteration.length / 2) {
-                            samples[bootstrap] += grid.grid[gridx][gridy];
+                            samples[bootstrap] += opportunityCountAtTarget;
                             continue BOOTSTRAP;
                         }
                     }

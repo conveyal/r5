@@ -134,14 +134,15 @@ public class GridComputer  {
                 new PerTargetPropagater(timesAtStopsEachIteration, nonTransferTravelTimesToStops, linkedTargets, request.request, request.cutoffMinutes * 60);
 
         // compute the percentiles
-        double[] samples = new double[BOOTSTRAP_ITERATIONS + 1];
+        int[] samples = new int[BOOTSTRAP_ITERATIONS + 1];
 
         propagater.propagate((target, reachable) -> {
             int gridx = target % grid.width;
             int gridy = target / grid.width;
-            double opportunityCountAtTarget = grid.grid[gridx][gridy];
+            // grids are stored as ints on S3 and only use doubles because that's what the Grid class uses.
+            int opportunityCountAtTarget = (int) grid.grid[gridx][gridy];
 
-            if (opportunityCountAtTarget < 1e-6) return; // don't bother with destinations that contain no opportunities
+            if (opportunityCountAtTarget == 0) return; // don't bother with destinations that contain no opportunities
 
             boolean foundAbove = false;
             boolean foundBelow = false;
@@ -164,6 +165,8 @@ public class GridComputer  {
                         }
                     }
 
+                    // The placement of this conditional inside or outside of the above loop does not seem to have a
+                    // significant impact on speed.
                     if (count > timesAtStopsEachIteration.length / 2) {
                         samples[bootstrap] += opportunityCountAtTarget;
                     }
@@ -175,13 +178,11 @@ public class GridComputer  {
             } // otherwise, this destination is never reachable, no need to do bootstrapping or increment samples
         });
 
-        int[] intSamples = DoubleStream.of(samples).mapToInt(d -> (int) Math.round(d)).toArray();
-
         // now construct the output
         // these things are tiny, no problem storing in memory
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
-        new Origin(request, intSamples).write(baos);
+        new Origin(request, samples).write(baos);
 
         // send this origin to an SQS queue as a binary payload; it will be consumed by GridResultConsumer
         // and GridResultAssembler

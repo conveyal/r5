@@ -37,11 +37,6 @@ public class PerTargetPropagater {
         this.cutoffSeconds = cutoffSeconds;
     }
 
-    /**
-     * Call the reducer with whether this target was reached at each iteration. If we ever want to reinstate the
-     * sigmoidal rolloff, we could do it probabilistically, i.e. if we're ten seconds above the cutoff draw a random number
-     * and say it's reachable if the random number is above 0.9.
-     */
     public void propagate (Reducer reducer) {
         targets.makePointToStopDistanceTablesIfNeeded();
 

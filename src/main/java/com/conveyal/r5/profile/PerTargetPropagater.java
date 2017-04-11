@@ -6,6 +6,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+import java.util.BitSet;
 
 /**
  * This is similar to the Propagater class, but instead of the reducer function being called with each iteration,
@@ -47,12 +48,13 @@ public class PerTargetPropagater {
         // than floats.
         int speedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
 
-        for (int targetIdx = 0; targetIdx < targets.size(); targetIdx++) {
-            boolean[] perIterationResults = new boolean[travelTimesToStopsEachIteration.length];
-            // fill with non-transit time as upper bound on travel time
-            Arrays.fill(perIterationResults, nonTransferTravelTimesToTargets[targetIdx] < cutoffSeconds);
+        BitSet perIterationResults = new BitSet(travelTimesToStopsEachIteration.length);
 
-            if (perIterationResults[0]) {
+        for (int targetIdx = 0; targetIdx < targets.size(); targetIdx++) {
+            // fill with non-transit time as upper bound on travel time
+            perIterationResults.set(0, travelTimesToStopsEachIteration.length, nonTransferTravelTimesToTargets[targetIdx] < cutoffSeconds);
+
+            if (perIterationResults.get(0)) {
                 // reachable on foot, no need to even check if it's reachable via transit
                 reducer.accept(targetIdx, perIterationResults);
                 continue;
@@ -67,7 +69,7 @@ public class PerTargetPropagater {
             // but still call the reducer below with the non-transit times, because you can walk even where there is no
             // transit
             if (pointToStopDistanceTable != null) {
-                for (int iteration = 0; iteration < perIterationResults.length; iteration++) {
+                for (int iteration = 0; iteration < travelTimesToStopsEachIteration.length; iteration++) {
                     final int effectivelyFinalIteration = iteration;
                     pointToStopDistanceTable.forEachEntry((stop, distanceMm) -> {
                         int timeAtStop = travelTimesToStopsEachIteration[effectivelyFinalIteration][stop];
@@ -77,7 +79,7 @@ public class PerTargetPropagater {
                         int timeAtTargetThisStop = timeAtStop + distanceMm / speedMillimetersPerSecond;
 
                         if (timeAtTargetThisStop < cutoffSeconds) {
-                            perIterationResults[effectivelyFinalIteration] = true;
+                            perIterationResults.set(effectivelyFinalIteration);
                             targetEverReached[0] = true;
                             return false; // stop iteration over stops
                         } else {
@@ -100,6 +102,6 @@ public class PerTargetPropagater {
     }
 
     public static interface Reducer {
-        public void accept (int targetIndex, boolean[] travelTimesForTarget);
+        public void accept (int targetIndex, BitSet travelTimesForTarget);
     }
 }

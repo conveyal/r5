@@ -41,7 +41,6 @@ public class PerTargetPropagater {
         targets.makePointToStopDistanceTablesIfNeeded();
 
         long startTimeMillis = System.currentTimeMillis();
-        long timeSpentInReducerNanos = 0;
         // avoid float math in loop below
         // float math was previously observed to slow down this loop, however it's debatable whether that was due to
         // casts, the operations themselves, or the fact that the operations were being completed with doubles rather
@@ -54,6 +53,9 @@ public class PerTargetPropagater {
             Arrays.fill(perIterationResults, nonTransferTravelTimesToTargets[targetIdx]);
 
             TIntIntMap pointToStopDistanceTable = targets.pointToStopDistanceTables.get(targetIdx);
+
+            // effectively final nonsense
+            boolean[] targetEverReached = new boolean[] { nonTransferTravelTimesToTargets[targetIdx] <= cutoffSeconds };
 
             // don't try to propagate transit if there are no nearby transit stops,
             // but still call the reducer below with the non-transit times, because you can walk even where there is no
@@ -68,8 +70,9 @@ public class PerTargetPropagater {
 
                         int timeAtTargetThisStop = timeAtStop + distanceMm / speedMillimetersPerSecond;
 
-                        if (timeAtTargetThisStop < perIterationResults[effectivelyFinalIteration]) {
+                        if (timeAtTargetThisStop < perIterationResults[effectivelyFinalIteration] && timeAtTargetThisStop < cutoffSeconds) {
                             perIterationResults[effectivelyFinalIteration] = timeAtTargetThisStop;
+                            targetEverReached[0] = true;
                         }
 
                         return true; // continue iteration
@@ -77,9 +80,7 @@ public class PerTargetPropagater {
                 }
             }
 
-            long reducerStartTime = System.nanoTime();
-            reducer.accept(targetIdx, perIterationResults);
-            timeSpentInReducerNanos += System.nanoTime() - reducerStartTime;
+            if (targetEverReached[0]) reducer.accept(targetIdx, perIterationResults);
         }
 
         long totalTimeMillis = System.currentTimeMillis() - startTimeMillis;
@@ -89,8 +90,6 @@ public class PerTargetPropagater {
                 targets.size(),
                 totalTimeMillis / 1000d
                 );
-        LOG.info(" - {}s in propagation", totalTimeMillis / 1000d - timeSpentInReducerNanos / 1e6);
-        LOG.info(" - {}s in reducer", timeSpentInReducerNanos / 1e6);
     }
 
     public static interface Reducer {

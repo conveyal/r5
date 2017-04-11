@@ -18,6 +18,8 @@ import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.google.common.io.LittleEndianDataOutputStream;
 import gnu.trove.iterator.TIntIntIterator;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import org.apache.commons.math3.random.MersenneTwister;
 import org.slf4j.Logger;
@@ -143,32 +145,33 @@ public class GridComputer  {
 
             if (opportunityCountAtTarget < 1e-6) return; // don't bother with destinations that contain no opportunities
 
-            boolean foundAbove = false;
-            boolean foundBelow = false;
+            TIntList reachableInIterationsList = new TIntArrayList();
 
-            for (boolean currentReachable : reachable) {
-                if (!currentReachable) foundAbove = true;
-                else foundBelow = true;
+            for (int i = 0; i < reachable.length; i++) {
+                if (reachable[i]) reachableInIterationsList.add(i);
             }
 
-            if (foundAbove && foundBelow) {
+            int[] reachableInIterations = reachableInIterationsList.toArray();
+
+            boolean foundUnreachable = reachableInIterations.length < timesAtStopsEachIteration.length;
+            boolean foundReachable = reachableInIterations.length > 0;
+
+            if (foundReachable && foundUnreachable) {
                 // This origin is sometimes reachable within the time window, do bootstrapping to determine
                 // the distribution of how often
                 BOOTSTRAP:
                 for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS + 1; bootstrap++) {
                     int count = 0;
                     // include all departure minutes, but create a sample of the same size as the original
-                    for (int iteration = 0; iteration < reachable.length; iteration++) {
-                        if (reachable[iteration]) {
-                            count += bootstrapWeights[bootstrap][iteration];
-                        }
+                    for (int iteration : reachableInIterations) {
+                        count += bootstrapWeights[bootstrap][iteration];
                     }
 
                     if (count > timesAtStopsEachIteration.length / 2) {
                         samples[bootstrap] += opportunityCountAtTarget;
                     }
                 }
-            } else if (foundBelow && !foundAbove) {
+            } else if (foundReachable && !foundUnreachable) {
                 // this destination is always reachable and will be included in all bootstrap samples, no need to do the
                 // bootstrapping
                 for (int i = 0; i < samples.length; i++) samples[i] += grid.grid[gridx][gridy];

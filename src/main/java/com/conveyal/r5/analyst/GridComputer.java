@@ -143,8 +143,13 @@ public class GridComputer  {
 
             if (opportunityCountAtTarget < 1e-6) return; // don't bother with destinations that contain no opportunities
 
-            boolean foundAbove = reachable.nextClearBit(0) > -1;
-            boolean foundBelow = reachable.nextSetBit(0) > -1;
+            boolean foundAbove = false;
+            boolean foundBelow = false;
+
+            for (boolean currentReachable : reachable) {
+                if (!currentReachable) foundAbove = true;
+                else foundBelow = true;
+            }
 
             if (foundAbove && foundBelow) {
                 // This origin is sometimes reachable within the time window, do bootstrapping to determine
@@ -153,9 +158,10 @@ public class GridComputer  {
                 for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS + 1; bootstrap++) {
                     int count = 0;
                     // include all departure minutes, but create a sample of the same size as the original
-                    // loop over all destinations where the target was reached
-                    for (int iteration = reachable.nextSetBit(0); iteration > -1; iteration = reachable.nextSetBit(iteration + 1)) {
-                        count += bootstrapWeights[bootstrap][iteration];
+                    for (int iteration = 0; iteration < reachable.length; iteration++) {
+                        if (reachable[iteration]) {
+                            count += bootstrapWeights[bootstrap][iteration];
+                        }
                     }
 
                     if (count > timesAtStopsEachIteration.length / 2) {

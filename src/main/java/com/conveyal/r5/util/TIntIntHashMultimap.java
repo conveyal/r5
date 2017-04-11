@@ -20,6 +20,15 @@ public class TIntIntHashMultimap implements TIntIntMultimap, Serializable {
 
     private TIntObjectMap<TIntList> wrapped = new TIntObjectHashMap<>();
 
+    //Copy constructor
+    public TIntIntHashMultimap (TIntIntHashMultimap base) {
+        wrapped.putAll(base.wrapped);
+    }
+
+    public TIntIntHashMultimap() {
+
+    }
+
     @Override
     public boolean put(int key, int value) {
         if (!wrapped.containsKey(key)) wrapped.put(key, new TIntArrayList());

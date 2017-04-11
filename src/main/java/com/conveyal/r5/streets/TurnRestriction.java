@@ -30,6 +30,20 @@ public class TurnRestriction implements Serializable {
     /** the intermediate edges in this turn restriction */
     public int[] viaEdges = EMPTY_INT_ARRAY;
 
+    // Copy constructor, used in scenarios, since street splitting can change turn restriction edges
+    public TurnRestriction(TurnRestriction tr) {
+        this.only = tr.only;
+        this.fromEdge = tr.fromEdge;
+        this.toEdge = tr.toEdge;
+        if (tr.viaEdges != EMPTY_INT_ARRAY) {
+            this.viaEdges = Arrays.copyOf(tr.viaEdges, tr.viaEdges.length);
+        }
+    }
+
+    public TurnRestriction() {
+
+    }
+
     /**
      * Reverses order of viaEdges this is used in reverse streetSearch for turn restrictions
      *

@@ -76,6 +76,42 @@ public class FakeGraph {
         }
     }
 
+    /** Build a graph from provided OSM using requested transit feeds */
+    public static TransportNetwork buildNetwork (InputStream osmFileStream, String osmFilename,
+        TNBuilderConfig tnBuilderConfig, TransitNetwork... networks) {
+        try {
+            File osmFile = File.createTempFile(osmFilename, ".osm.pbf");
+
+            InputStream is = new BufferedInputStream(osmFileStream);
+            OutputStream os = new BufferedOutputStream(new FileOutputStream(osmFile));
+            ByteStreams.copy(is, os);
+            is.close();
+            os.close();
+
+            List<File> filesToDelete = new ArrayList<>();
+            filesToDelete.add(osmFile);
+
+            List<String> gtfsFiles = new ArrayList<>();
+
+            for (TransitNetwork network : networks) {
+                File gtfsFile = File.createTempFile(network.toString(), ".gtfs.zip");
+                network.get().toFile(gtfsFile.getAbsolutePath());
+                filesToDelete.add(gtfsFile);
+                gtfsFiles.add(gtfsFile.getAbsolutePath());
+            }
+
+            TransportNetwork net = TransportNetwork.fromFiles(osmFile.getAbsolutePath(), gtfsFiles, tnBuilderConfig);
+            net.transitLayer.buildDistanceTables(null);
+
+            // clean up
+            filesToDelete.forEach(f -> f.delete());
+
+            return net;
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     /** Add transit (not just stops) to a Columbus graph */
     public static GTFSFeed getTransit () throws Exception {
         // using conveyal GTFS lib to build GTFS so a lot of code does not have to be rewritten later

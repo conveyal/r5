@@ -1183,23 +1183,51 @@ public class StreetLayer implements Serializable, Cloneable {
         // clean up any turn restrictions that exist
         // turn restrictions on the forward edge go to the new edge's forward edge. Turn restrictions on the back edge stay
         // where they are
-        edgeStore.turnRestrictions.removeAll(split.edge).forEach(ridx -> edgeStore.turnRestrictions.put(newEdge1.edgeIndex, ridx));
+        edgeStore.turnRestrictions.removeAll(split.edge).forEach(ridx -> {
+            TurnRestriction tr = turnRestrictions.get(ridx);
+            TurnRestriction newTurnRestriction;
+            // If edge is mutable we are splitting normal edge and can modify existing turnRestriction with new fromEdge
+            if (edge.isMutable()) {
+                newTurnRestriction = tr;
+            } else {
+                //If it isn't we are in scenario. Which means we need to replace current turnRestriction with new one
+                //Since TurnRestriction in original graph needs to stay the same
+                newTurnRestriction = new TurnRestriction(tr);
+            }
+            newTurnRestriction.fromEdge = newEdge1.edgeIndex;
+
+            //In scenario we replace existing turnRestriction with new one
+            if (!edge.isMutable()) {
+                turnRestrictions.remove(ridx);
+                turnRestrictions.add(ridx, newTurnRestriction);
+            }
+            edgeStore.turnRestrictions.put(newEdge1.edgeIndex, ridx);
+            return true;
+        });
 
         //Turn restrictions that are on via edge should be updated. Since we now have 2 via edges from one, because we split one
-        if (edgeStore.turnRestrictionsVia.containsKey(split.edge)) {
+        edgeStore.turnRestrictionsVia.get(split.edge).forEach(turnRestrictionIndex -> {
+            TurnRestriction tr = turnRestrictions.get(turnRestrictionIndex);
+            TurnRestriction newTurnRestriction;
+            int currentViaEdgeIndex =  ArrayUtils.indexOf(tr.viaEdges, split.edge);
+            //New via edge index is added as the next edge in viaEdges list
+            //noinspection UnnecessaryLocalVariable
+            int[] newViaEdges = ArrayUtils.add(tr.viaEdges, currentViaEdgeIndex+1, newEdge1.edgeIndex);
+            if (edge.isMutable()) {
+                newTurnRestriction = tr;
+            } else {
+                newTurnRestriction = new TurnRestriction(tr);
+            }
+            newTurnRestriction.viaEdges = newViaEdges;
+            if (!edge.isMutable()) {
+                turnRestrictions.remove(turnRestrictionIndex);
+                turnRestrictions.add(turnRestrictionIndex, newTurnRestriction);
+            }
+            //Also updates turnRestrictionsViaList
+            edgeStore.turnRestrictionsVia.put(newEdge1.edgeIndex, turnRestrictionIndex);
+            return true;
+        });
 
-            edgeStore.turnRestrictionsVia.get(split.edge).forEach(turnRestrictionIndex -> {
-                TurnRestriction tr = turnRestrictions.get(turnRestrictionIndex);
-                int currentViaEdgeIndex =  ArrayUtils.indexOf(tr.viaEdges, split.edge);
-                //New via edge index is added as the next edge in viaEdges list
-                //noinspection UnnecessaryLocalVariable
-                int[] newViaEdges = ArrayUtils.add(tr.viaEdges, currentViaEdgeIndex+1, newEdge1.edgeIndex);
-                tr.viaEdges = newViaEdges;
-                //Also updates turnRestrictionsViaList
-                edgeStore.turnRestrictionsVia.put(newEdge1.edgeIndex, turnRestrictionIndex);
-                return true;
-            });
-        }
 
         // Insert the new edge into the spatial index
         if (!edgeStore.isExtendOnlyCopy()) {
@@ -1384,6 +1412,11 @@ public class StreetLayer implements Serializable, Cloneable {
             // The extend-only copy of the EdgeStore also contains a new extend-only copy of the VertexStore.
             copy.vertexStore = copy.edgeStore.vertexStore;
             copy.temporaryEdgeIndex = new IntHashGrid();
+            // List of turn restrictions needs to be copied because if we split streets
+            // (when adding transit stops for example) that are part of turn restrictions we need to
+            // update TurnRestriction from/to/via edges
+            copy.turnRestrictions = new ArrayList<>(turnRestrictions.size());
+            copy.turnRestrictions.addAll(turnRestrictions);
         }
         copy.parentNetwork = newScenarioNetwork;
         copy.baseStreetLayer = this;

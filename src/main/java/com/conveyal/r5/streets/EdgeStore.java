@@ -1068,9 +1068,11 @@ public class EdgeStore implements Serializable {
         copy.inAngles = new TByteArrayList(inAngles);
         copy.outAngles = new TByteArrayList(outAngles);
         // We don't expect to add/change any turn restrictions.
-        copy.turnRestrictions = turnRestrictions;
-        copy.turnRestrictionsReverse = turnRestrictionsReverse;
-        copy.turnRestrictionsVia = turnRestrictionsVia;
+        copy.turnRestrictions = new TIntIntHashMultimap((TIntIntHashMultimap) turnRestrictions);
+        copy.turnRestrictionsReverse = new TIntIntHashMultimap(
+            (TIntIntHashMultimap) turnRestrictionsReverse);
+        copy.turnRestrictionsVia = new TIntIntHashMultimap(
+            (TIntIntHashMultimap) turnRestrictionsVia);
         return copy;
     }
 

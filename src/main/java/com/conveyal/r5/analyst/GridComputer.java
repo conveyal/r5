@@ -161,11 +161,11 @@ public class GridComputer  {
                     for (int iteration = 0; iteration < reachable.length; iteration++) {
                         if (reachable[iteration]) {
                             count += bootstrapWeights[bootstrap][iteration];
-                            if (count > timesAtStopsEachIteration.length / 2) {
-                                samples[bootstrap] += opportunityCountAtTarget;
-                                continue BOOTSTRAP;
-                            }
                         }
+                    }
+
+                    if (count > timesAtStopsEachIteration.length / 2) {
+                        samples[bootstrap] += opportunityCountAtTarget;
                     }
                 }
             } else if (foundBelow && !foundAbove) {

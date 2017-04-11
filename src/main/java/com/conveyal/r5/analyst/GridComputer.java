@@ -159,11 +159,12 @@ public class GridComputer  {
                     int count = 0;
                     // include all departure minutes, but create a sample of the same size as the original
                     for (int iteration = 0; iteration < reachable.length; iteration++) {
-                        if (reachable[iteration])
+                        if (reachable[iteration]) {
                             count += bootstrapWeights[bootstrap][iteration];
-                        if (count > timesAtStopsEachIteration.length / 2) {
-                            samples[bootstrap] += opportunityCountAtTarget;
-                            continue BOOTSTRAP;
+                            if (count > timesAtStopsEachIteration.length / 2) {
+                                samples[bootstrap] += opportunityCountAtTarget;
+                                continue BOOTSTRAP;
+                            }
                         }
                     }
                 }

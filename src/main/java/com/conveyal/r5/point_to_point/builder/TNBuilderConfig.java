@@ -4,6 +4,7 @@ import com.conveyal.r5.profile.GreedyFareCalculator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.google.common.annotations.VisibleForTesting;
 
 import java.io.File;
 
@@ -84,6 +85,11 @@ public class TNBuilderConfig {
      */
     public final boolean fetchElevationUS;
 
+    /**
+     * If non accessible islands should be removed (default true)
+     */
+    public final boolean removeIslands;
+
     /** If specified, download NED elevation tiles from the given AWS S3 bucket. */
     //public final S3BucketConfig elevationBucket;
 
@@ -144,6 +150,30 @@ public class TNBuilderConfig {
         bikeRentalFile = null;
         speeds = SpeedConfig.defaultConfig();
         analysisFareCalculator = null;
+        removeIslands = true;
+    }
+
+    @VisibleForTesting
+    public TNBuilderConfig(boolean removeIslands) {
+        htmlAnnotations = false;
+        maxHtmlAnnotationsPerFile = 1000;
+        transit = true;
+        useTransfersTxt = false;
+        parentStopLinking = false;
+        stationTransfers = false;
+        subwayAccessTime = DEFAULT_SUBWAY_ACCESS_TIME;
+        streets = true;
+        embedRouterConfig = true;
+        areaVisibility = false;
+        matchBusRoutesToStreets = false;
+        fetchElevationUS = false;
+        staticBikeRental = false;
+        staticParkAndRide = true;
+        staticBikeParkAndRide = false;
+        bikeRentalFile = null;
+        speeds = SpeedConfig.defaultConfig();
+        analysisFareCalculator = null;
+        this.removeIslands = removeIslands;
     }
 
     public static TNBuilderConfig defaultConfig() {

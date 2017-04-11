@@ -238,7 +238,7 @@ public class StreetLayer implements Serializable, Cloneable {
 
 
     /** Load OSM, optionally removing floating subgraphs (recommended) */
-    void loadFromOsm (OSM osm, boolean removeIslands, boolean saveVertexIndex) {
+    public void loadFromOsm(OSM osm, boolean removeIslands, boolean saveVertexIndex) {
         if (!osm.intersectionDetection)
             throw new IllegalArgumentException("Intersection detection not enabled on OSM source");
 

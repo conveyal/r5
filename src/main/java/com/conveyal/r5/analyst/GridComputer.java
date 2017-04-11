@@ -123,12 +123,8 @@ public class GridComputer  {
         Arrays.fill(bootstrapWeights[0], 1); // equal weight to all observations (sample mean) for first sample
 
         for (int bootstrap = 1; bootstrap < bootstrapWeights.length; bootstrap++) {
-            for (int minute = 0; minute < router.nMinutes; minute++) {
-                for (int draw = 0; draw < router.monteCarloDrawsPerMinute; draw++) {
-                    int iteration = minute * router.monteCarloDrawsPerMinute +
-                            twister.nextInt(router.monteCarloDrawsPerMinute);
-                    bootstrapWeights[bootstrap][iteration]++;
-                }
+            for (int draw = 0; draw < timesAtStopsEachIteration.length; draw++) {
+                bootstrapWeights[bootstrap][twister.nextInt(timesAtStopsEachIteration.length)]++;
             }
         }
 
@@ -141,21 +137,39 @@ public class GridComputer  {
         double[] samples = new double[BOOTSTRAP_ITERATIONS + 1];
 
         propagater.propagate((target, times) -> {
-            BOOTSTRAP: for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS + 1; bootstrap++) {
-                int count = 0;
-                // include all departure minutes, but create a sample of the same size as the original
-                for (int iteration = 0; iteration < times.length; iteration++) {
-                    if (times[iteration] < request.cutoffMinutes * 60) count += bootstrapWeights[bootstrap][iteration];
-                    if (count > timesAtStopsEachIteration.length / 2) {
-                        int gridx = target % grid.width;
-                        int gridy = target / grid.width;
-                        samples[bootstrap] += grid.grid[gridx][gridy];
-                        continue BOOTSTRAP;
+            boolean foundAbove = false;
+            boolean foundBelow = false;
+
+            for (int time : times) {
+                if (time > request.cutoffMinutes * 60) foundAbove = true;
+                if (time < request.cutoffMinutes * 60) foundBelow = true;
+            }
+
+            int gridx = target % grid.width;
+            int gridy = target / grid.width;
+
+            if (foundAbove && foundBelow) {
+                // This origin is sometimes reachable within the time window, do bootstrapping to determine
+                // the distribution of how often
+                BOOTSTRAP:
+                for (int bootstrap = 0; bootstrap < BOOTSTRAP_ITERATIONS + 1; bootstrap++) {
+                    int count = 0;
+                    // include all departure minutes, but create a sample of the same size as the original
+                    for (int iteration = 0; iteration < times.length; iteration++) {
+                        if (times[iteration] < request.cutoffMinutes * 60)
+                            count += bootstrapWeights[bootstrap][iteration];
+                        if (count > timesAtStopsEachIteration.length / 2) {
+                            samples[bootstrap] += grid.grid[gridx][gridy];
+                            continue BOOTSTRAP;
+                        }
                     }
                 }
-            }
+            } else if (foundBelow && !foundAbove) {
+                // this destination is always reachable and will be included in all bootstrap samples, no need to do the
+                // bootstrapping
+                for (int i = 0; i < samples.length; i++) samples[i] += grid.grid[gridx][gridy];
+            } // otherwise, this destination is never reachable, no need to do bootstrapping or increment samples
         });
-
 
         int[] intSamples = DoubleStream.of(samples).mapToInt(d -> (int) Math.round(d)).toArray();
 

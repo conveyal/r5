@@ -64,7 +64,7 @@ public class PerTargetPropagater {
                     pointToStopDistanceTable.forEachEntry((stop, distanceMm) -> {
                         int timeAtStop = travelTimesToStopsEachIteration[effectivelyFinalIteration][stop];
 
-                        if (timeAtStop == RaptorWorker.UNREACHED) return true; // avoid overflow
+                        if (timeAtStop > cutoffSeconds) return true; // avoid overflow
 
                         int timeAtTargetThisStop = timeAtStop + distanceMm / speedMillimetersPerSecond;
 

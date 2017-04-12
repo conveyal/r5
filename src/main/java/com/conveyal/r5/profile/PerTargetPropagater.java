@@ -10,6 +10,8 @@ import java.util.Arrays;
 /**
  * This is similar to the Propagater class, but instead of the reducer function being called with each iteration,
  * it is called with the travel times to a particular target for all iterations.
+ *
+ * The reducer will be called with the target index, and a boolean array of whether that target is reachable at each iteration.
  */
 public class PerTargetPropagater {
     private static final Logger LOG = LoggerFactory.getLogger(PerTargetPropagater.class);

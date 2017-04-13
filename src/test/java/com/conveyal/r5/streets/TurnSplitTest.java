@@ -117,6 +117,100 @@ public class TurnSplitTest {
 
     }
 
+    //Test if turn restriction still works if fromEdge is split which isn't forward edge but backward edge
+    //This splitting happens in StreetLayer#getOrCreateVertexNear which is used in associateBikeSharing, buildParkAndRideNodes and associateStops
+    @Test
+    public void testTurnRestrictionWithSplitOnFromBackwardEdge() throws Exception {
+
+        TurnRestriction restriction = new TurnRestriction();
+        restriction.fromEdge = 45;
+        restriction.toEdge = 28;
+        restriction.only = false;
+        int ridx = sl.turnRestrictions.size();
+        sl.turnRestrictions.add(restriction);
+        sl.edgeStore.turnRestrictions.put(restriction.fromEdge, ridx);
+        sl.addReverseTurnRestriction(restriction, ridx);
+
+
+        ProfileRequest profileRequest = new ProfileRequest();
+        profileRequest.fromLat = 38.89098;
+        profileRequest.fromLon = -76.99478;
+        profileRequest.toLat = 38.891657;
+        profileRequest.toLon = -76.99661326;
+
+        StreetRouter streetRouter = new StreetRouter(sl);
+        streetRouter.profileRequest = profileRequest;
+        streetRouter.streetMode = StreetMode.CAR;
+
+
+        streetRouter.distanceLimitMeters = 5_000;
+        //Split for end coordinate
+        assertTrue("Destination must be found", streetRouter.setDestination(profileRequest.toLat, profileRequest.toLon));
+        assertTrue("Origin must be found", streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon));
+
+        streetRouter.route();
+
+        StreetRouter.State lastState = streetRouter.getState(streetRouter.getDestinationSplit());
+        //LOG.info("W:{}", lastState.weight);
+
+        int oldWeight = lastState.weight;
+        StreetRouter.State state = lastState;
+        EdgeStore.Edge edge = sl.edgeStore.getCursor();
+
+        TurnRestriction tr = sl.turnRestrictions.get(2);
+
+        LOG.info("TR:{}->{}", tr.fromEdge, tr.toEdge);
+        while (state != null) {
+            edge.seek(state.backEdge);
+            LOG.debug("V:{} W:{} be:{}, TR:{} flags:{}", state.vertex, state.weight, state.backEdge, sl.edgeStore.turnRestrictions.containsKey(state.backEdge),  edge.getLengthMm());
+            //Turn from 45 to 28 is in Turn restriction 153 is new splitted edge
+            assertFalse(state.backEdge == 28 && (state.backState.backEdge == 45 || state.backState.backEdge == 153));
+            state = state.backState;
+
+        }
+
+        //Splits "from Turn restriction edge"
+        int vertex = sl.createAndLinkVertex(38.8909806,-76.995403);
+
+        sl.buildEdgeLists();
+
+        streetRouter = new StreetRouter(sl);
+        streetRouter.profileRequest = profileRequest;
+        streetRouter.streetMode = StreetMode.CAR;
+
+
+
+        streetRouter.distanceLimitMeters = 5_000;
+        //Split for end coordinate
+        assertTrue("Destination must be found", streetRouter.setDestination(profileRequest.toLat, profileRequest.toLon));
+        assertTrue("Origin must be found", streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon));
+
+        streetRouter.route();
+
+        lastState = streetRouter.getState(streetRouter.getDestinationSplit());
+        //LOG.info("W:{}", lastState.weight);
+        state = lastState;
+
+        int newWeight = lastState.weight;
+
+        //Weight isn't exactly the same because edge is split and some decimals are forgotten
+        // when weight is summed since it's an integer not float.
+        assertEquals(oldWeight, newWeight+1);
+
+
+        //LOG.info("TR:{}->{}", tr.fromEdge, tr.toEdge);
+        while (state != null) {
+            edge.seek(state.backEdge);
+            //LOG.info("V:{} W:{} be:{}, flags:{}", state.vertex, state.weight, state.backEdge, edge.getFlagsAsString());
+            LOG.debug("V:{} W:{} be:{}, TR:{} flags:{}", state.vertex, state.weight, state.backEdge, sl.edgeStore.turnRestrictions.containsKey(state.backEdge),  edge.getLengthMm());
+            //Turn from 45 to 28 is in Turn restriction 153 is new splitted edge
+            assertFalse(state.backEdge == 28 && (state.backState.backEdge == 45 || state.backState.backEdge == 153));
+            state = state.backState;
+
+        }
+
+    }
+
     //Test if turn restriction still works if toEdge is split
     //This splitting happens in StreetLayer#getOrCreateVertexNear which is used in associateBikeSharing, buildParkAndRideNodes and associateStops
     @Test

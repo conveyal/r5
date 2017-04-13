@@ -1205,6 +1205,32 @@ public class StreetLayer implements Serializable, Cloneable {
             return true;
         });
 
+        // clean up any turn restrictions that exist on this edge as to edge
+        // turn restrictions on the backward edge go to the new edge's backward edge. Turn restrictions on the forward edge stay
+        // where they are
+        edgeStore.turnRestrictionsReverse.removeAll(split.edge+1).forEach(ridx -> {
+            TurnRestriction tr = turnRestrictions.get(ridx);
+            TurnRestriction newTurnRestriction;
+            // If edge is mutable we are splitting normal edge and can modify existing turnRestriction with new toEdge
+            if (edge.isMutable()) {
+                newTurnRestriction = tr;
+            } else {
+                //If it isn't we are in scenario. Which means we need to replace current turnRestriction with new one
+                //Since TurnRestriction in original graph needs to stay the same
+                newTurnRestriction = new TurnRestriction(tr);
+            }
+            //+1 since edgeIndex is forward edge but we need backward edge
+            newTurnRestriction.toEdge = newEdge1.edgeIndex+1;
+
+            //In scenario we replace existing turnRestriction with new one
+            if (!edge.isMutable()) {
+                turnRestrictions.remove(ridx);
+                turnRestrictions.add(ridx, newTurnRestriction);
+            }
+            edgeStore.turnRestrictionsReverse.put(newEdge1.edgeIndex+1, ridx);
+            return true;
+        });
+
         //Turn restrictions that are on via edge should be updated. Since we now have 2 via edges from one, because we split one
         edgeStore.turnRestrictionsVia.get(split.edge).forEach(turnRestrictionIndex -> {
             TurnRestriction tr = turnRestrictions.get(turnRestrictionIndex);

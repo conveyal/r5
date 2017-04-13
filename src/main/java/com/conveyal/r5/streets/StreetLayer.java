@@ -1254,6 +1254,29 @@ public class StreetLayer implements Serializable, Cloneable {
             return true;
         });
 
+        //Turn restrictions that are on via backward edge should be updated. Since we now have 2 via edges from one, because we split one
+        edgeStore.turnRestrictionsVia.get(split.edge+1).forEach(turnRestrictionIndex -> {
+            TurnRestriction tr = turnRestrictions.get(turnRestrictionIndex);
+            TurnRestriction newTurnRestriction;
+            int currentViaEdgeIndex =  ArrayUtils.indexOf(tr.viaEdges, split.edge+1);
+            //New via edge index is added as the prev edge in viaEdges list
+            //noinspection UnnecessaryLocalVariable
+            int[] newViaEdges = ArrayUtils.add(tr.viaEdges, currentViaEdgeIndex, newEdge1.edgeIndex+1);
+            if (edge.isMutable()) {
+                newTurnRestriction = tr;
+            } else {
+                newTurnRestriction = new TurnRestriction(tr);
+            }
+            newTurnRestriction.viaEdges = newViaEdges;
+            if (!edge.isMutable()) {
+                turnRestrictions.remove(turnRestrictionIndex);
+                turnRestrictions.add(turnRestrictionIndex, newTurnRestriction);
+            }
+            //Also updates turnRestrictionsViaList
+            edgeStore.turnRestrictionsVia.put(newEdge1.edgeIndex+1, turnRestrictionIndex);
+            return true;
+        });
+
 
         // Insert the new edge into the spatial index
         if (!edgeStore.isExtendOnlyCopy()) {

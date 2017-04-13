@@ -38,7 +38,7 @@ public class TurnSplitTest {
     //Test if turn restriction still works if fromEdge is split
     //This splitting happens in StreetLayer#getOrCreateVertexNear which is used in associateBikeSharing, buildParkAndRideNodes and associateStops
     @Test
-    public void testTurnRestrictionWithSplit() throws Exception {
+    public void testTurnRestrictionWithSplitOnFrom() throws Exception {
 
         ProfileRequest profileRequest = new ProfileRequest();
         profileRequest.fromLat = 38.8930088;
@@ -120,7 +120,7 @@ public class TurnSplitTest {
     //Test if turn restriction still works if toEdge is split
     //This splitting happens in StreetLayer#getOrCreateVertexNear which is used in associateBikeSharing, buildParkAndRideNodes and associateStops
     @Test
-    public void testTurnRestrictionWithSplit1() throws Exception {
+    public void testTurnRestrictionWithSplitOnTo() throws Exception {
 
         ProfileRequest profileRequest = new ProfileRequest();
         profileRequest.fromLat = 38.8930088;
@@ -203,7 +203,7 @@ public class TurnSplitTest {
     //Test if turn restriction still works if viaEdge is split
     //This splitting happens in StreetLayer#getOrCreateVertexNear which is used in associateBikeSharing, buildParkAndRideNodes and associateStops
     @Test
-    public void testTurnRestrictionWithSplit2() throws Exception {
+    public void testTurnRestrictionWithSplitOnVia() throws Exception {
 
         ProfileRequest profileRequest = new ProfileRequest();
         profileRequest.fromLat = 38.8930088;

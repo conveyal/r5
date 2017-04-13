@@ -64,7 +64,8 @@ public class FakeGraph {
                 gtfsFiles.add(gtfsFile.getAbsolutePath());
             }
 
-            TransportNetwork net = TransportNetwork.fromFiles(osmFile.getAbsolutePath(), gtfsFiles, new TNBuilderConfig());
+            TransportNetwork net = TransportNetwork.fromFiles(osmFile.getAbsolutePath(), gtfsFiles, new TNBuilderConfig(),
+                true);
             net.transitLayer.buildDistanceTables(null);
 
             // clean up
@@ -100,7 +101,8 @@ public class FakeGraph {
                 gtfsFiles.add(gtfsFile.getAbsolutePath());
             }
 
-            TransportNetwork net = TransportNetwork.fromFiles(osmFile.getAbsolutePath(), gtfsFiles, tnBuilderConfig);
+            TransportNetwork net = TransportNetwork.fromFiles(osmFile.getAbsolutePath(), gtfsFiles, tnBuilderConfig,
+                true);
             net.transitLayer.buildDistanceTables(null);
 
             // clean up

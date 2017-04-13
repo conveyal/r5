@@ -130,12 +130,12 @@ public class TransportNetwork implements Serializable {
 
     /** Create a TransportNetwork from gtfs-lib feeds */
     public static TransportNetwork fromFeeds (String osmSourceFile, List<GTFSFeed> feeds, TNBuilderConfig config) {
-        return fromFiles(osmSourceFile, null, feeds, config);
+        return fromFiles(osmSourceFile, null, feeds, config, false);
     }
 
     /** Legacy method to load from a single GTFS file */
     public static TransportNetwork fromFiles (String osmSourceFile, String gtfsSourceFile, TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
-        return fromFiles(osmSourceFile, Arrays.asList(gtfsSourceFile), tnBuilderConfig);
+        return fromFiles(osmSourceFile, Arrays.asList(gtfsSourceFile), tnBuilderConfig, false);
     }
 
     /**
@@ -144,8 +144,8 @@ public class TransportNetwork implements Serializable {
      * the feeds into memory simulataneously, which shouldn't be so bad with mapdb-based feeds, but it's still not great
      * (due to caching etc.)
      */
-    private static TransportNetwork fromFiles (String osmSourceFile, List<String> gtfsSourceFiles, List<GTFSFeed> feeds,
-                                               TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
+    private static TransportNetwork fromFiles(String osmSourceFile, List<String> gtfsSourceFiles,
+        List<GTFSFeed> feeds, TNBuilderConfig tnBuilderConfig, boolean temporary) throws DuplicateFeedException {
 
         System.out.println("Summarizing builder config: " + BUILDER_CONFIG_FILENAME);
         System.out.println(tnBuilderConfig);
@@ -154,8 +154,9 @@ public class TransportNetwork implements Serializable {
         // Create a transport network to hold the street and transit layers
         TransportNetwork transportNetwork = new TransportNetwork();
 
+        String osmPath = temporary ? null : new File(dir,"osm.mapdb").getPath();
         // Load OSM data into MapDB
-        OSM osm = new OSM(new File(dir,"osm.mapdb").getPath());
+        OSM osm = new OSM(osmPath);
         osm.intersectionDetection = true;
         osm.readFromFile(osmSourceFile);
 
@@ -218,9 +219,12 @@ public class TransportNetwork implements Serializable {
      * On the other hand, GTFS feeds each have their own namespace. Each GTFS object is for one specific feed, and this
      * distinction should be maintained for various reasons. However, we use the GTFS IDs only for reference, so it
      * doesn't really matter, particularly for analytics.
+     *
+     * @param temporary: if true osm.mapdb is deleted after use. Default is false since it is needed for way names
      */
-    public static TransportNetwork fromFiles (String osmFile, List<String> gtfsFiles, TNBuilderConfig config) {
-        return fromFiles(osmFile, gtfsFiles, null, config);
+    public static TransportNetwork fromFiles(String osmFile, List<String> gtfsFiles,
+        TNBuilderConfig config, boolean temporary) {
+        return fromFiles(osmFile, gtfsFiles, null, config, temporary);
     }
 
     public static TransportNetwork fromDirectory (File directory) throws DuplicateFeedException {
@@ -254,7 +258,7 @@ public class TransportNetwork implements Serializable {
             LOG.error("An OSM PBF file is required to build a network.");
             return null;
         } else {
-            return fromFiles(osmFile.getAbsolutePath(), gtfsFiles, builderConfig);
+            return fromFiles(osmFile.getAbsolutePath(), gtfsFiles, builderConfig, false);
         }
     }
 

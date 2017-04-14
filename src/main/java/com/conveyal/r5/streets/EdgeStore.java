@@ -474,6 +474,7 @@ public class EdgeStore implements Serializable {
 
         /**
          * Copy the flags and speeds from the supplied Edge cursor into this one.
+         * Doesn't copy OSM ids since those are set when edge is created.
          * This is a hack and should be done some other way.
          */
         public void copyPairFlagsAndSpeeds(Edge other) {
@@ -485,7 +486,6 @@ public class EdgeStore implements Serializable {
             flags.set(backEdge, other.getEdgeStore().flags.get(otherBackEdge));
             speeds.set(foreEdge, other.getEdgeStore().speeds.get(otherForeEdge));
             speeds.set(backEdge, other.getEdgeStore().speeds.get(otherBackEdge));
-            osmids.set(pairIndex, other.pairIndex);
         }
 
         /**

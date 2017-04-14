@@ -37,7 +37,7 @@ cat > ~ec2-user/worker.conf <<EOF
 EOF
 
 # Download the worker
-sudo -u ec2-user wget -O ~ec2-user/r5.jar {0} 2>&1 >> $LOGFILE
+sudo -u ec2-user wget -O ~ec2-user/r5.jar {0} >> $LOGFILE 2>&1
 
 # Figure out how much memory to give the worker
 # figure out how much memory to use
@@ -46,11 +46,13 @@ TOTAL_MEM=`grep MemTotal /proc/meminfo | sed 's/[^0-9]//g'`
 MEM=`echo $TOTAL_MEM - 2097152 | bc`
 
 # Start the worker
-# run in ec2-user's home directory
-cd ~ec2-user
-sudo -u ec2-user java8 -jar r5.jar worker worker.conf 2>&1 >> $LOGFILE
+# run in ec2-user's home directory, in the subshell
+{
+    cd ~ec2-user
+    sudo -u ec2-user java8 -jar r5.jar worker worker.conf >> $LOGFILE 2>&1
 
-# If the worker exits or doesn't start, wait a few minutes so that the CloudWatch log agent grabs
-# the logs
-sleep 120
-halt -p
+    # If the worker exits or doesn't start, wait a few minutes so that the CloudWatch log agent grabs
+    # the logs
+    sleep 120
+    halt -p
+} &

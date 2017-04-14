@@ -1256,6 +1256,7 @@ public class PointToPointRouterServer {
         feature.addProperty("permission", cursor.getPermissionsAsString());
         feature.addProperty("edge_id", cursor.getEdgeIndex());
         feature.addProperty("speed_ms", cursor.getSpeed());
+        feature.addProperty("osmid", cursor.getOSMID());
         //Needed for filtering flags
         for (EdgeStore.EdgeFlag flag: EdgeStore.EdgeFlag.values()) {
             if (cursor.getFlag(flag)) {

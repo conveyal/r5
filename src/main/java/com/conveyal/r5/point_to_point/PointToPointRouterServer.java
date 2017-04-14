@@ -1057,15 +1057,18 @@ public class PointToPointRouterServer {
         if (transportNetwork.streetLayer.edgeStore.turnRestrictions
             .containsKey(edgeIdx)) {
 
-            List<TurnRestriction> edge_restrictions = new ArrayList<>();
+            final int numberOfRestrictions = transportNetwork.streetLayer.edgeStore.turnRestrictions.get(edgeIdx)
+                .size();
+            List<Integer> edge_restricion_idxs = new ArrayList<>(numberOfRestrictions);
             transportNetwork.streetLayer.edgeStore.turnRestrictions.get(edgeIdx)
                 .forEach(turn_restriction_idx -> {
-                    edge_restrictions.add(
-                        transportNetwork.streetLayer.turnRestrictions
-                            .get(turn_restriction_idx));
+                    edge_restricion_idxs.add(turn_restriction_idx);
                     return true;
                 });
-            for (TurnRestriction turnRestriction : edge_restrictions) {
+            for (int i=0; i < edge_restricion_idxs.size(); i++) {
+                int turnRestrictionIdx = edge_restricion_idxs.get(i);
+                TurnRestriction turnRestriction = transportNetwork.streetLayer.turnRestrictions.get(turnRestrictionIdx);
+
                 //TurnRestriction.fromEdge isn't necessary correct
                 //If edge on which from is is splitted then fromEdge is different but isn't updated in TurnRestriction
                 cursor.seek(edgeIdx);
@@ -1075,6 +1078,7 @@ public class PointToPointRouterServer {
 
                 feature.addProperty("only", turnRestriction.only);
                 feature.addProperty("edge", "FROM");
+                feature.addProperty("restrictionId", turnRestrictionIdx);
 
                 features.add(feature);
 
@@ -1089,6 +1093,7 @@ public class PointToPointRouterServer {
                         feature.addProperty("only", turnRestriction.only);
                         feature.addProperty("edge", "VIA");
                         feature.addProperty("via_edge_idx", idx);
+                        feature.addProperty("restrictionId", turnRestrictionIdx);
 
                         features.add(feature);
                     }
@@ -1101,6 +1106,7 @@ public class PointToPointRouterServer {
 
                 feature.addProperty("only", turnRestriction.only);
                 feature.addProperty("edge", "TO");
+                feature.addProperty("restrictionId", turnRestrictionIdx);
 
                 features.add(feature);
             }

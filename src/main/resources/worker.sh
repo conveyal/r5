@@ -18,7 +18,7 @@ echo Starting analyst worker at `date` > $LOGFILE
 chown ec2-user:ec2-user $LOGFILE
 chmod 664 $LOGFILE # Log agent needs to read log file
 
-cat > /etc/awslogs.conf <<EOF
+cat > /etc/awslogs/awslogs.conf <<EOF
 [general]
 state_file = /var/awslogs/state/agent-state
 

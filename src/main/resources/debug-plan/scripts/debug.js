@@ -27,18 +27,22 @@ $(function() {
         // query the map for the under the mouse
         map.featuresAt(e.point, { radius: 5, includeGeometry: true }, function (err, features) {
             if (err) throw err;
-            //console.log(e.point, features);
-            var ids = features.map(function (feat) { return feat.properties.edge_id });
-            if (ids.length == 1) {
-                var pop_html = fillPopup(features[0], current_layer);
-                if (pop_html != null) {
-                    var tooltip = new mapboxgl.Popup()
-                    .setLngLat(e.lngLat)
-                    .setHTML(pop_html)
-                    .addTo(map);
+            var seen_ids = Object.create(null);
+            var pop_html = "";
+            for(var i=0; i < features.length; i++) {
+                var feature = features[i];
+                if (!(feature.properties.edge_id in seen_ids)) {
+                    pop_html += fillPopup(feature, current_layer);
+                    seen_ids[feature.properties.edge_id] = true;
                 }
             }
-
+            if (pop_html.length > 10) {
+                var tooltip = new mapboxgl.Popup()
+                .setLngLat(e.lngLat)
+                .setHTML(pop_html)
+                .addTo(map);
+            }
+            var ids = Object.keys(seen_ids).map(function (string_id) { return parseInt(string_id); });
 
             // set the filter on the hover style layer to only select the features
             // currently under the mouse

@@ -717,58 +717,12 @@ public class PointToPointRouterServer {
             if ("turns".equals(layer)) {
                 streets.forEach(s -> {
                     try {
-                        if (transportNetwork.streetLayer.edgeStore.turnRestrictions
-                            .containsKey(s)) {
-
-                            List<TurnRestriction> edge_restrictions = new ArrayList<>();
-                            transportNetwork.streetLayer.edgeStore.turnRestrictions.get(s)
-                                .forEach(turn_restriction_idx -> {
-                                    edge_restrictions.add(
-                                        transportNetwork.streetLayer.turnRestrictions
-                                            .get(turn_restriction_idx));
-                                    return true;
-                                });
-                            for (TurnRestriction turnRestriction : edge_restrictions) {
-                                //TurnRestriction.fromEdge isn't necessary correct
-                                //If edge on which from is is splitted then fromEdge is different but isn't updated in TurnRestriction
-                                cursor.seek(s);
-
-                                GeoJsonFeature feature = getEdgeFeature(both, cursor, offsetBuilder,
-                                    distance, transportNetwork);
-
-                                feature.addProperty("only", turnRestriction.only);
-                                feature.addProperty("edge", "FROM");
-
-                                features.add(feature);
-
-                                if (turnRestriction.viaEdges.length > 0) {
-                                    for (int idx = 0; idx < turnRestriction.viaEdges.length; idx++) {
-                                        int via_edge_index = turnRestriction.viaEdges[idx];
-                                        cursor.seek(via_edge_index);
-
-                                        feature = getEdgeFeature(both, cursor, offsetBuilder,
-                                            distance, transportNetwork);
-
-                                        feature.addProperty("only", turnRestriction.only);
-                                        feature.addProperty("edge", "VIA");
-                                        feature.addProperty("via_edge_idx", idx);
-
-                                        features.add(feature);
-                                    }
-
-                                }
-                                cursor.seek(turnRestriction.toEdge);
-
-                                feature = getEdgeFeature(both, cursor, offsetBuilder, distance,
-                                    transportNetwork);
-
-                                feature.addProperty("only", turnRestriction.only);
-                                feature.addProperty("edge", "TO");
-
-                                features.add(feature);
-                            }
-
-                        }
+                        int edgeIdx = s;
+                        makeTurnEdge(transportNetwork, both, features, cursor, offsetBuilder,
+                            distance, edgeIdx);
+                        edgeIdx++;
+                        makeTurnEdge(transportNetwork, both, features, cursor, offsetBuilder,
+                            distance, edgeIdx);
 
                         return true;
                     } catch (Exception e) {
@@ -1097,6 +1051,69 @@ public class PointToPointRouterServer {
 
     }
 
+    private static void makeTurnEdge(TransportNetwork transportNetwork, boolean both,
+        List<GeoJsonFeature> features, EdgeStore.Edge cursor, OffsetCurveBuilder offsetBuilder,
+        float distance, int edgeIdx) {
+        if (transportNetwork.streetLayer.edgeStore.turnRestrictions
+            .containsKey(edgeIdx)) {
+
+            final int numberOfRestrictions = transportNetwork.streetLayer.edgeStore.turnRestrictions.get(edgeIdx)
+                .size();
+            List<Integer> edge_restricion_idxs = new ArrayList<>(numberOfRestrictions);
+            transportNetwork.streetLayer.edgeStore.turnRestrictions.get(edgeIdx)
+                .forEach(turn_restriction_idx -> {
+                    edge_restricion_idxs.add(turn_restriction_idx);
+                    return true;
+                });
+            for (int i=0; i < edge_restricion_idxs.size(); i++) {
+                int turnRestrictionIdx = edge_restricion_idxs.get(i);
+                TurnRestriction turnRestriction = transportNetwork.streetLayer.turnRestrictions.get(turnRestrictionIdx);
+
+                //TurnRestriction.fromEdge isn't necessary correct
+                //If edge on which from is is splitted then fromEdge is different but isn't updated in TurnRestriction
+                cursor.seek(edgeIdx);
+
+                GeoJsonFeature feature = getEdgeFeature(both, cursor, offsetBuilder,
+                    distance, transportNetwork);
+
+                feature.addProperty("only", turnRestriction.only);
+                feature.addProperty("edge", "FROM");
+                feature.addProperty("restrictionId", turnRestrictionIdx);
+
+                features.add(feature);
+
+                if (turnRestriction.viaEdges.length > 0) {
+                    for (int idx = 0; idx < turnRestriction.viaEdges.length; idx++) {
+                        int via_edge_index = turnRestriction.viaEdges[idx];
+                        cursor.seek(via_edge_index);
+
+                        feature = getEdgeFeature(both, cursor, offsetBuilder,
+                            distance, transportNetwork);
+
+                        feature.addProperty("only", turnRestriction.only);
+                        feature.addProperty("edge", "VIA");
+                        feature.addProperty("via_edge_idx", idx);
+                        feature.addProperty("restrictionId", turnRestrictionIdx);
+
+                        features.add(feature);
+                    }
+
+                }
+                cursor.seek(turnRestriction.toEdge);
+
+                feature = getEdgeFeature(both, cursor, offsetBuilder, distance,
+                    transportNetwork);
+
+                feature.addProperty("only", turnRestriction.only);
+                feature.addProperty("edge", "TO");
+                feature.addProperty("restrictionId", turnRestrictionIdx);
+
+                features.add(feature);
+            }
+
+        }
+    }
+
     /**
      * Creates features from from and to vertices of provided edge
      * if they weren't alreade created and they have TRAFFIC_SIGNAL flag
@@ -1239,6 +1256,7 @@ public class PointToPointRouterServer {
         feature.addProperty("permission", cursor.getPermissionsAsString());
         feature.addProperty("edge_id", cursor.getEdgeIndex());
         feature.addProperty("speed_ms", cursor.getSpeed());
+        feature.addProperty("osmid", cursor.getOSMID());
         //Needed for filtering flags
         for (EdgeStore.EdgeFlag flag: EdgeStore.EdgeFlag.values()) {
             if (cursor.getFlag(flag)) {

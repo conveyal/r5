@@ -40,6 +40,7 @@ REGION=`curl http://169.254.169.254/latest/meta-data/placement/availability-zone
 cat > /etc/awslogs/awscli.conf <<EOF
 [default]
 region = $REGION
+EOF
 
 # dump config and awslogs log to stdout so it ends up in the EC2 console
 sleep 30

@@ -41,7 +41,7 @@ sleep 30
 echo AWS Logs Config:
 cat /etc/awslogs/awslogs.conf
 
-echo AWS Logs Logs (how meta):
+echo AWS Log agent logs:
 cat /var/log/awslogs.log
 
 # Download the worker

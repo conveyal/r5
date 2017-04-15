@@ -36,6 +36,14 @@ cat > ~ec2-user/worker.conf <<EOF
 {2}
 EOF
 
+# dump config and awslogs log to stdout so it ends up in the EC2 console
+sleep 30
+echo AWS Logs Config:
+cat /etc/awslogs/awslogs.conf
+
+echo AWS Logs Logs (how meta):
+cat /var/log/awslogs.log
+
 # Download the worker
 sudo -u ec2-user wget -O ~ec2-user/r5.jar {0} >> $LOGFILE 2>&1
 

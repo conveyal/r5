@@ -36,6 +36,11 @@ cat > ~ec2-user/worker.conf <<EOF
 {2}
 EOF
 
+REGION=`curl http://169.254.169.254/latest/meta-data/placement/availability-zone | egrep --only-matching '^[a-z-]+-[0-9]'`
+cat > /etc/awslogs/awscli.conf <<EOF
+[default]
+region = $REGION
+
 # dump config and awslogs log to stdout so it ends up in the EC2 console
 sleep 30
 echo AWS Logs Config:

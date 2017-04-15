@@ -20,9 +20,9 @@ chmod 664 $LOGFILE # Log agent needs to read log file
 
 cat > /etc/awslogs/awslogs.conf <<EOF
 [general]
-state_file = /var/awslogs/state/agent-state
+state_file = /var/lib/awslogs/agent-state
 
-[otp]
+[logstream1]
 file = $LOGFILE
 log_group_name = {1}
 log_stream_name = '{instance_id}'

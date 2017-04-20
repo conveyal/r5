@@ -408,7 +408,11 @@ public class FastRaptorWorker {
         }
     }
 
-    private void doFrequencySearchForRound(RaptorState inputState, RaptorState outputState, boolean bound) {
+    /** Do a frequency search. If computeDeterministicUpperBound is true, worst-case frequency boarding time will be used
+     * so that the output of this function can be used in a range-RAPTOR search. Otherwise Monte Carlo schedules will be
+     * used to improve upon the output of the range-RAPTOR bounds search.
+     */
+    private void doFrequencySearchForRound(RaptorState inputState, RaptorState outputState, boolean computeDeterministicUpperBound) {
         BitSet patternsTouched = getPatternsTouchedForStops(inputState, frequencyIndexForOriginalPatternIndex);
 
         for (int patternIndex = patternsTouched.nextSetBit(0); patternIndex >= 0; patternIndex = patternsTouched.nextSetBit(patternIndex + 1)) {
@@ -445,7 +449,10 @@ public class FastRaptorWorker {
                         if (inputState.bestStopsTouched.get(stop)) {
                             int earliestBoardTime = inputState.bestTimes[stop] + MINIMUM_BOARD_WAIT_SEC;
 
-                            int newBoardingDepartureTimeAtStop = bound ?
+                            // if we're computing the upper bound, we want the worst case. This is the only thing that is
+                            // valid in a range RAPTOR search; using random schedule draws in range RAPTOR would be problematic
+                            // because they need to be independent across minutes.
+                            int newBoardingDepartureTimeAtStop = computeDeterministicUpperBound ?
                                 getWorstCaseFrequencyDepartureTime(schedule, stopPositionInPattern, frequencyEntryIdx, earliestBoardTime) :
                                 getRandomFrequencyDepartureTime(schedule, stopPositionInPattern, offset, frequencyEntryIdx, earliestBoardTime);
 

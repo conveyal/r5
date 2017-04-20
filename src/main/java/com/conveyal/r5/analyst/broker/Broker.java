@@ -379,28 +379,29 @@ public class Broker implements Runnable {
             throw new RuntimeException(e);
         }
 
-        String workerConfigString = cfg.toString();
-        String scriptTemplate;
-
         // Read in the startup script
+        // We used to just pass the config to custom AMI, but by constructing a startup script that initializes a stock
+        // Amazon Linux AMI, we don't have to worry about maintaining and keeping our AMI up to date. Amazon Linux applies
+        // important security updates on startup automatically.
         try {
+            String workerConfigString = cfg.toString();
             InputStream scriptIs = Broker.class.getClassLoader().getResourceAsStream("worker.sh");
             ByteArrayOutputStream scriptBaos = new ByteArrayOutputStream();
             ByteStreams.copy(scriptIs, scriptBaos);
             scriptIs.close();
             scriptBaos.close();
-            scriptTemplate = scriptBaos.toString();
+            String scriptTemplate = scriptBaos.toString();
+
+            String logGroup = workerConfig.getProperty("log-group");
+
+            String script = MessageFormat.format(scriptTemplate, workerDownloadUrl, logGroup, workerConfigString);
+
+            // Send the config to the new workers as EC2 "user data"
+            String userData = new String(Base64.getEncoder().encode(script.getBytes()));
+            req.setUserData(userData);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
-        String logGroup = workerConfig.getProperty("log-group");
-
-        String script = MessageFormat.format(scriptTemplate, workerDownloadUrl, logGroup, workerConfigString);
-
-        // Send the config to the new workers as EC2 "user data"
-        String userData = new String(Base64.getEncoder().encode(script.getBytes()));
-        req.setUserData(userData);
 
         if (brokerConfig.getProperty("worker-iam-role") != null)
             req.setIamInstanceProfile(new IamInstanceProfileSpecification().withArn(brokerConfig.getProperty("worker-iam-role")));

@@ -1,7 +1,8 @@
 #!/bin/bash
 # Downloads and runs an analyst worker.
-# This will be run through Java MessageFormat, and the following items will be available by wrapping
-# the relevant index in curly braces
+# This shell script will undergo variable substitution via Java's MessageFormat class before it is run on newly started
+# worker machines. MessageFormat will replace special tokens (consisting of numbers inside curly braces) with
+# configuration information specific to the worker being started. These are:
 # 0: the URL to grab the worker JAR from
 # 1: the AWS log group to use
 # 2: the worker configuration to use
@@ -18,6 +19,8 @@ echo Starting analyst worker at `date` > $LOGFILE
 chown ec2-user:ec2-user $LOGFILE
 chmod 664 $LOGFILE # Log agent needs to read log file
 
+# using a shell "herefile" or "heredoc", pipe the data between <<EOF and EOF into the cat process which then writes
+# it to the appropriate location on the file system. Leave EOF unquoted so that variables are substituted.
 cat > /etc/awslogs/awslogs.conf <<EOF
 [general]
 state_file = /var/lib/awslogs/agent-state

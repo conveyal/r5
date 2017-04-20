@@ -96,6 +96,22 @@ public class PointToPointRouterServer {
                 LOG.info("Loading transit networks from: {}", dir);
                 TransportNetwork transportNetwork = TransportNetwork.read(new File(dir, "network.dat"));
                 transportNetwork.readOSM(new File(dir, "osm.mapdb"));
+                int invalidTrs = 0;
+                for (int i=0; i < transportNetwork.streetLayer.turnRestrictions.size(); i++) {
+                    TurnRestriction tr = transportNetwork.streetLayer.turnRestrictions.get(i);
+                    if (tr.viaEdges.length > 0) {
+                        continue;
+                    }
+                    EdgeStore.Edge fromEdge = transportNetwork.streetLayer.edgeStore.getCursor(tr.fromEdge);
+                    EdgeStore.Edge toEdge = transportNetwork.streetLayer.edgeStore.getCursor(tr.toEdge);
+
+                    int viaVertex = fromEdge.getToVertex();
+                    if(!transportNetwork.streetLayer.outgoingEdges.get(viaVertex).contains(tr.toEdge)) {
+                        invalidTrs++;
+                        LOG.info("TR:{} -> {}, {}", fromEdge.getOSMID(), toEdge.getOSMID(), tr);
+                    }
+                }
+                LOG.info("Invalid trs:{}", invalidTrs);
                 run(transportNetwork);
             } catch (Exception e) {
                 LOG.error("An error occurred during the reading or decoding of transit networks", e);
@@ -723,7 +739,6 @@ public class PointToPointRouterServer {
                         edgeIdx++;
                         makeTurnEdge(transportNetwork, both, features, cursor, offsetBuilder,
                             distance, edgeIdx);
-
                         return true;
                     } catch (Exception e) {
                         response.status(500);
@@ -1068,6 +1083,15 @@ public class PointToPointRouterServer {
             for (int i=0; i < edge_restricion_idxs.size(); i++) {
                 int turnRestrictionIdx = edge_restricion_idxs.get(i);
                 TurnRestriction turnRestriction = transportNetwork.streetLayer.turnRestrictions.get(turnRestrictionIdx);
+                if (turnRestriction.viaEdges.length > 0) {
+                    continue;
+                }
+                EdgeStore.Edge fromEdge = transportNetwork.streetLayer.edgeStore.getCursor(turnRestriction.fromEdge);
+
+                int viaVertex = fromEdge.getToVertex();
+                if(transportNetwork.streetLayer.outgoingEdges.get(viaVertex).contains(turnRestriction.toEdge)) {
+                    continue;
+                }
 
                 //TurnRestriction.fromEdge isn't necessary correct
                 //If edge on which from is is splitted then fromEdge is different but isn't updated in TurnRestriction

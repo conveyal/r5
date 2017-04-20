@@ -139,13 +139,35 @@ public class EdgeStore implements Serializable {
     }
 
 
-    /** Turn restrictions for turning _out of_ each edge */
+    /** Turn restrictions for turning _out of_ each edge
+     *
+     * FROM edges of all turn restrictions
+     * */
     public TIntIntMultimap turnRestrictions;
 
-    /** Turn restrictions for turning _in of_ each edge */
+    /** Turn restrictions for turning _in of_ each edge in reverse search
+     *
+     * TO edges of NO TURN restrictions
+     * and TO edges of NO TURN restrictions remapped from ONLY TURN restrictions
+     *
+     * Also used when splitting edges
+     * */
     public TIntIntMultimap turnRestrictionsReverse;
 
-    /** Via edges to turn restrictions link. Used when splitting edges
+    /**
+     * TO edges of ONLY TURN restrictions. (They aren't in turnRestrictionsReverse since reverse search
+     * doesn't support ONLY TURNS)
+     * Used only when splitting edges
+     * */
+    public TIntIntMultimap turnRestrictionsToEdges;
+
+    /**
+     * Here are FROM edges of NO TURN restriction which are remapped ONLY turn restrictions to NO turn restrictions
+     * Used only when splitting edges
+     */
+    public TIntIntMultimap turnRestrictionsFromEdges;
+
+    /** Via edges to turn restrictions link. Used only when splitting edges
      * FIXME: Can be probably transient since it's used only when building graph in getOrCreateVertexNear
      * But I'm not sure what is with scenarios (materializeOne function)*/
     public TIntIntMultimap turnRestrictionsVia;
@@ -175,6 +197,8 @@ public class EdgeStore implements Serializable {
         outAngles = new TByteArrayList(initialEdgePairs);
         turnRestrictions = new TIntIntHashMultimap();
         turnRestrictionsReverse = new TIntIntHashMultimap();
+        turnRestrictionsToEdges = new TIntIntHashMultimap();
+        turnRestrictionsFromEdges = new TIntIntHashMultimap();
         turnRestrictionsVia = new TIntIntHashMultimap();
     }
 
@@ -1073,6 +1097,10 @@ public class EdgeStore implements Serializable {
             (TIntIntHashMultimap) turnRestrictionsReverse);
         copy.turnRestrictionsVia = new TIntIntHashMultimap(
             (TIntIntHashMultimap) turnRestrictionsVia);
+        copy.turnRestrictionsToEdges = new TIntIntHashMultimap(
+            (TIntIntHashMultimap) turnRestrictionsToEdges);
+        copy.turnRestrictionsFromEdges = new TIntIntHashMultimap(
+            (TIntIntHashMultimap) turnRestrictionsFromEdges);
         return copy;
     }
 

@@ -569,4 +569,83 @@ public class TurnSplitTest {
         }
 
     }
+
+    // Test if turn restriction is valid if from edge on ONLY turn is split
+    // This is different from normal from edge since ONLY turns from edges aren't saved in TurnRestriction list
+    @Test
+    public void testTurnRestrictionWithSplitOnFromOnly() throws Exception {
+        TurnRestriction out = new TurnRestriction();
+        out.fromEdge = 134;
+        out.toEdge = 31;
+        out.only = true;
+        int index = sl.turnRestrictions.size();
+        sl.turnRestrictions.add(out);
+        sl.edgeStore.turnRestrictions.put(out.fromEdge, index);
+        sl.addReverseTurnRestriction(out, index);
+        for (int i =index; i < sl.turnRestrictions.size(); i++) {
+            TurnRestriction tr = sl.turnRestrictions.get(i);
+            LOG.info("TR:{} {}", i, tr);
+            testTurnRestriction(tr);
+        }
+
+        //Splits FROM edge
+        sl.createAndLinkVertex(38.8919723,-76.9959763);
+        sl.buildEdgeLists();
+        LOG.info("Splits from edge on TR");
+
+        for (int i =index; i < sl.turnRestrictions.size(); i++) {
+            TurnRestriction tr = sl.turnRestrictions.get(i);
+            if (i == index) {
+                assertFalse("New Turn restriction should have different FROM edge", tr.fromEdge == 134);
+            }
+            testTurnRestriction(tr);
+        }
+
+    }
+
+    // Test if turn restriction is valid if to edge on ONLY turn is split
+    // This is different from normal to edge test since ONLY turns to edges aren't saved in TurnRestrictionReverse list
+    @Test
+    public void testTurnRestrictionWithSplitOnToOnly() throws Exception {
+        TurnRestriction out = new TurnRestriction();
+        out.fromEdge = 134;
+        out.toEdge = 31;
+        out.only = true;
+        int index = sl.turnRestrictions.size();
+        sl.turnRestrictions.add(out);
+        sl.edgeStore.turnRestrictions.put(out.fromEdge, index);
+        sl.addReverseTurnRestriction(out, index);
+        for (int i =index; i < sl.turnRestrictions.size(); i++) {
+            TurnRestriction tr = sl.turnRestrictions.get(i);
+            testTurnRestriction(tr);
+        }
+
+        //Splits TO edge
+        sl.createAndLinkVertex(38.891768,-76.9962057);
+        sl.buildEdgeLists();
+        LOG.info("Splits to edge on TR");
+
+        for (int i =index; i < sl.turnRestrictions.size(); i++) {
+            TurnRestriction tr = sl.turnRestrictions.get(i);
+            if (i == index) {
+                assertFalse("New Turn restriction should have different TO edge", tr.toEdge == 31);
+            }
+            testTurnRestriction(tr);
+        }
+
+
+
+    }
+
+    public void testTurnRestriction(TurnRestriction tr) {
+        EdgeStore.Edge fromEdge = sl.edgeStore.getCursor(tr.fromEdge);
+        EdgeStore.Edge toEdge = sl.edgeStore.getCursor(tr.toEdge);
+
+        int viaVertex = fromEdge.getToVertex();
+        LOG.info("TR:{} -> {}, {}", fromEdge.getOSMID(), toEdge.getOSMID(), tr);
+        //LOG.info ("Frome edge distance:{}", fromEdge.getLengthMm());
+        assertTrue(sl.outgoingEdges.get(viaVertex).contains(tr.toEdge));
+
+
+    }
 }

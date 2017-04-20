@@ -1,6 +1,6 @@
 #!/bin/bash
 # Downloads and runs an analyst worker.
-# This shell script will undergo variable substitution via Java's MessageFormat class before it is run on newly started
+# This shell script will undergo variable substitution via the Java MessageFormat class before it is run on newly started
 # worker machines. MessageFormat will replace special tokens (consisting of numbers inside curly braces) with
 # configuration information specific to the worker being started. These are:
 # 0: the URL to grab the worker JAR from

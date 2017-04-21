@@ -56,7 +56,7 @@ public abstract class GridStatisticComputer {
         // median travel time.
         int nSamples = input.readInt();
 
-        Grid grid = new Grid(zoom, width, height, north, west);
+        Grid outputGrid = new Grid(zoom, width, height, north, west);
 
         int[] valuesThisOrigin = new int[nSamples];
 
@@ -67,13 +67,13 @@ public abstract class GridStatisticComputer {
                 }
 
                 // compute percentiles
-                grid.grid[x][y] = computeValueForOrigin(x, y, valuesThisOrigin);
+                outputGrid.grid[x][y] = computeValueForOrigin(x, y, valuesThisOrigin);
             }
         }
 
         input.close();
 
-        return grid;
+        return outputGrid;
     }
 
     /** Subclasses should override this value to compute the single value at a particular grid cell given the samples at that origin. */

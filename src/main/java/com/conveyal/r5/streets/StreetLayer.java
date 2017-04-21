@@ -909,6 +909,9 @@ public class StreetLayer implements Serializable, Cloneable {
             for (TurnRestriction remapped_restriction: remapped) {
                 index = turnRestrictions.size();
                 turnRestrictions.add(remapped_restriction);
+                for(int edgeId: turnRestriction.viaEdges) {
+                    edgeStore.turnRestrictionsVia.put(edgeId, index);
+                }
                 edgeStore.turnRestrictionsReverse.put(remapped_restriction.toEdge, index);
                 edgeStore.turnRestrictionsFromEdges.put(remapped_restriction.fromEdge, index);
             }

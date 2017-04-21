@@ -62,6 +62,7 @@ public abstract class GridStatisticComputer {
 
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
+                // input values are delta-coded per origin, so use val to keep track of current value
                 for (int iteration = 0, val = 0; iteration < nSamples; iteration++) {
                     valuesThisOrigin[iteration] = (val += input.readInt());
                 }

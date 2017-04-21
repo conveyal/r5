@@ -14,6 +14,11 @@ import java.util.zip.GZIPInputStream;
  * used to create grid B will produce a higher accessibility value than the scenario used to compute grid A. Since this
  * uses instantaneous accessibility (based on the accessibility at a single minute and Monte Carlo draw), it is in the same
  * family as the AndrewOwenMeanGridStatisticComputer, and has the same fungibility concerns documented there.
+ *
+ * This can also be used with bootstrapped accessibility given median travel time, although it should be modified to
+ * treat the first value (the point estimate rather than a bootstrap replication) differently.
+ *
+ * Note that this does not extend GridStatisticComputer as it works with two access grids simultaneously.
  */
 public class ImprovementProbabilityGridStatisticComputer {
     private static final AmazonS3 s3 = new AmazonS3Client();

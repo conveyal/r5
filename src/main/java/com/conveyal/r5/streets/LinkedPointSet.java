@@ -71,7 +71,10 @@ public class LinkedPointSet implements Serializable {
     /** For each transit stop, the distances to nearby PointSet points as packed (point_index, distance) pairs. */
     public List<int[]> stopToPointDistanceTables;
 
-    /** For each pointset point, the reachable stops, as a map from StopID to distance in millimeters */
+    /**
+     * For each pointset point, the stops reachable without using transit, as a map from StopID to distance in millimeters.
+     * Inverted version of stopToPointDistanceTables.
+     */
     public transient List<TIntIntMap> pointToStopDistanceTables;
 
     /** It is preferred to specify a mode when linking TODO remove this. */

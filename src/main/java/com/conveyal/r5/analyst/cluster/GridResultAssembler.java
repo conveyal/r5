@@ -131,9 +131,11 @@ public class GridResultAssembler {
             ByteArrayInputStream bais = new ByteArrayInputStream(body);
             Origin origin = Origin.read(bais);
 
-            // if this is not the first request, make sure that we have the correct number of iterations
+            // if this is not the first request, make sure that we have the correct number of accessibility
+            // samples (either instantaneous accessibility values or bootstrap replications of accessibility given median
+            // travel time, depending on worker version)
             if (buffer != null && origin.samples.length != this.nIterations) {
-                LOG.error("Origin {}, {} has {} iterations, expected {}",
+                LOG.error("Origin {}, {} has {} samples, expected {}",
                         origin.x, origin.y, origin.samples.length, this.nIterations);
                 error = true;
             }

@@ -29,7 +29,10 @@ import java.util.stream.DoubleStream;
 
 /**
  * Computes an accessibility indicator at a single cell in a Web Mercator grid, using destination densities from
- * a Web Mercator density grid. Both grids must be at the same zoom level. The accessibility is calculated using
+ * a Web Mercator density grid. Both grids must be at the same zoom level. This class computes accessibility given median
+ * travel time (described below and in Conway, Byrd and van Eggermond 2017).
+ *
+ * The accessibility is calculated using
  * median travel time to each destination (there are plans to change this to allow use of arbitrary percentiles in the future). In order
  * to facilitate probabilistic comparison of scenarios, many accessibility values are returned, representing the
  * sampling distribution of the accessibility. The first value is the value computed using all the Monte Carlo frequency

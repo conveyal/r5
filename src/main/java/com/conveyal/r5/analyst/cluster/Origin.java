@@ -25,7 +25,10 @@ public class Origin {
     /** Y coordinate of origin within regional analysis */
     public int y;
 
-    /** Percentiles of accessibility, from first (index 0) up to 100th (index 99). 50th percentile (median) is index 49. */
+    /**
+     * Samples of accessibility. Depending on worker version, this could be bootstrap replications of accessibility given
+     * median travel time, or with older workers would be instantaneous accessibility for each departure minute.
+     */
     public int[] samples;
 
     /** Construct an origin given a grid request and the instantaneous accessibility computed for each iteration */

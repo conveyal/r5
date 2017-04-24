@@ -73,18 +73,23 @@ import java.util.stream.DoubleStream;
  * scheduled network. Adjacent departure minutes will additionally have correlated travel times and accessibility values
  * because transit service is similar (you might have to wait one more minute to catch the same bus).
  * There are also likely periodic effects at the transit service frequency (e.g. 15 minutes,
- * 30 minutes, etc.). In testing in Atlanta we did not find ignoring this dependence to be an issue, but it may
- * make sense to test using a scenario where the scheduled routes play more of a role (the frequency routes in
- * our test scenario provided much of the accessibility). See http://rpubs.com/mattwigway/bootstrap-dependence
- * In any case, patching this up is fairly simple. Rather than drawing n Monte Carlo draws with replacement for
+ * 30 minutes, etc.). In testing in Atlanta we did not find ignoring this dependence to be an issue, Patching this up is
+ * fairly simple. Rather than drawing n Monte Carlo draws with replacement for
  * each bootstrap sample, we draw n / m draws for each departure minute, where n is the number of Monte Carlo draws done in
  * the original analysis, and m is the number of departure minute. That is, we ensure that the number of Monte Carlo draws
  * using a particular departure minute is identical in each bootstrap sample and the original, non-bootstrapped point
  * estimate. This also means that all the variation in the sampling distributions is due to the effect of frequency-based
- * lines, rather than due to variation due to departure time (which is held constant).The current version of the class
- * is not doing this hierarchical resampling within departure minutes, but it's relatively easy to change; we
- * had initially concluded that this was not necessary, but we have since arrived at the conclusion that we should make
- * this change.
+ * lines, rather than due to variation due to departure time (which is held constant).
+ *
+ * We initially did not think that the change to sample from within the departure minutes to be that significant (see
+ * http://rpubs.com/mattwigway/bootstrap-dependence). However, it in fact is. It produces narrower sampling distributions
+ * that result entirely from the Monte Carlo simulation of frequency lines, without mixing in systematic variation that
+ * comes from variation due to different departure times. This also should yield p-values that are more correct; because
+ * there is no systematic influence from scheduled lines, 5% of the values should in fact be found statistically significant
+ * when testing the same scenario (which suggests we should probably be using a higher significance threshold, since we are
+ * doing thousands of computations; see Wasserstein and Lazar 2016, "The ASA's statement on p-values,"
+ * http://dx.doi.org/10.1080/00031305.2016.1154108, and Ioanndis 2005, "Why Most Published Research Findings are False",
+ * http://dx.doi.org/10.1371/journal.pmed.0020124.
  *
  * For more information on the bootstrap and its application to the computation of accessibility given median accessibility,
  * see
@@ -183,8 +188,10 @@ public class GridComputer  {
         Arrays.fill(bootstrapWeights[0], 1); // equal weight to all observations for first sample
 
         for (int bootstrap = 1; bootstrap < bootstrapWeights.length; bootstrap++) {
-            for (int draw = 0; draw < timesAtStopsEachIteration.length; draw++) {
-                bootstrapWeights[bootstrap][twister.nextInt(timesAtStopsEachIteration.length)]++;
+            for (int minute = 0; minute < router.nMinutes; minute++) {
+                for (int draw = 0; draw < router.monteCarloDrawsPerMinute; draw++) {
+                    bootstrapWeights[bootstrap][twister.nextInt(router.monteCarloDrawsPerMinute)]++;
+                }
             }
         }
 

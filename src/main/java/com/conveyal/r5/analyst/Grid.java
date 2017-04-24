@@ -345,20 +345,34 @@ public class Grid {
 
     /* functions below from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */
 
+    /** Return the pixel the given longitude falls within */
     public static int lonToPixel (double lon, int zoom) {
         return (int) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);
     }
 
+    /** return the west side of the given pixel (assuming an integer pixel; noninteger pixels will return the appropriate location within the pixel) */
     public static double pixelToLon (double pixel, int zoom) {
         return pixel / (Math.pow(2, zoom) * 256) * 360 - 180;
     }
 
+    /** Return the longitude of the center of the given pixel */
+    public static double pixelToCenterLon (int pixel, int zoom) {
+        return pixelToLon(pixel + 0.5, zoom);
+    }
+
+    /** Return the pixel the given latitude falls within */
     public static int latToPixel (double lat, int zoom) {
         double latRad = FastMath.toRadians(lat);
         return (int) ((1 - log(tan(latRad) + 1 / cos(latRad)) / Math.PI) * Math.pow(2, zoom - 1) * 256);
     }
 
-    // We're using FastMath here, because the built-in math functions were taking a laarge amount of time in profiling.
+    /** Return the latitude of the center of the given pixel */
+    public static double pixelToCenterLat (int pixel, int zoom) {
+        return pixelToLat(pixel + 0.5, zoom);
+    }
+
+    // We're using FastMath here, because the built-in math functions were taking a large amount of time in profiling.
+    /** return the north side of the given pixel (assuming an integer pixel; noninteger pixels will return the appropriate location within the pixel) */
     public static double pixelToLat (double pixel, int zoom) {
         return FastMath.toDegrees(atan(sinh(Math.PI - (pixel / 256d) / Math.pow(2, zoom) * 2 * Math.PI)));
     }

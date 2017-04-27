@@ -190,10 +190,15 @@ public class GridComputer  {
         for (int bootstrap = 1; bootstrap < bootstrapWeights.length; bootstrap++) {
             for (int minute = 0; minute < router.nMinutes; minute++) {
                 for (int draw = 0; draw < router.monteCarloDrawsPerMinute; draw++) {
-                    bootstrapWeights[bootstrap][twister.nextInt(router.monteCarloDrawsPerMinute)]++;
+                    int iteration = minute * router.monteCarloDrawsPerMinute + twister.nextInt(router.monteCarloDrawsPerMinute);
+                    bootstrapWeights[bootstrap][iteration]++;
                 }
             }
         }
+
+        // the minimum number of times a destination must be reachable in a single bootstrap sample to be considered
+        // reachable.
+        int minCount = (int) (router.nMinutes * router.monteCarloDrawsPerMinute * (request.travelTimePercentile / 100d));
 
         // Do propagation of travel times from transit stops to the destinations
         int[] nonTransferTravelTimesToStops = linkedDestinations.eval(sr::getTravelTimeToVertex).travelTimes;
@@ -251,7 +256,7 @@ public class GridComputer  {
 
                     // TODO sigmoidal rolloff here, to avoid artifacts from large destinations that jump a few seconds
                     // in or out of the cutoff.
-                    if (count > timesAtStopsEachIteration.length / 2) {
+                    if (count > minCount) {
                         bootstrapReplications[bootstrap] += opportunityCountAtTarget;
                     }
                 }

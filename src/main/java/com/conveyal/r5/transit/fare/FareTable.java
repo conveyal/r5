@@ -22,7 +22,14 @@ public class FareTable {
 
     private Map<P2<String>, Fare> fares = Maps.newHashMap();
 
+    private boolean ignoreAgencyId;
+
     public FareTable (String name) {
+        this(name, false);
+    }
+
+    public FareTable (String name, boolean ignoreAgencyId) {
+        this.ignoreAgencyId = ignoreAgencyId;
         InputStream is = FareTable.class.getClassLoader().getResourceAsStream(name);
         CsvReader reader = new CsvReader(is, ',', Charset.forName("UTF-8"));
         try {
@@ -47,7 +54,9 @@ public class FareTable {
 
     public Fare lookup (Stop from, Stop to) {
         //TODO: how does this works WRT different GTFS feeds having Stops with same Ids?
-        return lookup(from.stopId, to.stopId);
+        return this.ignoreAgencyId
+                ? lookup(from.stopId.split(":")[1], to.stopId.split(":")[1])
+                : lookup(from.stopId, to.stopId);
     }
 
 }

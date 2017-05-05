@@ -9,6 +9,7 @@ import com.conveyal.r5.api.util.SearchType;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.model.json_serialization.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import graphql.schema.DataFetchingEnvironment;
@@ -234,6 +235,11 @@ public class ProfileRequest implements Serializable, Cloneable {
     //If this is profile or point to point route request
     private boolean profile = false;
 
+    //If true current search is reverse search AKA we are looking for a path from destination to origin in reverse
+    //It differs from searchType because it is used as egress search
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+    public boolean reverseSearch = false;
+
     /** maximum fare. If nonnegative, fares will be used in routing. */
     public int maxFare = -1;
 
@@ -256,6 +262,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     public boolean isProfile() {
         return profile;
     }
+
 
     public ProfileRequest clone () {
         try {
@@ -393,7 +400,7 @@ public class ProfileRequest implements Serializable, Cloneable {
 
         //Transit modes can be empty if searching for path without transit is requested
         Collection<TransitModes> transitModes = environment.getArgument("transitModes");
-        if (transitModes.size() > 0) {
+        if (!transitModes.isEmpty()) {
             //If there is TRANSIT mode in transit modes all of transit modes need to be added.
             if (transitModes.contains(TransitModes.TRANSIT)) {
                 profileRequest.transitModes = EnumSet.allOf(TransitModes.class);
@@ -405,7 +412,14 @@ public class ProfileRequest implements Serializable, Cloneable {
         profileRequest.accessModes = EnumSet.copyOf((Collection<LegMode>) environment.getArgument("accessModes"));
         profileRequest.egressModes = EnumSet.copyOf((Collection<LegMode>)environment.getArgument("egressModes"));
 
-        profileRequest.directModes = EnumSet.copyOf((Collection<LegMode>)environment.getArgument("directModes"));
+
+        Collection<LegMode> directModes = environment.getArgument("directModes");
+        //directModes can be empty if we only want transit searches
+        if (!directModes.isEmpty()) {
+            profileRequest.directModes = EnumSet.copyOf(directModes);
+        } else {
+            profileRequest.directModes = EnumSet.noneOf(LegMode.class);
+        }
 
 
         return profileRequest;

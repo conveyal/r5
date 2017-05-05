@@ -289,6 +289,8 @@ function fillPopup(feature, layer) {
             pop +=": ";
             if (layer_info[i] == "speed_ms") {
                 pop += showSpeed(prop[layer_info[i]]);
+            } else if (layer_info[i] == "osmid") {
+                pop += "<a target='_blank' href='https://osm.org/way/"+ prop[layer_info[i]]+"'>OSM W:" + prop[layer_info[i]]+"</a>";
             } else {
                 pop += prop[layer_info[i]];
             }

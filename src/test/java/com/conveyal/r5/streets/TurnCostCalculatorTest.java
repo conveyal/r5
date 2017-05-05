@@ -6,6 +6,7 @@ import com.vividsolutions.jts.geom.Coordinate;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 /**
  * Created by matthewc on 2/23/16.

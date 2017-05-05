@@ -421,8 +421,14 @@ function showItinerary(optionIdx, itineraryIdx) {
     }
     if (connection.egress !== null) { 
         var egressData = egress[connection.egress];
-        var egressFeature = getFeature(egressData);
-        features.features.push(egressFeature);
+        /*var egressFeature = getFeature(egressData);*/
+        /*features.features.push(egressFeature);*/
+        for(var edgeIdx=0; edgeIdx < egressData.streetEdges.length; edgeIdx++) {
+            var curStreetEdge = egressData.streetEdges[edgeIdx];
+            var curStreetEdgeFeature = getFeature(curStreetEdge);
+            features.features.push(curStreetEdgeFeature);
+        }
+
     }
     layer = L.geoJson(features, {
         pointToLayer:function(feature, latlng) {

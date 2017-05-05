@@ -64,6 +64,11 @@ public class StreetSegment {
                 if (coordinates.size() == 0) {
                     Collections.addAll(coordinates, geometry.getCoordinates());
                 } else {
+                    Coordinate last = coordinates.get(coordinates.size()-1);
+                    Coordinate first = geometry.getCoordinateN(0);
+                    if (!last.equals2D(first)) {
+                            System.err.println("Last and first coordinate differ!:" + last + "!=" + first);
+                        }
                     coordinates.addAll(Arrays.asList(geometry.getCoordinates()).subList(1, geometry.getNumPoints())); // Avoid duplications
                 }
             }

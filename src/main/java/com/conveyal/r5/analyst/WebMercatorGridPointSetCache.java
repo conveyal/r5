@@ -27,6 +27,10 @@ public class WebMercatorGridPointSetCache {
         return cache.computeIfAbsent(key, GridKey::toPointset);
     }
 
+    public WebMercatorGridPointSet get(Grid grid) {
+        return get(grid.zoom, grid.west, grid.north, grid.width, grid.height);
+    }
+
     private static class GridKey {
         public int zoom;
         public int west;

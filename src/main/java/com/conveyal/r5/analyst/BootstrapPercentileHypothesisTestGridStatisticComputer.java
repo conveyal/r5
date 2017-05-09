@@ -34,7 +34,7 @@ public class BootstrapPercentileHypothesisTestGridStatisticComputer extends Dual
 
         // get the point estimate of the difference
         int pointEstimate = bValues[0] - aValues[0];
-        if (pointEstimate == 0) return 1e5; // no difference, not statistically significant
+        if (pointEstimate == 0) return 0; // no difference, not statistically significant
 
         // subtract every value in b from every value in a
         // this creates a bootstrapped sampling distribution of the differences, since each bootstrap sample in each analysis

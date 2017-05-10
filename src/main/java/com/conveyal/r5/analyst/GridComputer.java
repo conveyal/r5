@@ -198,7 +198,8 @@ public class GridComputer  {
 
         // the minimum number of times a destination must be reachable in a single bootstrap sample to be considered
         // reachable.
-        int minCount = (int) (router.nMinutes * router.monteCarloDrawsPerMinute * (request.travelTimePercentile / 100d));
+        // TODO THIS IS HARDWIRED TO 85th PERCENTILE ACCESSIBILITY. THIS IS A HACK AND SHOULD BE REMOVED AS SOON AS THE WSTLUR PAPER IS COMPLETE
+        int minCount = (int) (router.nMinutes * router.monteCarloDrawsPerMinute * 0.85);
 
         // Do propagation of travel times from transit stops to the destinations
         int[] nonTransferTravelTimesToStops = linkedDestinations.eval(sr::getTravelTimeToVertex).travelTimes;

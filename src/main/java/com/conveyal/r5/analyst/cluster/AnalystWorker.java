@@ -246,6 +246,7 @@ public class AnalystWorker implements Runnable {
      */
     @Override
     public void run() {
+        LOG.warn("This analyst worker has been modified to always analyze 85th percentile travel time regardless of user input!!");
 
         // Create executors with up to one thread per processor.
         int nP = Runtime.getRuntime().availableProcessors();

@@ -37,7 +37,10 @@ public class P2<E> {
 
     @Override
     public boolean equals(Object o) {
-        if (a == null || b == null) return a == b;
-        else return a.equals(b);
+        if(!(o instanceof P2)) return false;
+        P2 other = (P2) o;
+        boolean aIsEqual = (a == null) ? other.a == null : a.equals(other.a);
+        boolean bIsEqual = (b == null) ? other.b == null : b.equals(other.b);
+        return aIsEqual && bIsEqual;
     }
 }

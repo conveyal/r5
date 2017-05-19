@@ -2,7 +2,9 @@ package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AccessGridWriter;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceRequest;
+import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.profile.RaptorWorker;
@@ -20,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.stream.IntStream;
 
 /**
@@ -146,6 +149,16 @@ public class TravelTimeSurfaceComputer {
         }
 
         os.write(output.getBytes());
+
+        // Append scenario application warning JSON to result
+        ResultMetadata metadata = new ResultMetadata();
+        metadata.scenarioApplicationWarnings = network.scenarioApplicationWarnings;
+        JsonUtilities.objectMapper.writeValue(os, metadata);
+
         os.close();
+    }
+
+    private static class ResultMetadata {
+        public Collection<TaskError> scenarioApplicationWarnings;
     }
 }

@@ -3,10 +3,17 @@ package com.conveyal.r5.analyst.scenario;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.S3Object;
+import com.conveyal.r5.analyst.BootstrapPercentileHypothesisTestGridStatisticComputer;
+import com.conveyal.r5.analyst.DualGridStatisticComputer;
+import com.conveyal.r5.analyst.ExtractingGridStatisticComputer;
 import com.conveyal.r5.analyst.Grid;
 import com.google.common.io.LittleEndianDataInputStream;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.zip.GZIPInputStream;
 
 /**
@@ -28,7 +35,11 @@ public abstract class GridStatisticComputer {
     public Grid compute(String resultsBucket, String key) throws IOException {
         S3Object accessGrid = s3.getObject(resultsBucket, key);
 
-        LittleEndianDataInputStream input = new LittleEndianDataInputStream(new GZIPInputStream(accessGrid.getObjectContent()));
+        return compute(accessGrid.getObjectContent());
+    }
+
+    public Grid compute (InputStream rawInput) throws IOException {
+        LittleEndianDataInputStream input = new LittleEndianDataInputStream(new GZIPInputStream(rawInput));
 
         char[] header = new char[8];
         for (int i = 0; i < 8; i++) {
@@ -79,4 +90,28 @@ public abstract class GridStatisticComputer {
 
     /** Subclasses should override this value to compute the single value at a particular grid cell given the samples at that origin. */
     protected abstract double computeValueForOrigin (int x, int y, int[] valuesThisOrigin);
+
+    public static void main (String... args) throws IOException {
+        GridStatisticComputer comp;
+        InputStream in;
+        if ("--two-tailed".equals(args[0])) {
+            DualGridStatisticComputer.main(args);
+            return;
+        } else if ("--extract".equals(args[0])) {
+            int which = Integer.parseInt(args[1]);
+            in = new FileInputStream(args[2]);
+            comp = new ExtractingGridStatisticComputer(which);
+        } else {
+            throw new RuntimeException("Unknown grid statistic computer " + args[0]);
+        }
+
+        Grid grid = comp.compute(in);
+
+        if (args[3].endsWith(".grid"))
+            grid.write(new FileOutputStream(args[3]));
+        else if (args[3].endsWith(".png"))
+            grid.writePng(new FileOutputStream(args[3]));
+        else if (args[3].endsWith(".tif"))
+            grid.writeGeotiff(new FileOutputStream(args[3]));
+    }
 }

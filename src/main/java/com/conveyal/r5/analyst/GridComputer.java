@@ -137,140 +137,176 @@ public class GridComputer  {
         request.request.fromLat = Grid.pixelToCenterLat(request.north + request.y, request.zoom);
         request.request.fromLon = Grid.pixelToCenterLon(request.west + request.x, request.zoom);
 
-        // Run the raptor algorithm to get times at each destination for each iteration
-
-        // first, find the access stops
-        StreetMode mode;
-        if (request.request.accessModes.contains(LegMode.CAR)) mode = StreetMode.CAR;
-        else if (request.request.accessModes.contains(LegMode.BICYCLE)) mode = StreetMode.BICYCLE;
-        else mode = StreetMode.WALK;
-
-        LOG.info("Maximum number of rides: {}", request.request.maxRides);
-        LOG.info("Maximum trip duration: {}", request.request.maxTripDurationMinutes);
-
         // Use the extent of the opportunity density grid as the destinations; this avoids having to convert between
         // coordinate systems, and avoids including thousands of extra points in the weeds where there happens to be a
         // transit stop. It also means that all data will be included in the analysis even if the user is only analyzing
         // a small part of the city.
         WebMercatorGridPointSet destinations = pointSetCache.get(grid);
         // TODO recast using egress mode
-        final LinkedPointSet linkedDestinations = destinations.link(network.streetLayer, mode);
 
-        StreetRouter sr = new StreetRouter(network.streetLayer);
-        sr.distanceLimitMeters = 2000;
-        sr.setOrigin(request.request.fromLat, request.request.fromLon);
-        sr.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
-        sr.route();
+        StreetMode accessMode = LegMode.legModeSetToDominantStreetMode(request.request.accessModes);
+        StreetMode directMode = LegMode.legModeSetToDominantStreetMode(request.request.directModes);
 
-        TIntIntMap reachedStops = sr.getReachedStops();
+        // first, find the access stops
+        if (request.request.transitModes.isEmpty()) {
+            LinkedPointSet linkedDestinations = destinations.link(network.streetLayer, directMode);
 
-        // convert millimeters to seconds
-        int millimetersPerSecond = (int) (request.request.walkSpeed * 1000);
-        for (TIntIntIterator it = reachedStops.iterator(); it.hasNext();) {
-            it.advance();
-            it.setValue(it.value() / millimetersPerSecond);
-        }
+            StreetRouter sr = new StreetRouter(network.streetLayer);
+            sr.timeLimitSeconds = request.request.maxTripDurationMinutes * 60;
+            sr.streetMode = directMode;
+            sr.profileRequest = request.request;
+            sr.setOrigin(request.request.fromLat, request.request.fromLon);
+            sr.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+            sr.route();
 
-        FastRaptorWorker router = new FastRaptorWorker(network.transitLayer, request.request, reachedStops);
+            int offstreetWalkSpeedMillimetersPerSecond = (int) (request.request.getSpeed(directMode) * 1000);
+            int[] travelTimes = linkedDestinations.eval(sr::getTravelTimeToVertex, offstreetWalkSpeedMillimetersPerSecond).travelTimes;
 
-        // Run the raptor algorithm
-        int[][] timesAtStopsEachIteration = router.route();
-
-        // compute bootstrap weights, see comments in Javadoc detailing how we compute the weights we're using
-        // the Mersenne Twister is a fast, high-quality RNG well-suited to Monte Carlo situations
-        MersenneTwister twister = new MersenneTwister();
-
-        // This stores the number of times each Monte Carlo draw is included in each bootstrap sample, which could be
-        // 0, 1 or more. We store the weights on each iteration rather than a list of iterations because it allows
-        // us to easily construct the weights s.t. they sum to the original number of MC draws.
-        int[][] bootstrapWeights = new int[N_BOOTSTRAP_REPLICATIONS + 1][router.nMinutes * router.monteCarloDrawsPerMinute];
-
-        Arrays.fill(bootstrapWeights[0], 1); // equal weight to all observations for first sample
-
-        for (int bootstrap = 1; bootstrap < bootstrapWeights.length; bootstrap++) {
-            for (int minute = 0; minute < router.nMinutes; minute++) {
-                for (int draw = 0; draw < router.monteCarloDrawsPerMinute; draw++) {
-                    int iteration = minute * router.monteCarloDrawsPerMinute + twister.nextInt(router.monteCarloDrawsPerMinute);
-                    bootstrapWeights[bootstrap][iteration]++;
-                }
-            }
-        }
-
-        // the minimum number of times a destination must be reachable in a single bootstrap sample to be considered
-        // reachable.
-        int minCount = (int) (router.nMinutes * router.monteCarloDrawsPerMinute * (request.travelTimePercentile / 100d));
-
-        // Do propagation of travel times from transit stops to the destinations
-        int[] nonTransferTravelTimesToStops = linkedDestinations.eval(sr::getTravelTimeToVertex).travelTimes;
-        PerTargetPropagater propagater =
-                new PerTargetPropagater(timesAtStopsEachIteration, nonTransferTravelTimesToStops, linkedDestinations, request.request, request.cutoffMinutes * 60);
-
-        // store the accessibility results for each bootstrap replication
-        double[] bootstrapReplications = new double[N_BOOTSTRAP_REPLICATIONS + 1];
-
-        // The lambda will be called with a boolean array of whether the target is reachable within the cutoff at each
-        // Monte Carlo draw. These are then bootstrapped to create the sampling distribution.
-        propagater.propagate((target, reachable) -> {
-            int gridx = target % grid.width;
-            int gridy = target / grid.width;
-            double opportunityCountAtTarget = grid.grid[gridx][gridy];
-
-            // as an optimization, don't even bother to compute the sampling distribution at cells that contain no
-            // opportunities.
-            if (opportunityCountAtTarget < 1e-6) return;
-
-            // index the Monte Carlo iterations in which the destination was reached within the travel time cutoff,
-            // so we can skip over the non-reachable ones in bootstrap computations.
-            // this improves computation speed (verified)
-            TIntList reachableInIterationsList = new TIntArrayList();
-
-            for (int i = 0; i < reachable.length; i++) {
-                if (reachable[i]) reachableInIterationsList.add(i);
-            }
-
-            int[] reachableInIterations = reachableInIterationsList.toArray();
-
-            boolean isAlwaysReachableWithinTravelTimeCutoff =
-                    reachableInIterations.length == timesAtStopsEachIteration.length;
-            boolean isNeverReachableWithinTravelTimeCutoff = reachableInIterations.length == 0;
-
-            // Optimization: only bootstrap if some of the travel times are above the cutoff and some below.
-            // If a destination is always reachable, it will perforce be reachable always in every bootstrap
-            // sample, so there is no need to compute the bootstraps, and similarly if it is never reachable.
-            if (isAlwaysReachableWithinTravelTimeCutoff) {
-                // this destination is always reachable and will be included in all bootstrap samples, no need to do the
-                // bootstrapping
-                // possible optimization: have a variable that persists between calls to this lambda and increment
-                // that single value, then add that value to each replication at the end; reduces the number of additions.
-                for (int i = 0; i < bootstrapReplications.length; i++) bootstrapReplications[i] += grid.grid[gridx][gridy];
-            } else if (isNeverReachableWithinTravelTimeCutoff) {
-                // do nothing, never reachable, does not impact accessibility
-            } else {
-                // This origin is sometimes reachable within the time window, do bootstrapping to determine
-                // the distribution of how often
-                for (int bootstrap = 0; bootstrap < N_BOOTSTRAP_REPLICATIONS + 1; bootstrap++) {
-                    int count = 0;
-                    for (int iteration : reachableInIterations) {
-                        count += bootstrapWeights[bootstrap][iteration];
-                    }
-
-                    // TODO sigmoidal rolloff here, to avoid artifacts from large destinations that jump a few seconds
-                    // in or out of the cutoff.
-                    if (count > minCount) {
-                        bootstrapReplications[bootstrap] += opportunityCountAtTarget;
+            double accessibility = 0;
+            for (int y = 0, index1d = 0; y < grid.height; y++) {
+                for (int x = 0; x < grid.width; x++, index1d++) {
+                    if (travelTimes[index1d] < request.cutoffMinutes * 60) {
+                        accessibility += grid.grid[x][y];
                     }
                 }
             }
-        });
 
-        // round (not cast/floor) these all to ints.
-        int[] intReplications = DoubleStream.of(bootstrapReplications).mapToInt(d -> (int) Math.round(d)).toArray();
+            finish(new int[] { (int) accessibility }); // no uncertainty so no bootstraps
+        } else {
+            // always walk at egress
+            LinkedPointSet linkedDestinationsEgress = destinations.link(network.streetLayer, StreetMode.WALK);
+            // if the access mode is also walk, the link function will use its cache to return the same linkedpointset
+            // NB Should use direct mode but then we'd have to run the street search twice.
+            LinkedPointSet linkedDestinationsDirect = destinations.link(network.streetLayer, accessMode);
 
+            // Transit search, run the raptor algorithm to get times at each destination for each iteration
+            LOG.info("Maximum number of rides: {}", request.request.maxRides);
+            LOG.info("Maximum trip duration: {}", request.request.maxTripDurationMinutes);
+
+            StreetRouter sr = new StreetRouter(network.streetLayer);
+            sr.distanceLimitMeters = 2000;
+            sr.streetMode = accessMode;
+            sr.profileRequest = request.request;
+            sr.setOrigin(request.request.fromLat, request.request.fromLon);
+            sr.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+            sr.route();
+
+            TIntIntMap reachedStops = sr.getReachedStops();
+
+            // convert millimeters to seconds
+            int millimetersPerSecond = (int) (request.request.getSpeed(accessMode) * 1000);
+            for (TIntIntIterator it = reachedStops.iterator(); it.hasNext(); ) {
+                it.advance();
+                it.setValue(it.value() / millimetersPerSecond);
+            }
+
+            FastRaptorWorker router = new FastRaptorWorker(network.transitLayer, request.request, reachedStops);
+
+            // Run the raptor algorithm
+            int[][] timesAtStopsEachIteration = router.route();
+
+            // compute bootstrap weights, see comments in Javadoc detailing how we compute the weights we're using
+            // the Mersenne Twister is a fast, high-quality RNG well-suited to Monte Carlo situations
+            MersenneTwister twister = new MersenneTwister();
+
+            // This stores the number of times each Monte Carlo draw is included in each bootstrap sample, which could be
+            // 0, 1 or more. We store the weights on each iteration rather than a list of iterations because it allows
+            // us to easily construct the weights s.t. they sum to the original number of MC draws.
+            int[][] bootstrapWeights = new int[N_BOOTSTRAP_REPLICATIONS + 1][router.nMinutes * router.monteCarloDrawsPerMinute];
+
+            Arrays.fill(bootstrapWeights[0], 1); // equal weight to all observations for first sample
+
+            for (int bootstrap = 1; bootstrap < bootstrapWeights.length; bootstrap++) {
+                for (int minute = 0; minute < router.nMinutes; minute++) {
+                    for (int draw = 0; draw < router.monteCarloDrawsPerMinute; draw++) {
+                        int iteration = minute * router.monteCarloDrawsPerMinute + twister.nextInt(router.monteCarloDrawsPerMinute);
+                        bootstrapWeights[bootstrap][iteration]++;
+                    }
+                }
+            }
+
+            // the minimum number of times a destination must be reachable in a single bootstrap sample to be considered
+            // reachable.
+            int minCount = (int) (router.nMinutes * router.monteCarloDrawsPerMinute * (request.travelTimePercentile / 100d));
+
+            // Do propagation of travel times from transit stops to the destinations
+            int offstreetTravelSpeedMillimetersPerSecond = (int) (request.request.getSpeed(accessMode) * 1000);
+            int[] nonTransitTravelTimesToDestinations =
+                    linkedDestinationsDirect.eval(sr::getTravelTimeToVertex, offstreetTravelSpeedMillimetersPerSecond).travelTimes;
+            PerTargetPropagater propagater =
+                    new PerTargetPropagater(timesAtStopsEachIteration, nonTransitTravelTimesToDestinations, linkedDestinationsEgress, request.request, request.cutoffMinutes * 60);
+
+            // store the accessibility results for each bootstrap replication
+            double[] bootstrapReplications = new double[N_BOOTSTRAP_REPLICATIONS + 1];
+
+            // The lambda will be called with a boolean array of whether the target is reachable within the cutoff at each
+            // Monte Carlo draw. These are then bootstrapped to create the sampling distribution.
+            propagater.propagate((target, reachable) -> {
+                int gridx = target % grid.width;
+                int gridy = target / grid.width;
+                double opportunityCountAtTarget = grid.grid[gridx][gridy];
+
+                // as an optimization, don't even bother to compute the sampling distribution at cells that contain no
+                // opportunities.
+                if (opportunityCountAtTarget < 1e-6) return;
+
+                // index the Monte Carlo iterations in which the destination was reached within the travel time cutoff,
+                // so we can skip over the non-reachable ones in bootstrap computations.
+                // this improves computation speed (verified)
+                TIntList reachableInIterationsList = new TIntArrayList();
+
+                for (int i = 0; i < reachable.length; i++) {
+                    if (reachable[i]) reachableInIterationsList.add(i);
+                }
+
+                int[] reachableInIterations = reachableInIterationsList.toArray();
+
+                boolean isAlwaysReachableWithinTravelTimeCutoff =
+                        reachableInIterations.length == timesAtStopsEachIteration.length;
+                boolean isNeverReachableWithinTravelTimeCutoff = reachableInIterations.length == 0;
+
+                // Optimization: only bootstrap if some of the travel times are above the cutoff and some below.
+                // If a destination is always reachable, it will perforce be reachable always in every bootstrap
+                // sample, so there is no need to compute the bootstraps, and similarly if it is never reachable.
+                if (isAlwaysReachableWithinTravelTimeCutoff) {
+                    // this destination is always reachable and will be included in all bootstrap samples, no need to do the
+                    // bootstrapping
+                    // possible optimization: have a variable that persists between calls to this lambda and increment
+                    // that single value, then add that value to each replication at the end; reduces the number of additions.
+                    for (int i = 0; i < bootstrapReplications.length; i++)
+                        bootstrapReplications[i] += grid.grid[gridx][gridy];
+                } else if (isNeverReachableWithinTravelTimeCutoff) {
+                    // do nothing, never reachable, does not impact accessibility
+                } else {
+                    // This origin is sometimes reachable within the time window, do bootstrapping to determine
+                    // the distribution of how often
+                    for (int bootstrap = 0; bootstrap < N_BOOTSTRAP_REPLICATIONS + 1; bootstrap++) {
+                        int count = 0;
+                        for (int iteration : reachableInIterations) {
+                            count += bootstrapWeights[bootstrap][iteration];
+                        }
+
+                        // TODO sigmoidal rolloff here, to avoid artifacts from large destinations that jump a few seconds
+                        // in or out of the cutoff.
+                        if (count > minCount) {
+                            bootstrapReplications[bootstrap] += opportunityCountAtTarget;
+                        }
+                    }
+                }
+            });
+
+            // round (not cast/floor) these all to ints.
+            int[] intReplications = DoubleStream.of(bootstrapReplications).mapToInt(d -> (int) Math.round(d)).toArray();
+            finish(intReplications);
+        }
+    }
+
+    private void finish (int[] samples) throws IOException {
         // now construct the output
         // these things are tiny, no problem storing in memory
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
-        new Origin(request, intReplications).write(baos);
+        new Origin(request, samples).write(baos);
 
         // send this origin to an SQS queue as a binary payload; it will be consumed by GridResultConsumer
         // and GridResultAssembler

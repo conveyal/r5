@@ -327,6 +327,20 @@ public class ProfileRequest implements Serializable, Cloneable {
         throw new IllegalArgumentException("getSpeed(): Invalid mode " + streetMode);
     }
 
+    @JsonIgnore
+    public int getMaxAccessTime (StreetMode mode) {
+        switch (mode) {
+            case CAR:
+                return maxCarTime;
+            case BICYCLE:
+                return maxBikeTime;
+            case WALK:
+                return maxWalkTime;
+            default:
+                throw new IllegalArgumentException("Invalid mode");
+        }
+    }
+
     /**
      *
      * @return true if there is any transitMode in transitModes (Safe to call if transitModes is null)

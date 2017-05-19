@@ -6,6 +6,7 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.GridComputer;
+import com.conveyal.r5.analyst.TravelTimeSurfaceComputer;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.api.util.LegMode;
@@ -249,12 +250,12 @@ public class AnalystWorker implements Runnable {
 
         // Create executors with up to one thread per processor.
         int nP = Runtime.getRuntime().availableProcessors();
-        highPriorityExecutor = new ThreadPoolExecutor(1, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
+        highPriorityExecutor = new ThreadPoolExecutor(nP, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
         highPriorityExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-        batchExecutor = new ThreadPoolExecutor(1, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(nP * 2));
+        batchExecutor = new ThreadPoolExecutor(nP, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(nP * 2));
         batchExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
 
-        taskDeliveryExecutor = new ThreadPoolExecutor(1, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
+        taskDeliveryExecutor = new ThreadPoolExecutor(nP, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
         // can't use CallerRunsPolicy as that would cause deadlocks, calling thread is writing to inputstream
         taskDeliveryExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
 
@@ -404,6 +405,8 @@ public class AnalystWorker implements Runnable {
                 this.handleStaticMetadataRequest((StaticMetadata.MetadataRequest) clusterRequest, transportNetwork, ts);
             } else if (clusterRequest instanceof StaticMetadata.StopTreeRequest) {
                 this.handleStaticStopTrees((StaticMetadata.StopTreeRequest) clusterRequest, transportNetwork, ts);
+            } else if (clusterRequest instanceof TravelTimeSurfaceRequest) {
+                this.handleTravelTimeSurfaceRequest((TravelTimeSurfaceRequest) clusterRequest, transportNetwork, ts);
             } else if (clusterRequest instanceof GridRequest) {
                 this.handleGridRequest((GridRequest) clusterRequest, transportNetwork, ts);
             } else {
@@ -507,6 +510,22 @@ public class AnalystWorker implements Runnable {
             } catch (IOException e) {
                 LOG.error("Error writing static stop trees to broker", e);
             }
+        }
+    }
+
+    /** handle a request for a travel time surface */
+    public void handleTravelTimeSurfaceRequest (TravelTimeSurfaceRequest request, TransportNetwork network, TaskStatistics ts) {
+        TravelTimeSurfaceComputer computer = new TravelTimeSurfaceComputer(request, network);
+        try {
+            PipedInputStream pis = new PipedInputStream();
+            PipedOutputStream pos = new PipedOutputStream(pis);
+
+            finishPriorityTask(request, pis, "application/octet-stream");
+
+            computer.write(pos);
+            pos.close();
+        } catch (IOException e) {
+            LOG.error("Error writing travel time surface to broker", e);
         }
     }
 

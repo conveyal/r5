@@ -133,7 +133,9 @@ public class TravelTimeSurfaceComputer {
 
                 for (int i = 0; i < results.length; i++) {
                     int offset = (int) Math.round((i + 1) * PERCENTILE_STEP / 100d * times.length);
-                    // TODO is floor correct here?
+                    // Int divide will floor; this is correct because value 0 has travel times of up to one minute, etc.
+                    // This means that anything less than a cutoff of (say) 60 minutes (in seconds) will have value 59,
+                    // which is what we want. But maybe this is tying the backend and frontend too closely.
                     results[i] = times[offset] == RaptorWorker.UNREACHED ? RaptorWorker.UNREACHED : times[offset] / 60;
                 }
 

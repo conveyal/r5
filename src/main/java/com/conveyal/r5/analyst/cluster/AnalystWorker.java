@@ -249,13 +249,15 @@ public class AnalystWorker implements Runnable {
     public void run() {
 
         // Create executors with up to one thread per processor.
+        // fix size of highPriorityExecutor to avoid broken pipes when threads are killed off before they are done sending data
+        // (not confirmed if this actually works)
         int nP = Runtime.getRuntime().availableProcessors();
         highPriorityExecutor = new ThreadPoolExecutor(nP, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
         highPriorityExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-        batchExecutor = new ThreadPoolExecutor(nP, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(nP * 2));
+        batchExecutor = new ThreadPoolExecutor(1, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(nP * 2));
         batchExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
 
-        taskDeliveryExecutor = new ThreadPoolExecutor(nP, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
+        taskDeliveryExecutor = new ThreadPoolExecutor(1, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
         // can't use CallerRunsPolicy as that would cause deadlocks, calling thread is writing to inputstream
         taskDeliveryExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
 

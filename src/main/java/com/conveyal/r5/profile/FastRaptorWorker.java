@@ -40,7 +40,6 @@ public class FastRaptorWorker {
 
     /** Minimum wait for boarding to account for schedule variation */
     private static final int MINIMUM_BOARD_WAIT_SEC = 60;
-    public static final int MAX_TRIP_DURATION_SEC = 120 * 60;
     public final int nMinutes;
     public final int monteCarloDrawsPerMinute;
 

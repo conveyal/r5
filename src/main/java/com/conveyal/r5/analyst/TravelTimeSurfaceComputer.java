@@ -92,14 +92,22 @@ public class TravelTimeSurfaceComputer {
             }
         } else {
             // we always walk to egress from transit, but we may have a different access mode.
-            LinkedPointSet linkedDestinationsAccess = destinations.link(network.streetLayer, accessMode); // TODO use directMode? Is that a resource limiting issue?
+            // if the access mode is also walk, the pointset's linkage cache will return two references to the same
+            // linkage below
+            // TODO use directMode? Is that a resource limiting issue?
+            // also gridcomputer uses accessMode to avoid running two street searches
+            LinkedPointSet linkedDestinationsAccess = destinations.link(network.streetLayer, accessMode);
             LinkedPointSet linkedDestinationsEgress = destinations.link(network.streetLayer, StreetMode.WALK);
+
+            if (!request.request.directModes.equals(request.request.accessModes)) {
+                LOG.warn("Disparate direct modes and access modes are not supported in analysis mode.");
+            }
+
             // Perform street search to find transit stops and non-transit times.
             StreetRouter sr = new StreetRouter(network.streetLayer);
             sr.streetMode = accessMode;
             sr.profileRequest = request.request;
-            // not using a time limit as we just use distance / speed to compute travel time
-            sr.distanceLimitMeters = (int) (request.request.getMaxAccessTime(accessMode) * 60 * request.request.getSpeed(accessMode));
+            sr.distanceLimitMeters = 2000; // TODO hardwired same as gridcomputer
             sr.setOrigin(request.request.fromLat, request.request.fromLon);
             sr.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
             sr.route();
@@ -115,7 +123,6 @@ public class TravelTimeSurfaceComputer {
             }
 
             // Create a new Raptor Worker.
-            // Tell it that we want a travel time to each stop by leaving the point set parameter null.
             FastRaptorWorker worker = new FastRaptorWorker(network.transitLayer, request.request, accessTimes);
 
             // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.

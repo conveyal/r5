@@ -147,8 +147,8 @@ public class GridComputer  {
         StreetMode accessMode = LegMode.legModeSetToDominantStreetMode(request.request.accessModes);
         StreetMode directMode = LegMode.legModeSetToDominantStreetMode(request.request.directModes);
 
-        // first, find the access stops
         if (request.request.transitModes.isEmpty()) {
+            // non-transit search
             LinkedPointSet linkedDestinations = destinations.link(network.streetLayer, directMode);
 
             StreetRouter sr = new StreetRouter(network.streetLayer);
@@ -177,14 +177,18 @@ public class GridComputer  {
             LinkedPointSet linkedDestinationsEgress = destinations.link(network.streetLayer, StreetMode.WALK);
             // if the access mode is also walk, the link function will use its cache to return the same linkedpointset
             // NB Should use direct mode but then we'd have to run the street search twice.
+            if (!request.request.directModes.equals(request.request.accessModes)) {
+                LOG.warn("Disparate direct modes and access modes are not supported in analysis mode.");
+            }
             LinkedPointSet linkedDestinationsDirect = destinations.link(network.streetLayer, accessMode);
 
             // Transit search, run the raptor algorithm to get times at each destination for each iteration
             LOG.info("Maximum number of rides: {}", request.request.maxRides);
             LOG.info("Maximum trip duration: {}", request.request.maxTripDurationMinutes);
 
+            // first, find the access stops
             StreetRouter sr = new StreetRouter(network.streetLayer);
-            sr.distanceLimitMeters = 2000;
+            sr.distanceLimitMeters = 2000; // TODO hardwired same as traveltimesurfacecomputer
             sr.streetMode = accessMode;
             sr.profileRequest = request.request;
             sr.setOrigin(request.request.fromLat, request.request.fromLon);

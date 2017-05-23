@@ -21,13 +21,19 @@ import java.io.InputStream;
  */
 public abstract class JsonUtilities {
     public static final ObjectMapper objectMapper = createBaseObjectMapper();
+    public static final ObjectMapper lenientObjectMapper = createBaseObjectMapper();
 
     static {
         // If we receive a JSON object containing a field that we don't recognize, fail. This should catch misspellings.
+        // This is used on the broker which should always use the latest R5 so that fields aren't silently dropped because
+        // the broker does not support them.
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
-    }
 
-    public static final ObjectMapper lenientObjectMapper = createBaseObjectMapper();
+        // On the worker, we want to use an objectmapper that will ignore unknown properties, so that it doesn't crash
+        // when an older worker is connected to a newer broker.
+        // TODO figure out how to warn the user when a user uses features not supported by their worker
+        lenientObjectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    }
 
     private static ObjectMapper createBaseObjectMapper () {
         ObjectMapper objectMapper = new ObjectMapper();

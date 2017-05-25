@@ -769,6 +769,8 @@ public class AnalystWorker implements Runnable {
     public void finishPriorityTask(GenericClusterRequest clusterRequest, InputStream result, String contentType) {
         //CountingInputStream is = new CountingInputStream(result);
 
+        LOG.info("Returning high-priority results for task {}", clusterRequest.taskId);
+
         String url = BROKER_BASE_URL + String.format("/complete/success/%s", clusterRequest.taskId);
         HttpPost httpPost = new HttpPost(url);
 

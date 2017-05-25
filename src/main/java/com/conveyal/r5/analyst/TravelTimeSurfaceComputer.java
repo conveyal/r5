@@ -161,10 +161,14 @@ public class TravelTimeSurfaceComputer {
 
         os.write(output.getBytes());
 
+        LOG.info("Travel time surface written, appending metadata with {} warnings", network.scenarioApplicationWarnings.size());
+
         // Append scenario application warning JSON to result
         ResultMetadata metadata = new ResultMetadata();
         metadata.scenarioApplicationWarnings = network.scenarioApplicationWarnings;
         JsonUtilities.objectMapper.writeValue(os, metadata);
+
+        LOG.info("Done writing");
 
         os.close();
     }

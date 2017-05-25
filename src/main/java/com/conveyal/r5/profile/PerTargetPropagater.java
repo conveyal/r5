@@ -85,7 +85,7 @@ public class PerTargetPropagater {
             if (pointToStopDistanceTable != null) {
                 pointToStopDistanceTable.forEachEntry((stop, distanceMillimeters) -> {
                     for (int iteration = 0; iteration < perIterationResults.length; iteration++) {
-                    final int effectivelyFinalIteration = iteration;
+                        final int effectivelyFinalIteration = iteration;
                         int timeAtStop = travelTimesToStopsEachIteration[effectivelyFinalIteration][stop];
 
                         if (timeAtStop > cutoffSeconds || saveTravelTimes && timeAtStop > perIterationTravelTimes[effectivelyFinalIteration]) return true; // avoid overflow

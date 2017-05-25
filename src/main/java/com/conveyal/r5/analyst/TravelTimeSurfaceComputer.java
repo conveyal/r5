@@ -157,6 +157,8 @@ public class TravelTimeSurfaceComputer {
             });
         }
 
+        LOG.info("Travel time surface of size {}kb complete", output.getBytes().length / 1000);
+
         os.write(output.getBytes());
 
         // Append scenario application warning JSON to result

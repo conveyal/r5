@@ -83,9 +83,9 @@ public class PerTargetPropagater {
             // but still call the reducer below with the non-transit times, because you can walk even where there is no
             // transit
             if (pointToStopDistanceTable != null) {
-                for (int iteration = 0; iteration < perIterationResults.length; iteration++) {
+                pointToStopDistanceTable.forEachEntry((stop, distanceMillimeters) -> {
+                    for (int iteration = 0; iteration < perIterationResults.length; iteration++) {
                     final int effectivelyFinalIteration = iteration;
-                    pointToStopDistanceTable.forEachEntry((stop, distanceMillimeters) -> {
                         int timeAtStop = travelTimesToStopsEachIteration[effectivelyFinalIteration][stop];
 
                         if (timeAtStop > cutoffSeconds || saveTravelTimes && timeAtStop > perIterationTravelTimes[effectivelyFinalIteration]) return true; // avoid overflow
@@ -98,21 +98,14 @@ public class PerTargetPropagater {
                                     perIterationTravelTimes[effectivelyFinalIteration] = timeAtTargetThisStop;
                                     targetEverReached[0] = true;
                                 }
-                                return true; // continue iteration over stops, another stop might provide a faster way to get here
                             } else {
                                 perIterationResults[effectivelyFinalIteration] = true;
                                 targetEverReached[0] = true;
-
-                                // if this target is reached within the travel time cutoff from any stop, we don't need to
-                                // continue propagation since we don't actually care about the travel time, just whether it
-                                // was less than the cutoff.
-                                return false; // stop iteration over stops
                             }
-                        } else {
-                            return true; // continue iteration
                         }
-                    });
-                }
+                    }
+                    return true;
+                });
             }
 
             if (saveTravelTimes) travelTimeReducer.accept(targetIdx, perIterationTravelTimes);

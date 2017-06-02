@@ -1,14 +1,11 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
 
 /**
  * Random-access access grid writer - write arrays into offsets in an access grid format file (3-d array)
@@ -39,23 +36,23 @@ public class AccessGridWriter {
     private BufferAbstraction buffer;
 
     // store as longs so we can use with impunity without fear of overflow
-    private final long zoom, west, north, width, height, nSamples;
+    private final long zoom, west, north, width, height, nValuesPerPixel;
 
-    /** Create a new access grid writer for a width x height x nSamples array. */
-    public AccessGridWriter (int zoom, int west, int north, int width, int height, int nSamples) throws IOException {
-        this(null, zoom, west, north, width, height, nSamples);
+    /** Create a new access grid writer for a width x height x nValuesPerPixel array. */
+    public AccessGridWriter (int zoom, int west, int north, int width, int height, int nValuesPerPixel) throws IOException {
+        this(null, zoom, west, north, width, height, nValuesPerPixel);
     }
 
     /** Create a file-backed AccessGridWriter */
-    public AccessGridWriter (File gridFile, int zoom, int west, int north, int width, int height, int nSamples) throws IOException {
+    public AccessGridWriter (File gridFile, int zoom, int west, int north, int width, int height, int nValuesPerPixel) throws IOException {
         this.zoom = zoom;
         this.west = west;
         this.north = north;
         this.width = width;
         this.height = height;
-        this.nSamples = nSamples;
+        this.nValuesPerPixel = nValuesPerPixel;
 
-        long nBytes = (long) width * height * nSamples * 4 + HEADER_SIZE;
+        long nBytes = (long) width * height * nValuesPerPixel * 4 + HEADER_SIZE;
         this.buffer = new BufferAbstraction(gridFile, nBytes);
 
         buffer.writeString(0, "ACCESSGR");
@@ -65,13 +62,13 @@ public class AccessGridWriter {
         buffer.writeInt(20, north);
         buffer.writeInt(24, width);
         buffer.writeInt(28, height);
-        buffer.writeInt(32, nSamples);
+        buffer.writeInt(32, nValuesPerPixel);
     }
 
     public void writePixel (int x, int y, int[] pixelValues) throws IOException {
-        if (pixelValues.length != nSamples) throw new IllegalArgumentException("Incorrect pixel size!");
+        if (pixelValues.length != nValuesPerPixel) throw new IllegalArgumentException("Incorrect pixel size!");
 
-        long index1d =  (y * width + x) * nSamples * 4 + 36;
+        long index1d =  (y * width + x) * nValuesPerPixel * 4 + 36;
 
         int prev = 0;
         for (int i : pixelValues) {

@@ -144,8 +144,8 @@ public class GridComputer  {
         WebMercatorGridPointSet destinations = pointSetCache.get(grid);
         // TODO recast using egress mode
 
-        StreetMode accessMode = LegMode.legModeSetToDominantStreetMode(request.request.accessModes);
-        StreetMode directMode = LegMode.legModeSetToDominantStreetMode(request.request.directModes);
+        StreetMode accessMode = LegMode.getDominantStreetMode(request.request.accessModes);
+        StreetMode directMode = LegMode.getDominantStreetMode(request.request.directModes);
 
         if (request.request.transitModes.isEmpty()) {
             // non-transit search

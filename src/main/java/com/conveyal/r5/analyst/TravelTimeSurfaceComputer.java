@@ -9,13 +9,11 @@ import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.profile.RaptorWorker;
 import com.conveyal.r5.profile.StreetMode;
-import com.conveyal.r5.publish.StaticComputer;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
-import org.apache.commons.math3.util.FastMath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,13 +24,12 @@ import java.util.Collection;
 import java.util.stream.IntStream;
 
 /**
- * This computes a travel time surface and returns it in access grid format, with one travel time for each minute/MC draw.
+ * This computes a travel time surface and returns it in access grid format, with each pixel of the grid containing
+ * different percentiles of travel time requested by the frontend.
  */
 public class TravelTimeSurfaceComputer {
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeSurfaceComputer.class);
     private static final WebMercatorGridPointSetCache pointSetCache = new WebMercatorGridPointSetCache();
-
-    public static final int PERCENTILE_STEP = 5;
 
     public final TravelTimeSurfaceRequest request;
     public final TransportNetwork network;
@@ -43,16 +40,16 @@ public class TravelTimeSurfaceComputer {
     }
 
     public void write (OutputStream os) throws IOException {
-        StreetMode accessMode = LegMode.legModeSetToDominantStreetMode(request.request.accessModes);
-        StreetMode directMode = LegMode.legModeSetToDominantStreetMode(request.request.directModes);
+        StreetMode accessMode = LegMode.getDominantStreetMode(request.request.accessModes);
+        StreetMode directMode = LegMode.getDominantStreetMode(request.request.directModes);
 
-        int nSamples = 100 / PERCENTILE_STEP - 1;
+        int nPercentiles = request.percentiles.length;
 
         WebMercatorGridPointSet destinations = pointSetCache.get(request.zoom, request.west, request.north, request.width, request.height);
 
         AccessGridWriter output;
         try {
-            output = new AccessGridWriter(request.zoom, request.west, request.north, request.width, request.height, nSamples);
+            output = new AccessGridWriter(request.zoom, request.west, request.north, request.width, request.height, nPercentiles);
         } catch (IOException e) {
             // in memory, should not be able to throw this
             throw new RuntimeException(e);
@@ -82,7 +79,7 @@ public class TravelTimeSurfaceComputer {
                 // the frontend expects percentiles of travel time. There is no variation in nontransit travel time so
                 // just replicate the same number repeatedly. This could be improved, but at least it will compress well.
                 // int divide (floor) used below as well. TODO is this wise?
-                int[] results = IntStream.range(0, nSamples).map(i -> travelTimeMinutes).toArray();
+                int[] results = IntStream.range(0, nPercentiles).map(i -> travelTimeMinutes).toArray();
                 try {
                     output.writePixel(x, y, results);
                 } catch (IOException e) {
@@ -115,6 +112,7 @@ public class TravelTimeSurfaceComputer {
             // Get the travel times to all stops reached in the initial on-street search. Convert distances to speeds.
             int offstreetTravelSpeedMillimetersPerSecond = (int) (request.request.getSpeed(accessMode) * 1000);
 
+            // getReachedStops returns distances, not times, so convert to times in the loop below
             TIntIntMap accessTimes = sr.getReachedStops();
             for (TIntIntIterator it = accessTimes.iterator(); it.hasNext(); ) {
                 it.advance();
@@ -135,11 +133,12 @@ public class TravelTimeSurfaceComputer {
 
             PerTargetPropagater perTargetPropagater = new PerTargetPropagater(transitTravelTimesToStops, nonTransitTravelTimesToDestinations, linkedDestinationsEgress, request.request, 120 * 60);
             perTargetPropagater.propagateTimes((target, times) -> {
+                // sort the times at each target and read off percentiles
                 Arrays.sort(times);
-                int[] results = new int[nSamples];
+                int[] results = new int[nPercentiles];
 
-                for (int i = 0; i < results.length; i++) {
-                    int offset = (int) Math.round((i + 1) * PERCENTILE_STEP / 100d * times.length);
+                for (int i = 0; i < nPercentiles; i++) {
+                    int offset = (int) Math.round(request.percentiles[i] / 100d * times.length);
                     // Int divide will floor; this is correct because value 0 has travel times of up to one minute, etc.
                     // This means that anything less than a cutoff of (say) 60 minutes (in seconds) will have value 59,
                     // which is what we want. But maybe this is tying the backend and frontend too closely.

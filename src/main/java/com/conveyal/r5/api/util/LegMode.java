@@ -16,7 +16,7 @@ public enum  LegMode {
     CAR_PARK;
 
     /** Return the heaviest/fastest StreetMode for use in stop finding */
-    public static StreetMode legModeSetToDominantStreetMode (Set<LegMode> modes) {
+    public static StreetMode getDominantStreetMode(Set<LegMode> modes) {
         if (modes.contains(LegMode.CAR)) return StreetMode.CAR;
         else if (modes.contains(LegMode.BICYCLE)) return StreetMode.BICYCLE;
         else return StreetMode.WALK;

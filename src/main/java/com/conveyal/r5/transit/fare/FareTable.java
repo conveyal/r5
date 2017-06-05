@@ -49,14 +49,17 @@ public class FareTable {
     }
 
     public Fare lookup (String from, String to) {
-        return new Fare(fares.get(new P2<String>(from, to))); // defensive copy, in case the caller discounts
+        return new Fare(fares.get(new P2<>(from, to))); // defensive copy, in case the caller discounts
     }
 
     public Fare lookup (Stop from, Stop to) {
-        //TODO: how does this works WRT different GTFS feeds having Stops with same Ids?
-        return this.ignoreAgencyId
-                ? lookup(from.stopId.split(":")[1], to.stopId.split(":")[1])
-                : lookup(from.stopId, to.stopId);
+        if (this.ignoreAgencyId) {
+            String fromWithoutFeedId = from.stopId.split(":", 2)[1];
+            String toWithoutFeedId = to.stopId.split(":", 2)[1];
+            return lookup(fromWithoutFeedId, toWithoutFeedId);
+        } else {
+            return lookup(from.stopId, to.stopId);
+        }
     }
 
 }

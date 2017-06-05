@@ -906,6 +906,7 @@ public class StreetLayer implements Serializable, Cloneable {
 
     /**
      * Get or create mapping from a global long OSM ID to an internal street vertex ID, creating the vertex as needed.
+     * @return the internal ID for the street vertex that was found or created, or -1 if there was no such OSM node.
      */
     private int getVertexIndexForOsmNode(long osmNodeId) {
         int vertexIndex = vertexIndexForOsmNode.get(osmNodeId);
@@ -913,13 +914,15 @@ public class StreetLayer implements Serializable, Cloneable {
             // Register a new vertex, incrementing the index starting from zero.
             // Store node coordinates for this new street vertex
             Node node = osm.nodes.get(osmNodeId);
-            vertexIndex = vertexStore.addVertex(node.getLat(), node.getLon());
-
-            VertexStore.Vertex v = vertexStore.getCursor(vertexIndex);
-            if (node.hasTag("highway", "traffic_signals"))
-                v.setFlag(VertexStore.VertexFlag.TRAFFIC_SIGNAL);
-
-            vertexIndexForOsmNode.put(osmNodeId, vertexIndex);
+            if (node == null) {
+                LOG.warn("OSM data references an undefined node. This is often the result of extracting a bounding box in Osmosis without the completeWays option.");
+            } else {
+                vertexIndex = vertexStore.addVertex(node.getLat(), node.getLon());
+                VertexStore.Vertex v = vertexStore.getCursor(vertexIndex);
+                if (node.hasTag("highway", "traffic_signals"))
+                    v.setFlag(VertexStore.VertexFlag.TRAFFIC_SIGNAL);
+                vertexIndexForOsmNode.put(osmNodeId, vertexIndex);
+            }
         }
         return vertexIndex;
     }
@@ -965,6 +968,10 @@ public class StreetLayer implements Serializable, Cloneable {
         for (int n = beginIdx; n <= endIdx; n++) {
             long nodeId = way.nodes[n];
             Node node = osm.nodes.get(nodeId);
+            if (node == null) {
+                LOG.warn("Not creating street segment that references an undefined node.");
+                return;
+            }
             envelope.expandToInclude(node.getLon(), node.getLat());
             nodes.add(node);
         }

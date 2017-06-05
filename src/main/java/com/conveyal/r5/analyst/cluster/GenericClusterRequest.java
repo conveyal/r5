@@ -21,7 +21,8 @@ import java.io.Serializable;
         @JsonSubTypes.Type(name = "analyst", value = AnalystClusterRequest.class),
         @JsonSubTypes.Type(name = "grid", value = GridRequest.class),
         @JsonSubTypes.Type(name = "static-metadata", value = StaticMetadata.MetadataRequest.class),
-        @JsonSubTypes.Type(name = "static-stop-trees", value = StaticMetadata.StopTreeRequest.class)
+        @JsonSubTypes.Type(name = "static-stop-trees", value = StaticMetadata.StopTreeRequest.class),
+        @JsonSubTypes.Type(name = "travel-time-surface", value = TravelTimeSurfaceRequest.class)
 })
 public abstract class GenericClusterRequest implements Serializable {
 

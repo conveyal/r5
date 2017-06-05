@@ -24,7 +24,7 @@ public class PerTargetPropagater {
     public final int[][] travelTimesToStopsEachIteration;
 
     /** Times at targets using the street network */
-    public final int[] nonTransferTravelTimesToTargets;
+    public final int[] nonTransitTravelTimesToTargets;
 
     /** The travel time cutoff in this regional analysis */
     public final int cutoffSeconds;
@@ -35,15 +35,16 @@ public class PerTargetPropagater {
     /** the profilerequest (used for walk speed etc.) */
     public final ProfileRequest request;
 
-    public PerTargetPropagater (int[][] travelTimesToStopsEachIteration, int[] nonTransferTravelTimesToTargets, LinkedPointSet targets, ProfileRequest request, int cutoffSeconds) {
+    public PerTargetPropagater (int[][] travelTimesToStopsEachIteration, int[] nonTransitTravelTimesToTargets, LinkedPointSet targets, ProfileRequest request, int cutoffSeconds) {
         this.travelTimesToStopsEachIteration = travelTimesToStopsEachIteration;
-        this.nonTransferTravelTimesToTargets = nonTransferTravelTimesToTargets;
+        this.nonTransitTravelTimesToTargets = nonTransitTravelTimesToTargets;
         this.targets = targets;
         this.request = request;
         this.cutoffSeconds = cutoffSeconds;
     }
 
-    public void propagate (Reducer reducer) {
+    private void propagate (Reducer reducer, TravelTimeReducer travelTimeReducer) {
+        boolean saveTravelTimes = travelTimeReducer != null;
         targets.makePointToStopDistanceTablesIfNeeded();
 
         long startTimeMillis = System.currentTimeMillis();
@@ -53,15 +54,19 @@ public class PerTargetPropagater {
         // than floats.
         int speedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
 
-        for (int targetIdx = 0; targetIdx < targets.size(); targetIdx++) {
-            boolean[] perIterationResults = new boolean[travelTimesToStopsEachIteration.length];
+        boolean[] perIterationResults = new boolean[travelTimesToStopsEachIteration.length];
+        int[] perIterationTravelTimes = saveTravelTimes ? new int[travelTimesToStopsEachIteration.length] : null;
 
+        for (int targetIdx = 0; targetIdx < targets.size(); targetIdx++) {
             // clear previous results, fill with whether target is reached within the cutoff without transit (which does
             // not vary with monte carlo draw)
-            boolean targetReachedWithoutTransit = nonTransferTravelTimesToTargets[targetIdx] < cutoffSeconds;
+            boolean targetReachedWithoutTransit = nonTransitTravelTimesToTargets[targetIdx] < cutoffSeconds;
             Arrays.fill(perIterationResults, targetReachedWithoutTransit);
+            if (saveTravelTimes) {
+                Arrays.fill(perIterationTravelTimes, nonTransitTravelTimesToTargets[targetIdx]);
+            }
 
-            if (targetReachedWithoutTransit) {
+            if (targetReachedWithoutTransit && !saveTravelTimes) {
                 // if the target is reached without transit, there's no need to do any propagation as the array cannot
                 // change
                 reducer.accept(targetIdx, perIterationResults);
@@ -72,37 +77,39 @@ public class PerTargetPropagater {
 
             // all variables used in lambdas must be "effectively final"; arrays are effectively final even if their
             // values change
-            boolean[] targetEverReached = new boolean[] { nonTransferTravelTimesToTargets[targetIdx] <= cutoffSeconds };
+            boolean[] targetEverReached = new boolean[] { nonTransitTravelTimesToTargets[targetIdx] <= cutoffSeconds };
 
             // don't try to propagate transit if there are no nearby transit stops,
             // but still call the reducer below with the non-transit times, because you can walk even where there is no
             // transit
             if (pointToStopDistanceTable != null) {
-                for (int iteration = 0; iteration < perIterationResults.length; iteration++) {
-                    final int effectivelyFinalIteration = iteration;
-                    pointToStopDistanceTable.forEachEntry((stop, distanceMillimeters) -> {
+                pointToStopDistanceTable.forEachEntry((stop, distanceMillimeters) -> {
+                    for (int iteration = 0; iteration < perIterationResults.length; iteration++) {
+                        final int effectivelyFinalIteration = iteration;
                         int timeAtStop = travelTimesToStopsEachIteration[effectivelyFinalIteration][stop];
 
-                        if (timeAtStop > cutoffSeconds) return true; // avoid overflow
+                        if (timeAtStop > cutoffSeconds || saveTravelTimes && timeAtStop > perIterationTravelTimes[effectivelyFinalIteration]) return true; // avoid overflow
 
                         int timeAtTargetThisStop = timeAtStop + distanceMillimeters / speedMillimetersPerSecond;
 
                         if (timeAtTargetThisStop < cutoffSeconds) {
-                            perIterationResults[effectivelyFinalIteration] = true;
-                            targetEverReached[0] = true;
-
-                            // if this target is reached within the travel time cutoff from any stop, we don't need to
-                            // continue propagation since we don't actually care about the travel time, just whether it
-                            // was less than the cutoff.
-                            return false; // stop iteration over stops
-                        } else {
-                            return true; // continue iteration
+                            if (saveTravelTimes) {
+                                if (timeAtTargetThisStop < perIterationTravelTimes[effectivelyFinalIteration]) {
+                                    perIterationTravelTimes[effectivelyFinalIteration] = timeAtTargetThisStop;
+                                    targetEverReached[0] = true;
+                                }
+                            } else {
+                                perIterationResults[effectivelyFinalIteration] = true;
+                                targetEverReached[0] = true;
+                            }
                         }
-                    });
-                }
+                    }
+                    return true;
+                });
             }
 
-            if (targetEverReached[0]) reducer.accept(targetIdx, perIterationResults);
+            if (saveTravelTimes) travelTimeReducer.accept(targetIdx, perIterationTravelTimes);
+            else if (targetEverReached[0]) reducer.accept(targetIdx, perIterationResults);
         }
 
         long totalTimeMillis = System.currentTimeMillis() - startTimeMillis;
@@ -114,7 +121,19 @@ public class PerTargetPropagater {
                 );
     }
 
+    public void propagate (Reducer reducer) {
+        propagate(reducer, null);
+    }
+
+    public void propagateTimes (TravelTimeReducer reducer) {
+        propagate(null, reducer);
+    }
+
     public static interface Reducer {
-        public void accept (int targetIndex, boolean[] travelTimesForTarget);
+        public void accept (int targetIndex, boolean[] targetReachedWithinCutoff);
+    }
+
+    public interface TravelTimeReducer {
+        public void accept (int targetIndex, int[] travelTimesForTargets);
     }
 }

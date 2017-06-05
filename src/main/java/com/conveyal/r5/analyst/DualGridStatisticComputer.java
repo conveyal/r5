@@ -5,7 +5,10 @@ import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.S3Object;
 import com.google.common.io.LittleEndianDataInputStream;
 
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.zip.GZIPInputStream;
 
 /**
@@ -27,8 +30,13 @@ public abstract class DualGridStatisticComputer {
     public Grid computeImprovementProbability (String resultBucket, String regionalAnalysisAKey, String regionalAnalysisBKey) throws IOException {
         S3Object aGrid = s3.getObject(resultBucket, regionalAnalysisAKey);
         S3Object bGrid = s3.getObject(resultBucket, regionalAnalysisBKey);
-        LittleEndianDataInputStream aIn = new LittleEndianDataInputStream(new GZIPInputStream(aGrid.getObjectContent()));
-        LittleEndianDataInputStream bIn = new LittleEndianDataInputStream(new GZIPInputStream(bGrid.getObjectContent()));
+        return computeImprovementProbability(aGrid.getObjectContent(), bGrid.getObjectContent());
+    }
+
+    public Grid computeImprovementProbability(InputStream a, InputStream b) throws IOException {
+        LittleEndianDataInputStream aIn = new LittleEndianDataInputStream(new GZIPInputStream(a));
+        LittleEndianDataInputStream bIn = new LittleEndianDataInputStream(new GZIPInputStream(b));
+
         validateHeaderAndVersion(aIn);
         validateHeaderAndVersion(bIn);
 
@@ -99,4 +107,24 @@ public abstract class DualGridStatisticComputer {
 
     /** Given the origin coordinates and the values from the two grids, compute a value for the output grid */
     protected abstract double computeValuesForOrigin (int x, int y, int[] aValues, int[] bValues);
+
+    public static void main (String... args) throws IOException {
+        DualGridStatisticComputer comp;
+        if ("--two-tailed".equals(args[0])) {
+            comp = new BootstrapPercentileHypothesisTestGridStatisticComputer();
+        } else {
+            throw new RuntimeException("Unknown grid statistic computer " + args[0]);
+        }
+
+        FileInputStream a = new FileInputStream(args[1]);
+        FileInputStream b = new FileInputStream(args[2]);
+        Grid grid = comp.computeImprovementProbability(a, b);
+
+        if (args[3].endsWith(".grid"))
+            grid.write(new FileOutputStream(args[3]));
+        else if (args[3].endsWith(".png"))
+            grid.writePng(new FileOutputStream(args[3]));
+        else if (args[3].endsWith(".tif"))
+            grid.writeGeotiff(new FileOutputStream(args[3]));
+    }
 }

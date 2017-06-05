@@ -15,9 +15,9 @@ import java.util.stream.Collectors;
  */
 public class DCFareCalculator {
 
-    private static final FareTable METRORAIL = new FareTable("fares/dc/metrorail.csv");
-    private static final FareTable MARC = new FareTable("fares/dc/marc.csv");
-    private static final FareTable VRE = new FareTable("fares/dc/vre.csv");
+    private static final FareTable METRORAIL = new FareTable("fares/dc/metrorail.csv", true);
+    private static final FareTable MARC = new FareTable("fares/dc/marc.csv", true);
+    private static final FareTable VRE = new FareTable("fares/dc/vre.csv", true);
 
     private static final String[] metroExpress = { "J7", "J9", "P17", "P19", "W13", "W19", "11Y", "17A", "17B", "17G",
         "17H", "17K", "17L", "17M", "18E", "18G", "18H", "18P", "29E", "29G", "29H", "29X" };
@@ -40,7 +40,6 @@ public class DCFareCalculator {
     private static RideType classify (RouteInfo route) {
         // NOTE the agencyId string of the route's agencyAndId is not the same as the one given by route.getAgency.
         // The former is the same for all routes in the feed. The latter is the true agency of the feed.
-
         String agency = route.agency_id;
         String agency_url = route.agency_url == null ? null : route.agency_url.toString(); // this is used in single-agency feeds so it should work
         String short_name = route.route_short_name;

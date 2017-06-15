@@ -88,7 +88,7 @@ public class PerTargetPropagater {
                         final int effectivelyFinalIteration = iteration;
                         int timeAtStop = travelTimesToStopsEachIteration[effectivelyFinalIteration][stop];
 
-                        if (timeAtStop > cutoffSeconds || saveTravelTimes && timeAtStop > perIterationTravelTimes[effectivelyFinalIteration]) return true; // avoid overflow
+                        if (timeAtStop > cutoffSeconds || saveTravelTimes && timeAtStop > perIterationTravelTimes[effectivelyFinalIteration]) continue; // avoid overflow
 
                         int timeAtTargetThisStop = timeAtStop + distanceMillimeters / speedMillimetersPerSecond;
 

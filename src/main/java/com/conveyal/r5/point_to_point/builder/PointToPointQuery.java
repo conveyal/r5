@@ -10,6 +10,7 @@ import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
+import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import gnu.trove.iterator.TIntIntIterator;
@@ -297,7 +298,7 @@ public class PointToPointQuery {
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
             streetRouter.profileRequest = request;
             if (mode == LegMode.CAR_PARK) {
-                streetRouter = findParkRidePath(request, streetRouter);
+                streetRouter = findParkRidePath(request, streetRouter, transportNetwork.transitLayer);
                 if (streetRouter != null) {
                     accessRouter.put(LegMode.CAR_PARK, streetRouter);
                 } else {
@@ -348,7 +349,7 @@ public class PointToPointQuery {
      * @param streetRouter where profileRequest was already set
      * @return null if path isn't found
      */
-    private StreetRouter findParkRidePath(ProfileRequest request, StreetRouter streetRouter) {
+    public static StreetRouter findParkRidePath(ProfileRequest request, StreetRouter streetRouter, TransitLayer transitLayer) {
         streetRouter.streetMode = StreetMode.CAR;
         streetRouter.timeLimitSeconds = request.maxCarTime * 60;
         streetRouter.flagSearch = VertexStore.VertexFlag.PARK_AND_RIDE;
@@ -359,7 +360,7 @@ public class PointToPointQuery {
             LOG.info("CAR PARK: Found {} car parks", carParks.size());
             ParkRideRouter parkRideRouter = new ParkRideRouter(streetRouter.streetLayer);
             parkRideRouter.profileRequest = request;
-            parkRideRouter.addParks(carParks, transportNetwork.transitLayer);
+            parkRideRouter.addParks(carParks, transitLayer);
             parkRideRouter.previousRouter = streetRouter;
             return parkRideRouter;
             /*StreetRouter walking = new StreetRouter(transportNetwork.streetLayer);

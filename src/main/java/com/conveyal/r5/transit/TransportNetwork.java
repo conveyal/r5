@@ -41,6 +41,12 @@ public class TransportNetwork implements Serializable {
     public TransitLayer transitLayer;
 
     /**
+     * This stores any number of lightweight scenario networks built upon the current base network.
+     * FIXME that sounds like a memory leak, should be a WeighingCache or at least size-limited.
+     */
+    public Map<String, TransportNetwork> scenarios = new HashMap<>();
+
+    /**
      * A grid point set that covers the full extent of this transport network. The PointSet itself then caches linkages
      * to street networks (the baseline street network, or ones with various scenarios applied). If they have been
      * created, this point set and its linkage to the street network are serialized along with the network, which makes

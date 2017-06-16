@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
@@ -48,11 +49,9 @@ public class TransportNetworkCache {
     private final String sourceBucket;
     private final String bucketFolder;
 
-//    String currentNetworkId = null;
-
     private static final int DEFAULT_CACHE_SIZE = 1;
 
-    private final LoadingCache<String, TransportNetwork> cachedNetworks;
+    private final LoadingCache<String, TransportNetwork> cache;
     private final GTFSCache gtfsCache;
     private final OSMCache osmCache;
 
@@ -75,7 +74,7 @@ public class TransportNetworkCache {
         this.cacheDir = cacheDir;
         this.sourceBucket = sourceBucket;
         this.bucketFolder = bucketFolder != null ? bucketFolder.replaceAll("\\/","") : null;
-        this.cachedNetworks = createCache(cacheSize);
+        this.cache = createCache(cacheSize);
         this.gtfsCache = new GTFSCache(sourceBucket, cacheDir);
         this.osmCache = new OSMCache(sourceBucket, cacheDir);
     }
@@ -91,7 +90,7 @@ public class TransportNetworkCache {
     public TransportNetworkCache(GTFSCache gtfsCache, OSMCache osmCache, int cacheSize, String bucketFolder) {
         this.gtfsCache = gtfsCache;
         this.osmCache = osmCache;
-        this.cachedNetworks = createCache(cacheSize);
+        this.cache = createCache(cacheSize);
         this.cacheDir = gtfsCache.cacheDir;
         this.sourceBucket = gtfsCache.bucket;
         // we don't necessarily want to put r5 networks in the gtfsCache bucketFolder
@@ -99,23 +98,14 @@ public class TransportNetworkCache {
         this.bucketFolder = bucketFolder;
     }
 
-    /**
-     * Return the graph for the given unique identifier for graph builder inputs on S3.
-     * If this is the same as the last graph built, just return the pre-built graph.
-     * If not, build the graph from the inputs, fetching them from S3 to the local cache as needed.
-     */
+    /** Convenience method that returns transport network from cache. */
     public synchronized TransportNetwork getNetwork (String networkId) {
-
-        LOG.info("Finding or building a TransportNetwork for ID {} and R5 version {}", networkId, R5Version.version);
-
-        TransportNetwork network = checkCached(networkId);
-        if (network == null) {
-            LOG.info("Cached transport network for id {} and R5 version {} was not found. Building the network from scratch.",
-                    networkId, R5Version.version);
-            network = buildNetwork(networkId);
+        TransportNetwork network;
+        try {
+            network = cache.get(networkId);
+        } catch (Exception e) {
+            return null;
         }
-
-        cachedNetworks.put(networkId, network);
         return network;
     }
 
@@ -135,7 +125,10 @@ public class TransportNetworkCache {
 
         // The following call clears the scenarioNetworkCache if the current base graph changes.
         TransportNetwork baseNetwork = this.getNetwork(networkId);
-        TransportNetwork scenarioNetwork = baseNetwork.scenarios.get(scenarioId);
+        if (baseNetwork.scenarios == null) {
+            baseNetwork.scenarios = new HashMap<>();
+        }
+        TransportNetwork scenarioNetwork =  baseNetwork.scenarios.get(scenarioId);
 
         // DEBUG force scenario re-application
         // scenarioNetwork = null;
@@ -414,7 +407,7 @@ public class TransportNetworkCache {
         return GTFSCache.cleanId(networkId) + ".json";
     }
 
-    private LoadingCache<String, TransportNetwork> createCache(int size) {
+    private LoadingCache createCache(int size) {
         RemovalListener<String, TransportNetwork> removalListener = removalNotification -> {
             String id = removalNotification.getKey();
 
@@ -435,18 +428,38 @@ public class TransportNetworkCache {
                     public TransportNetwork load(Object s) throws Exception {
                         // Thanks, java, for making me use a cast here. If I put generic arguments to new CacheLoader
                         // due to type erasure it can't be sure I'm using types correctly.
-                        return getNetwork((String) s);
+                        return loadNetwork((String) s);
                     }
                 });
     }
 
+    /**
+     * Return the graph for the given unique identifier for graph builder inputs on S3.
+     * If this is the same as the last graph built, just return the pre-built graph.
+     * If not, build the graph from the inputs, fetching them from S3 to the local cache as needed.
+     */
+    private TransportNetwork loadNetwork(String networkId) {
+
+        LOG.info("Finding or building a TransportNetwork for ID {} and R5 version {}", networkId, R5Version.version);
+
+        TransportNetwork network = checkCached(networkId);
+        if (network == null) {
+            LOG.info("Cached transport network for id {} and R5 version {} was not found. Building the network from scratch.",
+                    networkId, R5Version.version);
+            network = buildNetwork(networkId);
+        }
+
+        cache.put(networkId, network);
+        return network;
+    }
+
     public Set<String> getLoadedNetworkIds() {
-        if (cachedNetworks == null) return Collections.emptySet();
-        else return cachedNetworks.asMap().keySet();
+        return cache.asMap().keySet();
     }
 
     public Set<String> getAppliedScenarios() {
-        return cachedNetworks.asMap().values().stream()
+        return cache.asMap().values().stream()
+                .filter(network -> network.scenarios != null)
                 .map(network -> network.scenarios.keySet())
                 .flatMap(Collection::stream)
                 .collect(Collectors.toSet());

@@ -44,7 +44,7 @@ public class TransportNetwork implements Serializable {
      * This stores any number of lightweight scenario networks built upon the current base network.
      * FIXME that sounds like a memory leak, should be a WeighingCache or at least size-limited.
      */
-    public Map<String, TransportNetwork> scenarios = new HashMap<>();
+    public transient Map<String, TransportNetwork> scenarios = new HashMap<>();
 
     /**
      * A grid point set that covers the full extent of this transport network. The PointSet itself then caches linkages

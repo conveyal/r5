@@ -7,6 +7,7 @@ import com.amazonaws.services.sqs.model.SendMessageRequest;
 import com.conveyal.r5.analyst.cluster.GridRequest;
 import com.conveyal.r5.analyst.cluster.Origin;
 import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.profile.StreetMode;
@@ -188,20 +189,32 @@ public class GridComputer  {
 
             // first, find the access stops
             StreetRouter sr = new StreetRouter(network.streetLayer);
-            sr.distanceLimitMeters = 2000; // TODO hardwired same as traveltimesurfacecomputer
-            sr.streetMode = accessMode;
             sr.profileRequest = request.request;
-            sr.setOrigin(request.request.fromLat, request.request.fromLon);
-            sr.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
-            sr.route();
+            if (request.request.accessModes.contains(LegMode.CAR_PARK)) {
+                //Currently first search from origin to P+R is hardcoded as time dominance variable for Max car time seconds
+                //Second search from P+R to stops is not actually a search we just return list of all reached stops for each found P+R.
+                // If multiple P+Rs reach the same stop, only one with shortest time is returned. Stops were searched for during graph building phase.
+                // time to stop is time from CAR streetrouter to stop + CAR PARK time + time to walk to stop based on request walk speed
+                //by default 20 CAR PARKS are found it can be changed with sr.maxVertices variable
+                sr = PointToPointQuery.findParkRidePath(request.request, sr, network.transitLayer);
+            } else {
+                sr.distanceLimitMeters = 2000; // TODO hardwired same as traveltimesurfacecomputer
+                sr.streetMode = accessMode;
+                sr.setOrigin(request.request.fromLat, request.request.fromLon);
+                sr.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+                sr.route();
+            }
 
             TIntIntMap reachedStops = sr.getReachedStops();
 
-            // convert millimeters to seconds
-            int millimetersPerSecond = (int) (request.request.getSpeed(accessMode) * 1000);
-            for (TIntIntIterator it = reachedStops.iterator(); it.hasNext(); ) {
-                it.advance();
-                it.setValue(it.value() / millimetersPerSecond);
+            //Park ride router always returns list of stop indexes and time, regardless of dominance function
+            if (!request.request.accessModes.contains(LegMode.CAR_PARK)) {
+                // convert millimeters to seconds
+                int millimetersPerSecond = (int) (request.request.getSpeed(accessMode) * 1000);
+                for (TIntIntIterator it = reachedStops.iterator(); it.hasNext(); ) {
+                    it.advance();
+                    it.setValue(it.value() / millimetersPerSecond);
+                }
             }
 
             FastRaptorWorker router = new FastRaptorWorker(network.transitLayer, request.request, reachedStops);

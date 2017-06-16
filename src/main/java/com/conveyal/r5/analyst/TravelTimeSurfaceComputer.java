@@ -5,6 +5,7 @@ import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceRequest;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.profile.RaptorWorker;
@@ -102,22 +103,34 @@ public class TravelTimeSurfaceComputer {
 
             // Perform street search to find transit stops and non-transit times.
             StreetRouter sr = new StreetRouter(network.streetLayer);
-            sr.streetMode = accessMode;
             sr.profileRequest = request.request;
-            sr.distanceLimitMeters = 2000; // TODO hardwired same as gridcomputer
-            sr.setOrigin(request.request.fromLat, request.request.fromLon);
-            sr.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
-            sr.route();
+            if (request.request.accessModes.contains(LegMode.CAR_PARK)) {
+                //Currently first search from origin to P+R is hardcoded as time dominance variable for Max car time seconds
+                //Second search from P+R to stops is not actually a search we just return list of all reached stops for each found P+R.
+                // If multiple P+Rs reach the same stop, only one with shortest time is returned. Stops were searched for during graph building phase.
+                // time to stop is time from CAR streetrouter to stop + CAR PARK time + time to walk to stop based on request walk speed
+                //by default 20 CAR PARKS are found it can be changed with sr.maxVertices variable
+                sr = PointToPointQuery.findParkRidePath(request.request, sr, network.transitLayer);
+            } else {
+                sr.streetMode = accessMode;
+                sr.distanceLimitMeters = 2000; // TODO hardwired same as gridcomputer
+                sr.setOrigin(request.request.fromLat, request.request.fromLon);
+                sr.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+                sr.route();
+            }
 
             // Get the travel times to all stops reached in the initial on-street search. Convert distances to speeds.
             int offstreetTravelSpeedMillimetersPerSecond = (int) (request.request.getSpeed(accessMode) * 1000);
 
             // getReachedStops returns distances, not times, so convert to times in the loop below
             TIntIntMap accessTimes = sr.getReachedStops();
-            for (TIntIntIterator it = accessTimes.iterator(); it.hasNext(); ) {
-                it.advance();
-                // TODO how to handle kiss and ride/park and ride? Clearly this is not right.
-                it.setValue(it.value() / offstreetTravelSpeedMillimetersPerSecond);
+
+            if (!request.request.accessModes.contains(LegMode.CAR_PARK)) {
+                for (TIntIntIterator it = accessTimes.iterator(); it.hasNext(); ) {
+                    it.advance();
+                    // TODO how to handle kiss and ride/park and ride? Clearly this is not right.
+                    it.setValue(it.value() / offstreetTravelSpeedMillimetersPerSecond);
+                }
             }
 
             // Create a new Raptor Worker.

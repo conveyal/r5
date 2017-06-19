@@ -520,9 +520,9 @@ public class AnalystWorker implements Runnable {
         TravelTimeSurfaceComputer computer = new TravelTimeSurfaceComputer(request, network);
         try {
             PipedInputStream pis = new PipedInputStream();
-            PipedOutputStream pos = new PipedOutputStream(pis);
+            GZIPOutputStream pos = new GZIPOutputStream(new PipedOutputStream(pis));
 
-            finishPriorityTask(request, pis, "application/octet-stream");
+            finishPriorityTask(request, pis, "application/octet-stream", "gzip");
 
             computer.write(pos);
             pos.close();
@@ -756,17 +756,21 @@ public class AnalystWorker implements Runnable {
         }
     }
 
-    /**
-     * We have two kinds of output from a worker: we can either write to an object in a bucket on S3, or we can stream
-     * output over HTTP to a waiting web service caller. This function handles the latter case. It connects to the
-     * cluster broker, signals that the task with a certain ID is being completed, and posts the result back through the
-     * broker. The broker then passes the result on to the original requester (usually the analysis web UI).
-     *
-     * This function will run the HTTP Post operation in a new thread so that this function can return, allowing its
-     * caller to write data to the input stream it passed in. This arrangement avoids broken pipes that can happen
-     * when the calling thread dies. TODO clarify when and how which thread can die.
-     */
     public void finishPriorityTask(GenericClusterRequest clusterRequest, InputStream result, String contentType) {
+        finishPriorityTask(clusterRequest, result, contentType, null);
+    }
+
+        /**
+         * We have two kinds of output from a worker: we can either write to an object in a bucket on S3, or we can stream
+         * output over HTTP to a waiting web service caller. This function handles the latter case. It connects to the
+         * cluster broker, signals that the task with a certain ID is being completed, and posts the result back through the
+         * broker. The broker then passes the result on to the original requester (usually the analysis web UI).
+         *
+         * This function will run the HTTP Post operation in a new thread so that this function can return, allowing its
+         * caller to write data to the input stream it passed in. This arrangement avoids broken pipes that can happen
+         * when the calling thread dies. TODO clarify when and how which thread can die.
+         */
+    public void finishPriorityTask(GenericClusterRequest clusterRequest, InputStream result, String contentType, String contentEncoding) {
         //CountingInputStream is = new CountingInputStream(result);
 
         LOG.info("Returning high-priority results for task {}", clusterRequest.taskId);
@@ -777,6 +781,7 @@ public class AnalystWorker implements Runnable {
         // TODO reveal any errors etc. that occurred on the worker.
         httpPost.setEntity(new InputStreamEntity(result));
         httpPost.setHeader("Content-Type", contentType);
+        if (contentEncoding != null) httpPost.setHeader("Content-Encoding", contentEncoding);
         taskDeliveryExecutor.execute(() -> {
             try {
                 HttpResponse response = httpClient.execute(httpPost);

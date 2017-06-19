@@ -57,6 +57,14 @@ public class PerTargetPropagater {
         boolean[] perIterationResults = new boolean[travelTimesToStopsEachIteration.length];
         int[] perIterationTravelTimes = saveTravelTimes ? new int[travelTimesToStopsEachIteration.length] : null;
 
+        int[][] invertedTravelTimesToStops = new int[travelTimesToStopsEachIteration[0].length][travelTimesToStopsEachIteration.length];
+
+        for (int iteration = 0; iteration < travelTimesToStopsEachIteration.length; iteration++) {
+            for (int stop = 0; stop < travelTimesToStopsEachIteration[0].length; stop++) {
+                invertedTravelTimesToStops[stop][iteration] = travelTimesToStopsEachIteration[iteration][stop];
+            }
+        }
+
         for (int targetIdx = 0; targetIdx < targets.size(); targetIdx++) {
             // clear previous results, fill with whether target is reached within the cutoff without transit (which does
             // not vary with monte carlo draw)
@@ -85,21 +93,20 @@ public class PerTargetPropagater {
             if (pointToStopDistanceTable != null) {
                 pointToStopDistanceTable.forEachEntry((stop, distanceMillimeters) -> {
                     for (int iteration = 0; iteration < perIterationResults.length; iteration++) {
-                        final int effectivelyFinalIteration = iteration;
-                        int timeAtStop = travelTimesToStopsEachIteration[effectivelyFinalIteration][stop];
+                        int timeAtStop = invertedTravelTimesToStops[stop][iteration];
 
-                        if (timeAtStop > cutoffSeconds || saveTravelTimes && timeAtStop > perIterationTravelTimes[effectivelyFinalIteration]) continue; // avoid overflow
+                        if (timeAtStop > cutoffSeconds || saveTravelTimes && timeAtStop > perIterationTravelTimes[iteration]) continue; // avoid overflow
 
                         int timeAtTargetThisStop = timeAtStop + distanceMillimeters / speedMillimetersPerSecond;
 
                         if (timeAtTargetThisStop < cutoffSeconds) {
                             if (saveTravelTimes) {
-                                if (timeAtTargetThisStop < perIterationTravelTimes[effectivelyFinalIteration]) {
-                                    perIterationTravelTimes[effectivelyFinalIteration] = timeAtTargetThisStop;
+                                if (timeAtTargetThisStop < perIterationTravelTimes[iteration]) {
+                                    perIterationTravelTimes[iteration] = timeAtTargetThisStop;
                                     targetEverReached[0] = true;
                                 }
                             } else {
-                                perIterationResults[effectivelyFinalIteration] = true;
+                                perIterationResults[iteration] = true;
                                 targetEverReached[0] = true;
                             }
                         }

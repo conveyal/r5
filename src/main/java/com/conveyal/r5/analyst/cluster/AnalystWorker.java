@@ -520,6 +520,10 @@ public class AnalystWorker implements Runnable {
         TravelTimeSurfaceComputer computer = new TravelTimeSurfaceComputer(request, network);
         try {
             PipedInputStream pis = new PipedInputStream();
+
+            // gzip the data before sending it to the broker. Compression ratios here are extreme (100x is not uncommon)
+            // so this will help avoid broken pipes, connection reset by peer, buffer overflows, etc. since these types
+            // of errors are more common on large files.
             GZIPOutputStream pos = new GZIPOutputStream(new PipedOutputStream(pis));
 
             finishPriorityTask(request, pis, "application/octet-stream", "gzip");

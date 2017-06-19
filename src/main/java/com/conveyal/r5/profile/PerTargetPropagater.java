@@ -57,6 +57,19 @@ public class PerTargetPropagater {
         boolean[] perIterationResults = new boolean[travelTimesToStopsEachIteration.length];
         int[] perIterationTravelTimes = saveTravelTimes ? new int[travelTimesToStopsEachIteration.length] : null;
 
+        // Invert the travel times to stops array, to provide better memory locality in the tight loop below. Confirmed
+        // that this provides a significant speedup, which makes sense; Java doesn't have true multidimensional arrays
+        // but rather represents int[][] as Object[int[]], which means that each of the arrays "on the inside" is stored
+        // separately in memory and may not be contiguous, also meaning the CPU can't efficiently predict and prefetch
+        // what we need next. When we invert the array, we then have all travel times to a particular stop for all iterations
+        // in a single array. The CPU will only page the data that is relevant for the current target, i.e. the travel
+        // times to nearby stops. Since we are also looping over the targets in a geographic manner (in row-major order),
+        // it is likely the stops relevant to a particular target will already be in memory from the previous target.
+        // This should not increase memory consumption very much as we're only storing the travel times to stops. The
+        // Netherlands has about 70,000 stops, if you do 1,000 iterations to 70,000 stops, the array being duplicated is
+        // only 70,000 * 1000 * 4 bytes per int ~= 267 megabytes. I don't think it will be worthwhile to change the
+        // algorithm to output already-transposed data as that will create other memory locality problems (since the
+        // pathfinding algorithm solves one iteration for all stops simultaneously).
         int[][] invertedTravelTimesToStops = new int[travelTimesToStopsEachIteration[0].length][travelTimesToStopsEachIteration.length];
 
         for (int iteration = 0; iteration < travelTimesToStopsEachIteration.length; iteration++) {

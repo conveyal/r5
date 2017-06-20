@@ -205,6 +205,8 @@ class BrokerHttpHandler extends HttpHandler {
                     // believes to be a reliable work result.
                     suspendedProducerResponse.setStatus(HttpStatus.OK_200);
                     suspendedProducerResponse.setContentType(request.getContentType());
+                    String contentEncoding = request.getHeader("Content-Encoding");
+                    if (contentEncoding != null) suspendedProducerResponse.setHeader("Content-Encoding", contentEncoding);
                 } else {
                     // The worker is providing an error message because it spotted something wrong with the request.
                     suspendedProducerResponse.setStatus(Integer.parseInt(successOrError));

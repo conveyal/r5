@@ -57,6 +57,27 @@ public class PerTargetPropagater {
         boolean[] perIterationResults = new boolean[travelTimesToStopsEachIteration.length];
         int[] perIterationTravelTimes = saveTravelTimes ? new int[travelTimesToStopsEachIteration.length] : null;
 
+        // Invert the travel times to stops array, to provide better memory locality in the tight loop below. Confirmed
+        // that this provides a significant speedup, which makes sense; Java doesn't have true multidimensional arrays
+        // but rather represents int[][] as Object[int[]], which means that each of the arrays "on the inside" is stored
+        // separately in memory and may not be contiguous, also meaning the CPU can't efficiently predict and prefetch
+        // what we need next. When we invert the array, we then have all travel times to a particular stop for all iterations
+        // in a single array. The CPU will only page the data that is relevant for the current target, i.e. the travel
+        // times to nearby stops. Since we are also looping over the targets in a geographic manner (in row-major order),
+        // it is likely the stops relevant to a particular target will already be in memory from the previous target.
+        // This should not increase memory consumption very much as we're only storing the travel times to stops. The
+        // Netherlands has about 70,000 stops, if you do 1,000 iterations to 70,000 stops, the array being duplicated is
+        // only 70,000 * 1000 * 4 bytes per int ~= 267 megabytes. I don't think it will be worthwhile to change the
+        // algorithm to output already-transposed data as that will create other memory locality problems (since the
+        // pathfinding algorithm solves one iteration for all stops simultaneously).
+        int[][] invertedTravelTimesToStops = new int[travelTimesToStopsEachIteration[0].length][travelTimesToStopsEachIteration.length];
+
+        for (int iteration = 0; iteration < travelTimesToStopsEachIteration.length; iteration++) {
+            for (int stop = 0; stop < travelTimesToStopsEachIteration[0].length; stop++) {
+                invertedTravelTimesToStops[stop][iteration] = travelTimesToStopsEachIteration[iteration][stop];
+            }
+        }
+
         for (int targetIdx = 0; targetIdx < targets.size(); targetIdx++) {
             // clear previous results, fill with whether target is reached within the cutoff without transit (which does
             // not vary with monte carlo draw)
@@ -85,21 +106,20 @@ public class PerTargetPropagater {
             if (pointToStopDistanceTable != null) {
                 pointToStopDistanceTable.forEachEntry((stop, distanceMillimeters) -> {
                     for (int iteration = 0; iteration < perIterationResults.length; iteration++) {
-                        final int effectivelyFinalIteration = iteration;
-                        int timeAtStop = travelTimesToStopsEachIteration[effectivelyFinalIteration][stop];
+                        int timeAtStop = invertedTravelTimesToStops[stop][iteration];
 
-                        if (timeAtStop > cutoffSeconds || saveTravelTimes && timeAtStop > perIterationTravelTimes[effectivelyFinalIteration]) return true; // avoid overflow
+                        if (timeAtStop > cutoffSeconds || saveTravelTimes && timeAtStop > perIterationTravelTimes[iteration]) continue; // avoid overflow
 
                         int timeAtTargetThisStop = timeAtStop + distanceMillimeters / speedMillimetersPerSecond;
 
                         if (timeAtTargetThisStop < cutoffSeconds) {
                             if (saveTravelTimes) {
-                                if (timeAtTargetThisStop < perIterationTravelTimes[effectivelyFinalIteration]) {
-                                    perIterationTravelTimes[effectivelyFinalIteration] = timeAtTargetThisStop;
+                                if (timeAtTargetThisStop < perIterationTravelTimes[iteration]) {
+                                    perIterationTravelTimes[iteration] = timeAtTargetThisStop;
                                     targetEverReached[0] = true;
                                 }
                             } else {
-                                perIterationResults[effectivelyFinalIteration] = true;
+                                perIterationResults[iteration] = true;
                                 targetEverReached[0] = true;
                             }
                         }

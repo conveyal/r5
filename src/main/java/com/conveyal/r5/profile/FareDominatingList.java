@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.analyst.fare.GreedyFareCalculator;
 
 import java.util.Collection;
 import java.util.Iterator;

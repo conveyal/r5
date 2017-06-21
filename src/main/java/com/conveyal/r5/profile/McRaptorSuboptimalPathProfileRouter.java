@@ -498,7 +498,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     private void doPropagationToPointSet (int departureTime) {
         int[] timesAtTargetsThisIteration = new int[pointSet.size()];
-        Arrays.fill(timesAtTargetsThisIteration, RaptorWorker.UNREACHED);
+        Arrays.fill(timesAtTargetsThisIteration, FastRaptorWorker.UNREACHED);
 
         for (int stop = 0; stop < network.transitLayer.getStopCount(); stop++) {
             int[] distanceTable = pointSet.stopToPointDistanceTables.get(stop);
@@ -539,7 +539,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         }
 
         for (int i = 0; i < timesAtTargetsThisIteration.length; i++) {
-            if (timesAtTargetsThisIteration[i] != RaptorWorker.UNREACHED) timesAtTargetsThisIteration[i] -= departureTime;
+            if (timesAtTargetsThisIteration[i] != FastRaptorWorker.UNREACHED) timesAtTargetsThisIteration[i] -= departureTime;
         }
 
         timesAtTargetsEachIteration.add(timesAtTargetsThisIteration);

@@ -1,5 +1,16 @@
 package com.conveyal.r5.analyst;
 
+import com.amazonaws.services.s3.AmazonS3;
+import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.model.S3Object;
+import com.google.common.io.LittleEndianDataInputStream;
+
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.zip.GZIPInputStream;
+
 /**
  * Compute p-values that the two regional analysis results differ due to systematic variation (change in transit network,
  * percentile of interest, land use, time window, etc.) rather than due to random variation from the Monte Carlo search
@@ -22,10 +33,106 @@ package com.conveyal.r5.analyst;
  *
  * References
  * Efron, B., & Tibshirani, R. J. (1993). An Introduction to the Bootstrap. Boca Raton, FL: Chapman and Hall/CRC.
+ *
+ * This class is not referenced within the R5 library, but is used by the Analysis frontend.
  */
-public class BootstrapPercentileHypothesisTestGridStatisticComputer extends DualGridStatisticComputer {
-    @Override
-    protected double computeValuesForOrigin(int x, int y, int[] aValues, int[] bValues) {
+public abstract class BootstrapPercentileMethodHypothesisTestGridReducer {
+    private static final AmazonS3 s3 = new AmazonS3Client();
+    /** Version of the access grid format we read */
+    private static final int ACCESS_GRID_VERSION = 0;
+
+    /**
+     * Calculate the probability at each origin that a random individual sample from regional analysis B is larger than one from regional
+     * analysis A. We do this empirically and exhaustively by for each origin looping over every possible combination of
+     * samples and taking a difference, then evaluating the number that yielded results greater than zero.
+     *
+     * The regional analysis access grids must be of identical size and zoom level, and a Grid object (the same as is used
+     * for destination grids) will be returned, with probabilities scaled from 0 to 100,000.
+     *
+     * This function is called from the Analysis front end, not called within R5 library.
+     */
+    public Grid computeImprovementProbability (String resultBucket, String regionalAnalysisAKey, String regionalAnalysisBKey) throws IOException {
+        S3Object aGrid = s3.getObject(resultBucket, regionalAnalysisAKey);
+        S3Object bGrid = s3.getObject(resultBucket, regionalAnalysisBKey);
+        return computeImprovementProbability(aGrid.getObjectContent(), bGrid.getObjectContent());
+    }
+
+    public Grid computeImprovementProbability(InputStream a, InputStream b) throws IOException {
+        LittleEndianDataInputStream aIn = new LittleEndianDataInputStream(new GZIPInputStream(a));
+        LittleEndianDataInputStream bIn = new LittleEndianDataInputStream(new GZIPInputStream(b));
+
+        validateHeaderAndVersion(aIn);
+        validateHeaderAndVersion(bIn);
+
+        int aZoom = aIn.readInt();
+        int aWest = aIn.readInt();
+        int aNorth = aIn.readInt();
+        int aWidth = aIn.readInt();
+        int aHeight = aIn.readInt();
+
+        int bZoom = bIn.readInt();
+        int bWest = bIn.readInt();
+        int bNorth = bIn.readInt();
+        int bWidth = bIn.readInt();
+        int bHeight = bIn.readInt();
+
+        if (aZoom != bZoom ||
+                aWest != bWest ||
+                aNorth != bNorth ||
+                aWidth != bWidth ||
+                aHeight != bHeight) {
+            throw new IllegalArgumentException("Grid sizes for comparison must be identical!");
+        }
+
+        // number of iterations need not be equal, the computed probability is still valid even if they are not
+        // as the probability of choosing any particular sample is still uniform within each scenario.
+        int aIterations = aIn.readInt();
+        int bIterations = bIn.readInt();
+
+        Grid out = new Grid(aZoom, aWidth, aHeight, aNorth, aWest);
+
+        // pixels are in row-major order, iterate over y on outside
+        for (int y = 0; y < aHeight; y++) {
+            for (int x = 0; x < aWidth; x++) {
+                int[] aValues = new int[aIterations];
+                int[] bValues = new int[bIterations];
+
+                for (int iteration = 0, val = 0; iteration < aIterations; iteration++) {
+                    aValues[iteration] = (val += aIn.readInt());
+                }
+
+                for (int iteration = 0, val = 0; iteration < bIterations; iteration++) {
+                    bValues[iteration] = (val += bIn.readInt());
+                }
+
+                out.grid[x][y] = computeValuesForOrigin(aValues, bValues);
+            }
+        }
+
+        return out;
+    }
+
+    private static void validateHeaderAndVersion(LittleEndianDataInputStream input) throws IOException {
+        char[] header = new char[8];
+        for (int i = 0; i < 8; i++) {
+            header[i] = (char) input.readByte();
+        }
+
+        if (!"ACCESSGR".equals(new String(header))) {
+            throw new IllegalArgumentException("Input not in access grid format!");
+        }
+
+        int version = input.readInt();
+
+        if (version != ACCESS_GRID_VERSION) {
+            throw new IllegalArgumentException(String.format("Version mismatch of access grids, expected %s, found %s", ACCESS_GRID_VERSION, version));
+        }
+    }
+
+    /**
+     * Given the origin coordinates and the values from the two grids, compute a value for the output grid.
+     */
+    protected double computeValuesForOrigin(int[] aValues, int[] bValues) {
         // compute the value
         int nBelowZero = 0;
         int nZero = 0;
@@ -57,7 +164,7 @@ public class BootstrapPercentileHypothesisTestGridStatisticComputer extends Dual
         // if the point estimate was less than zero, assume the confidence interval is less than zero
         // This could be wrong if the accessibility does not lie on the same side of zero as the majority of the density.
         // TODO Efron and Tibshirani don't really discuss how to handle that case, and in particular don't discuss two-
-        // tailed tests at all. 
+        // tailed tests at all.
         if (pointEstimate < 0) {
             // compute the density that lies at or above zero. We have changed the technique slightly from what is
             // described in Efron and Tibshirani 1993 to explicitly handle values that are exactly 0 (important because
@@ -82,4 +189,5 @@ public class BootstrapPercentileHypothesisTestGridStatisticComputer extends Dual
         // change (i.e. the p-value). Invert the values (i.e. replace p with alpha)
         return (1 - pVal) * 1e5;
     }
+
 }

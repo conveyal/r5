@@ -2,7 +2,6 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
-import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.analyst.scenario.Scenario;
@@ -11,7 +10,7 @@ import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.util.ExpandingMMFBytez;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
-import com.conveyal.r5.profile.GreedyFareCalculator;
+import com.conveyal.r5.analyst.fare.GreedyFareCalculator;
 import com.conveyal.r5.profile.StreetMode;
 import com.google.common.io.Files;
 import com.vividsolutions.jts.geom.Envelope;

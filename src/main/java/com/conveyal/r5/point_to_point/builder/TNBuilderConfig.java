@@ -1,6 +1,6 @@
 package com.conveyal.r5.point_to_point.builder;
 
-import com.conveyal.r5.profile.GreedyFareCalculator;
+import com.conveyal.r5.analyst.fare.GreedyFareCalculator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;

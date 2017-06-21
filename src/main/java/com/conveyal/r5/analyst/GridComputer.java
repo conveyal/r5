@@ -100,7 +100,7 @@ import java.util.stream.DoubleStream;
  *   Uncertainty in Public Transport Sketch Planning," paper presented at the 2017 World Symposium of Transport and Land
  *   Use Research, Brisbane, Queensland, Australia, Jul 3-6.
  *
- * The results are placed on an Amazon SQS queue for collation by a GridResultConsumer and a GridResultAssembler.
+ * The results are placed on an Amazon SQS queue for collation by a GridResultQueueConsumer and a GridResultAssembler.
  */
 public class GridComputer  {
     private static final Logger LOG = LoggerFactory.getLogger(GridComputer.class);
@@ -312,7 +312,7 @@ public class GridComputer  {
 
         new Origin(request, samples).write(baos);
 
-        // send this origin to an SQS queue as a binary payload; it will be consumed by GridResultConsumer
+        // send this origin to an SQS queue as a binary payload; it will be consumed by GridResultQueueConsumer
         // and GridResultAssembler
         SendMessageRequest smr = new SendMessageRequest(request.outputQueue, base64.encodeToString(baos.toByteArray()));
         smr = smr.addMessageAttributesEntry("jobId", new MessageAttributeValue().withDataType("String").withStringValue(request.jobId));

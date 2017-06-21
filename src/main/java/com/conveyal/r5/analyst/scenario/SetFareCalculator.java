@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.r5.profile.GreedyFareCalculator;
+import com.conveyal.r5.analyst.fare.GreedyFareCalculator;
 import com.conveyal.r5.transit.TransportNetwork;
 
 /**

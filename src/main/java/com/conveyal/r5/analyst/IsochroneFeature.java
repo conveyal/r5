@@ -20,12 +20,13 @@ import java.util.stream.Collectors;
 
 /**
  * This is similar to the IsochroneData class in OTP, and in fact for compatibility can be serialized to JSON and
- * deserialized as such. However the code is entirely new.
+ * deserialized as such. However it uses a completely different algorithm.
+ *
+ * Although we have another separate implementaion of the marching squares contour line algorithm in Javascript,
+ * we're holding on to this one in case we need an R5 server to generate vector isochrones itself.
  */
 public class IsochroneFeature implements Serializable {
     private static final Logger LOG = LoggerFactory.getLogger(IsochroneFeature.class);
-
-    public static final Geometry EMPTY_POLYGON = GeometryUtils.geometryFactory.createPolygon(new Coordinate[0]);
 
     private static final long serialVersionUID = 1L;
 
@@ -34,10 +35,6 @@ public class IsochroneFeature implements Serializable {
 
     /** The minimum ring size (to get rid of small rings). Should be at least 4 to ensure all rings are valid */
     public static final int MIN_RING_SIZE = 12;
-
-    // scale factor for the grid. Making this a power of 2 will theoretically make the algorithm fast as the averaging
-    // is just a bit shift (but who knows what the JVM will decide to optimize)
-    public static final int SCALE_FACTOR = 4;
 
     public MultiPolygon geometry;
     public int cutoffSec;
@@ -49,18 +46,6 @@ public class IsochroneFeature implements Serializable {
      * https://en.wikipedia.org/wiki/Marching_squares
      */
     public IsochroneFeature (int cutoffSec, WebMercatorGridPointSet points, int[] times) {
-        /*try {
-            FileWriter w = new FileWriter(new File("times" + cutoffSec + ".txt"));
-            for (int y = 0, pixel = 0; y < points.height; y++) {
-                for (int x = 0; x < points.width; x++, pixel++) {
-                    w.write(times[pixel] < cutoffSec ? "XX" : "  ");
-                }
-                w.write("\n");
-            }
-        } catch (Exception e) {
-            LOG.error("could not dump times", e);
-        }*/
-
         // slightly hacky, but simple: set all of the times around the edges of the pointset to MAX_VALUE so that
         // the isochrone never runs off the edge of the display.
         // first, protective copy
@@ -99,12 +84,6 @@ public class IsochroneFeature implements Serializable {
                 contour[x][y] = idx;
             }
         }
-
-        /*try {
-            dumpContourGrid(contour, "contour" + cutoffSec + ".txt");
-        } catch (Exception e) {
-            LOG.error("Could not dump contour grid", e);
-        }*/
 
         // create a geometry. For now not doing linear interpolation. Find a cell a line crosses through and
         // follow that line.
@@ -341,34 +320,6 @@ public class IsochroneFeature implements Serializable {
             LOG.warn("Found no fitting shell for isochrone hole {} at cutoff {}, dropping this hole.", holeIdx, cutoffSec);
         }
 
-        /*
-        try {
-            FileWriter w = new FileWriter("debug" + cutoffSec + ".tsv");
-            w.write("outer\tidx\twkt\n");
-
-            WKTWriter wkt = new WKTWriter();
-
-            for (Polygon ring : polygonsForOuterRing.values()) {
-                w.write("true\t-1\t");
-                w.write(wkt.write(ring));
-                w.write("\n");
-            }
-
-            int hidx = 0;
-            for (Polygon ring : polygonsForInnerRing.values()) {
-                w.write("false\t");
-                w.write(hidx++ + "\t");
-                w.write(wkt.write(ring));
-                w.write("\n");
-            }
-
-            w.close();
-        } catch (Exception e) {
-            LOG.error("error saving debug geometry", e);
-        }
-        */
-
-
         Polygon[] polygons = outerRings.stream().map(shell -> {
             Collection<LinearRing> holes = holesForRing.get(shell);
             return GeometryUtils.geometryFactory.createPolygon(shell, holes.toArray(new LinearRing[holes.size()]));
@@ -380,6 +331,9 @@ public class IsochroneFeature implements Serializable {
         LOG.debug("Done.");
     }
 
+    /**
+     * Debug code to draw an ascii-art isochrone.
+     */
     public void dumpContourGrid (byte[][] contour, String out) throws Exception {
         FileWriter sb = new FileWriter(new File(out));
         for (int y = 0; y < contour[0].length; y++) {

@@ -1,5 +1,6 @@
-package com.conveyal.r5.profile;
+package com.conveyal.r5.analyst.fare;
 
+import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
 import com.conveyal.r5.transit.TransitLayer;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;

@@ -1,14 +1,10 @@
 package com.conveyal.r5.point_to_point;
 
-import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
-import com.conveyal.r5.analyst.cluster.ResultEnvelope;
-import com.conveyal.r5.analyst.cluster.TaskStatistics;
 import com.conveyal.r5.api.GraphQlRequest;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.api.util.Stop;
-import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.common.GeoJsonFeature;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.common.JsonUtilities;
@@ -17,7 +13,6 @@ import com.conveyal.r5.point_to_point.builder.RouterInfo;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetPath;
-import com.conveyal.r5.profile.RepeatedRaptorProfileRouter;
 import com.conveyal.r5.streets.*;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.core.JsonParseException;
@@ -35,7 +30,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.time.LocalDate;
 
 import java.io.File;
 
@@ -585,79 +579,6 @@ public class PointToPointRouterServer {
             featureCollection.put("features", features);
 
             return featureCollection;
-        }, JsonUtilities.objectMapper::writeValueAsString);
-
-        get("/calculateIsochrones", (request, response) -> {
-            LOG.info("/calculateIsochrones");
-            response.header("Content-Type", "application/json");
-
-            Map<String, Object> content = new HashMap<>(2);
-
-            if (transportNetwork.linkedGridPointSet == null) {
-                content.put("error", "point set not calculated.  Did you mean to run with isochrone option?");
-                return content;
-            }
-
-            Float fromLat = request.queryMap("fromLat").floatValue();
-            Float fromLon = request.queryMap("fromLon").floatValue();
-            boolean returnDistinctArea = false;
-            if (request.queryMap("returnDistinctAreas").hasValue()) {
-                returnDistinctArea = request.queryMap("returnDistinctAreas").booleanValue();
-            }
-            boolean finalReturnDistinctArea = returnDistinctArea;
-
-            List<String> modes = Arrays.asList("CAR", "WALK", "BICYCLE", "TRANSIT");
-
-            Map<String, Object> modeMap = new HashMap<>();
-
-            modes.forEach(mode -> {
-                LOG.info("calculating isochrone for: " + mode);
-                ResultEnvelope result = calculateIsochrone(transportNetwork, fromLat, fromLon, mode);
-
-                LOG.info("writing geojson");
-                Map<String, Object> featureCollection = new HashMap<>(2);
-                featureCollection.put("type", "FeatureCollection");
-                List<GeoJsonFeature> features = result.avgCase.generateGeoJSONFeatures(finalReturnDistinctArea);
-
-                LOG.info(mode, "Num features:{}", features.size());
-                featureCollection.put("features", features);
-                modeMap.put(mode, featureCollection);
-            });
-
-            content.put("data", modeMap);
-
-            return content;
-        }, JsonUtilities.objectMapper::writeValueAsString);
-
-        get("/isochrone", (request, response) -> {
-            response.header("Content-Type", "application/json");
-
-            Map<String, Object> content = new HashMap<>(2);
-
-            if (transportNetwork.linkedGridPointSet == null) {
-                content.put("error", "point set not calculated.  Did you mean to run with isochrone option?");
-                return content;
-            }
-
-            Float fromLat = request.queryMap("fromLat").floatValue();
-            Float fromLon = request.queryMap("fromLon").floatValue();
-            String queryMode = request.queryParams("mode");
-            boolean returnDistinctArea = false;
-            if (request.queryMap("returnDistinctAreas").hasValue()) {
-                returnDistinctArea = request.queryMap("returnDistinctAreas").booleanValue();
-            }
-
-            ResultEnvelope result = calculateIsochrone(transportNetwork, fromLat, fromLon, queryMode);
-
-            Map<String, Object> featureCollection = new HashMap<>(2);
-            featureCollection.put("type", "FeatureCollection");
-            List<GeoJsonFeature> features = result.avgCase.generateGeoJSONFeatures(returnDistinctArea);
-
-            LOG.info("Num features:{}", features.size());
-            featureCollection.put("features", features);
-            content.put("data", featureCollection);
-
-            return content;
         }, JsonUtilities.objectMapper::writeValueAsString);
 
         get("debug/turns", (request, response) -> {
@@ -1293,54 +1214,4 @@ public class PointToPointRouterServer {
         return Math.round(speed * 1000) / 1000;
     }
 
-    /**
-     * Calcuate the isochrone on a particular transportNetwork at a given lat/lon for a given mode
-     *
-     * @param transportNetwork  A transportation network.  Must have the linkedGridPointSet initialised.
-     * @param fromLat           The latitude
-     * @param fromLon           The longitude
-     * @param queryMode         must be a valid mode
-     * @return                  the resulting ResultEnvelope
-     */
-    private static ResultEnvelope calculateIsochrone(TransportNetwork transportNetwork,
-                                                     float fromLat,
-                                                     float fromLon,
-                                                     String queryMode) {
-
-        AnalystClusterRequest clusterRequest = new AnalystClusterRequest();
-        ProfileRequest profileRequest = new ProfileRequest();
-
-        profileRequest.zoneId = transportNetwork.getTimeZone();
-        profileRequest.fromLat = fromLat;
-        profileRequest.fromLon = fromLon;
-        profileRequest.date = LocalDate.now();
-        profileRequest.fromTime = 7 * 3600;
-        profileRequest.toTime = 9 * 3600;
-        if (queryMode.equals("TRANSIT")) {
-            profileRequest.transitModes = EnumSet.of(TransitModes.TRANSIT);
-            profileRequest.accessModes = EnumSet.of(LegMode.WALK);
-            profileRequest.egressModes = EnumSet.of(LegMode.WALK);
-        } else {
-            profileRequest.directModes = EnumSet.of(LegMode.valueOf(queryMode));
-        }
-        profileRequest.streetTime = 120;
-        profileRequest.maxBikeTime = 120;
-        profileRequest.maxWalkTime = 120;
-        profileRequest.maxCarTime = 120;
-
-        clusterRequest.profileRequest = profileRequest;
-
-        LinkedPointSet targets = transportNetwork.linkedGridPointSet;
-
-        if (clusterRequest.profileRequest.directModes != null && clusterRequest.profileRequest.directModes.contains(LegMode.CAR)) {
-            targets = targets.pointSet.link(transportNetwork.streetLayer, StreetMode.CAR);
-        }
-
-        StreetMode mode = StreetMode.WALK;
-        RepeatedRaptorProfileRouter router = new RepeatedRaptorProfileRouter(transportNetwork,
-            clusterRequest,
-            targets,
-            new TaskStatistics());
-        return router.route();
-    }
 }

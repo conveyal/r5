@@ -1,4 +1,4 @@
 /**
- * This is a new replacement transit layer implementation.
+ * Classes for the transit layer of an R5 TransportNetwork.
  */
 package com.conveyal.r5.transit;

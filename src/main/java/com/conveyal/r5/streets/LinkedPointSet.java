@@ -73,7 +73,10 @@ public class LinkedPointSet implements Serializable {
 
     /**
      * For each pointset point, the stops reachable without using transit, as a map from StopID to distance in millimeters.
-     * Inverted version of stopToPointDistanceTables.
+     * Inverted version of stopToPointDistanceTables. This is used in PerTargetPropagator to find all the stops near
+     * a particular point (grid cell) so we can perform propagation to that grid cell only. We only retain a few
+     * percentiles of travel time at each target cell, so doing one cell at a time allows us to keep the output size
+     * within reason.
      */
     public transient List<TIntIntMap> pointToStopDistanceTables;
 

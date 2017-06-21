@@ -3,12 +3,11 @@ package com.conveyal.r5.api;
 import com.conveyal.r5.api.util.*;
 import com.conveyal.r5.profile.*;
 import com.conveyal.r5.streets.StreetRouter;
-import com.conveyal.r5.transit.DCFareCalculator;
+import com.conveyal.r5.transit.fare.DCFareCalculator;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
-import gnu.trove.map.TIntObjectMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

@@ -31,8 +31,24 @@ import java.util.stream.Stream;
  *   http://research.microsoft.com/pubs/156567/raptor_alenex.pdf.
  *
  * There is currently no support for saving paths.
+ *
+ * This class originated as a rewrite of our RAPTOR code that would use "thin workers", allowing computation by a
+ * generic function-execution service like AWS Lambda. The gains in efficiency were significant enough that this is now
+ * the way we do all analysis work. This system also accounts for pure-frequency routes by using Monte Carlo methods
+ * (generating randomized schedules).
  */
 public class FastRaptorWorker {
+
+    /**
+     * This value essentially serves as Infinity for ints - it's bigger than every other number.
+     * It is the travel time to a transit stop or a target before that stop or target is ever reached.
+     * Be careful when propagating travel times from stops to targets, adding something to UNREACHED will cause overflow.
+     */
+    public static final int UNREACHED = Integer.MAX_VALUE;
+
+    /** Minimum slack time to board transit in seconds. */
+    public static final int BOARD_SLACK_SECONDS = 60;
+
     private static final Logger LOG = LoggerFactory.getLogger(FastRaptorWorker.class);
 
     /** Step for departure times */
@@ -144,7 +160,7 @@ public class FastRaptorWorker {
             for (int[] resultsForIteration : resultsForMinute) {
                 // NB this copies the array, so we don't have issues with it being updated later
                 results[currentIteration++] = IntStream.of(resultsForIteration)
-                        .map(r -> r != RaptorWorker.UNREACHED ? r - finalDepartureTime : r)
+                        .map(r -> r != UNREACHED ? r - finalDepartureTime : r)
                         .toArray();
             }
         }

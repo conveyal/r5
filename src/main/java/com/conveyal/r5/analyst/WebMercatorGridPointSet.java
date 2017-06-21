@@ -14,7 +14,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * A linked pointset that represents a web mercator grid laid over the graph.
+ * A pointset that represents a grid of pixels from the web mercator projection.
  */
 public class WebMercatorGridPointSet extends PointSet implements Serializable {
 

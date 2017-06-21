@@ -9,11 +9,8 @@ import com.conveyal.r5.analyst.GridComputer;
 import com.conveyal.r5.analyst.TravelTimeSurfaceComputer;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
-import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
-import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
-import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.publish.StaticComputer;
 import com.conveyal.r5.publish.StaticDataStore;
 import com.conveyal.r5.publish.StaticMetadata;
@@ -21,7 +18,6 @@ import com.conveyal.r5.publish.StaticSiteRequest;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.google.common.io.ByteStreams;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -33,9 +29,6 @@ import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
-import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.profile.RepeatedRaptorProfileRouter;
-import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
 import org.eclipse.jetty.http.HttpStatus;
@@ -54,17 +47,18 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * This is an exact copy of the AnalystWorker in the OTP repository that's been modified to work with (new)
- * TransitNetworks instead of (old) OTP Graphs.
- * We can afford the maintainability nightmare of duplicating so much code because this is intended to completely
- * replace the old class sooner than later.
- * We don't need to wait for point-to-point routing and detailed walking directions etc. to be available on the new
- * TransitNetwork code to do analysis work with it.
+ * This is a main class run by worker machines in our Analysis computation cluster.
+ * It polls a broker requesting work over HTTP, telling the broker what networks and scenarios it has loaded.
+ * When it receives some work from the broker it does the necessary work and returns the results back to the front
+ * end via the broker.
+ *
+ * The worker can poll for work over two different channels. One is for large asynchronous batch jobs, the other is
+ * intended for interactive single point requests that should return as fast as possible.
  */
 public class AnalystWorker implements Runnable {
 
     /**
-     * worker ID - just a random ID so we can differentiate machines used for computation.
+     * Worker ID - just a random ID so we can differentiate machines used for computation.
      * Useful to isolate the logs from a particular machine, as well as to evaluate any
      * variation in performance coming from variation in the performance of the underlying
      * VMs.
@@ -83,7 +77,7 @@ public class AnalystWorker implements Runnable {
 
     public static final String WORKER_ID_HEADER = "X-Worker-Id";
 
-    public static final int POLL_TIMEOUT = 10 * 1000;
+    public static final int POLL_TIMEOUT = 10 * 1000; // TODO add units (milliseconds)
 
     /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
     final TransportNetworkCache transportNetworkCache;
@@ -102,9 +96,6 @@ public class AnalystWorker implements Runnable {
     public final boolean autoShutdown;
 
     public static final Random random = new Random();
-
-    /** Records extra (meta-)data that is not essential to the calculation, such as speed and other performance info. */
-    private TaskStatisticsStore taskStatisticsStore;
 
     /** is there currently a channel open to the broker to receive single point jobs? */
     private volatile boolean sideChannelOpen = false;
@@ -183,15 +174,6 @@ public class AnalystWorker implements Runnable {
         workOffline = Boolean.parseBoolean(config.getProperty("work-offline", "false"));
         if (workOffline) {
             LOG.info("Working offline. Avoiding internet connections and hosted services.");
-        }
-
-        // Set up the stats store.
-        String statsQueue = config.getProperty("statistics-queue");
-        if (workOffline || statsQueue == null) {
-            // A stats store that does nothing.
-            this.taskStatisticsStore = s -> { };
-        } else {
-            this.taskStatisticsStore = new SQSTaskStatisticsStore(statsQueue);
         }
 
         String addr = config.getProperty("broker-address");
@@ -365,13 +347,6 @@ public class AnalystWorker implements Runnable {
         try {
             long startTime = System.currentTimeMillis();
             LOG.info("Handling message {}", clusterRequest.toString());
-
-            TaskStatistics ts = new TaskStatistics();
-            ts.graphId = clusterRequest.graphId;
-            ts.awsInstanceType = ec2info.instanceType;
-            ts.jobId = clusterRequest.jobId;
-            ts.workerId = machineId;
-
             long graphStartTime = System.currentTimeMillis();
             // Get the graph object for the ID given in the request, fetching inputs and building as needed.
             // All requests handled together are for the same graph, and this call is synchronized so the graph will
@@ -384,12 +359,6 @@ public class AnalystWorker implements Runnable {
             try {
                 // FIXME ideally we should just be passing the scenario object into this function, and another separate function should get the scenario object from the cluster request.
                 transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, clusterRequest.extractProfileRequest());
-                // FIXME this stats stuff needs to be moved to where the graph is actually built, or fetch the graph out here.
-                ts.graphBuild = (int) (System.currentTimeMillis() - graphStartTime);
-                // FIXME this is causing the transportNetwork to be fetched twice, once here and once in handleAnalystRequest.
-                // TODO lazy-initialize all additional indexes on transitLayer
-                // ts.graphTripCount = transportNetwork.transitLayer...
-                ts.graphStopCount = transportNetwork.transitLayer.getStopCount();
             } catch (ScenarioApplicationException scenarioException) {
                 // Handle exceptions specifically representing a failure to apply the scenario.
                 // These exceptions can be turned into structured JSON.
@@ -398,25 +367,14 @@ public class AnalystWorker implements Runnable {
                 reportTaskErrors(clusterRequest.taskId, HttpStatus.BAD_REQUEST_400, scenarioException.taskErrors);
                 return;
             }
-            // FIXME manually coded polymorphism
-            if (clusterRequest instanceof AnalystClusterRequest) {
-                this.handleAnalystRequest((AnalystClusterRequest) clusterRequest, ts);
-            } else if (clusterRequest instanceof StaticSiteRequest.PointRequest) {
-                this.handleStaticSiteRequest((StaticSiteRequest.PointRequest) clusterRequest, transportNetwork, ts);
-            } else if (clusterRequest instanceof StaticMetadata.MetadataRequest) {
-                this.handleStaticMetadataRequest((StaticMetadata.MetadataRequest) clusterRequest, transportNetwork, ts);
-            } else if (clusterRequest instanceof StaticMetadata.StopTreeRequest) {
-                this.handleStaticStopTrees((StaticMetadata.StopTreeRequest) clusterRequest, transportNetwork, ts);
-            } else if (clusterRequest instanceof TravelTimeSurfaceRequest) {
-                this.handleTravelTimeSurfaceRequest((TravelTimeSurfaceRequest) clusterRequest, transportNetwork, ts);
+            // FIXME manually coded polymorphism - we want to just combine these two request classes into one.
+            if (clusterRequest instanceof TravelTimeSurfaceRequest) {
+                this.handleTravelTimeSurfaceRequest((TravelTimeSurfaceRequest) clusterRequest, transportNetwork);
             } else if (clusterRequest instanceof GridRequest) {
-                this.handleGridRequest((GridRequest) clusterRequest, transportNetwork, ts);
+                this.handleGridRequest((GridRequest) clusterRequest, transportNetwork);
             } else {
                 LOG.error("Unrecognized request type {}", clusterRequest.getClass());
             }
-            // Record information about the current task so we can analyze usage and efficiency over time.
-            ts.total = (int) (System.currentTimeMillis() - startTime);
-            taskStatisticsStore.store(ts);
         } catch (Exception ex) {
             // Catch any exceptions that were not handled by more specific catch clauses above.
             // This ensures that some form of error message is passed all the way back up to the web UI.
@@ -426,97 +384,8 @@ public class AnalystWorker implements Runnable {
         }
     }
 
-    /**
-     * Handle a fancy new-fangled static site request.
-     * This is also the method that handles single-point requests in the new combined analysis+scenario editor interface.
-     */
-    private void handleStaticSiteRequest (StaticSiteRequest.PointRequest request, TransportNetwork transportNetwork, TaskStatistics ts) {
-        StaticComputer computer = new StaticComputer(request, transportNetwork, ts);
-
-        if (request.request.bucket != null) computer.run();
-        else {
-            // if bucket is null, return results directly to consumer (high-priority request)
-            try {
-                PipedInputStream pis = new PipedInputStream();
-                PipedOutputStream pos = new PipedOutputStream(pis);
-
-                // This will return immediately as the streaming is done in a new thread.
-                finishPriorityTask(request, pis, "application/octet-stream");
-
-                computer.write(pos, false); // don't include paths in interactive analysis mode
-                pos.close();
-            } catch (IOException e) {
-                LOG.error("Could not write static output to broker", e);
-            }
-        }
-
-        // mark the task as complete
-        deleteRequest(request);
-    }
-
-    /** produce static metadata TODO explain what static metadata is. */
-    private void handleStaticMetadataRequest (StaticMetadata.MetadataRequest request, TransportNetwork transportNetwork, TaskStatistics ts) {
-        StaticMetadata staticMetadata = new StaticMetadata(request.request, transportNetwork); // TODO task statistics
-
-        if (request.request.bucket != null) {
-            try {
-                OutputStream os = StaticDataStore.getOutputStream(request.request, "query.json", "application/json");
-                staticMetadata.writeMetadata(os);
-                os.close();
-            } catch (IOException e) {
-                LOG.error("Error creating static metadata", e);
-            }
-
-            deleteRequest(request);
-        } else {
-            // if bucket is null, return results directly to consumer (high-priority request)
-            try {
-                PipedInputStream pis = new PipedInputStream();
-                PipedOutputStream pos = new PipedOutputStream(pis);
-
-                finishPriorityTask(request, pis, "application/json");
-
-                staticMetadata.writeMetadata(pos);
-                pos.close();
-            } catch (IOException e) {
-                LOG.error("Error writing static metadata to broker", e);
-            }
-
-        }
-    }
-
-    /** Produce static stop trees */
-    private void handleStaticStopTrees (StaticMetadata.StopTreeRequest request, TransportNetwork transportNetwork, TaskStatistics ts) {
-        StaticMetadata staticMetadata = new StaticMetadata(request.request, transportNetwork); // TODO task statistics
-
-        if (request.request.bucket != null) {
-            try {
-                OutputStream os = StaticDataStore.getOutputStream(request.request, "stop_trees.dat", "application/octet-stream");
-                staticMetadata.writeStopTrees(os);
-                os.close();
-            } catch (IOException e) {
-                LOG.error("Error creating static stop trees", e);
-            }
-
-            deleteRequest(request);
-        } else {
-            // if bucket is null, return results directly to consumer (high-priority request)
-            try {
-                PipedInputStream pis = new PipedInputStream();
-                PipedOutputStream pos = new PipedOutputStream(pis);
-
-                finishPriorityTask(request, pis, "application/octet-stream");
-
-                staticMetadata.writeStopTrees(pos);
-                pos.close();
-            } catch (IOException e) {
-                LOG.error("Error writing static stop trees to broker", e);
-            }
-        }
-    }
-
     /** handle a request for a travel time surface */
-    public void handleTravelTimeSurfaceRequest (TravelTimeSurfaceRequest request, TransportNetwork network, TaskStatistics ts) {
+    public void handleTravelTimeSurfaceRequest (TravelTimeSurfaceRequest request, TransportNetwork network) {
         TravelTimeSurfaceComputer computer = new TravelTimeSurfaceComputer(request, network);
         try {
             PipedInputStream pis = new PipedInputStream();
@@ -536,117 +405,14 @@ public class AnalystWorker implements Runnable {
     }
 
     /** Handle a request for access from a Web Mercator grid to a web mercator opportunity density grid (used for regional analysis) */
-    private void handleGridRequest (GridRequest request, TransportNetwork network, TaskStatistics ts) {
+    private void handleGridRequest (GridRequest request, TransportNetwork network) {
         try {
             new GridComputer(request, gridCache, network).run();
         } catch (IOException e) {
             LOG.error("Error in grid computer", e);
             return; // this causes the request to be retried, I think that's what we want
         }
-
         deleteRequest(request);
-    }
-
-    /** Handle a stock Analyst request */
-    // TODO refactor into separate class
-    private void handleAnalystRequest (AnalystClusterRequest clusterRequest, TaskStatistics ts) {
-        long startTime = System.currentTimeMillis();
-
-        // We need to distinguish between and handle four different types of requests here:
-        // Either vector isochrones or accessibility to a pointset,
-        // as either a single-origin priority request (where the result is returned immediately)
-        // or a job task (where the result is saved to output location on S3).
-        boolean isochrone = (clusterRequest.destinationPointsetId == null);
-        boolean singlePoint = (clusterRequest.outputLocation == null);
-
-        ts.lon = clusterRequest.profileRequest.fromLon;
-        ts.lat = clusterRequest.profileRequest.fromLat;
-        ts.pointsetId = clusterRequest.destinationPointsetId;
-        ts.single = singlePoint;
-
-        StreetMode mode;
-        if (clusterRequest.profileRequest.accessModes.contains(LegMode.CAR)) mode = StreetMode.CAR;
-        else if (clusterRequest.profileRequest.accessModes.contains(LegMode.BICYCLE)) mode = StreetMode.BICYCLE;
-        else mode = StreetMode.WALK;
-
-        TransportNetwork transportNetwork =
-                transportNetworkCache.getNetworkForScenario(clusterRequest.graphId, clusterRequest.profileRequest);
-
-        LOG.info("Maximum number of rides: {}", clusterRequest.profileRequest.maxRides);
-        LOG.info("Maximum trip duration: {}", clusterRequest.profileRequest.maxTripDurationMinutes);
-
-        // If this one-to-many request is for accessibility information based on travel times to a pointset,
-        // fetch the set of points we will use as destinations.
-        final PointSet targets;
-        if (isochrone) {
-            // This is an isochrone request, search to a regular grid of points.
-            targets = transportNetwork.gridPointSet;
-        } else {
-            // This is a detailed accessibility request. There is necessarily a destination point set supplied.
-            targets = pointSetDatastore.get(clusterRequest.destinationPointsetId);
-        }
-
-        // Linkage is performed after applying the scenario because the linkage may be different after street modifications.
-        // LinkedPointSets retained withing the unlinked PointSet in a LoadingCache, so only one thread will perform the linkage..
-        final LinkedPointSet linkedTargets = targets.link(transportNetwork.streetLayer, mode);
-
-        // Run the core repeated-raptor analysis.
-        ResultEnvelope envelope = new ResultEnvelope();
-        if (clusterRequest.profileRequest.maxFare < 0) {
-            // TODO transportNetwork is implied by linkedTargets.
-            RepeatedRaptorProfileRouter router =
-                    new RepeatedRaptorProfileRouter(transportNetwork, clusterRequest, linkedTargets, ts);
-            try {
-                envelope = router.route();
-                ts.success = true;
-            } catch (Exception ex) {
-                // An error occurred. Keep the empty envelope empty and TODO include error information.
-                LOG.error("Error occurred in profile request", ex);
-                ts.success = false;
-            }
-        } else {
-            // pareto-optimal search on fares
-
-            McRaptorSuboptimalPathProfileRouter router =
-                    new McRaptorSuboptimalPathProfileRouter(transportNetwork, clusterRequest, linkedTargets);
-
-            try {
-                envelope = router.routeEnvelope();
-                ts.success = true;
-            } catch (Exception ex) {
-                // An error occurred. Keep the empty envelope empty and TODO include error information.
-                LOG.error("Error occurred in profile request", ex);
-                ts.success = false;
-            }
-        }
-
-        // Send the ResultEnvelope back to the user.
-        // The results are either stored on S3 (for multi-origin jobs) or sent back through the broker
-        // (for immediate interactive display of isochrones).
-        envelope.id = clusterRequest.id;
-        envelope.jobId = clusterRequest.jobId;
-        envelope.destinationPointsetId = clusterRequest.destinationPointsetId;
-        if (clusterRequest.outputLocation == null) {
-            // No output location was provided. Instead of saving the result on S3,
-            // return the result immediately via a connection held open by the broker and mark the task completed.
-            try {
-                PipedInputStream is = new PipedInputStream();
-                PipedOutputStream pos = new PipedOutputStream(is);
-
-                // this returns immediately and streams output to the server in a second thread
-                finishPriorityTask(clusterRequest, is, "application/json");
-
-                final ResultEnvelope finalEnvelope = envelope; // dodge effectively final nonsense
-                JsonUtilities.objectMapper.writeValue(pos, finalEnvelope);
-                pos.close();
-            } catch (IOException e) {
-                LOG.info("Error writing single-point result to broker", e);
-            }
-
-        } else {
-            // Save the result on S3 for retrieval by the UI.
-            saveBatchTaskResults(clusterRequest, envelope);
-        }
     }
 
     /** Open a single point channel to the broker to receive high-priority requests immediately */
@@ -713,67 +479,20 @@ public class AnalystWorker implements Runnable {
 
     }
 
-    /**
-     * Convert the result envelope and its contents to JSON and gzip it in this thread.
-     * Transfer the results to Amazon S3 in another thread, piping between the two.
-     */
-    private void saveBatchTaskResults (AnalystClusterRequest clusterRequest, ResultEnvelope envelope) {
-        String fileName = clusterRequest.id + ".json.gz";
-        PipedInputStream inPipe = new PipedInputStream();
-        Runnable resultSaverRunnable;
-        if (workOffline) {
-            resultSaverRunnable = () -> {
-                // No internet connection or hosted services. Save to local file.
-                try {
-                    // TODO make a FakeS3 class that can be used by other components.
-                    File fakeS3 = new File("S3", clusterRequest.outputLocation);
-                    File jobDirectory = new File(fakeS3, clusterRequest.jobId);
-                    File outputFile = new File(jobDirectory, fileName);
-                    jobDirectory.mkdirs();
-                    OutputStream fileOut = new BufferedOutputStream(new FileOutputStream(outputFile));
-                    ByteStreams.copy(inPipe, fileOut);
-                } catch (Exception e) {
-                    LOG.error("Could not save results locally: {}", e);
-                }
-            };
-        } else {
-            resultSaverRunnable = () -> {
-                // TODO catch the case where the S3 putObject fails. (call deleteRequest based on PutObjectResult in the runnable)
-                // Otherwise the AnalystWorker can freeze piping data to a failed S3 saver thread.
-                String s3key = String.join("/", clusterRequest.jobId, fileName);
-                s3.putObject(clusterRequest.outputLocation, s3key, inPipe, null);
-            };
-        };
-        new Thread(resultSaverRunnable).start();
-        try {
-            PipedOutputStream outPipe = new PipedOutputStream(inPipe);
-            OutputStream gzipOutputStream = new GZIPOutputStream(outPipe);
-            // We could do the writeValue() in a thread instead, in which case both the DELETE and S3 options
-            // could consume it in the same way.
-            JsonUtilities.objectMapper.writeValue(gzipOutputStream, envelope);
-            gzipOutputStream.close();
-            // Tell the broker the task has been handled and should not be redelivered to another worker.
-            deleteRequest(clusterRequest);
-        } catch (Exception e) {
-            // Do not delete task from broker, it will be retried.
-            LOG.error("Exception while saving routing result to S3: {}", e.getMessage());
-        }
-    }
-
     public void finishPriorityTask(GenericClusterRequest clusterRequest, InputStream result, String contentType) {
         finishPriorityTask(clusterRequest, result, contentType, null);
     }
 
-        /**
-         * We have two kinds of output from a worker: we can either write to an object in a bucket on S3, or we can stream
-         * output over HTTP to a waiting web service caller. This function handles the latter case. It connects to the
-         * cluster broker, signals that the task with a certain ID is being completed, and posts the result back through the
-         * broker. The broker then passes the result on to the original requester (usually the analysis web UI).
-         *
-         * This function will run the HTTP Post operation in a new thread so that this function can return, allowing its
-         * caller to write data to the input stream it passed in. This arrangement avoids broken pipes that can happen
-         * when the calling thread dies. TODO clarify when and how which thread can die.
-         */
+    /**
+     * We have two kinds of output from a worker: we can either write to an object in a bucket on S3, or we can stream
+     * output over HTTP to a waiting web service caller. This function handles the latter case. It connects to the
+     * cluster broker, signals that the task with a certain ID is being completed, and posts the result back through the
+     * broker. The broker then passes the result on to the original requester (usually the analysis web UI).
+     *
+     * This function will run the HTTP Post operation in a new thread so that this function can return, allowing its
+     * caller to write data to the input stream it passed in. This arrangement avoids broken pipes that can happen
+     * when the calling thread dies. TODO clarify when and how which thread can die.
+     */
     public void finishPriorityTask(GenericClusterRequest clusterRequest, InputStream result, String contentType, String contentEncoding) {
         //CountingInputStream is = new CountingInputStream(result);
 

@@ -1,36 +1,23 @@
 package com.conveyal.r5.publish;
 
-import com.conveyal.gtfs.validator.service.GeoUtils;
 import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.TaskStatistics;
 import com.conveyal.r5.profile.FastRaptorWorker;
-import com.conveyal.r5.profile.PathWithTimes;
-import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.RaptorState;
-import com.conveyal.r5.profile.RaptorWorker;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.StreetRouter;
-import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.google.common.io.LittleEndianDataOutputStream;
-import com.vividsolutions.jts.geom.Coordinate;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
-import org.geotools.geometry.jts.JTS;
-import org.geotools.referencing.CRS;
-import org.geotools.referencing.crs.DefaultGeographicCRS;
-import org.opengis.referencing.crs.CoordinateReferenceSystem;
-import org.opengis.referencing.operation.TransformException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.BufferedOutputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
@@ -172,7 +159,7 @@ public class StaticComputer implements Runnable {
                     int pathIdx = -1;
 
                     // only compute a path if this stop was reached
-                    if (state.bestNonTransferTimes[stop] != RaptorWorker.UNREACHED) {
+                    if (state.bestNonTransferTimes[stop] != FastRaptorWorker.UNREACHED) {
                         // TODO reuse pathwithtimes?
                         Path path = new Path(state, stop);
                         if (!paths.containsKey(path)) {

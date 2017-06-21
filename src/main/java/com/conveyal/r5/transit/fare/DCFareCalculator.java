@@ -1,7 +1,11 @@
-package com.conveyal.r5.transit;
+package com.conveyal.r5.transit.fare;
 
 import com.conveyal.r5.api.util.Fare;
 import com.conveyal.r5.profile.PathWithTimes;
+import com.conveyal.r5.transit.RouteInfo;
+import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.fare.FareTable;
 import com.conveyal.r5.transit.fare.RideType;
 

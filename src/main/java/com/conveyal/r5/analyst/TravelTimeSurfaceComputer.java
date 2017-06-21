@@ -7,7 +7,6 @@ import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.PerTargetPropagater;
-import com.conveyal.r5.profile.RaptorWorker;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetRouter;
@@ -24,8 +23,12 @@ import java.util.Collection;
 import java.util.stream.IntStream;
 
 /**
- * This computes a travel time surface and returns it in access grid format, with each pixel of the grid containing
- * different percentiles of travel time requested by the frontend.
+ * This computes a surface representing travel time from one origin to all destination cells, and writes out a
+ * flattened 3D array, with each pixel of a 2D grid containing the different percentiles of travel time requested by
+ * the frontend. This is called the "access grid"
+ * format and is distinct from the "destination grid" format in that holds multiple values per pixel and has no
+ * inter-cell delta coding. It also has JSON concatenated on the end with any scenario application warnings.
+ * So TODO: we should merge these grid formats and update the spec to allow JSON errors at the end.
  */
 public class TravelTimeSurfaceComputer {
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeSurfaceComputer.class);
@@ -75,7 +78,7 @@ public class TravelTimeSurfaceComputer {
                 int y = target / request.width;
 
                 final int travelTimeMinutes =
-                        travelTimesToTargets[target] == RaptorWorker.UNREACHED ? RaptorWorker.UNREACHED : travelTimesToTargets[target] / 60;
+                        travelTimesToTargets[target] == FastRaptorWorker.UNREACHED ? FastRaptorWorker.UNREACHED : travelTimesToTargets[target] / 60;
                 // the frontend expects percentiles of travel time. There is no variation in nontransit travel time so
                 // just replicate the same number repeatedly. This could be improved, but at least it will compress well.
                 // int divide (floor) used below as well. TODO is this wise?
@@ -142,7 +145,7 @@ public class TravelTimeSurfaceComputer {
                     // Int divide will floor; this is correct because value 0 has travel times of up to one minute, etc.
                     // This means that anything less than a cutoff of (say) 60 minutes (in seconds) will have value 59,
                     // which is what we want. But maybe this is tying the backend and frontend too closely.
-                    results[i] = times[offset] == RaptorWorker.UNREACHED ? RaptorWorker.UNREACHED : times[offset] / 60;
+                    results[i] = times[offset] == FastRaptorWorker.UNREACHED ? FastRaptorWorker.UNREACHED : times[offset] / 60;
                 }
 
                 int x = target % request.width;

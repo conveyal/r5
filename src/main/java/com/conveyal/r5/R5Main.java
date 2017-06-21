@@ -5,8 +5,6 @@ import com.conveyal.r5.analyst.cluster.AnalystWorker;
 import com.conveyal.r5.point_to_point.PointToPointRouterServer;
 import com.conveyal.r5.publish.StaticMain;
 import com.conveyal.r5.publish.StaticServer;
-import com.conveyal.r5.publish.StaticSiteRequest;
-import com.conveyal.r5.visualizer.RaptorDebugger;
 
 import java.util.Arrays;
 
@@ -38,8 +36,6 @@ public class R5Main {
             StaticServer.main(commandArguments);
         } else if ("point".equals(command)) {
             PointToPointRouterServer.main(commandArguments);
-        } else if ("visualizer".equals(command)) {
-            RaptorDebugger.main(commandArguments);
         } else {
             System.err.println("Unknown command " + command);
         }

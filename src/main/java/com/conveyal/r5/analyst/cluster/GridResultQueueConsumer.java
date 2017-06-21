@@ -2,7 +2,6 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClient;
-import com.amazonaws.services.sqs.model.DeleteMessageBatchRequest;
 import com.amazonaws.services.sqs.model.DeleteMessageBatchRequestEntry;
 import com.amazonaws.services.sqs.model.MessageAttributeValue;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
@@ -15,17 +14,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.stream.Collectors;
 
 /**
  * Listens to an SQS queue and manages grid results coming back; this runs in an independent thread for the lifetime
- * of the listening process.
+ * of the listening process. This is only used by the frontend repo - not used within R5 itself.
+ * This manages multiple grid result assemblers running for multiple regional analysis jobs simultaneously. It
+ * splits a stream of messages so each message goes into the right result file.
  */
-public class GridResultConsumer implements Runnable {
-    private static final Logger LOG = LoggerFactory.getLogger(GridResultConsumer.class);
+public class GridResultQueueConsumer implements Runnable {
+    private static final Logger LOG = LoggerFactory.getLogger(GridResultQueueConsumer.class);
     private static final AmazonSQS sqs = new AmazonSQSClient();
 
     public final String sqsUrl;
@@ -33,7 +31,7 @@ public class GridResultConsumer implements Runnable {
 
     public Map<String, GridResultAssembler> assemblers = new HashMap<>();
 
-    public GridResultConsumer (String sqsUrl, String outputBucket) {
+    public GridResultQueueConsumer(String sqsUrl, String outputBucket) {
         this.sqsUrl = sqsUrl;
         this.outputBucket = outputBucket;
     }

@@ -87,8 +87,8 @@ public class RaptorState {
         this.bestTimes = new int[nStops];
         this.bestNonTransferTimes = new int[nStops];
 
-        Arrays.fill(bestTimes, RaptorWorker.UNREACHED);
-        Arrays.fill(bestNonTransferTimes, RaptorWorker.UNREACHED);
+        Arrays.fill(bestTimes, FastRaptorWorker.UNREACHED);
+        Arrays.fill(bestNonTransferTimes, FastRaptorWorker.UNREACHED);
 
         this.previousPatterns = new int[nStops];
         this.previousStop = new int[nStops];
@@ -261,8 +261,8 @@ public class RaptorState {
         // remove trips that are now too long
         int maxClockTime = departureTime + maxDurationSeconds;
         for (int i = 0; i < bestTimes.length; i++) {
-            if (bestTimes[i] > maxClockTime) bestTimes[i] = RaptorWorker.UNREACHED;
-            if (bestNonTransferTimes[i] > maxClockTime) bestNonTransferTimes[i] = RaptorWorker.UNREACHED;
+            if (bestTimes[i] > maxClockTime) bestTimes[i] = FastRaptorWorker.UNREACHED;
+            if (bestNonTransferTimes[i] > maxClockTime) bestNonTransferTimes[i] = FastRaptorWorker.UNREACHED;
         }
 
         // handle updating wait

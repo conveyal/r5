@@ -12,17 +12,13 @@ import java.io.Serializable;
 
 /**
  * A request sent to an Analyst cluster worker.
- * It has two separate fields for RoutingReqeust or ProfileReqeust to facilitate binding from JSON.
+ * It has two separate fields for RoutingRequest or ProfileReqeust to facilitate binding from JSON.
  * Only one of them should be set in a given instance, with the ProfileRequest taking precedence if both are set.
  */
 @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include= JsonTypeInfo.As.PROPERTY, property="type")
 @JsonSubTypes({
         @JsonSubTypes.Type(name = "static", value = StaticSiteRequest.PointRequest.class),
-        @JsonSubTypes.Type(name = "analyst", value = AnalystClusterRequest.class),
-        @JsonSubTypes.Type(name = "grid", value = GridRequest.class),
-        @JsonSubTypes.Type(name = "static-metadata", value = StaticMetadata.MetadataRequest.class),
-        @JsonSubTypes.Type(name = "static-stop-trees", value = StaticMetadata.StopTreeRequest.class),
-        @JsonSubTypes.Type(name = "travel-time-surface", value = TravelTimeSurfaceRequest.class)
+        @JsonSubTypes.Type(name = "grid", value = GridRequest.class)
 })
 public abstract class GenericClusterRequest implements Serializable {
 

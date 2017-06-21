@@ -16,6 +16,12 @@ import java.util.Arrays;
  *
  * It may seem needlessly generic to use a lambda function, but it allows us to confine the bootstrapping code to GridComputer.
  * Perhaps this should be refactored to be a BootstrappingPropagater that just returns bootstrapped accessibility values.
+ *
+ * We propagate to a single target (grid cell) at a time because we only intend to store a few percentiles of travel time
+ * at each target. Propagating the other direction, from stops out to targets, requires storing every travel time for
+ * every MC draw/departure time, at every target. This would be impractically huge. To handle one target at a time we
+ * need to invert the table of distances from stops to nearby targets: we instead use a table of distances from targets
+ * to nearby stops.
  */
 public class PerTargetPropagater {
     private static final Logger LOG = LoggerFactory.getLogger(PerTargetPropagater.class);

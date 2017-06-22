@@ -56,12 +56,7 @@ public class SpeedLabeler {
     }
 
     /**
-     * Reads maxspeed first from maxsped tags then based on highway type
-     *
-     * @author Matt Conway
-     * @param way
-     * @param back
-     * @return maxspeed in m/s
+     * @return maxspeed in m/s, looking first at maxspeed tags and falling back on highway type heuristics
      */
     public float getSpeedMS(Way way, boolean back) {
         // first, check for maxspeed tags

@@ -11,7 +11,8 @@ import org.slf4j.LoggerFactory;
 import java.util.LinkedList;
 
 /**
- * Unwinds states from last to first into a list so they can be accessed more easily
+ * This class materializes a whole street router path at once by unwinding the states from last to first into a list,
+ * just to facilitate random access.
  *
  * Created by mabu on 24.12.2015.
  */
@@ -27,8 +28,7 @@ public class StreetPath {
     private int distance;
     private int duration;
 
-    public StreetPath(StreetRouter.State s, TransportNetwork transportNetwork,
-        boolean reverseSearch) {
+    public StreetPath(StreetRouter.State s, TransportNetwork transportNetwork, boolean reverseSearch) {
         edges = new LinkedList<>();
         states = new LinkedList<>();
         this.transportNetwork = transportNetwork;
@@ -56,9 +56,11 @@ public class StreetPath {
     }
 
     /**
-     * Creates Streetpaths which consists of multiple parts
+     * Concatenates paths through the street network which consist of multiple parts, produced by multiple searches
+     * performed one after another, usually on different modes (as in bike sharing and P+R). We follow the chain of
+     * states backward to reconstruct the path, then follow the chain of streetRouters back to continue unrolling
+     * the path in the previous streetRouters.
      *
-     * Like in Bike sharing and P+R
      * @param lastState last state of last streetrouter (walking from bike station or from P+R parking) this is destination
      * @param streetRouter last streetRouter (previus routers are read from previous variable)
      * @param mode BICYCLE_RENT is the only supported currently
@@ -126,11 +128,8 @@ public class StreetPath {
     }
 
     /**
-     * Adds streetpath of this state to existing
-     *
-     * it adds all the new states before existing ones. Since path is reconstructed from end to start
-     * @param lastState
-     * @param updateDistanceTime
+     * Unrolls a path by following back pointers from the final state, adding the unrolled states to the beginning
+     * of the existing path in this StreetPath.
      */
     public void add(StreetRouter.State lastState, boolean updateDistanceTime) {
         boolean first = true;

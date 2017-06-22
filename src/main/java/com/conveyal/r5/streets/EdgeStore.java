@@ -38,7 +38,14 @@ import java.util.StringJoiner;
 import java.util.function.IntConsumer;
 
 /**
- * A column store with parallel arrays is better than a struct simulation because:
+ * This stores all the characteristics of the edges in the street graph layer of the transport network.
+ * The naive way to do this is making one object per edge, and storing all those edges in one big list or in outgoing
+ * and incoming edge lists in each vertex. However, representing the street graph as an object graph has some
+ * disadvantages, including devoting a large amount of space to pointers, making serialization more complex, and
+ * possible memory locality effects on speed.
+ *
+ * Originally we considered using a library that would simulate compound value types (C structs). A column store with
+ * parallel arrays is better than a struct simulation because:
  * 1. it is less fancy, 2. it is auto-resizing (not fixed size), 3. I've tried both and they're the same speed.
  *
  * Edges come in pairs that have the same origin and destination vertices and the same geometries, but reversed.
@@ -55,7 +62,7 @@ import java.util.function.IntConsumer;
  * List of int arrays: 246MB serialized, 5.2 sec write, 6.3 sec read.
  * List of int arrays, full lists (not only intermediates): 261MB, 6.1 sec write, 6.2 sec read.
  * Indexes into single contiguous int array: 259MB, 5 sec write, 7.5 sec read.
- * Currently I am using the first option as it is both readable and efficient.
+ * We are using the first option as it is both readable and efficient.
  */
 public class EdgeStore implements Serializable {
 

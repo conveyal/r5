@@ -9,13 +9,11 @@ import java.util.Arrays;
 
 /**
  * This class propagates from times at transit stops to times at destinations (targets). It is called with a function
- * that will be called with  the target index (which is the row-major 1D index of the destination that is being
+ * that will be called with the target index (which is the row-major 1D index of the destination that is being
  * propagated to) and the array of whether the target was reached within the travel time cutoff in each Monte Carlo
  * draw. This is used in GridComputer to perform bootstrapping of accessibility given median travel time. This function
- * is only called for targets that were ever reached.
- *
- * It may seem needlessly generic to use a lambda function, but it allows us to confine the bootstrapping code to GridComputer.
- * Perhaps this should be refactored to be a BootstrappingPropagater that just returns bootstrapped accessibility values.
+ * is only called for targets that were ever reached. It may seem needlessly generic to use a lambda function, but it
+ * allows us to confine the bootstrapping code to GridComputer.
  *
  * We propagate to a single target (grid cell) at a time because we only intend to store a few percentiles of travel time
  * at each target. Propagating the other direction, from stops out to targets, requires storing every travel time for
@@ -49,6 +47,12 @@ public class PerTargetPropagater {
         this.cutoffSeconds = cutoffSeconds;
     }
 
+    /**
+     * Call with either a reducer or a travelTimeReducer, but never both. One of the two must be null.
+     * A reducer is only told whether the target was reached within the travel time threshold, which allows some
+     * optimizations in certain cases. A travelTimeReducer receives a full list of travel times to the given
+     * destination.
+     */
     private void propagate (Reducer reducer, TravelTimeReducer travelTimeReducer) {
         boolean saveTravelTimes = travelTimeReducer != null;
         targets.makePointToStopDistanceTablesIfNeeded();

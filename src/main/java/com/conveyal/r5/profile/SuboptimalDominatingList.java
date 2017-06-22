@@ -5,7 +5,13 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
-/** A list that handles domination automatically */
+/**
+ * An implementation of DominatingList that conserves some sub-optimal states to obtain a wider variety of paths.
+ * This is used for customer-facing routing (e.g. in Modeify) where people might actually want to take a path that is
+ * technically suboptimal for some personal reason.
+ *
+ * We may also end up using this to establish choice sets in traffic modeling. See dominates() function below.
+ */
 public class SuboptimalDominatingList implements DominatingList {
     public SuboptimalDominatingList (int suboptimalMinutes) {
         this.suboptimalSeconds = suboptimalMinutes * 60;
@@ -69,6 +75,11 @@ public class SuboptimalDominatingList implements DominatingList {
         return true;
     }
 
+    /**
+     * This function is the core logic that makes it different from "normal" Raptor, and should be explained should we
+     * want to document how R5 finds sub-optimal paths in detail.
+     * TODO ADD explanation of why we're running multiple access mode searches at once
+     */
     public boolean dominates (McRaptorSuboptimalPathProfileRouter.McRaptorState newState, McRaptorSuboptimalPathProfileRouter.McRaptorState oldState) {
         boolean sameAccessMode = oldState.accessMode == newState.accessMode;
 
@@ -79,7 +90,7 @@ public class SuboptimalDominatingList implements DominatingList {
         // looser dominance rules for states with different access modes
         // this is more efficient than what we used to do, which was to treat different access modes as completely incomparable
         // this eliminates a lot of trips that drive out into the sticks and take transit back in, which are slow to compute
-        // TODO this *5 nonsense is a huge clooge. Make the dominance parameter configurable.
+        // TODO this *5 nonsense is a huge clooge. Make separate fields for suboptimalSecondsSameMode and suboptimalSecondsDifferentMode.
         int threshold = sameAccessMode ? suboptimalSeconds : suboptimalSeconds * 5;
 
         if (newState.time + threshold < oldState.time) return true;

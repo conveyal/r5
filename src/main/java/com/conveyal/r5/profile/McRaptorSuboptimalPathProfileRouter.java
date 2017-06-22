@@ -257,8 +257,12 @@ public class McRaptorSuboptimalPathProfileRouter {
     /** Perform a McRAPTOR search and extract paths */
     public Collection<PathWithTimes> getPaths () {
         Collection<McRaptorState> states = route();
-        // using a map here because even paths that are considered equal may have different times and we want to apply
-        // strict dominance to equal paths
+
+        // A map to keep track of the best path among each group of paths using the same sequence of patterns.
+        // We will often find multiple paths that board or transfer to the same patterns at different locations.
+        // We only want to retain the best set of boarding, transfer, and alighting stops for a particular pattern sequence.
+        // FIXME we are using a map here with unorthodox definitions of hashcode and equals to make them serve as map keys.
+        // We should instead wrap PathWithTimes or copy the relevant fields into a PatternSequenceKey class.
         Map<PathWithTimes, PathWithTimes> paths = new HashMap<>();
 
         states.forEach(s -> {

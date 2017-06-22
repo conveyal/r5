@@ -7,7 +7,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 
 /**
- * A dominating list, pareto on time and fare.
+ * An implementation of DominatingList, retaining pareto-optimal paths on time and fare.
  */
 public class FareDominatingList implements DominatingList {
     private GreedyFareCalculator fareCalculator;

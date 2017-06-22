@@ -203,6 +203,9 @@ public class PathWithTimes extends Path {
         }
     }
 
+    // FIXME we are using a map with unorthodox definitions of hashcode and equals to make them serve as map keys.
+    // We should instead wrap PathWithTimes or copy the relevant fields into a PatternSequenceKey class.
+
     public int hashCode () {
         return super.hashCode() ^ (accessMode.hashCode() * 31 + egressMode.hashCode() * 29);
     }

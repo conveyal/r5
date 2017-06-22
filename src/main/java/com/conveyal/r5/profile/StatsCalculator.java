@@ -6,7 +6,8 @@ import java.util.Collection;
 import java.util.stream.IntStream;
 
 /**
- * Created by matthewc on 4/4/17.
+ * This is used in Modeify. "Stats" summarize the travel time for a set of similar paths, giving the minimum,
+ * maximum, and average travel and wait over all those paths, over a whole departure time window.
  */
 public class StatsCalculator {
     /**

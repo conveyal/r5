@@ -19,21 +19,19 @@ import static javax.measure.unit.SI.METERS_PER_SECOND;
 
 /**
  * Gets information about max speeds based on highway tags from build-config
- *
- * And for each way reads maxspeed tags and returns max speeds. If maxspeed isn't specified then uses highway tags.
- * Otherwise returns default max speed.
- *
+ * And for each way reads maxspeed tags and returns max speeds.
+ * If maxspeed isn't specified then uses highway tags. Otherwise returns default max speed.
  */
-public class SpeedConfigurator {
-    private static final Logger LOG = LoggerFactory.getLogger(SpeedConfigurator.class);
+public class SpeedLabeler {
+    private static final Logger LOG = LoggerFactory.getLogger(SpeedLabeler.class);
 
-    // regex courtesy http://wiki.openstreetmap.org/wiki/Key:maxspeed
-    // and edited
+    // regex is an edited version of one taken from http://wiki.openstreetmap.org/wiki/Key:maxspeed
     private static final Pattern maxSpeedPattern = Pattern.compile("^([0-9][\\.0-9]+?)(?:[ ]?(kmh|km/h|kmph|kph|mph|knots))?$");
-    private static Map<String, Float> highwaySpeedMap; // FIXME is this really supposed to be static?
+
+    private static Map<String, Float> highwaySpeedMap; // FIXME this is probably not supposed to be static.
     private Float defaultSpeed;
 
-    public SpeedConfigurator(SpeedConfig speedConfig) {
+    public SpeedLabeler(SpeedConfig speedConfig) {
         //Converts all speeds from units to m/s
         UnitConverter unitConverter = null;
         //TODO: move this to SpeedConfig?

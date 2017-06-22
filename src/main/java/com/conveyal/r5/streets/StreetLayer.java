@@ -11,7 +11,7 @@ import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
 import com.conveyal.r5.labeling.RoadPermission;
-import com.conveyal.r5.labeling.SpeedConfigurator;
+import com.conveyal.r5.labeling.SpeedLabeler;
 import com.conveyal.r5.labeling.TraversalPermissionLabeler;
 import com.conveyal.r5.labeling.TypeOfEdgeLabeler;
 import com.conveyal.r5.labeling.USTraversalPermissionLabeler;
@@ -24,13 +24,11 @@ import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.operation.union.UnaryUnionOp;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TLongIntMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
 import org.geotools.geojson.geom.GeometryJSON;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,21 +50,21 @@ import static com.conveyal.r5.streets.VertexStore.fixedDegreeGeometryToFloating;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
 /**
- * This stores the street layer of OTP routing data.
+ * This class stores the street network. Information about public transit is in a separate layer.
  *
- * Is is currently using a column store.
- * An advantage of disk-backing this (FSTStructs, MapDB optimized for zero-based
- * integer keys) would be that we can remove any logic about loading/unloading graphs.
- * We could route over a whole continent without using much memory.
+ * Is is currently implemented as a column store.
  *
- * Any data that's not used by Analyst workers (street names and geometries for example)
- * should be optional so we can have fast-loading, small transportation network files to pass around.
- * It can even be loaded from the OSM MapDB on demand.
+ * We could also use something like https://github.com/RichardWarburton/slab which simulates Java objects in a chunk
+ * of memory that could be mapped to a file. This could be useful for routing across continents or large countries.
  *
- * There's also https://github.com/RichardWarburton/slab
- * which seems simpler to use.
+ * While the transit search is very fast (probably because it tends to search in order over contiguous arrays) the
+ * street searches can be surprisingly slow. We suspect this is due to the vertices being in somewhat random order
+ * in memory. The solution would be to order the vertices in memory according to their proximity in the graph,
+ * then sort edges according to from-vertex order.
  *
- * TODO Morton-code-sort vertices, then sort edges by from-vertex.
+ * Really what you want to do is embed the distance metric defined by the graph in 1D space. This is a 'metric embedding'
+ * or multidimensional scaling, analagous to force-directed graph layout. http://ceur-ws.org/Vol-733/paper_pacher.pdf
+ * You could do something similar using their geographic coordinates (Morton-code-sort the vertices).
  */
 public class StreetLayer implements Serializable, Cloneable {
 
@@ -108,7 +106,7 @@ public class StreetLayer implements Serializable, Cloneable {
     private transient TraversalPermissionLabeler permissions = new USTraversalPermissionLabeler();
     private transient LevelOfTrafficStressLabeler stressLabeler = new LevelOfTrafficStressLabeler();
     private transient TypeOfEdgeLabeler typeOfEdgeLabeler = new TypeOfEdgeLabeler();
-    private transient SpeedConfigurator speedConfigurator;
+    private transient SpeedLabeler speedLabeler;
     // This is only used when loading from OSM, and is then nulled to save memory.
     transient OSM osm;
 
@@ -162,7 +160,7 @@ public class StreetLayer implements Serializable, Cloneable {
     public boolean bikeSharing = false;
 
     public StreetLayer(TNBuilderConfig tnBuilderConfig) {
-            speedConfigurator = new SpeedConfigurator(tnBuilderConfig.speeds);
+        speedLabeler = new SpeedLabeler(tnBuilderConfig.speeds);
     }
 
     /** Load street layer from an OSM-lib OSM DB */
@@ -984,8 +982,8 @@ public class StreetLayer implements Serializable, Cloneable {
         }
 
         // FIXME this encoded speed should probably never be exposed outside the edge object
-        short forwardSpeed = speedToShort(speedConfigurator.getSpeedMS(way, false));
-        short backwardSpeed = speedToShort(speedConfigurator.getSpeedMS(way, true));
+        short forwardSpeed = speedToShort(speedLabeler.getSpeedMS(way, false));
+        short backwardSpeed = speedToShort(speedLabeler.getSpeedMS(way, true));
 
         RoadPermission roadPermission = permissions.getPermissions(way);
 

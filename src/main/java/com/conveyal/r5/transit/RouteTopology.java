@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Set;
 
 /**
+ * This class is no longer used. It was apparently created to assist in naming trip patterns, but I don't know how.
+ *
  * This represents the topology of a given GTFS route, with branches and common trunks etc.
  * All trips on this route are interpreted as valid paths through a directed graph.
  * We then perform a topological sort on the stops, such that all edges point to the right on the

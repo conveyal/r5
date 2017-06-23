@@ -210,7 +210,6 @@ public class StreetRouter {
         transitLayer.stopForStreetVertex.forEachEntry((streetVertex, stop) -> {
             if (streetVertex == -1) return true;
             State state = getStateAtVertex(streetVertex);
-            // TODO should this be time?
             if (state != null) result.put(stop, state.getRoutingVariable(quantityToMinimize));
             return true; // continue iteration
         });
@@ -1089,7 +1088,7 @@ public class StreetRouter {
         }
 
         /**
-         * @return found stops. Same format of returned value as in {@link StreetRouter#getReachedStops()}
+         * @return found stops. Same format of returned value as in
          */
         public TIntIntMap getStops() {
             return stops;

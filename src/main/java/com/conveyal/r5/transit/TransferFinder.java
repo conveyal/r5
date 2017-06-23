@@ -7,14 +7,11 @@ import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
-import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
 import com.conveyal.r5.streets.StreetLayer;
 import com.conveyal.r5.streets.StreetRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -60,7 +57,7 @@ public class TransferFinder {
             StreetRouter streetRouter = new StreetRouter(streetLayer);
             streetRouter.distanceLimitMeters = TransitLayer.PARKRIDE_DISTANCE_LIMIT;
             streetRouter.setOrigin(originStreetVertex);
-            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+            streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
 
             streetRouter.transitStopSearch = true;
             streetRouter.route();
@@ -114,7 +111,7 @@ public class TransferFinder {
             streetRouter.distanceLimitMeters = TransitLayer.TRANSFER_DISTANCE_LIMIT;
 
             streetRouter.setOrigin(originStreetVertex);
-            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+            streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
 
             streetRouter.route();
             TIntIntMap distancesToReachedStops = streetRouter.getReachedStops();

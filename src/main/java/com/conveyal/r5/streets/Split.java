@@ -13,7 +13,9 @@ import org.slf4j.LoggerFactory;
 /**
  * Represents a potential split point along an existing edge, retaining some geometric calculation state so that
  * once the best candidate is found more detailed calculations can continue.
- * TODO handle initial and final Splits on same edge (use straight-line distance)
+ * We don't yet handle initial and final Splits on the same edge. This can be a problem for Analysis if your
+ * starting point is on a long road without intersections. Travel times to other points along that road would be
+ * measured by going to the end of the road and back.
  */
 public class Split {
 
@@ -24,7 +26,7 @@ public class Split {
     public double frac = 0; // the fraction along that segment where a link should occur
     public int fixedLon; // the x coordinate of the link point along the edge
     public int fixedLat; // the y coordinate of the link point along the edge
-    // We must use a long because squaring a typical search radius in fixed-point _does_ cause sint32 overflow.
+    // We must use a long because squaring a typical search radius in fixed-point _does_ cause signed int32 overflow.
     public long distSquared = Long.MAX_VALUE;
 
     // The following fields require more calculations and are only set once a best edge is found.
@@ -33,6 +35,10 @@ public class Split {
     public int vertex0; // the vertex at the beginning of the chosen edge
     public int vertex1; // the vertex at the end of the chosen edge
 
+    /**
+     * Copy all the fields in another Split into this one.
+     * This avoids creating large amounts of tiny short-lived objects.
+     */
     public void setFrom (Split other) {
         edge = other.edge;
         seg = other.seg;
@@ -93,7 +99,7 @@ public class Split {
                 // Note: the fraction is scaleless, xScale is accounted for in the segmentFraction function.
                 curr.fixedLon = (int)(fixedLon0 + curr.frac * (fixedLon1 - fixedLon0));
                 curr.fixedLat = (int)(fixedLat0 + curr.frac * (fixedLat1 - fixedLat0));
-                // Find squared distance to edge (avoid taking root)
+                // Find squared distance to edge (avoid taking square root, which is slow)
                 long dx = (long)((curr.fixedLon - fixedLon) * cosLat);
                 long dy = (long) (curr.fixedLat - fixedLat);
                 curr.distSquared = dx * dx + dy * dy;
@@ -164,7 +170,8 @@ public class Split {
 
     /**
      * Find a split on a particular edge.
-     * FIXME this appears to be copy-pasted from another method and only used for park and rides. Can we reuse some code here?
+     * FIXME this contains too much duplicate code. We can reuse the code in Split.find()
+     * we just need a way to supply an edge or edges, instead of using the spatial index.
      */
     public static Split findOnEdge (double lat, double lon, EdgeStore.Edge edge) {
 

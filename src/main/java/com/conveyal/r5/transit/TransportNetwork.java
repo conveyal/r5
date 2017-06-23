@@ -176,7 +176,7 @@ public class TransportNetwork implements Serializable {
         streetLayer.indexStreets();
 
         if (tnBuilderConfig.bikeRentalFile != null) {
-            streetLayer.associateBikeSharing(tnBuilderConfig, 500);
+            streetLayer.associateBikeSharing(tnBuilderConfig);
         }
 
         // Load transit data TODO remove need to supply street layer at this stage

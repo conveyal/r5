@@ -80,16 +80,12 @@ public class LinkedPointSet implements Serializable {
      */
     public transient List<TIntIntMap> pointToStopDistanceTables;
 
-    /** It is preferred to specify a mode when linking TODO remove this. */
-    @Deprecated
-    public LinkedPointSet(PointSet pointSet, StreetLayer streetLayer) {
-        this(pointSet, streetLayer, null, null);
-    }
-
     /**
      * A LinkedPointSet is a PointSet that has been pre-connected to a StreetLayer in a non-destructive, reversible way.
      * These objects are long-lived and not extremely numerous, so we keep references to the objects it was built from.
      * Besides they are useful for later processing of LinkedPointSets.
+     * However once we start evicting TransportNetworks, we have to make sure we're not holding references to entire
+     * StreetLayers in LinkedPointSets (memory leak).
      */
     public LinkedPointSet(PointSet pointSet, StreetLayer streetLayer, StreetMode streetMode, LinkedPointSet baseLinkage) {
         LOG.info("Linking pointset to street network...");

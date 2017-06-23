@@ -1,4 +1,4 @@
-package com.conveyal.r5.streets;
+package com.conveyal.r5.util;
 
 import com.google.common.base.Strings;
 import gnu.trove.iterator.TIntIntIterator;

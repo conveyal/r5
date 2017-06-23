@@ -239,7 +239,7 @@ public class TurnRestrictionTest extends TurnTest {
         r.setOrigin(VS);
         r.route();
 
-        Split split = streetLayer.findSplit(37.363, -122.1235, 100);
+        Split split = streetLayer.findSplit(37.363, -122.1235, 100, null);
 
         StreetRouter.State state = r.getState(split);
         assertNotNull(state);
@@ -306,10 +306,10 @@ public class TurnRestrictionTest extends TurnTest {
     public void testNoTurnWithSplitReverse2 () {
         setUp(false);
 
-        Split split = streetLayer.findSplit(37.363, -122.1235, 100);
+        Split split = streetLayer.findSplit(37.363, -122.1235, 100, null);
 
         VertexStore.Vertex vs = streetLayer.vertexStore.getCursor(VS);
-        Split splitVS = streetLayer.findSplit(vs.getLat(), vs.getLon(), 100);
+        Split splitVS = streetLayer.findSplit(vs.getLat(), vs.getLon(), 100, null);
 
         StreetRouter r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
@@ -352,7 +352,7 @@ public class TurnRestrictionTest extends TurnTest {
         assertTrue(r.setOrigin(37.3625, -122.123));
         r.route();
 
-        Split dest = streetLayer.findSplit(37.363, -122.1235, 100);
+        Split dest = streetLayer.findSplit(37.363, -122.1235, 100, null);
 
         StreetRouter.State state = r.getState(dest);
 

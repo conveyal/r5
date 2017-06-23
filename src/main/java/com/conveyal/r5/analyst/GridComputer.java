@@ -156,10 +156,10 @@ public class GridComputer  {
             sr.streetMode = directMode;
             sr.profileRequest = request.request;
             sr.setOrigin(request.request.fromLat, request.request.fromLon);
-            sr.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+            sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             sr.route();
 
-            int offstreetWalkSpeedMillimetersPerSecond = (int) (request.request.getSpeed(directMode) * 1000);
+            int offstreetWalkSpeedMillimetersPerSecond = (int) (request.request.getSpeedForMode(directMode) * 1000);
             int[] travelTimes = linkedDestinations.eval(sr::getTravelTimeToVertex, offstreetWalkSpeedMillimetersPerSecond).travelTimes;
 
             double accessibility = 0;
@@ -192,13 +192,13 @@ public class GridComputer  {
             sr.streetMode = accessMode;
             sr.profileRequest = request.request;
             sr.setOrigin(request.request.fromLat, request.request.fromLon);
-            sr.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+            sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
             sr.route();
 
             TIntIntMap reachedStops = sr.getReachedStops();
 
             // convert millimeters to seconds
-            int millimetersPerSecond = (int) (request.request.getSpeed(accessMode) * 1000);
+            int millimetersPerSecond = (int) (request.request.getSpeedForMode(accessMode) * 1000);
             for (TIntIntIterator it = reachedStops.iterator(); it.hasNext(); ) {
                 it.advance();
                 it.setValue(it.value() / millimetersPerSecond);
@@ -234,7 +234,7 @@ public class GridComputer  {
             int minCount = (int) (router.nMinutes * router.monteCarloDrawsPerMinute * (request.travelTimePercentile / 100d));
 
             // Do propagation of travel times from transit stops to the destinations
-            int offstreetTravelSpeedMillimetersPerSecond = (int) (request.request.getSpeed(accessMode) * 1000);
+            int offstreetTravelSpeedMillimetersPerSecond = (int) (request.request.getSpeedForMode(accessMode) * 1000);
             int[] nonTransitTravelTimesToDestinations =
                     linkedDestinationsDirect.eval(sr::getTravelTimeToVertex, offstreetTravelSpeedMillimetersPerSecond).travelTimes;
             PerTargetPropagater propagater =

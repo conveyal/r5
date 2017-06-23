@@ -191,7 +191,7 @@ public class PointToPointRouterServer {
             streetRouter.profileRequest = profileRequest;
             streetRouter.streetMode = streetMode;
             streetRouter.timeLimitSeconds = profileRequest.getTimeLimit(LegMode.valueOf(streetMode.toString()));
-            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+            streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             streetRouter.transitStopSearch = true;
             if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
                 streetRouter.route();
@@ -250,9 +250,9 @@ public class PointToPointRouterServer {
             streetRouter.profileRequest = profileRequest;
             streetRouter.streetMode = streetMode;
             streetRouter.timeLimitSeconds = profileRequest.getTimeLimit(LegMode.valueOf(streetMode.toString()));
-            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+            streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             streetRouter.flagSearch = VertexStore.VertexFlag.BIKE_SHARING;
-            streetRouter.maxVertices = 50;
+            streetRouter.flagSearchQuantity = 50;
             if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
                 streetRouter.route();
                 streetRouter.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING).forEachEntry((vertexIdx, state) -> {
@@ -306,9 +306,9 @@ public class PointToPointRouterServer {
             streetRouter.profileRequest = profileRequest;
             streetRouter.streetMode = streetMode;
             streetRouter.timeLimitSeconds = profileRequest.getTimeLimit(LegMode.valueOf(streetMode.toString()));
-            streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+            streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             streetRouter.flagSearch = VertexStore.VertexFlag.PARK_AND_RIDE;
-            streetRouter.maxVertices = 50;
+            streetRouter.flagSearchQuantity = 50;
             if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
                 streetRouter.route();
                 streetRouter.getReachedVertices(VertexStore.VertexFlag.PARK_AND_RIDE).forEachEntry((vertexIdx, state) -> {
@@ -972,14 +972,16 @@ public class PointToPointRouterServer {
 
     }
 
+    /**
+     * Add a feature to the supplied List of GeoJSON features. Used in street layer debug visualizations.
+     */
     private static void makeTurnEdge(TransportNetwork transportNetwork, boolean both,
         List<GeoJsonFeature> features, EdgeStore.Edge cursor, OffsetCurveBuilder offsetBuilder,
         float distance, int edgeIdx) {
-        if (transportNetwork.streetLayer.edgeStore.turnRestrictions
-            .containsKey(edgeIdx)) {
+        if (transportNetwork.streetLayer.edgeStore.turnRestrictions.containsKey(edgeIdx)) {
 
-            final int numberOfRestrictions = transportNetwork.streetLayer.edgeStore.turnRestrictions.get(edgeIdx)
-                .size();
+            final int numberOfRestrictions =
+                    transportNetwork.streetLayer.edgeStore.turnRestrictions.get(edgeIdx).size();
             List<Integer> edge_restricion_idxs = new ArrayList<>(numberOfRestrictions);
             transportNetwork.streetLayer.edgeStore.turnRestrictions.get(edgeIdx)
                 .forEach(turn_restriction_idx -> {
@@ -1037,12 +1039,7 @@ public class PointToPointRouterServer {
 
     /**
      * Creates features from from and to vertices of provided edge
-     * if they weren't alreade created and they have TRAFFIC_SIGNAL flag
-     *
-     * @param cursor
-     * @param vcursor
-     * @param seenVertices
-     * @param features
+     * if they weren't already created and they have TRAFFIC_SIGNAL flag
      */
     private static void getVertexFeatures(EdgeStore.Edge cursor, VertexStore.Vertex vcursor,
         Set<Integer> seenVertices, List<GeoJsonFeature> features, TransportNetwork network) {
@@ -1142,12 +1139,11 @@ public class PointToPointRouterServer {
     }
 
     /**
-     * Gets feature from edge in EdgeStore
+     * Gets feature from edge in EdgeStore as GeoJSON for debug visualization of the street layer.
      * @param both true if we are showing edges in both directions AKA it needs to be offset
      * @param cursor cursor to current forward or reversed edge
      * @param offsetBuilder builder which creates edge offset if needed
      * @param distance for which edge is offset if both is true
-     * @return
      */
     private static GeoJsonFeature getEdgeFeature(boolean both, EdgeStore.Edge cursor,
         OffsetCurveBuilder offsetBuilder, float distance, TransportNetwork network) {

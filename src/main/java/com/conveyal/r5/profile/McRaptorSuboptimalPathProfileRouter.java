@@ -34,6 +34,7 @@ import java.util.function.Supplier;
  * @author mattwigway
  */
 public class McRaptorSuboptimalPathProfileRouter {
+    
     private static final Logger LOG = LoggerFactory.getLogger(McRaptorSuboptimalPathProfileRouter.class);
 
     public static final int BOARD_SLACK = 60;
@@ -232,7 +233,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         streetRouter.distanceLimitMeters = TransitLayer.DISTANCE_TABLE_SIZE_METERS; // FIXME arbitrary, and account for bike or car access mode
         streetRouter.setOrigin(request.fromLat, request.fromLon);
         streetRouter.route();
-        streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+        streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
         accessTimes = new HashMap<>();
         accessTimes.put(mode, streetRouter.getReachedStops());
     }

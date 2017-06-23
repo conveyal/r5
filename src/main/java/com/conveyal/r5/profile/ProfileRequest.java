@@ -148,21 +148,30 @@ public class ProfileRequest implements Serializable, Cloneable {
     /** A non-destructive scenario to apply when executing this request */
     public Scenario scenario;
 
-    /** The ID of a scenario stored in S3. It is an error if both scenario and the scenarioId are specified */
+    /**
+     * The ID of a scenario stored in S3 as JSON.
+     * You must specify one (but only one) of scenario or scenarioId.
+     * It is an error if both scenario and the scenarioId are specified.
+     */
     public String scenarioId;
 
     @JsonSerialize(using=ZoneIdSerializer.class)
     @JsonDeserialize(using=ZoneIdDeserializer.class)
     public ZoneId zoneId = ZoneOffset.UTC;
 
-    // Require all streets and transit to be wheelchair-accessible
+    /**
+     * Require all streets and transit to be wheelchair-accessible. This is not fully implemented and doesn't work
+     * at all in Analysis (FastRaptorWorker), only in Modeify (McRaptorSuboptimalPathProfileRouter).
+     */
     public boolean wheelchair;
 
-    // Whether this is a depart-after or arrive-by search
+    /** Whether this is a depart-after or arrive-by search */
     private SearchType searchType;
 
-    //If true current search is reverse search AKA we are looking for a path from destination to origin in reverse
-    //It differs from searchType because it is used as egress search
+    /**
+     * If true current search is reverse search AKA we are looking for a path from destination to origin in reverse
+     * It differs from searchType because it is used as egress search
+     */
     @JsonInclude(JsonInclude.Include.NON_DEFAULT)
     public boolean reverseSearch = false;
 
@@ -229,8 +238,11 @@ public class ProfileRequest implements Serializable, Cloneable {
         return  currentDateTime.plusSeconds(fromTime);
     }
 
+    /**
+     * @return the speed at which the given mode will traverse street edges.
+     */
     @JsonIgnore
-    public float getSpeed(StreetMode streetMode) {
+    public float getSpeedForMode (StreetMode streetMode) {
         switch (streetMode) {
         case WALK:
             return walkSpeed;
@@ -241,11 +253,14 @@ public class ProfileRequest implements Serializable, Cloneable {
         default:
             break;
         }
-        throw new IllegalArgumentException("getSpeed(): Invalid mode " + streetMode);
+        throw new IllegalArgumentException("getSpeedForMode(): Invalid mode " + streetMode);
     }
 
+    /**
+     * @return the maximum pre-transit travel time for the given mode
+     */
     @JsonIgnore
-    public int getMaxAccessTime (StreetMode mode) {
+    public int getMaxAccessTimeForMode (StreetMode mode) {
         switch (mode) {
             case CAR:
                 return maxCarTime;
@@ -266,9 +281,9 @@ public class ProfileRequest implements Serializable, Cloneable {
     }
 
     /**
-     * Sets profile request with parameters from GraphQL request
+     * Factory method to create a profile request with query parameters from a GraphQL request
      */
-    public static ProfileRequest fromEnvironment(DataFetchingEnvironment environment, ZoneId timezone) {
+    public static ProfileRequest fromGraphqlEnvironment(DataFetchingEnvironment environment, ZoneId timezone) {
         ProfileRequest profileRequest = new ProfileRequest();
         profileRequest.zoneId = timezone;
 
@@ -332,7 +347,6 @@ public class ProfileRequest implements Serializable, Cloneable {
         profileRequest.accessModes = EnumSet.copyOf((Collection<LegMode>) environment.getArgument("accessModes"));
         profileRequest.egressModes = EnumSet.copyOf((Collection<LegMode>)environment.getArgument("egressModes"));
 
-
         Collection<LegMode> directModes = environment.getArgument("directModes");
         //directModes can be empty if we only want transit searches
         if (!directModes.isEmpty()) {
@@ -340,7 +354,6 @@ public class ProfileRequest implements Serializable, Cloneable {
         } else {
             profileRequest.directModes = EnumSet.noneOf(LegMode.class);
         }
-
 
         return profileRequest;
     }

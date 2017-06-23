@@ -63,12 +63,12 @@ public class TravelTimeSurfaceComputer {
             StreetRouter sr = new StreetRouter(network.streetLayer);
             sr.timeLimitSeconds = request.request.maxTripDurationMinutes * 60;
             sr.streetMode = directMode;
-            sr.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+            sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             sr.profileRequest = request.request;
             sr.setOrigin(request.request.fromLat, request.request.fromLon);
             sr.route();
 
-            int offstreetTravelSpeedMillimetersPerSecond = (int) (request.request.getSpeed(directMode) * 1000);
+            int offstreetTravelSpeedMillimetersPerSecond = (int) (request.request.getSpeedForMode(directMode) * 1000);
 
             LinkedPointSet linkedDestinations = destinations.link(network.streetLayer, directMode);
 
@@ -109,11 +109,11 @@ public class TravelTimeSurfaceComputer {
             sr.profileRequest = request.request;
             sr.distanceLimitMeters = 2000; // TODO hardwired same as gridcomputer
             sr.setOrigin(request.request.fromLat, request.request.fromLon);
-            sr.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+            sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
             sr.route();
 
             // Get the travel times to all stops reached in the initial on-street search. Convert distances to speeds.
-            int offstreetTravelSpeedMillimetersPerSecond = (int) (request.request.getSpeed(accessMode) * 1000);
+            int offstreetTravelSpeedMillimetersPerSecond = (int) (request.request.getSpeedForMode(accessMode) * 1000);
 
             // getReachedStops returns distances, not times, so convert to times in the loop below
             TIntIntMap accessTimes = sr.getReachedStops();

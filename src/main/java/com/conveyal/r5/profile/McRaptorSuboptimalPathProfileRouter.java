@@ -1,8 +1,5 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.analyst.WebMercatorGridPointSet;
-import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
-import com.conveyal.r5.analyst.cluster.ResultEnvelope;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -67,7 +64,6 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     private TransportNetwork network;
     private ProfileRequest request;
-    private AnalystClusterRequest clusterRequest;
     private Map<LegMode, TIntIntMap> accessTimes;
     private Map<LegMode, TIntIntMap> egressTimes = null;
 
@@ -86,9 +82,6 @@ public class McRaptorSuboptimalPathProfileRouter {
     private BitSet patternsNearDestination;
     private BitSet servicesActive;
 
-    /** output from analyst algorithm will end up here */
-    public PropagatedTimesStore propagatedTimesStore;
-
     /** In order to properly do target pruning we store the best times at each target _by access mode_, so car trips don't quash walk trips */
     private TObjectIntMap<LegMode> bestTimesAtTargetByAccessMode = new TObjectIntHashMap<>(4, 0.95f, Integer.MAX_VALUE);
 
@@ -101,19 +94,6 @@ public class McRaptorSuboptimalPathProfileRouter {
         this.touchedPatterns = new BitSet(network.transitLayer.tripPatterns.size());
         this.patternsNearDestination = new BitSet(network.transitLayer.tripPatterns.size());
         this.servicesActive = network.transitLayer.getActiveServicesForDate(req.date);
-        this.offsets = new FrequencyRandomOffsets(network.transitLayer);
-    }
-
-    public McRaptorSuboptimalPathProfileRouter (TransportNetwork network, AnalystClusterRequest req, LinkedPointSet pointSet) {
-        this.network = network;
-        this.request = req.profileRequest;
-        this.clusterRequest = req;
-        this.pointSet = pointSet;
-        this.touchedStops = new BitSet(network.transitLayer.getStopCount());
-        this.touchedPatterns = new BitSet(network.transitLayer.tripPatterns.size());
-        this.patternsNearDestination = new BitSet(network.transitLayer.tripPatterns.size());
-        this.servicesActive = network.transitLayer.getActiveServicesForDate(req.profileRequest.date);
-        this.timesAtTargetsEachIteration = new ArrayList<>();
         this.offsets = new FrequencyRandomOffsets(network.transitLayer);
     }
 
@@ -197,11 +177,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         // analyst request, create a propagated times store
         if (egressTimes == null) {
-            propagatedTimesStore = new PropagatedTimesStore(pointSet.size());
-            BitSet includeInAverages = new BitSet();
-            includeInAverages.set(0, timesAtTargetsEachIteration.size());
-            // TODO min/max not appropriate without explicitly calculated extrema in frequency search
-            propagatedTimesStore.setFromArray(timesAtTargetsEachIteration.toArray(new int[timesAtTargetsEachIteration.size()][]), request.reachabilityThreshold);
+            throw new UnsupportedOperationException("We have removed support for fare analysis during refactoring, because there is no more PropagatedTimesStore");
         }
 
         LOG.info("McRAPTOR took {}ms", System.currentTimeMillis() - startTime);
@@ -677,12 +653,12 @@ public class McRaptorSuboptimalPathProfileRouter {
         }
     }
 
-    /** run routing and return a result envelope */
-    public ResultEnvelope routeEnvelope() {
-        boolean isochrone = pointSet.pointSet instanceof WebMercatorGridPointSet;
-        route();
-        return propagatedTimesStore.makeResults(pointSet.pointSet, clusterRequest.includeTimes, !isochrone, isochrone);
-    }
+//    /** run routing and return a result envelope */
+//    public ResultEnvelope routeEnvelope() {
+//        boolean isochrone = pointSet.pointSet instanceof WebMercatorGridPointSet;
+//        route();
+//        return propagatedTimesStore.makeResults(pointSet.pointSet, clusterRequest.includeTimes, !isochrone, isochrone);
+//    }
 
     /**
      * This is the McRAPTOR state. It is an object, so there is a certain level of indirection, but note that all of

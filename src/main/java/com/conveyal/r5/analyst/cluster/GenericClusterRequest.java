@@ -2,8 +2,6 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.broker.WorkerCategory;
 import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.publish.StaticMetadata;
-import com.conveyal.r5.publish.StaticSiteRequest;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
@@ -17,8 +15,8 @@ import java.io.Serializable;
  */
 @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include= JsonTypeInfo.As.PROPERTY, property="type")
 @JsonSubTypes({
-        @JsonSubTypes.Type(name = "static", value = StaticSiteRequest.PointRequest.class),
-        @JsonSubTypes.Type(name = "grid", value = GridRequest.class)
+    @JsonSubTypes.Type(name = "travel-time-surface", value = TravelTimeSurfaceRequest.class),
+    @JsonSubTypes.Type(name = "grid", value = GridRequest.class)
 })
 public abstract class GenericClusterRequest implements Serializable {
 

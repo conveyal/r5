@@ -11,10 +11,6 @@ import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
-import com.conveyal.r5.publish.StaticComputer;
-import com.conveyal.r5.publish.StaticDataStore;
-import com.conveyal.r5.publish.StaticMetadata;
-import com.conveyal.r5.publish.StaticSiteRequest;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -119,11 +115,6 @@ public class AnalystWorker implements Runnable {
                 .build();
     }
 
-    // Builds and caches (old) Graphs
-//    ClusterGraphBuilder clusterGraphBuilder;
-
-    // Of course this will eventually need to be shared between multiple AnalystWorker threads.
-    PointSetDatastore pointSetDatastore;
     GridCache gridCache;
 
     // Clients for communicating with Amazon web services
@@ -194,7 +185,6 @@ public class AnalystWorker implements Runnable {
         this.networkId = config.getProperty("initial-graph-id");
 
         this.gridCache = new GridCache(config.getProperty("pointsets-bucket"));
-        this.pointSetDatastore = new PointSetDatastore(10, null, false, config.getProperty("pointsets-bucket"));
         this.transportNetworkCache = cache;
         Boolean autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown"));
         this.autoShutdown = autoShutdown == null ? false : autoShutdown;

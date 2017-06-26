@@ -10,6 +10,7 @@ import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.PerTargetPropagater;
+import com.conveyal.r5.profile.RaptorWorker;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetRouter;
@@ -18,6 +19,7 @@ import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
+import gnu.trove.map.hash.TIntIntHashMap;
 import org.apache.commons.math3.random.MersenneTwister;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -181,7 +183,7 @@ public class GridComputer  {
             if (!request.request.directModes.equals(request.request.accessModes)) {
                 LOG.warn("Disparate direct modes and access modes are not supported in analysis mode.");
             }
-            LinkedPointSet linkedDestinationsDirect = destinations.link(network.streetLayer, accessMode);
+            LinkedPointSet linkedDestinationsAccess = destinations.link(network.streetLayer, accessMode);
 
             // Transit search, run the raptor algorithm to get times at each destination for each iteration
             LOG.info("Maximum number of rides: {}", request.request.maxRides);
@@ -190,6 +192,11 @@ public class GridComputer  {
             // first, find the access stops
             StreetRouter sr = new StreetRouter(network.streetLayer);
             sr.profileRequest = request.request;
+
+            TIntIntMap accessTimes;
+            int offstreetTravelSpeedMillimetersPerSecond = (int) (request.request.getSpeed(accessMode) * 1000);
+            int[] nonTransitTravelTimesToDestinations;
+
             if (request.request.accessModes.contains(LegMode.CAR_PARK)) {
                 //Currently first search from origin to P+R is hardcoded as time dominance variable for Max car time seconds
                 //Second search from P+R to stops is not actually a search we just return list of all reached stops for each found P+R.
@@ -197,27 +204,59 @@ public class GridComputer  {
                 // time to stop is time from CAR streetrouter to stop + CAR PARK time + time to walk to stop based on request walk speed
                 //by default 20 CAR PARKS are found it can be changed with sr.maxVertices variable
                 sr = PointToPointQuery.findParkRidePath(request.request, sr, network.transitLayer);
-            } else {
-                sr.distanceLimitMeters = 2000; // TODO hardwired same as traveltimesurfacecomputer
+
+                if (sr == null) {
+                    // Origin not found. Return an empty access times map, as is done by the other conditions for other modes.
+                    // TODO this is ugly. we should have a way to break out of the search early (here and in other methods).
+                    accessTimes = new TIntIntHashMap();
+                } else {
+                    accessTimes = sr.getReachedStops();
+                }
+
+                // disallow non-transit access
+                // TODO should we allow non transit access with park and ride?
+                nonTransitTravelTimesToDestinations = new int[linkedDestinationsAccess.size()];
+                Arrays.fill(nonTransitTravelTimesToDestinations, RaptorWorker.UNREACHED);
+            } else if (accessMode == StreetMode.WALK) {
+                // Special handling for walk search, find distance in seconds and divide to match behavior at egress
+                // (in stop trees). For bike/car searches this is immaterial as the access searches are already asymmetric.
                 sr.streetMode = accessMode;
+                sr.distanceLimitMeters = 2000; // TODO hardwired same as gridcomputer
                 sr.setOrigin(request.request.fromLat, request.request.fromLon);
                 sr.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
                 sr.route();
-            }
 
-            TIntIntMap reachedStops = sr.getReachedStops();
-
-            //Park ride router always returns list of stop indexes and time, regardless of dominance function
-            if (!request.request.accessModes.contains(LegMode.CAR_PARK)) {
-                // convert millimeters to seconds
-                int millimetersPerSecond = (int) (request.request.getSpeed(accessMode) * 1000);
-                for (TIntIntIterator it = reachedStops.iterator(); it.hasNext(); ) {
+                // Get the travel times to all stops reached in the initial on-street search. Convert distances to speeds.
+                // getReachedStops returns distances in this case since dominance variable is millimeters,
+                // so convert to times in the loop below
+                accessTimes = sr.getReachedStops();
+                for (TIntIntIterator it = accessTimes.iterator(); it.hasNext(); ) {
                     it.advance();
-                    it.setValue(it.value() / millimetersPerSecond);
+                    it.setValue(it.value() / offstreetTravelSpeedMillimetersPerSecond);
                 }
+
+                // again, use distance / speed rather than time for symmetry with other searches
+                final StreetRouter effectivelyFinalSr = sr;
+                nonTransitTravelTimesToDestinations =
+                        linkedDestinationsAccess.eval(v -> {
+                                    StreetRouter.State state = effectivelyFinalSr.getStateAtVertex(v);
+                                    if (state == null) return RaptorWorker.UNREACHED;
+                                    else return state.distance / offstreetTravelSpeedMillimetersPerSecond;
+                                },
+                                offstreetTravelSpeedMillimetersPerSecond).travelTimes;
+            } else {
+                sr.streetMode = accessMode;
+                sr.timeLimitSeconds = request.request.getMaxAccessTime(accessMode);
+                sr.setOrigin(request.request.fromLat, request.request.fromLon);
+                sr.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+                sr.route();
+                accessTimes = sr.getReachedStops(); // already in seconds
+                nonTransitTravelTimesToDestinations =
+                        linkedDestinationsAccess.eval(sr::getTravelTimeToVertex, offstreetTravelSpeedMillimetersPerSecond)
+                                .travelTimes;
             }
 
-            FastRaptorWorker router = new FastRaptorWorker(network.transitLayer, request.request, reachedStops);
+            FastRaptorWorker router = new FastRaptorWorker(network.transitLayer, request.request, accessTimes);
 
             // Run the raptor algorithm
             int[][] timesAtStopsEachIteration = router.route();
@@ -247,9 +286,6 @@ public class GridComputer  {
             int minCount = (int) (router.nMinutes * router.monteCarloDrawsPerMinute * (request.travelTimePercentile / 100d));
 
             // Do propagation of travel times from transit stops to the destinations
-            int offstreetTravelSpeedMillimetersPerSecond = (int) (request.request.getSpeed(accessMode) * 1000);
-            int[] nonTransitTravelTimesToDestinations =
-                    linkedDestinationsDirect.eval(sr::getTravelTimeToVertex, offstreetTravelSpeedMillimetersPerSecond).travelTimes;
             PerTargetPropagater propagater =
                     new PerTargetPropagater(timesAtStopsEachIteration, nonTransitTravelTimesToDestinations, linkedDestinationsEgress, request.request, request.cutoffMinutes * 60);
 

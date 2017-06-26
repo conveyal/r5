@@ -1339,7 +1339,7 @@ public class StreetLayer implements Serializable, Cloneable {
             // Indicate that the content of the new StreetLayer will be changed by giving it the scenario's scenarioId.
             // If the copy will not be modified, scenarioId remains unchanged to allow cached pointset linkage reuse.
             copy.scenarioId = newScenarioNetwork.scenarioId;
-            copy.edgeStore = edgeStore.extendOnlyCopy();
+            copy.edgeStore = edgeStore.extendOnlyCopy(copy);
             // The extend-only copy of the EdgeStore also contains a new extend-only copy of the VertexStore.
             copy.vertexStore = copy.edgeStore.vertexStore;
             copy.temporaryEdgeIndex = new IntHashGrid();

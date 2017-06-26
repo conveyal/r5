@@ -158,6 +158,8 @@ public class TravelTimeSurfaceComputer {
                         },
                         offstreetTravelSpeedMillimetersPerSecond).travelTimes;
             } else {
+                // Other modes are already asymmetric with the egress/stop trees, so just do a time-based on street
+                // search and don't worry about distance limiting.
                 sr.streetMode = accessMode;
                 sr.timeLimitSeconds = request.request.getMaxAccessTime(accessMode);
                 sr.setOrigin(request.request.fromLat, request.request.fromLon);

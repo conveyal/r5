@@ -221,7 +221,7 @@ public class GridComputer  {
                 // Special handling for walk search, find distance in seconds and divide to match behavior at egress
                 // (in stop trees). For bike/car searches this is immaterial as the access searches are already asymmetric.
                 sr.streetMode = accessMode;
-                sr.distanceLimitMeters = 2000; // TODO hardwired same as gridcomputer
+                sr.distanceLimitMeters = 2000; // TODO hardwired same as traveltimesurfacecomputer
                 sr.setOrigin(request.request.fromLat, request.request.fromLon);
                 sr.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
                 sr.route();
@@ -245,6 +245,8 @@ public class GridComputer  {
                                 },
                                 offstreetTravelSpeedMillimetersPerSecond).travelTimes;
             } else {
+                // Other modes are already asymmetric with the egress/stop trees, so just do a time-based on street
+                // search and don't worry about distance limiting.
                 sr.streetMode = accessMode;
                 sr.timeLimitSeconds = request.request.getMaxAccessTime(accessMode);
                 sr.setOrigin(request.request.fromLat, request.request.fromLon);

@@ -591,6 +591,24 @@ public class StreetLayer implements Serializable, Cloneable {
             else if ("via".equals(member.role)) {
                 via.add(member);
             }
+
+            // Osmosis may produce situations where referential integrity is violated, probably at the edge of the
+            // bounding box where half a turn restriction is outside the box.
+            if (member.type == OSMEntity.Type.WAY) {
+                if (!osm.ways.containsKey(member.id)) {
+                    LOG.warn("Turn restriction relation {} references nonexistent way {}, dropping this relation",
+                            id,
+                            member.id);
+                    return;
+                }
+            } else if (member.type == OSMEntity.Type.NODE) {
+                if (!osm.nodes.containsKey(member.id)) {
+                    LOG.warn("Turn restriction relation {} references nonexistent node {}, dropping this relation",
+                            id,
+                            member.id);
+                    return;
+                }
+            }
         }
 
 

@@ -35,8 +35,6 @@ import java.util.zip.ZipInputStream;
  * This holds one or more TransportNetworks keyed on unique strings.
  * Because (de)serialization is now much faster than building networks from scratch, built graphs are cached on the
  * local filesystem and on S3 for later re-use.
- * Actually this currently only holds one single TransportNetwork, but that will eventually change.
- * FIXME the synchronization is kind of primitive and will need to be more sophisticated when a worker has multiple loaded networks.
  */
 public class TransportNetworkCache {
 

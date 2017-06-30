@@ -971,8 +971,11 @@ public class StreetLayer implements Serializable, Cloneable {
         return (int)(lengthMeters * 1000);
     }
 
-    private static short speedToShort(Float speed) {
-        return (short) Math.round(speed * 100);
+    /**
+     * Converts speed from m/s to mm/s and rounds it to integer
+     */
+    private static int speedToMmPerS(Float speed) {
+        return (int) Math.round(speed * 1000);
     }
 
     /**
@@ -1009,8 +1012,8 @@ public class StreetLayer implements Serializable, Cloneable {
         }
 
         // FIXME this encoded speed should probably never be exposed outside the edge object
-        short forwardSpeed = speedToShort(speedLabeler.getSpeedMS(way, false));
-        short backwardSpeed = speedToShort(speedLabeler.getSpeedMS(way, true));
+        int forwardSpeed = speedToMmPerS(speedLabeler.getSpeedMS(way, false));
+        int backwardSpeed = speedToMmPerS(speedLabeler.getSpeedMS(way, true));
 
         RoadPermission roadPermission = permissions.getPermissions(way);
 

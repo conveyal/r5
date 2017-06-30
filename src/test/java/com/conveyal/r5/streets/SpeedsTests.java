@@ -37,18 +37,18 @@ public class SpeedsTests {
 
         double EXPECTED_SPEED_KMH = 56.327; //56.304001
         double EXPECTED_SPEED_MS = 15.6464; //15.64
-        double EXPECTED_CAR_SPEED_MMS = 15.6464; //15.64
+        double EXPECTED_CAR_SPEED_MMS = 15.64304*1000; //15.64
 
         compareSpeed(testEdge, EXPECTED_SPEED_KMH, EXPECTED_SPEED_MS, EXPECTED_CAR_SPEED_MMS);
 
         testEdge = getEdgeFromOSM(21409508); //highway = residential
-        compareSpeed(testEdge, 40.24, 11.18, 11.18);
+        compareSpeed(testEdge, 40.2336, 11.176, 11.176*1000);
 
         testEdge = getEdgeFromOSM(21346162); //highway = motorway
-        compareSpeed(testEdge, 88.48, 24.58, 24.58);
+        compareSpeed(testEdge, 88.4952, 24.582, 24.582*1000);
 
         testEdge = getEdgeFromOSM(158779252); //highway = footway
-        compareSpeed(testEdge, 40.24, 11.18, 11.18);
+        compareSpeed(testEdge, 40.2336, 11.176, 11.176*1000);
 
     }
 
@@ -63,18 +63,17 @@ public class SpeedsTests {
         pr.toLon = -83.0145031;
 
         compareTime(pr, StreetMode.CAR, 54, 88, 253580);
-        compareTime(pr, StreetMode.WALK, 196, 561, 253580);
+        compareTime(pr, StreetMode.WALK, 196, 562, 253580);
         compareTime(pr, StreetMode.BICYCLE, 64, 162, 253580);
 
         pr.toLat = 39.9972981;
         pr.toLon = -83.0115556;
         compareTime(pr, StreetMode.CAR, 823, 719, 11500909);
-        compareTime(pr, StreetMode.WALK, 8752, 17569, 11276153);
+        compareTime(pr, StreetMode.WALK, 8752, 17570, 11276153);
         compareTime(pr, StreetMode.BICYCLE, 2947, 2888, 11463477);
     }
 
-    private void compareTime(ProfileRequest pr, StreetMode streetMode,
-        int expectedDuration, int expectedWeight, int expectedDistance) {
+    private void compareTime(ProfileRequest pr, StreetMode streetMode, int expectedDuration, int expectedWeight, int expectedDistance) {
         StreetRouter sr = new StreetRouter(transportNetwork.streetLayer);
         sr.profileRequest = pr;
         sr.streetMode = streetMode;
@@ -102,8 +101,8 @@ public class SpeedsTests {
         final ProfileRequest pr = new ProfileRequest();
 
         Assert.assertEquals(EXPECTED_CAR_SPEED_MMS,testEdge.calculateSpeed(pr, StreetMode.CAR),0.1);
-        Assert.assertEquals(pr.bikeSpeed,testEdge.calculateSpeed(pr, StreetMode.BICYCLE),0.1);
-        Assert.assertEquals(pr.walkSpeed,testEdge.calculateSpeed(pr, StreetMode.WALK),0.1);
+        Assert.assertEquals(pr.bikeSpeed*1000,testEdge.calculateSpeed(pr, StreetMode.BICYCLE),0.1);
+        Assert.assertEquals(pr.walkSpeed*1000,testEdge.calculateSpeed(pr, StreetMode.WALK),0.1);
     }
 
     private EdgeStore.Edge getEdgeFromOSM(long osmid) {

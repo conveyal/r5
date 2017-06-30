@@ -159,7 +159,7 @@ public class GridComputer  {
             sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             sr.route();
 
-            int offstreetWalkSpeedMillimetersPerSecond = (int) (request.request.getSpeedForMode(directMode) * 1000);
+            int offstreetWalkSpeedMillimetersPerSecond = (int) (request.request.getSpeedForMode(directMode));
             int[] travelTimes = linkedDestinations.eval(sr::getTravelTimeToVertex, offstreetWalkSpeedMillimetersPerSecond).travelTimes;
 
             double accessibility = 0;
@@ -198,7 +198,7 @@ public class GridComputer  {
             TIntIntMap reachedStops = sr.getReachedStops();
 
             // convert millimeters to seconds
-            int millimetersPerSecond = (int) (request.request.getSpeedForMode(accessMode) * 1000);
+            int millimetersPerSecond = (int) (request.request.getSpeedForMode(accessMode));
             for (TIntIntIterator it = reachedStops.iterator(); it.hasNext(); ) {
                 it.advance();
                 it.setValue(it.value() / millimetersPerSecond);
@@ -234,7 +234,7 @@ public class GridComputer  {
             int minCount = (int) (router.nMinutes * router.monteCarloDrawsPerMinute * (request.travelTimePercentile / 100d));
 
             // Do propagation of travel times from transit stops to the destinations
-            int offstreetTravelSpeedMillimetersPerSecond = (int) (request.request.getSpeedForMode(accessMode) * 1000);
+            int offstreetTravelSpeedMillimetersPerSecond = (int) (request.request.getSpeedForMode(accessMode));
             int[] nonTransitTravelTimesToDestinations =
                     linkedDestinationsDirect.eval(sr::getTravelTimeToVertex, offstreetTravelSpeedMillimetersPerSecond).travelTimes;
             PerTargetPropagater propagater =

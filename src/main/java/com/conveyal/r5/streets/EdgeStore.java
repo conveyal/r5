@@ -84,7 +84,7 @@ public class EdgeStore implements Serializable {
      * Saved speed is mostly the same as speed saved as m/s * 1000 it differs in second decimal place and is 0.024% smaller
      * This way of saving speeds is 3.5% smaller then previous (saving 7 decimal places)
      */
-    public TShortList speeds;
+    public TIntList speeds;
 
     /** The index of the origin vertex of each edge pair in the forward direction. One entry for each edge pair. */
     public TIntList fromVertices;
@@ -175,7 +175,7 @@ public class EdgeStore implements Serializable {
 
         // There are separate flags and speeds entries for the forward and backward edges in each pair.
         flags = new TIntArrayList(initialSize);
-        speeds = new TShortArrayList(initialSize);
+        speeds = new TIntArrayList(initialSize);
         // Vertex indices, geometries, and lengths are shared between pairs of forward and backward edges.
         int initialEdgePairs = initialSize / 2;
         fromVertices = new TIntArrayList(initialEdgePairs);
@@ -469,7 +469,11 @@ public class EdgeStore implements Serializable {
             }
         }
 
-        public short getSpeed() {
+        /**
+         * @return the car speed on this edge in mm/s taking live traffic updates into account if requested (though that's not
+         * yet implemented)
+         */
+        public int getSpeed() {
             return speeds.get(edgeIndex);
         }
 
@@ -478,14 +482,17 @@ public class EdgeStore implements Serializable {
          * yet implemented)
          */
         public float getCarSpeedMetersPerSecond() {
-            return (float) ((speeds.get(edgeIndex) / 100.));
+            return (float) ((speeds.get(edgeIndex) / 1000.));
         }
 
         public float getSpeedkmh() {
-            return (float) ((speeds.get(edgeIndex) / 100.) * 3.6);
+            return (float) ((speeds.get(edgeIndex) / 1000.) * 3.6);
         }
 
-        public void setSpeed(short speed) {
+        /**
+         * @param speed Speed in mm/s
+         */
+        public void setSpeed(int speed) {
             speeds.set(edgeIndex, speed);
         }
 
@@ -540,6 +547,8 @@ public class EdgeStore implements Serializable {
          * If driving speed is based on max edge speed. (or from traffic if traffic is supported)
          *
          * Otherwise speed is based on wanted walking, cycling speed provided in ProfileRequest.
+         *
+         * Unit is mm/s
          */
         public float calculateSpeed(ProfileRequest options, StreetMode traverseStreetMode) {
             if (traverseStreetMode == null) {
@@ -547,7 +556,7 @@ public class EdgeStore implements Serializable {
                 return Float.NaN;
             } else if (traverseStreetMode == StreetMode.CAR) {
                 // TODO: apply speed based on traffic information if switched on in the request
-                return getCarSpeedMetersPerSecond();
+                return getSpeed();
             }
             return options.getSpeedForMode(traverseStreetMode);
         }
@@ -564,8 +573,8 @@ public class EdgeStore implements Serializable {
             }
 
             StreetRouter.State s1 = new StreetRouter.State(vertex, edgeIndex, s0);
-            float speedms = calculateSpeed(req, streetMode);
-            float time = (float) (getLengthM() / speedms);
+            float speedmms = calculateSpeed(req, streetMode);
+            float time = getLengthMm() / speedmms;
             float weight = 0;
 
             if (!canTurnFrom(s0, s1, req.reverseSearch)) return null;
@@ -606,8 +615,8 @@ public class EdgeStore implements Serializable {
 
                 if (walking) {
                     //Recalculation of time and speed is needed if we are walking with bike
-                    speedms = calculateSpeed(req, StreetMode.WALK)*0.9f;
-                    time = (float) (getLengthM() / speedms);
+                    speedmms = calculateSpeed(req, StreetMode.WALK)*0.9f;
+                    time = getLengthMm() / speedmms;
                 }
 
                 //elevation costs
@@ -1073,7 +1082,7 @@ public class EdgeStore implements Serializable {
         copy.vertexStore = vertexStore.extendOnlyCopy();
         copy.flags = new TIntAugmentedList(flags);
         // This is a deep copy, we should do an extend-copy but need a new class for that. Can we just use ints?
-        copy.speeds = new TShortArrayList(speeds);
+        copy.speeds = new TIntArrayList(speeds);
         // Vertex indices, geometries, and lengths are shared between pairs of forward and backward edges.
         copy.fromVertices = new TIntAugmentedList(fromVertices);
         copy.toVertices = new TIntAugmentedList(toVertices);

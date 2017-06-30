@@ -304,12 +304,12 @@ public class StreetRouter {
         State startState1 = new State(split.vertex1, split.edge, streetMode);
         EdgeStore.Edge  edge = streetLayer.edgeStore.getCursor(split.edge);
         // Uses weight based on distance from end vertices, and speed on edge which depends on transport mode
-        float speedMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
-        startState1.weight = (int) ((split.distance1_mm / 1000) / speedMetersPerSecond);
+        float speedMiliMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
+        startState1.weight = (int) (split.distance1_mm / speedMiliMetersPerSecond);
         edge.advance();
         // Speed can be different on opposite sides of the same street
-        speedMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
-        startState0.weight = (int) ((split.distance0_mm / 1000) / speedMetersPerSecond);
+        speedMiliMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
+        startState0.weight = (int) (split.distance0_mm / speedMiliMetersPerSecond);
         // FIXME we're setting weight but not time and distance on these states above!
 
         // FIXME Below is reversing the vertices, but then aren't the weights, times, distances wrong? Why are we even doing this?
@@ -433,10 +433,10 @@ public class StreetRouter {
             double maxAbsLatRadians = Math.toRadians(VertexStore.fixedDegreesToFloating(maxAbsLatFixed));
             millimetersPerUnitLonFixed = MM_PER_UNIT_LAT_FIXED * Math.cos(maxAbsLatRadians);
             // FIXME account for speeds of individual street segments, not just speed in request
-            double maxSpeedMetersPerSecond = profileRequest.getSpeedForMode(streetMode);
+            double maxSpeedMilimetersPerSecond = profileRequest.getSpeedForMode(streetMode);
             // Car speed is currently often unspecified in the request and defaults to zero.
-            if (maxSpeedMetersPerSecond == 0) maxSpeedMetersPerSecond = 36.11; // 130 km/h
-            maxSpeedSecondsPerMillimeter = 1 / (maxSpeedMetersPerSecond * 1000);
+            if (maxSpeedMilimetersPerSecond == 0) maxSpeedMilimetersPerSecond = 36.11*1000; // 130 km/h
+            maxSpeedSecondsPerMillimeter = 1 / maxSpeedMilimetersPerSecond;
         }
 
         if (distanceLimitMeters > 0) {
@@ -735,7 +735,7 @@ public class StreetRouter {
 
                         // figure out the turn cost
                         int turnCost = this.turnCostCalculator.computeTurnCost(s.backEdge, split.edge, s.streetMode);
-                        int traversalCost = (int) Math.round(split.distance0_mm / 1000d / e.calculateSpeed(profileRequest, s.streetMode));
+                        int traversalCost = Math.round(split.distance0_mm / e.calculateSpeed(profileRequest, s.streetMode));
 
                         // TODO length of perpendicular
                         ret.incrementWeight(turnCost + traversalCost);
@@ -765,7 +765,7 @@ public class StreetRouter {
 
                         // figure out the turn cost
                         int turnCost = this.turnCostCalculator.computeTurnCost(s.backEdge, split.edge + 1, s.streetMode);
-                        int traversalCost = (int) Math.round(split.distance1_mm / 1000d / e.calculateSpeed(profileRequest, s.streetMode));
+                        int traversalCost = Math.round(split.distance1_mm / e.calculateSpeed(profileRequest, s.streetMode));
                         ret.distance += split.distance1_mm;
 
                         // TODO length of perpendicular

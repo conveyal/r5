@@ -68,7 +68,7 @@ public class TravelTimeSurfaceComputer {
             sr.setOrigin(request.request.fromLat, request.request.fromLon);
             sr.route();
 
-            int offstreetTravelSpeedMillimetersPerSecond = (int) (request.request.getSpeedForMode(directMode) * 1000);
+            int offstreetTravelSpeedMillimetersPerSecond = (int) (request.request.getSpeedForMode(directMode));
 
             LinkedPointSet linkedDestinations = destinations.link(network.streetLayer, directMode);
 
@@ -113,7 +113,7 @@ public class TravelTimeSurfaceComputer {
             sr.route();
 
             // Get the travel times to all stops reached in the initial on-street search. Convert distances to speeds.
-            int offstreetTravelSpeedMillimetersPerSecond = (int) (request.request.getSpeedForMode(accessMode) * 1000);
+            int offstreetTravelSpeedMillimetersPerSecond = (int) (request.request.getSpeedForMode(accessMode));
 
             // getReachedStops returns distances, not times, so convert to times in the loop below
             TIntIntMap accessTimes = sr.getReachedStops();

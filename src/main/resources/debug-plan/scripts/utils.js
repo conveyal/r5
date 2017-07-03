@@ -224,7 +224,7 @@ function getStyle(type) {
                     "line-color":speedColor(speed),
                     "line-width":2
                 },
-                "filter":["==", "speed_ms", parseInt(speed)]
+                "filter":["==", "speed_mms", parseInt(speed)]
             };
             style.layers.push(speed_layer);
         });
@@ -263,12 +263,12 @@ function getStyle(type) {
     current_type = type;
 }
 
-//Converts speed from m/s to kmh/mph
+//Converts speed from mm/s to kmh/mph
 // based on GUI settings
 // And returnes it rounded to 2 decimal places
 //and wanted unit
-function showSpeed(speedms) {
-    var speed_ms = speedms/100;
+function showSpeed(speedmms) {
+    var speed_ms = speedmms/1000;
     var speed;
     if (text.unit == "kmh") {
         speed = speed_ms*3.6;
@@ -287,7 +287,7 @@ function fillPopup(feature, layer) {
         for (var i=0; i < layer_info.length; i++) {
             pop += layer_info[i].toUpperCase();
             pop +=": ";
-            if (layer_info[i] == "speed_ms") {
+            if (layer_info[i] == "speed_mms") {
                 pop += showSpeed(prop[layer_info[i]]);
             } else if (layer_info[i] == "osmid") {
                 pop += "<a target='_blank' href='https://osm.org/way/"+ prop[layer_info[i]]+"'>OSM W:" + prop[layer_info[i]]+"</a>";

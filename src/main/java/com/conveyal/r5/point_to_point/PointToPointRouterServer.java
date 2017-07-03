@@ -1172,8 +1172,7 @@ public class PointToPointRouterServer {
         GeoJsonFeature feature = new GeoJsonFeature(geometry);
         feature.addProperty("permission", cursor.getPermissionsAsString());
         feature.addProperty("edge_id", cursor.getEdgeIndex());
-        //TODO: make better speed calculations client side with mm/s instead of 100*m/s
-        feature.addProperty("speed_ms", cursor.getSpeed()/10); //divided by 10 so it's the same as previously short speed
+        feature.addProperty("speed_mms", cursor.getSpeed());
         feature.addProperty("osmid", cursor.getOSMID());
         //Needed for filtering flags
         for (EdgeStore.EdgeFlag flag: EdgeStore.EdgeFlag.values()) {
@@ -1187,7 +1186,7 @@ public class PointToPointRouterServer {
 
     private static void updateSpeed(EdgeStore.Edge edge, Map<Integer, Integer> speedUsage,
         MinMax minMax) {
-        Integer currentEdgeSpeed = edge.getSpeed()/10;
+        Integer currentEdgeSpeed = edge.getSpeed();
         Integer currentValue = speedUsage.getOrDefault(currentEdgeSpeed, 0);
         speedUsage.put(currentEdgeSpeed, currentValue+1);
         minMax.updateMin(currentEdgeSpeed);

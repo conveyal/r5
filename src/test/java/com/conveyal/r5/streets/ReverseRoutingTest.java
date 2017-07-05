@@ -97,7 +97,7 @@ public class ReverseRoutingTest extends TestCase {
         ProfileRequest profileRequest = new ProfileRequest();
         StreetRouter streetRouter = new StreetRouter(streetLayer);
         streetRouter.profileRequest = profileRequest;
-        profileRequest.reverseSearch = true;
+        streetRouter.reverseSearch = true;
         streetRouter.streetMode = StreetMode.BICYCLE;
         VertexStore.Vertex AVertex = streetLayer.vertexStore.getCursor(A);
         VertexStore.Vertex EVertex = streetLayer.vertexStore.getCursor(E);
@@ -108,7 +108,7 @@ public class ReverseRoutingTest extends TestCase {
 
         StreetRouter.State lastState = streetRouter.getStateAtVertex(A); //streetRouter.getDestinationSplit());
         assertNotNull(lastState);
-        StreetPath streetPath = new StreetPath(lastState, transportNetwork, profileRequest.reverseSearch);
+        StreetPath streetPath = new StreetPath(lastState, transportNetwork, streetRouter.reverseSearch);
 
         List<Integer> correctEdgeIdx = Arrays.asList( 0, 4, 6, 3 );
         List<Integer> correctDuration = Arrays.asList(3,6,9,13);

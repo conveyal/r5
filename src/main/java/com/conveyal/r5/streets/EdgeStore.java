@@ -552,12 +552,12 @@ public class EdgeStore implements Serializable {
             return options.getSpeedForMode(traverseStreetMode);
         }
 
-        public StreetRouter.State traverse (StreetRouter.State s0, StreetMode streetMode, ProfileRequest req,
-                                            TurnCostCalculator turnCostCalculator) {
+        public StreetRouter.State traverse(StreetRouter.State s0, StreetMode streetMode,
+            ProfileRequest req, TurnCostCalculator turnCostCalculator, boolean reverseSearch) {
 
             // The vertex we'll be at after the traversal
             int vertex;
-            if (req.reverseSearch) {
+            if (reverseSearch) {
                 vertex = getFromVertex();
             } else {
                 vertex = getToVertex();
@@ -568,14 +568,14 @@ public class EdgeStore implements Serializable {
             float time = (float) (getLengthM() / speedms);
             float weight = 0;
 
-            if (!canTurnFrom(s0, s1, req.reverseSearch)) return null;
+            if (!canTurnFrom(s0, s1, reverseSearch)) return null;
 
             // clear out turn restrictions if they're empty
             if (s1.turnRestrictions != null && s1.turnRestrictions.isEmpty()) s1.turnRestrictions = null;
 
             // figure out which turn res
 
-            startTurnRestriction(s0.streetMode, req.reverseSearch, s1);
+            startTurnRestriction(s0.streetMode, reverseSearch, s1);
 
             //We allow two links in a row if this is a first state (negative back edge or no backState
             //Since at least P+R stations are connected to graph with only LINK edges and otherwise search doesn't work
@@ -644,7 +644,7 @@ public class EdgeStore implements Serializable {
             // Negative backEdge means this state is not the result of traversing an edge (it's the start of a search).
             int turnCost = 0;
             if (s0.backEdge >= 0) {
-                if (req.reverseSearch) {
+                if (reverseSearch) {
                     turnCost = turnCostCalculator.computeTurnCost(getEdgeIndex(), s0.backEdge, streetMode);
                 } else {
                     turnCost = turnCostCalculator.computeTurnCost(s0.backEdge, getEdgeIndex(), streetMode);

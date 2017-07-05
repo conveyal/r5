@@ -71,6 +71,11 @@ public class StreetRouter {
      */
     private TurnCostCalculator turnCostCalculator;
 
+    /**
+     * If true current search is reverse search AKA we are looking for a path from destination to origin in reverse
+     */
+    public boolean reverseSearch = false;
+
     // These are used for scaling coordinates in approximate distance calculations.
     // The lon value must be properly scaled to underestimate distances in the region where we're routing.
     private static final double MM_PER_UNIT_LAT_FIXED =
@@ -313,15 +318,15 @@ public class StreetRouter {
         // FIXME we're setting weight but not time and distance on these states above!
 
         // FIXME Below is reversing the vertices, but then aren't the weights, times, distances wrong? Why are we even doing this?
-        if (profileRequest.reverseSearch) {
+        if (reverseSearch) {
              startState0.vertex = split.vertex1;
              startState1.vertex = split.vertex0;
         }
 
         // If there is a turn restriction on this edge, we need to indicate that we are beginning the search in a
         // turn restriction.
-        streetLayer.edgeStore.startTurnRestriction(streetMode, profileRequest.reverseSearch, startState0);
-        streetLayer.edgeStore.startTurnRestriction(streetMode, profileRequest.reverseSearch, startState1);
+        streetLayer.edgeStore.startTurnRestriction(streetMode, reverseSearch, startState0);
+        streetLayer.edgeStore.startTurnRestriction(streetMode, reverseSearch, startState1);
 
         // These initial states are not recorded as bestStates, they will be added when they come out of the queue.
         // FIXME but wait - we are putting them in the bestStates for some reason.
@@ -550,7 +555,7 @@ public class StreetRouter {
             }
 
             TIntList edgeList;
-            if (profileRequest.reverseSearch) {
+            if (reverseSearch) {
                 edgeList = streetLayer.incomingEdges.get(s0.vertex);
             } else {
                 edgeList = streetLayer.outgoingEdges.get(s0.vertex);
@@ -558,7 +563,7 @@ public class StreetRouter {
             // explore edges leaving this vertex
             edgeList.forEach(eidx -> {
                 edge.seek(eidx);
-                State s1 = edge.traverse(s0, streetMode, profileRequest, turnCostCalculator);
+                State s1 = edge.traverse(s0, streetMode, profileRequest, turnCostCalculator, reverseSearch);
                 if (s1 != null && s1.distance <= distanceLimitMm && s1.getDurationSeconds() < tmpTimeLimitSeconds) {
                     if (!isDominated(s1)) {
                         // Calculate the heuristic (which involves a square root) only when the state is retained.
@@ -676,7 +681,7 @@ public class StreetRouter {
         State ret = null;
 
         TIntList edgeList;
-        if (profileRequest.reverseSearch) {
+        if (reverseSearch) {
             edgeList = streetLayer.outgoingEdges.get(vertexIndex);
         } else {
             edgeList = streetLayer.incomingEdges.get(vertexIndex);
@@ -718,7 +723,7 @@ public class StreetRouter {
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor(split.edge);
 
         TIntList edgeList;
-        if (profileRequest.reverseSearch) {
+        if (reverseSearch) {
             edgeList = streetLayer.outgoingEdges.get(split.vertex1);
         } else {
             edgeList = streetLayer.incomingEdges.get(split.vertex0);
@@ -728,7 +733,7 @@ public class StreetRouter {
             Collection<State> states = bestStatesAtEdge.get(it.next());
             // NB this needs a state to copy turn restrictions into. We then don't use that state, which is fine because
             // we don't need the turn restrictions any more because we're at the end of the search
-            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge, s), profileRequest.reverseSearch))
+            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge, s), reverseSearch))
                     .map(s -> {
                         State ret = new State(-1, split.edge, s);
                         ret.streetMode = s.streetMode;
@@ -750,7 +755,7 @@ public class StreetRouter {
         // advance to back edge
         e.advance();
 
-        if (profileRequest.reverseSearch) {
+        if (reverseSearch) {
             edgeList = streetLayer.outgoingEdges.get(split.vertex0);
         } else {
             edgeList = streetLayer.incomingEdges.get(split.vertex1);
@@ -758,7 +763,7 @@ public class StreetRouter {
 
         for (TIntIterator it = edgeList.iterator(); it.hasNext();) {
             Collection<State> states = bestStatesAtEdge.get(it.next());
-            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge + 1, s), profileRequest.reverseSearch))
+            states.stream().filter(s -> e.canTurnFrom(s, new State(-1, split.edge + 1, s), reverseSearch))
                     .map(s -> {
                         State ret = new State(-1, split.edge + 1, s);
                         ret.streetMode = s.streetMode;

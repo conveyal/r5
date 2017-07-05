@@ -169,13 +169,6 @@ public class ProfileRequest implements Serializable, Cloneable {
     private SearchType searchType;
 
     /**
-     * If true current search is reverse search AKA we are looking for a path from destination to origin in reverse
-     * It differs from searchType because it is used as egress search
-     */
-    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
-    public boolean reverseSearch = false;
-
-    /**
      * Maximum fare for constraining monetary cost of paths during search in Analysis.
      * If nonnegative, fares will be used in routing.
      */

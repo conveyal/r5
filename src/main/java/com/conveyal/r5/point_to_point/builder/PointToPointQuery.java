@@ -199,10 +199,9 @@ public class PointToPointQuery {
     private Map<LegMode, StreetRouter> findEgressPaths(ProfileRequest request) {
         Map<LegMode, StreetRouter> egressRouter = new HashMap<>();
         //For egress
-        //TODO: this must be reverse search
-        request.reverseSearch = true;
         for(LegMode mode: request.egressModes) {
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+            streetRouter.reverseSearch = true;
             streetRouter.transitStopSearch = true;
             streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             if (egressUnsupportedModes.contains(mode)) {
@@ -232,10 +231,10 @@ public class PointToPointQuery {
      * @param option
      */
     private void findDirectPaths(ProfileRequest request, ProfileOption option) {
-        request.reverseSearch = false;
         //For direct modes
         for(LegMode mode: request.directModes) {
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+            //reverse search is false
             StreetPath streetPath;
             streetRouter.profileRequest = request;
             if (mode == LegMode.BICYCLE_RENT) {
@@ -289,10 +288,10 @@ public class PointToPointQuery {
      * @param request
      */
     private HashMap<LegMode, StreetRouter> findAccessPaths(ProfileRequest request) {
-        request.reverseSearch = false;
         // Routes all access modes
         HashMap<LegMode, StreetRouter> accessRouter = new HashMap<>();
         for(LegMode mode: request.accessModes) {
+            //reverse search is false
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
             streetRouter.profileRequest = request;
             if (mode == LegMode.CAR_PARK) {

@@ -359,9 +359,10 @@ public class PointToPointRouterServer {
             }
 
             ProfileRequest profileRequest = new ProfileRequest();
-            Boolean reverseSearch = request.queryMap("reverse").booleanValue();
-            if (reverseSearch != null && reverseSearch) {
-                profileRequest.reverseSearch = true;
+            Boolean reverseSearchB = request.queryMap("reverse").booleanValue();
+            boolean reverseSearch = false;
+            if (reverseSearchB != null && reverseSearchB) {
+                reverseSearch = true;
             }
             profileRequest.zoneId = transportNetwork.getTimeZone();
             profileRequest.fromLat = fromLat;
@@ -410,7 +411,7 @@ public class PointToPointRouterServer {
                 featureCollection.put("type", "FeatureCollection");
                 List<GeoJsonFeature> features = new ArrayList<>();
 
-                fillFeature(transportNetwork, lastState, features, profileRequest.reverseSearch);
+                fillFeature(transportNetwork, lastState, features, reverseSearch);
                 featureCollection.put("features", features);
                 content.put("data", featureCollection);
             } else {

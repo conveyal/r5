@@ -37,7 +37,7 @@ public class TurnRestrictionTest extends TurnTest {
         r.route();
 
         StreetRouter.State s1 = r.getStateAtVertex(VW);
-        LOG.debug("turn rest: {} {}", s1.dump(), s1.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("turn rest: {} {}", s1.dump(), s1.compactDump(r.reverseSearch));
 
         // weight should be greater because path should now include going past the intersection and making a U-turn back at it.
         assertTrue(s1.weight > state.weight);
@@ -51,7 +51,7 @@ public class TurnRestrictionTest extends TurnTest {
         StreetRouter r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
         r.streetMode = StreetMode.CAR;
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.setOrigin(VW);
         r.route();
 
@@ -63,7 +63,7 @@ public class TurnRestrictionTest extends TurnTest {
         restrictTurn(false, ES + 1, EW);
 
         r = new StreetRouter(streetLayer);
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.streetMode = StreetMode.CAR;
         r.setOrigin(VW);
         r.route();
@@ -98,7 +98,7 @@ public class TurnRestrictionTest extends TurnTest {
         new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
         r.streetMode = StreetMode.CAR;
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.setOrigin(VW);
         r.route();
 
@@ -190,7 +190,7 @@ public class TurnRestrictionTest extends TurnTest {
         StreetRouter r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
         r.streetMode = StreetMode.CAR;
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.setOrigin(VW);
         r.route();
 
@@ -201,7 +201,7 @@ public class TurnRestrictionTest extends TurnTest {
         restrictTurn(true, ES + 1, EE);
 
         r = new StreetRouter(streetLayer);
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.streetMode = StreetMode.CAR;
         r.setOrigin(VW);
         r.route();
@@ -244,7 +244,7 @@ public class TurnRestrictionTest extends TurnTest {
         StreetRouter.State state = r.getState(split);
         assertNotNull(state);
 
-        LOG.debug("Normat with split:{}", state.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Normat with split:{}", state.compactDump(r.reverseSearch));
 
         // create a turn restriction
         restrictTurn(false, ES + 1, EW);
@@ -256,7 +256,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         StreetRouter.State restrictedState = r.getState(split);
 
-        LOG.debug("Normal restricted with split:{}", restrictedState.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Normal restricted with split:{}", restrictedState.compactDump(r.reverseSearch));
 
         // weight should be greater because path should now include going past the intersection and making a U-turn back at it.
         assertTrue(restrictedState.weight > state.weight);
@@ -272,14 +272,14 @@ public class TurnRestrictionTest extends TurnTest {
         StreetRouter r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
         r.streetMode = StreetMode.CAR;
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.setOrigin(37.363, -122.1235); //location of split
         r.route();
 
         StreetRouter.State state = r.getStateAtVertex(VS); // getState(splitVS);
         assertNotNull(state);
 
-        LOG.debug("Reverse with split:{}", state.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Reverse with split:{}", state.compactDump(r.reverseSearch));
 
 
         // create a turn restriction
@@ -287,14 +287,14 @@ public class TurnRestrictionTest extends TurnTest {
 
         r = new StreetRouter(streetLayer);
         r.streetMode = StreetMode.CAR;
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.setOrigin(37.363, -122.1235);
         //r.setOrigin(VW);
         r.route();
 
         StreetRouter.State restrictedState =  r.getStateAtVertex(VS); // getState(splitVS);
 
-        LOG.debug("Reverse restricted with split:{}", restrictedState.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Reverse restricted with split:{}", restrictedState.compactDump(r.reverseSearch));
 
         // weight should be greater because path should now include going past the intersection and making a U-turn back at it.
         assertTrue(restrictedState.weight > state.weight);
@@ -314,14 +314,14 @@ public class TurnRestrictionTest extends TurnTest {
         StreetRouter r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
         r.streetMode = StreetMode.CAR;
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.setOrigin(VW); //location of split
         r.route();
 
         StreetRouter.State state = r.getState(splitVS);
         assertNotNull(state);
 
-        LOG.debug("Reverse with split:{}", state.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Reverse with split:{}", state.compactDump(r.reverseSearch));
 
 
         // create a turn restriction
@@ -329,14 +329,14 @@ public class TurnRestrictionTest extends TurnTest {
 
         r = new StreetRouter(streetLayer);
         r.streetMode = StreetMode.CAR;
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.setOrigin(VW);
         //r.setOrigin(VW);
         r.route();
 
         StreetRouter.State restrictedState =  r.getState(splitVS);
 
-        LOG.debug("Reverse restricted with split:{}", restrictedState.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Reverse restricted with split:{}", restrictedState.compactDump(r.reverseSearch));
 
         // weight should be greater because path should now include going past the intersection and making a U-turn back at it.
         assertTrue(restrictedState.weight > state.weight);
@@ -356,7 +356,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         StreetRouter.State state = r.getState(dest);
 
-        LOG.debug("Normal:{}", state.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Normal:{}", state.compactDump(r.reverseSearch));
         assertNotNull(state);
 
         // create a turn restriction
@@ -369,7 +369,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         StreetRouter.State restrictedState = r.getState(dest);
 
-        LOG.debug("Restricted:{}", restrictedState.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Restricted:{}", restrictedState.compactDump(r.reverseSearch));
 
         // weight should be greater because path should now include going past the intersection and making a U-turn back at it.
         assertTrue(restrictedState.weight > state.weight);
@@ -387,7 +387,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         StreetRouter.State state = r.getStateAtVertex(VW);
 
-        LOG.debug("Normal:{}", state.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Normal:{}", state.compactDump(r.reverseSearch));
         assertNotNull(state);
 
         // create a turn restriction
@@ -400,7 +400,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         StreetRouter.State restrictedState = r.getStateAtVertex(VW);
 
-        LOG.debug("Restricted:{}", restrictedState.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Restricted:{}", restrictedState.compactDump(r.reverseSearch));
 
         // weight should be greater because path should now include going past the intersection and making a U-turn back at it.
         assertTrue(restrictedState.weight > state.weight);
@@ -463,7 +463,7 @@ public class TurnRestrictionTest extends TurnTest {
         StreetRouter r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
         r.streetMode = StreetMode.CAR;
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.setOrigin(VNW);
         r.route();
 
@@ -474,7 +474,7 @@ public class TurnRestrictionTest extends TurnTest {
         r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
         r.streetMode = StreetMode.CAR;
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.setOrigin(VNW);
         r.route();
 
@@ -485,7 +485,7 @@ public class TurnRestrictionTest extends TurnTest {
         r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
         r.streetMode = StreetMode.CAR;
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.setOrigin(VNW);
         r.route();
 
@@ -499,7 +499,7 @@ public class TurnRestrictionTest extends TurnTest {
         r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
         r.streetMode = StreetMode.CAR;
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.setOrigin(VNW);
         r.route();
 
@@ -521,7 +521,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         StreetRouter.State stateFromN = r.getStateAtVertex(VE);
 
-        LOG.debug("Only via N: VN to VE {}", stateFromN.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Only via N: VN to VE {}", stateFromN.compactDump(r.reverseSearch));
         assertFalse(stateContainsVertex(stateFromN, VNW));
 
         r = new StreetRouter(streetLayer);
@@ -531,7 +531,7 @@ public class TurnRestrictionTest extends TurnTest {
         r.route();
 
         StreetRouter.State stateFromCenter = r.getStateAtVertex(VE);
-        LOG.debug("Only via N: VCENTER to VE {}", stateFromCenter.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Only via N: VCENTER to VE {}", stateFromCenter.compactDump(r.reverseSearch));
         assertFalse(stateContainsVertex(stateFromCenter, VNW));
 
 
@@ -544,7 +544,7 @@ public class TurnRestrictionTest extends TurnTest {
         r.route();
 
         StreetRouter.State restrictedStateFromN = r.getStateAtVertex(VE);
-        LOG.debug("Only via Restricted: VN to VE {}", restrictedStateFromN.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Only via Restricted: VN to VE {}", restrictedStateFromN.compactDump(r.reverseSearch));
 
         // we should be forced to make a U-turn
         assertTrue(restrictedStateFromN.weight > stateFromN.weight);
@@ -557,7 +557,7 @@ public class TurnRestrictionTest extends TurnTest {
 
         // Only U turn should not affect a state starting at the center
         StreetRouter.State restrictedStateFromCenter = r.getStateAtVertex(VE);
-        LOG.debug("Only via Restricted: VCENTER to VE {}", restrictedStateFromCenter.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Only via Restricted: VCENTER to VE {}", restrictedStateFromCenter.compactDump(r.reverseSearch));
         assertEquals(stateFromCenter.weight, restrictedStateFromCenter.weight);
 
         // make sure the state from the north goes through VNW as there's an only U turn restriction.
@@ -572,23 +572,23 @@ public class TurnRestrictionTest extends TurnTest {
         StreetRouter r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
         r.streetMode = StreetMode.CAR;
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.setOrigin(VE);
         r.route();
 
         StreetRouter.State stateFromN = r.getStateAtVertex(VN);
-        LOG.debug("Rev: Only via N: VN to VE {}", stateFromN.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Rev: Only via N: VN to VE {}", stateFromN.compactDump(r.reverseSearch));
         assertFalse(stateContainsVertex(stateFromN, VNW));
 
         r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
         r.streetMode = StreetMode.CAR;
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.setOrigin(VE);
         r.route();
 
         StreetRouter.State stateFromCenter = r.getStateAtVertex(VCENTER);
-        LOG.debug("Rev: Only via N: VCENTER to VE {}", stateFromCenter.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Rev: Only via N: VCENTER to VE {}", stateFromCenter.compactDump(r.reverseSearch));
         assertFalse(stateContainsVertex(stateFromCenter, VNW));
 
 
@@ -597,12 +597,12 @@ public class TurnRestrictionTest extends TurnTest {
         r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
         r.streetMode = StreetMode.CAR;
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.setOrigin(VE);
         r.route();
 
         StreetRouter.State restrictedStateFromN = r.getStateAtVertex(VN);
-        LOG.debug("Rev: Only via Restricted: VN to VE {}", restrictedStateFromN.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Rev: Only via Restricted: VN to VE {}", restrictedStateFromN.compactDump(r.reverseSearch));
 
         // we should be forced to make a U-turn
         assertTrue(restrictedStateFromN.weight > stateFromN.weight);
@@ -610,13 +610,13 @@ public class TurnRestrictionTest extends TurnTest {
         r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
         r.streetMode = StreetMode.CAR;
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.setOrigin(VE);
         r.route();
 
         // Only U turn should not affect a state starting at the center
         StreetRouter.State restrictedStateFromCenter = r.getStateAtVertex(VCENTER);
-        LOG.debug("Rev: Only via Restricted: VCenter to VE {}", restrictedStateFromCenter.compactDump(r.profileRequest.reverseSearch));
+        LOG.debug("Rev: Only via Restricted: VCenter to VE {}", restrictedStateFromCenter.compactDump(r.reverseSearch));
         assertEquals(stateFromCenter.weight, restrictedStateFromCenter.weight);
 
         // make sure the state from the north goes through VNW as there's an only U turn restriction.
@@ -672,7 +672,7 @@ public class TurnRestrictionTest extends TurnTest {
         StreetRouter r = new StreetRouter(streetLayer);
         // turn restrictions only apply to cars
         r.streetMode = StreetMode.CAR;
-        r.profileRequest.reverseSearch = true;
+        r.reverseSearch = true;
         r.setRoutingVisitor(countingVisitor);
         r.setOrigin(VCENTER);
 

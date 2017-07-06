@@ -1,7 +1,6 @@
 package com.conveyal.r5.analyst.broker;
 
 import com.conveyal.r5.analyst.cluster.AnalystWorker;
-import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import com.conveyal.r5.analyst.cluster.WorkerStatus;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;

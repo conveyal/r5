@@ -1,18 +1,13 @@
 package com.conveyal.r5.analyst.broker;
 
-import gnu.trove.iterator.TIntLongIterator;
-import gnu.trove.map.TIntLongMap;
 import gnu.trove.map.TIntObjectMap;
-import gnu.trove.map.hash.TIntLongHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
-import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayDeque;
-import java.util.List;
 import java.util.Queue;
 
 /**

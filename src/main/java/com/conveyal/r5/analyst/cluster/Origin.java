@@ -22,13 +22,19 @@ public class Origin {
     public static final Logger LOG = LoggerFactory.getLogger(Origin.class);
 
     /** The version of the origin file format supported by this class */
-    public static final int ORIGIN_VERSION = 0;
+    public static final int ORIGIN_VERSION = 1;
 
     /** X coordinate of origin within regional analysis */
     public int x;
 
     /** Y coordinate of origin within regional analysis */
     public int y;
+
+    /** Percentile of travel time used to compute these accessibility values */
+    public double percentile = Double.NaN;
+
+    /** Job ID this origin is associated with */
+    public String jobId;
 
     /**
      * Samples of accessibility. Depending on worker version, this could be bootstrap replications of accessibility given
@@ -37,7 +43,9 @@ public class Origin {
     public int[] samples;
 
     /** Construct an origin given a grid request and the instantaneous accessibility computed for each iteration */
-    public Origin (GridRequest request, int[] samples) {
+    public Origin (AnalysisRequest request, double percentile, int[] samples) {
+        this.jobId = request.jobId;
+        this.percentile = percentile;
         this.x = request.x;
         this.y = request.y;
         this.samples = samples;
@@ -59,6 +67,8 @@ public class Origin {
         // version
         data.writeInt(ORIGIN_VERSION);
 
+        data.writeUTF(jobId);
+        data.writeDouble(percentile);
         data.writeInt(x);
         data.writeInt(y);
 
@@ -89,12 +99,14 @@ public class Origin {
         int version = data.readInt();
 
         if (version != ORIGIN_VERSION) {
-            LOG.error("Origin version mismatch , expected {}, found {}", ORIGIN_VERSION, version);
+            LOG.error("Origin version mismatch, expected {} found {}", ORIGIN_VERSION, version);
             throw new IllegalArgumentException("Origin version mismatch, expected " + ORIGIN_VERSION + ", found " + version);
         }
 
         Origin origin = new Origin();
 
+        origin.jobId = data.readUTF();
+        origin.percentile = data.readDouble();
         origin.x = data.readInt();
         origin.y = data.readInt();
 

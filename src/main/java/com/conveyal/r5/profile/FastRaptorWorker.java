@@ -51,7 +51,12 @@ public class FastRaptorWorker {
 
     private static final Logger LOG = LoggerFactory.getLogger(FastRaptorWorker.class);
 
-    /** Step for departure times */
+    /**
+     * Step for departure times. Use caution when changing this as we use the functions
+     * request.getTimeWindowLengthMinutes and request.getMonteCarloDrawsPerMinute below which assume this value is 1 minute.
+     * The same functions are also used in BootstrappingTravelTimeReducer where we assume that their product is the number
+     * of iterations performed.
+     */
     private static final int DEPARTURE_STEP_SEC = 60;
 
     /** Minimum wait for boarding to account for schedule variation */
@@ -127,10 +132,10 @@ public class FastRaptorWorker {
         offsets = new FrequencyRandomOffsets(transitLayer);
 
         // compute number of minutes for scheduled search
-        nMinutes = (request.toTime - request.fromTime) / DEPARTURE_STEP_SEC;
+        nMinutes = request.getTimeWindowLengthMinutes();
 
         // how many monte carlo draws per minute of scheduled search to get desired total iterations?
-        monteCarloDrawsPerMinute = (int) Math.ceil((double) request.monteCarloDraws / nMinutes);
+        monteCarloDrawsPerMinute = request.getMonteCarloDrawsPerMinute();
     }
 
     /** For each iteration, return the travel time to each transit stop */

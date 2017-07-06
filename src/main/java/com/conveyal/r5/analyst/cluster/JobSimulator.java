@@ -58,24 +58,22 @@ public class JobSimulator {
         mapper.registerModule(JavaLocalDateSerializer.makeModule());
         mapper.registerModule(TraverseModeSetSerializer.makeModule());*/
 
-        List<GenericClusterRequest> requests = new ArrayList<>();
+        List<AnalysisRequest> requests = new ArrayList<>();
 
         IntStream.range(0, nOrigins).forEach(i -> {
             // Enqueue one fake origin
-            ProfileRequest profileRequest = new ProfileRequest();
-            profileRequest.fromLat = 45.515;
-            profileRequest.fromLon = -122.643;
-            profileRequest.transitModes = null; //new TraverseModeSet(TraverseMode.TRANSIT);
+            AnalysisRequest request = new AnalysisRequest();
+            request.fromLat = 45.515;
+            request.fromLon = -122.643;
+            request.transitModes = null; //new TraverseModeSet(TraverseMode.TRANSIT);
             // The request type has been changed due to refactoring.
             // We haven't tested that this works properly, but thought it would be useful to leave in the
             // tests to check that broker task retrying works.
-            GridRequest clusterRequest = new GridRequest();
-            clusterRequest.graphId = graphId;
-            clusterRequest.request = profileRequest;
-            clusterRequest.jobId = jobId;
-            clusterRequest.workerVersion = workerVersion;
-            clusterRequest.id = Integer.toString(i);
-            requests.add(clusterRequest);
+            request.graphId = graphId;
+            request.jobId = jobId;
+            request.workerVersion = workerVersion;
+            request.id = Integer.toString(i);
+            requests.add(request);
         });
 
 //        try {

@@ -87,7 +87,7 @@ public class GridResultQueueConsumer implements Runnable {
         }
     }
 
-    public void registerJob (GridRequest request) {
+    public void registerJob (AnalysisRequest request) {
         this.assemblers.put(request.jobId, new GridResultAssembler(request, outputBucket));
     }
 

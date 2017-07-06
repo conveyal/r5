@@ -1,8 +1,8 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.analyst.broker.WorkerCategory;
 import com.conveyal.r5.profile.ProfileRequest;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.sun.tools.javac.jvm.Profile;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 /**
  * Request a travel time surface containing travel times to all destinations for several percentiles of travel time.
@@ -53,6 +53,11 @@ public class AnalysisRequest extends ProfileRequest {
     /** Travel time surfaces (single point requests) are high priority. Regional analyses are not */
     public boolean isHighPriority() {
         return type == Type.TRAVEL_TIME_SURFACE;
+    }
+
+    @JsonIgnore
+    public WorkerCategory getWorkerCategory () {
+        return new WorkerCategory(graphId, workerVersion);
     }
 
     public enum Type {

@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.broker;
 
+import com.conveyal.r5.analyst.cluster.AnalysisRequest;
 import com.conveyal.r5.analyst.cluster.AnalystWorker;
 import com.conveyal.r5.analyst.cluster.WorkerStatus;
 import com.conveyal.r5.analyst.error.TaskError;
@@ -147,8 +148,8 @@ class BrokerHttpHandler extends HttpHandler {
                 String workType = pathComponents[2];
                 if ("single".equals(workType)) {
                     // Enqueue a single priority task.
-                    GenericClusterRequest task =
-                            mapper.readValue(request.getInputStream(), GenericClusterRequest.class);
+                    AnalysisRequest task =
+                            mapper.readValue(request.getInputStream(), AnalysisRequest.class);
                     if (broker.enqueuePriorityTask(task, response)) {
                         // Enqueueing the priority task has set its internal taskId.
                         // TODO move all removal listener registration into the broker functions.
@@ -161,11 +162,11 @@ class BrokerHttpHandler extends HttpHandler {
                 }
                 else if ("regional".equals(workType)) {
                     // Enqueue a list of tasks that all belong to one job.
-                    List<GenericClusterRequest> tasks = mapper.readValue(request.getInputStream(),
-                            new TypeReference<List<GenericClusterRequest>>() { });
+                    List<AnalysisRequest> tasks = mapper.readValue(request.getInputStream(),
+                            new TypeReference<List<AnalysisRequest>>() { });
                     // Pre-validate tasks checking that they are all on the same job
-                    GenericClusterRequest exemplar = tasks.get(0);
-                    for (GenericClusterRequest task : tasks) {
+                    AnalysisRequest exemplar = tasks.get(0);
+                    for (AnalysisRequest task : tasks) {
                         if (!task.jobId.equals(exemplar.jobId) ||
                             !task.graphId.equals(exemplar.graphId) ||
                             !task.workerVersion.equals(exemplar.workerVersion)) {

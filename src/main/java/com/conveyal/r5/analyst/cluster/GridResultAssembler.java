@@ -60,7 +60,7 @@ public class GridResultAssembler {
 
     private Base64.Decoder base64 = Base64.getDecoder();
 
-    private final GridRequest request;
+    private final AnalysisRequest request;
 
     private File temporaryFile;
     private RandomAccessFile buffer;
@@ -84,7 +84,7 @@ public class GridResultAssembler {
     /** Number of iterations for this grid request */
     private int nIterations;
 
-    public GridResultAssembler (GridRequest request, String outputBucket) {
+    public GridResultAssembler (AnalysisRequest request, String outputBucket) {
         this.request = request;
         this.outputBucket = outputBucket;
         nTotal = request.width * request.height;

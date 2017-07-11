@@ -431,8 +431,9 @@ public abstract class TraversalPermissionLabeler {
             applyOnewayHierarchically(Node.BICYCLE, sidepath, tree);
         }
 
-        // there are in fact one way pedestrian paths, believe it or not, but usually pedestrians don't inherit any oneway
-        // restrictions from more general modes
+        // Usually pedestrians don't inherit any oneway restrictions from other modes.
+        // However there are there are some one way pedestrian paths, e.g. entrances with turnstiles.
+        // Most such tags are oneway:foot=no though.
         applyOnewayHierarchically(Node.FOOT, OneWay.NO, tree);
         if (way.hasTag("oneway:foot")) {
             applyOnewayHierarchically(Node.FOOT, OneWay.fromTag(way.getTag("oneway:foot")), tree);

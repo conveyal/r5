@@ -283,7 +283,7 @@ public abstract class TraversalPermissionLabeler {
         }
     }
 
-    /** Label a tree with the defaults for a highway tag for a particular country */
+    /** Label a sub-tree of modes with the defaults for a highway tag for a particular country */
     protected EnumMap<Node, Label> getTreeForWay (Way way) {
         String highway = way.getTag("highway");
         EnumMap<Node, Label> tree = getDefaultTree();
@@ -434,14 +434,20 @@ public abstract class TraversalPermissionLabeler {
         // there are in fact one way pedestrian paths, believe it or not, but usually pedestrians don't inherit any oneway
         // restrictions from more general modes
         applyOnewayHierarchically(Node.FOOT, OneWay.NO, tree);
-        if (way.hasTag("oneway:foot")) applyOnewayHierarchically(Node.FOOT, OneWay.fromTag(way.getTag("oneway")), tree);
+        if (way.hasTag("oneway:foot")) {
+            applyOnewayHierarchically(Node.FOOT, OneWay.fromTag(way.getTag("oneway:foot")), tree);
+        }
 
         return tree;
     }
 
 
 
-    /** We are using such a small subset of the tree that we can just code it up manually here */
+    /**
+     * We apply access permissions recursively to sub-trees of modes.
+     * https://wiki.openstreetmap.org/wiki/Computing_access_restrictions#Transport_mode_hierarchy
+     * We are using such a small subset of the tree on the wiki that we code up the parent/child relationships manually.
+     */
     protected enum Node {
         ACCESS, // root
         FOOT, VEHICLE, // level 1

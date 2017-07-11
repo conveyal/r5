@@ -269,8 +269,11 @@ public class AnalystWorker implements Runnable {
         // so the worker needs to not come online until it's ready to process requests.
         if (networkId != null) {
             LOG.info("Pre-loading or building network with ID {}", networkId);
-            transportNetworkCache.getNetwork(networkId);
-            LOG.info("Done pre-loading network {}", networkId);
+            if (transportNetworkCache.getNetwork(networkId) == null) {
+                LOG.error("Failed to pre-load transport network {}", networkId);
+            } else {
+                LOG.info("Done pre-loading network {}", networkId);
+            }
         }
 
         // Start filling the work queues.

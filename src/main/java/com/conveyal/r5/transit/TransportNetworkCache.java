@@ -98,13 +98,13 @@ public class TransportNetworkCache {
 
     /** Convenience method that returns transport network from cache. */
     public synchronized TransportNetwork getNetwork (String networkId) {
-        TransportNetwork network;
         try {
-            network = cache.get(networkId);
+            return cache.get(networkId);
         } catch (Exception e) {
+            LOG.error("Exception while loading a transport network into the cache: {}", e.toString());
+            e.printStackTrace();
             return null;
         }
-        return network;
     }
 
     /**

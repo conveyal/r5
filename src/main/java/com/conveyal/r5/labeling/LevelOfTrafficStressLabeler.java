@@ -12,6 +12,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.EnumSet;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -27,6 +29,10 @@ public class LevelOfTrafficStressLabeler {
 
     /** match OSM speeds, from http://wiki.openstreetmap.org/wiki/Key:maxspeed */
     private static final Pattern speedPattern = Pattern.compile("^([0-9][\\.0-9]*?) ?(km/h|kmh|kph|mph|knots)?$");
+
+    Set<String> badMaxspeedValues = new HashSet<>();
+
+    Set<String> badLaneValues = new HashSet<>();
 
     /** Set the LTS for this way in the provided flags (not taking into account any intersection LTS at the moment) */
     public void label (Way way, EnumSet<EdgeStore.EdgeFlag> forwardFlags, EnumSet<EdgeStore.EdgeFlag> backFlags) {
@@ -76,18 +82,23 @@ public class LevelOfTrafficStressLabeler {
         double maxSpeed = Double.NaN;
         if (way.hasTag("maxspeed")) {
             // parse the max speed tag
-            maxSpeed = getSpeedKmh(way.getTag("maxspeed"));
+            String tagValue = way.getTag("maxspeed");
+            maxSpeed = getSpeedKmh(tagValue);
             if (Double.isNaN(maxSpeed)) {
-                LOG.warn("Unable to parse maxspeed tag {}", way.getTag("maxspeed"));
+                LOG.debug("Unable to parse maxspeed tag {}", tagValue);
+                badMaxspeedValues.add(tagValue);
             }
         }
 
         int lanes = Integer.MAX_VALUE;
         if (way.hasTag("lanes")) {
+            String tagValue = null;
             try {
-                lanes = Integer.parseInt(way.getTag("lanes"));
+                tagValue = way.getTag("lanes");
+                lanes = Integer.parseInt(tagValue);
             } catch (NumberFormatException e) {
-                LOG.warn("Unable to parse lane specification {}", way.getTag("lanes"));
+                LOG.debug("Unable to parse lane specification {}", tagValue);
+                badLaneValues.add(tagValue);
             }
         }
 
@@ -266,5 +277,13 @@ public class LevelOfTrafficStressLabeler {
         } catch (Exception e) {
             return Double.NaN;
         }
+    }
+
+    /**
+     * Call when finished using the instance to print some summary information.
+     */
+    public void logErrors() {
+        if (badMaxspeedValues.size() > 0) LOG.warn("Unrecognized values for maxspeed tag: {}", badMaxspeedValues);
+        if (badLaneValues.size() > 0) LOG.warn("Unrecognized values for lane tag: {}", badLaneValues);
     }
 }

@@ -24,13 +24,11 @@ import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.operation.union.UnaryUnionOp;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TLongIntMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TLongIntHashMap;
 import gnu.trove.set.TIntSet;
-import gnu.trove.set.hash.TIntHashSet;
 import org.geotools.geojson.geom.GeometryJSON;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -267,6 +265,7 @@ public class StreetLayer implements Serializable, Cloneable {
                 }
             }
         }
+        stressLabeler.logErrors();
 
         // summarize LTS statistics
         Edge cursor = edgeStore.getCursor();

@@ -7,7 +7,8 @@
 # 1: the AWS log group to use
 # 2: the worker configuration to use
 # If you are reading this comment inside the EC2 user data field, this variable substitution has already happened.
-# The string instance_id in curly brackets is substituted by EC2 at startup, not by our Java code.
+# The string instance_id in curly brackets is substituted by EC2 at startup, not by our Java code. It and any shell
+# variable references that contain brackets are single-quoted to tell Java's MessageFormat not to substitute them.
 
 # prep the system: install log agent, java
 yum -y install awslogs java-1.8.0-openjdk
@@ -72,7 +73,7 @@ MEM=`echo $TOTAL_MEM - 2097152 | bc`
 # run in ec2-user's home directory, in the subshell
 {
     cd ~ec2-user
-    sudo -u ec2-user java8 -Xmx${MEM}k -jar r5.jar worker worker.conf >> $LOGFILE 2>&1
+    sudo -u ec2-user java8 -Xmx$'{MEM}'k -jar r5.jar worker worker.conf >> $LOGFILE 2>&1
 
     # If the worker exits or doesn't start, wait a few minutes so that the CloudWatch log agent grabs
     # the logs

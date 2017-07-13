@@ -93,10 +93,6 @@ public class PerTargetPropagater {
 
             TIntIntMap pointToStopDistanceTable = targets.pointToStopDistanceTables.get(targetIdx);
 
-            // all variables used in lambdas must be "effectively final"; arrays are effectively final even if their
-            // values change
-            boolean[] targetEverReached = new boolean[] { nonTransitTravelTimesToTargets[targetIdx] <= cutoffSeconds };
-
             // don't try to propagate transit if there are no nearby transit stops,
             // but still call the reducer below with the non-transit times, because you can walk even where there is no
             // transit
@@ -112,7 +108,6 @@ public class PerTargetPropagater {
                         if (timeAtTargetThisStop < cutoffSeconds) {
                             if (timeAtTargetThisStop < perIterationTravelTimes[iteration]) {
                                 perIterationTravelTimes[iteration] = timeAtTargetThisStop;
-                                targetEverReached[0] = true;
                             }
                         }
                     }
@@ -136,7 +131,7 @@ public class PerTargetPropagater {
 
     public interface TravelTimeReducer {
         /** Receive the travel times for all iterations of the algorithm to a particular target specified by targetIndex */
-        void accept (int targetIndex, int[] travelTimesForTargets);
+        void accept (int targetIndex, int[] travelTimesForTarget);
 
         /** Called when propagation is done, used to signal the reducer that it can upload its results to s3 etc; optional */
         default void finish () {};

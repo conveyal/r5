@@ -33,6 +33,9 @@ public class AccessGridWriter {
     /** The offset to get to the data section of the access grid file */
     public static final long HEADER_SIZE = 9 * 4;
 
+    /** File backing this access grid writer, if it's using a file */
+    public final File file;
+
     private BufferAbstraction buffer;
 
     // store as longs so we can use with impunity without fear of overflow
@@ -51,6 +54,7 @@ public class AccessGridWriter {
         this.width = width;
         this.height = height;
         this.nValuesPerPixel = nValuesPerPixel;
+        this.file = gridFile;
 
         long nBytes = (long) width * height * nValuesPerPixel * 4 + HEADER_SIZE;
         this.buffer = new BufferAbstraction(gridFile, nBytes);

@@ -60,7 +60,7 @@ public class GridResultAssembler {
 
     private Base64.Decoder base64 = Base64.getDecoder();
 
-    private final AnalysisRequest request;
+    public final AnalysisRequest request;
 
     private File temporaryFile;
     private RandomAccessFile buffer;
@@ -79,7 +79,7 @@ public class GridResultAssembler {
 
     public int nTotal;
 
-    private final String outputBucket;
+    public final String outputBucket;
 
     /** Number of iterations for this grid request */
     private int nIterations;
@@ -91,7 +91,7 @@ public class GridResultAssembler {
         originsReceived = new BitSet(nTotal);
     }
 
-    private synchronized void finish () {
+    protected synchronized void finish () {
         // gzip and push up to S3
         LOG.info("Finished receiving data for regional analysis {}, uploading to S3", request.jobId);
 

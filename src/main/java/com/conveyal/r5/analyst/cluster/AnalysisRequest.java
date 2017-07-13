@@ -51,6 +51,7 @@ public class AnalysisRequest extends ProfileRequest {
     public Type type;
 
     /** Travel time surfaces (single point requests) are high priority. Regional analyses are not */
+    @JsonIgnore
     public boolean isHighPriority() {
         return type == Type.TRAVEL_TIME_SURFACE;
     }
@@ -65,5 +66,10 @@ public class AnalysisRequest extends ProfileRequest {
         TRAVEL_TIME_SURFACE,
         /** Bootstrapped accessibility results returned over SQS. */
         REGIONAL_ANALYSIS
+    }
+
+    public AnalysisRequest clone () {
+        // no need to catch CloneNotSupportedException, it's caught in ProfileRequest::clone
+        return (AnalysisRequest) super.clone();
     }
 }

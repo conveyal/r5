@@ -153,22 +153,24 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
     }
 
     @Override
-    public void accept(int target, int[] travelTimesForTargets) {
-        int gridx = target % request.width;
-        int gridy = target / request.width;
+    public void accept(int target, int[] travelTimesForTarget) {
+        // We use the size of the grid to determine the number of destinations used in the linked point set in
+        // TravelTimeComputer, therefore the target indices are relative to the grid, not the request.
+        int gridx = target % grid.width;
+        int gridy = target / grid.width;
         double opportunityCountAtTarget = grid.grid[gridx][gridy];
 
         // as an optimization, don't even bother to compute the sampling distribution at cells that contain no
         // opportunities.
         if (opportunityCountAtTarget < 1e-6) return;
 
-        if (travelTimesForTargets.length == 1) {
+        if (travelTimesForTarget.length == 1) {
             // no variation and hence no bootstrapping.
             // TODO this only happens with non-transit modes currently, but we could just short circuit the bootstrapping
             // any time there are no frequencies. That won't work though once we have the double monte carlo method
             // where we sample from departure times as well though because even scheduled networks will have variation
             // (unless we short-circuit those random draws and use all minutes in that case).
-            if (travelTimesForTargets[0] < request.maxTripDurationMinutes * 60) {
+            if (travelTimesForTarget[0] < request.maxTripDurationMinutes * 60) {
                 bootstrapReplicationsOfAccessibility[0] += opportunityCountAtTarget;
             }
 
@@ -180,14 +182,14 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
         // this improves computation speed (verified)
         TIntList reachableInIterationsList = new TIntArrayList();
 
-        for (int i = 0; i < travelTimesForTargets.length; i++) {
-            if (travelTimesForTargets[i] < request.maxTripDurationMinutes * 60) reachableInIterationsList.add(i);
+        for (int i = 0; i < travelTimesForTarget.length; i++) {
+            if (travelTimesForTarget[i] < request.maxTripDurationMinutes * 60) reachableInIterationsList.add(i);
         }
 
         int[] reachableInIterations = reachableInIterationsList.toArray();
 
         boolean isAlwaysReachableWithinTravelTimeCutoff =
-                reachableInIterations.length == travelTimesForTargets.length;
+                reachableInIterations.length == travelTimesForTarget.length;
         boolean isNeverReachableWithinTravelTimeCutoff = reachableInIterations.length == 0;
 
         // Optimization: only bootstrap if some of the travel times are above the cutoff and some below.
@@ -242,5 +244,7 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
         SendMessageRequest smr = new SendMessageRequest(request.outputQueue, base64.encodeToString(baos.toByteArray()));
         smr = smr.addMessageAttributesEntry("jobId", new MessageAttributeValue().withDataType("String").withStringValue(request.jobId));
         sqs.sendMessage(smr);
+
+
     }
 }

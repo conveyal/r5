@@ -27,7 +27,7 @@ import java.util.zip.GZIPInputStream;
  *
  * This class is not referenced within R5, but is used by the Analysis front end.
  */
-public abstract class SelectingGridReducer {
+public class SelectingGridReducer {
 
     private static final AmazonS3 s3 = new AmazonS3Client();
 

@@ -36,7 +36,7 @@ import java.util.zip.GZIPInputStream;
  *
  * This class is not referenced within the R5 library, but is used by the Analysis frontend.
  */
-public abstract class BootstrapPercentileMethodHypothesisTestGridReducer {
+public class BootstrapPercentileMethodHypothesisTestGridReducer {
     private static final AmazonS3 s3 = new AmazonS3Client();
     /** Version of the access grid format we read */
     private static final int ACCESS_GRID_VERSION = 0;

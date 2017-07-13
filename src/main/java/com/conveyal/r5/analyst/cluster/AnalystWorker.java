@@ -358,7 +358,7 @@ public class AnalystWorker implements Runnable {
             }
 
             TravelTimeComputer computer = new TravelTimeComputer(request, transportNetwork, gridCache);
-            try {
+            if (request.isHighPriority()) {
                 PipedInputStream pis = new PipedInputStream();
 
                 // gzip the data before sending it to the broker. Compression ratios here are extreme (100x is not uncommon)
@@ -370,14 +370,17 @@ public class AnalystWorker implements Runnable {
 
                 computer.write(pos);
                 pos.close();
-            } catch (IOException e) {
-                LOG.error("Error writing travel time surface to broker", e);
+            } else {
+                // not a high priority request, will not be returned via high-priority channel but rather via an SQS
+                // queue. Explicitly delete the request when done if there have been no exceptions thrown.
+                computer.write(null);
+                deleteRequest(request);
             }
         } catch (Exception ex) {
             // Catch any exceptions that were not handled by more specific catch clauses above.
             // This ensures that some form of error message is passed all the way back up to the web UI.
             TaskError taskError = new TaskError(ex);
-            LOG.error("An error occurred while routing: {}", ExceptionUtils.asString(ex));
+            LOG.error("An error occurred while routing", ex);
             reportTaskErrors(request.taskId, HttpStatus.INTERNAL_SERVER_ERROR_500, Arrays.asList(taskError));
         }
     }

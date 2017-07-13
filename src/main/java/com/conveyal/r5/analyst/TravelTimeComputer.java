@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalysisRequest;
+import com.conveyal.r5.analyst.cluster.AnalystWorker;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.PerTargetPropagater;
@@ -52,7 +53,23 @@ public class TravelTimeComputer {
             throw new IllegalArgumentException("If either x or y coordinate of origin is specified, both must be specified.");
         }
 
-        WebMercatorGridPointSet destinations = pointSetCache.get(request.zoom, request.west, request.north, request.width, request.height);
+        WebMercatorGridPointSet destinations;
+        if (request.grid != null) {
+            // NB kinda hacky, grids are only used when doing regional analysis as accessibility is computed client side
+            // in interactive single point mode. But we need to know how big the grid is to know how big to make the
+            // destination pointset.
+            // This does mean two calls to gridCache.get (here and in BootstrappingTravelTimeReducer), but gridCache is a true
+            // LoadingCache so this should not matter as the grid should already be loaded and the same one returned on
+            // both calls.
+            // Note that it doesn't matter if the origin is outside of the grid size. Since it is assumed there are no
+            // opportunities outside the grid, only the cells within the grid can have any effect, so there is no need to
+            // link additional cells.
+            Grid grid = gridCache.get(request.grid);
+            destinations = pointSetCache.get(grid);
+
+        } else {
+            destinations = pointSetCache.get(request.zoom, request.west, request.north, request.width, request.height);
+        }
 
         PerTargetPropagater.TravelTimeReducer output;
         if (request.type == AnalysisRequest.Type.TRAVEL_TIME_SURFACE) output = new TravelTimeSurfaceReducer(request, network, os);

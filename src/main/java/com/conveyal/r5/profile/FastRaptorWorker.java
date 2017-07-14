@@ -128,7 +128,7 @@ public class FastRaptorWorker {
         LOG.info("Performing {} scheduled iterations each with {} Monte Carlo draws for a total of {} iterations",
                 nMinutes, monteCarloDrawsPerMinute, nMinutes * monteCarloDrawsPerMinute);
 
-        int[][] results = new int[transit.hasFrequencies ? nMinutes * monteCarloDrawsPerMinute : nMinutes][];
+        int[][] results = new int[nMinutes * monteCarloDrawsPerMinute][];
         int currentIteration = 0;
 
         // main loop over departure times

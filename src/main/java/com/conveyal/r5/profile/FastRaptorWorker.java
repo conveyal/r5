@@ -316,9 +316,16 @@ public class FastRaptorWorker {
 
             return result;
         } else {
-            // no frequencies, return result of scheduled search
-            if (saveAllStates) statesEachIteration.add(scheduleState[request.maxRides].deepCopy());
-            return new int[][] { scheduleState[request.maxRides].bestNonTransferTimes };
+            // No frequencies, return result of scheduled search, but duplicated by the number of
+            // MC draws so that the scheduled search accessibility isn't artificially deflated
+            // relative to any networks with frequencies.
+            int[][] result = new int[iterationsPerMinute][];
+            for (int i = 0; i < monteCarloDrawsPerMinute; i++) {
+                if (saveAllStates) statesEachIteration.add(scheduleState[request.maxRides].deepCopy());
+                result[i] = scheduleState[request.maxRides].bestNonTransferTimes;
+            }
+            if (saveAllStates) statesEachIteration.add(scheduleState[request.maxRides * monteCarloDrawsPerMinute].deepCopy());
+            return result;
         }
     }
 

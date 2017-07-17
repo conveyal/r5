@@ -123,11 +123,23 @@ public class Grid {
     }
 
     /**
+     * Version of getPixelWeights which returns the weights as relative to the total area of the input geometry (i.e.
+     * the weight at a pixel is the proportion of the input geometry that falls within that pixel.
+     */
+    public TObjectDoubleMap<int[]> getPixelWeights (Geometry geometry) {
+        return getPixelWeights(geometry, false);
+    }
+
+    /**
      * Get the proportions of an input polygon feature that overlap each grid cell, in the format [x, y] => weight.
      * This weight object can then be fed into the incrementFromPixelWeights function to actually burn a polygon into the
      * grid.
+     *
+     * If relativeToPixels is true, the weights are the proportion of the pixel that is covered. Otherwise they are the
+     * portion of this polygon which is within the given grid cell. If using incrementPixelWeights, this should be set to
+     * false.
      */
-    public TObjectDoubleMap<int[]> getPixelWeights (Geometry geometry) {
+    public TObjectDoubleMap<int[]> getPixelWeights (Geometry geometry, boolean relativeToPixels) {
         // No need to convert to a local coordinate system
         // Both the supplied polygon and the web mercator pixel geometries are left in WGS84 geographic coordinates.
         // Both are distorted equally along the X axis at a given latitude so the proportion of the geometry within
@@ -151,7 +163,8 @@ public class Grid {
 
                 Geometry pixel = getPixelGeometry(x + west, y + north, zoom);
                 Geometry intersection = pixel.intersection(geometry);
-                double weight = intersection.getArea() / area;
+                double denominator = relativeToPixels ? pixel.getArea() : area;
+                double weight = intersection.getArea() / denominator;
                 weights.put(new int[] { x, y }, weight);
             }
         }

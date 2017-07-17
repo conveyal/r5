@@ -128,7 +128,7 @@ public class FastRaptorWorker {
         LOG.info("Performing {} scheduled iterations each with {} Monte Carlo draws for a total of {} iterations",
                 nMinutes, monteCarloDrawsPerMinute, nMinutes * monteCarloDrawsPerMinute);
 
-        int[][] results = new int[transit.hasFrequencies ? nMinutes * monteCarloDrawsPerMinute : nMinutes][];
+        int[][] results = new int[nMinutes * monteCarloDrawsPerMinute][];
         int currentIteration = 0;
 
         // main loop over departure times
@@ -316,9 +316,16 @@ public class FastRaptorWorker {
 
             return result;
         } else {
-            // no frequencies, return result of scheduled search
-            if (saveAllStates) statesEachIteration.add(scheduleState[request.maxRides].deepCopy());
-            return new int[][] { scheduleState[request.maxRides].bestNonTransferTimes };
+            // No frequencies, return result of scheduled search, but multiplied by the number of
+            // MC draws so that the scheduled search accessibility avoids potential bugs where assumptions
+            // are made about how many results will be returned from a search, e.g., in
+            // https://github.com/conveyal/r5/issues/306
+            int[][] result = new int[iterationsPerMinute][];
+            for (int i = 0; i < monteCarloDrawsPerMinute; i++) {
+                if (saveAllStates) statesEachIteration.add(scheduleState[request.maxRides].deepCopy());
+                result[i] = scheduleState[request.maxRides].bestNonTransferTimes;
+            }
+            return result;
         }
     }
 

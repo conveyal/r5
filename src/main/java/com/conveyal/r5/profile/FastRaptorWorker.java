@@ -316,15 +316,15 @@ public class FastRaptorWorker {
 
             return result;
         } else {
-            // No frequencies, return result of scheduled search, but duplicated by the number of
-            // MC draws so that the scheduled search accessibility isn't artificially deflated
-            // relative to any networks with frequencies.
+            // No frequencies, return result of scheduled search, but multiplied by the number of
+            // MC draws so that the scheduled search accessibility avoids potential bugs where assumptions
+            // are made about how many results will be returned from a search, e.g., in
+            // https://github.com/conveyal/r5/issues/306
             int[][] result = new int[iterationsPerMinute][];
             for (int i = 0; i < monteCarloDrawsPerMinute; i++) {
-                if (saveAllStates) statesEachIteration.add(scheduleState[request.maxRides].deepCopy());
+                if (saveAllStates) statesEachIteration.add(scheduleState[request.maxRides * monteCarloDrawsPerMinute].deepCopy());
                 result[i] = scheduleState[request.maxRides].bestNonTransferTimes;
             }
-            if (saveAllStates) statesEachIteration.add(scheduleState[request.maxRides * monteCarloDrawsPerMinute].deepCopy());
             return result;
         }
     }

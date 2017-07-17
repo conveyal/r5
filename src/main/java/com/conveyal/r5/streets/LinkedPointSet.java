@@ -192,6 +192,33 @@ public class LinkedPointSet implements Serializable {
             }
         }
 
+        stopToPointDistanceTables = sourceLinkage.stopToPointDistanceTables.stream()
+                .map(distanceTable -> {
+                    if (distanceTable == null) return null; // if it was previously unlinked, it is still unlinked
+
+                    TIntList newDistanceTable = new TIntArrayList();
+                    for (int i = 0; i < distanceTable.length; i += 2) {
+                        int targetInSuperLinkage = distanceTable[i];
+                        int distance = distanceTable[i + 1];
+
+                        int superX = targetInSuperLinkage % superGrid.width;
+                        int superY = targetInSuperLinkage / superGrid.width;
+
+                        int subX = superX + superGrid.west - subGrid.west;
+                        int subY = superY + superGrid.north - subGrid.north;
+
+                        if (subX >= 0 && subX < subGrid.width && subY >= 0 && subY < subGrid.height) {
+                            // only retain connections to points that fall within the subGrid
+                            int targetInSubLinkage = subY * subGrid.width + subX;
+                            newDistanceTable.add(targetInSubLinkage);
+                            newDistanceTable.add(distance); // distance to target does not change when we crop the pointset
+                        }
+                    }
+
+                    if (newDistanceTable.isEmpty()) return null; // not near any points in sub pointset
+                    else return newDistanceTable.toArray();
+                })
+                .collect(Collectors.toList());
     }
 
 

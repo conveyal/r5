@@ -40,8 +40,10 @@ public abstract class PointSet implements Serializable {
      * must be copied for every scenario due to references to their containing TransportNetwork.
      * Note that this cache will be serialized with the PointSet, but serializing a Guava cache only serializes the
      * cache instance and its settings, not the contents of the cache. We consider this sane behavior.
+     *
+     * This is public so we can populate it during deserialization. It should generally not be accessed directly.
      */
-    protected LoadingCache<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> linkageCache = CacheBuilder.newBuilder()
+    public LoadingCache<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> linkageCache = CacheBuilder.newBuilder()
             .maximumSize(LINKAGE_CACHE_SIZE)
             .build(new LinkageCacheLoader());
 

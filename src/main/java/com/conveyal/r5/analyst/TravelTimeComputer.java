@@ -1,7 +1,6 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.analyst.cluster.AnalysisRequest;
-import com.conveyal.r5.analyst.cluster.AnalystWorker;
+import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.PerTargetPropagater;
@@ -29,11 +28,11 @@ public class TravelTimeComputer {
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeComputer.class);
     private static final WebMercatorGridPointSetCache pointSetCache = new WebMercatorGridPointSetCache();
 
-    public final AnalysisRequest request;
+    public final AnalysisTask request;
     public final TransportNetwork network;
     public final GridCache gridCache;
 
-    public TravelTimeComputer(AnalysisRequest request, TransportNetwork network, GridCache gridCache) {
+    public TravelTimeComputer(AnalysisTask request, TransportNetwork network, GridCache gridCache) {
         this.request = request;
         this.network = network;
         this.gridCache = gridCache;
@@ -46,35 +45,10 @@ public class TravelTimeComputer {
         // use x, y within grid if available, otherwise fromLat and toLat
         double fromLat = request.fromLat;
         double fromLon = request.fromLon;
-        if (request.x >= 0 && request.y >= 0) {
-            fromLat = request.y >= 0 ? Grid.pixelToCenterLat(request.y + request.north, request.zoom) : request.fromLat;
-            fromLon = request.x >= 0 ? Grid.pixelToCenterLon(request.x + request.west, request.zoom) : request.fromLon;
-        } else if (request.x >= 0 || request.y >= 0) {
-            throw new IllegalArgumentException("If either x or y coordinate of origin is specified, both must be specified.");
-        }
 
-        WebMercatorGridPointSet destinations;
-        if (request.grid != null) {
-            // NB kinda hacky, grids are only used when doing regional analysis as accessibility is computed client side
-            // in interactive single point mode. But we need to know how big the grid is to know how big to make the
-            // destination pointset.
-            // This does mean two calls to gridCache.get (here and in BootstrappingTravelTimeReducer), but gridCache is a true
-            // LoadingCache so this should not matter as the grid should already be loaded and the same one returned on
-            // both calls.
-            // Note that it doesn't matter if the origin is outside of the grid size. Since it is assumed there are no
-            // opportunities outside the grid, only the cells within the grid can have any effect, so there is no need to
-            // link additional cells.
-            Grid grid = gridCache.get(request.grid);
-            destinations = pointSetCache.get(grid);
+        PointSet destinations = request.getDestinations(network, gridCache);
 
-        } else {
-            destinations = pointSetCache.get(request.zoom, request.west, request.north, request.width, request.height);
-        }
-
-        PerTargetPropagater.TravelTimeReducer output;
-        if (request.type == AnalysisRequest.Type.TRAVEL_TIME_SURFACE) output = new TravelTimeSurfaceReducer(request, network, os);
-        else if (request.type == AnalysisRequest.Type.REGIONAL_ANALYSIS) output = new BootstrappingTravelTimeReducer(request, gridCache);
-        else throw new IllegalArgumentException("Unrecognized request type " + request.type);
+        PerTargetPropagater.TravelTimeReducer output = request.getTravelTimeReducer(network, os);
 
         if (request.transitModes.isEmpty()) {
             // non transit search
@@ -146,7 +120,9 @@ public class TravelTimeComputer {
                     .eval(sr::getTravelTimeToVertex, offstreetTravelSpeedMillimetersPerSecond)
                     .travelTimes;
 
-            // From this point on the requests are handled separately depending on whether
+            // From this point on the requests are handled separately depending on whether they are single point requests
+            // returning a surface representing the distribution of potential travel times to each destination, regional
+            // requests that will return bootstrapped accessibility numbers via Amazon SQS.
 
             PerTargetPropagater perTargetPropagater = new PerTargetPropagater(transitTravelTimesToStops, nonTransitTravelTimesToDestinations, linkedDestinationsEgress, request, 120 * 60);
             perTargetPropagater.propagate(output);

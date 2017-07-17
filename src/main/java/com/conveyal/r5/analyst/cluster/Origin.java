@@ -42,8 +42,8 @@ public class Origin {
      */
     public int[] samples;
 
-    /** Construct an origin given a grid request and the instantaneous accessibility computed for each iteration */
-    public Origin (AnalysisRequest request, double percentile, int[] samples) {
+    /** Construct an origin given a grid task and the instantaneous accessibility computed for each iteration */
+    public Origin (RegionalTask request, double percentile, int[] samples) {
         this.jobId = request.jobId;
         this.percentile = percentile;
         this.x = request.x;

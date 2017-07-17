@@ -10,7 +10,6 @@ import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
-import com.conveyal.r5.util.ExceptionUtils;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.http.HttpEntity;
@@ -84,7 +83,7 @@ public class AnalystWorker implements Runnable {
      */
     public int dryRunFailureRate = -1;
 
-    /** How long (minimum, in milliseconds) should this worker stay alive after receiving a single point request? */
+    /** How long (minimum, in milliseconds) should this worker stay alive after receiving a single point task? */
     public static final int SINGLE_POINT_KEEPALIVE_MSEC = 15 * 60 * 1000;
 
     /** should this worker shut down automatically */
@@ -128,10 +127,10 @@ public class AnalystWorker implements Runnable {
     EC2Info ec2info;
 
     /**
-     * The time the last high priority request was processed, in milliseconds since the epoch, used to check if the
+     * The time the last high priority task was processed, in milliseconds since the epoch, used to check if the
      * machine should be shut down.
      */
-    long lastHighPriorityRequestProcessed = 0;
+    private long lastHighPriorityTaskProcessed = 0;
 
     /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
     private boolean workOffline;
@@ -236,7 +235,7 @@ public class AnalystWorker implements Runnable {
         // Pre-loading the graph is necessary because if the graph is not cached it can take several
         // minutes to build it. Even if the graph is cached, reconstructing the indices and stop trees
         // can take a while. The UI times out after 30 seconds, so the broker needs to return a response to tell it
-        // to try again later within that timespan. The broker can't do that after it's sent a request to a worker,
+        // to try again later within that timespan. The broker can't do that after it's sent a task to a worker,
         // so the worker needs to not come online until it's ready to process requests.
         if (networkId != null) {
             LOG.info("Pre-loading or building network with ID {}", networkId);
@@ -250,7 +249,7 @@ public class AnalystWorker implements Runnable {
             long now = System.currentTimeMillis();
             // Consider shutting down if enough time has passed
             if (now > nextShutdownCheckTime && autoShutdown) {
-                if (idle && now > lastHighPriorityRequestProcessed + SINGLE_POINT_KEEPALIVE_MSEC) {
+                if (idle && now > lastHighPriorityTaskProcessed + SINGLE_POINT_KEEPALIVE_MSEC) {
                     LOG.warn("Machine is idle, shutting down.");
                     try {
                         Process process = new ProcessBuilder("sudo", "/sbin/shutdown", "-h", "now").start();
@@ -265,7 +264,7 @@ public class AnalystWorker implements Runnable {
             }
             LOG.debug("Long-polling for work ({} second timeout).", POLL_TIMEOUT / 1000.0);
             // Long-poll (wait a few seconds for messages to become available)
-            List<AnalysisRequest> tasks = getSomeWork(WorkType.REGIONAL);
+            List<AnalysisTask> tasks = getSomeWork(WorkType.REGIONAL);
             if (tasks == null) {
                 LOG.debug("Didn't get any work. Retrying.");
                 idle = true;
@@ -274,9 +273,9 @@ public class AnalystWorker implements Runnable {
 
             // Enqueue high-priority (interactive) tasks first to ensure they are enqueued
             // even if the low-priority batch queue blocks.
-            tasks.stream().filter(AnalysisRequest::isHighPriority)
+            tasks.stream().filter(AnalysisTask::isHighPriority)
                     .forEach(t -> highPriorityExecutor.execute(() -> {
-                        LOG.warn("Handling single point request via normal channel, side channel should open shortly.");
+                        LOG.warn("Handling single point task via normal channel, side channel should open shortly.");
                         this.handleOneRequest(t);
                     }));
 
@@ -308,9 +307,9 @@ public class AnalystWorker implements Runnable {
      * This is the callback that processes a single task and returns the results upon completion.
      * It may be called several times simultaneously on different executor threads.
      */
-    private void handleOneRequest(AnalysisRequest request) {
+    private void handleOneRequest(AnalysisTask request) {
         if (request.isHighPriority()) {
-            lastHighPriorityRequestProcessed = System.currentTimeMillis();
+            lastHighPriorityTaskProcessed = System.currentTimeMillis();
             if (!sideChannelOpen) {
                 openSideChannel();
             }
@@ -337,7 +336,7 @@ public class AnalystWorker implements Runnable {
             long startTime = System.currentTimeMillis();
             LOG.info("Handling message {}", request.toString());
             long graphStartTime = System.currentTimeMillis();
-            // Get the graph object for the ID given in the request, fetching inputs and building as needed.
+            // Get the graph object for the ID given in the task, fetching inputs and building as needed.
             // All requests handled together are for the same graph, and this call is synchronized so the graph will
             // only be built once.
             // Record graphId so we "stick" to this same graph on subsequent polls.
@@ -346,7 +345,7 @@ public class AnalystWorker implements Runnable {
             // TODO fetch the scenario-applied transportNetwork out here, maybe using OptionalResult instead of exceptions
             TransportNetwork transportNetwork = null;
             try {
-                // FIXME ideally we should just be passing the scenario object into this function, and another separate function should get the scenario object from the cluster request.
+                // FIXME ideally we should just be passing the scenario object into this function, and another separate function should get the scenario object from the task.
                 transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, request);
             } catch (ScenarioApplicationException scenarioException) {
                 // Handle exceptions specifically representing a failure to apply the scenario.
@@ -371,8 +370,8 @@ public class AnalystWorker implements Runnable {
                 computer.write(pos);
                 pos.close();
             } else {
-                // not a high priority request, will not be returned via high-priority channel but rather via an SQS
-                // queue. Explicitly delete the request when done if there have been no exceptions thrown.
+                // not a high priority task, will not be returned via high-priority channel but rather via an SQS
+                // queue. Explicitly delete the task when done if there have been no exceptions thrown.
                 computer.write(null);
                 deleteRequest(request);
             }
@@ -394,10 +393,10 @@ public class AnalystWorker implements Runnable {
         new Thread(() -> {
             sideChannelOpen = true;
             // don't keep single point connections alive forever
-            while (System.currentTimeMillis() < lastHighPriorityRequestProcessed + SINGLE_POINT_KEEPALIVE_MSEC) {
+            while (System.currentTimeMillis() < lastHighPriorityTaskProcessed + SINGLE_POINT_KEEPALIVE_MSEC) {
                 LOG.debug("Awaiting high-priority work");
                 try {
-                    List<AnalysisRequest> tasks = getSomeWork(WorkType.SINGLE);
+                    List<AnalysisTask> tasks = getSomeWork(WorkType.SINGLE);
 
                     if (tasks != null)
                         tasks.stream().forEach(t -> highPriorityExecutor.execute(
@@ -412,9 +411,9 @@ public class AnalystWorker implements Runnable {
         }).start();
     }
 
-    public List<AnalysisRequest> getSomeWork(WorkType type) {
-        // Run a POST request (long-polling for work)
-        // The graph and r5 commit of this worker are indicated in the request body.
+    public List<AnalysisTask> getSomeWork(WorkType type) {
+        // Run a POST task (long-polling for work)
+        // The graph and r5 commit of this worker are indicated in the task body.
         String url = String.join("/", BROKER_BASE_URL, "dequeue", type == WorkType.SINGLE ? "single" : "regional");
         HttpPost httpPost = new HttpPost(url);
         WorkerStatus workerStatus = new WorkerStatus();
@@ -431,7 +430,7 @@ public class AnalystWorker implements Runnable {
                 return null;
             }
             // Use the lenient object mapper here in case the broker belongs to a newer
-            return JsonUtilities.lenientObjectMapper.readValue(entity.getContent(), new TypeReference<List<AnalysisRequest>>() {});
+            return JsonUtilities.lenientObjectMapper.readValue(entity.getContent(), new TypeReference<List<AnalysisTask>>() {});
         } catch (JsonProcessingException e) {
             LOG.error("JSON processing exception while getting work", e);
         } catch (SocketTimeoutException stex) {
@@ -459,7 +458,7 @@ public class AnalystWorker implements Runnable {
      * caller to write data to the input stream it passed in. This arrangement avoids broken pipes that can happen
      * when the calling thread dies. TODO clarify when and how which thread can die.
      */
-    public void finishPriorityTask(AnalysisRequest request, InputStream result, String contentType, String contentEncoding) {
+    public void finishPriorityTask(AnalysisTask request, InputStream result, String contentType, String contentEncoding) {
         //CountingInputStream is = new CountingInputStream(result);
 
         LOG.info("Returning high-priority results for task {}", request.taskId);
@@ -516,7 +515,7 @@ public class AnalystWorker implements Runnable {
     /**
      * Tell the broker that the given message has been successfully processed by a worker (HTTP DELETE).
      */
-    public void deleteRequest(AnalysisRequest request) {
+    public void deleteRequest(AnalysisTask request) {
         String url = BROKER_BASE_URL + String.format("/tasks/%s", request.taskId);
         HttpDelete httpDelete = new HttpDelete(url);
         try {

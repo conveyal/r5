@@ -2,14 +2,10 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
-import com.google.common.io.ByteStreams;
-import org.apache.http.HttpResponse;
 import org.apache.http.StatusLine;
-import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
-import com.conveyal.r5.profile.ProfileRequest;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -58,15 +54,15 @@ public class JobSimulator {
         mapper.registerModule(JavaLocalDateSerializer.makeModule());
         mapper.registerModule(TraverseModeSetSerializer.makeModule());*/
 
-        List<AnalysisRequest> requests = new ArrayList<>();
+        List<AnalysisTask> requests = new ArrayList<>();
 
         IntStream.range(0, nOrigins).forEach(i -> {
             // Enqueue one fake origin
-            AnalysisRequest request = new AnalysisRequest();
+            RegionalTask request = new RegionalTask();
             request.fromLat = 45.515;
             request.fromLon = -122.643;
             request.transitModes = null; //new TraverseModeSet(TraverseMode.TRANSIT);
-            // The request type has been changed due to refactoring.
+            // The task type has been changed due to refactoring.
             // We haven't tested that this works properly, but thought it would be useful to leave in the
             // tests to check that broker task retrying works.
             request.graphId = graphId;

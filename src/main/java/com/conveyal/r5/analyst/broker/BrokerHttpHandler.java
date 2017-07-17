@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst.broker;
 
-import com.conveyal.r5.analyst.cluster.AnalysisRequest;
+import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.AnalystWorker;
 import com.conveyal.r5.analyst.cluster.WorkerStatus;
 import com.conveyal.r5.analyst.error.TaskError;
@@ -148,8 +148,8 @@ class BrokerHttpHandler extends HttpHandler {
                 String workType = pathComponents[2];
                 if ("single".equals(workType)) {
                     // Enqueue a single priority task.
-                    AnalysisRequest task =
-                            mapper.readValue(request.getInputStream(), AnalysisRequest.class);
+                    AnalysisTask task =
+                            mapper.readValue(request.getInputStream(), AnalysisTask.class);
                     if (broker.enqueuePriorityTask(task, response)) {
                         // Enqueueing the priority task has set its internal taskId.
                         // TODO move all removal listener registration into the broker functions.
@@ -162,11 +162,11 @@ class BrokerHttpHandler extends HttpHandler {
                 }
                 else if ("regional".equals(workType)) {
                     // Enqueue a list of tasks that all belong to one job.
-                    List<AnalysisRequest> tasks = mapper.readValue(request.getInputStream(),
-                            new TypeReference<List<AnalysisRequest>>() { });
+                    List<AnalysisTask> tasks = mapper.readValue(request.getInputStream(),
+                            new TypeReference<List<AnalysisTask>>() { });
                     // Pre-validate tasks checking that they are all on the same job
-                    AnalysisRequest exemplar = tasks.get(0);
-                    for (AnalysisRequest task : tasks) {
+                    AnalysisTask exemplar = tasks.get(0);
+                    for (AnalysisTask task : tasks) {
                         if (!task.jobId.equals(exemplar.jobId) ||
                             !task.graphId.equals(exemplar.graphId) ||
                             !task.workerVersion.equals(exemplar.workerVersion)) {
@@ -201,14 +201,14 @@ class BrokerHttpHandler extends HttpHandler {
                     return;
                 }
                 if ("success".equals(successOrError)) {
-                    // The worker did not find any obvious problems with the request and is streaming back what it
+                    // The worker did not find any obvious problems with the task and is streaming back what it
                     // believes to be a reliable work result.
                     suspendedProducerResponse.setStatus(HttpStatus.OK_200);
                     suspendedProducerResponse.setContentType(request.getContentType());
                     String contentEncoding = request.getHeader("Content-Encoding");
                     if (contentEncoding != null) suspendedProducerResponse.setHeader("Content-Encoding", contentEncoding);
                 } else {
-                    // The worker is providing an error message because it spotted something wrong with the request.
+                    // The worker is providing an error message because it spotted something wrong with the task.
                     suspendedProducerResponse.setStatus(Integer.parseInt(successOrError));
                     suspendedProducerResponse.setCharacterEncoding("utf-8");
                     suspendedProducerResponse.setContentType("application/json");

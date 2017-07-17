@@ -87,13 +87,13 @@ public class GridResultQueueConsumer implements Runnable {
         }
     }
 
-    /** Register a particular request using the default grid assembler */
-    public void registerJob (AnalysisRequest request) {
+    /** Register a particular task using the default grid assembler */
+    public void registerJob (AnalysisTask request) {
         registerJob(request, new GridResultAssembler(request, outputBucket));
     }
 
-    /** Register a grid assembler for a particular request */
-    public void registerJob (AnalysisRequest request, GridResultAssembler assembler) {
+    /** Register a grid assembler for a particular task */
+    public void registerJob (AnalysisTask request, GridResultAssembler assembler) {
         this.assemblers.put(request.jobId, assembler);
     }
 

@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst.broker;
 
-import com.conveyal.r5.analyst.cluster.AnalysisRequest;
+import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TIntSet;
@@ -39,10 +39,10 @@ public class Job {
      * Tasks in this job that have yet to be delivered, or that will be re-delivered due to completion timeout.
      * Maybe this should only be a list of IDs.
      */
-    Queue<AnalysisRequest> tasksAwaitingDelivery = new ArrayDeque<>();
+    Queue<AnalysisTask> tasksAwaitingDelivery = new ArrayDeque<>();
 
     /* The tasks in this job keyed on their task ID. */
-    TIntObjectMap<AnalysisRequest> tasksById = new TIntObjectHashMap<>();
+    TIntObjectMap<AnalysisTask> tasksById = new TIntObjectHashMap<>();
 
     /* The last time tasks were delivered to a worker. Enables a quiet period between delivery and re-delivery. */
     long lastDeliveryTime = 0;
@@ -58,7 +58,7 @@ public class Job {
     }
 
     /** Adds a task to this Job, assigning it a task ID number. */
-    public void addTask (AnalysisRequest task) {
+    public void addTask (AnalysisTask task) {
         tasksById.put(task.taskId, task);
         tasksAwaitingDelivery.add(task);
     }
@@ -97,7 +97,7 @@ public class Job {
     }
 
     public boolean containsTask (int taskId) {
-        AnalysisRequest req = tasksById.get(taskId);
+        AnalysisTask req = tasksById.get(taskId);
         if (req != null) {
             if (!req.jobId.equals(this.jobId)) {
                 LOG.error("Task {} has a job ID that does not match the job in which it was discovered.");

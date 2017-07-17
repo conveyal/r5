@@ -4,8 +4,8 @@ import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.MessageAttributeValue;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
-import com.conveyal.r5.analyst.cluster.AnalysisRequest;
 import com.conveyal.r5.analyst.cluster.Origin;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -101,7 +101,7 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
 
     private static final Base64.Encoder base64 = Base64.getEncoder();
 
-    private final AnalysisRequest request;
+    private final RegionalTask task;
 
     /** Accessibility results for each bootstrap sample */
     private final double[] bootstrapReplicationsOfAccessibility;
@@ -119,9 +119,9 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
      */
     private final int[][] bootstrapWeights;
 
-    public BootstrappingTravelTimeReducer (AnalysisRequest request, GridCache gridCache) {
-        this.request = request;
-        this.grid = gridCache.get(request.grid);
+    public BootstrappingTravelTimeReducer (RegionalTask request, Grid grid) {
+        this.task = request;
+        this.grid = grid;
         int nMinutes = request.getTimeWindowLengthMinutes();
         int monteCarloDrawsPerMinute = request.getMonteCarloDrawsPerMinute();
 
@@ -155,7 +155,7 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
     @Override
     public void accept(int target, int[] travelTimesForTarget) {
         // We use the size of the grid to determine the number of destinations used in the linked point set in
-        // TravelTimeComputer, therefore the target indices are relative to the grid, not the request.
+        // TravelTimeComputer, therefore the target indices are relative to the grid, not the task.
         int gridx = target % grid.width;
         int gridy = target / grid.width;
         double opportunityCountAtTarget = grid.grid[gridx][gridy];
@@ -170,7 +170,7 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
             // any time there are no frequencies. That won't work though once we have the double monte carlo method
             // where we sample from departure times as well though because even scheduled networks will have variation
             // (unless we short-circuit those random draws and use all minutes in that case).
-            if (travelTimesForTarget[0] < request.maxTripDurationMinutes * 60) {
+            if (travelTimesForTarget[0] < task.maxTripDurationMinutes * 60) {
                 bootstrapReplicationsOfAccessibility[0] += opportunityCountAtTarget;
             }
 
@@ -183,7 +183,7 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
         TIntList reachableInIterationsList = new TIntArrayList();
 
         for (int i = 0; i < travelTimesForTarget.length; i++) {
-            if (travelTimesForTarget[i] < request.maxTripDurationMinutes * 60) reachableInIterationsList.add(i);
+            if (travelTimesForTarget[i] < task.maxTripDurationMinutes * 60) reachableInIterationsList.add(i);
         }
 
         int[] reachableInIterations = reachableInIterationsList.toArray();
@@ -222,7 +222,7 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
         }
     }
 
-    /** Write the origin to S3 */
+    /** Write the origin to SQS */
     @Override
     public void finish () {
         // now construct the output
@@ -234,15 +234,15 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
                 .toArray();
 
         try {
-            new Origin(request, request.percentiles[0], intReplications).write(baos);
+            new Origin(task, task.percentiles[0], intReplications).write(baos);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
         // send this origin to an SQS queue as a binary payload; it will be consumed by GridResultQueueConsumer
         // and GridResultAssembler
-        SendMessageRequest smr = new SendMessageRequest(request.outputQueue, base64.encodeToString(baos.toByteArray()));
-        smr = smr.addMessageAttributesEntry("jobId", new MessageAttributeValue().withDataType("String").withStringValue(request.jobId));
+        SendMessageRequest smr = new SendMessageRequest(task.outputQueue, base64.encodeToString(baos.toByteArray()));
+        smr = smr.addMessageAttributesEntry("jobId", new MessageAttributeValue().withDataType("String").withStringValue(task.jobId));
         sqs.sendMessage(smr);
 
 

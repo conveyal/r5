@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AccessGridWriter;
-import com.conveyal.r5.analyst.cluster.AnalysisRequest;
+import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.FastRaptorWorker;
@@ -16,7 +16,9 @@ import java.util.Arrays;
 import java.util.Collection;
 
 /**
- * From travel times to targets for each iteration, produce a binary travel time surface with percentiles of travel time.
+ * Take the travel times to targets at each iteration (passed in one target at a time, because storing them all in memory
+ * is not practical), and summarize that list to a few percentiles of travel time and return them in an AccessGrid-format
+ * file (see AccessGridWriter for format documentation).
  */
 public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeReducer {
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeSurfaceReducer.class);
@@ -30,16 +32,16 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
     /** The network used to compute the travel time results */
     public final TransportNetwork network;
 
-    /** The request used to create travel times being reduced herein */
-    public final AnalysisRequest request;
+    /** The task used to create travel times being reduced herein */
+    public final TravelTimeSurfaceTask task;
 
-    public TravelTimeSurfaceReducer (AnalysisRequest request, TransportNetwork network, OutputStream outputStream) {
-        this.request = request;
+    public TravelTimeSurfaceReducer (TravelTimeSurfaceTask task, TransportNetwork network, OutputStream outputStream) {
+        this.task = task;
         this.network = network;
         this.outputStream = outputStream;
 
         try {
-            encodedResults = new AccessGridWriter(request.zoom, request.west, request.north, request.width, request.height, request.percentiles.length);
+            encodedResults = new AccessGridWriter(task.zoom, task.west, task.north, task.width, task.height, task.percentiles.length);
         } catch (IOException e) {
             // in memory, should not be able to throw this
             throw new RuntimeException(e);
@@ -48,21 +50,21 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
 
     @Override
     public void accept (int target, int[] times) {
-        int nPercentiles = request.percentiles.length;
+        int nPercentiles = task.percentiles.length;
         // sort the times at each target and read off percentiles
         Arrays.sort(times);
         int[] results = new int[nPercentiles];
 
         for (int i = 0; i < nPercentiles; i++) {
-            int offset = (int) Math.round(request.percentiles[i] / 100d * times.length);
+            int offset = (int) Math.round(task.percentiles[i] / 100d * times.length);
             // Int divide will floor; this is correct because value 0 has travel times of up to one minute, etc.
             // This means that anything less than a cutoff of (say) 60 minutes (in seconds) will have value 59,
             // which is what we want. But maybe this is tying the backend and frontend too closely.
             results[i] = times[offset] == FastRaptorWorker.UNREACHED ? FastRaptorWorker.UNREACHED : times[offset] / 60;
         }
 
-        int x = target % request.width;
-        int y = target / request.width;
+        int x = target % task.width;
+        int y = target / task.width;
         try {
             encodedResults.writePixel(x, y, results);
         } catch (IOException e) {

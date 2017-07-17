@@ -322,7 +322,7 @@ public class FastRaptorWorker {
             // https://github.com/conveyal/r5/issues/306
             int[][] result = new int[iterationsPerMinute][];
             for (int i = 0; i < monteCarloDrawsPerMinute; i++) {
-                if (saveAllStates) statesEachIteration.add(scheduleState[request.maxRides * monteCarloDrawsPerMinute].deepCopy());
+                if (saveAllStates) statesEachIteration.add(scheduleState[request.maxRides].deepCopy());
                 result[i] = scheduleState[request.maxRides].bestNonTransferTimes;
             }
             return result;

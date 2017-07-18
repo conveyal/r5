@@ -133,6 +133,8 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
 
         Arrays.fill(bootstrapWeights[0], 1); // equal weight to all observations for first sample
 
+        // Remaining samples: create weights summing to the number of iterations, and constrained to have an equal number
+        // of draws for each departure minute
         for (int bootstrap = 1; bootstrap < bootstrapWeights.length; bootstrap++) {
             for (int minute = 0; minute < nMinutes; minute++) {
                 for (int draw = 0; draw < monteCarloDrawsPerMinute; draw++) {

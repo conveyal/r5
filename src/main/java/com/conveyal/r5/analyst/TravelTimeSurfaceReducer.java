@@ -41,6 +41,7 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
         this.outputStream = outputStream;
 
         try {
+            // use an in-memory access grid, don't specify disk cache file
             encodedResults = new AccessGridWriter(task.zoom, task.west, task.north, task.width, task.height, task.percentiles.length);
         } catch (IOException e) {
             // in memory, should not be able to throw this

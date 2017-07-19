@@ -429,4 +429,19 @@ public class ProfileRequest implements Serializable, Cloneable {
             return 0;
         }
     }
+
+    /** Return the length of the time window in minutes */
+    @JsonIgnore
+    public int getTimeWindowLengthMinutes() {
+        return (toTime - fromTime) / 60;
+    }
+
+    /**
+     * Return the number of Monte Carlo draws that must be done each minute to get at least the desired number of total
+     * Monte Carlo draws over all minutes.
+     */
+    @JsonIgnore
+    public int getMonteCarloDrawsPerMinute() {
+        return (int) Math.ceil((double) monteCarloDraws / getTimeWindowLengthMinutes());
+    }
 }

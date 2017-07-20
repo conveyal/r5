@@ -391,7 +391,9 @@ public class TransportNetworkCache {
 
         network.rebuildTransientIndexes();
 
-        new TransferFinder(network).findTransfers();
+        TransferFinder transferFinder = new TransferFinder(network);
+        transferFinder.findTransfers();
+        transferFinder.findParkRideTransfer();
 
         return network;
     }

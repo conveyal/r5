@@ -1,11 +1,14 @@
 #!/bin/bash
 # Downloads and runs an analyst worker.
-# This shell script will undergo variable substitution via the Java MessageFormat class before it is run on newly started
-# worker machines. MessageFormat will replace special tokens (consisting of numbers inside curly braces) with
-# configuration information specific to the worker being started. These are:
+# This shell script undergoes variable substitution via the Java MessageFormat class before being passed to newly
+# started worker machines via the AWS EC2 user data. MessageFormat will replace special tokens (consisting of numbers
+# inside curly braces) with configuration information specific to the worker being started. These are:
 # 0: the URL to grab the worker JAR from
 # 1: the AWS log group to use
 # 2: the worker configuration to use
+# If you are reading this comment inside the EC2 user data field, this variable substitution has already happened.
+# The string instance_id in curly brackets is substituted by EC2 at startup, not by our Java code. It and any shell
+# variable references that contain brackets are single-quoted to tell Java's MessageFormat not to substitute them.
 
 # prep the system: install log agent, java
 yum -y install awslogs java-1.8.0-openjdk
@@ -61,8 +64,7 @@ cat /var/log/awslogs.log
 # Download the worker
 sudo -u ec2-user wget -O ~ec2-user/r5.jar {0} >> $LOGFILE 2>&1
 
-# Figure out how much memory to give the worker
-# figure out how much memory to use
+# Figure out how much memory to give the worker in kilobytes
 TOTAL_MEM=`grep MemTotal /proc/meminfo | sed 's/[^0-9]//g'`
 # 2097152 kb is 2GB, leave that much for the OS
 MEM=`echo $TOTAL_MEM - 2097152 | bc`
@@ -71,7 +73,7 @@ MEM=`echo $TOTAL_MEM - 2097152 | bc`
 # run in ec2-user's home directory, in the subshell
 {
     cd ~ec2-user
-    sudo -u ec2-user java8 -jar r5.jar worker worker.conf >> $LOGFILE 2>&1
+    sudo -u ec2-user java8 -Xmx$'{MEM}'k -jar r5.jar worker worker.conf >> $LOGFILE 2>&1
 
     # If the worker exits or doesn't start, wait a few minutes so that the CloudWatch log agent grabs
     # the logs

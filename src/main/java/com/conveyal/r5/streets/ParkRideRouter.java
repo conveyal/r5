@@ -15,8 +15,12 @@ import gnu.trove.map.hash.TIntObjectHashMap;
  */
 public class ParkRideRouter extends StreetRouter {
 
+    //Key is stop index, value is duration to reach it for getReachedStops
     TIntIntMap transitStopIndexDurationMap;
+    //Key is streetVertex of stops, value is duration to reach it for getTravelTimeToVertex
+    TIntIntMap streetVertexDurationMap;
 
+    //Key is streetVertex value is state from park ride to this stop for making path
     TIntObjectMap<State> transitStopStreetIndexParkRideState;
 
     public ParkRideRouter(StreetLayer streetLayer) {
@@ -35,6 +39,7 @@ public class ParkRideRouter extends StreetRouter {
      */
     public void addParks(TIntObjectMap<State> carParks, TransitLayer transitLayer) {
         transitStopIndexDurationMap = new TIntIntHashMap(carParks.size() * 3);
+        streetVertexDurationMap = new TIntIntHashMap(carParks.size() * 3);
         TIntObjectMap<ParkRideParking> parkRideLocationsMap = streetLayer.parkRideLocationsMap;
         transitStopStreetIndexParkRideState = new TIntObjectHashMap<>(carParks.size());
         final double walkSpeedMillimetersPerSecond = profileRequest.walkSpeed * 1000;
@@ -56,12 +61,14 @@ public class ParkRideRouter extends StreetRouter {
                 if (!transitStopIndexDurationMap.containsKey(toStop)) {
                     transitStopIndexDurationMap.put(toStop, totalTime);
                     transitStopStreetIndexParkRideState.put(stopStreetVertexIdx, pr_state);
+                    streetVertexDurationMap.put(stopStreetVertexIdx, totalTime);
                     // ELSE we only add time and update P+R if new time is shorter then previously saved one
                 } else {
                     int savedTime = transitStopIndexDurationMap.get(toStop);
                     if (totalTime < savedTime) {
                         transitStopIndexDurationMap.put(toStop, totalTime);
                         transitStopStreetIndexParkRideState.put(stopStreetVertexIdx, pr_state);
+                        streetVertexDurationMap.put(stopStreetVertexIdx, totalTime);
                     }
                 }
 
@@ -100,6 +107,20 @@ public class ParkRideRouter extends StreetRouter {
             return this.transitStopStreetIndexParkRideState.get(vertexIndex);
         } else {
             return null;
+        }
+    }
+
+    /**
+     * Returns travel time to this vertex. Only returns time to stops, since only those times are saved
+     * @param vertexIndex
+     * @return
+     */
+    @Override
+    public int getTravelTimeToVertex(int vertexIndex) {
+        if (this.streetVertexDurationMap.containsKey(vertexIndex)) {
+            return streetVertexDurationMap.get(vertexIndex);
+        } else {
+            return Integer.MAX_VALUE;
         }
     }
 }

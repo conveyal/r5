@@ -158,13 +158,14 @@ public class StreetLayer implements Serializable, Cloneable {
             EdgeStore.EdgeFlag.NO_THRU_TRAFFIC_CAR);
 
     public boolean bikeSharing = false;
+    public boolean hasOSM;
 
-    public StreetLayer(TNBuilderConfig tnBuilderConfig) {
+    public StreetLayer (TNBuilderConfig tnBuilderConfig) {
             speedConfigurator = new SpeedConfigurator(tnBuilderConfig.speeds);
     }
 
     /** Load street layer from an OSM-lib OSM DB */
-    public void loadFromOsm(OSM osm) {
+    public void loadFromOsm (OSM osm) {
         loadFromOsm(osm, true, false);
     }
 
@@ -187,7 +188,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * @param way
      * @return
      */
-    private static boolean isWayRoutable(Way way) {
+    private static boolean isWayRoutable (Way way) {
         boolean isRoutable = false;
 
         String highway = way.getTag("highway");
@@ -225,7 +226,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * @param way
      * @return
      */
-    private static boolean actuallyExistsInReality(String highway, Way way) {
+    private static boolean actuallyExistsInReality (String highway, Way way) {
         return !("construction".equals(highway)
             || "abandoned".equals(highway)|| "removed".equals(highway)
             || "proposed".equals(highway) || "propossed".equals(highway)
@@ -352,7 +353,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * @param locale which locale to use
      * @return null if edge doesn't have name tag or if OSM data isn't loaded
      */
-    public String getNameEdgeIdx(int edgeIdx, Locale locale) {
+    public String getNameEdgeIdx (int edgeIdx, Locale locale) {
         if (osm == null) {
             return null;
         }
@@ -381,7 +382,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * @param locale which locale to use
      * @return
      */
-    private String getName(long OSMid, Locale locale) {
+    private String getName (long OSMid, Locale locale) {
         String name = null;
         Way way = osm.ways.get(OSMid);
         if (way != null) {
@@ -400,7 +401,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * @param edge for which to get tags
      * @return String with all the tags or null
      */
-    public String getWayTags(EdgeStore.Edge edge) {
+    public String getWayTags (EdgeStore.Edge edge) {
         if (osm == null) {
             return null;
         }
@@ -415,7 +416,7 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /** Connect areal park and rides to the graph */
-    private void buildParkAndRideAreas(List<Way> parkAndRideWays) {
+    private void buildParkAndRideAreas (List<Way> parkAndRideWays) {
         VertexStore.Vertex v = this.vertexStore.getCursor();
         EdgeStore.Edge e = this.edgeStore.getCursor();
         parkRideLocationsMap = new TIntObjectHashMap<>();
@@ -878,7 +879,8 @@ public class StreetLayer implements Serializable, Cloneable {
     /**
      * Adding turn restrictions for reverse search is a little tricky.
      *
-     * First because we are adding toEdge to turnRestrictionReverse map and second because ONLY TURNs aren't supported
+     * First because we are adding toEdge to {@link EdgeStore#turnRestrictionsReverse} map and
+     * second because ONLY TURNs aren't supported
      *
      * Since ONLY TURN restrictions aren't supported ONLY TURN restrictions
      * are created with NO TURN restrictions and added to turnRestrictions and edgeStore turnRestrictionsReverse
@@ -888,7 +890,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * @param turnRestriction
      * @param index
      */
-    void addReverseTurnRestriction(TurnRestriction turnRestriction, int index) {
+    void addReverseTurnRestriction (TurnRestriction turnRestriction, int index) {
         if (turnRestriction.only) {
             //From Only turn restrictions create multiple NO TURN restrictions which means the same
             //Since only turn restrictions aren't supported in reverse street search
@@ -1080,7 +1082,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * So any time you add edges or change their endpoints, you need to rebuild the edge index.
      * TODO some way to signal that a few new edges have been added, rather than rebuilding the whole lists.
      */
-    public void buildEdgeLists() {
+    public void buildEdgeLists () {
         LOG.info("Building edge lists from edges...");
         outgoingEdges = new ArrayList<>(vertexStore.getVertexCount());
         incomingEdges = new ArrayList<>(vertexStore.getVertexCount());
@@ -1111,7 +1113,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * @return the index of a street vertex very close to the supplied location,
      *         or -1 if no such vertex could be found or created.
      */
-    public int getOrCreateVertexNear(double lat, double lon, StreetMode streetMode) {
+    public int getOrCreateVertexNear (double lat, double lon, StreetMode streetMode) {
 
         Split split = findSplit(lat, lon, LINK_RADIUS_METERS, streetMode);
         if (split == null) {
@@ -1190,7 +1192,7 @@ public class StreetLayer implements Serializable, Cloneable {
 
     /** perform destructive splitting of edges
      * FIXME: currently used only in P+R it should probably be changed to use getOrCreateVertexNear */
-    public int splitEdge(Split split) {
+    public int splitEdge (Split split) {
         // We have a linking site. Find or make a suitable vertex at that site.
         // Retaining the original Edge cursor object inside findSplit is not necessary, one object creation is harmless.
         Edge edge = edgeStore.getCursor(split.edge);
@@ -1249,6 +1251,7 @@ public class StreetLayer implements Serializable, Cloneable {
      */
     public int createAndLinkVertex (double lat, double lon) {
         int stopVertex = vertexStore.addVertex(lat, lon);
+        if (!hasOSM) return stopVertex;
         int streetVertex = getOrCreateVertexNear(lat, lon, StreetMode.WALK);
         if (streetVertex == -1) {
             return -1; // Unlinked
@@ -1288,7 +1291,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * @param lon longitude in floating point geographic coordinates (not fixed point int coordinates)
      * @return a Split object representing a point along a sub-segment of a specific edge, or null if there are no streets nearby.
      */
-    public Split findSplit(double lat, double lon, double radiusMeters, StreetMode streetMode) {
+    public Split findSplit (double lat, double lon, double radiusMeters, StreetMode streetMode) {
         Split split = null;
         if (radiusMeters > 300) {
             split = Split.find(lat, lon, 150, this, streetMode);
@@ -1307,15 +1310,17 @@ public class StreetLayer implements Serializable, Cloneable {
         for (Stop stop : transitLayer.stopForIndex) {
             int stopVertex = createAndLinkVertex(stop.stop_lat, stop.stop_lon);
             transitLayer.streetVertexForStop.add(stopVertex); // This is always a valid, unique vertex index.
+            // if no streets, plug stops in as vertices instead
+            if (!hasOSM) vertexStore.addVertex(stop.stop_lat, stop.stop_lon);
             // The inverse stopForStreetVertex map is a transient, derived index and will be built later.
         }
     }
 
-    public int getVertexCount() {
+    public int getVertexCount () {
         return vertexStore.getVertexCount();
     }
 
-    public Envelope getEnvelope() {
+    public Envelope getEnvelope () {
         return envelope;
     }
 
@@ -1331,7 +1336,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * saves a comparison and an extra dereference every time we use the edge/vertex stores.
      * TODO check whether this actually affects speed. If not, just wrap the lists in every scenario copy.
      */
-    public StreetLayer scenarioCopy(TransportNetwork newScenarioNetwork, boolean willBeModified) {
+    public StreetLayer scenarioCopy (TransportNetwork newScenarioNetwork, boolean willBeModified) {
         StreetLayer copy = this.clone();
         if (willBeModified) {
             // Wrap all the edge and vertex storage in classes that make them extensible.
@@ -1349,7 +1354,7 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     // FIXME radiusMeters is now set project-wide
-    public void associateBikeSharing(TNBuilderConfig tnBuilderConfig, int radiusMeters) {
+    public void associateBikeSharing (TNBuilderConfig tnBuilderConfig, int radiusMeters) {
         LOG.info("Builder file:{}", tnBuilderConfig.bikeRentalFile);
         BikeRentalBuilder bikeRentalBuilder = new BikeRentalBuilder(new File(tnBuilderConfig.bikeRentalFile));
         List<BikeRentalStation> bikeRentalStations = bikeRentalBuilder.getRentalStations();
@@ -1381,7 +1386,7 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /** @return true iff this StreetLayer was created by a scenario, and is therefore wrapping a base StreetLayer. */
-    public boolean isScenarioCopy() {
+    public boolean isScenarioCopy () {
         return baseStreetLayer != null;
     }
 
@@ -1391,7 +1396,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * When there are no created or removed edges, returns an empty geometry rather than null, because we test whether
      * transit stops are contained within the resulting geometry.
      */
-    public Geometry scenarioEdgesBoundingGeometry(int radiusMeters) {
+    public Geometry scenarioEdgesBoundingGeometry (int radiusMeters) {
         List<Polygon> geoms = new ArrayList<>();
         Edge edge = edgeStore.getCursor();
         edgeStore.forEachTemporarilyAddedOrDeletedEdge(e -> {
@@ -1434,7 +1439,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * @param env Envelope in float degrees
      * @return
      */
-    public List<ParkRideParking> findParkRidesInEnvelope(Envelope env) {
+    public List<ParkRideParking> findParkRidesInEnvelope (Envelope env) {
         List<ParkRideParking> parkingRides = new ArrayList<>();
 
         if (parkRideLocationsMap != null) {
@@ -1464,7 +1469,7 @@ public class StreetLayer implements Serializable, Cloneable {
      * @param env Envelope in float degrees
      * @return
      */
-    public List<BikeRentalStation> findBikeSharesInEnvelope(Envelope env) {
+    public List<BikeRentalStation> findBikeSharesInEnvelope (Envelope env) {
         List<BikeRentalStation> bikeRentalStations = new ArrayList<>();
 
         if (bikeRentalStationMap != null) {

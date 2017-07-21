@@ -11,7 +11,6 @@ import com.conveyal.r5.util.TIntObjectMultimap;
 import gnu.trove.iterator.TIntIterator;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.list.TIntList;
-import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
@@ -41,9 +40,9 @@ public class StreetRouter {
     public final StreetLayer streetLayer;
 
     /**
-     * True if this is transitStop search
+     * True if this is transitStop search.
      *
-     * This will stop search when maxStop stops will be found
+     * This will stop search when {@link #maxTransitStops} stops will be found
      * or before if queue is empty or time/distance limit is tripped
      */
     public boolean transitStopSearch = false;
@@ -78,8 +77,8 @@ public class StreetRouter {
 
     /**
      * It uses all nonzero limit as a limit whichever gets hit first
-     * For example if distanceLimitMeters &gt; 0 it is used as a limit. But if it isn't
-     * timeLimitSeconds is used if it is bigger then 0. If both limits are 0 or both are set
+     * For example if <code>{@link #distanceLimitMeters} > 0</code> it is used as a limit. But if it isn't,
+     * {@link #timeLimitSeconds} is used if it is bigger than 0. If both limits are 0 or both are set
      * warning is shown and both are used.
      */
     public int distanceLimitMeters = 0;
@@ -132,7 +131,7 @@ public class StreetRouter {
 
     /**
      * Mode of transport used in this search. This router requires a single mode, so it is up to the caller to
-     * disentangle the modes set in the profile request.
+     * disentangle the modes set in the profile request. Defaults to {@link StreetMode#WALK}
      */
     public StreetMode streetMode = StreetMode.WALK;
 
@@ -177,11 +176,11 @@ public class StreetRouter {
     }
 
     /**
-     * This uses stops found in {@link StopVisitor} if transitStopSearch is true
+     * This uses stops found in {@link StopVisitor} if <code>{@link #transitStopSearch}=true</code>
      * and DOESN'T search in found states for stops
      *
      * @return a map from transit stop indexes to their distances from the origin (or whatever the dominance variable is).
-     * Note that the TransitLayer contains all the information about which street vertices are transit stops.
+     * Note that the {@link TransitLayer} contains all the information about which street vertices are transit stops.
      */
     public TIntIntMap getReachedStops() {
         if (transitStopSearch && routingVisitor instanceof StopVisitor) {
@@ -206,16 +205,16 @@ public class StreetRouter {
     public TIntIntMap getReachedVertices () {
         TIntIntMap result = new TIntIntHashMap();
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
-        bestStatesAtEdge.forEachEntry((eidx, states) -> {
-            if (eidx < 0) return true;
+        bestStatesAtEdge.forEachEntry((eIdx, states) -> {
+            if (eIdx < 0) return true;
 
             State state = states.stream()
                     .reduce((s0, s1) -> s0.getRoutingVariable(dominanceVariable) < s1.getRoutingVariable(dominanceVariable) ? s0 : s1).get();
-            e.seek(eidx);
-            int vidx = e.getToVertex();
+            e.seek(eIdx);
+            int vIdx = e.getToVertex();
 
-            if (!result.containsKey(vidx) || result.get(vidx) > state.getRoutingVariable(dominanceVariable))
-                result.put(vidx, state.getRoutingVariable(dominanceVariable));
+            if (!result.containsKey(vIdx) || result.get(vIdx) > state.getRoutingVariable(dominanceVariable))
+                result.put(vIdx, state.getRoutingVariable(dominanceVariable));
 
             return true; // continue iteration
         });
@@ -223,8 +222,8 @@ public class StreetRouter {
     }
 
     /**
-     * Uses states found in {@link VertexFlagVisitor} if flagSearch is for the same flag as requested one
-     * and DOESN't search in found states for found vertices
+     * Uses states found in {@link VertexFlagVisitor} if {@link #flagSearch} is for the same flag as requested one
+     * and DOESN'T search in found states for found vertices
      *
      * @return a map where all the keys are vertex indexes with the particular flag and all the values are states.
      */
@@ -235,19 +234,19 @@ public class StreetRouter {
         TIntObjectMap<State> result = new TIntObjectHashMap<>();
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
         VertexStore.Vertex v = streetLayer.vertexStore.getCursor();
-        bestStatesAtEdge.forEachEntry((eidx, states) -> {
-            if (eidx < 0) return true;
+        bestStatesAtEdge.forEachEntry((int eIdx, Collection<State> states) -> {
+            if (eIdx < 0) return true;
 
             State state = states.stream().reduce((s0, s1) ->
                     s0.getRoutingVariable(dominanceVariable) < s1.getRoutingVariable(dominanceVariable) ? s0 : s1).get();
-            e.seek(eidx);
-            int vidx = e.getToVertex();
-            v.seek(vidx);
+            e.seek(eIdx);
+            int vIdx = e.getToVertex();
+            v.seek(vIdx);
 
             if (v.getFlag(flag)) {
-                if (!result.containsKey(vidx) || result.get(vidx).getRoutingVariable(dominanceVariable) >
+                if (!result.containsKey(vIdx) || result.get(vIdx).getRoutingVariable(dominanceVariable) >
                                                             state.getRoutingVariable(dominanceVariable)) {
-                    result.put(vidx, state);
+                    result.put(vIdx, state);
                 }
             }
 
@@ -263,10 +262,10 @@ public class StreetRouter {
     }
 
     /**
-     * Finds closest vertex which has streetMode permissions
+     * Finds closest vertex which has {@link #streetMode} permissions
      *
      * @param lat Latitude in floating point (not fixed int) degrees.
-     * @param lon Longitude in flating point (not fixed int) degrees.
+     * @param lon Longitude in floating point (not fixed int) degrees.
      * @return true if edge was found near wanted coordinate
      */
     public boolean setOrigin (double lat, double lon) {
@@ -327,7 +326,7 @@ public class StreetRouter {
      * Adds multiple origins.
      *
      * Each state is one origin. Weight, durationSeconds and distance is copied from state.
-     * If legMode is LegMode.BICYCLE_RENT state.isBikeShare is set to true
+     * If legMode is {@link LegMode#BICYCLE_RENT} {@link State#isBikeShare} is set to true
      *
      * @param previousStates map of bikeshares/P+Rs vertexIndexes and states Return of {@link #getReachedVertices(VertexStore.VertexFlag)}}
      * @param switchTime How many s is added to state time (this is used when switching modes, renting bike, parking a car etc.)
@@ -365,10 +364,10 @@ public class StreetRouter {
     }
 
     /**
-     * Finds closest vertex which has streetMode permissions
+     * Finds closest vertex which has {@link #streetMode} permissions
      *
      * @param lat Latitude in floating point (not fixed int) degrees.
-     * @param lon Longitude in flating point (not fixed int) degrees.
+     * @param lon Longitude in floating point (not fixed int) degrees.
      * @return true if edge was found near wanted coordinate
      */
     public boolean setDestination (double lat, double lon) {
@@ -381,11 +380,11 @@ public class StreetRouter {
     }
 
     /**
-     * Call one of the setOrigin functions first before calling route().
+     * Call one of the {@link #setOrigin} functions first before calling <code>route()</code>.
      *
      * It uses all nonzero limit as a limit whichever gets hit first
-     * For example if distanceLimitMeters &gt; 0 it is used a limit. But if it isn't
-     * timeLimitSeconds is used if it is bigger then 0. If both limits are 0 or both are set
+     * For example if <code>{@link #distanceLimitMeters} > 0</code> it is used a limit. But if it isn't
+     * {@link #timeLimitSeconds} is used if it is bigger than 0. If both limits are 0 or both are set
      * warning is shown and both are used.
      */
     public void route () {
@@ -453,7 +452,7 @@ public class StreetRouter {
 
         PrintStream debugPrintStream = null;
         if (DEBUG_OUTPUT) {
-            File debugFile = new File(String.format("street-router-debug.csv"));
+            File debugFile = new File("street-router-debug.csv");
             OutputStream outputStream;
             try {
                 outputStream = new BufferedOutputStream(new FileOutputStream(debugFile));
@@ -503,7 +502,7 @@ public class StreetRouter {
             // TODO how important is this? How can this even happen? In a street search, is target pruning even effective?
             if (s0.getRoutingVariable(dominanceVariable) > bestValueAtDestination) break;
 
-            // Hit RoutingVistor callbacks to monitor search progress.
+            // Hit RoutingVisitor callbacks to monitor search progress.
             if (routingVisitor != null) {
                 routingVisitor.visitVertex(s0);
 
@@ -533,8 +532,8 @@ public class StreetRouter {
                 edgeList = streetLayer.outgoingEdges.get(s0.vertex);
             }
             // explore edges leaving this vertex
-            edgeList.forEach(eidx -> {
-                edge.seek(eidx);
+            edgeList.forEach(eIdx -> {
+                edge.seek(eIdx);
                 State s1 = edge.traverse(s0, streetMode, profileRequest, turnCostCalculator);
                 if (s1 != null && s1.distance <= distanceLimitMm && s1.getDurationSeconds() < tmpTimeLimitSeconds) {
                     if (!isDominated(s1)) {
@@ -765,10 +764,10 @@ public class StreetRouter {
 
     /**
      * Given the geographic coordinates of a starting point...
-     * Returns the State with the smaller weight to vertex0 or vertex1
+     * Returns the {@link State} with the smaller weight to vertex0 or vertex1
      * TODO explain what this is for.
      *
-     * First split is called with streetMode Mode
+     * First split is called with {@link #streetMode} Mode
      *
      * If state to only one vertex exists return that vertex.
      * If state to none of the vertices exists returns null
@@ -847,7 +846,7 @@ public class StreetRouter {
 
         /**
          * Reverses order of states in arriveBy=true searches. Because start and target are reversed there
-         * @param transportNetwork this is used for getting from/to vertex in backEdge
+         * @param transportNetwork this is used for getting from/to vertex in {@link #backEdge}
          * @return last edge in reversed order
          */
         public State reverse(TransportNetwork transportNetwork) {
@@ -992,7 +991,7 @@ public class StreetRouter {
             }
         }
 
-        public static enum RoutingVariable {
+        public enum RoutingVariable {
             /** Time, in seconds */
             DURATION_SECONDS,
 
@@ -1005,8 +1004,8 @@ public class StreetRouter {
     }
 
     /**
-     * Saves maxStops number of transitStops that are at least minTravelTimeSeconds from start of search
-     * If stop is found multiple times best states according to dominanceVariable wins.
+     * Saves {@link #maxStops} number of transitStops that are at least {@link #minTravelTimeSeconds} from start of search
+     * If stop is found multiple times best states according to {@link #dominanceVariable} wins.
      */
     private static class StopVisitor implements RoutingVisitor {
         private final int minTravelTimeSeconds;
@@ -1022,7 +1021,7 @@ public class StreetRouter {
         TIntIntMap stops = new TIntIntHashMap();
 
         /**
-         * @param streetLayer          needed because we need stopForStreetVertex
+         * @param streetLayer          needed because we need {@link TransitLayer#stopForStreetVertex} (through {@link TransportNetwork}
          * @param dominanceVariable    according to which dominance variable should states be compared (same as in routing)
          * @param maxStops             maximal number of stops that should be found
          * @param minTravelTimeSeconds for stops that should be still added to list of stops
@@ -1039,7 +1038,7 @@ public class StreetRouter {
 
         /**
          * If vertex at current state is transit stop. It adds it to best stops
-         * if it is more then minTravelTimeSeconds away and is better then existing path
+         * if it is more than {@link #minTravelTimeSeconds} away and is better than existing path
          * to the same stop according to dominance variable
          */
         @Override
@@ -1058,7 +1057,7 @@ public class StreetRouter {
         }
 
         /**
-         * @return true when maxStops transitStops are found
+         * @return true when {@link #maxStops} transitStops are found
          */
         public boolean shouldBreakSearch() {
             return stops.size() >= this.maxStops;
@@ -1073,10 +1072,10 @@ public class StreetRouter {
     }
 
     /**
-     * Saves maxVertices number of vertices which have wantedFlag
-     * and are at least minTravelTimeSeconds away from the origin
+     * Saves maxVertices number of vertices which have {@link #wantedFlag}
+     * and are at least {@link #minTravelTimeSeconds} away from the origin
      * <p>
-     * If vertex is found multiple times vertex with lower dominanceVariable is saved
+     * If vertex is found multiple times vertex with lower {@link #dominanceVariable} is saved
      */
     private static class VertexFlagVisitor implements RoutingVisitor {
         private final int minTravelTimeSeconds;
@@ -1105,10 +1104,10 @@ public class StreetRouter {
         }
 
         /**
-         * If vertex at current state has wantedFlag it is added to vertices map
-         * if it is more then minTravelTimeSeconds away and has backState and non negative vertexIdx
+         * If vertex at current state has {@link #wantedFlag} it is added to vertices map
+         * if it is more than {@link #minTravelTimeSeconds} away and has backState and non negative vertexIdx
          * <p>
-         * If vertex is found multiple times vertex with lower dominanceVariable is saved
+         * If vertex is found multiple times vertex with lower {@link #dominanceVariable} is saved
          *
          * @param state
          */
@@ -1121,8 +1120,8 @@ public class StreetRouter {
                 skippedVertices.contains(state.vertex)
                 ) {
                 // Make sure that vertex to which you can come sooner then minTravelTimeSeconds won't be used
-                // if a path which uses more then minTravelTimeSeconds is found
-                // since this means we need to walk/cycle/drive longer then required
+                // if a path which uses more than minTravelTimeSeconds is found
+                // since this means we need to walk/cycle/drive longer than required
                 if (state.vertex > 0 && state.durationFromOriginSeconds < minTravelTimeSeconds) {
                     skippedVertices.add(state.vertex);
                 }
@@ -1140,14 +1139,15 @@ public class StreetRouter {
         }
 
         /**
-         * @return true when maxVertices vertices are found
+         * @return true when number of vertices found is greater than {@link #maxVertices}
          */
         public boolean shouldBreakSearch() {
             return vertices.size() >= this.maxVertices;
         }
 
         /**
-         * @return found vertices with wantedFlag. Same format of returned value as in {@link StreetRouter#getReachedVertices(VertexStore.VertexFlag)}
+         * @return found vertices with wantedFlag. Same format of returned value as in
+         * {@link StreetRouter#getReachedVertices(VertexStore.VertexFlag)}
          */
         public TIntObjectMap<State> getVertices() {
             return vertices;

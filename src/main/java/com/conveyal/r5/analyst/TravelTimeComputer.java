@@ -58,6 +58,10 @@ public class TravelTimeComputer {
             StreetRouter sr = new StreetRouter(network.streetLayer);
             sr.timeLimitSeconds = request.maxTripDurationMinutes * 60;
             sr.streetMode = directMode;
+            // When doing a non-transit walk search, we're not trying to match the behavior of egress and transfer
+            // searches which use distance as the quantity to minimize (because they are precalculated and stored as distance,
+            // and then converted to times by dividing by speed without regard to weights/penalties for things like stairs)
+            // This does mean that walk-only results will not match the walking portion of walk+transit results.
             sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             sr.profileRequest = request;
             sr.setOrigin(fromLat, fromLon);
@@ -101,11 +105,11 @@ public class TravelTimeComputer {
             int[] nonTransitTravelTimesToDestinations;
 
             if (request.accessModes.contains(LegMode.CAR_PARK)) {
-                //Currently first search from origin to P+R is hardcoded as time dominance variable for Max car time seconds
-                //Second search from P+R to stops is not actually a search we just return list of all reached stops for each found P+R.
+                // Currently first search from origin to P+R is hardcoded as time dominance variable for Max car time seconds
+                // Second search from P+R to stops is not actually a search we just return list of all reached stops for each found P+R.
                 // If multiple P+Rs reach the same stop, only one with shortest time is returned. Stops were searched for during graph building phase.
                 // time to stop is time from CAR streetrouter to stop + CAR PARK time + time to walk to stop based on request walk speed
-                //by default 20 CAR PARKS are found it can be changed with sr.maxVertices variable
+                // by default 20 CAR PARKS are found it can be changed with sr.maxVertices variable
                 sr = PointToPointQuery.findParkRidePath(request, sr, network.transitLayer);
 
                 if (sr == null) {

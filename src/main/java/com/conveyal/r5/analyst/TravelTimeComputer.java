@@ -45,7 +45,6 @@ public class TravelTimeComputer {
         StreetMode accessMode = LegMode.getDominantStreetMode(request.accessModes);
         StreetMode directMode = LegMode.getDominantStreetMode(request.directModes);
 
-        // use x, y within grid if available, otherwise fromLat and toLat
         double fromLat = request.fromLat;
         double fromLon = request.fromLon;
 

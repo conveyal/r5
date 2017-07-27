@@ -1071,9 +1071,12 @@ public class EdgeStore implements Serializable {
      * lists.
      * We don't use clone() and make sure every field copy is explicit below, avoiding any unintentional shallow-copying
      * of collections or referenced data structures.
+     *
+     * @param copiedStreetLayer the copy of the street layer that this edgeStore will reference.
      */
-    public EdgeStore extendOnlyCopy() {
+    public EdgeStore extendOnlyCopy(StreetLayer copiedStreetLayer) {
         EdgeStore copy = new EdgeStore();
+        copy.layer = copiedStreetLayer;
         copy.firstModifiableEdge = this.nEdges();
         // The Edge store references a vertex store, and the StreetLayer should also hold the same reference.
         // So the StreetLayer that makes this copy needs to grab a pointer to the new extend only VertexStore

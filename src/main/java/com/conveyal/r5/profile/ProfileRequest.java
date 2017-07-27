@@ -9,6 +9,7 @@ import com.conveyal.r5.api.util.SearchType;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.model.json_serialization.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import graphql.schema.DataFetchingEnvironment;
@@ -236,6 +237,7 @@ public class ProfileRequest implements Serializable, Cloneable {
 
     //If true current search is reverse search AKA we are looking for a path from destination to origin in reverse
     //It differs from searchType because it is used as egress search
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
     public boolean reverseSearch = false;
 
     /** maximum fare. If nonnegative, fares will be used in routing. */
@@ -323,6 +325,20 @@ public class ProfileRequest implements Serializable, Cloneable {
             break;
         }
         throw new IllegalArgumentException("getSpeed(): Invalid mode " + streetMode);
+    }
+
+    @JsonIgnore
+    public int getMaxAccessTime (StreetMode mode) {
+        switch (mode) {
+            case CAR:
+                return maxCarTime;
+            case BICYCLE:
+                return maxBikeTime;
+            case WALK:
+                return maxWalkTime;
+            default:
+                throw new IllegalArgumentException("Invalid mode");
+        }
     }
 
     /**

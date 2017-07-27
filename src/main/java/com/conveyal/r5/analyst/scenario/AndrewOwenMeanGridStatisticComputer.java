@@ -26,60 +26,11 @@ import java.util.zip.GZIPInputStream;
  * Planning Using Interactive Accessibility Methods on Combined Schedule and Headway-Based Networks,” under review for the
  * the 96th Annual Meeting of the Transportation Research Board, January 2017.
  */
-public class AndrewOwenMeanGridStatisticComputer {
-    private static final AmazonS3 s3 = new AmazonS3Client();
-
-    /** Version of the access grid format we read */
-    private static final int ACCESS_GRID_VERSION = 0;
-
-    /** Compute a particular percentile of a grid (percentile between 0 and 100) */
-    public static Grid computeMean (String resultsBucket, String key) throws IOException {
-        S3Object accessGrid = s3.getObject(resultsBucket, key);
-
-        LittleEndianDataInputStream input = new LittleEndianDataInputStream(new GZIPInputStream(accessGrid.getObjectContent()));
-
-        char[] header = new char[8];
-        for (int i = 0; i < 8; i++) {
-            header[i] = (char) input.readByte();
-        }
-
-        if (!"ACCESSGR".equals(new String(header))) {
-            throw new IllegalArgumentException("Input not in access grid format!");
-        }
-
-        int version = input.readInt();
-
-        if (version != ACCESS_GRID_VERSION) {
-            throw new IllegalArgumentException(String.format("Version mismatch of access grids, expected %s, found %s", ACCESS_GRID_VERSION, version));
-        }
-
-        int zoom = input.readInt();
-        int west = input.readInt();
-        int north = input.readInt();
-        int width = input.readInt();
-        int height = input.readInt();
-        int nIterations = input.readInt();
-
-        Grid grid = new Grid(zoom, width, height, north, west);
-
-        for (int y = 0; y < height; y++) {
-            for (int x = 0; x < width; x++) {
-
-                int sum = 0;
-                int count = 0;
-
-                for (int iteration = 0, val = 0; iteration < nIterations; iteration++) {
-                    sum += (val += input.readInt());
-                    count++;
-                }
-
-                // compute percentiles
-                grid.grid[x][y] = (double) sum / count;
-            }
-        }
-
-        input.close();
-
-        return grid;
+public class AndrewOwenMeanGridStatisticComputer extends GridStatisticComputer {
+    @Override
+    protected double computeValueForOrigin(int x, int y, int[] valuesThisOrigin) {
+        int sum = 0;
+        for (int i = 0; i < valuesThisOrigin.length; i++) sum += valuesThisOrigin[i];
+        return (double) sum / (double) valuesThisOrigin.length;
     }
 }

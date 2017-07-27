@@ -9,6 +9,8 @@ on this particular point [here](http://conveyal.com/blog/2015/05/04/variation-in
 
 Please follow the Conveyal Java style guide at https://github.com/conveyal/JavaStyle/
 
+Javadoc for the project is built automatically after every change and published at http://javadoc.conveyal.com/r5/master/
+
 ## History
 
 R<sup>5</sup> grew out of several open-source projects. The focus on analytic applications, and the core development team behind R<sup>5</sup>,

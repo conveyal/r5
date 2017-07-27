@@ -8,7 +8,7 @@
 
   <groupId>com.conveyal</groupId>
   <artifactId>r5</artifactId>
-  <version>2.2.0-SNAPSHOT</version>
+  <version>2.5.0-SNAPSHOT</version>
   <packaging>jar</packaging>
 
   <licenses>
@@ -72,6 +72,7 @@
         <filtering>true</filtering>
         <includes>
           <include>**/*.properties</include>
+          <include>worker.sh</include>
           <include>debug-plan/**</include>
           <include>fares/**</include>
         </includes>

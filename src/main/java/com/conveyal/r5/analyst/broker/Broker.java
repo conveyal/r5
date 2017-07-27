@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.TreeMultimap;
+import com.google.common.io.ByteStreams;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TObjectLongMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
@@ -24,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.text.MessageFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -182,7 +184,7 @@ public class Broker implements Runnable {
             workerConfig.setProperty("auto-shutdown", "true");
         }
 
-        // TODO what are these for?
+        // Tags for the workers
         workerName = brokerConfig.getProperty("worker-name") != null ? brokerConfig.getProperty("worker-name") : "analyst-worker";
         project = brokerConfig.getProperty("project") != null ? brokerConfig.getProperty("project") : "analyst";
 
@@ -349,7 +351,7 @@ public class Broker implements Runnable {
             return;
         }
 
-        // TODO: compute
+        // TODO: should we start multiple workers on large jobs?
         int nWorkers = 1;
 
         // There are no workers on this graph with the right worker commit, start some.
@@ -365,13 +367,10 @@ public class Broker implements Runnable {
 
         // It's fine to just modify the worker config without a protective copy because this method is synchronized.
         workerConfig.setProperty("initial-graph-id", category.graphId);
-        workerConfig.setProperty("worker-version", category.workerVersion);
         // Tell the worker where to get its R5 JAR. This is a Conveyal S3 bucket with HTTP access turned on.
         String workerDownloadUrl = String.format("https://r5-builds.s3.amazonaws.com/%s.jar",
                 category.workerVersion);
-        workerConfig.setProperty("download-url", workerDownloadUrl);
-        // This is the R5 broker, so always start R5 workers (rather than OTP workers).
-        workerConfig.setProperty("main-class", AnalystWorker.class.getName());
+
         ByteArrayOutputStream cfg = new ByteArrayOutputStream();
         try {
             workerConfig.store(cfg, "Worker config");
@@ -380,9 +379,29 @@ public class Broker implements Runnable {
             throw new RuntimeException(e);
         }
 
-        // Send the config to the new workers as EC2 "user data"
-        String userData = new String(Base64.getEncoder().encode(cfg.toByteArray()));
-        req.setUserData(userData);
+        // Read in the startup script
+        // We used to just pass the config to custom AMI, but by constructing a startup script that initializes a stock
+        // Amazon Linux AMI, we don't have to worry about maintaining and keeping our AMI up to date. Amazon Linux applies
+        // important security updates on startup automatically.
+        try {
+            String workerConfigString = cfg.toString();
+            InputStream scriptIs = Broker.class.getClassLoader().getResourceAsStream("worker.sh");
+            ByteArrayOutputStream scriptBaos = new ByteArrayOutputStream();
+            ByteStreams.copy(scriptIs, scriptBaos);
+            scriptIs.close();
+            scriptBaos.close();
+            String scriptTemplate = scriptBaos.toString();
+
+            String logGroup = workerConfig.getProperty("log-group");
+
+            String script = MessageFormat.format(scriptTemplate, workerDownloadUrl, logGroup, workerConfigString);
+
+            // Send the config to the new workers as EC2 "user data"
+            String userData = new String(Base64.getEncoder().encode(script.getBytes()));
+            req.setUserData(userData);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
 
         if (brokerConfig.getProperty("worker-iam-role") != null)
             req.setIamInstanceProfile(new IamInstanceProfileSpecification().withArn(brokerConfig.getProperty("worker-iam-role")));
@@ -398,7 +417,7 @@ public class Broker implements Runnable {
         RunInstancesResult res = ec2.runInstances(req);
         res.getReservation().getInstances().forEach(i -> {
             Collection<Tag> tags = Arrays.asList(
-                    new Tag("name", workerName),
+                    new Tag("Name", workerName),
                     new Tag("project", project)
             );
             i.setTags(tags);

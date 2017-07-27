@@ -21,7 +21,6 @@ public class PathWithTimes extends Path {
     /** Wait stats for each leg */
     public Stats[] waitStats;
 
-
     /** Ride stats for each leg */
     public Stats[] rideStats;
 
@@ -175,69 +174,12 @@ public class PathWithTimes extends Path {
      * we just compute how long the path takes at every possible departure minute. There's probably an
      * elegant theoretical way to do this, but I prefer pragmatism over theory.
      */
-    private void computeStatistics (ProfileRequest req, int accessTime, int egressTime) {
-        this.stats = new Stats();
-        this.rideStats = IntStream.range(0, this.patterns.length).mapToObj(i -> new Stats()).toArray(Stats[]::new);
-        this.waitStats = IntStream.range(0, this.patterns.length).mapToObj(i -> new Stats()).toArray(Stats[]::new);
-
-        for (int start = req.fromTime; start < req.toTime; start += 60) {
-            // TODO should board slack be applied at the origin stop? Is this done in RaptorWorker?
-            int timeAtOriginStop = start + accessTime + RaptorWorker.BOARD_SLACK_SECONDS;
-            int bestTimeAtDestinationStop = Integer.MAX_VALUE;
-
-            Itinerary bestItinerary = null;
-            for (Itinerary itin : this.itineraries) {
-                // itinerary cannot be used at this time
-                if (itin.boardTimes[0] < timeAtOriginStop) continue;
-
-                if (itin.alightTimes[this.length - 1] < bestTimeAtDestinationStop) {
-                    bestTimeAtDestinationStop = itin.alightTimes[this.length - 1];
-                    bestItinerary = itin;
-                }
-            }
-
-            if (bestItinerary == null) continue; // cannot use this trip at this time
-
-            int bestTimeAtDestination = bestTimeAtDestinationStop + egressTime;
-
-            int travelTime = bestTimeAtDestination - start;
-
-            stats.num++;
-            stats.avg += travelTime;
-            stats.min = Math.min(stats.min, travelTime);
-            stats.max = Math.max(stats.max, travelTime);
-
-            // accumulate stats for each leg
-            for (int leg = 0; leg < this.patterns.length; leg++) {
-                Stats ride = rideStats[leg];
-                int rideLen = bestItinerary.alightTimes[leg] - bestItinerary.boardTimes[leg];
-                ride.num++;
-                ride.avg += rideLen;
-                ride.min = Math.min(ride.min, rideLen);
-                ride.max = Math.max(ride.max, rideLen);
-
-                Stats wait = waitStats[leg];
-
-                int arriveAtStopTime = leg == 0 ? timeAtOriginStop : bestItinerary.arriveAtBoardStopTimes[leg];
-
-                int waitTime = bestItinerary.boardTimes[leg] - arriveAtStopTime;
-
-                wait.num++;
-                wait.avg += waitTime;
-                wait.min = Math.min(waitTime, wait.min);
-                wait.max = Math.max(waitTime, wait.max);
-            }
-        }
-
-        if (stats.num == 0) throw new IllegalStateException("No valid itineraries found for path computed in RaptorWorker");
-
-        stats.avg /= stats.num;
-
-        for (Stats[] statSet : new Stats[][] { rideStats, waitStats }) {
-            for (Stats stats : statSet) {
-                stats.avg /= stats.num;
-            }
-        }
+    public void computeStatistics (ProfileRequest req, int accessTime, int egressTime) {
+        StatsCalculator.StatsCollection coll =
+                StatsCalculator.computeStatistics(req, accessTime, egressTime, length, itineraries);
+        this.stats = coll.stats;
+        this.waitStats = coll.waitStats;
+        this.rideStats = coll.rideStats;
     }
 
     /** itineraries for this path, which can be sorted by departure time */

@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.profile.ProfileRequest;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.util.List;
 
@@ -28,6 +29,10 @@ public class GridRequest extends GenericClusterRequest {
 
     /** Travel time cutoff (minutes) */
     public int cutoffMinutes;
+
+    /** Percentile of travel time */
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+    public int travelTimePercentile = 50;
 
     public final String type = "grid";
 

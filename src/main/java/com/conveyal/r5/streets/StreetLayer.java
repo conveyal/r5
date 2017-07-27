@@ -24,7 +24,6 @@ import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.operation.union.UnaryUnionOp;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
-import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TLongIntMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
@@ -268,6 +267,7 @@ public class StreetLayer implements Serializable, Cloneable {
                 }
             }
         }
+        stressLabeler.logErrors();
 
         // summarize LTS statistics
         Edge cursor = edgeStore.getCursor();
@@ -591,6 +591,24 @@ public class StreetLayer implements Serializable, Cloneable {
             }
             else if ("via".equals(member.role)) {
                 via.add(member);
+            }
+
+            // Osmosis may produce situations where referential integrity is violated, probably at the edge of the
+            // bounding box where half a turn restriction is outside the box.
+            if (member.type == OSMEntity.Type.WAY) {
+                if (!osm.ways.containsKey(member.id)) {
+                    LOG.warn("Turn restriction relation {} references nonexistent way {}, dropping this relation",
+                            id,
+                            member.id);
+                    return;
+                }
+            } else if (member.type == OSMEntity.Type.NODE) {
+                if (!osm.nodes.containsKey(member.id)) {
+                    LOG.warn("Turn restriction relation {} references nonexistent node {}, dropping this relation",
+                            id,
+                            member.id);
+                    return;
+                }
             }
         }
 
@@ -922,6 +940,7 @@ public class StreetLayer implements Serializable, Cloneable {
 
     /**
      * Get or create mapping from a global long OSM ID to an internal street vertex ID, creating the vertex as needed.
+     * @return the internal ID for the street vertex that was found or created, or -1 if there was no such OSM node.
      */
     private int getVertexIndexForOsmNode(long osmNodeId) {
         int vertexIndex = vertexIndexForOsmNode.get(osmNodeId);
@@ -929,13 +948,15 @@ public class StreetLayer implements Serializable, Cloneable {
             // Register a new vertex, incrementing the index starting from zero.
             // Store node coordinates for this new street vertex
             Node node = osm.nodes.get(osmNodeId);
-            vertexIndex = vertexStore.addVertex(node.getLat(), node.getLon());
-
-            VertexStore.Vertex v = vertexStore.getCursor(vertexIndex);
-            if (node.hasTag("highway", "traffic_signals"))
-                v.setFlag(VertexStore.VertexFlag.TRAFFIC_SIGNAL);
-
-            vertexIndexForOsmNode.put(osmNodeId, vertexIndex);
+            if (node == null) {
+                LOG.warn("OSM data references an undefined node. This is often the result of extracting a bounding box in Osmosis without the completeWays option.");
+            } else {
+                vertexIndex = vertexStore.addVertex(node.getLat(), node.getLon());
+                VertexStore.Vertex v = vertexStore.getCursor(vertexIndex);
+                if (node.hasTag("highway", "traffic_signals"))
+                    v.setFlag(VertexStore.VertexFlag.TRAFFIC_SIGNAL);
+                vertexIndexForOsmNode.put(osmNodeId, vertexIndex);
+            }
         }
         return vertexIndex;
     }
@@ -981,6 +1002,10 @@ public class StreetLayer implements Serializable, Cloneable {
         for (int n = beginIdx; n <= endIdx; n++) {
             long nodeId = way.nodes[n];
             Node node = osm.nodes.get(nodeId);
+            if (node == null) {
+                LOG.warn("Not creating street segment that references an undefined node.");
+                return;
+            }
             envelope.expandToInclude(node.getLon(), node.getLat());
             nodes.add(node);
         }
@@ -1513,7 +1538,7 @@ public class StreetLayer implements Serializable, Cloneable {
             // Indicate that the content of the new StreetLayer will be changed by giving it the scenario's scenarioId.
             // If the copy will not be modified, scenarioId remains unchanged to allow cached pointset linkage reuse.
             copy.scenarioId = newScenarioNetwork.scenarioId;
-            copy.edgeStore = edgeStore.extendOnlyCopy();
+            copy.edgeStore = edgeStore.extendOnlyCopy(copy);
             // The extend-only copy of the EdgeStore also contains a new extend-only copy of the VertexStore.
             copy.vertexStore = copy.edgeStore.vertexStore;
             copy.temporaryEdgeIndex = new IntHashGrid();

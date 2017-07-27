@@ -40,6 +40,8 @@ public class FastRaptorWorker {
 
     /** Minimum wait for boarding to account for schedule variation */
     private static final int MINIMUM_BOARD_WAIT_SEC = 60;
+    public final int nMinutes;
+    public final int monteCarloDrawsPerMinute;
 
     // Variables to track time spent, all in nanoseconds (some of the operations we're timing are significantly submillisecond)
     // (although I suppose using ms would be fine because the number of times we cross a millisecond boundary would be proportional
@@ -107,6 +109,12 @@ public class FastRaptorWorker {
         for (int i = 1; i < this.scheduleState.length; i++) this.scheduleState[i].previous = this.scheduleState[i - 1];
 
         offsets = new FrequencyRandomOffsets(transitLayer);
+
+        // compute number of minutes for scheduled search
+        nMinutes = (request.toTime - request.fromTime) / DEPARTURE_STEP_SEC;
+
+        // how many monte carlo draws per minute of scheduled search to get desired total iterations?
+        monteCarloDrawsPerMinute = (int) Math.ceil((double) request.monteCarloDraws / nMinutes);
     }
 
     /** For each iteration, return the travel time to each transit stop */
@@ -117,16 +125,10 @@ public class FastRaptorWorker {
 
         prefilterPatterns();
 
-        // compute number of minutes for scheduled search
-        int nMinutes = (request.toTime - request.fromTime) / DEPARTURE_STEP_SEC;
-
-        // how many monte carlo draws per minute of scheduled search to get desired total iterations?
-        int monteCarloDrawsPerMinute = (int) Math.ceil((double) request.monteCarloDraws / nMinutes);
-
         LOG.info("Performing {} scheduled iterations each with {} Monte Carlo draws for a total of {} iterations",
                 nMinutes, monteCarloDrawsPerMinute, nMinutes * monteCarloDrawsPerMinute);
 
-        int[][] results = new int[transit.hasFrequencies ? nMinutes * monteCarloDrawsPerMinute : nMinutes][];
+        int[][] results = new int[nMinutes * monteCarloDrawsPerMinute][];
         int currentIteration = 0;
 
         // main loop over departure times
@@ -314,9 +316,16 @@ public class FastRaptorWorker {
 
             return result;
         } else {
-            // no frequencies, return result of scheduled search
-            if (saveAllStates) statesEachIteration.add(scheduleState[request.maxRides].deepCopy());
-            return new int[][] { scheduleState[request.maxRides].bestNonTransferTimes };
+            // No frequencies, return result of scheduled search, but multiplied by the number of
+            // MC draws so that the scheduled search accessibility avoids potential bugs where assumptions
+            // are made about how many results will be returned from a search, e.g., in
+            // https://github.com/conveyal/r5/issues/306
+            int[][] result = new int[iterationsPerMinute][];
+            for (int i = 0; i < monteCarloDrawsPerMinute; i++) {
+                if (saveAllStates) statesEachIteration.add(scheduleState[request.maxRides].deepCopy());
+                result[i] = scheduleState[request.maxRides].bestNonTransferTimes;
+            }
+            return result;
         }
     }
 
@@ -408,7 +417,11 @@ public class FastRaptorWorker {
         }
     }
 
-    private void doFrequencySearchForRound(RaptorState inputState, RaptorState outputState, boolean bound) {
+    /** Do a frequency search. If computeDeterministicUpperBound is true, worst-case frequency boarding time will be used
+     * so that the output of this function can be used in a range-RAPTOR search. Otherwise Monte Carlo schedules will be
+     * used to improve upon the output of the range-RAPTOR bounds search.
+     */
+    private void doFrequencySearchForRound(RaptorState inputState, RaptorState outputState, boolean computeDeterministicUpperBound) {
         BitSet patternsTouched = getPatternsTouchedForStops(inputState, frequencyIndexForOriginalPatternIndex);
 
         for (int patternIndex = patternsTouched.nextSetBit(0); patternIndex >= 0; patternIndex = patternsTouched.nextSetBit(patternIndex + 1)) {
@@ -445,9 +458,12 @@ public class FastRaptorWorker {
                         if (inputState.bestStopsTouched.get(stop)) {
                             int earliestBoardTime = inputState.bestTimes[stop] + MINIMUM_BOARD_WAIT_SEC;
 
-                            int newBoardingDepartureTimeAtStop = bound ?
-                                    getRandomFrequencyDepartureTime(schedule, stopPositionInPattern, offset, frequencyEntryIdx, earliestBoardTime) :
-                                    getWorstCaseFrequencyDepartureTime(schedule, stopPositionInPattern, frequencyEntryIdx, earliestBoardTime);
+                            // if we're computing the upper bound, we want the worst case. This is the only thing that is
+                            // valid in a range RAPTOR search; using random schedule draws in range RAPTOR would be problematic
+                            // because they need to be independent across minutes.
+                            int newBoardingDepartureTimeAtStop = computeDeterministicUpperBound ?
+                                getWorstCaseFrequencyDepartureTime(schedule, stopPositionInPattern, frequencyEntryIdx, earliestBoardTime) :
+                                getRandomFrequencyDepartureTime(schedule, stopPositionInPattern, offset, frequencyEntryIdx, earliestBoardTime);
 
                             int remainOnBoardDepartureTimeAtStop = Integer.MAX_VALUE;
 

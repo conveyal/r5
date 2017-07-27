@@ -6,6 +6,7 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.GridComputer;
+import com.conveyal.r5.analyst.TravelTimeSurfaceComputer;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.api.util.LegMode;
@@ -248,8 +249,10 @@ public class AnalystWorker implements Runnable {
     public void run() {
 
         // Create executors with up to one thread per processor.
+        // fix size of highPriorityExecutor to avoid broken pipes when threads are killed off before they are done sending data
+        // (not confirmed if this actually works)
         int nP = Runtime.getRuntime().availableProcessors();
-        highPriorityExecutor = new ThreadPoolExecutor(1, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
+        highPriorityExecutor = new ThreadPoolExecutor(nP, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
         highPriorityExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         batchExecutor = new ThreadPoolExecutor(1, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(nP * 2));
         batchExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
@@ -266,8 +269,11 @@ public class AnalystWorker implements Runnable {
         // so the worker needs to not come online until it's ready to process requests.
         if (networkId != null) {
             LOG.info("Pre-loading or building network with ID {}", networkId);
-            transportNetworkCache.getNetwork(networkId);
-            LOG.info("Done pre-loading network {}", networkId);
+            if (transportNetworkCache.getNetwork(networkId) == null) {
+                LOG.error("Failed to pre-load transport network {}", networkId);
+            } else {
+                LOG.info("Done pre-loading network {}", networkId);
+            }
         }
 
         // Start filling the work queues.
@@ -404,6 +410,8 @@ public class AnalystWorker implements Runnable {
                 this.handleStaticMetadataRequest((StaticMetadata.MetadataRequest) clusterRequest, transportNetwork, ts);
             } else if (clusterRequest instanceof StaticMetadata.StopTreeRequest) {
                 this.handleStaticStopTrees((StaticMetadata.StopTreeRequest) clusterRequest, transportNetwork, ts);
+            } else if (clusterRequest instanceof TravelTimeSurfaceRequest) {
+                this.handleTravelTimeSurfaceRequest((TravelTimeSurfaceRequest) clusterRequest, transportNetwork, ts);
             } else if (clusterRequest instanceof GridRequest) {
                 this.handleGridRequest((GridRequest) clusterRequest, transportNetwork, ts);
             } else {
@@ -507,6 +515,26 @@ public class AnalystWorker implements Runnable {
             } catch (IOException e) {
                 LOG.error("Error writing static stop trees to broker", e);
             }
+        }
+    }
+
+    /** handle a request for a travel time surface */
+    public void handleTravelTimeSurfaceRequest (TravelTimeSurfaceRequest request, TransportNetwork network, TaskStatistics ts) {
+        TravelTimeSurfaceComputer computer = new TravelTimeSurfaceComputer(request, network);
+        try {
+            PipedInputStream pis = new PipedInputStream();
+
+            // gzip the data before sending it to the broker. Compression ratios here are extreme (100x is not uncommon)
+            // so this will help avoid broken pipes, connection reset by peer, buffer overflows, etc. since these types
+            // of errors are more common on large files.
+            GZIPOutputStream pos = new GZIPOutputStream(new PipedOutputStream(pis));
+
+            finishPriorityTask(request, pis, "application/octet-stream", "gzip");
+
+            computer.write(pos);
+            pos.close();
+        } catch (IOException e) {
+            LOG.error("Error writing travel time surface to broker", e);
         }
     }
 
@@ -735,18 +763,24 @@ public class AnalystWorker implements Runnable {
         }
     }
 
-    /**
-     * We have two kinds of output from a worker: we can either write to an object in a bucket on S3, or we can stream
-     * output over HTTP to a waiting web service caller. This function handles the latter case. It connects to the
-     * cluster broker, signals that the task with a certain ID is being completed, and posts the result back through the
-     * broker. The broker then passes the result on to the original requester (usually the analysis web UI).
-     *
-     * This function will run the HTTP Post operation in a new thread so that this function can return, allowing its
-     * caller to write data to the input stream it passed in. This arrangement avoids broken pipes that can happen
-     * when the calling thread dies. TODO clarify when and how which thread can die.
-     */
     public void finishPriorityTask(GenericClusterRequest clusterRequest, InputStream result, String contentType) {
+        finishPriorityTask(clusterRequest, result, contentType, null);
+    }
+
+        /**
+         * We have two kinds of output from a worker: we can either write to an object in a bucket on S3, or we can stream
+         * output over HTTP to a waiting web service caller. This function handles the latter case. It connects to the
+         * cluster broker, signals that the task with a certain ID is being completed, and posts the result back through the
+         * broker. The broker then passes the result on to the original requester (usually the analysis web UI).
+         *
+         * This function will run the HTTP Post operation in a new thread so that this function can return, allowing its
+         * caller to write data to the input stream it passed in. This arrangement avoids broken pipes that can happen
+         * when the calling thread dies. TODO clarify when and how which thread can die.
+         */
+    public void finishPriorityTask(GenericClusterRequest clusterRequest, InputStream result, String contentType, String contentEncoding) {
         //CountingInputStream is = new CountingInputStream(result);
+
+        LOG.info("Returning high-priority results for task {}", clusterRequest.taskId);
 
         String url = BROKER_BASE_URL + String.format("/complete/success/%s", clusterRequest.taskId);
         HttpPost httpPost = new HttpPost(url);
@@ -754,6 +788,7 @@ public class AnalystWorker implements Runnable {
         // TODO reveal any errors etc. that occurred on the worker.
         httpPost.setEntity(new InputStreamEntity(result));
         httpPost.setHeader("Content-Type", contentType);
+        if (contentEncoding != null) httpPost.setHeader("Content-Encoding", contentEncoding);
         taskDeliveryExecutor.execute(() -> {
             try {
                 HttpResponse response = httpClient.execute(httpPost);

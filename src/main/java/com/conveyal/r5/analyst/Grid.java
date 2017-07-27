@@ -123,11 +123,23 @@ public class Grid {
     }
 
     /**
+     * Version of getPixelWeights which returns the weights as relative to the total area of the input geometry (i.e.
+     * the weight at a pixel is the proportion of the input geometry that falls within that pixel.
+     */
+    public TObjectDoubleMap<int[]> getPixelWeights (Geometry geometry) {
+        return getPixelWeights(geometry, false);
+    }
+
+    /**
      * Get the proportions of an input polygon feature that overlap each grid cell, in the format [x, y] => weight.
      * This weight object can then be fed into the incrementFromPixelWeights function to actually burn a polygon into the
      * grid.
+     *
+     * If relativeToPixels is true, the weights are the proportion of the pixel that is covered. Otherwise they are the
+     * portion of this polygon which is within the given grid cell. If using incrementPixelWeights, this should be set to
+     * false.
      */
-    public TObjectDoubleMap<int[]> getPixelWeights (Geometry geometry) {
+    public TObjectDoubleMap<int[]> getPixelWeights (Geometry geometry, boolean relativeToPixels) {
         // No need to convert to a local coordinate system
         // Both the supplied polygon and the web mercator pixel geometries are left in WGS84 geographic coordinates.
         // Both are distorted equally along the X axis at a given latitude so the proportion of the geometry within
@@ -151,7 +163,8 @@ public class Grid {
 
                 Geometry pixel = getPixelGeometry(x + west, y + north, zoom);
                 Geometry intersection = pixel.intersection(geometry);
-                double weight = intersection.getArea() / area;
+                double denominator = relativeToPixels ? pixel.getArea() : area;
+                double weight = intersection.getArea() / denominator;
                 weights.put(new int[] { x, y }, weight);
             }
         }
@@ -345,20 +358,34 @@ public class Grid {
 
     /* functions below from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */
 
+    /** Return the pixel the given longitude falls within */
     public static int lonToPixel (double lon, int zoom) {
         return (int) ((lon + 180) / 360 * Math.pow(2, zoom) * 256);
     }
 
+    /** return the west side of the given pixel (assuming an integer pixel; noninteger pixels will return the appropriate location within the pixel) */
     public static double pixelToLon (double pixel, int zoom) {
         return pixel / (Math.pow(2, zoom) * 256) * 360 - 180;
     }
 
+    /** Return the longitude of the center of the given pixel */
+    public static double pixelToCenterLon (int pixel, int zoom) {
+        return pixelToLon(pixel + 0.5, zoom);
+    }
+
+    /** Return the pixel the given latitude falls within */
     public static int latToPixel (double lat, int zoom) {
         double latRad = FastMath.toRadians(lat);
         return (int) ((1 - log(tan(latRad) + 1 / cos(latRad)) / Math.PI) * Math.pow(2, zoom - 1) * 256);
     }
 
-    // We're using FastMath here, because the built-in math functions were taking a laarge amount of time in profiling.
+    /** Return the latitude of the center of the given pixel */
+    public static double pixelToCenterLat (int pixel, int zoom) {
+        return pixelToLat(pixel + 0.5, zoom);
+    }
+
+    // We're using FastMath here, because the built-in math functions were taking a large amount of time in profiling.
+    /** return the north side of the given pixel (assuming an integer pixel; noninteger pixels will return the appropriate location within the pixel) */
     public static double pixelToLat (double pixel, int zoom) {
         return FastMath.toDegrees(atan(sinh(Math.PI - (pixel / 256d) / Math.pow(2, zoom) * 2 * Math.PI)));
     }

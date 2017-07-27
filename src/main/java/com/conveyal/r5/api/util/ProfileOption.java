@@ -1,6 +1,9 @@
 package com.conveyal.r5.api.util;
 
+import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.PathWithTimes;
+import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.profile.StatsCalculator;
 import com.conveyal.r5.transit.TransitLayer;
 import com.google.common.base.Joiner;
 import com.google.common.collect.Lists;
@@ -8,6 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.*;
+import java.time.temporal.TemporalAccessor;
+import java.time.temporal.TemporalField;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -33,6 +38,18 @@ public class ProfileOption {
 
     private transient Map<ModeStopIndex, Integer> accessIndexes = new HashMap<>();
     private transient Map<ModeStopIndex, Integer> egressIndexes = new HashMap<>();
+
+    /**
+     * contains full itineraries needed to compute statistics. We don't present these to the client though.
+     *
+     * There is no way to compute the statistics by combining the statistics of constituent paths. Suppose there
+     * are two patterns each running every 15 minutes; we don't know if they are coming in and out of phase.
+     * Ergo, we save all itineraries so we can compute fresh stats when we're done.
+     *
+     * Since all transit paths here will have the same start and end stops, we can save all itineraries individually,
+     * we don't need to save their start and end stops as well.
+     */
+    private transient List<PathWithTimes.Itinerary> fullItineraries = new ArrayList<>();
 
     @Override public String toString() {
         return "ProfileOption{" +
@@ -154,6 +171,7 @@ public class ProfileOption {
             }
         }
 
+        fullItineraries.addAll(currentTransitPath.itineraries);
     }
 
     /**
@@ -278,6 +296,29 @@ public class ProfileOption {
             // which is easier if everything is at one place
             currentItinerary.addWalkTime(streetSegment.duration);
             currentItinerary.distance += streetSegment.distance;
+        }
+    }
+
+    /** recompute wait and ride stats for all transit itineraries, should be done once all transit paths are added */
+    public void recomputeStats (ProfileRequest req) {
+        if (!fullItineraries.isEmpty()) {
+            StatsCalculator.StatsCollection collection =
+                    StatsCalculator.computeStatistics(
+                            req,
+                            // TODO is this intended to handle multiple access modes to the same stop?
+                            // do these ever have more or less than one value?
+                            access.get(itinerary.get(0).connection.access).duration,
+                            egress.get(itinerary.get(0).connection.egress).duration,
+                            transit.size(),
+                            fullItineraries);
+
+            this.stats = collection.stats;
+
+            for (int leg = 0; leg < transit.size(); leg++) {
+                TransitSegment segment = transit.get(leg);
+                segment.rideStats = collection.rideStats[leg];
+                segment.waitStats = collection.waitStats[leg];
+            }
         }
     }
 

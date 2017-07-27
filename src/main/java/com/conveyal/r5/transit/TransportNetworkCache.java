@@ -6,7 +6,6 @@ import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
 import com.conveyal.gtfs.GTFSCache;
 import com.conveyal.osmlib.OSMCache;
-import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.BundleManifest;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
@@ -14,17 +13,21 @@ import com.conveyal.r5.common.R5Version;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.streets.StreetLayer;
-import com.google.common.collect.Sets;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.cache.RemovalListener;
 import com.google.common.io.ByteStreams;
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -32,8 +35,6 @@ import java.util.zip.ZipInputStream;
  * This holds one or more TransportNetworks keyed on unique strings.
  * Because (de)serialization is now much faster than building networks from scratch, built graphs are cached on the
  * local filesystem and on S3 for later re-use.
- * Actually this currently only holds one single TransportNetwork, but that will eventually change.
- * FIXME the synchronization is kind of primitive and will need to be more sophisticated when a worker has multiple loaded networks.
  */
 public class TransportNetworkCache {
 
@@ -44,11 +45,11 @@ public class TransportNetworkCache {
     private final File cacheDir;
 
     private final String sourceBucket;
+    private final String bucketFolder;
 
-    String currentNetworkId = null;
+    private static final int DEFAULT_CACHE_SIZE = 1;
 
-    TransportNetwork currentNetwork = null;
-
+    private final LoadingCache<String, TransportNetwork> cache;
     private final GTFSCache gtfsCache;
     private final OSMCache osmCache;
 
@@ -59,51 +60,51 @@ public class TransportNetworkCache {
 
     /** Create a transport network cache. If source bucket is null, will work offline. */
     public TransportNetworkCache(String sourceBucket, File cacheDir) {
+        this(sourceBucket, cacheDir, DEFAULT_CACHE_SIZE, null);
+    }
+
+    public TransportNetworkCache(String sourceBucket, File cacheDir, String bucketFolder) {
+        this(sourceBucket, cacheDir, DEFAULT_CACHE_SIZE, bucketFolder);
+    }
+
+    /** Create a transport network cache. If source bucket is null, will work offline. */
+    public TransportNetworkCache(String sourceBucket, File cacheDir, int cacheSize, String bucketFolder) {
         this.cacheDir = cacheDir;
         this.sourceBucket = sourceBucket;
+        this.bucketFolder = bucketFolder != null ? bucketFolder.replaceAll("\\/","") : null;
+        this.cache = createCache(cacheSize);
         this.gtfsCache = new GTFSCache(sourceBucket, cacheDir);
         this.osmCache = new OSMCache(sourceBucket, cacheDir);
     }
 
     public TransportNetworkCache(GTFSCache gtfsCache, OSMCache osmCache) {
-        this.gtfsCache = gtfsCache;
-        this.osmCache = osmCache;
-        this.cacheDir = gtfsCache.cacheDir;
-        this.sourceBucket = gtfsCache.bucket;
+        this(gtfsCache, osmCache, DEFAULT_CACHE_SIZE);
     }
 
-    /**
-     * This stores any number of lightweight scenario networks built upon the current base network.
-     * FIXME that sounds like a memory leak, should be a WeighingCache or at least size-limited.
-     */
-    private Map<String, TransportNetwork> scenarioNetworkCache = new HashMap<>();
+    public TransportNetworkCache(GTFSCache gtfsCache, OSMCache osmCache, int cacheSize) {
+        this(gtfsCache, osmCache, cacheSize, null);
+    }
 
-    /**
-     * Return the graph for the given unique identifier for graph builder inputs on S3.
-     * If this is the same as the last graph built, just return the pre-built graph.
-     * If not, build the graph from the inputs, fetching them from S3 to the local cache as needed.
-     */
+    public TransportNetworkCache(GTFSCache gtfsCache, OSMCache osmCache, int cacheSize, String bucketFolder) {
+        this.gtfsCache = gtfsCache;
+        this.osmCache = osmCache;
+        this.cache = createCache(cacheSize);
+        this.cacheDir = gtfsCache.cacheDir;
+        this.sourceBucket = gtfsCache.bucket;
+        // we don't necessarily want to put r5 networks in the gtfsCache bucketFolder
+        // (e.g., "s3://bucket/gtfs"), but we'll go ahead and use the same bucket
+        this.bucketFolder = bucketFolder;
+    }
+
+    /** Convenience method that returns transport network from cache. */
     public synchronized TransportNetwork getNetwork (String networkId) {
-
-        LOG.info("Finding or building a TransportNetwork for ID {} and R5 version {}", networkId, R5Version.version);
-
-        if (networkId.equals(currentNetworkId)) {
-            LOG.info("Network ID has not changed. Reusing the last one that was built.");
-            return currentNetwork;
+        try {
+            return cache.get(networkId);
+        } catch (Exception e) {
+            LOG.error("Exception while loading a transport network into the cache: {}", e.toString());
+            e.printStackTrace();
+            return null;
         }
-
-        TransportNetwork network = checkCached(networkId);
-        if (network == null) {
-            LOG.info("Cached transport network for id {} and R5 version {} was not found. Building the network from scratch.",
-                    networkId, R5Version.version);
-            network = buildNetwork(networkId);
-        }
-
-        currentNetwork = network;
-        currentNetworkId = networkId;
-        scenarioNetworkCache.clear(); // We cache only scenario graphs built upon the currently active base graph.
-
-        return network;
     }
 
     /**
@@ -122,7 +123,10 @@ public class TransportNetworkCache {
 
         // The following call clears the scenarioNetworkCache if the current base graph changes.
         TransportNetwork baseNetwork = this.getNetwork(networkId);
-        TransportNetwork scenarioNetwork = scenarioNetworkCache.get(scenarioId);
+        if (baseNetwork.scenarios == null) {
+            baseNetwork.scenarios = new HashMap<>();
+        }
+        TransportNetwork scenarioNetwork =  baseNetwork.scenarios.get(scenarioId);
 
         // DEBUG force scenario re-application
         // scenarioNetwork = null;
@@ -135,12 +139,11 @@ public class TransportNetworkCache {
                 // resolve scenario
                 LOG.info("Retrieving scenario stored separately on S3 rather than in the ProfileRequest");
 
-                String scenarioKey = String.format("%s_%s.json", networkId, scenarioId);
-                File scenarioFile = new File(cacheDir, scenarioKey);
+                File scenarioFile = new File(cacheDir, getScenarioFilename(networkId, scenarioId));
 
                 if (!scenarioFile.exists()) {
                     try {
-                        S3Object obj = s3.getObject(sourceBucket, scenarioKey);
+                        S3Object obj = s3.getObject(sourceBucket, getScenarioKey(networkId, scenarioId));
                         InputStream is = obj.getObjectContent();
                         OutputStream os = new BufferedOutputStream(new FileOutputStream(scenarioFile));
                         ByteStreams.copy(is, os);
@@ -172,18 +175,26 @@ public class TransportNetworkCache {
             // scenario.modifications.add(0, new InactiveTripsFilter(baseNetwork, clusterRequest.profileRequest));
             scenarioNetwork = scenario.applyToTransportNetwork(baseNetwork);
             LOG.info("Done applying scenario. Caching the resulting network.");
-            scenarioNetworkCache.put(scenario.id, scenarioNetwork);
+            baseNetwork.scenarios.put(scenario.id, scenarioNetwork);
         } else {
             LOG.info("Reusing cached TransportNetwork for scenario {}.", scenarioId);
         }
         return scenarioNetwork;
     }
 
+    private String getScenarioFilename(String networkId, String scenarioId) {
+        return String.format("%s_%s.json", networkId, scenarioId);
+    }
+
+    private String getScenarioKey(String networkId, String scenarioId) {
+        String filename = getScenarioFilename(networkId, scenarioId);
+        return bucketFolder != null ? String.join("/", bucketFolder, filename) : filename;
+    }
+
     /** If this transport network is already built and cached, fetch it quick */
     private TransportNetwork checkCached (String networkId) {
         try {
-            String filename = networkId + "_" + R5Version.version + ".dat";
-            File cacheLocation = new File(cacheDir, networkId + "_" + R5Version.version + ".dat");
+            File cacheLocation = new File(cacheDir, getR5NetworkFilename(networkId));
             if (cacheLocation.exists())
                 LOG.info("Found locally-cached TransportNetwork at {}", cacheLocation);
             else {
@@ -193,7 +204,7 @@ public class TransportNetworkCache {
                     LOG.info("Checking for cached transport network on S3.");
                     S3Object tn;
                     try {
-                        tn = s3.getObject(sourceBucket, filename);
+                        tn = s3.getObject(sourceBucket, getR5NetworkKey(networkId));
                     } catch (AmazonServiceException ex) {
                         LOG.info("No cached transport network was found in S3. It will be built from scratch.");
                         return null;
@@ -222,6 +233,16 @@ public class TransportNetworkCache {
         }
     }
 
+
+    private String getR5NetworkKey(String networkId) {
+        String filename = getR5NetworkFilename(networkId);
+        return bucketFolder != null ? String.join("/", bucketFolder, filename) : filename;
+    }
+
+    private String getR5NetworkFilename(String networkId) {
+        return networkId + "_" + R5Version.version + ".dat";
+    }
+
     /** If we did not find a cached network, build one */
     public TransportNetwork buildNetwork (String networkId) {
 
@@ -247,8 +268,7 @@ public class TransportNetworkCache {
         network.rebuildLinkedGridPointSet();
 
         // Cache the network.
-        String filename = networkId + "_" + R5Version.version + ".dat";
-        File cacheLocation = new File(cacheDir, networkId + "_" + R5Version.version + ".dat");
+        File cacheLocation = new File(cacheDir, getR5NetworkFilename(networkId));
 
         try {
             // Serialize TransportNetwork to local cache on this worker
@@ -256,7 +276,7 @@ public class TransportNetworkCache {
             // Upload the serialized TransportNetwork to S3
             if (sourceBucket != null) {
                 LOG.info("Uploading the serialized TransportNetwork to S3 for use by other workers.");
-                s3.putObject(sourceBucket, filename, cacheLocation);
+                s3.putObject(sourceBucket, getR5NetworkKey(networkId), cacheLocation);
                 LOG.info("Done uploading the serialized TransportNetwork to S3.");
             } else {
                 LOG.info("Network saved to cache directory, not uploading to S3 while working offline.");
@@ -279,7 +299,8 @@ public class TransportNetworkCache {
             if (sourceBucket != null) {
                 LOG.info("Downloading graph input files from S3.");
                 dataDirectory.mkdirs();
-                S3Object graphDataZipObject = s3.getObject(sourceBucket, networkId + ".zip");
+                String networkZipKey = bucketFolder != null ? String.join("/", bucketFolder, networkId + ".zip") : networkId + ".zip";
+                S3Object graphDataZipObject = s3.getObject(sourceBucket, networkZipKey);
                 ZipInputStream zis = new ZipInputStream(graphDataZipObject.getObjectContent());
                 try {
                     ZipEntry entry;
@@ -329,13 +350,14 @@ public class TransportNetworkCache {
      * It contains the unique IDs of the GTFS feeds and OSM extract.
      */
     private TransportNetwork buildNetworkFromManifest (String networkId) {
-        String manifestFileName = GTFSCache.cleanId(networkId) + ".json";
+        String manifestFileName = getManifestFilename(networkId);
         File manifestFile = new File(cacheDir, manifestFileName);
 
         // TODO handle manifest not in S3
         if (!manifestFile.exists() && sourceBucket != null) {
             LOG.info("Manifest file not found locally, downloading from S3");
-            s3.getObject(new GetObjectRequest(sourceBucket, manifestFileName), manifestFile);
+            String manifestKey = getManifestKey(networkId);
+            s3.getObject(new GetObjectRequest(sourceBucket, manifestKey), manifestFile);
         }
 
         BundleManifest manifest;
@@ -369,17 +391,77 @@ public class TransportNetworkCache {
 
         network.rebuildTransientIndexes();
 
-        new TransferFinder(network).findTransfers();
+        TransferFinder transferFinder = new TransferFinder(network);
+        transferFinder.findTransfers();
+        transferFinder.findParkRideTransfer();
 
         return network;
     }
 
+    private String getManifestKey(String networkId) {
+        String filename = getManifestFilename(networkId);
+        return bucketFolder != null ? String.join("/", bucketFolder, filename) : filename;
+    }
+
+    private String getManifestFilename(String networkId) {
+        return GTFSCache.cleanId(networkId) + ".json";
+    }
+
+    private LoadingCache createCache(int size) {
+        RemovalListener<String, TransportNetwork> removalListener = removalNotification -> {
+            String id = removalNotification.getKey();
+
+            // delete local files ONLY if using s3
+            if (sourceBucket != null) {
+                String[] extensions = {".db", ".db.p", ".zip"};
+                // delete local cache files (including zip) when feed removed from cache
+                for (String type : extensions) {
+                    File file = new File(cacheDir, id + type);
+                    file.delete();
+                }
+            }
+        };
+        return CacheBuilder.newBuilder()
+                .maximumSize(size)
+                .removalListener(removalListener)
+                .build(new CacheLoader() {
+                    public TransportNetwork load(Object s) throws Exception {
+                        // Thanks, java, for making me use a cast here. If I put generic arguments to new CacheLoader
+                        // due to type erasure it can't be sure I'm using types correctly.
+                        return loadNetwork((String) s);
+                    }
+                });
+    }
+
+    /**
+     * Return the graph for the given unique identifier for graph builder inputs on S3.
+     * If this is the same as the last graph built, just return the pre-built graph.
+     * If not, build the graph from the inputs, fetching them from S3 to the local cache as needed.
+     */
+    private TransportNetwork loadNetwork(String networkId) {
+
+        LOG.info("Finding or building a TransportNetwork for ID {} and R5 version {}", networkId, R5Version.version);
+
+        TransportNetwork network = checkCached(networkId);
+        if (network == null) {
+            LOG.info("Cached transport network for id {} and R5 version {} was not found. Building the network from scratch.",
+                    networkId, R5Version.version);
+            network = buildNetwork(networkId);
+        }
+
+        cache.put(networkId, network);
+        return network;
+    }
+
     public Set<String> getLoadedNetworkIds() {
-        if (currentNetwork == null) return Collections.emptySet();
-        else return Sets.newHashSet(currentNetwork.scenarioId);
+        return cache.asMap().keySet();
     }
 
     public Set<String> getAppliedScenarios() {
-        return scenarioNetworkCache.keySet();
+        return cache.asMap().values().stream()
+                .filter(network -> network.scenarios != null)
+                .map(network -> network.scenarios.keySet())
+                .flatMap(Collection::stream)
+                .collect(Collectors.toSet());
     }
 }

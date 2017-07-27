@@ -8,6 +8,7 @@ import java.net.URL;
 
 /**
  * Information about a route.
+ * FIXME This was originally to copy GTFS Route to get rid of inter-object references. Eliminate it.
  */
 public class RouteInfo implements Serializable {
     public static final long serialVersionUID = 1L;

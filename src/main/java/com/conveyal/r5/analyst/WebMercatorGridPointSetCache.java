@@ -7,28 +7,29 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Cache Web Mercator Grid Pointsets so that they are not recreated and relinked on every regional analysis request.
+ * Cache Web Mercator Grid Pointsets so that they are not recreated and relinked on every regional analysis task.
  * The cache does not have expiration, which is fine, because it exists on the workers which are short-lived.
  */
 public class WebMercatorGridPointSetCache {
 
     private Map<GridKey, WebMercatorGridPointSet> cache = new ConcurrentHashMap<>();
 
-    public WebMercatorGridPointSet get (int zoom, int west, int north, int width, int height) {
+    public WebMercatorGridPointSet get (int zoom, int west, int north, int width, int height, WebMercatorGridPointSet base) {
         GridKey key = new GridKey();
         key.zoom = zoom;
         key.west = west;
         key.north = north;
         key.width = width;
         key.height = height;
+        key.base = base;
 
         // this works even in a multithreaded environment; ConcurrentHashMap's contract specifies that this will be called
         // at most once per key
         return cache.computeIfAbsent(key, GridKey::toPointset);
     }
 
-    public WebMercatorGridPointSet get(Grid grid) {
-        return get(grid.zoom, grid.west, grid.north, grid.width, grid.height);
+    public WebMercatorGridPointSet get(Grid grid, WebMercatorGridPointSet base) {
+        return get(grid.zoom, grid.west, grid.north, grid.width, grid.height, base);
     }
 
     private static class GridKey {
@@ -37,13 +38,14 @@ public class WebMercatorGridPointSetCache {
         public int north;
         public int width;
         public int height;
+        public WebMercatorGridPointSet base;
 
         public WebMercatorGridPointSet toPointset () {
-            return new WebMercatorGridPointSet(zoom, west, north, width, height);
+            return new WebMercatorGridPointSet(zoom, west, north, width, height, base);
         }
 
         public int hashCode () {
-            return west + north * 31 + width * 63 + height + 99;
+            return west + north * 31 + width * 63 + height * 99 + (base == null ? 0 : base.hashCode() * 123);
         }
 
         public boolean equals (Object o) {
@@ -53,11 +55,11 @@ public class WebMercatorGridPointSetCache {
                         west == other.west &&
                         north == other.north &&
                         width == other.width &&
-                        height == other.height;
+                        height == other.height &&
+                        base == other.base;
             } else {
                 return false;
             }
         }
     }
-
 }

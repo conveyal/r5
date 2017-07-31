@@ -27,7 +27,7 @@ import java.util.zip.GZIPInputStream;
  *
  * This class is not referenced within R5, but is used by the Analysis front end.
  */
-public abstract class SelectingGridReducer {
+public class SelectingGridReducer {
 
     private static final AmazonS3 s3 = new AmazonS3Client();
 
@@ -88,7 +88,7 @@ public abstract class SelectingGridReducer {
                 }
 
                 // compute percentiles
-                outputGrid.grid[x][y] = computeValueForOrigin(x, y, valuesThisOrigin);
+                outputGrid.grid[x][y] = computeValueForOrigin(x, y, valuesThisOrigin, zoom, west, north, width, height);
             }
         }
 
@@ -103,8 +103,7 @@ public abstract class SelectingGridReducer {
      * This function could easily be inlined, but we're leaving it separate as an indicator of how to make grid
      * reduce operations abstract (so you could have more than one different one).
      */
-    protected double computeValueForOrigin(int x, int y, int[] valuesThisOrigin) {
+    protected double computeValueForOrigin(int x, int y, int[] valuesThisOrigin, int zoom, int west, int north, int width, int height) {
         return valuesThisOrigin[index];
     }
-
 }

@@ -5,8 +5,7 @@ import com.amazonaws.regions.Region;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.*;
-import com.conveyal.r5.analyst.cluster.EC2Info;
-import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
+import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.common.JsonUtilities;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
@@ -17,10 +16,8 @@ import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.TObjectLongMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.map.hash.TObjectLongHashMap;
-import org.glassfish.grizzly.http.server.Request;
 import org.glassfish.grizzly.http.server.Response;
 import org.glassfish.grizzly.http.util.HttpStatus;
-import com.conveyal.r5.analyst.cluster.AnalystWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,7 +101,7 @@ public class Broker implements Runnable {
      * the side channels. If that doesn't work, we put them here to be picked up the next time a worker
      * is available via normal task distribution channels.
      */
-    private ArrayListMultimap<WorkerCategory, GenericClusterRequest> stalledHighPriorityTasks = ArrayListMultimap.create();
+    private ArrayListMultimap<WorkerCategory, AnalysisTask> stalledHighPriorityTasks = ArrayListMultimap.create();
 
     /**
      * High priority requests that have just come and are about to be sent down a single point channel.
@@ -113,7 +110,7 @@ public class Broker implements Runnable {
      * two different workers because the second came in in between closing the side channel and the worker
      * reopening it.
      */
-    private Multimap<WorkerCategory, GenericClusterRequest> newHighPriorityTasks = ArrayListMultimap.create();
+    private Multimap<WorkerCategory, AnalysisTask> newHighPriorityTasks = ArrayListMultimap.create();
 
     /** Priority requests that have already been farmed out to workers, and are awaiting a response. */
     private TIntObjectMap<Response> highPriorityResponses = new TIntObjectHashMap<>();
@@ -208,7 +205,7 @@ public class Broker implements Runnable {
      *
      * Returns true if the task was delivered and the caller should suspend the response.
      */
-    public synchronized boolean enqueuePriorityTask (GenericClusterRequest task, Response response) {
+    public synchronized boolean enqueuePriorityTask (AnalysisTask task, Response response) {
         boolean workersAvailable = workersAvailable(task.getWorkerCategory());
         if (!workersAvailable) {
             createWorkersInCategory(task.getWorkerCategory());
@@ -235,7 +232,7 @@ public class Broker implements Runnable {
             // workers aren't available, don't suspend the response
             if (workersAvailable) highPriorityResponses.put(task.taskId, response);
 
-            // wait 100ms to deliver to workers in case another request comes in almost simultaneously
+            // wait 100ms to deliver to workers in case another task comes in almost simultaneously
             timer.schedule(new TimerTask() {
                 @Override
                 public void run() {
@@ -252,7 +249,7 @@ public class Broker implements Runnable {
 
     /** Attempt to deliver high priority tasks via side channels, or move them into normal channels if need be. */
     public synchronized void deliverHighPriorityTasks (WorkerCategory category) {
-        Collection<GenericClusterRequest> tasks = newHighPriorityTasks.get(category);
+        Collection<AnalysisTask> tasks = newHighPriorityTasks.get(category);
 
         if (tasks.isEmpty())
             // someone got here first
@@ -295,14 +292,14 @@ public class Broker implements Runnable {
     }
 
     /** Enqueue some tasks for queued execution possibly much later. Results will be saved to S3. */
-    public synchronized void enqueueTasks (List<GenericClusterRequest> tasks) {
+    public synchronized void enqueueTasks (List<AnalysisTask> tasks) {
         Job job = findJob(tasks.get(0)); // creates one if it doesn't exist
 
         if (!workersAvailable(job.getWorkerCategory())) {
             createWorkersInCategory(job.getWorkerCategory());
         }
 
-        for (GenericClusterRequest task : tasks) {
+        for (AnalysisTask task : tasks) {
             task.taskId = nextTaskId++;
             job.addTask(task);
             LOG.debug("Enqueued task id {} in job {}", task.taskId, job.jobId);
@@ -529,11 +526,11 @@ public class Broker implements Runnable {
         // workers on their graph.
 
         // start with high-priority tasks
-        HIGHPRIORITY: for (Map.Entry<WorkerCategory, Collection<GenericClusterRequest>> e : stalledHighPriorityTasks
+        HIGHPRIORITY: for (Map.Entry<WorkerCategory, Collection<AnalysisTask>> e : stalledHighPriorityTasks
                 .asMap().entrySet()) {
             // the collection is an arraylist with the most recently added at the end
             WorkerCategory workerCategory = e.getKey();
-            Collection<GenericClusterRequest> tasks = e.getValue();
+            Collection<AnalysisTask> tasks = e.getValue();
 
             // See if there are any workers that requested tasks in this category.
             // Don't respect graph affinity when working offline; we can't arbitrarily start more workers.
@@ -552,7 +549,7 @@ public class Broker implements Runnable {
                 continue HIGHPRIORITY;
             }
 
-            Iterator<GenericClusterRequest> taskIt = tasks.iterator();
+            Iterator<AnalysisTask> taskIt = tasks.iterator();
             while (taskIt.hasNext() && !consumers.isEmpty()) {
                 Response consumer = consumers.pop();
 
@@ -641,7 +638,7 @@ public class Broker implements Runnable {
         }
 
         // Get up to N tasks from the tasksAwaitingDelivery deque
-        List<GenericClusterRequest> tasks = new ArrayList<>();
+        List<AnalysisTask> tasks = new ArrayList<>();
         while (tasks.size() < MAX_TASKS_PER_WORKER && !job.tasksAwaitingDelivery.isEmpty()) {
             tasks.add(job.tasksAwaitingDelivery.poll());
         }
@@ -682,9 +679,9 @@ public class Broker implements Runnable {
     }
 
     /**
-     * Marks the specified priority request as completed, and returns the suspended Response object for the connection
-     * that submitted the priority request (the UI), which is probably still waiting to receive a result back over the
-     * same connection. A HttpHandler thread can then pump data from the worker back to the origin of the request,
+     * Marks the specified priority task as completed, and returns the suspended Response object for the connection
+     * that submitted the priority task (the UI), which is probably still waiting to receive a result back over the
+     * same connection. A HttpHandler thread can then pump data from the worker back to the origin of the task,
      * without blocking the broker thread.
      * TODO rename to "deregisterSuspendedTaskProducer" and "deregisterSuspendedTaskConsumer" ?
      */
@@ -706,7 +703,7 @@ public class Broker implements Runnable {
     }
 
     /** Find the job that should contain a given task, creating that job if it does not exist. */
-    public Job findJob (GenericClusterRequest task) {
+    public Job findJob (AnalysisTask task) {
         Job job = findJob(task.jobId);
         if (job != null) {
             return job;

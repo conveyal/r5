@@ -53,8 +53,7 @@ public class PerTargetPropagater {
      * optimizations in certain cases. A travelTimeReducer receives a full list of travel times to the given
      * destination.
      */
-    private void propagate (Reducer reducer, TravelTimeReducer travelTimeReducer) {
-        boolean saveTravelTimes = travelTimeReducer != null;
+    public void propagate (TravelTimeReducer travelTimeReducer) {
         targets.makePointToStopDistanceTablesIfNeeded();
 
         long startTimeMillis = System.currentTimeMillis();
@@ -64,8 +63,7 @@ public class PerTargetPropagater {
         // than floats.
         int speedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
 
-        boolean[] perIterationResults = new boolean[travelTimesToStopsEachIteration.length];
-        int[] perIterationTravelTimes = saveTravelTimes ? new int[travelTimesToStopsEachIteration.length] : null;
+        int[] perIterationTravelTimes = new int[travelTimesToStopsEachIteration.length];
 
         // Invert the travel times to stops array, to provide better memory locality in the tight loop below. Confirmed
         // that this provides a significant speedup, which makes sense; Java doesn't have true multidimensional arrays
@@ -91,46 +89,25 @@ public class PerTargetPropagater {
         for (int targetIdx = 0; targetIdx < targets.size(); targetIdx++) {
             // clear previous results, fill with whether target is reached within the cutoff without transit (which does
             // not vary with monte carlo draw)
-            boolean targetReachedWithoutTransit = nonTransitTravelTimesToTargets[targetIdx] < cutoffSeconds;
-            Arrays.fill(perIterationResults, targetReachedWithoutTransit);
-            if (saveTravelTimes) {
-                Arrays.fill(perIterationTravelTimes, nonTransitTravelTimesToTargets[targetIdx]);
-            }
-
-            if (targetReachedWithoutTransit && !saveTravelTimes) {
-                // if the target is reached without transit, there's no need to do any propagation as the array cannot
-                // change
-                reducer.accept(targetIdx, perIterationResults);
-                continue;
-            }
+            Arrays.fill(perIterationTravelTimes, nonTransitTravelTimesToTargets[targetIdx]);
 
             TIntIntMap pointToStopDistanceTable = targets.pointToStopDistanceTables.get(targetIdx);
-
-            // all variables used in lambdas must be "effectively final"; arrays are effectively final even if their
-            // values change
-            boolean[] targetEverReached = new boolean[] { nonTransitTravelTimesToTargets[targetIdx] <= cutoffSeconds };
 
             // don't try to propagate transit if there are no nearby transit stops,
             // but still call the reducer below with the non-transit times, because you can walk even where there is no
             // transit
             if (pointToStopDistanceTable != null) {
                 pointToStopDistanceTable.forEachEntry((stop, distanceMillimeters) -> {
-                    for (int iteration = 0; iteration < perIterationResults.length; iteration++) {
+                    for (int iteration = 0; iteration < perIterationTravelTimes.length; iteration++) {
                         int timeAtStop = invertedTravelTimesToStops[stop][iteration];
 
-                        if (timeAtStop > cutoffSeconds || saveTravelTimes && timeAtStop > perIterationTravelTimes[iteration]) continue; // avoid overflow
+                        if (timeAtStop > cutoffSeconds || timeAtStop > perIterationTravelTimes[iteration]) continue; // avoid overflow
 
                         int timeAtTargetThisStop = timeAtStop + distanceMillimeters / speedMillimetersPerSecond;
 
                         if (timeAtTargetThisStop < cutoffSeconds) {
-                            if (saveTravelTimes) {
-                                if (timeAtTargetThisStop < perIterationTravelTimes[iteration]) {
-                                    perIterationTravelTimes[iteration] = timeAtTargetThisStop;
-                                    targetEverReached[0] = true;
-                                }
-                            } else {
-                                perIterationResults[iteration] = true;
-                                targetEverReached[0] = true;
+                            if (timeAtTargetThisStop < perIterationTravelTimes[iteration]) {
+                                perIterationTravelTimes[iteration] = timeAtTargetThisStop;
                             }
                         }
                     }
@@ -138,8 +115,7 @@ public class PerTargetPropagater {
                 });
             }
 
-            if (saveTravelTimes) travelTimeReducer.accept(targetIdx, perIterationTravelTimes);
-            else if (targetEverReached[0]) reducer.accept(targetIdx, perIterationResults);
+            travelTimeReducer.accept(targetIdx, perIterationTravelTimes);
         }
 
         long totalTimeMillis = System.currentTimeMillis() - startTimeMillis;
@@ -149,21 +125,15 @@ public class PerTargetPropagater {
                 targets.size(),
                 totalTimeMillis / 1000d
                 );
-    }
 
-    public void propagate (Reducer reducer) {
-        propagate(reducer, null);
-    }
-
-    public void propagateTimes (TravelTimeReducer reducer) {
-        propagate(null, reducer);
-    }
-
-    public static interface Reducer {
-        public void accept (int targetIndex, boolean[] targetReachedWithinCutoff);
+        travelTimeReducer.finish();
     }
 
     public interface TravelTimeReducer {
-        public void accept (int targetIndex, int[] travelTimesForTargets);
+        /** Receive the travel times for all iterations of the algorithm to a particular target specified by targetIndex */
+        void accept (int targetIndex, int[] travelTimesForTarget);
+
+        /** Called when propagation is done, used to signal the reducer that it can upload its results to s3 etc; optional */
+        default void finish () {};
     }
 }

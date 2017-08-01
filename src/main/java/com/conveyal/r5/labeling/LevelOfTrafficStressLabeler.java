@@ -32,8 +32,11 @@ public class LevelOfTrafficStressLabeler {
     /** Match OSM speeds, from http://wiki.openstreetmap.org/wiki/Key:maxspeed */
     private static final Pattern speedPattern = Pattern.compile("^([0-9][\\.0-9]*?) ?(km/h|kmh|kph|mph|knots)?$");
 
-    /** Set the LTS for this way in the provided flags (not taking into account any intersection LTS at the moment) */
-    public void label (Way way, EnumSet<EdgeStore.EdgeFlag> forwardFlags, EnumSet<EdgeStore.EdgeFlag> backFlags) {
+    /** Set the LTS for this way in the provided flags (not taking into account any intersection LTS at the moment)
+     *
+     * @param maxSpeed maximal speed of forward edge in km/h
+     * */
+    public void label (Way way, EnumSet<EdgeStore.EdgeFlag> forwardFlags, EnumSet<EdgeStore.EdgeFlag> backFlags, double maxSpeed) {
         // the general idea behind this function is that we progress from low-stress to higher-stress, bailing out as we go.
 
         if (!forwardFlags.contains(EdgeStore.EdgeFlag.ALLOWS_CAR) && !backFlags.contains(EdgeStore.EdgeFlag.ALLOWS_CAR)) {
@@ -74,16 +77,6 @@ public class LevelOfTrafficStressLabeler {
         // but cycleway:lane means a lane in all directions traffic is allowed to flow.
         if (way.hasTag("cycleway:left", "opposite") ||  way.hasTag("cycleway:right", "lane")) {
             hasForwardLane = true;
-        }
-
-        // extract max speed and lane info
-        double maxSpeed = Double.NaN;
-        if (way.hasTag("maxspeed")) {
-            // parse the max speed tag
-            maxSpeed = getSpeedKmh(way.getTag("maxspeed"));
-            if (Double.isNaN(maxSpeed)) {
-                LOG.warn("Unable to parse maxspeed tag {}", way.getTag("maxspeed"));
-            }
         }
 
         int lanes = Integer.MAX_VALUE;
@@ -245,30 +238,5 @@ public class LevelOfTrafficStressLabeler {
         else if (lts == 2) return EdgeStore.EdgeFlag.BIKE_LTS_2;
         else if (lts == 3) return EdgeStore.EdgeFlag.BIKE_LTS_3;
         else return EdgeStore.EdgeFlag.BIKE_LTS_4;
-    }
-
-    /** parse an OSM speed tag */
-    public static double getSpeedKmh (String maxSpeed) {
-        try {
-            Matcher m = speedPattern.matcher(maxSpeed);
-
-            // do match op here
-            if (!m.matches())
-                return Double.NaN;
-
-            double ret = Double.parseDouble(m.group(1));
-
-            // check for non-metric units
-            if (m.groupCount() > 1) {
-                if ("mph".equals(m.group(2))) ret *= 1.609;
-                // seriously? knots?
-                else if ("knots".equals(m.group(2))) ret *= 1.852;
-                // all other units are assumed to be km/h
-            }
-
-            return ret;
-        } catch (Exception e) {
-            return Double.NaN;
-        }
     }
 }

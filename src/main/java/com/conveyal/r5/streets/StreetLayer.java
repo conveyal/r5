@@ -1008,8 +1008,11 @@ public class StreetLayer implements Serializable, Cloneable {
             return;
         }
 
+
+        final float forwardSpeedMS = speedLabeler.getSpeedMS(way, false);
+
         // FIXME this encoded speed should probably never be exposed outside the edge object
-        short forwardSpeed = speedToShort(speedLabeler.getSpeedMS(way, false));
+        short forwardSpeed = speedToShort(forwardSpeedMS);
         short backwardSpeed = speedToShort(speedLabeler.getSpeedMS(way, true));
 
         RoadPermission roadPermission = permissions.getPermissions(way);
@@ -1025,7 +1028,8 @@ public class StreetLayer implements Serializable, Cloneable {
             return;
         }
 
-        stressLabeler.label(way, forwardFlags, backFlags);
+        //stressLabeler expects speed in km/h
+        stressLabeler.label(way, forwardFlags, backFlags, forwardSpeedMS*3.6);
 
         typeOfEdgeLabeler.label(way, forwardFlags, backFlags);
 

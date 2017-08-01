@@ -1,0 +1,81 @@
+Country,value,numeric equivalent
+Austria,AT:urban,50
+,AT:rural,100
+,AT:trunk,100
+,AT:motorway,130
+Switzerland,CH:urban,50
+,CH:rural,80
+,CH:trunk,100
+,CH:motorway,120
+Czech Republic,CZ:urban,50
+,CZ:rural,90
+,CZ:trunk,"130 (outside city), 80 (in city)"
+,CZ:motorway,"130 (outside city), 80 (in city)"
+Denmark,DK:urban,50
+,DK:rural,80
+,DK:motorway,130
+Germany,DE:living_street,7
+,DE:urban,50
+,DE:rural,100
+,DE:motorway,none[1]
+Finland,FI:urban,50
+,FI:rural,80
+,FI:trunk,100
+,FI:motorway,120
+France,FR:urban,50
+,FR:rural,90
+,FR:trunk,110
+,FR:motorway,130
+Greece,GR:urban,50
+,GR:rural,90
+,GR:trunk,110
+,GR:motorway,130
+Hungary,HU:urban,50
+,HU:rural,90
+,HU:trunk,110
+,HU:motorway,130
+Italy,IT:urban,50
+,IT:rural,90
+,IT:trunk,110
+,IT:motorway,130
+Japan,JP:national,60
+,JP:motorway,100
+Poland,PL:living_street,20
+,PL:urban,50
+,PL:rural,90
+,PL:motorway,140
+Romania,RO:urban,50
+,RO:rural,90
+,RO:trunk,100
+,RO:motorway,130
+Russian Federation,RU:living_street,20
+,RU:rural,90
+,RU:urban,60
+,RU:motorway,110
+Slovakia,SK:urban,50
+,SK:rural,90
+,SK:trunk,"130 (outside city), 90 (in city)"
+,SK:motorway,"130 (outside city), 90 (in city)"
+Slovenia,SI:urban,50
+,SI:rural,90
+,SI:trunk,110
+,SI:motorway,130
+Spain,ES:urban,50
+,ES:rural,90
+,ES:trunk,100
+,ES:motorway,120
+Sweden,SE:urban,50
+,SE:rural,70
+,SE:trunk,90
+,SE:motorway,110
+United Kingdom,GB:nsl_single,60 mph
+,GB:nsl_dual,70 mph
+,GB:motorway,70 mph
+Ukraine,UA:urban,60
+,UA:rural,90
+,UA:trunk,110
+,UA:motorway,130
+Uzbekistan,UZ:living_street,30
+,UZ:urban,70
+,UZ:rural,100
+,UZ:motorway,110

@@ -75,6 +75,7 @@
           <include>worker.sh</include>
           <include>debug-plan/**</include>
           <include>fares/**</include>
+          <include>speeds/speeds.json</include>
         </includes>
       </resource>
     </resources>

@@ -573,18 +573,24 @@ public class StreetLayer implements Serializable, Cloneable {
         for (Relation.Member member : restriction.members) {
             if ("from".equals(member.role)) {
                 if (from != null) {
-                    LOG.error("Turn restriction {} has multiple from members, skipping", id);
+                    LOG.error("Turn restriction {} has multiple 'from' members, skipping.", id);
                     return;
                 }
-
+                if (member.type != OSMEntity.Type.WAY) {
+                    LOG.error("Turn restriction {} has a 'from' member that is not a way, skipping.", id);
+                    return;
+                }
                 from = member;
             }
             else if ("to".equals(member.role)) {
                 if (to != null) {
-                    LOG.error("Turn restriction {} has multiple to members, skipping", id);
+                    LOG.error("Turn restriction {} has multiple 'to' members, skipping.", id);
                     return;
                 }
-
+                if (member.type != OSMEntity.Type.WAY) {
+                    LOG.error("Turn restriction {} has a 'to' member that is not a way, skipping.", id);
+                    return;
+                }
                 to = member;
             }
             else if ("via".equals(member.role)) {
@@ -616,26 +622,27 @@ public class StreetLayer implements Serializable, Cloneable {
             return;
         }
 
-        boolean hasWays = false, hasNodes = false;
+        boolean hasViaWays = false, hasViaNodes = false;
 
         for (Relation.Member m : via) {
-            if (m.type == OSMEntity.Type.WAY) hasWays = true;
-            else if (m.type == OSMEntity.Type.NODE) hasNodes = true;
+            if (m.type == OSMEntity.Type.WAY) hasViaWays = true;
+            else if (m.type == OSMEntity.Type.NODE) hasViaNodes = true;
             else {
                 LOG.error("via must be node or way, skipping restriction {}", id);
                 return;
             }
         }
 
-        if (hasWays && hasNodes || hasNodes && via.size() > 1) {
+        if ((hasViaWays && hasViaNodes) || (hasViaNodes && via.size() > 1)) {
             LOG.error("via must be single node or one or more ways, skipping restriction {}", id);
             return;
         }
 
         EdgeStore.Edge e = edgeStore.getCursor();
 
-        if (hasNodes) {
-            // via node, this is a fairly simple turn restriction. First find the relevant vertex.
+        if (hasViaNodes) {
+            // Turn restriction passes via a single node. This is a fairly simple turn restriction.
+            // First find the relevant vertex.
             int vertex = vertexIndexForOsmNode.get(via.get(0).id);
 
             if (vertex == -1) {
@@ -643,7 +650,7 @@ public class StreetLayer implements Serializable, Cloneable {
                 return;
             }
 
-            // use array to dodge effectively final nonsense
+            // use array to dodge Java closure "effectively final" nonsense
             final int[] fromEdge = new int[] { -1 };
             final long fromWayId = from.id; // more effectively final nonsense
             final boolean[] bad = new boolean[] { false };

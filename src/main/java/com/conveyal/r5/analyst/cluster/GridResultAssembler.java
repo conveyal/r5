@@ -45,7 +45,10 @@ import java.util.zip.GZIPOutputStream;
  * (repeated 4-byte int) values of each pixel in row major order. Values within a given pixel are delta coded.
  */
 public class GridResultAssembler {
+
     public static final Logger LOG = LoggerFactory.getLogger(GridResultAssembler.class);
+
+    private static final int INT32_WIDTH_BYTES = 4;
 
     /** The version of the access grids we produce */
     public static final int VERSION = 0;
@@ -141,7 +144,7 @@ public class GridResultAssembler {
             }
 
             // convert to a delta coded byte array
-            ByteArrayOutputStream pixelByteOutputStream = new ByteArrayOutputStream(origin.samples.length * 4);
+            ByteArrayOutputStream pixelByteOutputStream = new ByteArrayOutputStream(origin.samples.length * INT32_WIDTH_BYTES);
             LittleEndianDataOutputStream pixelDataOutputStream = new LittleEndianDataOutputStream(pixelByteOutputStream);
             for (int i = 0, prev = 0; i < origin.samples.length; i++) {
                 int current = origin.samples[i];
@@ -156,8 +159,12 @@ public class GridResultAssembler {
                 if (buffer == null) this.initialize(origin.samples.length);
                 // The origins we receive have 2d coordinates.
                 // Flatten them to compute file offsets and for the origin checklist.
+                // The 1D index should not overflow an int (the grid would need to be 1000x bigger than the Netherlands)
+                // However the output file size can easily exceed 2^31, and intermediate results in the file offset
+                // computation are susceptible to overflow (see #321).
+                // Casting the 1D offset to long should ensure that each intermediate result is stored in a long.
                 int index1d = origin.y * request.width + origin.x;
-                long offset = DATA_OFFSET + index1d * 4 * nIterations;
+                long offset = DATA_OFFSET + ((long)index1d) * nIterations * INT32_WIDTH_BYTES;
                 buffer.seek(offset);
                 buffer.write(pixelByteOutputStream.toByteArray());
                 // Don't double-count origins if we receive them more than once.
@@ -165,6 +172,7 @@ public class GridResultAssembler {
                     originsReceived.set(index1d);
                     nComplete += 1;
                 }
+                // TODO It might be more reliable to double-check the bitset of received results inside finish() instead of just counting.
                 if (nComplete == nTotal && !error) finish();
             }
         } catch (Exception e) {

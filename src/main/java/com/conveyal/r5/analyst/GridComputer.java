@@ -109,7 +109,7 @@ public class GridComputer  {
     private static final Logger LOG = LoggerFactory.getLogger(GridComputer.class);
 
     /** The number of bootstrap replications used to bootstrap the sampling distribution of the percentiles */
-    public static final int N_BOOTSTRAP_REPLICATIONS = 1000;
+    public static final int N_BOOTSTRAP_REPLICATIONS = 0;
 
     /** SQS client. TODO: async? */
     private static final AmazonSQS sqs = new AmazonSQSClient();

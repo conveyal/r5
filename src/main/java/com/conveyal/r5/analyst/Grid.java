@@ -24,6 +24,7 @@ import org.geotools.gce.geotiff.GeoTiffFormat;
 import org.geotools.gce.geotiff.GeoTiffWriteParams;
 import org.geotools.gce.geotiff.GeoTiffWriter;
 import org.geotools.geometry.jts.ReferencedEnvelope;
+import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.opengis.feature.Property;
 import org.opengis.feature.simple.SimpleFeature;
@@ -31,6 +32,7 @@ import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
 import org.opengis.referencing.FactoryException;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.TransformException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +54,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -112,7 +113,10 @@ public class Grid {
         this.grid = new double[width][height];
     }
 
-    /** Used when reading a saved grid. */
+    /**
+     * Used when reading a saved grid.
+     * FIXME we have two constructors with five numeric parameters, differentiated only by int/double type.
+     */
     public Grid (int zoom, int width, int height, int north, int west) {
         this.zoom = zoom;
         this.width = width;
@@ -232,38 +236,52 @@ public class Grid {
         out.close();
     }
 
+    private Coordinate mercatorPixelToMeters (double xPixel, double yPixel) {
+        double worldWidthPixels = Math.pow(2, zoom) * 256D;
+        // Top left is min x and y because y increases toward the south in web Mercator. Bottom right is max x and y.
+        // The origin is WGS84 (0,0).
+        final double worldWidthMeters = 20037508.342789244 * 2;
+        double xMeters = ((xPixel / worldWidthPixels) - 0.5) * worldWidthMeters;
+        double yMeters = (0.5 - (yPixel / worldWidthPixels)) * worldWidthMeters; // flip y axis
+        return new Coordinate(xMeters, yMeters);
+    }
+
+    /**
+     * At zoom level zero, our coordinates are pixels in a single planetary tile, with coordinates are in the range
+     * [0...256). We want to export with a conventional web Mercator envelope in meters.
+     */
+    public ReferencedEnvelope getMercatorEnvelopeMeters() {
+        Coordinate topLeft = mercatorPixelToMeters(west, north);
+        Coordinate bottomRight = mercatorPixelToMeters(west + width, north + height);
+        Envelope mercatorEnvelope = new Envelope(topLeft, bottomRight);
+        try {
+            // Get Spherical Mercator pseudo-projection CRS
+            CoordinateReferenceSystem webMercator = CRS.decode("EPSG:3857");
+            ReferencedEnvelope env = new ReferencedEnvelope(mercatorEnvelope, webMercator);
+            return env;
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
     /** Write this grid out in GeoTIFF format */
     public void writeGeotiff (OutputStream out) {
         try {
-            Coordinate topLeft = new Coordinate(pixelToLon(west, zoom), pixelToLat(north, zoom));
-            Coordinate bottomRight = new Coordinate(pixelToLon(west + width, zoom), pixelToLat(north + height, zoom));
-
-            Envelope envelopeWgs = new Envelope(topLeft, bottomRight);
-
-            // TODO fix projection
-            // This is not strictly correct, the data are not WGS 84. However, we're saying what the bounds are so
-            // the data will be stretched to fit; the only issue is the variation in scale over the map, which is
-            // small in the small areas we're working with. After two hours of trying to find/make an appropriate CRS
-            // for what we're doing, I resorted to this.
-            ReferencedEnvelope env = new ReferencedEnvelope(envelopeWgs, DefaultGeographicCRS.WGS84);
-
             float[][] data = new float[height][width];
-
             for (int x = 0; x < width; x++) {
                 for (int y = 0; y < height; y++) {
                     data[y][x] = (float) grid[x][y];
                 }
             }
-
+            ReferencedEnvelope env = getMercatorEnvelopeMeters();
             GridCoverage2D coverage = new GridCoverageFactory().create("GRID", data, env);
-
             GeoTiffWriteParams wp = new GeoTiffWriteParams();
             wp.setCompressionMode(GeoTiffWriteParams.MODE_EXPLICIT);
             wp.setCompressionType("LZW");
             ParameterValueGroup params = new GeoTiffFormat().getWriteParameters();
             params.parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString()).setValue(wp);
             GeoTiffWriter writer = new GeoTiffWriter(out);
-            writer.write(coverage, (GeneralParameterValue[]) params.values().toArray(new GeneralParameterValue[1]));
+            writer.write(coverage, params.values().toArray(new GeneralParameterValue[1]));
             writer.dispose();
             out.close();
         } catch (Exception e) {

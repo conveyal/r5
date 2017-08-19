@@ -236,6 +236,17 @@ public class Grid {
         out.close();
     }
 
+    /**
+     * How to get the width of the world in meters according to the EPSG CRS spec:
+     * $ gdaltransform -s_srs epsg:4326 -t_srs epsg:3857
+     * 180, 0
+     * 20037508.3427892 -7.08115455161362e-10 0
+     * You can't do 180, 90 because this projection is cut off above a certain level to make the world square.
+     * You can do the reverse projection to find this latitude:
+     * $ gdaltransform -s_srs epsg:3857 -t_srs epsg:4326
+     * 20037508.342789, 20037508.342789
+     * 179.999999999998 85.0511287798064 0
+     */
     private Coordinate mercatorPixelToMeters (double xPixel, double yPixel) {
         double worldWidthPixels = Math.pow(2, zoom) * 256D;
         // Top left is min x and y because y increases toward the south in web Mercator. Bottom right is max x and y.

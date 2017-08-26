@@ -16,9 +16,11 @@ import java.io.Serializable;
 import java.time.DayOfWeek;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import static java.time.DayOfWeek.*;
@@ -123,19 +125,15 @@ public class AddTrips extends Modification {
         TripPattern pattern = new TripPattern(intStopIds);
         LOG.info("Created {}.", pattern);
         for (PatternTimetable timetable : frequencies) {
-            TripSchedule schedule = createSchedule(timetable, directionId, transitLayer.services);
-            if (schedule == null) {
-                errors.add("Failed to create a trip.");
-                continue;
-            }
-            pattern.addTrip(schedule);
+            createSchedules(timetable, directionId, transitLayer.services).forEach(pattern::addTrip);
+            if (timetable.firstDepartures != null) transitLayer.hasFrequencies = true;
+            else transitLayer.hasSchedules = true;
         }
 
         pattern.routeIndex = this.routeIndex;
         pattern.routeId = this.routeId;
 
         transitLayer.tripPatterns.add(pattern);
-        transitLayer.hasFrequencies = true;
     }
 
     /**
@@ -326,7 +324,7 @@ public class AddTrips extends Modification {
      * whose code will be saved in the new TripSchedule.
      * Make sure the supplied service list is a protective copy, not the one from the original TransportNetwork!
      */
-    public TripSchedule createSchedule (PatternTimetable timetable, int directionId, List<Service> services) {
+    public List<TripSchedule> createSchedules (PatternTimetable timetable, int directionId, List<Service> services) {
 
         // The code for a newly added Service will be the number of services already in the list.
         int serviceCode = services.size();
@@ -338,29 +336,41 @@ public class AddTrips extends Modification {
 
         // Convert the supplied hop and dwell times (which are relative to adjacent entries) to arrival and departure
         // times (which are relative to the beginning of the trip or the beginning of the service day).
-        int nStops = stops.size();
-        int[] arrivals = new int[nStops];
-        int[] departures = new int[nStops];
-        for (int s = 0, t = 0; s < nStops; s++) {
-            arrivals[s] = t;
-            t += timetable.dwellTimes[s];
-            departures[s] = t;
-            if (s < timetable.hopTimes.length) {
-                t += timetable.hopTimes[s];
+        final boolean frequency = timetable.firstDepartures == null;
+        // if we are making one frequency trip, use 0 as its departure time
+        int[] firstDepartures = frequency ? new int[] { 0 } : timetable.firstDepartures;
+
+        return IntStream.of(firstDepartures).mapToObj(firstDeparture -> {
+            int nStops = stops.size();
+            int[] arrivals = new int[nStops];
+            int[] departures = new int[nStops];
+            for (int s = 0, t = firstDeparture; s < nStops; s++) {
+                arrivals[s] = t;
+                t += timetable.dwellTimes[s];
+                departures[s] = t;
+                if (s < timetable.hopTimes.length) {
+                    t += timetable.hopTimes[s];
+                }
             }
-        }
 
-        // Create an R5 frequency entry and attach it to the new trip, then convert this to a TripSchedule
-        Frequency freq = new Frequency();
-        freq.start_time = timetable.startTime;
-        freq.end_time = timetable.endTime;
-        freq.headway_secs = timetable.headwaySecs;
-        TripSchedule sched =
-                TripSchedule.create(trip, arrivals, departures, Lists.newArrayList(freq), IntStream.range(0, arrivals.length).toArray(), serviceCode);
+            TripSchedule sched;
 
-        timetable.applyPhasing(sched);
+            if (frequency) {
+                // Create an R5 frequency entry and attach it to the new trip, then convert this to a TripSchedule
+                Frequency freq = new Frequency();
+                freq.start_time = timetable.startTime;
+                freq.end_time = timetable.endTime;
+                freq.headway_secs = timetable.headwaySecs;
+                sched =
+                        TripSchedule.create(trip, arrivals, departures, Lists.newArrayList(freq), IntStream.range(0, arrivals.length).toArray(), serviceCode);
 
-        return sched;
+                timetable.applyPhasing(sched);
+            } else {
+                sched = TripSchedule.create(trip, arrivals, departures, Collections.emptyList(), IntStream.range(0, arrivals.length).toArray(), serviceCode);
+            }
+
+            return sched;
+        }).collect(Collectors.toList());
     }
 
     @Override

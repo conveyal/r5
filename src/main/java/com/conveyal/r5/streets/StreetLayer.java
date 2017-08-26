@@ -275,6 +275,7 @@ public class StreetLayer implements Serializable, Cloneable {
                 }
             }
         }
+        stressLabeler.logErrors();
 
         // summarize LTS statistics
         Edge cursor = edgeStore.getCursor();
@@ -613,6 +614,24 @@ public class StreetLayer implements Serializable, Cloneable {
             }
             else if ("via".equals(member.role)) {
                 via.add(member);
+            }
+
+            // Osmosis may produce situations where referential integrity is violated, probably at the edge of the
+            // bounding box where half a turn restriction is outside the box.
+            if (member.type == OSMEntity.Type.WAY) {
+                if (!osm.ways.containsKey(member.id)) {
+                    LOG.warn("Turn restriction relation {} references nonexistent way {}, dropping this relation",
+                            osmRelationId,
+                            member.id);
+                    return;
+                }
+            } else if (member.type == OSMEntity.Type.NODE) {
+                if (!osm.nodes.containsKey(member.id)) {
+                    LOG.warn("Turn restriction relation {} references nonexistent node {}, dropping this relation",
+                            osmRelationId,
+                            member.id);
+                    return;
+                }
             }
         }
 
@@ -1341,7 +1360,7 @@ public class StreetLayer implements Serializable, Cloneable {
             // Indicate that the content of the new StreetLayer will be changed by giving it the scenario's scenarioId.
             // If the copy will not be modified, scenarioId remains unchanged to allow cached pointset linkage reuse.
             copy.scenarioId = newScenarioNetwork.scenarioId;
-            copy.edgeStore = edgeStore.extendOnlyCopy();
+            copy.edgeStore = edgeStore.extendOnlyCopy(copy);
             // The extend-only copy of the EdgeStore also contains a new extend-only copy of the VertexStore.
             copy.vertexStore = copy.edgeStore.vertexStore;
             copy.temporaryEdgeIndex = new IntHashGrid();

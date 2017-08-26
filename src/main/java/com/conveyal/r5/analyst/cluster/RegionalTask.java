@@ -16,6 +16,9 @@ import java.io.OutputStream;
 public class RegionalTask extends AnalysisTask implements Cloneable {
     /**
      * Coordinates of origin cell in grid defined in AnalysisTask.
+     *
+     * Note that these do not override fromLat and fromLon; those must still be set separately. This is for future use
+     * to allow use of arbitrary origin points.
      */
     public int x = -1, y = -1;
 

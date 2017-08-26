@@ -8,7 +8,8 @@
 # 2: the worker configuration to use
 # If you are reading this comment inside the EC2 user data field, this variable substitution has already happened.
 # The string instance_id in curly brackets is substituted by EC2 at startup, not by our Java code. It and any shell
-# variable references that contain brackets are single-quoted to tell Java MessageFormat not to substitute them.
+# variable references that contain brackets are single-quoted to tell MessageFormat not to substitute them.
+# Be very careful not to put any stray single quotes in this file, even in comments!
 
 # prep the system: install log agent, java
 yum -y install awslogs java-1.8.0-openjdk
@@ -65,18 +66,23 @@ cat /var/log/awslogs.log
 sudo -u ec2-user wget -O ~ec2-user/r5.jar {0} >> $LOGFILE 2>&1
 
 # Figure out how much memory to give the worker in kilobytes
-TOTAL_MEM=`grep MemTotal /proc/meminfo | sed 's/[^0-9]//g'`
+# Doubled up single quotes on the following line to please Java MessageFormat
+TOTAL_MEM=`grep MemTotal /proc/meminfo | sed ''s/[^0-9]//g''`
 # 2097152 kb is 2GB, leave that much for the OS
 MEM=`echo $TOTAL_MEM - 2097152 | bc`
 
+
 # Start the worker
-# run in the ec2-user home directory, in the subshell
-'{'
+# run in the home directory for ec2-user, in the subshell
+# Extra single quotes to appease Java MessageFormat
+'
+{
     cd ~ec2-user
-    sudo -u ec2-user java8 -Xmx$'{MEM}'k -jar r5.jar worker worker.conf >> $LOGFILE 2>&1
+    sudo -u ec2-user java8 -Xmx${MEM}k -jar r5.jar worker worker.conf >> $LOGFILE 2>&1
 
     # If the worker exits or does not start, wait a few minutes so that the CloudWatch log agent grabs
     # the logs
     sleep 120
     halt -p
-'}' &
+} &
+'

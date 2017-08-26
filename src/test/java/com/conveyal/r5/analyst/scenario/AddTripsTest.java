@@ -15,7 +15,9 @@ import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
@@ -530,6 +532,57 @@ public class AddTripsTest {
         assertNull(ts1.phaseSeconds);
 
         assertEquals(checksum, network.checksum());
+    }
+
+    /** Test that adding exact-times trips works */
+    @Test
+    public void testAddExactTimes () {
+        assertEquals(1, network.transitLayer.tripPatterns.size());
+
+        AddTrips at = new AddTrips();
+        at.bidirectional = false;
+        at.stops = Arrays.asList(
+                new StopSpec("SINGLE_LINE:s1"),
+                new StopSpec("SINGLE_LINE:s2"),
+                new StopSpec("SINGLE_LINE:s3")
+        );
+        at.mode = Route.BUS;
+
+        AddTrips.PatternTimetable entry = new AddTrips.PatternTimetable();
+        entry.firstDepartures = new int[] { 1800, 3600, 5400, 7200 };
+        entry.monday = entry.tuesday = entry.wednesday = entry.thursday = entry.friday = true;
+        entry.saturday = entry.sunday = false;
+        entry.hopTimes = new int[] { 120, 140 };
+        entry.dwellTimes = new int[] { 0, 30, 0 };
+
+        at.frequencies = Arrays.asList(entry);
+
+        Scenario scenario = new Scenario();
+        scenario.modifications = Arrays.asList(at);
+
+        TransportNetwork mod = scenario.applyToTransportNetwork(network);
+
+        assertEquals(2, mod.transitLayer.tripPatterns.size());
+
+        TripPattern pattern = mod.transitLayer.tripPatterns.get(1);
+
+        // find all departure times, sort and make sure they match
+        int[] foundDepartures = pattern.tripSchedules.stream()
+                .mapToInt(s -> s.departures[0])
+                .sorted()
+                .toArray();
+
+        assertArrayEquals(entry.firstDepartures, foundDepartures);
+
+        // check that correct number of stops show up
+        assertEquals(3, pattern.stops.length);
+
+        // check trip length
+        for (TripSchedule schedule : pattern.tripSchedules) {
+            assertEquals(290, schedule.arrivals[2] - schedule.departures[0]);
+            // make sure it's not a frequency trip
+            assertNull(schedule.headwaySeconds);
+        }
     }
 
     @After

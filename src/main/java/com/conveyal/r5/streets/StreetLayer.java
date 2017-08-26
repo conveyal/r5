@@ -598,24 +598,29 @@ public class StreetLayer implements Serializable, Cloneable {
         for (Relation.Member member : restrictionRelation.members) {
             if ("from".equals(member.role)) {
                 if (from != null) {
-                    LOG.error("Turn restriction {} has multiple from members, skipping", osmRelationId);
+                    LOG.error("Turn restriction {} has multiple 'from' members, skipping.", osmRelationId);
                     return;
                 }
-
+                if (member.type != OSMEntity.Type.WAY) {
+                    LOG.error("Turn restriction {} has a 'from' member that is not a way, skipping.", osmRelationId);
+                    return;
+                }
                 from = member;
             }
             else if ("to".equals(member.role)) {
                 if (to != null) {
-                    LOG.error("Turn restriction {} has multiple to members, skipping", osmRelationId);
+                    LOG.error("Turn restriction {} has multiple 'to' members, skipping.", osmRelationId);
                     return;
                 }
-
+                if (member.type != OSMEntity.Type.WAY) {
+                    LOG.error("Turn restriction {} has a 'to' member that is not a way, skipping.", osmRelationId);
+                    return;
+                }
                 to = member;
             }
             else if ("via".equals(member.role)) {
                 via.add(member);
             }
-
             // Osmosis may produce situations where referential integrity is violated, probably at the edge of the
             // bounding box where half a turn restriction is outside the box.
             if (member.type == OSMEntity.Type.WAY) {
@@ -635,7 +640,6 @@ public class StreetLayer implements Serializable, Cloneable {
             }
         }
 
-
         if (from == null || to == null || via.isEmpty()) {
             LOG.error("Invalid turn restriction {}, does not have from, to and via, skipping", osmRelationId);
             return;
@@ -652,7 +656,7 @@ public class StreetLayer implements Serializable, Cloneable {
             }
         }
 
-        if (hasViaWays && hasViaNodes || hasViaNodes && via.size() > 1) {
+        if ((hasViaWays && hasViaNodes) || (hasViaNodes && via.size() > 1)) {
             LOG.error("via must be single node or one or more ways, skipping restriction {}", osmRelationId);
             return;
         }
@@ -660,20 +664,17 @@ public class StreetLayer implements Serializable, Cloneable {
         EdgeStore.Edge e = edgeStore.getCursor();
 
         if (hasViaNodes) {
-            // Turn restriction passes via a single node, this is a fairly simple turn restriction.
+            // Turn restriction passes via a single node. This is a fairly simple turn restriction.
             // First find the street layer vertex for the OSM node the restriction passes through.
             int vertex = vertexIndexForOsmNode.get(via.get(0).id);
-
             if (vertex == -1) {
                 LOG.warn("Vertex {} not found to use as via node for restriction {}, skipping this restriction", via.get(0).id, osmRelationId);
                 return;
             }
-
-            // use array to dodge "effectively final" nonsense
+            // use array to dodge Java closure "effectively final" nonsense
             final int[] fromEdge = new int[] { -1 };
-            final long fromWayId = from.id; // more effectively final nonsense
+            final long fromWayId = from.id; // more "effectively final" nonsense
             final boolean[] bad = new boolean[] { false };
-
             // find the street layer edge corresponding to the turn restriction's "from" OSM way
             incomingEdges.get(vertex).forEach(eidx -> {
                 e.seek(eidx);
@@ -686,10 +687,8 @@ public class StreetLayer implements Serializable, Cloneable {
 
                     fromEdge[0] = eidx;
                 }
-
                 return true; // iteration should continue
             });
-
 
             // find the street layer edge corresponding to the turn restriction's "to" OSM way
             final int[] toEdge = new int[] { -1 };

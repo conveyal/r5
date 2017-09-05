@@ -203,7 +203,16 @@ public abstract class Modification implements Serializable {
             }
         }
         if (unmatchedRoutes.size() > 0) {
-            errors.add("These route IDs could not be found: " + unmatchedRoutes.toString());
+            if (unmatchedRoutes.size() == routes.size()) {
+                errors.add("None of the specified route IDs could be found.");
+            } else {
+                // When a GTFS feed contains routes that have no stoptimes (which is unfortunately common) R5 will not
+                // represent that route. When someone bulk-adds all the routes in that feed to a modification,
+                // some of them may be valid while others are not.
+                // Specifying some routes that don't exist seems like a severe problem that should be an error rather
+                // than a warning, but for now we have to tolerate it for the above reason.
+                warnings.add("Some of the specified route IDs could be found: " + unmatchedRoutes.toString());
+            }
         }
         if (unmatchedTrips.size() > 0) {
             errors.add("These trip IDs could not be found: " + unmatchedTrips.toString());

@@ -142,7 +142,7 @@ public class LinkedPointSet implements Serializable {
         while (stopToPointDistanceTables.size() < nStops) stopToPointDistanceTables.add(null);
 
         /* First, link the points in this PointSet to specific street vertices. If there is no base linkage, link all streets. */
-        this.linkPointsToStreets(baseLinkage == null);
+        if (streetLayer.hasOSM) this.linkPointsToStreets(baseLinkage == null);
 
         /* Second, make a table of distances from each transit stop to the points in this PointSet. */
         this.makeStopToPointDistanceTables(treeRebuildZone);

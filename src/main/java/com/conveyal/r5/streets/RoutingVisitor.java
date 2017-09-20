@@ -12,7 +12,7 @@ public interface RoutingVisitor {
     void visitVertex(StreetRouter.State state);
 
     /**
-     * Called right after visitVertex
+     * Called right after {@link #visitVertex}
      *
      * @return true if search should stop
      */

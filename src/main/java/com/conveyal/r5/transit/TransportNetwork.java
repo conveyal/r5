@@ -40,6 +40,8 @@ public class TransportNetwork implements Serializable {
 
     public TransitLayer transitLayer;
 
+//    public boolean hasOSM;
+
     /**
      * This stores any number of lightweight scenario networks built upon the current base network.
      * FIXME that sounds like a memory leak, should be a WeighingCache or at least size-limited.
@@ -128,8 +130,10 @@ public class TransportNetwork implements Serializable {
      * Distance tables and street spatial indexes are now serialized with the network.
      */
     public void rebuildTransientIndexes() {
-        streetLayer.buildEdgeLists();
-        streetLayer.indexStreets();
+        if (streetLayer.hasOSM) {
+            streetLayer.buildEdgeLists();
+            streetLayer.indexStreets();
+        }
         transitLayer.rebuildTransientIndexes();
     }
 
@@ -155,22 +159,27 @@ public class TransportNetwork implements Serializable {
 
         System.out.println("Summarizing builder config: " + BUILDER_CONFIG_FILENAME);
         System.out.println(tnBuilderConfig);
-        File dir = new File(osmSourceFile).getParentFile();
+        File dir = osmSourceFile != null
+            ? new File(osmSourceFile).getParentFile()
+            : new File(gtfsSourceFiles.get(0)).getParentFile();
 
         // Create a transport network to hold the street and transit layers
         TransportNetwork transportNetwork = new TransportNetwork();
 
-        // Load OSM data into MapDB
-        OSM osm = new OSM(new File(dir,"osm.mapdb").getPath());
-        osm.intersectionDetection = true;
-        osm.readFromFile(osmSourceFile);
-
-        // Make street layer from OSM data in MapDB
+        // Make street layer from OSM data in MapDB (should happen regardless of OSM data)
         StreetLayer streetLayer = new StreetLayer(tnBuilderConfig);
         transportNetwork.streetLayer = streetLayer;
         streetLayer.parentNetwork = transportNetwork;
-        streetLayer.loadFromOsm(osm);
-        osm.close();
+        streetLayer.hasOSM = osmSourceFile != null;
+
+        // Load OSM data into MapDB
+        if (streetLayer.hasOSM) {
+            OSM osm = new OSM(new File(dir,"osm.mapdb").getPath());
+            osm.intersectionDetection = true;
+            osm.readFromFile(osmSourceFile);
+            streetLayer.loadFromOsm(osm);
+            osm.close();
+        }
 
         // The street index is needed for associating transit stops with the street network
         // and for associating bike shares with the street network
@@ -179,6 +188,7 @@ public class TransportNetwork implements Serializable {
         if (tnBuilderConfig.bikeRentalFile != null) {
             streetLayer.associateBikeSharing(tnBuilderConfig, 500);
         }
+
 
         // Load transit data TODO remove need to supply street layer at this stage
         TransitLayer transitLayer = new TransitLayer();
@@ -200,15 +210,21 @@ public class TransportNetwork implements Serializable {
 
         // The street index is needed for associating transit stops with the street network.
         // FIXME indexStreets is called three times: in StreetLayer::loadFromOsm, just after loading the OSM, and here
-        streetLayer.indexStreets();
+        if (streetLayer.hasOSM) streetLayer.indexStreets();
+
         streetLayer.associateStops(transitLayer);
         // Edge lists must be built after all inter-layer linking has occurred.
         streetLayer.buildEdgeLists();
-        transitLayer.rebuildTransientIndexes();
+
+        if (streetLayer.hasOSM) {
+            transitLayer.rebuildTransientIndexes();
+        }
 
         // Create transfers
         new TransferFinder(transportNetwork).findTransfers();
-        new TransferFinder(transportNetwork).findParkRideTransfer();
+        if (streetLayer.hasOSM) {
+            new TransferFinder(transportNetwork).findParkRideTransfer();
+        }
 
         transportNetwork.fareCalculator = tnBuilderConfig.analysisFareCalculator;
 
@@ -227,6 +243,10 @@ public class TransportNetwork implements Serializable {
      */
     public static TransportNetwork fromFiles (String osmFile, List<String> gtfsFiles, TNBuilderConfig config) {
         return fromFiles(osmFile, gtfsFiles, null, config);
+    }
+
+    public static TransportNetwork fromFiles (List<String> gtfsFiles, TNBuilderConfig config) {
+        return fromFiles(null, gtfsFiles, null, config);
     }
 
     public static TransportNetwork fromDirectory (File directory) throws DuplicateFeedException {
@@ -257,8 +277,8 @@ public class TransportNetwork implements Serializable {
             }
         }
         if (osmFile == null) {
-            LOG.error("An OSM PBF file is required to build a network.");
-            return null;
+            LOG.warn("An OSM PBF file is required to build a complete network.");
+            return fromFiles(gtfsFiles, builderConfig);
         } else {
             return fromFiles(osmFile.getAbsolutePath(), gtfsFiles, builderConfig);
         }

@@ -543,14 +543,14 @@ public class TransitLayer implements Serializable, Cloneable {
     /**
      * Perform a single on-street search from the specified transit stop.
      * Return the distance in millimeters to every reached street vertex.
-     * @param stop the internal integer stop ID for which to build a distance table.
+     * @param stopIndex the internal integer stop ID (stop index) for which to build a distance table.
      * @return a map from street vertex numbers to distances in millimeters
      */
-    public TIntIntMap buildOneDistanceTable(int stop) {
-        int originVertex = streetVertexForStop.get(stop);
+    public TIntIntMap buildOneDistanceTable(int stopIndex) {
+        int originVertex = streetVertexForStop.get(stopIndex);
         if (originVertex == -1) {
             // -1 indicates that this stop is not linked to the street network.
-            LOG.warn("Stop {} has not been linked to the street network, cannot build a distance table for it.", stop);
+            LOG.warn("Stop {} has not been linked to the street network, cannot build a distance table for it.", stopIndex);
             return null;
         }
         StreetRouter router = new StreetRouter(parentNetwork.streetLayer);
@@ -594,7 +594,11 @@ public class TransitLayer implements Serializable, Cloneable {
         }
     }
 
-    /** Get a coordinate for a stop in FIXED POINT DEGREES */
+    /**
+     * Get a coordinate for a stop in FIXED POINT DEGREES
+     * @param s stop index
+     * @return Coordinate for stop lat/lon
+     */
     public Coordinate getCoordinateForStopFixed(int s) {
         int v = streetVertexForStop.get(s);
 
@@ -604,7 +608,11 @@ public class TransitLayer implements Serializable, Cloneable {
         return new Coordinate(vertex.getFixedLon(), vertex.getFixedLat());
     }
 
-    /** Get a JTS point for a stop in FIXED POINT DEGREES */
+    /**
+     * Get a JTS point for a stop in FIXED POINT DEGREES
+     * @param s stop index
+     * @return Point for stop coordinate
+     */
     public Point getJTSPointForStopFixed(int s) {
         Coordinate c = getCoordinateForStopFixed(s);
         return c == null ? null : GeometryUtils.geometryFactory.createPoint(c);

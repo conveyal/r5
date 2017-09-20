@@ -5,11 +5,13 @@ for analytic applications but there are plans to eventually have it support poin
 The routing is "realistic" because it works by planning many trips over a time window, which is more reflective of how people
 use the transportation system than planning a single trip at an exact departure time---very few people leave for work at precisely
 7:53 AM every morning, and even fewer leave at a precise time when going to a non-work event. There's more information on our thinking
-on this particular point [here](http://conveyal.com/blog/2015/05/04/variation-in-accessibility-measures).
+on this particular point [here](http://conveyal.com/blog/2015/05/04/variation-in-accessibility-measures) and [here](http://trrjournalonline.trb.org/doi/abs/10.3141/2653-06).
 
 Please follow the Conveyal Java style guide at https://github.com/conveyal/JavaStyle/
 
 Javadoc for the project is built automatically after every change and published at http://javadoc.conveyal.com/r5/master/
+
+This is a Maven project, so you'll need to install maven to build R<sup>5</sup> before running it. Build instructions are in pom.xml.  Once R<sup>5</sup> is built (e.g. using `mvn clean package`), it can be run (e.g. `java -jar -Xmx4G target/v3.0.0.jar worker` -- see list of commands [here](https://github.com/conveyal/r5/blob/master/src/main/java/com/conveyal/r5/R5Main.java)).
 
 ## History
 

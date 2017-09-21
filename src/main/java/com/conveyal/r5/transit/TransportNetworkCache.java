@@ -4,7 +4,9 @@ import com.amazonaws.AmazonServiceException;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
+import com.conveyal.gtfs.BaseGTFSCache;
 import com.conveyal.gtfs.GTFSCache;
+import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSMCache;
 import com.conveyal.r5.analyst.cluster.BundleManifest;
 import com.conveyal.r5.analyst.scenario.Scenario;
@@ -22,9 +24,13 @@ import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -50,7 +56,7 @@ public class TransportNetworkCache {
     private static final int DEFAULT_CACHE_SIZE = 1;
 
     private final LoadingCache<String, TransportNetwork> cache;
-    private final GTFSCache gtfsCache;
+    private final BaseGTFSCache gtfsCache;
     private final OSMCache osmCache;
 
     @Deprecated
@@ -77,15 +83,15 @@ public class TransportNetworkCache {
         this.osmCache = new OSMCache(sourceBucket, cacheDir);
     }
 
-    public TransportNetworkCache(GTFSCache gtfsCache, OSMCache osmCache) {
+    public TransportNetworkCache(BaseGTFSCache gtfsCache, OSMCache osmCache) {
         this(gtfsCache, osmCache, DEFAULT_CACHE_SIZE);
     }
 
-    public TransportNetworkCache(GTFSCache gtfsCache, OSMCache osmCache, int cacheSize) {
+    public TransportNetworkCache(BaseGTFSCache gtfsCache, OSMCache osmCache, int cacheSize) {
         this(gtfsCache, osmCache, cacheSize, null);
     }
 
-    public TransportNetworkCache(GTFSCache gtfsCache, OSMCache osmCache, int cacheSize, String bucketFolder) {
+    public TransportNetworkCache(BaseGTFSCache gtfsCache, OSMCache osmCache, int cacheSize, String bucketFolder) {
         this.gtfsCache = gtfsCache;
         this.osmCache = osmCache;
         this.cache = createCache(cacheSize);
@@ -382,7 +388,7 @@ public class TransportNetworkCache {
         network.transitLayer = new TransitLayer();
 
         manifest.gtfsIds.stream()
-                .map(id -> gtfsCache.get(id))
+                .map(id -> gtfsCache.getFeed(id))
                 .forEach(network.transitLayer::loadFromGtfs);
 
         network.transitLayer.parentNetwork = network;

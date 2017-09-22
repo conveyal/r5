@@ -6,7 +6,7 @@ import com.conveyal.r5.streets.EdgeStore;
 import java.util.EnumSet;
 
 /**
- * Created by mabu on 27.11.2015.
+ * This sets the flags on edges indicating what category of edge they are, e.g. stairs, bike path, sidewalk.
  */
 public class TypeOfEdgeLabeler {
 
@@ -96,9 +96,6 @@ public class TypeOfEdgeLabeler {
 
     /**
      * Adds Stairs, bike path, sidewalk and crossing flags to ways
-     * @param way
-     * @param forwardFlags
-     * @param backFlags
      */
     public void label (Way way, EnumSet<EdgeStore.EdgeFlag> forwardFlags, EnumSet<EdgeStore.EdgeFlag> backFlags) {
         if (way.hasTag("highway", "steps")) {

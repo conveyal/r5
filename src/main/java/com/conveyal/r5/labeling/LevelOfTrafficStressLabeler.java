@@ -22,12 +22,16 @@ import java.util.regex.Pattern;
  * http://transweb.sjsu.edu/PDFs/research/1005-low-stress-bicycling-network-connectivity.pdf
  *
  * OSM actually doesn't contain enough data to extract a level of traffic stress, so we give our best guess regarding
- * lane widths, etc.
+ * lane widths, etc. This blog post explains how we make this guess:
+ * https://blog.conveyal.com/better-measures-of-bike-accessibility-d875ae5ed831
+ *
+ * Originally the plan was to verify these guesses against actual LTS data, but we never did that because we never
+ * got the ground truth data.
  */
 public class LevelOfTrafficStressLabeler {
     private static final Logger LOG = LoggerFactory.getLogger(LevelOfTrafficStressLabeler.class);
 
-    /** match OSM speeds, from http://wiki.openstreetmap.org/wiki/Key:maxspeed */
+    /** Match OSM speeds, from http://wiki.openstreetmap.org/wiki/Key:maxspeed */
     private static final Pattern speedPattern = Pattern.compile("^([0-9][\\.0-9]*?) ?(km/h|kmh|kph|mph|knots)?$");
 
     Set<String> badMaxspeedValues = new HashSet<>();

@@ -88,7 +88,7 @@ public class PathWithTimes extends Path {
         // loop over departures within the time window
         // firstTrip is the trip on the first pattern
         int firstTrip = 0;
-        while (times[0][firstTrip][0] < req.fromTime + accessTime + RaptorWorker.BOARD_SLACK_SECONDS) firstTrip++;
+        while (times[0][firstTrip][0] < req.fromTime + accessTime + FastRaptorWorker.BOARD_SLACK_SECONDS) firstTrip++;
 
         // now interleave times
         double walkSpeedMillimetersPerSecond = req.walkSpeed * 1000;
@@ -133,7 +133,7 @@ public class PathWithTimes extends Path {
 
                     // TODO should board slack be applied at the origin stop? Is this done in RaptorWorker?
                     // See also below in computeStatistics
-                    time = times[patIdx][trip][1] + transferTime + RaptorWorker.BOARD_SLACK_SECONDS;
+                    time = times[patIdx][trip][1] + transferTime + FastRaptorWorker.BOARD_SLACK_SECONDS;
                     itin.arriveAtBoardStopTimes[patIdx + 1] = time;
                 }
             }
@@ -202,6 +202,9 @@ public class PathWithTimes extends Path {
             return this.boardTimes[0] - o.boardTimes[0];
         }
     }
+
+    // FIXME we are using a map with unorthodox definitions of hashcode and equals to make them serve as map keys.
+    // We should instead wrap PathWithTimes or copy the relevant fields into a PatternSequenceKey class.
 
     public int hashCode () {
         return super.hashCode() ^ (accessMode.hashCode() * 31 + egressMode.hashCode() * 29);

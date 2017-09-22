@@ -17,7 +17,6 @@ import com.google.common.collect.Multimap;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.LineString;
 import com.vividsolutions.jts.geom.Point;
 import com.vividsolutions.jts.linearref.LinearLocation;
 import gnu.trove.list.TIntList;
@@ -558,7 +557,7 @@ public class TransitLayer implements Serializable, Cloneable {
 
         // Dominate based on distance in millimeters, since (a) we're using a hard distance limit, and (b) we divide
         // by a speed to get time when we use these tables.
-        router.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+        router.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
         router.setOrigin(originVertex);
         router.route();
 

@@ -142,6 +142,12 @@ public class Grid {
      * If relativeToPixels is true, the weights are the proportion of the pixel that is covered. Otherwise they are the
      * portion of this polygon which is within the given grid cell. If using incrementPixelWeights, this should be set to
      * false.
+     *
+     * This returns a map from int arrays containing the coordinates to the weight. I believe int arrays in hashmaps are
+     * hashed based on memory location, meaning lookups will fail. However, we only use this in a streaming fashion, looping
+     * over all values, which is harmless.
+     *
+     * TODO create a class with x, y, and value attributes and just return a list.
      */
     public TObjectDoubleMap<int[]> getPixelWeights (Geometry geometry, boolean relativeToPixels) {
         // No need to convert to a local coordinate system

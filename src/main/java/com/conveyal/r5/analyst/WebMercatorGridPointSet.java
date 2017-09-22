@@ -12,9 +12,10 @@ import org.slf4j.LoggerFactory;
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
- * A linked pointset that represents a web mercator grid laid over the graph.
+ * A pointset that represents a grid of pixels from the web mercator projection.
  */
 public class WebMercatorGridPointSet extends PointSet implements Serializable {
 
@@ -37,13 +38,36 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
     /** height */
     public final int height;
 
+    /** Base pointset; linkages will be shared with this pointset */
+    public final WebMercatorGridPointSet base;
+
+    /** Create a new WebMercatorGridPointSet with no base pointset */
     public WebMercatorGridPointSet(int zoom, int west, int north, int width, int height) {
+        this(zoom, west, north, width, height, null);
+    }
+
+    /** Create a new WebMercatorGridPointSet with a base pointset from which linkages will be shared */
+    public WebMercatorGridPointSet(int zoom, int west, int north, int width, int height, WebMercatorGridPointSet base) {
         this.zoom = zoom;
         this.west = west;
         this.north = north;
         this.width = width;
         this.height = height;
+        this.base = base;
 
+        // Copy base linkages to this point set, so that we won't rebuild them but rather can use the linkages already
+        // made for the full transport network.
+        // TODO don't copy, just have a cache that lazy loads and crops from base pointset
+        if (base != null) {
+            base.linkageCache.asMap().forEach((key, baseLinkage) -> {
+                // TODO handle the case where the new grid is not completely contained by the base grid.
+                // Since this generally will happen when there are points beyond the transit network, just leaving the points
+                // that are not contained by the base linkage unlinked (and logging a warning, or perhaps even returning a
+                // warning to the UI) should be completely sufficient as you will not be able to reach these locations anyhow.
+                LinkedPointSet croppedLinkage = new LinkedPointSet(baseLinkage, this);
+                this.linkageCache.put(key, croppedLinkage);
+            });
+        }
     }
 
     public WebMercatorGridPointSet(TransportNetwork transportNetwork) {
@@ -59,6 +83,7 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         this.north = north;
         this.height = south - north;
         this.width = east - west;
+        this.base = null;
     }
 
     @Override

@@ -23,6 +23,9 @@ import java.util.EnumSet;
  * All the modifiable parameters for profile routing.
  */
 public class ProfileRequest implements Serializable, Cloneable {
+
+    // Analyst used to serialize the request along with regional analysis results into MapDB.
+    // In Analysis, the request is still saved but as JSON in MongoDB.
     private static final long serialVersionUID = -6501962907644662303L;
 
     //From and to zonedDateTime filled in GraphQL request
@@ -123,124 +126,59 @@ public class ProfileRequest implements Serializable, Cloneable {
     public EnumSet<TransitModes> transitModes;
 
     /**
-     * What is the minimum proportion of the time for which a destination must be accessible for it to be included in
-     * the average?
-     *
-     * This avoids issues where destinations are reachable for some very small percentage of the time, either because
-     * there is a single departure near the start of the time window, or because they take approximately 2 hours
-     * (the default maximum cutoff) to reach.
-
-     * Consider a search run with time window 7AM to 9AM, and an origin and destination connected by an express
-     * bus that runs once at 7:05. For the first five minutes of the time window, accessibility is very good.
-     * For the rest, there is no accessibility; if we didn't have this rule in place, the average would be the average
-     * of the time the destination is reachable, and the time it is unreachable would be excluded from the calculation
-     * (see issue 2148)
-
-     * There is another issue that this rule does not completely address. Consider a trip that takes 1:45
-     * exclusive of wait time and runs every half-hour. Half the time it takes less than two hours and is considered
-     * and half the time it takes more than two hours and is excluded, so the average is biased low on very long trips.
-     * This rule catches the most egregious cases (say where we average only the best four minutes out of a two-hour
-     * span) but does not completely address the issue. However if you're looking at a time cutoff significantly
-     * less than two hours, it's not a big problem. Significantly less is half the headway of your least-frequent service, because
-     * if there is a trip on your least-frequent service that takes on average the time cutoff plus one minute
-     * it will be unbiased and considered unreachable iff the longest trip is less than two hours, which it has
-     * to be if the time cutoff plus half the headway is less than two hours, assuming a symmetric travel time
-     *
-     * The default is 0.5.
+     * This parameter compensates for the fact that GTFS does not contain information about schedule deviation (lateness).
+     * The min-max travel time range for some trains is zero, since the trips are reported to always have the same
+     * timings in the schedule. Such an option does not overlap (temporally) its alternatives, and is too easily
+     * eliminated by an alternative that is only marginally better. We want to effectively push the max travel time of
+     * alternatives out a bit to account for the fact that they don't always run on schedule.
      */
-    public float reachabilityThreshold = 0.5f;
-
-    /* The relative importance of different factors when biking */
-    /** The relative importance of maximizing safety when cycling */
-    public int bikeSafe;
-    
-    /** The relative importance of minimizing hills when cycling */
-    public int bikeSlope;
-    
-    /** The relative importance of minimizing time when cycling */
-    public int bikeTime;
-    // FIXME change "safe" to "danger" to consistently refer to the things being minimized
-
-    /**
-      This parameter compensates for the fact that GTFS does not contain information about schedule deviation (lateness).
-      The min-max travel time range for some trains is zero, since the trips are reported to always have the same
-      timings in the schedule. Such an option does not overlap (temporally) its alternatives, and is too easily
-      eliminated by an alternative that is only marginally better. We want to effectively push the max travel time of
-      alternatives out a bit to account for the fact that they don't always run on schedule.
-    */
     public int suboptimalMinutes = 5;
 
     /**
-     * The maximum duration of any transit trip found by this search.
-     *
-     * Believe it or not the search can be quite sensitive to the value of this number, or at least whether it is set to a
-     * non-infinite value, as it effectively eliminates outliers in the samples of travel time, see ticket #162.
-     *
-     * Consider a network in which there is significant peak-only service, that runs from say 6-8am and 4-6pm,
-     * and your analysis window is 6:30 - 8:30. Suppose for the purpose of argument that there is no other way
-     * to reach your destination other than this peak only transit service, and also assume that there is
-     * no walking or waiting time. During your time window the you can take transit for the first 1.5 hours,
-     * and after that you would have to wait until 4pm to get the first bus in the PM peak. Of course
-     * no one would ever do this; the trip should be considered not possible after 8 am. The reachability threshold will
-     * then determine whether this destination should be considered reachable during the time window or not.
-     *
-     * We had initially considered using a cutoff on wait time to board a vehicle, rather than on maximum trip duration.
-     * However, the planner will cunningly work around that limit and still get on the later vehicle by riding buses the
-     * wrong direction, taking long walks to transfer to other buses, etc., eventually eating up all the time until that
-     * later trip. The results would then be even less clear, as they would be speckled. If the origin had no other transit
-     * service, the planner would not be able to find a way to kill enough time, and the destination would be
-     * considered unreachable. However, if the origin had a network of local buses that don't go to the destination, the
-     * planner might be able to kill all day riding buses (without visiting the same stop twice) and still get on the late
-     * afternoon vehicle.
-     *
-     * If we used percentiles rather than a mean, this parameter would have no effect and we could also eliminate
-     * reachability thresholds. We'd just sort long or impossible trips to the top of the list (it doesn't matter whether
-     * they're long or impossible; they're the same once you're past whatever travel time cutoff is being analyzed), and
-     * let the percentile fall where it may; if it happens to end up in the unreachable portion, then that destination
-     * is unreachable.
-     *
-     * Default is four hours. It should be somewhat longer than the longest travel time cutoff you wish to analyze, because
-     * travel times whose "true average" (whatever that means) is near this value will be biased faster. Suppose there is a
-     * trip that takes between 1.5 and 2.5 hours depending on your departure time. If you set max duration to 2 hours, the
-     * average would be 1.75 hours not 2 (assuming a uniform distribution of travel times).
-     *
-     * This cutoff is applied to the final, propagated times at the pointset.
-     *
-     * It is expected that this parameter will have a significant impact on compute times in large networks as it will
-     * prevent exploration to the end of the Earth.
+     * The maximum duration of any transit trip found by this search. Results used to be very sensitive to this
+     * when we were using mean travel times, now we use medians so we could set this to 2 hours.
      */
     public int maxTripDurationMinutes = 4 * 60;
 
     /**
      * The maximum number of rides, e.g. taking the L2 to the Red line to the Green line would be three rides.
-     * Default of 6 should be enough for most intercity trips (two local buses, two intercity trains, two local buses).
      */
     public int maxRides = 8;
 
     /** A non-destructive scenario to apply when executing this request */
     public Scenario scenario;
 
-    /** The ID of a scenario stored in S3. It is an error if both scenario and the scenarioId are specified */
+    /**
+     * The ID of a scenario stored in S3 as JSON.
+     * You must specify one (but only one) of scenario or scenarioId.
+     * It is an error if both scenario and the scenarioId are specified.
+     */
     public String scenarioId;
 
     @JsonSerialize(using=ZoneIdSerializer.class)
     @JsonDeserialize(using=ZoneIdDeserializer.class)
     public ZoneId zoneId = ZoneOffset.UTC;
 
-    //If routing with wheelchair is needed
+    /**
+     * Require all streets and transit to be wheelchair-accessible. This is not fully implemented and doesn't work
+     * at all in Analysis (FastRaptorWorker), only in Modeify (McRaptorSuboptimalPathProfileRouter).
+     */
     public boolean wheelchair;
 
+    /** Whether this is a depart-after or arrive-by search */
     private SearchType searchType;
 
-    //If this is profile or point to point route request
-    private boolean profile = false;
-
-    //If true current search is reverse search AKA we are looking for a path from destination to origin in reverse
-    //It differs from searchType because it is used as egress search
+    /**
+     * If true current search is reverse search AKA we are looking for a path from destination to origin in reverse
+     * It differs from searchType because it is used as egress search
+     */
     @JsonInclude(JsonInclude.Include.NON_DEFAULT)
     public boolean reverseSearch = false;
 
-    /** maximum fare. If nonnegative, fares will be used in routing. */
+    /**
+     * Maximum fare for constraining monetary cost of paths during search in Analysis.
+     * If nonnegative, fares will be used in routing.
+     */
     public int maxFare = -1;
 
     /**
@@ -259,11 +197,6 @@ public class ProfileRequest implements Serializable, Cloneable {
      */
     public int monteCarloDraws = 220;
 
-    public boolean isProfile() {
-        return profile;
-    }
-
-
     public ProfileRequest clone () {
         try {
             return (ProfileRequest) super.clone();
@@ -275,13 +208,9 @@ public class ProfileRequest implements Serializable, Cloneable {
 
     /**
      * Returns number of milliseconds UNIX time made with date and fromTime
-     *
      * It reads date as date in transportNetwork timezone when it is converted to UNIX time it is in UTC
-     *
      * It needs to be decided how to do this correctly: #37
-     *
      * If date isn't set current date is used. Time is empty (one hour before midnight in UTC if +1 timezone is used)
-     *
      * uses {@link #getFromTimeDateZD()}
      */
     @JsonIgnore
@@ -291,11 +220,8 @@ public class ProfileRequest implements Serializable, Cloneable {
 
     /**
      * Returns ZonedDateTime made with date and fromTime fields
-     *
      * It reads date as date in transportNetwork timezone when it is converted to UNIX time it is in UTC
-     *
      * It needs to be decided how to do this correctly: #37
-     *
      * If date isn't set current date is used. Time is empty (one hour before midnight in UTC if +1 timezone is used)
      */
     @JsonIgnore
@@ -312,8 +238,11 @@ public class ProfileRequest implements Serializable, Cloneable {
         return  currentDateTime.plusSeconds(fromTime);
     }
 
+    /**
+     * @return the speed at which the given mode will traverse street edges.
+     */
     @JsonIgnore
-    public float getSpeed(StreetMode streetMode) {
+    public float getSpeedForMode (StreetMode streetMode) {
         switch (streetMode) {
         case WALK:
             return walkSpeed;
@@ -324,11 +253,14 @@ public class ProfileRequest implements Serializable, Cloneable {
         default:
             break;
         }
-        throw new IllegalArgumentException("getSpeed(): Invalid mode " + streetMode);
+        throw new IllegalArgumentException("getSpeedForMode(): Invalid mode " + streetMode);
     }
 
+    /**
+     * @return the maximum pre-transit travel time for the given mode
+     */
     @JsonIgnore
-    public int getMaxAccessTime (StreetMode mode) {
+    public int getMaxAccessTimeForMode (StreetMode mode) {
         switch (mode) {
             case CAR:
                 return maxCarTime;
@@ -342,7 +274,6 @@ public class ProfileRequest implements Serializable, Cloneable {
     }
 
     /**
-     *
      * @return true if there is any transitMode in transitModes (Safe to call if transitModes is null)
      */
     public boolean hasTransit() {
@@ -350,23 +281,13 @@ public class ProfileRequest implements Serializable, Cloneable {
     }
 
     /**
-     * Sets profile request with parameters from GraphQL request
-     * @param environment
-     * @param timezone transportNetwork timezone
-     * @return
+     * Factory method to create a profile request with query parameters from a GraphQL request
      */
-    public static ProfileRequest fromEnvironment(DataFetchingEnvironment environment, ZoneId timezone) {
+    public static ProfileRequest fromGraphqlEnvironment(DataFetchingEnvironment environment, ZoneId timezone) {
         ProfileRequest profileRequest = new ProfileRequest();
         profileRequest.zoneId = timezone;
 
         String operation = environment.getFields().get(0).getName();
-
-        if  (operation.equals("profile")) {
-            profileRequest.profile=true;
-        }
-
-
-
         //ZonedDatetime is used to fill fromTime/toTime and date
         //we need to have a network Timezone for that so that all the times are in network own timezone
         profileRequest.fromZonedDateTime = environment.getArgument("fromTime");
@@ -426,7 +347,6 @@ public class ProfileRequest implements Serializable, Cloneable {
         profileRequest.accessModes = EnumSet.copyOf((Collection<LegMode>) environment.getArgument("accessModes"));
         profileRequest.egressModes = EnumSet.copyOf((Collection<LegMode>)environment.getArgument("egressModes"));
 
-
         Collection<LegMode> directModes = environment.getArgument("directModes");
         //directModes can be empty if we only want transit searches
         if (!directModes.isEmpty()) {
@@ -434,7 +354,6 @@ public class ProfileRequest implements Serializable, Cloneable {
         } else {
             profileRequest.directModes = EnumSet.noneOf(LegMode.class);
         }
-
 
         return profileRequest;
     }
@@ -509,5 +428,20 @@ public class ProfileRequest implements Serializable, Cloneable {
         default:
             return 0;
         }
+    }
+
+    /** Return the length of the time window in minutes */
+    @JsonIgnore
+    public int getTimeWindowLengthMinutes() {
+        return (toTime - fromTime) / 60;
+    }
+
+    /**
+     * Return the number of Monte Carlo draws that must be done each minute to get at least the desired number of total
+     * Monte Carlo draws over all minutes.
+     */
+    @JsonIgnore
+    public int getMonteCarloDrawsPerMinute() {
+        return (int) Math.ceil((double) monteCarloDraws / getTimeWindowLengthMinutes());
     }
 }

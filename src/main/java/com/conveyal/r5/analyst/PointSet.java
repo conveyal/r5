@@ -18,6 +18,14 @@ import java.util.concurrent.ExecutionException;
 
 import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
 
+/**
+ * A PointSet represents a set of geographic points, which serve as destinations or "opportunities" in an
+ * accessibility analysis.
+ *
+ * Although we currently only use one implementation of this abstract class, which represents an implicit set of
+ * points on a regular grid in the web Mercator projection, we're keeping the abstration so we can one day (re)-
+ * implement freeform sets of points that are not on grids.
+ */
 public abstract class PointSet implements Serializable {
 
     /** Maximum number of street network linkages to cache per PointSet. Affects memory consumption. */
@@ -32,8 +40,10 @@ public abstract class PointSet implements Serializable {
      * must be copied for every scenario due to references to their containing TransportNetwork.
      * Note that this cache will be serialized with the PointSet, but serializing a Guava cache only serializes the
      * cache instance and its settings, not the contents of the cache. We consider this sane behavior.
+     *
+     * This is public so we can populate it during deserialization. It should generally not be accessed directly.
      */
-    protected LoadingCache<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> linkageCache = CacheBuilder.newBuilder()
+    public LoadingCache<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> linkageCache = CacheBuilder.newBuilder()
             .maximumSize(LINKAGE_CACHE_SIZE)
             .build(new LinkageCacheLoader());
 

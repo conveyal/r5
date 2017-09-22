@@ -11,7 +11,7 @@ import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.labeling.LevelOfTrafficStressLabeler;
 import com.conveyal.r5.labeling.RoadPermission;
-import com.conveyal.r5.labeling.SpeedConfigurator;
+import com.conveyal.r5.labeling.SpeedLabeler;
 import com.conveyal.r5.labeling.TraversalPermissionLabeler;
 import com.conveyal.r5.labeling.TypeOfEdgeLabeler;
 import com.conveyal.r5.labeling.USTraversalPermissionLabeler;
@@ -50,21 +50,21 @@ import static com.conveyal.r5.streets.VertexStore.fixedDegreeGeometryToFloating;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
 /**
- * This stores the street layer of OTP routing data.
+ * This class stores the street network. Information about public transit is in a separate layer.
  *
- * Is is currently using a column store.
- * An advantage of disk-backing this (FSTStructs, MapDB optimized for zero-based
- * integer keys) would be that we can remove any logic about loading/unloading graphs.
- * We could route over a whole continent without using much memory.
+ * Is is currently implemented as a column store.
  *
- * Any data that's not used by Analyst workers (street names and geometries for example)
- * should be optional so we can have fast-loading, small transportation network files to pass around.
- * It can even be loaded from the OSM MapDB on demand.
+ * We could also use something like https://github.com/RichardWarburton/slab which simulates Java objects in a chunk
+ * of memory that could be mapped to a file. This could be useful for routing across continents or large countries.
  *
- * There's also https://github.com/RichardWarburton/slab
- * which seems simpler to use.
+ * While the transit search is very fast (probably because it tends to search in order over contiguous arrays) the
+ * street searches can be surprisingly slow. We suspect this is due to the vertices being in somewhat random order
+ * in memory. The solution would be to order the vertices in memory according to their proximity in the graph,
+ * then sort edges according to from-vertex order.
  *
- * TODO Morton-code-sort vertices, then sort edges by from-vertex.
+ * Really what you want to do is embed the distance metric defined by the graph in 1D space. This is a 'metric embedding'
+ * or multidimensional scaling, analagous to force-directed graph layout. http://ceur-ws.org/Vol-733/paper_pacher.pdf
+ * You could do something similar using their geographic coordinates (Morton-code-sort the vertices).
  */
 public class StreetLayer implements Serializable, Cloneable {
 
@@ -80,6 +80,11 @@ public class StreetLayer implements Serializable, Cloneable {
      */
     public static final int MIN_SUBGRAPH_SIZE = 40;
 
+    /**
+     * The radius below which we will not split a street, and will instead connect to an existing intersection.
+     * i.e. if the requested split point is less than this distance from an existing vertex (edge endpoint) we'll just
+     * return that existing endpoint.
+     */
     private static final int SNAP_RADIUS_MM = 5 * 1000;
 
     /**
@@ -94,7 +99,12 @@ public class StreetLayer implements Serializable, Cloneable {
     public transient List<TIntList> incomingEdges;
     public transient IntHashGrid spatialIndex = new IntHashGrid();
 
-    /** Spatial index of temporary edges from a scenario */
+    /**
+     * Spatial index of temporary edges from a scenario. We used to not have this, and we used to return all
+     * temporarily added edges in every spatial index query (because spatial indexes are allowed to over-select, and
+     * are filtered). However, we now create scenarios with thousands of temporary edges (from thousands of added
+     * transit stops), so we keep two spatial indexes, one for the baseline network and one for the scenario additions.
+     */
     private transient IntHashGrid temporaryEdgeIndex;
 
     // Key is street vertex index, value is BikeRentalStation (with name, number of bikes, spaces id etc.)
@@ -106,7 +116,7 @@ public class StreetLayer implements Serializable, Cloneable {
     private transient TraversalPermissionLabeler permissions = new USTraversalPermissionLabeler();
     private transient LevelOfTrafficStressLabeler stressLabeler = new LevelOfTrafficStressLabeler();
     private transient TypeOfEdgeLabeler typeOfEdgeLabeler = new TypeOfEdgeLabeler();
-    private transient SpeedConfigurator speedConfigurator;
+    private transient SpeedLabeler speedLabeler;
     // This is only used when loading from OSM, and is then nulled to save memory.
     transient OSM osm;
 
@@ -120,8 +130,8 @@ public class StreetLayer implements Serializable, Cloneable {
     public EdgeStore edgeStore = new EdgeStore(vertexStore, this, 200_000);
 
     /**
-     * Turn restrictions can potentially have a large number of affected edges, so store them once and reference them.
-     * TODO clarify documentation: what does "store them once and reference them" mean? Why?
+     * Turn restrictions can potentially affect (include) several edges, so they are stored here and referenced
+     * by index within all edges that are affected by them. TODO what if an edge is affected by multiple restrictions?
      */
     public List<TurnRestriction> turnRestrictions = new ArrayList<>();
 
@@ -160,7 +170,7 @@ public class StreetLayer implements Serializable, Cloneable {
     public boolean bikeSharing = false;
 
     public StreetLayer(TNBuilderConfig tnBuilderConfig) {
-            speedConfigurator = new SpeedConfigurator(tnBuilderConfig.speeds);
+        speedLabeler = new SpeedLabeler(tnBuilderConfig.speeds);
     }
 
     /** Load street layer from an OSM-lib OSM DB */
@@ -453,8 +463,11 @@ public class StreetLayer implements Serializable, Cloneable {
                 }
                 LineString edgeGeometry = e.getGeometry();
 
+                // Check every edge found by the spatial index (which may overselect), looking for ones that
+                // intersect the road.
+                // The intersection of a park and ride linestring and an edge should be one or more points.
+                // Potentially a line if the road is running along the edge of the parking lot.
                 if (edgeGeometry.intersects(g)) {
-                    // we found an intersection! yay!
                     Geometry intersection = edgeGeometry.intersection(g);
 
                     for (int i = 0; i < intersection.getNumGeometries(); i++) {
@@ -548,47 +561,59 @@ public class StreetLayer implements Serializable, Cloneable {
         created.setFlag(EdgeStore.EdgeFlag.LINK);
     }
 
-    private void applyTurnRestriction (long id, Relation restriction) {
+    /**
+     * Given a turn restriction relation from OSM, find the affected edges in our street layer and create a turn
+     * restriction object to store this information. The restriction is added to the network and associated with
+     * the edges it affects, so the method need not return anything.
+     *
+     * @param osmRelationId the OSM ID of the supplied turn restriction relation
+     * @param restrictionRelation a turn restriction relation from OSM
+     */
+    private void applyTurnRestriction (long osmRelationId, Relation restrictionRelation) {
+
+        // If true, this is an "only" turn restriction rather than a "no" turn restriction, as in
+        // "right turn only" rather than "no right turn".
         boolean only;
 
-        if (!restriction.hasTag("restriction")) {
-            LOG.error("Restriction {} has no restriction tag, skipping", id);
+        if (!restrictionRelation.hasTag("restriction")) {
+            // TODO shouldn't this just be an assertion, checking for bugs?
+            LOG.error("Restriction {} has no restriction tag, skipping", osmRelationId);
             return;
         }
 
-        if (restriction.getTag("restriction").startsWith("no_")) only = false;
-        else if (restriction.getTag("restriction").startsWith("only_")) only = true;
+        if (restrictionRelation.getTag("restriction").startsWith("no_")) only = false;
+        else if (restrictionRelation.getTag("restriction").startsWith("only_")) only = true;
         else {
-            LOG.error("Restriction {} has invalid restriction tag {}, skipping", id, restriction.getTag("restriction"));
+            LOG.error("Restriction {} has invalid restriction tag {}, skipping", osmRelationId, restrictionRelation.getTag("restriction"));
             return;
         }
 
-        TurnRestriction out = new TurnRestriction();
-        out.only = only;
+        TurnRestriction restriction = new TurnRestriction();
+        restriction.only = only;
 
-        // sort out the members
+        // Sort out the members of the relation (using relation roles: from, to, via)
         Relation.Member from = null, to = null;
         List<Relation.Member> via = new ArrayList<>();
 
-        for (Relation.Member member : restriction.members) {
+        for (Relation.Member member : restrictionRelation.members) {
             if ("from".equals(member.role)) {
                 if (from != null) {
-                    LOG.error("Turn restriction {} has multiple 'from' members, skipping.", id);
+                    LOG.error("Turn restriction {} has multiple 'from' members, skipping.", osmRelationId);
                     return;
                 }
                 if (member.type != OSMEntity.Type.WAY) {
-                    LOG.error("Turn restriction {} has a 'from' member that is not a way, skipping.", id);
+                    LOG.error("Turn restriction {} has a 'from' member that is not a way, skipping.", osmRelationId);
                     return;
                 }
                 from = member;
             }
             else if ("to".equals(member.role)) {
                 if (to != null) {
-                    LOG.error("Turn restriction {} has multiple 'to' members, skipping.", id);
+                    LOG.error("Turn restriction {} has multiple 'to' members, skipping.", osmRelationId);
                     return;
                 }
                 if (member.type != OSMEntity.Type.WAY) {
-                    LOG.error("Turn restriction {} has a 'to' member that is not a way, skipping.", id);
+                    LOG.error("Turn restriction {} has a 'to' member that is not a way, skipping.", osmRelationId);
                     return;
                 }
                 to = member;
@@ -596,29 +621,27 @@ public class StreetLayer implements Serializable, Cloneable {
             else if ("via".equals(member.role)) {
                 via.add(member);
             }
-
             // Osmosis may produce situations where referential integrity is violated, probably at the edge of the
             // bounding box where half a turn restriction is outside the box.
             if (member.type == OSMEntity.Type.WAY) {
                 if (!osm.ways.containsKey(member.id)) {
                     LOG.warn("Turn restriction relation {} references nonexistent way {}, dropping this relation",
-                            id,
+                            osmRelationId,
                             member.id);
                     return;
                 }
             } else if (member.type == OSMEntity.Type.NODE) {
                 if (!osm.nodes.containsKey(member.id)) {
                     LOG.warn("Turn restriction relation {} references nonexistent node {}, dropping this relation",
-                            id,
+                            osmRelationId,
                             member.id);
                     return;
                 }
             }
         }
 
-
         if (from == null || to == null || via.isEmpty()) {
-            LOG.error("Invalid turn restriction {}, does not have from, to and via, skipping", id);
+            LOG.error("Invalid turn restriction {}, does not have from, to and via, skipping", osmRelationId);
             return;
         }
 
@@ -628,13 +651,13 @@ public class StreetLayer implements Serializable, Cloneable {
             if (m.type == OSMEntity.Type.WAY) hasViaWays = true;
             else if (m.type == OSMEntity.Type.NODE) hasViaNodes = true;
             else {
-                LOG.error("via must be node or way, skipping restriction {}", id);
+                LOG.error("via must be node or way, skipping restriction {}", osmRelationId);
                 return;
             }
         }
 
         if ((hasViaWays && hasViaNodes) || (hasViaNodes && via.size() > 1)) {
-            LOG.error("via must be single node or one or more ways, skipping restriction {}", id);
+            LOG.error("via must be single node or one or more ways, skipping restriction {}", osmRelationId);
             return;
         }
 
@@ -642,43 +665,39 @@ public class StreetLayer implements Serializable, Cloneable {
 
         if (hasViaNodes) {
             // Turn restriction passes via a single node. This is a fairly simple turn restriction.
-            // First find the relevant vertex.
+            // First find the street layer vertex for the OSM node the restriction passes through.
             int vertex = vertexIndexForOsmNode.get(via.get(0).id);
-
             if (vertex == -1) {
-                LOG.warn("Vertex {} not found to use as via node for restriction {}, skipping this restriction", via.get(0).id, id);
+                LOG.warn("Vertex {} not found to use as via node for restriction {}, skipping this restriction", via.get(0).id, osmRelationId);
                 return;
             }
-
             // use array to dodge Java closure "effectively final" nonsense
             final int[] fromEdge = new int[] { -1 };
-            final long fromWayId = from.id; // more effectively final nonsense
+            final long fromWayId = from.id; // more "effectively final" nonsense
             final boolean[] bad = new boolean[] { false };
-
-            // find the edges
+            // find the street layer edge corresponding to the turn restriction's "from" OSM way
             incomingEdges.get(vertex).forEach(eidx -> {
                 e.seek(eidx);
                 if (e.getOSMID() == fromWayId) {
                     if (fromEdge[0] != -1) {
-                        LOG.error("From way enters vertex {} twice, restriction {} is therefore ambiguous, skipping", vertex, id);
+                        LOG.error("From way enters vertex {} twice, restriction {} is therefore ambiguous, skipping", vertex, osmRelationId);
                         bad[0] = true;
                         return false;
                     }
 
                     fromEdge[0] = eidx;
                 }
-
                 return true; // iteration should continue
             });
 
-
+            // find the street layer edge corresponding to the turn restriction's "to" OSM way
             final int[] toEdge = new int[] { -1 };
             final long toWayId = to.id; // more effectively final nonsense
             outgoingEdges.get(vertex).forEach(eidx -> {
                 e.seek(eidx);
                 if (e.getOSMID() == toWayId) {
                     if (toEdge[0] != -1) {
-                        LOG.error("To way exits vertex {} twice, restriction {} is therefore ambiguous, skipping", vertex, id);
+                        LOG.error("To way exits vertex {} twice, restriction {} is therefore ambiguous, skipping", vertex, osmRelationId);
                         bad[0] = true;
                         return false;
                     }
@@ -692,30 +711,31 @@ public class StreetLayer implements Serializable, Cloneable {
             if (bad[0]) return; // log message already printed
 
             if (fromEdge[0] == -1 || toEdge[0] == -1) {
-                LOG.error("Did not find from/to edges for restriction {}, skipping", id);
+                LOG.error("Did not find from/to edges for restriction {}, skipping", osmRelationId);
                 return;
             }
 
             // phew. create the restriction and apply it where needed
-            out.fromEdge = fromEdge[0];
-            out.toEdge = toEdge[0];
+            restriction.fromEdge = fromEdge[0];
+            restriction.toEdge = toEdge[0];
 
-            int index = turnRestrictions.size();
-            turnRestrictions.add(out);
-            edgeStore.turnRestrictions.put(out.fromEdge, index);
-            addReverseTurnRestriction(out, index);
+            int newRestrictionIndex = turnRestrictions.size();
+            turnRestrictions.add(restriction);
+            edgeStore.turnRestrictions.put(restriction.fromEdge, newRestrictionIndex);
+            addReverseTurnRestriction(restriction, newRestrictionIndex);
         } else {
-            // via member(s) are ways, which is more tricky
-            // do a little street search constrained to the ways in question
+            // The restriction's via member(s) are ways, which is more tricky than a restriction via a single node.
             Way fromWay = osm.ways.get(from.id);
             long[][] viaNodes = via.stream().map(m -> osm.ways.get(m.id).nodes).toArray(i -> new long[i][]);
             Way toWay = osm.ways.get(to.id);
 
-            // We do a little search, keeping in mind that there must be the same number of ways as there are via members
+            // We need to convert from an unordered set of OSM ways to an ordered sequence of R5 edges, where the
+            // edges may be smaller than the ways. We do a search, finding a path through our street graph that touches
+            // all the "via" OSM ways.
             List<long[]> nodes = new ArrayList<>();
             List<long[]> ways = new ArrayList<>();
 
-            // loop over from way to initialize search
+            // Initialize search, which will begin at all vertices within the "from" OSM way.
             for (long node : fromWay.nodes) {
                 for (int viaPos = 0; viaPos < viaNodes.length; viaPos++) {
                     for (long viaNode : viaNodes[viaPos]) {
@@ -748,7 +768,7 @@ public class StreetLayer implements Serializable, Cloneable {
                         for (int viaPos = 0; viaPos < viaNodes.length; viaPos++) {
                             long viaWayId = via.get(viaPos).id;
 
-                            // don't do looping searches
+                            // We don't handle complicated cases (which may or may not exist) that have loops.
                             for (long prevWay : previousWays.get(statePos)) {
                                 if (viaWayId == prevWay) continue VIA;
                             }
@@ -770,9 +790,10 @@ public class StreetLayer implements Serializable, Cloneable {
                 }
             }
 
-            // now filter them to just ones that reach the to way
-            long[] pathNodes = null;
-            long[] pathWays = null;
+            // We have found all possibles paths from the "from" way that use all the via ways.
+            // Now, filter those paths to just ones that actually reach the "to" way.
+            long[] pathNodes = null; // the sequence of OSM node IDs that you pass through, in order
+            long[] pathWays = null; // the sequence of OSM way IDs that you pass through, in order
 
             for (int statePos = 0; statePos < nodes.size(); statePos++) {
                 long[] theseWays = ways.get(statePos);
@@ -782,7 +803,7 @@ public class StreetLayer implements Serializable, Cloneable {
                     for (long toNode : toWay.nodes) {
                         if (node == toNode) {
                             if (pathNodes != null) {
-                                LOG.error("Turn restriction {} has ambiguous via ways (multiple paths through via ways between from and to), skipping", id);
+                                LOG.error("Turn restriction {} has ambiguous via ways (multiple paths through via ways between from and to), skipping", osmRelationId);
                                 return;
                             }
 
@@ -795,7 +816,7 @@ public class StreetLayer implements Serializable, Cloneable {
             }
 
             if (pathNodes == null) {
-                LOG.error("Invalid turn restriction {}, no way from from to to via via, skipping", id);
+                LOG.error("Invalid turn restriction {}, no way from from to to via via, skipping", osmRelationId);
                 return;
             }
 
@@ -812,7 +833,7 @@ public class StreetLayer implements Serializable, Cloneable {
                 e.seek(eidx);
                 if (e.getOSMID() == fromWayId) {
                     if (fromEdge[0] != -1) {
-                        LOG.error("From way enters vertex {} twice, restriction {} is therefore ambiguous, skipping", fromVertex, id);
+                        LOG.error("From way enters vertex {} twice, restriction {} is therefore ambiguous, skipping", fromVertex, osmRelationId);
                         bad[0] = true;
                         return false;
                     }
@@ -831,7 +852,7 @@ public class StreetLayer implements Serializable, Cloneable {
                 e.seek(eidx);
                 if (e.getOSMID() == toWayId) {
                     if (toEdge[0] != -1) {
-                        LOG.error("To way exits vertex {} twice, restriction {} is therefore ambiguous, skipping", toVertex, id);
+                        LOG.error("To way exits vertex {} twice, restriction {} is therefore ambiguous, skipping", toVertex, osmRelationId);
                         bad[0] = true;
                         return false;
                     }
@@ -845,12 +866,12 @@ public class StreetLayer implements Serializable, Cloneable {
             if (bad[0]) return; // log message already printed
 
             if (fromEdge[0] == -1 || toEdge[0] == -1) {
-                LOG.error("Did not find from/to edges for restriction {}, skipping", id);
+                LOG.error("Did not find from/to edges for restriction {}, skipping", osmRelationId);
                 return;
             }
 
-            out.fromEdge = fromEdge[0];
-            out.toEdge = toEdge[0];
+            restriction.fromEdge = fromEdge[0];
+            restriction.toEdge = toEdge[0];
 
             // edges affected by this turn restriction. Make a list in case something goes awry when trying to find edges
             TIntList affectedEdges = new TIntArrayList();
@@ -867,7 +888,7 @@ public class StreetLayer implements Serializable, Cloneable {
                     if (e.getOSMID() == wayId) {
                         if (edge[0] != -1) {
                             // TODO we've already started messing with data structures!
-                            LOG.error("To way exits vertex {} twice, restriction {} is therefore ambiguous, skipping", vertex, id);
+                            LOG.error("To way exits vertex {} twice, restriction {} is therefore ambiguous, skipping", vertex, osmRelationId);
                             bad[0] = true;
                             return false;
                         }
@@ -880,7 +901,7 @@ public class StreetLayer implements Serializable, Cloneable {
 
                 if (bad[0]) return; // log message already printed
                 if (edge[0] == -1) {
-                    LOG.warn("Did not find via way {} for restriction {}, skipping", wayId, id);
+                    LOG.warn("Did not find via way {} for restriction {}, skipping", wayId, osmRelationId);
                     return;
                 }
 
@@ -889,34 +910,32 @@ public class StreetLayer implements Serializable, Cloneable {
 
             affectedEdges.reverse();
 
-            out.viaEdges = affectedEdges.toArray();
+            restriction.viaEdges = affectedEdges.toArray();
 
             int index = turnRestrictions.size();
-            turnRestrictions.add(out);
-            edgeStore.turnRestrictions.put(out.fromEdge, index);
-            addReverseTurnRestriction(out, index);
+            turnRestrictions.add(restriction);
+            edgeStore.turnRestrictions.put(restriction.fromEdge, index);
+            addReverseTurnRestriction(restriction, index);
 
             // take a deep breath
         }
     }
 
     /**
-     * Adding turn restrictions for reverse search is a little tricky.
+     * There is support for both "only" and "no" turn restrictions in the forward search direction.
+     * "only" restrictions are a mess to implement in reverse, so "only" restrictions are converted to (possibly
+     * multiple) "no" restrictions when they're reversed.
      *
-     * First because we are adding toEdge to turnRestrictionReverse map and second because ONLY TURNs aren't supported
+     * These converted restrictions are added to StreetLayer.turnRestrictions (the list of all turn restrictions in
+     * the network) and then to EdgeStore.turnRestrictionsReverse (associating them with their toEdge).
      *
-     * Since ONLY TURN restrictions aren't supported ONLY TURN restrictions
-     * are created with NO TURN restrictions and added to turnRestrictions and edgeStore turnRestrictionsReverse
-     *
-     * if NO TURN restriction is added it's just added with correct toEdge (instead of from since
-     * we are searching from the back)
-     * @param turnRestriction
-     * @param index
+     * "No" turn restrictions, whether they were originally "no" restrictions or were converted from "only" turn
+     * restrictions, are associated with their toEdge (instead of fromEdge) since this method is handling restrictions
+     * to be used in reverse searches.
      */
     void addReverseTurnRestriction(TurnRestriction turnRestriction, int index) {
         if (turnRestriction.only) {
-            //From Only turn restrictions create multiple NO TURN restrictions which means the same
-            //Since only turn restrictions aren't supported in reverse street search
+            // From "only" turn restrictions, create multiple equivalent "no" turn restrictions.
             List<TurnRestriction> remapped = turnRestriction.remap(this);
             for (TurnRestriction remapped_restriction: remapped) {
                 index = turnRestrictions.size();
@@ -1008,8 +1027,8 @@ public class StreetLayer implements Serializable, Cloneable {
         }
 
         // FIXME this encoded speed should probably never be exposed outside the edge object
-        short forwardSpeed = speedToShort(speedConfigurator.getSpeedMS(way, false));
-        short backwardSpeed = speedToShort(speedConfigurator.getSpeedMS(way, true));
+        short forwardSpeed = speedToShort(speedLabeler.getSpeedMS(way, false));
+        short backwardSpeed = speedToShort(speedLabeler.getSpeedMS(way, true));
 
         RoadPermission roadPermission = permissions.getPermissions(way);
 
@@ -1077,29 +1096,6 @@ public class StreetLayer implements Serializable, Cloneable {
         return candidates;
     }
 
-    /** After JIT this appears to scale almost linearly with number of cores. */
-    public void testRouting (boolean withDestinations, TransitLayer transitLayer) {
-        LOG.info("Routing from random vertices in the graph...");
-        LOG.info("{} goal direction.", withDestinations ? "Using" : "Not using");
-        StreetRouter router = new StreetRouter(this);
-        long startTime = System.currentTimeMillis();
-        final int N = 1_000;
-        final int nVertices = outgoingEdges.size();
-        Random random = new Random();
-        for (int n = 0; n < N; n++) {
-            int from = random.nextInt(nVertices);
-            VertexStore.Vertex vertex = vertexStore.getCursor(from);
-            // LOG.info("Routing from ({}, {}).", vertex.getLat(), vertex.getLon());
-            router.setOrigin(from);
-            router.toVertex = withDestinations ? random.nextInt(nVertices) : StreetRouter.ALL_VERTICES;
-            if (n != 0 && n % 100 == 0) {
-                LOG.info("    {}/{} searches", n, N);
-            }
-        }
-        double eTime = System.currentTimeMillis() - startTime;
-        LOG.info("average response time {} msec", eTime / N);
-    }
-
     /**
      * The edge lists (which edges go out of and come into each vertex) are derived from the edges in the EdgeStore.
      * So any time you add edges or change their endpoints, you need to rebuild the edge index.
@@ -1125,11 +1121,10 @@ public class StreetLayer implements Serializable, Cloneable {
      * Find an existing street vertex near the supplied coordinates, or create a new one if there are no vertices
      * near enough. Note that calling this method is potentially destructive (it can modify the street network).
      *
-     * This uses {@link #findSplit(double, double, double, StreetMode)} and {@link Split} which need filled spatialIndex
-     * In other works {@link #indexStreets()} needs to be called before this is used. Otherwise no near vertex is found.
+     * This uses {@link #findSplit(double, double, double, StreetMode)} and {@link Split} which require the spatial
+     * index to already be built. In other works {@link #indexStreets()} needs to be called before this is used.
      *
-     * TODO maybe use X and Y everywhere for fixed point, and lat/lon for double precision degrees.
-     * TODO maybe move this into Split.perform(), store streetLayer ref in Split.
+     * TODO potential refactor: rename this method Split.perform(), and store a ref to streetLayer in Split.
      * @param lat latitude in floating point geographic (not fixed point) degrees.
      * @param lon longitude in floating point geographic (not fixed point) degrees.
      * @param streetMode Link to edges which have permission for StreetMode
@@ -1179,12 +1174,13 @@ public class StreetLayer implements Serializable, Cloneable {
             // We must be applying a scenario, and this edge is part of the baseline graph shared between threads.
             // Preserve the existing edge pair, creating a new edge pair to lead up to the split.
             // The new edge will be added to the edge lists later (the edge lists are a transient index).
-            // We don't add it to the spatial index, which is shared between all threads.
+            // We add it to a temporary spatial index specific to this scenario, rather than the base spatial index
+            // which is shared between all scenarios on this network.
             EdgeStore.Edge newEdge0 = edgeStore.addStreetPair(edge.getFromVertex(), newVertexIndex, split.distance0_mm, edge.getOSMID());
             // Copy the flags and speeds for both directions, making the new edge like the existing one.
             newEdge0.copyPairFlagsAndSpeeds(edge);
 
-            // add to temp spatial index
+            // Add the new edges to a temporary spatial index that is associated with only this scenario.
             // we need to build this on the fly so that it is possible to split a street multiple times; otherwise,
             // once a street had been split once, the original edge would be removed from consideration
             // (StreetLayer#getEdgesNear filters out edges that have been deleted) and the new edge would not yet be in
@@ -1207,14 +1203,19 @@ public class StreetLayer implements Serializable, Cloneable {
             temporaryEdgeIndex.insert(newEdge1.getEnvelope(), newEdge1.edgeIndex);
         }
 
-        // don't allow the router to make ill-advised U-turns at splitter vertices
+        // FIXME Don't allow the router to make U-turns at splitter vertices.
+        // One way to do this: make a vertex flag for splitter vertices. When at a splitter vertex, don't consider
+        // traversing edges that have the same OSM ID but the opposite direction (i.e. are even when the previous
+        // edge was odd or vice versa).
 
         // Return the splitter vertex ID
         return newVertexIndex;
     }
 
-    /** perform destructive splitting of edges
-     * FIXME: currently used only in P+R it should probably be changed to use getOrCreateVertexNear */
+    /**
+     * Perform destructive splitting of edges
+     * FIXME: currently used only in P+R. This methods should probably be changed to resuse code from getOrCreateVertexNear.
+     */
     public int splitEdge(Split split) {
         // We have a linking site. Find or make a suitable vertex at that site.
         // Retaining the original Edge cursor object inside findSplit is not necessary, one object creation is harmless.
@@ -1294,14 +1295,6 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /**
-     * Find a split. Deprecated in favor of finding a split for a particular mode, below.
-     */
-    @Deprecated
-    public Split findSplit (double lat, double lon, double radiusMeters) {
-        return findSplit(lat, lon, radiusMeters, null);
-    }
-
-    /**
      * Find a location on an existing street near the given point, without actually creating any vertices or edges.
      * The search radius can be specified freely here because we use this function to link transit stops to streets but
      * also to link pointsets to streets, and currently we use different distances for these two things.
@@ -1355,6 +1348,9 @@ public class StreetLayer implements Serializable, Cloneable {
      * It's questionable whether the willBeModified optimization actually affects routing speed, but in theory it
      * saves a comparison and an extra dereference every time we use the edge/vertex stores.
      * TODO check whether this actually affects speed. If not, just wrap the lists in every scenario copy.
+     * Why would you clone the StreetLayer at all if it's not going to be modified? Because there are circular
+     * references between the street and transit layers, so if you don't clone both, you could end up at the wrong
+     * transit or street layer by chaining together those references.
      */
     public StreetLayer scenarioCopy(TransportNetwork newScenarioNetwork, boolean willBeModified) {
         StreetLayer copy = this.clone();
@@ -1373,8 +1369,11 @@ public class StreetLayer implements Serializable, Cloneable {
         return copy;
     }
 
-    // FIXME radiusMeters is now set project-wide
-    public void associateBikeSharing(TNBuilderConfig tnBuilderConfig, int radiusMeters) {
+
+    /**
+     * Creates vertices to represent each bike rental station.
+     */
+    public void associateBikeSharing(TNBuilderConfig tnBuilderConfig) {
         LOG.info("Builder file:{}", tnBuilderConfig.bikeRentalFile);
         BikeRentalBuilder bikeRentalBuilder = new BikeRentalBuilder(new File(tnBuilderConfig.bikeRentalFile));
         List<BikeRentalStation> bikeRentalStations = bikeRentalBuilder.getRentalStations();
@@ -1405,7 +1404,10 @@ public class StreetLayer implements Serializable, Cloneable {
         }
     }
 
-    /** @return true iff this StreetLayer was created by a scenario, and is therefore wrapping a base StreetLayer. */
+    /**
+     * @return true if this StreetLayer was created by a scenario,
+     * and is therefore wrapping a base StreetLayer.
+     */
     public boolean isScenarioCopy() {
         return baseStreetLayer != null;
     }
@@ -1452,12 +1454,11 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /**
-     * Finds all the P+R stations in given envelope
-     *
-     * Returns empty list if none are found or no P+R stations are in graph
+     * Finds all the P+R stations in given envelope. This might overselect (doesn't filter the objects from the
+     * spatial index) but it's only used in visualizations.
      *
      * @param env Envelope in float degrees
-     * @return
+     * @return empty list if none are found or no P+R stations are in graph
      */
     public List<ParkRideParking> findParkRidesInEnvelope(Envelope env) {
         List<ParkRideParking> parkingRides = new ArrayList<>();
@@ -1482,12 +1483,11 @@ public class StreetLayer implements Serializable, Cloneable {
     }
 
     /**
-     * Finds all the bike share stations in given envelope
-     *
-     * Returns empty list if none are found or no bike stations are in graph
+     * Finds all the bike share stations in given envelope. Might overselect from the spatial index but this is only
+     * used for visualizations.
      *
      * @param env Envelope in float degrees
-     * @return
+     * @return BikeRentalStations, or empty list if none are found or there are no bike stations in the graph.
      */
     public List<BikeRentalStation> findBikeSharesInEnvelope(Envelope env) {
         List<BikeRentalStation> bikeRentalStations = new ArrayList<>();

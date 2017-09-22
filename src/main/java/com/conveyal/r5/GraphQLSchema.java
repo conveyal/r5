@@ -1353,7 +1353,7 @@ public class GraphQLSchema {
                 .defaultValue(15)
                 .build())
             .dataFetcher(environment -> {
-                return profileResponse.getPlan(ProfileRequest.fromEnvironment(environment, profileResponse.getTimezone()));
+                return profileResponse.getPlan(ProfileRequest.fromGraphqlEnvironment(environment, profileResponse.getTimezone()));
             })
             .build();
 
@@ -1527,7 +1527,7 @@ public class GraphQLSchema {
                 .defaultValue(5)
                 .build())
             .dataFetcher(environment -> {
-                 return profileResponse.getPlan(ProfileRequest.fromEnvironment(environment, profileResponse.getTimezone()));
+                 return profileResponse.getPlan(ProfileRequest.fromGraphqlEnvironment(environment, profileResponse.getTimezone()));
             })
             .build();
 

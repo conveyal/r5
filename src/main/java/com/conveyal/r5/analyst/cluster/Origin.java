@@ -10,14 +10,19 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * Utility class to read and write origin format files (used to send instantaneous accessibility distributions from the worker
- * to the assembler via SQS)
+ * Utility class to read and write "origin" format. Messages in this format contain the regional analysis results for
+ * a single origin point, and are sent back to the GridResultQueueConsumer via an SQS Queue for assembly into one big
+ * result file for the entire job. These results include some metadata about the origin point itself (coordinates) and
+ * a large array of accessibility values, which are the bootstrap replications.
+ *
+ * The job ID for this result is not currently stored here - it's in the SQS message metadata. It should probably be
+ * moved in here just so each origin message is self-contained.
  */
 public class Origin {
     public static final Logger LOG = LoggerFactory.getLogger(Origin.class);
 
     /** The version of the origin file format supported by this class */
-    public static final int ORIGIN_VERSION = 0;
+    public static final int ORIGIN_VERSION = 1;
 
     /** X coordinate of origin within regional analysis */
     public int x;
@@ -25,14 +30,22 @@ public class Origin {
     /** Y coordinate of origin within regional analysis */
     public int y;
 
+    /** Percentile of travel time used to compute these accessibility values */
+    public double percentile = Double.NaN;
+
+    /** Job ID this origin is associated with */
+    public String jobId;
+
     /**
      * Samples of accessibility. Depending on worker version, this could be bootstrap replications of accessibility given
      * median travel time, or with older workers would be instantaneous accessibility for each departure minute.
      */
     public int[] samples;
 
-    /** Construct an origin given a grid request and the instantaneous accessibility computed for each iteration */
-    public Origin (GridRequest request, int[] samples) {
+    /** Construct an origin given a grid task and the instantaneous accessibility computed for each iteration */
+    public Origin (RegionalTask request, double percentile, int[] samples) {
+        this.jobId = request.jobId;
+        this.percentile = percentile;
         this.x = request.x;
         this.y = request.y;
         this.samples = samples;
@@ -54,6 +67,8 @@ public class Origin {
         // version
         data.writeInt(ORIGIN_VERSION);
 
+        data.writeUTF(jobId);
+        data.writeDouble(percentile);
         data.writeInt(x);
         data.writeInt(y);
 
@@ -84,12 +99,14 @@ public class Origin {
         int version = data.readInt();
 
         if (version != ORIGIN_VERSION) {
-            LOG.error("Origin version mismatch , expected {}, found {}", ORIGIN_VERSION, version);
+            LOG.error("Origin version mismatch, expected {} found {}", ORIGIN_VERSION, version);
             throw new IllegalArgumentException("Origin version mismatch, expected " + ORIGIN_VERSION + ", found " + version);
         }
 
         Origin origin = new Origin();
 
+        origin.jobId = data.readUTF();
+        origin.percentile = data.readDouble();
         origin.x = data.readInt();
         origin.y = data.readInt();
 

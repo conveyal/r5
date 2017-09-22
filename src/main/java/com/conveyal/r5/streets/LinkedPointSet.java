@@ -73,20 +73,19 @@ public class LinkedPointSet implements Serializable {
 
     /**
      * For each pointset point, the stops reachable without using transit, as a map from StopID to distance in millimeters.
-     * Inverted version of stopToPointDistanceTables.
+     * Inverted version of stopToPointDistanceTables. This is used in PerTargetPropagator to find all the stops near
+     * a particular point (grid cell) so we can perform propagation to that grid cell only. We only retain a few
+     * percentiles of travel time at each target cell, so doing one cell at a time allows us to keep the output size
+     * within reason.
      */
     public transient List<TIntIntMap> pointToStopDistanceTables;
-
-    /** It is preferred to specify a mode when linking TODO remove this. */
-    @Deprecated
-    public LinkedPointSet(PointSet pointSet, StreetLayer streetLayer) {
-        this(pointSet, streetLayer, null, null);
-    }
 
     /**
      * A LinkedPointSet is a PointSet that has been pre-connected to a StreetLayer in a non-destructive, reversible way.
      * These objects are long-lived and not extremely numerous, so we keep references to the objects it was built from.
      * Besides they are useful for later processing of LinkedPointSets.
+     * However once we start evicting TransportNetworks, we have to make sure we're not holding references to entire
+     * StreetLayers in LinkedPointSets (memory leak).
      */
     public LinkedPointSet(PointSet pointSet, StreetLayer streetLayer, StreetMode streetMode, LinkedPointSet baseLinkage) {
         LOG.info("Linking pointset to street network...");
@@ -193,6 +192,33 @@ public class LinkedPointSet implements Serializable {
             }
         }
 
+        stopToPointDistanceTables = sourceLinkage.stopToPointDistanceTables.stream()
+                .map(distanceTable -> {
+                    if (distanceTable == null) return null; // if it was previously unlinked, it is still unlinked
+
+                    TIntList newDistanceTable = new TIntArrayList();
+                    for (int i = 0; i < distanceTable.length; i += 2) {
+                        int targetInSuperLinkage = distanceTable[i];
+                        int distance = distanceTable[i + 1];
+
+                        int superX = targetInSuperLinkage % superGrid.width;
+                        int superY = targetInSuperLinkage / superGrid.width;
+
+                        int subX = superX + superGrid.west - subGrid.west;
+                        int subY = superY + superGrid.north - subGrid.north;
+
+                        if (subX >= 0 && subX < subGrid.width && subY >= 0 && subY < subGrid.height) {
+                            // only retain connections to points that fall within the subGrid
+                            int targetInSubLinkage = subY * subGrid.width + subX;
+                            newDistanceTable.add(targetInSubLinkage);
+                            newDistanceTable.add(distance); // distance to target does not change when we crop the pointset
+                        }
+                    }
+
+                    if (newDistanceTable.isEmpty()) return null; // not near any points in sub pointset
+                    else return newDistanceTable.toArray();
+                })
+                .collect(Collectors.toList());
     }
 
 

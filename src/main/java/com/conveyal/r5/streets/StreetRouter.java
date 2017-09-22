@@ -11,7 +11,6 @@ import com.conveyal.r5.util.TIntObjectMultimap;
 import gnu.trove.iterator.TIntIterator;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.list.TIntList;
-import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
@@ -27,7 +26,7 @@ import java.util.*;
 
 /**
  * This routes over the street layer of a TransitNetwork.
- * It is a throw-away calculator object that retains routing state and after the search is finished.
+ * It is a throw-away calculator object that retains routing state after the search is finished.
  * Additional functions are called to retrieve the routing results from that state.
  */
 public class StreetRouter {
@@ -36,62 +35,73 @@ public class StreetRouter {
 
     private static final boolean DEBUG_OUTPUT = false;
 
+    /** A special value for the search target vertex: do not stop the search at any particular vertex. */
     public static final int ALL_VERTICES = -1;
 
+    /** The StreetLayer to route on. */
     public final StreetLayer streetLayer;
 
     /**
-     * True if this is transitStop search
-     *
-     * This will stop search when maxStop stops will be found
-     * or before if queue is empty or time/distance limit is tripped
+     * True if this is a search to find transit stops.
+     * If true, the search will stop when the quantity of stops found is maxStops,
+     * or earlier if the queue is empty or if the time or distance limit is hit.
      */
     public boolean transitStopSearch = false;
 
     /**
-     * non null if this is search for vertices with specific flags AKA bike share or Park ride
-     *
-     * This will stop the search when maxVertices are found
-     * or before if queue is empty or time/distance limit is tripped
+     * If this is non-null, search for vertices with specific flags, e.g. bike share or park and ride.
+     * The search will stop when the quantity of vertices found with that flag reaches flagSearchQuantity,
+     * or earlier if the queue is empty or the time or distance limit is reached.
      */
     public VertexStore.VertexFlag flagSearch = null;
 
     /**
      * How many transit stops should we find
      */
-    public int maxTransitStops = PointToPointQuery.MAX_ACCESS_STOPS;
+    public int transitStopSearchQuantity = PointToPointQuery.MAX_ACCESS_STOPS;
 
     /**
      * How many vertices with flags should we find
      */
-    public int maxVertices = 20;
+    public int flagSearchQuantity = 20;
 
-    // TODO don't hardwire drive-on-right
+    /**
+     * The reason this is pluggable is to account for left and right hand drive (as well as any other country-specific
+     * details you might want to implement)
+     */
     private TurnCostCalculator turnCostCalculator;
 
     // These are used for scaling coordinates in approximate distance calculations.
-    // The lon value must be properly scaled to underestimate in the region where we're routing.
-    private static final double MM_PER_DEGREE_LAT_FIXED =
+    // The lon value must be properly scaled to underestimate distances in the region where we're routing.
+    private static final double MM_PER_UNIT_LAT_FIXED =
             (SphericalDistanceLibrary.EARTH_CIRCUMFERENCE_METERS * 1000) / (360 * VertexStore.FIXED_FACTOR);
-    private double millimetersPerDegreeLonFixed;
+    private double millimetersPerUnitLonFixed;
+    // Yes, that's indeed the speed unit "seconds per millimeter", to avoid computing 1/x repeatedly.
     private double maxSpeedSecondsPerMillimeter;
 
     /**
-     * It uses all nonzero limit as a limit whichever gets hit first
-     * For example if distanceLimitMeters &gt; 0 it is used as a limit. But if it isn't
-     * timeLimitSeconds is used if it is bigger then 0. If both limits are 0 or both are set
-     * warning is shown and both are used.
+     * The StreetRouter will respect any nonzero limits, and will stop the search when it hits either of them.
+     * If both limits are zero a warning will be logged. If both are set, both are used, but you should never do this.
      */
     public int distanceLimitMeters = 0;
     public int timeLimitSeconds = 0;
 
-    /** What routing variable (weight, distance, etc.) should be used in the dominance function? */
-    public State.RoutingVariable dominanceVariable = State.RoutingVariable.WEIGHT;
+    /**
+     * What routing variable (weight, distance, etc.) should be used to decide when a path is better than another.
+     * We only ever have one such variable, and it's algorithmically invalid to prune or otherwise discard any path
+     * based on any other characteristic of the path but this one. This is referred to as a "resource limiting"
+     * problem and would require computing pareto-optimal paths, which we don't provide on the street network.
+     * e.g. you should not set a distance limit when the quantityToMinimize is not distance.
+     */
+    public State.RoutingVariable quantityToMinimize = State.RoutingVariable.WEIGHT;
 
     /**
-     * Store the best state at the end of each edge. We store states at the ends of edges, rather than at vertices, so
-     * that we can apply turn costs. You can't apply turn costs (which are vertex costs) when you are storing a single state
-     * per vertex, because the vertex cost is not applied until leaving the vertex. This means that a state that must make
+     * Store the best state at the end of each edge. Although we think of states being located at vertices, from a
+     * routing point of view they are located just before the vertex, at the end of one of the edges coming into that
+     * vertex. This allows us to apply turn costs.
+     *
+     * You can't properly apply turn costs (which are vertex costs) when you are storing a single state at each vertex,
+     * because the vertex cost is not applied until leaving the vertex. This means that a state that must make
      * an expensive U-turn to reach the destination may beat out a state that is slightly less costly _at that vertex_ but
      * will complete the search with a cheap straight-through movement. We use the ends rather than the beginnings of edges
      * to avoid state proliferation (otherwise after traversing an edge you'd have to create states, many of which would
@@ -102,37 +112,45 @@ public class StreetRouter {
      * is a very theoretical view and creates a semantic nightmare because it's hard to think about nodes that represent
      * things with dimension (not to mention never being sure whether you're talking about the original, standard graph
      * or the transformed, edge-based graph). We had a nightmarish time trying to keep this straight in OTP, and eventually
-     * removed it. Using edge-based graphs to represent turn costs/restrictions is documented at http://geo.fsv.cvut.cz/gdata/2013/pin2/d/dokumentace/line_graph_teorie.pdf
+     * removed it. Using edge-based graphs to represent turn costs/restrictions is documented at
+     * http://geo.fsv.cvut.cz/gdata/2013/pin2/d/dokumentace/line_graph_teorie.pdf
      *
-     * This would seem to obviate the need to have incomparable states at all, but it in fact does not, because of the existence
-     * of complex turn restrictions that have via ways. This could be a simple U-turn on a dual carriageway, but could also be
-     * something more complex (no right turn after left &c.). In these cases, we still have to have incomparable states when
-     * we are partway through the restriction.
+     * Though we imagine having multiple states at any vertex, we represent this by associating the states with directed
+     * edges, at it seems at first that you would need to keep only one state per directed edge (at its end).
+     * However, OSM contains complex turn restrictions that have via ways. This could be a simple U-turn on a dual
+     * carriageway, but could also be something more complex (no right turn after left &c.). In these cases, we still
+     * have to have incomparable states (states that cannot be dominated by other paths with different characteristics)
+     * when we are partway through the restriction.
      *
-     * When determining the weight at a vertex, one should just grab all the incoming edges, and take the minimum. However,
-     * it's a bit more complicated to properly determine the time/weight at a split, because of turn costs. Suppose that
-     * the best state at a particular vertex require a left turn onto the split edge; it is important to apply that left
-     * turn costs. Even more important is to make sure that the split edge is not the end of a restricted turn; if it is,
-     * one must reach the split via an alternate state.
+     * When determining the weight at a vertex, one should just grab the states at the ends of all the incoming edges,
+     * and take the minimum. However, turn costs make it a bit more complicated to properly determine the time/weight
+     * at a destination along a road that is not represented by a vertex. Suppose that the best state at one of the
+     * endpoint vertices of the destination edge requires a left turn onto that destination edge. It is important to
+     * apply that left turn cost. Even more important is to make sure that the destination edge is not the end of a
+     * restricted turn; if it is, one must reach the destination via an alternate state.
+     *
+     * TODO we might be able to make this more efficient (not using a multimap)
+     * by taking advantage of the fact that we almost always have a single state per edge
+     * (the only time we don't is when we're in the middle of a turn restriction).
      */
-    // TODO we might be able to make this more efficient by taking advantage of the fact that we almost always have a
-    // single state per edge (the only time we don't is when we're in the middle of a turn restriction).
     TIntObjectMultimap<State> bestStatesAtEdge = new TIntObjectHashMultimap<>();
 
-    // The sort order of the priority queue uses the specified routing dominance variable.
+    // The queue is prioritized by the specified optimization objective variable.
     PriorityQueue<State> queue = new PriorityQueue<>(
-            (s0, s1) -> (s0.getRoutingVariable(dominanceVariable) + s0.heuristic) -
-                        (s1.getRoutingVariable(dominanceVariable) + s1.heuristic));
+            Comparator.comparingInt(s0 -> (s0.getRoutingVariable(quantityToMinimize) + s0.heuristic)));
 
-    // If you set this to a non-negative number, the search will be directed toward the vertex with that index.
+    /**
+     * If you set this to a non-negative number, the search will end at the vertex with the given index,
+     * and will be directed toward that vertex.
+     */
     public int toVertex = ALL_VERTICES;
 
-    /** Set individual properties here, or an entirely new request */
+    /** Set individual properties here, or an entirely new request FIXME <-- what does this comment mean? */
     public ProfileRequest profileRequest = new ProfileRequest();
 
     /**
      * Mode of transport used in this search. This router requires a single mode, so it is up to the caller to
-     * disentangle the modes set in the profile request.
+     * run several street searches in sequence if that's what the profileRequest requires.
      */
     public StreetMode streetMode = StreetMode.WALK;
 
@@ -143,22 +161,27 @@ public class StreetRouter {
 
     private Split destinationSplit;
 
-    // The best known value of the chosen dominance variable at the destination, used to prune the search.
+    // The best known value of the chosen objective variable at the destination, used to prune the search.
     private int bestValueAtDestination = Integer.MAX_VALUE;
 
-
-    // This is maximal absolute latitude of origin, when there are multiple origin states
-    // it is used when calculating A* goal direction heuristic
+    // This is the maximum absolute latitude of origin, when there are multiple origin states.
+    // It is used when calculating A* goal direction heuristic to ensure that we underestimate distances.
+    // FIXME no, we'd need to use the max latitude of any vertex in the street network. Do we need goal direction at all?
     private int maxAbsOriginLat = Integer.MIN_VALUE;
-
 
     /**
      * The preceding StreetRouter in a multi-router search.
-     * For example if we are searching for P+R we need 2 street searches:
-     * First driving from the origin to all car parks, then from all the car parks to nearby transit stops.
-     * Recording the first street router in the second one allows reconstructing paths in the response.
-     **/
+     * For example if we are renting a bike we need three street searches:
+     * First walking from the origin to all bike rental stations, then biking to other bike rental stations, then
+     * walking from the final bike rental station to the destination.
+     */
     public StreetRouter previousRouter;
+
+    public StreetRouter (StreetLayer streetLayer) {
+        this.streetLayer = streetLayer;
+        // TODO one of two things: 1) don't hardwire drive-on-right, or 2) https://en.wikipedia.org/wiki/Dagen_H
+        this.turnCostCalculator = new TurnCostCalculator(streetLayer, true);
+    }
 
     /**
      * Supply a RoutingVisitor to track search progress for debugging.
@@ -168,20 +191,15 @@ public class StreetRouter {
     }
 
     /**
-     * Currently used for debugging snapping to vertices
-     * TODO: API should probably be nicer
-     * setOrigin on split or setOrigin that would return split
-     */
-    public Split getOriginSplit() {
-        return originSplit;
-    }
-
-    /**
-     * This uses stops found in {@link StopVisitor} if transitStopSearch is true
-     * and DOESN'T search in found states for stops
+     * After a search has been run, calling this method will returns a map from transit stop indexes to the value of
+     * the objective variable for the optimal path to that stop. TransitLayer contains the information about which
+     * street vertices are transit stops.
      *
-     * @return a map from transit stop indexes to their distances from the origin (or whatever the dominance variable is).
-     * Note that the TransitLayer contains all the information about which street vertices are transit stops.
+     * Currently this has what appears to be an optimization that uses the stops found by the {@link StopVisitor}
+     * itself, if the routingVisitor used by the search is a StopVisitor. This is the case when transitStopSearch
+     * is true. The point of this whole thing is to limit the number of stops found, which was a hack to keep
+     * profile routing reasonably fast back in the day. Current SuboptimalPathRouting may not need this anymore.
+     * FIXME remove limits on the number of transit stops found, then remove this special case for StopVisitor
      */
     public TIntIntMap getReachedStops() {
         if (transitStopSearch && routingVisitor instanceof StopVisitor) {
@@ -192,30 +210,30 @@ public class StreetRouter {
         transitLayer.stopForStreetVertex.forEachEntry((streetVertex, stop) -> {
             if (streetVertex == -1) return true;
             State state = getStateAtVertex(streetVertex);
-            // TODO should this be time?
-            if (state != null) result.put(stop, state.getRoutingVariable(dominanceVariable));
+            if (state != null) result.put(stop, state.getRoutingVariable(quantityToMinimize));
             return true; // continue iteration
         });
         return result;
     }
 
     /**
-     * Return a map where the keys are all the reached vertices, and the values are their distances from the origin
-     * (as used in the chosen dominance function).
+     * Return a map where the keys are all the reached vertices, and the values are the value of the optimization
+     * objective variable for the optimal path to that vertex.
      */
     public TIntIntMap getReachedVertices () {
         TIntIntMap result = new TIntIntHashMap();
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
         bestStatesAtEdge.forEachEntry((eidx, states) -> {
             if (eidx < 0) return true;
-
+            // Iterating over a little list and reducing the values with a stream might be slow.
+            // TODO We should try replacing this with states.get(0) and see if it makes building distance tables faster.
             State state = states.stream()
-                    .reduce((s0, s1) -> s0.getRoutingVariable(dominanceVariable) < s1.getRoutingVariable(dominanceVariable) ? s0 : s1).get();
+                    .reduce((s0, s1) -> s0.getRoutingVariable(quantityToMinimize) < s1.getRoutingVariable(quantityToMinimize) ? s0 : s1).get();
             e.seek(eidx);
             int vidx = e.getToVertex();
 
-            if (!result.containsKey(vidx) || result.get(vidx) > state.getRoutingVariable(dominanceVariable))
-                result.put(vidx, state.getRoutingVariable(dominanceVariable));
+            if (!result.containsKey(vidx) || result.get(vidx) > state.getRoutingVariable(quantityToMinimize))
+                result.put(vidx, state.getRoutingVariable(quantityToMinimize));
 
             return true; // continue iteration
         });
@@ -223,8 +241,12 @@ public class StreetRouter {
     }
 
     /**
-     * Uses states found in {@link VertexFlagVisitor} if flagSearch is for the same flag as requested one
-     * and DOESN't search in found states for found vertices
+     * After a search has been run, calling this method will returns a map from vertex indexes to the value of
+     * the objective variable for the optimal path to that vertex, but only for vertices with a certain flag set.
+     *
+     * There is currently an optimization that makes a special case where {@link VertexFlagVisitor}
+     * was used. We're not sure that's necessary, see javadoc on getReachedStops. This one returns the states
+     * themselves, while the others return objective variable values.
      *
      * @return a map where all the keys are vertex indexes with the particular flag and all the values are states.
      */
@@ -239,14 +261,14 @@ public class StreetRouter {
             if (eidx < 0) return true;
 
             State state = states.stream().reduce((s0, s1) ->
-                    s0.getRoutingVariable(dominanceVariable) < s1.getRoutingVariable(dominanceVariable) ? s0 : s1).get();
+                    s0.getRoutingVariable(quantityToMinimize) < s1.getRoutingVariable(quantityToMinimize) ? s0 : s1).get();
             e.seek(eidx);
             int vidx = e.getToVertex();
             v.seek(vidx);
 
             if (v.getFlag(flag)) {
-                if (!result.containsKey(vidx) || result.get(vidx).getRoutingVariable(dominanceVariable) >
-                                                            state.getRoutingVariable(dominanceVariable)) {
+                if (!result.containsKey(vidx) || result.get(vidx).getRoutingVariable(quantityToMinimize) >
+                                                            state.getRoutingVariable(quantityToMinimize)) {
                     result.put(vidx, state);
                 }
             }
@@ -256,18 +278,16 @@ public class StreetRouter {
         return result;
     }
 
-    public StreetRouter (StreetLayer streetLayer) {
-        this.streetLayer = streetLayer;
-        // TODO one of two things: 1) don't hardwire drive-on-right, or 2) https://en.wikipedia.org/wiki/Dagen_H
-        this.turnCostCalculator = new TurnCostCalculator(streetLayer, true);
-    }
-
     /**
-     * Finds closest vertex which has streetMode permissions
+     * Set the origin point of this StreetRouter (before a search is started) to a point along an edge that allows
+     * traversal by the specified streetMode.
+     *
+     * If the given point is not close to an existing vertex, we will create two states, one at each vertex at the
+     * ends of the edge that is found.
      *
      * @param lat Latitude in floating point (not fixed int) degrees.
      * @param lon Longitude in flating point (not fixed int) degrees.
-     * @return true if edge was found near wanted coordinate
+     * @return true if an edge was found near the specified coordinate
      */
     public boolean setOrigin (double lat, double lon) {
         Split split = streetLayer.findSplit(lat, lon, StreetLayer.LINK_RADIUS_METERS, streetMode);
@@ -278,29 +298,33 @@ public class StreetRouter {
         originSplit = split;
         bestStatesAtEdge.clear();
         queue.clear();
-        // from vertex is at end of back edge. Set edge correctly so that turn restrictions/costs are applied correctly
-        // at the origin.
+        // The states are located at the end of edges. Vertex0 is at the end of the reverse edge (split.edge + 1).
+        // In these states we must specify which edge was traversed to reach them, so that turn costs work.
         State startState0 = new State(split.vertex0, split.edge + 1, streetMode);
         State startState1 = new State(split.vertex1, split.edge, streetMode);
         EdgeStore.Edge  edge = streetLayer.edgeStore.getCursor(split.edge);
-        // Uses weight based on distance from end vertices and speed on edge which depends on transport mode
-        float speedms = edge.calculateSpeed(profileRequest, streetMode);
-        startState1.weight = (int) ((split.distance1_mm / 1000) / speedms);
+        // Uses weight based on distance from end vertices, and speed on edge which depends on transport mode
+        float speedMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
+        startState1.weight = (int) ((split.distance1_mm / 1000) / speedMetersPerSecond);
         edge.advance();
-        //speed can differ in different directions
-        speedms = edge.calculateSpeed(profileRequest, streetMode);
-        startState0.weight = (int) ((split.distance0_mm / 1000) / speedms);
+        // Speed can be different on opposite sides of the same street
+        speedMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
+        startState0.weight = (int) ((split.distance0_mm / 1000) / speedMetersPerSecond);
+        // FIXME we're setting weight but not time and distance on these states above!
 
+        // FIXME Below is reversing the vertices, but then aren't the weights, times, distances wrong? Why are we even doing this?
         if (profileRequest.reverseSearch) {
              startState0.vertex = split.vertex1;
              startState1.vertex = split.vertex0;
         }
 
-        //We need to set turn restrictions if turn restriction starts in first edge
+        // If there is a turn restriction on this edge, we need to indicate that we are beginning the search in a
+        // turn restriction.
         streetLayer.edgeStore.startTurnRestriction(streetMode, profileRequest.reverseSearch, startState0);
         streetLayer.edgeStore.startTurnRestriction(streetMode, profileRequest.reverseSearch, startState1);
 
-        // NB not adding to bestStates, as it will be added when it comes out of the queue
+        // These initial states are not recorded as bestStates, they will be added when they come out of the queue.
+        // FIXME but wait - we are putting them in the bestStates for some reason.
         queue.add(startState0);
         queue.add(startState1);
         bestStatesAtEdge.put(startState0.backEdge, startState0);
@@ -382,11 +406,10 @@ public class StreetRouter {
 
     /**
      * Call one of the setOrigin functions first before calling route().
-     *
-     * It uses all nonzero limit as a limit whichever gets hit first
-     * For example if distanceLimitMeters &gt; 0 it is used a limit. But if it isn't
-     * timeLimitSeconds is used if it is bigger then 0. If both limits are 0 or both are set
-     * warning is shown and both are used.
+     * Don't call route() more than once, a StreetRouter is only intended to be used once.
+     * Routing will respect any nonzero limits (distance or time), and will stop the search when it hits either of them.
+     * If both limits are zero a warning will be logged. If both are set, both are used, but you should not do this
+     * because it always implies a resource limiting problem.
      */
     public void route () {
 
@@ -408,9 +431,9 @@ public class StreetRouter {
             // TODO this should really use the max latitude of the whole street layer.
             int maxAbsLatFixed = Math.max(Math.abs(destinationSplit.fixedLat), Math.abs(maxAbsOriginLat));
             double maxAbsLatRadians = Math.toRadians(VertexStore.fixedDegreesToFloating(maxAbsLatFixed));
-            millimetersPerDegreeLonFixed = MM_PER_DEGREE_LAT_FIXED * Math.cos(maxAbsLatRadians);
+            millimetersPerUnitLonFixed = MM_PER_UNIT_LAT_FIXED * Math.cos(maxAbsLatRadians);
             // FIXME account for speeds of individual street segments, not just speed in request
-            double maxSpeedMetersPerSecond = profileRequest.getSpeed(streetMode);
+            double maxSpeedMetersPerSecond = profileRequest.getSpeedForMode(streetMode);
             // Car speed is currently often unspecified in the request and defaults to zero.
             if (maxSpeedMetersPerSecond == 0) maxSpeedMetersPerSecond = 36.11; // 130 km/h
             maxSpeedSecondsPerMillimeter = 1 / (maxSpeedMetersPerSecond * 1000);
@@ -419,7 +442,7 @@ public class StreetRouter {
         if (distanceLimitMeters > 0) {
             // Distance in State is in millimeters. Distance limit is in meters, requiring a conversion.
             distanceLimitMm = distanceLimitMeters * 1000;
-            if (dominanceVariable != State.RoutingVariable.DISTANCE_MILLIMETERS) {
+            if (quantityToMinimize != State.RoutingVariable.DISTANCE_MILLIMETERS) {
                 LOG.warn("Setting a distance limit when distance is not the dominance function, this is a resource limiting issue and paths may be incorrect.");
             }
         } else {
@@ -429,7 +452,7 @@ public class StreetRouter {
 
         if (timeLimitSeconds > 0) {
             tmpTimeLimitSeconds = timeLimitSeconds;
-            if (dominanceVariable != State.RoutingVariable.DURATION_SECONDS) {
+            if (quantityToMinimize != State.RoutingVariable.DURATION_SECONDS) {
                 LOG.warn("Setting a time limit when time is not the dominance function, this is a resource limiting issue and paths may be incorrect.");
             }
         } else {
@@ -467,9 +490,9 @@ public class StreetRouter {
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
 
         if (transitStopSearch) {
-            routingVisitor = new StopVisitor(streetLayer, dominanceVariable, maxTransitStops, profileRequest.getMinTimeLimit(streetMode));
+            routingVisitor = new StopVisitor(streetLayer, quantityToMinimize, transitStopSearchQuantity, profileRequest.getMinTimeLimit(streetMode));
         } else if (flagSearch != null) {
-            routingVisitor = new VertexFlagVisitor(streetLayer, dominanceVariable, flagSearch, maxVertices, profileRequest.getMinTimeLimit(streetMode));
+            routingVisitor = new VertexFlagVisitor(streetLayer, quantityToMinimize, flagSearch, flagSearchQuantity, profileRequest.getMinTimeLimit(streetMode));
         }
         while (!queue.isEmpty()) {
             State s0 = queue.poll();
@@ -501,7 +524,7 @@ public class StreetRouter {
 
             // End the search if the state coming off the queue has exceeded the best-known cost to reach the destination.
             // TODO how important is this? How can this even happen? In a street search, is target pruning even effective?
-            if (s0.getRoutingVariable(dominanceVariable) > bestValueAtDestination) break;
+            if (s0.getRoutingVariable(quantityToMinimize) > bestValueAtDestination) break;
 
             // Hit RoutingVistor callbacks to monitor search progress.
             if (routingVisitor != null) {
@@ -521,8 +544,8 @@ public class StreetRouter {
             if (destinationSplit != null && (s0.vertex == destinationSplit.vertex0 || s0.vertex == destinationSplit.vertex1)) {
                 State atDest = getState(destinationSplit);
                 // atDest could be null even though we've found a nearby vertex because of a turn restriction
-                if (atDest != null && bestValueAtDestination > atDest.getRoutingVariable(dominanceVariable)) {
-                    bestValueAtDestination = atDest.getRoutingVariable(dominanceVariable);
+                if (atDest != null && bestValueAtDestination > atDest.getRoutingVariable(quantityToMinimize)) {
+                    bestValueAtDestination = atDest.getRoutingVariable(quantityToMinimize);
                 }
             }
 
@@ -585,16 +608,16 @@ public class StreetRouter {
         VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor(state.vertex);
         int deltaLatFixed = destinationSplit.fixedLat - vertex.getFixedLat();
         int deltaLonFixed = destinationSplit.fixedLon - vertex.getFixedLon();
-        double millimetersX = millimetersPerDegreeLonFixed * deltaLonFixed;
-        double millimetersY = MM_PER_DEGREE_LAT_FIXED * deltaLatFixed;
+        double millimetersX = millimetersPerUnitLonFixed * deltaLonFixed;
+        double millimetersY = MM_PER_UNIT_LAT_FIXED * deltaLatFixed;
         double distanceMillimeters = FastMath.sqrt(millimetersX * millimetersX + millimetersY * millimetersY);
         double estimate = distanceMillimeters;
-        if (dominanceVariable != State.RoutingVariable.DISTANCE_MILLIMETERS) {
+        if (quantityToMinimize != State.RoutingVariable.DISTANCE_MILLIMETERS) {
             // Calculate time in seconds to traverse this distance in a straight line.
             // Weight should always be greater than or equal to time in seconds.
             estimate *= maxSpeedSecondsPerMillimeter;
         }
-        if (dominanceVariable == State.RoutingVariable.WEIGHT && streetMode == StreetMode.WALK) {
+        if (quantityToMinimize == State.RoutingVariable.WEIGHT && streetMode == StreetMode.WALK) {
             estimate *= EdgeStore.WALK_RELUCTANCE_FACTOR;
         }
         return (int) estimate;
@@ -607,7 +630,7 @@ public class StreetRouter {
         if (s1.turnRestrictions == null && s2.turnRestrictions == null) {
             // The simple case where neither state has turn restrictions.
             // Note this is <= rather than < because we want an existing state with the same weight to beat a new one.
-            return s1.getRoutingVariable(dominanceVariable) <= s2.getRoutingVariable(dominanceVariable);
+            return s1.getRoutingVariable(quantityToMinimize) <= s2.getRoutingVariable(quantityToMinimize);
         }
         // At least one of the states has turn restrictions.
         // Generally, a state with turn restrictions cannot dominate another state and cannot be dominated.
@@ -642,7 +665,7 @@ public class StreetRouter {
         }
         // Get the lowest weight, even if it's in the middle of a turn restriction.
         return states.stream().reduce((s0, s1) ->
-                s0.getRoutingVariable(dominanceVariable) < s1.getRoutingVariable(dominanceVariable) ? s0 : s1).get();
+                s0.getRoutingVariable(quantityToMinimize) < s1.getRoutingVariable(quantityToMinimize) ? s0 : s1).get();
     }
 
     /**
@@ -667,7 +690,7 @@ public class StreetRouter {
             if (state == null) continue;
 
             if (ret == null) ret = state;
-            else if (ret.getRoutingVariable(dominanceVariable) > state.getRoutingVariable(dominanceVariable)) {
+            else if (ret.getRoutingVariable(quantityToMinimize) > state.getRoutingVariable(quantityToMinimize)) {
                 ret = state;
             }
         }
@@ -755,7 +778,7 @@ public class StreetRouter {
         }
 
         return relevantStates.stream()
-                .reduce((s0, s1) -> s0.getRoutingVariable(dominanceVariable) < s1.getRoutingVariable(dominanceVariable) ? s0 : s1)
+                .reduce((s0, s1) -> s0.getRoutingVariable(quantityToMinimize) < s1.getRoutingVariable(quantityToMinimize) ? s0 : s1)
                 .orElse(null);
     }
 
@@ -1006,7 +1029,7 @@ public class StreetRouter {
 
     /**
      * Saves maxStops number of transitStops that are at least minTravelTimeSeconds from start of search
-     * If stop is found multiple times best states according to dominanceVariable wins.
+     * If stop is found multiple times best states according to quantityToMinimize wins.
      */
     private static class StopVisitor implements RoutingVisitor {
         private final int minTravelTimeSeconds;
@@ -1065,7 +1088,7 @@ public class StreetRouter {
         }
 
         /**
-         * @return found stops. Same format of returned value as in {@link StreetRouter#getReachedStops()}
+         * @return found stops. Same format of returned value as in
          */
         public TIntIntMap getStops() {
             return stops;
@@ -1073,10 +1096,10 @@ public class StreetRouter {
     }
 
     /**
-     * Saves maxVertices number of vertices which have wantedFlag
+     * Saves flagSearchQuantity number of vertices which have wantedFlag
      * and are at least minTravelTimeSeconds away from the origin
      * <p>
-     * If vertex is found multiple times vertex with lower dominanceVariable is saved
+     * If vertex is found multiple times vertex with lower quantityToMinimize is saved
      */
     private static class VertexFlagVisitor implements RoutingVisitor {
         private final int minTravelTimeSeconds;
@@ -1108,7 +1131,7 @@ public class StreetRouter {
          * If vertex at current state has wantedFlag it is added to vertices map
          * if it is more then minTravelTimeSeconds away and has backState and non negative vertexIdx
          * <p>
-         * If vertex is found multiple times vertex with lower dominanceVariable is saved
+         * If vertex is found multiple times vertex with lower quantityToMinimize is saved
          *
          * @param state
          */
@@ -1140,7 +1163,7 @@ public class StreetRouter {
         }
 
         /**
-         * @return true when maxVertices vertices are found
+         * @return true when flagSearchQuantity vertices are found
          */
         public boolean shouldBreakSearch() {
             return vertices.size() >= this.maxVertices;

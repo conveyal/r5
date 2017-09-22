@@ -8,46 +8,40 @@ import java.util.Arrays;
 import java.util.BitSet;
 
 /**
- * Tracks the state of a RAPTOR search. We have a separate class because we need to clone it when doing Monte Carlo
- * frequency searches. Note that this represents the _entire_ state of the RAPTOR search, rather than the state at
- * a particular vertex, as is the case with State objects in other search algorithms we have.
+ * Tracks the state of a RAPTOR search, specifically the best arrival times at each transit stop at the end of a
+ * particular round, along with associated data to reconstruct paths etc.
+ *
+ * This is grouped into a separate class (rather than just having the fields in the raptor worker class) because we
+ * need to make copies of it when doing Monte Carlo frequency searches. While performing the range-raptor search,
+ * we keep performing raptor searches at different departure times, stepping back in time, but operating on the same
+ * set of states (one for each round). But after each one of those departure time searches, we want to run sub-searches
+ * with different randomly selected schedules (the Monte Carlo draws). We don't want those sub-searches to invalidate
+ * the states for the ongoing range-raptor search, so we make a protective copy.
+ *
+ * Note that this represents the entire state of the RAPTOR search for a single round, rather than the state at
+ * a particular vertex (transit stop), as is the case with State objects in other search algorithms we have.
  *
  * @author mattwigway
  */
 public class RaptorState {
     private static final Logger LOG = LoggerFactory.getLogger(RaptorState.class);
 
-    /** Previous state (one less transfer). Don't serialize and send to debug interface. */
-    @JsonIgnore
+    /** State for the previous round (one less transfer). */
     public RaptorState previous;
 
-    /** departure time for this state */
+    /** Departure time for the search producing this state. */
     public int departureTime;
 
-    /** Best times to reach stops, whether via a transfer or via transit directly. */
+    /** Best times to reach each stop, whether via a transfer or via transit directly. */
     public int[] bestTimes;
-
-    /**
-     * wait time for transit, parallel to bestTimes
-     * Deprecated because FastRaptorWorker does not need separate wait times for bestTimes and bestNonTransferTimes.
-     */
-    @Deprecated
-    public int[] waitTime;
-
-    /**
-     * in-vehicle travel time, parallel to bestTimes
-     * Deprecated because FastRaptorWorker does not need separate in vehicle times for bestTimes and bestNonTransferTimes.
-     */
-    @Deprecated
-    public int[] inVehicleTravelTime;
 
     /** The best times for reaching stops via transit rather than via a transfer from another stop */
     public int[] bestNonTransferTimes;
 
-    /** cumulative wait time for transit, parallel to bestNonTransferTimes */
+    /** Cumulative transit wait time for the best path to each stop, parallel to bestNonTransferTimes. */
     public int[] nonTransferWaitTime;
 
-    /** cumulative in-vehicle travel time, parallel to bestNonTransferTimes */
+    /** Cumulative in-vehicle travel time for the best path to each stop, parallel to bestNonTransferTimes. */
     public int[] nonTransferInVehicleTravelTime;
 
     /**
@@ -87,8 +81,8 @@ public class RaptorState {
         this.bestTimes = new int[nStops];
         this.bestNonTransferTimes = new int[nStops];
 
-        Arrays.fill(bestTimes, RaptorWorker.UNREACHED);
-        Arrays.fill(bestNonTransferTimes, RaptorWorker.UNREACHED);
+        Arrays.fill(bestTimes, FastRaptorWorker.UNREACHED);
+        Arrays.fill(bestNonTransferTimes, FastRaptorWorker.UNREACHED);
 
         this.previousPatterns = new int[nStops];
         this.previousStop = new int[nStops];
@@ -97,8 +91,6 @@ public class RaptorState {
         Arrays.fill(previousStop, -1);
         Arrays.fill(transferStop, -1);
 
-        this.inVehicleTravelTime = new int[nStops];
-        this.waitTime = new int[nStops];
         this.nonTransferWaitTime = new int[nStops];
         this.nonTransferInVehicleTravelTime = new int[nStops];
         this.nonTransferStopsTouched = new BitSet(nStops);
@@ -107,7 +99,7 @@ public class RaptorState {
     }
 
     /**
-     * copy constructor, does not copy touchedStops data
+     * Copy constructor, does not copy touchedStops data (leaves it empty).
      */
     private RaptorState(RaptorState state) {
         this.bestTimes = Arrays.copyOf(state.bestTimes, state.bestTimes.length);
@@ -115,8 +107,6 @@ public class RaptorState {
         this.previousPatterns = Arrays.copyOf(state.previousPatterns, state.previousPatterns.length);
         this.previousStop = Arrays.copyOf(state.previousStop, state.previousStop.length);
         this.transferStop = Arrays.copyOf(state.transferStop, state.transferStop.length);
-        this.waitTime = Arrays.copyOf(state.waitTime, state.waitTime.length);
-        this.inVehicleTravelTime = Arrays.copyOf(state.inVehicleTravelTime, state.inVehicleTravelTime.length);
         this.nonTransferWaitTime = Arrays.copyOf(state.nonTransferWaitTime, state.nonTransferWaitTime.length);
         this.nonTransferInVehicleTravelTime = Arrays.copyOf(state.nonTransferInVehicleTravelTime, state.nonTransferInVehicleTravelTime.length);
         this.departureTime = state.departureTime;
@@ -129,7 +119,10 @@ public class RaptorState {
         this.maxDurationSeconds = state.maxDurationSeconds;
     }
 
-    /** Copy this raptor state to progress to the next round. Clears reachedThisRound so should be used only to progress to the next round. */
+    /**
+     * Copy this raptor state to progress to the next round.
+     * Clears reachedThisRound so should be used only to progress to the next round.
+     */
     public RaptorState copy () {
         return new RaptorState(this);
     }
@@ -145,11 +138,7 @@ public class RaptorState {
             if (other.bestTimes[stop] <= this.bestTimes[stop]) {
                 this.bestTimes[stop] = other.bestTimes[stop];
                 this.transferStop[stop] = other.transferStop[stop];
-                this.inVehicleTravelTime[stop] = other.inVehicleTravelTime[stop];
-                // add in any additional wait at the beginning in the range raptor case.
-                this.waitTime[stop] = other.waitTime[stop] + (other.departureTime - this.departureTime);
             }
-
             if (other.bestNonTransferTimes[stop] <= this.bestNonTransferTimes[stop]) {
                 this.bestNonTransferTimes[stop] = other.bestNonTransferTimes[stop];
                 this.previousPatterns[stop] = other.previousPatterns[stop];
@@ -225,7 +214,7 @@ public class RaptorState {
         return optimal;
     }
 
-    /** dump this as a string */
+    /** Debug functionn: dump the path up to this state as a string */
     public String dump (int stop) {
         Path p = new Path(this, stop);
 
@@ -261,15 +250,14 @@ public class RaptorState {
         // remove trips that are now too long
         int maxClockTime = departureTime + maxDurationSeconds;
         for (int i = 0; i < bestTimes.length; i++) {
-            if (bestTimes[i] > maxClockTime) bestTimes[i] = RaptorWorker.UNREACHED;
-            if (bestNonTransferTimes[i] > maxClockTime) bestNonTransferTimes[i] = RaptorWorker.UNREACHED;
+            if (bestTimes[i] > maxClockTime) bestTimes[i] = FastRaptorWorker.UNREACHED;
+            if (bestNonTransferTimes[i] > maxClockTime) bestNonTransferTimes[i] = FastRaptorWorker.UNREACHED;
         }
 
         // handle updating wait
         for (int stop = 0; stop < this.bestTimes.length; stop++) {
             if (this.previousPatterns[stop] > -1) {
                 this.nonTransferWaitTime[stop] += previousDepartureTime - departureTime;
-                this.waitTime[stop] += previousDepartureTime - departureTime;
             }
         }
     }

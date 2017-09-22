@@ -1,8 +1,5 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.analyst.WebMercatorGridPointSet;
-import com.conveyal.r5.analyst.cluster.AnalystClusterRequest;
-import com.conveyal.r5.analyst.cluster.ResultEnvelope;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -34,6 +31,7 @@ import java.util.function.Supplier;
  * @author mattwigway
  */
 public class McRaptorSuboptimalPathProfileRouter {
+    
     private static final Logger LOG = LoggerFactory.getLogger(McRaptorSuboptimalPathProfileRouter.class);
 
     public static final int BOARD_SLACK = 60;
@@ -66,7 +64,6 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     private TransportNetwork network;
     private ProfileRequest request;
-    private AnalystClusterRequest clusterRequest;
     private Map<LegMode, TIntIntMap> accessTimes;
     private Map<LegMode, TIntIntMap> egressTimes = null;
 
@@ -85,9 +82,6 @@ public class McRaptorSuboptimalPathProfileRouter {
     private BitSet patternsNearDestination;
     private BitSet servicesActive;
 
-    /** output from analyst algorithm will end up here */
-    public PropagatedTimesStore propagatedTimesStore;
-
     /** In order to properly do target pruning we store the best times at each target _by access mode_, so car trips don't quash walk trips */
     private TObjectIntMap<LegMode> bestTimesAtTargetByAccessMode = new TObjectIntHashMap<>(4, 0.95f, Integer.MAX_VALUE);
 
@@ -100,19 +94,6 @@ public class McRaptorSuboptimalPathProfileRouter {
         this.touchedPatterns = new BitSet(network.transitLayer.tripPatterns.size());
         this.patternsNearDestination = new BitSet(network.transitLayer.tripPatterns.size());
         this.servicesActive = network.transitLayer.getActiveServicesForDate(req.date);
-        this.offsets = new FrequencyRandomOffsets(network.transitLayer);
-    }
-
-    public McRaptorSuboptimalPathProfileRouter (TransportNetwork network, AnalystClusterRequest req, LinkedPointSet pointSet) {
-        this.network = network;
-        this.request = req.profileRequest;
-        this.clusterRequest = req;
-        this.pointSet = pointSet;
-        this.touchedStops = new BitSet(network.transitLayer.getStopCount());
-        this.touchedPatterns = new BitSet(network.transitLayer.tripPatterns.size());
-        this.patternsNearDestination = new BitSet(network.transitLayer.tripPatterns.size());
-        this.servicesActive = network.transitLayer.getActiveServicesForDate(req.profileRequest.date);
-        this.timesAtTargetsEachIteration = new ArrayList<>();
         this.offsets = new FrequencyRandomOffsets(network.transitLayer);
     }
 
@@ -196,11 +177,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         // analyst request, create a propagated times store
         if (egressTimes == null) {
-            propagatedTimesStore = new PropagatedTimesStore(pointSet.size());
-            BitSet includeInAverages = new BitSet();
-            includeInAverages.set(0, timesAtTargetsEachIteration.size());
-            // TODO min/max not appropriate without explicitly calculated extrema in frequency search
-            propagatedTimesStore.setFromArray(timesAtTargetsEachIteration.toArray(new int[timesAtTargetsEachIteration.size()][]), request.reachabilityThreshold);
+            throw new UnsupportedOperationException("We have removed support for fare analysis during refactoring, because there is no more PropagatedTimesStore");
         }
 
         LOG.info("McRAPTOR took {}ms", System.currentTimeMillis() - startTime);
@@ -232,7 +209,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         streetRouter.distanceLimitMeters = TransitLayer.DISTANCE_TABLE_SIZE_METERS; // FIXME arbitrary, and account for bike or car access mode
         streetRouter.setOrigin(request.fromLat, request.fromLon);
         streetRouter.route();
-        streetRouter.dominanceVariable = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+        streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
         accessTimes = new HashMap<>();
         accessTimes.put(mode, streetRouter.getReachedStops());
     }
@@ -257,8 +234,12 @@ public class McRaptorSuboptimalPathProfileRouter {
     /** Perform a McRAPTOR search and extract paths */
     public Collection<PathWithTimes> getPaths () {
         Collection<McRaptorState> states = route();
-        // using a map here because even paths that are considered equal may have different times and we want to apply
-        // strict dominance to equal paths
+
+        // A map to keep track of the best path among each group of paths using the same sequence of patterns.
+        // We will often find multiple paths that board or transfer to the same patterns at different locations.
+        // We only want to retain the best set of boarding, transfer, and alighting stops for a particular pattern sequence.
+        // FIXME we are using a map here with unorthodox definitions of hashcode and equals to make them serve as map keys.
+        // We should instead wrap PathWithTimes or copy the relevant fields into a PatternSequenceKey class.
         Map<PathWithTimes, PathWithTimes> paths = new HashMap<>();
 
         states.forEach(s -> {
@@ -498,7 +479,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     private void doPropagationToPointSet (int departureTime) {
         int[] timesAtTargetsThisIteration = new int[pointSet.size()];
-        Arrays.fill(timesAtTargetsThisIteration, RaptorWorker.UNREACHED);
+        Arrays.fill(timesAtTargetsThisIteration, FastRaptorWorker.UNREACHED);
 
         for (int stop = 0; stop < network.transitLayer.getStopCount(); stop++) {
             int[] distanceTable = pointSet.stopToPointDistanceTables.get(stop);
@@ -539,7 +520,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         }
 
         for (int i = 0; i < timesAtTargetsThisIteration.length; i++) {
-            if (timesAtTargetsThisIteration[i] != RaptorWorker.UNREACHED) timesAtTargetsThisIteration[i] -= departureTime;
+            if (timesAtTargetsThisIteration[i] != FastRaptorWorker.UNREACHED) timesAtTargetsThisIteration[i] -= departureTime;
         }
 
         timesAtTargetsEachIteration.add(timesAtTargetsThisIteration);
@@ -672,12 +653,12 @@ public class McRaptorSuboptimalPathProfileRouter {
         }
     }
 
-    /** run routing and return a result envelope */
-    public ResultEnvelope routeEnvelope() {
-        boolean isochrone = pointSet.pointSet instanceof WebMercatorGridPointSet;
-        route();
-        return propagatedTimesStore.makeResults(pointSet.pointSet, clusterRequest.includeTimes, !isochrone, isochrone);
-    }
+//    /** run routing and return a result envelope */
+//    public ResultEnvelope routeEnvelope() {
+//        boolean isochrone = pointSet.pointSet instanceof WebMercatorGridPointSet;
+//        route();
+//        return propagatedTimesStore.makeResults(pointSet.pointSet, clusterRequest.includeTimes, !isochrone, isochrone);
+//    }
 
     /**
      * This is the McRAPTOR state. It is an object, so there is a certain level of indirection, but note that all of

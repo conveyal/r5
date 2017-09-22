@@ -298,7 +298,7 @@ public class AddTripsTest {
         r.setOrigin(createdVertex);
         r.distanceLimitMeters = 500;
         // avoid a lot of spewing warnings about resource limiting
-        r.dominanceVariable = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+        r.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
         r.route();
 
         assertTrue(r.getReachedVertices().size() > 5);

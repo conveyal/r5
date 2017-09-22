@@ -8,8 +8,7 @@ import java.util.Set;
  * Modes of transport on ingress egress legs
  */
 public enum  LegMode {
-    WALK, BICYCLE,
-    CAR,
+    WALK, BICYCLE, CAR,
     //Renting a bicycle
     BICYCLE_RENT,
     //Park & Ride

@@ -30,7 +30,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -38,7 +37,14 @@ import java.util.StringJoiner;
 import java.util.function.IntConsumer;
 
 /**
- * A column store with parallel arrays is better than a struct simulation because:
+ * This stores all the characteristics of the edges in the street graph layer of the transport network.
+ * The naive way to do this is making one object per edge, and storing all those edges in one big list or in outgoing
+ * and incoming edge lists in each vertex. However, representing the street graph as an object graph has some
+ * disadvantages, including devoting a large amount of space to pointers, making serialization more complex, and
+ * possible memory locality effects on speed.
+ *
+ * Originally we considered using a library that would simulate compound value types (C structs). A column store with
+ * parallel arrays is better than a struct simulation because:
  * 1. it is less fancy, 2. it is auto-resizing (not fixed size), 3. I've tried both and they're the same speed.
  *
  * Edges come in pairs that have the same origin and destination vertices and the same geometries, but reversed.
@@ -55,7 +61,7 @@ import java.util.function.IntConsumer;
  * List of int arrays: 246MB serialized, 5.2 sec write, 6.3 sec read.
  * List of int arrays, full lists (not only intermediates): 261MB, 6.1 sec write, 6.2 sec read.
  * Indexes into single contiguous int array: 259MB, 5 sec write, 7.5 sec read.
- * Currently I am using the first option as it is both readable and efficient.
+ * We are using the first option as it is both readable and efficient.
  */
 public class EdgeStore implements Serializable {
 
@@ -92,28 +98,32 @@ public class EdgeStore implements Serializable {
     /** OSM ids of edges. One entry for each edge pair */
     public TLongList osmids;
 
-    /** Geometries. One entry for each edge pair */
-    public List<int[]> geometries; // intermediate points along the edge, other than the intersection endpoints
+    /**
+     * Geometries. One entry for each edge pair. These are packed lists of lat, lon, lat, lon... as fixed-point
+     * integers, and don't include the endpoints (i.e. don't include the intersection vertices, only intermediate points).
+     */
+    public List<int[]> geometries;
 
     /**
-     * The angle at the start of the edge geometry.
+     * The compass angle at the start of the edge geometry (binary radians clockwise from North).
      * Internal representation is -180 to +179 integer degrees mapped to -128 to +127 (brads)
      * One entry for each edge pair.
      */
     public TByteList inAngles;
 
     /**
-     * The angle at the end of the edge geometry
+     * The compass angle at the end of the edge geometry (binary radians clockwise from North).
      * Internal representation is -180 to +179 integer degrees mapped to -128 to +127 (brads)
      * One entry for each edge pair.
      */
     public TByteList outAngles;
 
-    /** When applying scenarios, we don't duplicate the entire set of edges and vertices. We extend them, treating
+    /**
+     * When applying scenarios, we don't duplicate the entire set of edges and vertices. We extend them, treating
      * the baseline graph as immutable. We have to be careful not to change or delete any elements of that baseline
      * graph which is shared between all threads. All edges at or above the index firstModifiableEdge can be modified,
      * all lower indexes should be treated as immutable.
-     * All edges from firstModifiableEdge up to nEdges() are temporary and are not in the spatial index.
+     * All edges from firstModifiableEdge up to nEdges() are temporary and are in a separate spatial index.
      * This field also serves as an indication that a scenario is being applied and this EdgeStore is a protective copy,
      * whenever firstModifiableEdge &gt; 0.
      */
@@ -128,28 +138,35 @@ public class EdgeStore implements Serializable {
     public TIntSet temporarilyDeletedEdges = null;
 
     /**
-     * There's one case where this method will fail: using Scenarios to create street networks from a blank slate,
-     * where there are no edges before the scenario is applied.
+     * This method will tell you whether a scenario has been applied to this EdgeStore, i.e. whether its lists have
+     * been extended. There's one case where this method will fail: using Scenarios to create street networks from a
+     * blank slate, where there are no edges before the scenario is applied.
      *
-     * @return true if this EdgeStore has already been extended,
-     * and can therefore be modified without affecting the baseline graph shared between all threads.
+     * @return true if this EdgeStore has already been extended, and can therefore be modified without affecting the
+     * baseline graph shared between all threads.
      */
     public boolean isExtendOnlyCopy() {
         return firstModifiableEdge > 0;
     }
 
-
     /** Turn restrictions for turning _out of_ each edge */
     public TIntIntMultimap turnRestrictions;
 
-    /** Turn restrictions for turning _in of_ each edge */
+    /** Turn restrictions for turning _into_ each edge */
     public TIntIntMultimap turnRestrictionsReverse;
 
+    /** The street layer of a transport network that the edges in this edgestore make up. */
     public StreetLayer layer;
 
+    /** As a convenience, the set of all edge flags that control which modes can traverse the edge */
     public static final transient EnumSet<EdgeFlag> PERMISSION_FLAGS = EnumSet
         .of(EdgeFlag.ALLOWS_PEDESTRIAN, EdgeFlag.ALLOWS_BIKE, EdgeFlag.ALLOWS_CAR);
 
+    /**
+     * When we create new edges, we must assign them OSM IDs. By convention user-generated OSM IDs not in the main
+     * OSM database are negative.
+     * FIXME it's weird to store a positive ID, increment it in a positive direction, but always negate it before using it.
+     */
     private long generatedOSMID = 1;
 
     public EdgeStore (VertexStore vertexStore, StreetLayer layer, int initialSize) {
@@ -182,7 +199,7 @@ public class EdgeStore implements Serializable {
         // Street categories.
         // FIXME some street categories are mutually exclusive and should not be flags, just narrow numbers.
         // Maybe reserve the first 4-5 bits (or a whole byte, and 16 bits for flags) for mutually exclusive edge types.
-        UNUSED (0),
+        UNUSED (0), // This flag is deprecated and currently unused. Use it for something new and interesting!
         BIKE_PATH (1),
         SIDEWALK (2),
         CROSSING (3),
@@ -196,7 +213,7 @@ public class EdgeStore implements Serializable {
         NO_THRU_TRAFFIC_BIKE (11),
         NO_THRU_TRAFFIC_CAR (12),
         SLOPE_OVERRIDE (13),
-        /** Link edge, two should not be traversed one-after-another */
+        /** Link edge, two should not be traversed one-after-another FIXME comment seems incorrect */
         LINK (14),
 
         // Permissions
@@ -456,7 +473,11 @@ public class EdgeStore implements Serializable {
             return speeds.get(edgeIndex);
         }
 
-        public float getSpeedMs() {
+        /**
+         * @return the car speed on this edge, taking live traffic updates into account if requested (though that's not
+         * yet implemented)
+         */
+        public float getCarSpeedMetersPerSecond() {
             return (float) ((speeds.get(edgeIndex) / 100.));
         }
 
@@ -522,24 +543,26 @@ public class EdgeStore implements Serializable {
          */
         public float calculateSpeed(ProfileRequest options, StreetMode traverseStreetMode) {
             if (traverseStreetMode == null) {
+                // Do we really want to do this? Why not just let the NPE happen if the parameter is missing?
                 return Float.NaN;
             } else if (traverseStreetMode == StreetMode.CAR) {
-                /*if (options.useTraffic) {
-                    //TODO: speed based on traffic information
-                }*/
-                return getSpeedMs();
+                // TODO: apply speed based on traffic information if switched on in the request
+                return getCarSpeedMetersPerSecond();
             }
-            return options.getSpeed(traverseStreetMode);
+            return options.getSpeedForMode(traverseStreetMode);
         }
 
-        public StreetRouter.State traverse (StreetRouter.State s0, StreetMode streetMode, ProfileRequest req, TurnCostCalculator turnCostCalculator) {
-            int vertex;
+        public StreetRouter.State traverse (StreetRouter.State s0, StreetMode streetMode, ProfileRequest req,
+                                            TurnCostCalculator turnCostCalculator) {
 
+            // The vertex we'll be at after the traversal
+            int vertex;
             if (req.reverseSearch) {
                 vertex = getFromVertex();
             } else {
                 vertex = getToVertex();
             }
+
             StreetRouter.State s1 = new StreetRouter.State(vertex, edgeIndex, s0);
             float speedms = calculateSpeed(req, streetMode);
             float time = (float) (getLengthM() / speedms);

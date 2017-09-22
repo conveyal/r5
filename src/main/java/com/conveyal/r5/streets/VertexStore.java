@@ -175,6 +175,8 @@ public class VertexStore implements Serializable {
         PARK_AND_RIDE(1),
         BIKE_SHARING(2);
 
+        // TODO Add Stop and split vertex flags. This allows blocking U-turns at splits and eliminating the special stop finder visitor
+
         /** In each enum value this field should contain an integer with only a single bit switched on. */
         public final int flag;
 

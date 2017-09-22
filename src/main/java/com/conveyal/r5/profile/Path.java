@@ -10,9 +10,10 @@ import org.slf4j.LoggerFactory;
 import java.util.Arrays;
 
 /**
- * Class used to represent paths in Browsochrones.
+ * Class used to represent transit paths in Browsochrones and Modeify.
  */
 public class Path {
+
     private static final Logger LOG = LoggerFactory.getLogger(Path.class);
 
     public int[] patterns;
@@ -24,6 +25,9 @@ public class Path {
     public int[] alightStopPositions;
     public final int length;
 
+    /**
+     * Scan over a raptor state and extract the path leading up to that state.
+     */
     public Path(RaptorState state, int stop) {
         // trace the path back from this RaptorState
         int previousPattern;
@@ -82,6 +86,9 @@ public class Path {
             LOG.error("Transit path computed without a transit segment!");
     }
 
+    /**
+     * Scan over a mcraptor state and extract the path leading up to that state.
+     */
     public Path(McRaptorSuboptimalPathProfileRouter.McRaptorState s) {
         TIntList patterns = new TIntArrayList();
         TIntList boardStops = new TIntArrayList();
@@ -127,6 +134,9 @@ public class Path {
         if (this.patterns.length == 0)
             LOG.error("Transit path computed without a transit segment!");
     }
+
+    // FIXME we are using a map with unorthodox definitions of hashcode and equals to make them serve as map keys.
+    // We should instead wrap Path or copy the relevant fields into a PatternSequenceKey class.
 
     public int hashCode() {
         return Arrays.hashCode(patterns);

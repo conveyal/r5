@@ -1,13 +1,13 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.api.util.Itinerary;
 import com.conveyal.r5.api.util.Stats;
 
 import java.util.Collection;
 import java.util.stream.IntStream;
 
 /**
- * Created by matthewc on 4/4/17.
+ * This is used in Modeify. "Stats" summarize the travel time for a set of similar paths, giving the minimum,
+ * maximum, and average travel and wait over all those paths, over a whole departure time window.
  */
 public class StatsCalculator {
     /**
@@ -23,7 +23,7 @@ public class StatsCalculator {
 
         for (int start = req.fromTime; start < req.toTime; start += 60) {
             // TODO should board slack be applied at the origin stop? Is this done in RaptorWorker?
-            int timeAtOriginStop = start + accessTime + RaptorWorker.BOARD_SLACK_SECONDS;
+            int timeAtOriginStop = start + accessTime + FastRaptorWorker.BOARD_SLACK_SECONDS;
             int bestTimeAtDestinationStop = Integer.MAX_VALUE;
 
             PathWithTimes.Itinerary bestItinerary = null;

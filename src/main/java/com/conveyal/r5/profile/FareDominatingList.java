@@ -1,13 +1,13 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.analyst.fare.GreedyFareCalculator;
 
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 
 /**
- * A dominating list, pareto on time and fare.
+ * An implementation of DominatingList, retaining pareto-optimal paths on time and fare.
  */
 public class FareDominatingList implements DominatingList {
     private GreedyFareCalculator fareCalculator;

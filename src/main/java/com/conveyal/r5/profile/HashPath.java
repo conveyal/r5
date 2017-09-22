@@ -3,12 +3,13 @@ package com.conveyal.r5.profile;
 import java.util.Arrays;
 
 /**
- * A wrapper around a Path that redefines the hash code and equals functions.
- * The functions are changed to compare only the boardStops and alightStops of the Path.
- * This is used to group paths by their combination of boardStops and alightStops in the response.
+ * Different equals and hashCode function then Path
+ *
+ * It compares only boardStops and alightStops of provided Path in equals and hashCode
+ * It is used to see which boardStop alightStop combination already exists in response so that
+ * each combination is inserted only once
  */
 public class HashPath  {
-
     final public Path path;
 
     public HashPath(Path path) {
@@ -22,8 +23,7 @@ public class HashPath  {
         if (o == null || getClass() != o.getClass())
             return false;
         HashPath hashPath = (HashPath) o;
-        return this == hashPath || Arrays.equals(path.boardStops, hashPath.path.boardStops)
-                && Arrays.equals(path.alightStops, hashPath.path.alightStops);
+        return this == hashPath || Arrays.equals(path.boardStops, hashPath.path.boardStops) && Arrays.equals(path.alightStops, hashPath.path.alightStops);
     }
 
     @Override

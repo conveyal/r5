@@ -11,7 +11,6 @@ import java.io.Serializable;
 
 /**
  * Information about P+R parking lots
- * TODO rename me
  */
 public class ParkRideParking implements Serializable {
     private static final Logger LOG = LoggerFactory.getLogger(ParkRideParking.class);

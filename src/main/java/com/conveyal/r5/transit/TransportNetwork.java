@@ -2,6 +2,7 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.osmlib.OSM;
+import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.analyst.scenario.Scenario;
@@ -10,13 +11,12 @@ import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.util.ExpandingMMFBytez;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
-import com.conveyal.r5.analyst.fare.GreedyFareCalculator;
+import com.conveyal.r5.profile.GreedyFareCalculator;
 import com.conveyal.r5.profile.StreetMode;
 import com.google.common.io.Files;
 import com.vividsolutions.jts.geom.Envelope;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
-import org.mapdb.Fun;
 import org.nustaq.serialization.FSTObjectInput;
 import org.nustaq.serialization.FSTObjectOutput;
 import org.slf4j.Logger;
@@ -93,18 +93,6 @@ public class TransportNetwork implements Serializable {
         if (result.fareCalculator != null) {
             result.fareCalculator.transitLayer = result.transitLayer;
         }
-
-        // we need to put the linked grid pointset back in the linkage cache, as the contents of the linkage cache
-        // are not saved by Guava. This accelerates the time to first result after a prebuilt network has been loaded
-        // to just a few seconds even in the largest regions. However, currently only the linkage for walking is saved,
-        // so there will still be a long pause at the first request for driving or cycling.
-        // TODO just use a map for linkages? There should never be more than a handful per pointset, one for each mode.
-        // and the pointsets themselves are in a cache, although it does not currently have an eviction method.
-        if (result.gridPointSet != null && result.linkedGridPointSet != null) {
-            result.gridPointSet.linkageCache
-                    .put(new Fun.Tuple2<>(result.streetLayer, result.linkedGridPointSet.streetMode), result.linkedGridPointSet);
-        }
-
         result.rebuildTransientIndexes();
         return result;
     }
@@ -189,7 +177,7 @@ public class TransportNetwork implements Serializable {
         streetLayer.indexStreets();
 
         if (tnBuilderConfig.bikeRentalFile != null) {
-            streetLayer.associateBikeSharing(tnBuilderConfig);
+            streetLayer.associateBikeSharing(tnBuilderConfig, 500);
         }
 
         // Load transit data TODO remove need to supply street layer at this stage

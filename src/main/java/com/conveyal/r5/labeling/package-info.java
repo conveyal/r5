@@ -1,4 +1,4 @@
 /**
- * Labelers set flags or characteristics of network links based on tags in the OSM data they are built from.
+ * Contains code to label OSM data.
  */
 package com.conveyal.r5.labeling;

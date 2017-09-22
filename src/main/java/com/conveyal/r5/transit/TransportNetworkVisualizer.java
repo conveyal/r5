@@ -73,7 +73,7 @@ public class TransportNetworkVisualizer {
         server.getServerConfiguration().addHttpHandler(new CLStaticHttpHandler(ClassLoader.getSystemClassLoader(), "/visualization/"));
         try {
             server.start();
-            LOG.info("Network visualizer server running.");
+            LOG.info("VEX server running.");
             Thread.currentThread().join();
         } catch (BindException be) {
             LOG.error("Cannot bind to port {}. Is it already in use?", PORT);

@@ -11,8 +11,7 @@ import org.slf4j.LoggerFactory;
 import java.util.LinkedList;
 
 /**
- * This class materializes a whole street router path at once by unwinding the states from last to first into a list,
- * just to facilitate random access.
+ * Unwinds states from last to first into a list so they can be accessed more easily
  *
  * Created by mabu on 24.12.2015.
  */
@@ -28,7 +27,8 @@ public class StreetPath {
     private int distance;
     private int duration;
 
-    public StreetPath(StreetRouter.State s, TransportNetwork transportNetwork, boolean reverseSearch) {
+    public StreetPath(StreetRouter.State s, TransportNetwork transportNetwork,
+        boolean reverseSearch) {
         edges = new LinkedList<>();
         states = new LinkedList<>();
         this.transportNetwork = transportNetwork;
@@ -56,11 +56,9 @@ public class StreetPath {
     }
 
     /**
-     * Concatenates paths through the street network which consist of multiple parts, produced by multiple searches
-     * performed one after another, usually on different modes (as in bike sharing and P+R). We follow the chain of
-     * states backward to reconstruct the path, then follow the chain of streetRouters back to continue unrolling
-     * the path in the previous streetRouters.
+     * Creates Streetpaths which consists of multiple parts
      *
+     * Like in Bike sharing and P+R
      * @param lastState last state of last streetrouter (walking from bike station or from P+R parking) this is destination
      * @param streetRouter last streetRouter (previus routers are read from previous variable)
      * @param mode BICYCLE_RENT is the only supported currently
@@ -128,30 +126,11 @@ public class StreetPath {
     }
 
     /**
-     * Unrolls a path by following back pointers from the final state, adding the unrolled states to the beginning
-     * of the existing path in this StreetPath.
+     * Adds streetpath of this state to existing
      *
-     * P+R is actually only one search from origin point to all reachable P+R lots. The transit stops connected to
-     * those lots are then looked up directly without another street search.
-     *
-     * StreetRouter allows setting a single start point, or setting multiple existing start states.
-     * The updateDistanceTime parameter is for bike shares and park+rides, which function differently than single-mode
-     * searches.
-     * P+R functions differently than bikeshare in that the final connection from the P+R lot to the transit stations
-     * is pre-calculated and not done with a street router.
-     *
-     * When you do a bike share search, you actually run three street searches in sequence, one for walking to the
-     * bike station, one for riding, and another for walking to transit. Each street search is initialized with the
-     * states from the previous stage, including distance and time. So final states at transit stations have correct
-     * distance and time in this case.
-     *
-     * For P+R the P+R router is initialized with the states at the P+R lots, which were found with the street router.
-     * But this router doesn't traverse the
-     * Analysis pull request uses this.
-     *
-     * NB this class is only being used to unroll the paths at the end after they're already found and identified as
-     * interesting paths. When the search starts at the transit stops, they must already.
-     * Why don't we return states from that P+R router, instead of just returning times.
+     * it adds all the new states before existing ones. Since path is reconstructed from end to start
+     * @param lastState
+     * @param updateDistanceTime
      */
     public void add(StreetRouter.State lastState, boolean updateDistanceTime) {
         boolean first = true;

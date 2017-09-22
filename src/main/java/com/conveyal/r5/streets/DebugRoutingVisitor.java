@@ -6,8 +6,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Callbacks for debugging street routing.
- * It accumulates all the steps in routing as GeoJSON.
+ * Visitor for debugging purpose
+ *
+ * It outputs full state graph in plan debugger
  * Created by mabu on 10.12.2015.
  */
 public class DebugRoutingVisitor implements RoutingVisitor {

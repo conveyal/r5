@@ -1,14 +1,18 @@
 package com.conveyal.r5.analyst.broker;
 
-import com.conveyal.r5.analyst.cluster.AnalysisTask;
+import gnu.trove.iterator.TIntLongIterator;
+import gnu.trove.map.TIntLongMap;
 import gnu.trove.map.TIntObjectMap;
+import gnu.trove.map.hash.TIntLongHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
 import gnu.trove.set.TIntSet;
 import gnu.trove.set.hash.TIntHashSet;
+import com.conveyal.r5.analyst.cluster.GenericClusterRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayDeque;
+import java.util.List;
 import java.util.Queue;
 
 /**
@@ -39,10 +43,10 @@ public class Job {
      * Tasks in this job that have yet to be delivered, or that will be re-delivered due to completion timeout.
      * Maybe this should only be a list of IDs.
      */
-    Queue<AnalysisTask> tasksAwaitingDelivery = new ArrayDeque<>();
+    Queue<GenericClusterRequest> tasksAwaitingDelivery = new ArrayDeque<>();
 
     /* The tasks in this job keyed on their task ID. */
-    TIntObjectMap<AnalysisTask> tasksById = new TIntObjectHashMap<>();
+    TIntObjectMap<GenericClusterRequest> tasksById = new TIntObjectHashMap<>();
 
     /* The last time tasks were delivered to a worker. Enables a quiet period between delivery and re-delivery. */
     long lastDeliveryTime = 0;
@@ -58,7 +62,7 @@ public class Job {
     }
 
     /** Adds a task to this Job, assigning it a task ID number. */
-    public void addTask (AnalysisTask task) {
+    public void addTask (GenericClusterRequest task) {
         tasksById.put(task.taskId, task);
         tasksAwaitingDelivery.add(task);
     }
@@ -97,7 +101,7 @@ public class Job {
     }
 
     public boolean containsTask (int taskId) {
-        AnalysisTask req = tasksById.get(taskId);
+        GenericClusterRequest req = tasksById.get(taskId);
         if (req != null) {
             if (!req.jobId.equals(this.jobId)) {
                 LOG.error("Task {} has a job ID that does not match the job in which it was discovered.");

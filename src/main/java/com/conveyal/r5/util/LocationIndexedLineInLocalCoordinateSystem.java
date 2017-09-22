@@ -9,11 +9,7 @@ import com.vividsolutions.jts.linearref.LocationIndexedLine;
 import java.util.stream.Stream;
 
 /**
- * Wraps a location indexed line so that the supplied operations (project, extractPoint, etc.) correctly account
- * for lines of longitude getting closer together toward the poles, even though the locationIndexedLine is still
- * constructed using geographic (unprojected) coordinates.
- *
- * It just projects the coordinates when the object is constructed, and de-projects them when you get a result out.
+ * Wraps a location indexed line in a local coordinate system, so that snapping works right.
  */
 public class LocationIndexedLineInLocalCoordinateSystem {
 

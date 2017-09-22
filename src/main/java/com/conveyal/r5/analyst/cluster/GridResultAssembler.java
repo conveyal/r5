@@ -63,7 +63,7 @@ public class GridResultAssembler {
 
     private Base64.Decoder base64 = Base64.getDecoder();
 
-    public final AnalysisTask request;
+    private final GridRequest request;
 
     private File temporaryFile;
     private RandomAccessFile buffer;
@@ -82,19 +82,19 @@ public class GridResultAssembler {
 
     public int nTotal;
 
-    public final String outputBucket;
+    private final String outputBucket;
 
-    /** Number of iterations for this grid task */
+    /** Number of iterations for this grid request */
     private int nIterations;
 
-    public GridResultAssembler (AnalysisTask request, String outputBucket) {
+    public GridResultAssembler (GridRequest request, String outputBucket) {
         this.request = request;
         this.outputBucket = outputBucket;
         nTotal = request.width * request.height;
         originsReceived = new BitSet(nTotal);
     }
 
-    protected synchronized void finish () {
+    private synchronized void finish () {
         // gzip and push up to S3
         LOG.info("Finished receiving data for regional analysis {}, uploading to S3", request.jobId);
 
@@ -134,7 +134,7 @@ public class GridResultAssembler {
             ByteArrayInputStream bais = new ByteArrayInputStream(body);
             Origin origin = Origin.read(bais);
 
-            // if this is not the first task, make sure that we have the correct number of accessibility
+            // if this is not the first request, make sure that we have the correct number of accessibility
             // samples (either instantaneous accessibility values or bootstrap replications of accessibility given median
             // travel time, depending on worker version)
             if (buffer != null && origin.samples.length != this.nIterations) {

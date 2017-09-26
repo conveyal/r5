@@ -164,9 +164,11 @@ public class LinkedPointSet implements Serializable {
         if (superGrid.zoom != subGrid.zoom) {
             throw new IllegalArgumentException("Source and sub-grid zoom level do not match.");
         }
-        if (superGrid.west > subGrid.west || superGrid.west + superGrid.width < subGrid.west + subGrid.width ||
-            superGrid.north > subGrid.north || superGrid.north + superGrid.height < subGrid.north + subGrid.height) {
-            throw new IllegalArgumentException("Sub-grid must lie fully inside the super-grid.");
+        if (subGrid.west + subGrid.width < superGrid.west //sub-grid is entirely west of super-grid
+                || superGrid.west + superGrid.width < subGrid.west // super-grid is entirely west of sub-grid
+                || subGrid.north + subGrid.height < superGrid.north //sub-grid is entirely north of super-grid (note Web Mercator conventions)
+                || superGrid.north + superGrid.height < subGrid.north ) { //super-grid is entirely north of sub-grid
+            LOG.warn("Sub-grid is entirely outside the super-grid.  Points will not be linked to any street edges.");
         }
 
         // Initialize the fields of the new LinkedPointSet instance
@@ -185,10 +187,17 @@ public class LinkedPointSet implements Serializable {
             for (int x = 0; x < subGrid.width; x++, pixel++) {
                 int sourceColumn = subGrid.west + x - superGrid.west;
                 int sourceRow = subGrid.north + y - superGrid.north;
-                int sourcePixel = sourceRow * superGrid.width + sourceColumn;
-                edges[pixel] = sourceLinkage.edges[sourcePixel];
-                distances0_mm[pixel] = sourceLinkage.distances0_mm[sourcePixel];
-                distances1_mm[pixel] = sourceLinkage.distances1_mm[sourcePixel];
+                if (sourceColumn < 0 || sourceColumn >= superGrid.width || sourceRow < 0 || sourceRow >= superGrid.height){ //point is outside super-grid
+                    edges[pixel] = -1; //set the edge value to -1 to indicate no linkage.
+                    distances0_mm[pixel] = MAX_OFFSTREET_WALK_METERS;
+                    distances1_mm[pixel] = MAX_OFFSTREET_WALK_METERS;
+                } else { //point is inside super-grid
+                    int sourcePixel = sourceRow * superGrid.width + sourceColumn;
+                    LOG.info(Integer.toString(sourcePixel));
+                    edges[pixel] = sourceLinkage.edges[sourcePixel];
+                    distances0_mm[pixel] = sourceLinkage.distances0_mm[sourcePixel];
+                    distances1_mm[pixel] = sourceLinkage.distances1_mm[sourcePixel];
+                }
             }
         }
 

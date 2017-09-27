@@ -188,9 +188,9 @@ public class LinkedPointSet implements Serializable {
                 int sourceColumn = subGrid.west + x - superGrid.west;
                 int sourceRow = subGrid.north + y - superGrid.north;
                 if (sourceColumn < 0 || sourceColumn >= superGrid.width || sourceRow < 0 || sourceRow >= superGrid.height) { //point is outside super-grid
-                    edges[pixel] = -1; //set the edge value to -1 to indicate no linkage.
-                    distances0_mm[pixel] = MAX_OFFSTREET_WALK_METERS;
-                    distances1_mm[pixel] = MAX_OFFSTREET_WALK_METERS;
+                    //Set the edge value to -1 to indicate no linkage.
+                    //Distances should never be read downstream, so they don't need to be set here.
+                    edges[pixel] = -1;
                 } else { //point is inside super-grid
                     int sourcePixel = sourceRow * superGrid.width + sourceColumn;
                     edges[pixel] = sourceLinkage.edges[sourcePixel];

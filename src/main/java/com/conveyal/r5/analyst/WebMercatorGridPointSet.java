@@ -60,10 +60,10 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         // TODO don't copy, just have a cache that lazy loads and crops from base pointset
         if (base != null) {
             base.linkageCache.asMap().forEach((key, baseLinkage) -> {
-                // TODO handle the case where the new grid is not completely contained by the base grid.
-                // Since this generally will happen when there are points beyond the transit network, just leaving the points
-                // that are not contained by the base linkage unlinked (and logging a warning, or perhaps even returning a
-                // warning to the UI) should be completely sufficient as you will not be able to reach these locations anyhow.
+                // LinkedPointSet now handles the case where the new grid is not completely contained by the base grid.
+                // Since this generally happens when there are points beyond the transit network's extents, marking the points
+                // that are not contained by the base linkage as unlinked (and logging a warning if all points are beyond
+                // the network) is sufficient as you will not be able to reach these locations anyhow.
                 LinkedPointSet croppedLinkage = new LinkedPointSet(baseLinkage, this);
                 this.linkageCache.put(key, croppedLinkage);
             });

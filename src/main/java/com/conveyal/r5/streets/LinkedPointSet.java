@@ -193,7 +193,6 @@ public class LinkedPointSet implements Serializable {
                     distances1_mm[pixel] = MAX_OFFSTREET_WALK_METERS;
                 } else { //point is inside super-grid
                     int sourcePixel = sourceRow * superGrid.width + sourceColumn;
-                    LOG.info(Integer.toString(sourcePixel));
                     edges[pixel] = sourceLinkage.edges[sourcePixel];
                     distances0_mm[pixel] = sourceLinkage.distances0_mm[sourcePixel];
                     distances1_mm[pixel] = sourceLinkage.distances1_mm[sourcePixel];

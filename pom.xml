@@ -225,6 +225,27 @@
           </execution>
         </executions>
       </plugin>
+
+      <!-- This plugin generates code coverage reports during the test phase of maven. -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.7.9</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>test</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 
@@ -385,11 +406,25 @@
       <artifactId>aws-java-sdk-sqs</artifactId>
       <version>1.11.18</version>
     </dependency>
+    <!-- Rest Assured is an assertion library that makes testing web apis easy. -->
+    <dependency>
+      <groupId>io.rest-assured</groupId>
+      <artifactId>rest-assured</artifactId>
+      <version>3.0.3</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- JUnit is a java testing framework. -->
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>4.12</version>
       <scope>test</scope>
+    </dependency>
+    <!-- Hamcrest is an assertion library that prints pretty messages when assertions fail -->
+    <dependency>
+      <groupId>org.hamcrest</groupId>
+      <artifactId>java-hamcrest</artifactId>
+      <version>2.0.0.0</version>
     </dependency>
     <dependency>
       <groupId>com.graphql-java</groupId>

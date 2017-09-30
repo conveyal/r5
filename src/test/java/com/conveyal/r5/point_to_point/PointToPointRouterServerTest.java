@@ -2,6 +2,7 @@ package com.conveyal.r5.point_to_point;
 
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.ReadContext;
+import net.minidev.json.JSONArray;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -9,12 +10,14 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.List;
+import java.util.LinkedHashMap;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.number.OrderingComparison.greaterThan;
+import static org.hamcrest.number.OrderingComparison.greaterThanOrEqualTo;
 
 public class PointToPointRouterServerTest {
     private static final String resourcesDir = "./src/test/resources/com/conveyal/r5/point_to_point";
@@ -78,20 +81,75 @@ public class PointToPointRouterServerTest {
             .get("/reachedStops")
             .asString();
 
+        // we need to use JSONPath here, because it's impossible to search for an object at
+        // any position in an array with rest-assured's version of JSONPath.
         ReadContext ctx = JsonPath.parse(response);
 
+        // expect a certain amount of reached stops
         assertThat(ctx.read("$.data.features.length()"), equalTo(33));
 
         // Search for the stop of Union Hospital
-        String stopPrefix = "$.data.features.[?(@.properties.name=='Union Hospital')]";
+        JSONArray foundStops = ctx.read("$.data.features.[?(@.properties.name=='Union Hospital')]");
+        assertThat(foundStops.size(), equalTo(1));
+        LinkedHashMap unionHospitalStop = (LinkedHashMap) foundStops.get(0);
 
-        // the indexed selector at the end in the following line is actually getting the first result in the above query
-        // therefore I write two selectors.  Weird quirk of jsonpath.
-        List<Double> latCoords = ctx.read(stopPrefix + ".geometry.coordinates[0]");
-        List<Double> lonCoords = ctx.read(stopPrefix + ".geometry.coordinates[1]");
+        // assert position of stop
+        JSONArray coordinates = (JSONArray) ((LinkedHashMap)unionHospitalStop.get("geometry")).get("coordinates");
+        assertThat(coordinates.get(0), equalTo(-87.40889));
+        assertThat(coordinates.get(1), equalTo(39.48484));
 
-        assertThat(latCoords.get(0), equalTo(-87.40889));
-        assertThat(lonCoords.get(0), equalTo(39.48484));
+        // assert properties of stop
+        LinkedHashMap properties = (LinkedHashMap) unionHospitalStop.get("properties");
+        assertThat(properties.get("distance_m"), equalTo(2284));
+        assertThat(properties.get("duration_s"), equalTo(1768));
+    }
+
+    /**
+     * Assert that reached bike shares route works
+     */
+    @Test
+    public void plan() {
+        String response = given()
+            .port(8080)
+            .queryParam("mode", "WALK")
+            .queryParam("fromLat", 39.465659)
+            .queryParam("fromLon", -87.410839)
+            .queryParam("toLat", 39.485515)
+            .queryParam("toLon", -87.384223)
+            .get("/plan")
+            .asString();
+
+        // we need to use JSONPath here, because we need to extract the data and dynamically compare features
+        // any position in an array with rest-assured's version of JSONPath.
+        ReadContext ctx = JsonPath.parse(response);
+
+        // get all polylines
+        JSONArray polylines = ctx.read("$.data.features");
+
+        // expect at least 1 polyline, likely many more
+        int numPolylines = polylines.size();
+        assertThat(numPolylines, greaterThan(0));
+
+
+        // expect an exact position of the first and last polylines
+        LinkedHashMap firstPolyline = (LinkedHashMap) polylines.get(0);
+        JSONArray firstPolylineCoordinates = (JSONArray)((LinkedHashMap)firstPolyline.get("geometry")).get("coordinates");
+        JSONArray firstPolylineFirstCoordinate = (JSONArray)firstPolylineCoordinates.get(0);
+        assertThat(firstPolylineFirstCoordinate.get(0), equalTo(-87.4099729));
+        assertThat(firstPolylineFirstCoordinate.get(1), equalTo(39.4654342));
+        LinkedHashMap lastPolyline = (LinkedHashMap) polylines.get(numPolylines - 1);
+        JSONArray lastPolylineCoordinates = (JSONArray)((LinkedHashMap)lastPolyline.get("geometry")).get("coordinates");
+        JSONArray lastPolylineLastCoordinate = (JSONArray)lastPolylineCoordinates.get(lastPolylineCoordinates.size() - 1);
+        assertThat(lastPolylineLastCoordinate.get(0), equalTo(-87.3837375));
+        assertThat(lastPolylineLastCoordinate.get(1), equalTo(39.4858394));
+
+        // expect each polyline to have a distance greater than the last
+        int curDistance = 0;
+        for (int i = 0; i < numPolylines; i++) {
+            int curPolylineDistance = (int)((LinkedHashMap)((LinkedHashMap)polylines.get(i)).get("properties")).get("distance");
+            assertThat(curPolylineDistance, greaterThanOrEqualTo(curDistance));
+            curDistance = curPolylineDistance;
+        }
     }
 
     /**

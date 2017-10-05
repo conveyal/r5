@@ -61,6 +61,10 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
             // Int divide will floor; this is correct because value 0 has travel times of up to one minute, etc.
             // This means that anything less than a cutoff of (say) 60 minutes (in seconds) will have value 59,
             // which is what we want. But maybe this is tying the backend and frontend too closely.
+            if (offset >= times.length){
+                LOG.warn("Requested offset too high, returning maximum time");
+                offset = times.length - 1;
+            }
             results[i] = times[offset] == FastRaptorWorker.UNREACHED ? FastRaptorWorker.UNREACHED : times[offset] / 60;
         }
 

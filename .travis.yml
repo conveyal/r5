@@ -36,8 +36,6 @@ env:
   - secure: dw6bS2P1iaoUaJKo18EtfwpycfcjDWbo7uhUegrA5CGUXnk5o3D7j0yz9uNwvxUByOWq8qRWoz/Y6rUC6cwrV596O/H3mk8Z+YU8kYHUptBJOSch3NtpyBFdc8ry4tV7qtW4Fg4WAcZWzGyT7KiKA532vXLWweHKKv/YqxscLneSgchBOCT2DnG0+mvDoQ+TB8kODo4AjSaSpciIhpq0EqagrJppRUW0DL2m8MYOmqjnMURaPkPqv4XRIdRDQH0d1CUgNDOM4l3ZrCTRFdZHOeryiLujLLtiTF1K7d1bFC6kS7WVEdqLJzOs2NGwVS8s/4dgc4GVHOwx8SJLor3sfzduh4Jk1YT46SMBHwwP3K4vsAIaw2NOu0ewjufC/LH1ZjfBeouS5sx7R4cCcPsEJr0hmg1jgFtTOIJrvINNl936eMLAG4maICXveGOrWmKflFKL8EiaO5E3p1NRCJkL/Yt27BL+kNz5GLByIfLS+CqsSBySG3WM5QrUw2EKpjWE6gqRml7o0c1Jmn+9yDLQhWtJ0JLN7Y3pP4HDtBgCO1WgN/0YAWdCc0e968gY9NeSm1SYZkUmpkWSMYb88kpjjQRW6BlDh1O+jnYa66o1GgmpI2XoBc6edDLg998nKzsbGFCuiwkLPO+Ccqk3vAlED0ZpoDt44cUn4Pl9ZBcpFe0=
 
 after_success:
-  # Upload coverage reports to codecov.io
-  - env -i bash <(curl -s https://codecov.io/bash)
   # Upload shaded JAR to S3. The un-shaded jar was deployed to our Maven repo during the main build.
   # Ideally we'd use the Travis S3 deployer here instead of installing the AWS CLI software every time.
   # See the analyst-server travis.yml for how to copy specific files to a subdirectory and deploy those.
@@ -51,6 +49,17 @@ after_success:
   # builds: one for the tag and one for the commit to the branch.
   - JAVADOC_TARGET=${TRAVIS_TAG:-$TRAVIS_BRANCH}
   - if [[ "$TRAVIS_PULL_REQUEST" = false ]]; then mvn javadoc:javadoc; aws s3 cp --cache-control max-age=300 --recursive /home/travis/build/conveyal/r5/target/site/apidocs s3://javadoc.conveyal.com/r5/${TRAVIS_BRANCH}/; fi
+  # unset sensitive environment variables
+  - unset encrypted_e5d28768eb0e_key
+  - unset encrypted_e5d28768eb0e_iv
+  - unset OSSRH_JIRA_USERNAME
+  - unset OSSRH_JIRA_PASSWORD
+  - unset GPG_KEY_NAME
+  - unset GPG_PASSPHRASE
+  - unset AWS_ACCESS_KEY_ID
+  - unset AWS_SECRET_ACCESS_KEY
+  # Upload coverage reports to codecov.io
+  - bash <(curl -s https://codecov.io/bash)
 
 sudo: true # sudo: true gets us more memory, which we need, at the expense of slower builds
 

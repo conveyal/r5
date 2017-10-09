@@ -37,7 +37,7 @@ env:
 
 after_success:
   # Upload coverage reports to codecov.io
-  - bash <(curl -s https://codecov.io/bash)
+  - env -i bash <(curl -s https://codecov.io/bash)
   # Upload shaded JAR to S3. The un-shaded jar was deployed to our Maven repo during the main build.
   # Ideally we'd use the Travis S3 deployer here instead of installing the AWS CLI software every time.
   # See the analyst-server travis.yml for how to copy specific files to a subdirectory and deploy those.

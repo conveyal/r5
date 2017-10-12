@@ -59,7 +59,7 @@ public class PointToPointRouterServerTest {
      * Assert that metadata route works
      */
     @Test
-    public void metadata() {
+    public void canFetchMetadata() {
         given()
             .port(8080)
             .get("/metadata")
@@ -72,7 +72,7 @@ public class PointToPointRouterServerTest {
      * Assert that reached stops route works
      */
     @Test
-    public void reachedStops() {
+    public void canFetchReachedStops() {
         String response = given()
             .port(8080)
             .queryParam("mode", "WALK")
@@ -105,10 +105,10 @@ public class PointToPointRouterServerTest {
     }
 
     /**
-     * Assert that reached bike shares route works
+     * Assert that a trip plan with walking can be dones
      */
     @Test
-    public void plan() {
+    public void canPlanWalkTrip() {
         String response = given()
             .port(8080)
             .queryParam("mode", "WALK")
@@ -150,6 +150,247 @@ public class PointToPointRouterServerTest {
             assertThat(curPolylineDistance, greaterThanOrEqualTo(curDistance));
             curDistance = curPolylineDistance;
         }
+    }
+
+    /**
+     * Assert that a trip plan with walking can be dones
+     */
+    @Test
+    public void canMakeOTPGraphQLQuery() {
+        String response = given()
+            .port(8080)
+            .body(makeGraphQLQuery())
+            .post("/otp/routers/default/index/graphql")
+            .asString();
+
+        // assertThat(response, equalTo("Hi"));
+        // we need to use JSONPath here, because we need to extract the data and dynamically compare features
+        // any position in an array with rest-assured's version of JSONPath.
+        ReadContext ctx = JsonPath.parse(response);
+    }
+
+    /**
+     * Make a GraphQL query to use in the body of a post request to /otp/routers/default/index/graphql
+     */
+    private String makeGraphQLQuery() {
+        String accessModes = "WALK,BICYCLE,BICYCLE_RENT,CAR_PARK";
+        String bikeSpeed = "8";
+        String bikeTrafficStress = "4";
+        String directModes = "CAR,WALK,BICYCLE,BICYCLE_RENT";
+        String egressModes = "WALK";
+        String fromLat = "39.465659";
+        String fromLon = "-87.410839";
+        String fromTime = "2017-09-18T12:00:00.000Z";
+        String toLat = "39.4767";
+        String toLon = "-87.4052";
+        String toTime = "2017-09-18T14:00:00.000Z";
+        String transitModes = "BUS,RAIL,SUBWAY,TRAM";
+        String walkSpeed = "3";
+
+        return "{" +
+            "  \"query\": \"query requestPlan(\\n" +
+            "    $fromLat: Float!, \\n" +
+            "    $fromLon: Float!, \\n" +
+            "    $toLat: Float!, \\n" +
+            "    $toLon: Float!, \\n" +
+            "    $fromTime: ZonedDateTime!, \\n" +
+            "    $toTime: ZonedDateTime!, \\n" +
+            "    $bikeSpeed:Float!, \\n" +
+            "    $walkSpeed:Float!\\n" +
+            "  ) {\\n" +
+            "    plan(\\n" +
+            "      minBikeTime: 1, \\n" +
+            "      bikeTrafficStress: " + bikeTrafficStress + ", \\n" +
+            "      fromLat: $fromLat, \\n" +
+            "      fromLon: $fromLon, \\n" +
+            "      toLat: $toLat, \\n" +
+            "      toLon: $toLon, \\n" +
+            "      fromTime: $fromTime, \\n" +
+            "      toTime: $toTime, \\n" +
+            "      directModes: [" + directModes + "], \\n" +
+            "      accessModes: [" + accessModes + "], \\n" +
+            "      egressModes: [" + egressModes + "], \\n" +
+            "      transitModes: [" + transitModes + "], \\n" +
+            "      bikeSpeed: $bikeSpeed, \\n" +
+            "      walkSpeed: $walkSpeed\\n" +
+            "    ) {\\n" +
+            "      patterns {\\n" +
+            "        tripPatternIdx\\n" +
+            "        routeId\\n" +
+            "        routeIdx\\n" +
+            "        directionId\\n" +
+            "        stops {\\n" +
+            "          stopId\\n" +
+            "          name\\n" +
+            "          lat\\n" +
+            "          lon\\n" +
+            "        }\\n" +
+            "        trips {\\n" +
+            "          tripId\\n" +
+            "          serviceId\\n" +
+            "          bikesAllowed\\n" +
+            "        }\\n" +
+            "      }\\n" +
+            "      options {\\n" +
+            "        summary\\n" +
+            "        itinerary {\\n" +
+            "          waitingTime\\n" +
+            "          walkTime\\n" +
+            "          distance\\n" +
+            "          transfers\\n" +
+            "          duration\\n" +
+            "          transitTime\\n" +
+            "          startTime\\n" +
+            "          endTime\\n" +
+            "          connection {\\n" +
+            "            access\\n" +
+            "            egress\\n" +
+            "            transit {\\n" +
+            "              pattern\\n" +
+            "              time\\n" +
+            "            }\\n" +
+            "          }\\n" +
+            "        }\\n" +
+            "        transit {\\n" +
+            "          from {\\n" +
+            "            name\\n" +
+            "            stopId\\n" +
+            "            lon\\n" +
+            "            lat\\n" +
+            "          }\\n" +
+            "          to {\\n" +
+            "            name\\n" +
+            "            stopId\\n" +
+            "            lon\\n" +
+            "            lat\\n" +
+            "          }\\n" +
+            "          mode\\n" +
+            "          routes {\\n" +
+            "            id\\n" +
+            "            description\\n" +
+            "            routeIdx\\n" +
+            "            shortName\\n" +
+            "            mode\\n" +
+            "            routeColor\\n" +
+            "            textColor\\n" +
+            "            url\\n" +
+            "            agencyName\\n" +
+            "          }\\n" +
+            "          segmentPatterns {\\n" +
+            "            patternId\\n" +
+            "            patternIdx\\n" +
+            "            routeIdx\\n" +
+            "            fromIndex\\n" +
+            "            toIndex\\n" +
+            "            nTrips\\n" +
+            "            fromArrivalTime\\n" +
+            "            fromDepartureTime\\n" +
+            "            toArrivalTime\\n" +
+            "            toDepartureTime\\n" +
+            "            tripId\\n" +
+            "          }\\n" +
+            "          middle {\\n" +
+            "            mode\\n" +
+            "            duration\\n" +
+            "            distance\\n" +
+            "            geometryPolyline\\n" +
+            "          }\\n" +
+            "          rideStats {\\n" +
+            "            min\\n" +
+            "            avg\\n" +
+            "            max\\n" +
+            "            num\\n" +
+            "          }\\n" +
+            "          waitStats {\\n" +
+            "            min\\n" +
+            "            avg\\n" +
+            "            max\\n" +
+            "            num\\n" +
+            "          }\\n" +
+            "        }\\n" +
+            "        access {\\n" +
+            "          mode\\n" +
+            "          duration\\n" +
+            "          distance\\n" +
+            "          streetEdges {\\n" +
+            "            edgeId\\n" +
+            "            geometryPolyline\\n" +
+            "            distance\\n" +
+            "            mode\\n" +
+            "            streetName\\n" +
+            "            relativeDirection\\n" +
+            "            absoluteDirection\\n" +
+            "            stayOn\\n" +
+            "            area\\n" +
+            "            exit\\n" +
+            "            bogusName\\n" +
+            "            bikeRentalOnStation {\\n" +
+            "              id\\n" +
+            "              name\\n" +
+            "              lat\\n" +
+            "              lon\\n" +
+            "            }\\n" +
+            "            bikeRentalOffStation {\\n" +
+            "              id\\n" +
+            "              name\\n" +
+            "              lat\\n" +
+            "              lon\\n" +
+            "            }\\n" +
+            "            parkRide {\\n" +
+            "              id\\n" +
+            "              name\\n" +
+            "              capacity\\n" +
+            "              lon\\n" +
+            "              lat\\n" +
+            "            }\\n" +
+            "          }\\n" +
+            "        }\\n" +
+            "        egress {\\n" +
+            "          mode\\n" +
+            "          duration\\n" +
+            "          distance\\n" +
+            "          streetEdges {\\n" +
+            "            edgeId\\n" +
+            "            distance\\n" +
+            "            geometryPolyline\\n" +
+            "            mode\\n" +
+            "            streetName\\n" +
+            "            relativeDirection\\n" +
+            "            absoluteDirection\\n" +
+            "            stayOn\\n" +
+            "            area\\n" +
+            "            exit\\n" +
+            "            bogusName\\n" +
+            "            bikeRentalOnStation {\\n" +
+            "              id\\n" +
+            "              name\\n" +
+            "              lon\\n" +
+            "              lat\\n" +
+            "            }\\n" +
+            "          }\\n" +
+            "        }\\n" +
+            "        fares {\\n" +
+            "          type\\n" +
+            "          low\\n" +
+            "          peak\\n" +
+            "          senior\\n" +
+            "          transferReduction\\n" +
+            "          currency\\n" +
+            "        }\\n" +
+            "      }\\n" +
+            "    }\\n" +
+            "  }\"," +
+            "  \"variables\":\"{" +
+            "    \\\"bikeSpeed\\\":" + bikeSpeed + "," +
+            "    \\\"fromLat\\\":" + fromLat + "," +
+            "    \\\"fromLon\\\":" + fromLon + "," +
+            "    \\\"fromTime\\\": \\\"" + fromTime + "\\\"," +
+            "    \\\"toLat\\\":" + toLat + "," +
+            "    \\\"toLon\\\":" + toLon + "," +
+            "    \\\"toTime\\\":\\\"" + toTime + "\\\"," +
+            "    \\\"walkSpeed\\\":" + walkSpeed +
+            "    }\"" +
+            "}";
     }
 
     /**

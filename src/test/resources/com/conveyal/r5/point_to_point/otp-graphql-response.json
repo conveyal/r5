@@ -1,0 +1,462 @@
+{
+  "$schema": "http://json-schema.org/draft-06/schema#",
+  "definitions": {
+    "accessOrEgress": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "distance": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "duration": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "mode": {
+                "type": "string"
+              },
+              "streetEdges": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "absoluteDirection": {
+                      "type": "string"
+                    },
+                    "area": {
+                      "type": "null"
+                    },
+                    "bikeRentalOffStation": {
+                      "type": "null"
+                    },
+                    "bikeRentalOnStation": {
+                      "type": "null"
+                    },
+                    "bogusName": {
+                      "type": "null"
+                    },
+                    "distance": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "edgeId": {
+                      "minimum": 0,
+                      "type": "integer"
+                    },
+                    "exit": {
+                      "type": "null"
+                    },
+                    "geometryPolyline": {
+                      "type": "string"
+                    },
+                    "mode": {
+                      "type": "string"
+                    },
+                    "parkRide": {
+                      "type": "null"
+                    },
+                    "relativeDirection": {
+                      "type": "string"
+                    },
+                    "stayOn": {
+                      "type": "boolean"
+                    },
+                    "streetName": {
+                      "type": ["null", "string"]
+                    }
+                  },
+                  "required": [
+                    "absoluteDirection",
+                    "distance",
+                    "edgeId",
+                    "geometryPolyline",
+                    "mode",
+                    "relativeDirection",
+                    "stayOn",
+                    "streetName"
+                  ]
+                }
+              }
+            },
+            "required": ["distance", "duration", "mode", "streetEdges"]
+          }
+        }
+      ]
+    },
+    "stats": {
+      "type": "object",
+      "properties": {
+        "avg": {
+          "type": "integer"
+        },
+        "max": {
+          "type": "integer"
+        },
+        "min": {
+          "type": "integer"
+        },
+        "num": {
+          "type": "integer"
+        }
+      },
+      "required": ["avg", "max", "min", "num"]
+    },
+    "stop": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "maximum": 90,
+          "minimum": -90,
+          "type": "number"
+        },
+        "lon": {
+          "maximum": 180,
+          "minimum": -180,
+          "type": "number"
+        },
+        "name": {
+          "type": "string"
+        },
+        "stopId": {
+          "type": "string"
+        }
+      },
+      "required": ["lat", "lon", "name", "stopId"]
+    }
+  },
+  "type": "object",
+  "properties": {
+    "data": {
+      "type": "object",
+      "properties": {
+        "plan": {
+          "type": "object",
+          "properties": {
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "access": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/definitions/accessOrEgress"
+                      }
+                    ]
+                  },
+                  "egress": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/definitions/accessOrEgress"
+                      }
+                    ]
+                  },
+                  "fares": {
+                    "type": ["array", "null"]
+                  },
+                  "itinerary": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "connection": {
+                          "type": "object",
+                          "properties": {
+                            "access": {
+                              "type": "integer"
+                            },
+                            "egress": {
+                              "type": ["integer", "null"]
+                            },
+                            "transit": {
+                              "oneOf": [
+                                {
+                                  "type": "null"
+                                },
+                                {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "pattern": {
+                                        "type": "integer"
+                                      },
+                                      "time": {
+                                        "type": "integer"
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        "distance": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "duration": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "endTime": {
+                          "type": "string"
+                        },
+                        "startTime": {
+                          "type": "string"
+                        },
+                        "transfers": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "transitTime": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "waitingTime": {
+                          "minimum": 0,
+                          "type": "integer"
+                        },
+                        "walkTime": {
+                          "minimum": 0,
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  },
+                  "summary": {
+                    "type": "string"
+                  },
+                  "transit": {
+                    "oneOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "from": {
+                              "oneOf": [
+                                {
+                                  "$ref": "#/definitions/stop"
+                                }
+                              ]
+                            },
+                            "mode": {
+                              "type": "string"
+                            },
+                            "rideStats": {
+                              "allOf": [
+                                {
+                                  "$ref": "#/definitions/stats"
+                                }
+                              ]
+                            },
+                            "routes": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "description": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "routeIdx": {
+                                    "type": "integer"
+                                  },
+                                  "shortName": {
+                                    "type": [
+                                      "string",
+                                      "null"
+                                    ]
+                                  },
+                                  "mode": {
+                                    "type": "string"
+                                  },
+                                  "routeColor": {
+                                    "type": ["string", "null"]
+                                  },
+                                  "textColor": {
+                                    "type": ["string", "null"]
+                                  },
+                                  "url": {
+                                    "type": ["string", "null"]
+                                  },
+                                  "agencyName": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            },
+                            "segmentPatterns": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "fromArrivalTime": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "fromDepartureTime": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "fromIndex": {
+                                    "type": "integer"
+                                  },
+                                  "nTrips": {
+                                    "type": "integer"
+                                  },
+                                  "patternId": {
+                                    "type": "string"
+                                  },
+                                  "patternIdx": {
+                                    "type": "integer"
+                                  },
+                                  "routeIdx": {
+                                    "type": "integer"
+                                  },
+                                  "toArrivalTime": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "toDepartureTime": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "toIndex": {
+                                    "type": "integer"
+                                  },
+                                  "tripId": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "fromArrivalTime",
+                                  "fromDepartureTime",
+                                  "fromIndex",
+                                  "nTrips",
+                                  "patternId",
+                                  "patternIdx",
+                                  "routeIdx",
+                                  "toArrivalTime",
+                                  "toDepartureTime",
+                                  "toIndex",
+                                  "tripId"
+                                ]
+                              }
+                            },
+                            "to": {
+                              "oneOf": [
+                                {
+                                  "$ref": "#/definitions/stop"
+                                }
+                              ]
+                            },
+                            "waitStats": {
+                              "allOf": [
+                                {
+                                  "$ref": "#/definitions/stats"
+                                }
+                              ]
+                            }
+                          },
+                          "required": ["from", "mode", "routes", "segmentPatterns", "to"]
+                        }
+                      }
+                    ]
+                  }
+                },
+                "required": ["access", "summary"]
+              }
+            },
+            "patterns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "directionId": {
+                    "type": "string"
+                  },
+                  "routeId": {
+                    "type": "string"
+                  },
+                  "routeIdx": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "stops": {
+                    "type": "array",
+                    "items": {
+                      "allOf": [
+                        {
+                          "$ref": "#/definitions/stop"
+                        }
+                      ]
+                    }
+                  },
+                  "tripPatternIdx": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "trips": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "bikesAllowed": {
+                          "type": "boolean"
+                        },
+                        "serviceId": {
+                          "type": "string"
+                        },
+                        "tripId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["bikesAllowed", "serviceId", "tripId"]
+                    }
+                  }
+                },
+                "required": [
+                  "tripPatternIdx",
+                  "routeId",
+                  "routeIdx",
+                  "directionId",
+                  "stops",
+                  "trips"
+                ]
+              }
+            }
+          },
+          "required": ["options", "patterns"]
+        }
+      }
+    }
+  }
+}

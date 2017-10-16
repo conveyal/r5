@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 
 import static io.restassured.RestAssured.given;
+import static io.restassured.module.jsv.JsonSchemaValidator.matchesJsonSchemaInClasspath;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -157,16 +158,12 @@ public class PointToPointRouterServerTest {
      */
     @Test
     public void canMakeOTPGraphQLQuery() {
-        String response = given()
+        given()
             .port(8080)
             .body(makeGraphQLQuery())
             .post("/otp/routers/default/index/graphql")
-            .asString();
-
-        // assertThat(response, equalTo("Hi"));
-        // we need to use JSONPath here, because we need to extract the data and dynamically compare features
-        // any position in an array with rest-assured's version of JSONPath.
-        ReadContext ctx = JsonPath.parse(response);
+        .then()
+            .body(matchesJsonSchemaInClasspath("com/conveyal/r5/point_to_point/otp-graphql-response.json"));
     }
 
     /**

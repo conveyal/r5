@@ -406,6 +406,12 @@
       <artifactId>aws-java-sdk-sqs</artifactId>
       <version>1.11.18</version>
     </dependency>
+    <!-- This is used to validate API responses against a JSONSchema. -->
+    <dependency>
+      <groupId>io.rest-assured</groupId>
+      <artifactId>json-schema-validator</artifactId>
+      <version>3.0.5</version>
+    </dependency>
     <!-- Rest Assured is an assertion library that makes testing web apis easy. -->
     <dependency>
       <groupId>io.rest-assured</groupId>

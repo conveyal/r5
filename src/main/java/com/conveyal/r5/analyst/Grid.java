@@ -11,9 +11,6 @@ import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.MultiPolygon;
 import com.vividsolutions.jts.geom.Point;
 import com.vividsolutions.jts.geom.Polygon;
-import gnu.trove.iterator.TObjectDoubleIterator;
-import gnu.trove.map.TObjectDoubleMap;
-import gnu.trove.map.hash.TObjectDoubleHashMap;
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
@@ -49,6 +46,7 @@ import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -130,32 +128,53 @@ public class Grid {
      * Version of getPixelWeights which returns the weights as relative to the total area of the input geometry (i.e.
      * the weight at a pixel is the proportion of the input geometry that falls within that pixel.
      */
-    public TObjectDoubleMap<int[]> getPixelWeights (Geometry geometry) {
+    public ArrayList<PixelWeight> getPixelWeights (Geometry geometry) {
         return getPixelWeights(geometry, false);
     }
 
+    public class PixelWeight {
+       int x;
+       int y;
+       double weight;
+
+        public PixelWeight (int x, int y, double weight){
+           this.x = x;
+           this.y = y;
+           this.weight = weight;
+        }
+
+        public int getX() {
+            return x;
+        }
+
+        public int getY() {
+            return y;
+        }
+
+        public double getWeight() {
+            return weight;
+        }
+    }
+
     /**
-     * Get the proportions of an input polygon feature that overlap each grid cell, in the format [x, y] => weight.
-     * This weight object can then be fed into the incrementFromPixelWeights function to actually burn a polygon into the
+     * Get the proportions of an input polygon feature that overlap each grid cell, for use in List(x, y, weight)
+     * These weight lists can then be fed into the incrementFromPixelWeights function to actually burn a polygon into the
      * grid.
      *
      * If relativeToPixels is true, the weights are the proportion of the pixel that is covered. Otherwise they are the
      * portion of this polygon which is within the given grid cell. If using incrementPixelWeights, this should be set to
      * false.
      *
-     * This returns a map from int arrays containing the coordinates to the weight. I believe int arrays in hashmaps are
-     * hashed based on memory location, meaning lookups will fail. However, we only use this in a streaming fashion, looping
-     * over all values, which is harmless.
+     * This used to return a map from int arrays containing the coordinates to the weight.
      *
-     * TODO create a class with x, y, and value attributes and just return a list.
      */
-    public TObjectDoubleMap<int[]> getPixelWeights (Geometry geometry, boolean relativeToPixels) {
+    public ArrayList<PixelWeight> getPixelWeights (Geometry geometry, boolean relativeToPixels) {
         // No need to convert to a local coordinate system
         // Both the supplied polygon and the web mercator pixel geometries are left in WGS84 geographic coordinates.
         // Both are distorted equally along the X axis at a given latitude so the proportion of the geometry within
         // each pixel is accurate, even though the surface area in WGS84 coordinates is not a usable value.
 
-        TObjectDoubleMap<int[]> weights = new TObjectDoubleHashMap<>();
+        ArrayList<PixelWeight> weights = new ArrayList<>();
 
         double area = geometry.getArea();
         if (area < 1e-12) {
@@ -163,19 +182,36 @@ public class Grid {
         }
 
         Envelope env = geometry.getEnvelopeInternal();
-        for (int worldx = lonToPixel(env.getMinX(), zoom); worldx <= lonToPixel(env.getMaxX(), zoom); worldx++) {
+
+        for (int worldy = latToPixel(env.getMaxY(), zoom); worldy <= latToPixel(env.getMinY(), zoom); worldy++) {
             // NB web mercator Y is reversed relative to latitude
-            for (int worldy = latToPixel(env.getMaxY(), zoom); worldy <= latToPixel(env.getMinY(), zoom); worldy++) {
+
+            double pixelAreaAtLat = 0;
+            //areas of cells at a given latitude are approximately equal? Set to 0 to reocmpute for each latitude.
+
+            for (int worldx = lonToPixel(env.getMinX(), zoom); worldx <= lonToPixel(env.getMaxX(), zoom); worldx++) {
+
                 int x = worldx - west;
                 int y = worldy - north;
 
                 if (x < 0 || x >= width || y < 0 || y >= height) continue; // off the grid
 
                 Geometry pixel = getPixelGeometry(x + west, y + north, zoom);
-                Geometry intersection = pixel.intersection(geometry);
-                double denominator = relativeToPixels ? pixel.getArea() : area;
-                double weight = intersection.getArea() / denominator;
-                weights.put(new int[] { x, y }, weight);
+
+                if (pixelAreaAtLat == 0) pixelAreaAtLat = pixel.getArea();
+
+                if (geometry.contains(pixel)) { //pixel completely inside feature
+                    double weight = relativeToPixels ? 1 : pixelAreaAtLat/area;
+                    weights.add(new PixelWeight(x,y,weight));
+                    continue;
+                }
+
+                if (pixel.overlaps(geometry)) { //pixel partly inside feature
+                    Geometry intersection = pixel.intersection(geometry);
+                    double denominator = relativeToPixels ? pixelAreaAtLat : area;
+                    double weight = intersection.getArea() / denominator;
+                    weights.add(new PixelWeight(x, y, weight));
+                }
             }
         }
 
@@ -184,7 +220,7 @@ public class Grid {
 
     /**
      * Do pycnoplactic mapping:
-     * the value associated with the supplied polygon a polygon will be split out proportionately to
+     * the value associated with the supplied polygon will be split out proportionately to
      * all the web Mercator pixels that intersect it.
      *
      * If you are creating multiple grids of the same size for different attributes of the same input features, you should
@@ -197,10 +233,11 @@ public class Grid {
     }
 
     /** Using a grid of weights produced by getPixelWeights, burn the value of a polygon into the grid */
-    public void incrementFromPixelWeights (TObjectDoubleMap<int[]> weights, double value) {
-        for (TObjectDoubleIterator<int[]> it = weights.iterator(); it.hasNext();) {
-            it.advance();
-            grid[it.key()[0]][it.key()[1]] += it.value() * value;
+    public void incrementFromPixelWeights (ArrayList weights, double value) {
+        Iterator<PixelWeight> pixelWeightIterator = weights.iterator();
+        while(pixelWeightIterator.hasNext()) {
+            PixelWeight pix = pixelWeightIterator.next();
+            grid[pix.x][pix.y] += pix.weight * value;
         }
     }
 

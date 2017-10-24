@@ -216,6 +216,7 @@ public class TransitLayer implements Serializable, Cloneable {
         // Keyed with unscoped route_id, which is fine as this is for a single GTFS feed
         TObjectIntMap<String> routeIndexForRoute = new TObjectIntHashMap<>();
         int nTripsAdded = 0;
+        int nZeroDurationHops = 0;
         TRIPS: for (String tripId : gtfs.trips.keySet()) {
             Trip trip = gtfs.trips.get(tripId);
             Route route = gtfs.routes.get(trip.route_id);
@@ -248,8 +249,10 @@ public class TransitLayer implements Serializable, Cloneable {
                     continue TRIPS;
                 }
 
-                if (previousDeparture == st.arrival_time) {
-                    LOG.warn("Zero-length hop at stop {} on trip {} on route {} {}", st.stop_id, trip.trip_id, trip.route_id, route.route_short_name);
+                if (previousDeparture == st.arrival_time) { //Teleportation: arrive at downstream stop immediately after departing upstream
+                    //often the result of a stop_times input with time values rounded to the nearest minute.
+                    //TODO check if the distance of the hop is reasonably traveled in less than 60 seconds, which may vary by mode.
+                    nZeroDurationHops++;
                 }
 
                 previousDeparture = st.departure_time;
@@ -362,6 +365,8 @@ public class TransitLayer implements Serializable, Cloneable {
             }
         }
         LOG.info("Done creating {} trips on {} patterns.", nTripsAdded, tripPatternForPatternId.size());
+
+        LOG.info("{} zero-duration hops found.", nZeroDurationHops);
 
         LOG.info("Chaining trips together according to blocks to model interlining...");
         // Chain together trips served by the same vehicle that allow transfers by simply staying on board.

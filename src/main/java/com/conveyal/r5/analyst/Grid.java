@@ -11,6 +11,9 @@ import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.MultiPolygon;
 import com.vividsolutions.jts.geom.Point;
 import com.vividsolutions.jts.geom.Polygon;
+import com.vividsolutions.jts.geom.prep.PreparedGeometry;
+import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory;
+import com.vividsolutions.jts.geom.prep.PreparedPolygon;
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
@@ -124,36 +127,35 @@ public class Grid {
         this.grid = new double[width][height];
     }
 
+    public static class PixelWeight {
+        int x;
+        int y;
+        double weight;
+
+        public PixelWeight (int x, int y, double weight){
+            this.x = x;
+            this.y = y;
+            this.weight = weight;
+        }
+
+        public int getX() {
+            return x;
+        }
+        public int getY() {
+            return y;
+        }
+        public double getWeight() {
+            return weight;
+        }
+    }
+
+
     /**
      * Version of getPixelWeights which returns the weights as relative to the total area of the input geometry (i.e.
      * the weight at a pixel is the proportion of the input geometry that falls within that pixel.
      */
     public ArrayList<PixelWeight> getPixelWeights (Geometry geometry) {
         return getPixelWeights(geometry, false);
-    }
-
-    public class PixelWeight {
-       int x;
-       int y;
-       double weight;
-
-        public PixelWeight (int x, int y, double weight){
-           this.x = x;
-           this.y = y;
-           this.weight = weight;
-        }
-
-        public int getX() {
-            return x;
-        }
-
-        public int getY() {
-            return y;
-        }
-
-        public double getWeight() {
-            return weight;
-        }
     }
 
     /**
@@ -181,13 +183,20 @@ public class Grid {
             throw new IllegalArgumentException("Geometry is too small");
         }
 
+        // PreparedGeometry is often faster for small numbers of vertices;
+        // see https://github.com/chrisbennight/intersection-test
+
+        PreparedGeometryFactory pgFact = new PreparedGeometryFactory();
+        PreparedGeometry preparedGeom = pgFact.create(geometry);
+
         Envelope env = geometry.getEnvelopeInternal();
 
         for (int worldy = latToPixel(env.getMaxY(), zoom); worldy <= latToPixel(env.getMinY(), zoom); worldy++) {
-            // NB web mercator Y is reversed relative to latitude
+            // NB web mercator Y is reversed relative to latitude.
+            // Iterate over longitude (x) in the inner loop to avoid repeat calculations of pixel areas, which should be
+            // equal at a given latitude (y)
 
-            double pixelAreaAtLat = 0;
-            //areas of cells at a given latitude are approximately equal? Set to 0 to reocmpute for each latitude.
+            double pixelAreaAtLat = -1; //Set to -1 to recalculate for each latitude.
 
             for (int worldx = lonToPixel(env.getMinX(), zoom); worldx <= lonToPixel(env.getMaxX(), zoom); worldx++) {
 
@@ -198,25 +207,25 @@ public class Grid {
 
                 Geometry pixel = getPixelGeometry(x + west, y + north, zoom);
 
-                if (pixelAreaAtLat == 0) pixelAreaAtLat = pixel.getArea();
+                if (pixelAreaAtLat == -1) pixelAreaAtLat = pixel.getArea(); //Recalculate for a new latitude.
 
-                if (geometry.contains(pixel)) { //pixel completely inside feature
-                    double weight = relativeToPixels ? 1 : pixelAreaAtLat/area;
-                    weights.add(new PixelWeight(x,y,weight));
-                    continue;
-                }
-
-                if (pixel.overlaps(geometry)) { //pixel partly inside feature
+                if (preparedGeom.overlaps(pixel)){ // pixel is partly inside the feature; note JTS definition of overlaps
                     Geometry intersection = pixel.intersection(geometry);
                     double denominator = relativeToPixels ? pixelAreaAtLat : area;
                     double weight = intersection.getArea() / denominator;
                     weights.add(new PixelWeight(x, y, weight));
+                } else if (preparedGeom.contains(pixel)) { // pixel is completely inside the feature
+                    double weight = relativeToPixels ? 1 : pixelAreaAtLat/area;
+                    weights.add(new PixelWeight(x,y,weight));
+                } else { //pixel is outside the feature
+                    weights.add(new PixelWeight(x,y,0));
                 }
             }
         }
-
         return weights;
     }
+
+    //public void streamPixelWeights (Geometry geometry, PixelWeightCallback pixelWeightCallback)
 
     /**
      * Do pycnoplactic mapping:
@@ -252,7 +261,7 @@ public class Grid {
         if (x >= 0 && x < width && y >= 0 && y < height) {
             grid[x][y] += amount;
         } else {
-            // Warn that an attempt was made to increment outside the grid
+            LOG.warn("{} opportunities are outside regional bounds, at {}, {}", amount, lon, lat);
         }
     }
 
@@ -512,7 +521,7 @@ public class Grid {
         // Detect which columns are completely numeric by iterating over all the rows and trying to parse the fields
         int total = 0;
         while (reader.readRecord()) {
-            if (++total % 10000 == 0) LOG.info("{} records", human(total));
+            if (++total % 1000 == 0) LOG.info("{} records", human(total));
 
             envelope.expandToInclude(parseDouble(reader.get(lonField)), parseDouble(reader.get(latField)));
 
@@ -553,7 +562,7 @@ public class Grid {
 
         int i = 0;
         while (reader.readRecord()) {
-            if (++i % 10000 == 0) {
+            if (++i % 1000 == 0) {
                 LOG.info("{} records", human(i));
             }
 
@@ -636,7 +645,7 @@ public class Grid {
 
             if (statusListener != null) statusListener.accept(currentCount, total);
 
-            if (currentCount % 10000 == 0) {
+            if (currentCount % 100 == 0) {
                 LOG.info("{} / {} features read", human(currentCount), human(total));
             }
         });

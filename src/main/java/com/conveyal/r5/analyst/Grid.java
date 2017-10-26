@@ -13,7 +13,6 @@ import com.vividsolutions.jts.geom.Point;
 import com.vividsolutions.jts.geom.Polygon;
 import com.vividsolutions.jts.geom.prep.PreparedGeometry;
 import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory;
-import com.vividsolutions.jts.geom.prep.PreparedPolygon;
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
@@ -196,7 +195,7 @@ public class Grid {
             // Iterate over longitude (x) in the inner loop to avoid repeat calculations of pixel areas, which should be
             // equal at a given latitude (y)
 
-            double pixelAreaAtLat = -1; //Set to -1 to recalculate for each latitude.
+            double pixelAreaAtLat = -1; //Set to -1 to recalculate pixelArea at each latitude.
 
             for (int worldx = lonToPixel(env.getMinX(), zoom); worldx <= lonToPixel(env.getMaxX(), zoom); worldx++) {
 
@@ -209,16 +208,11 @@ public class Grid {
 
                 if (pixelAreaAtLat == -1) pixelAreaAtLat = pixel.getArea(); //Recalculate for a new latitude.
 
-                if (preparedGeom.overlaps(pixel)){ // pixel is partly inside the feature; note JTS definition of overlaps
+                if (preparedGeom.intersects(pixel)){ // pixel is at least partly inside the feature
                     Geometry intersection = pixel.intersection(geometry);
                     double denominator = relativeToPixels ? pixelAreaAtLat : area;
                     double weight = intersection.getArea() / denominator;
                     weights.add(new PixelWeight(x, y, weight));
-                } else if (preparedGeom.contains(pixel)) { // pixel is completely inside the feature
-                    double weight = relativeToPixels ? 1 : pixelAreaAtLat/area;
-                    weights.add(new PixelWeight(x,y,weight));
-                } else { //pixel is outside the feature
-                    weights.add(new PixelWeight(x,y,0));
                 }
             }
         }

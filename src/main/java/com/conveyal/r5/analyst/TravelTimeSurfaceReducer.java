@@ -57,7 +57,7 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
         int[] results = new int[nPercentiles];
 
         for (int i = 0; i < nPercentiles; i++) {
-            // We scale the interval between the beginning and end elements of the array (the mib and max values).
+            // We scale the interval between the beginning and end elements of the array (the min and max values).
             // In an array with N values the interval is N-1 elements. We should be scaling N-1, which makes the result
             // always defined even when using a high percentile and low number of elements.  Previously, this caused
             // an error below when requesting the 95th percentile when times.length = 1 (or any length less than 10).

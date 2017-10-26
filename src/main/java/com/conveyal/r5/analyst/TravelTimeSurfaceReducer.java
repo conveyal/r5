@@ -57,7 +57,11 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
         int[] results = new int[nPercentiles];
 
         for (int i = 0; i < nPercentiles; i++) {
-            int offset = (int) Math.round(task.percentiles[i] / 100d * times.length);
+            // We scale the interval between the beginning and end elements of the array (the min and max values).
+            // In an array with N values the interval is N-1 elements. We should be scaling N-1, which makes the result
+            // always defined even when using a high percentile and low number of elements.  Previously, this caused
+            // an error below when requesting the 95th percentile when times.length = 1 (or any length less than 10).
+            int offset = (int) Math.round(task.percentiles[i] / 100d * (times.length-1));
             // Int divide will floor; this is correct because value 0 has travel times of up to one minute, etc.
             // This means that anything less than a cutoff of (say) 60 minutes (in seconds) will have value 59,
             // which is what we want. But maybe this is tying the backend and frontend too closely.

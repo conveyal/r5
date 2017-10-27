@@ -131,7 +131,7 @@ public class Grid {
         int y;
         double weight;
 
-        public PixelWeight (int x, int y, double weight){
+        private PixelWeight (int x, int y, double weight){
             this.x = x;
             this.y = y;
             this.weight = weight;
@@ -148,13 +148,32 @@ public class Grid {
         }
     }
 
+    /**
+     * A functional interface (callback interface) that processes one pixel weight at a time.
+     * This avoids storing massive lists of intermediate results that have been known to eat memory on the server.
+     * This happens when processing geometries that contain a huge amount of pixels, which a user might include in
+     * a shapefile.
+     */
+    public interface PixelWeightCallback {
+        void handlePixelWeight (int x, int y, double weight);
+    }
+
+    /**
+     *
+     * @param geometry
+     * @param relativeToPixels
+     * @param pixelWeightCallback
+     */
+    public void streamPixelWeights (Geometry geometry, boolean relativeToPixels, PixelWeightCallback pixelWeightCallback) {
+        getPixelWeights(geometry, relativeToPixels, pixelWeightCallback);
+    }
 
     /**
      * Version of getPixelWeights which returns the weights as relative to the total area of the input geometry (i.e.
      * the weight at a pixel is the proportion of the input geometry that falls within that pixel.
      */
     public ArrayList<PixelWeight> getPixelWeights (Geometry geometry) {
-        return getPixelWeights(geometry, false);
+        return getPixelWeights(geometry, false, null);
     }
 
     /**
@@ -163,13 +182,13 @@ public class Grid {
      * grid.
      *
      * If relativeToPixels is true, the weights are the proportion of the pixel that is covered. Otherwise they are the
-     * portion of this polygon which is within the given grid cell. If using incrementPixelWeights, this should be set to
+     * portion of this polygon which is within the given pixel. If using incrementPixelWeights, this should be set to
      * false.
      *
      * This used to return a map from int arrays containing the coordinates to the weight.
      *
      */
-    public ArrayList<PixelWeight> getPixelWeights (Geometry geometry, boolean relativeToPixels) {
+    private ArrayList<PixelWeight> getPixelWeights (Geometry geometry, boolean relativeToPixels, PixelWeightCallback pixelWeightCallback) {
         // No need to convert to a local coordinate system
         // Both the supplied polygon and the web mercator pixel geometries are left in WGS84 geographic coordinates.
         // Both are distorted equally along the X axis at a given latitude so the proportion of the geometry within
@@ -212,14 +231,14 @@ public class Grid {
                     Geometry intersection = pixel.intersection(geometry);
                     double denominator = relativeToPixels ? pixelAreaAtLat : area;
                     double weight = intersection.getArea() / denominator;
-                    weights.add(new PixelWeight(x, y, weight));
+                    if (pixelWeightCallback == null){
+                        weights.add(new PixelWeight(x, y, weight));
+                    }
                 }
             }
         }
         return weights;
     }
-
-    //public void streamPixelWeights (Geometry geometry, PixelWeightCallback pixelWeightCallback)
 
     /**
      * Do pycnoplactic mapping:
@@ -231,7 +250,7 @@ public class Grid {
      * and the attribute value into incrementFromPixelWeights function; this will avoid duplicating expensive geometric
      * math.
      */
-    public void rasterize (Geometry geometry, double value) {
+    private void rasterize (Geometry geometry, double value) {
         incrementFromPixelWeights(getPixelWeights(geometry), value);
     }
 
@@ -247,7 +266,7 @@ public class Grid {
     /**
      * Burn point data into the grid.
      */
-    public void incrementPoint (double lat, double lon, double amount) {
+    private void incrementPoint (double lat, double lon, double amount) {
         int worldx = lonToPixel(lon, zoom);
         int worldy = latToPixel(lat, zoom);
         int x = worldx - west;

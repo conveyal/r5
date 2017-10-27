@@ -1,5 +1,7 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
@@ -197,8 +199,10 @@ public class FastRaptorWorker {
         int scheduledIndex = 0;
         for (TripPattern pattern : transit.tripPatterns) {
             patternIndex++;
-            if (pattern.servicesActive.intersects(servicesActive)) {
-                // at least one trip on this pattern is relevant
+            RouteInfo routeInfo = transit.routes.get(pattern.routeIndex);
+            TransitModes mode = TransitLayer.getTransitModes(routeInfo.route_type);
+            if (pattern.servicesActive.intersects(servicesActive) && request.transitModes.contains(mode)) {
+                // at least one trip on this pattern is relevant, based on the profile request's date and modes
                 if (pattern.hasFrequencies) {
                     frequencyPatterns.add(patternIndex);
                     frequencyIndexForOriginalPatternIndex[patternIndex] = frequencyIndex++;

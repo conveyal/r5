@@ -159,10 +159,7 @@ public class Grid {
     }
 
     /**
-     *
-     * @param geometry
-     * @param relativeToPixels
-     * @param pixelWeightCallback
+     * Stream pixel weights using a callback, rather than keeping them in memory.
      */
     public void streamPixelWeights (Geometry geometry, boolean relativeToPixels, PixelWeightCallback pixelWeightCallback) {
         getPixelWeights(geometry, relativeToPixels, pixelWeightCallback);
@@ -233,6 +230,8 @@ public class Grid {
                     double weight = intersection.getArea() / denominator;
                     if (pixelWeightCallback == null){
                         weights.add(new PixelWeight(x, y, weight));
+                    } else {
+                        pixelWeightCallback.handlePixelWeight(x,y,weight);
                     }
                 }
             }

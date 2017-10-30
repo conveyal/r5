@@ -18,7 +18,11 @@ import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
-import org.geotools.data.*;
+import org.geotools.data.DefaultTransaction;
+import org.geotools.data.FeatureWriter;
+import org.geotools.data.FileDataStore;
+import org.geotools.data.FileDataStoreFinder;
+import org.geotools.data.Transaction;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.gce.geotiff.GeoTiffFormat;
 import org.geotools.gce.geotiff.GeoTiffWriteParams;
@@ -64,7 +68,6 @@ import static org.apache.commons.math3.util.FastMath.cos;
 import static org.apache.commons.math3.util.FastMath.log;
 import static org.apache.commons.math3.util.FastMath.sinh;
 import static org.apache.commons.math3.util.FastMath.tan;
-import static spark.Spark.halt;
 
 /**
  * Class that represents a grid in the spherical Mercator "projection" at a given zoom level.
@@ -457,12 +460,12 @@ public class Grid {
         String[] headers = reader.getHeaders();
         if (!Stream.of(headers).filter(h -> h.equals(latField)).findAny().isPresent()) {
             LOG.info("Lat field not found!");
-            halt(400, "Lat field not found");
+            throw new IOException("Latitude field not found in CSV.");
         }
 
         if (!Stream.of(headers).filter(h -> h.equals(lonField)).findAny().isPresent()) {
             LOG.info("Lon field not found!");
-            halt(400, "Lon field not found");
+            throw new IOException("Longitude field not found in CSV.");
         }
 
         Envelope envelope = new Envelope();

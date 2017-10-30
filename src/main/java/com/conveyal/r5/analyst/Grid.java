@@ -110,6 +110,13 @@ public class Grid {
     public Grid (int zoom, double north, double east, double south, double west) {
         this.zoom = zoom;
         this.north = latToPixel(north, zoom);
+        /**
+         * The grid extent is computed from the points. If the cell number for the right edge of the grid is rounded
+         * down, some points could fall outside the grid. `latToPixel` and `lonToPixel` naturally round down - which is
+         * the correct behavior for binning points into cells but means the grid is always 1 row too narrow/short.
+         *
+         * So we add 1 to the height and width when a grid is created in this manner.
+         */
         this.height = (latToPixel(south, zoom) - this.north) + 1; // minimum height is 1
         this.west = lonToPixel(west, zoom);
         this.width = (lonToPixel(east, zoom) - this.west) + 1; // minimum width is 1

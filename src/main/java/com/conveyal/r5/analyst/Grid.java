@@ -169,13 +169,19 @@ public class Grid {
     private PreparedGeometryFactory pgFact = new PreparedGeometryFactory();
 
     /**
-     * Get the proportions of an input polygon feature that overlap each grid cell, for use in List(x, y, weight)
-     * These weight lists can then be fed into the incrementFromPixelWeights function to actually burn a polygon into the
+     * Get the proportions of an input polygon feature that overlap each grid cell, for use in lists of PixelWeights.
+     * These lists can then be fed into the incrementFromPixelWeights function to actually burn a polygon into the
      * grid.
      *
      * If relativeToPixels is true, the weights are the proportion of the pixel that is covered. Otherwise they are the
      * portion of this polygon which is within the given pixel. If using incrementPixelWeights, this should be set to
      * false.
+     *
+     * This is an internal private method, called by two different public methods with different signatures,
+     * streamPixelWeights or getPixelWeights above.
+     *
+     * streamPixelWeights includes a callback function, which is called for each pixel.  This function then returns null.
+     * The public getPixelWeights calls this function with a null callback, so this function returns the weights.
      *
      * This used to return a map from int arrays containing the coordinates to the weight.
      *

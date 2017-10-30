@@ -49,6 +49,7 @@ import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -169,7 +170,7 @@ public class Grid {
      * Version of getPixelWeights which returns the weights as relative to the total area of the input geometry (i.e.
      * the weight at a pixel is the proportion of the input geometry that falls within that pixel.
      */
-    public ArrayList<PixelWeight> getPixelWeights (Geometry geometry) {
+    public List<PixelWeight> getPixelWeights (Geometry geometry) {
         return getPixelWeights(geometry, false, null);
     }
 
@@ -185,13 +186,13 @@ public class Grid {
      * This used to return a map from int arrays containing the coordinates to the weight.
      *
      */
-    private ArrayList<PixelWeight> getPixelWeights (Geometry geometry, boolean relativeToPixels, PixelWeightCallback pixelWeightCallback) {
+    private List<PixelWeight> getPixelWeights (Geometry geometry, boolean relativeToPixels, PixelWeightCallback pixelWeightCallback) {
         // No need to convert to a local coordinate system
         // Both the supplied polygon and the web mercator pixel geometries are left in WGS84 geographic coordinates.
         // Both are distorted equally along the X axis at a given latitude so the proportion of the geometry within
         // each pixel is accurate, even though the surface area in WGS84 coordinates is not a usable value.
 
-        ArrayList<PixelWeight> weights = new ArrayList<>();
+        List<PixelWeight> weights = new ArrayList<>();
 
         double area = geometry.getArea();
         if (area < 1e-12) {
@@ -254,7 +255,7 @@ public class Grid {
     }
 
     /** Using a grid of weights produced by getPixelWeights, burn the value of a polygon into the grid */
-    public void incrementFromPixelWeights (ArrayList weights, double value) {
+    public void incrementFromPixelWeights (List weights, double value) {
         Iterator<PixelWeight> pixelWeightIterator = weights.iterator();
         while(pixelWeightIterator.hasNext()) {
             PixelWeight pix = pixelWeightIterator.next();

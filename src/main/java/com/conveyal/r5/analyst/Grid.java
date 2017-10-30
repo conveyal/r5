@@ -128,24 +128,14 @@ public class Grid {
     }
 
     public static class PixelWeight {
-        int x;
-        int y;
-        double weight;
+        final int x;
+        final int y;
+        final double weight;
 
         private PixelWeight (int x, int y, double weight){
             this.x = x;
             this.y = y;
             this.weight = weight;
-        }
-
-        public int getX() {
-            return x;
-        }
-        public int getY() {
-            return y;
-        }
-        public double getWeight() {
-            return weight;
         }
     }
 

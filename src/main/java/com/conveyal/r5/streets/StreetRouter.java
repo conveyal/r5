@@ -179,13 +179,6 @@ public class StreetRouter {
      */
     public StreetRouter previousRouter;
 
-    public StreetRouter (StreetLayer streetLayer) {
-        this.streetLayer = streetLayer;
-        // TODO one of two things: 1) don't hardwire drive-on-right, or 2) https://en.wikipedia.org/wiki/Dagen_H
-        this.turnCostCalculator = new TurnCostCalculator(streetLayer, true);
-        this.travelTimeCalculator = new EdgeStore.DefaultTravelTimeCalculator();
-    }
-
     /**
      * Supply a RoutingVisitor to track search progress for debugging.
      */
@@ -280,6 +273,18 @@ public class StreetRouter {
         });
         return result;
     }
+
+    public StreetRouter (StreetLayer streetLayer) {
+        this(streetLayer, new EdgeStore.DefaultTravelTimeCalculator());
+    }
+
+    public StreetRouter (StreetLayer streetLayer, TravelTimeCalculator travelTimeCalculator) {
+        this.streetLayer = streetLayer;
+        // TODO one of two things: 1) don't hardwire drive-on-right, or 2) https://en.wikipedia.org/wiki/Dagen_H
+        this.turnCostCalculator = new TurnCostCalculator(streetLayer, true);
+        this.travelTimeCalculator = travelTimeCalculator;
+    }
+
 
     /**
      * Set the origin point of this StreetRouter (before a search is started) to a point along an edge that allows

@@ -36,12 +36,21 @@ public class TimeDependentRoutingTest {
 
         assertEquals(24, stateAtVertex.durationSeconds);
 
-        StreetRouter anotherStreetRouter = new StreetRouter(streetLayer, (edge, streetMode, req) -> 30);
+        StreetRouter anotherStreetRouter = new StreetRouter(streetLayer, (edge, durationSeconds, streetMode, req) -> 30);
         anotherStreetRouter.setOrigin(one);
         anotherStreetRouter.route();
         StreetRouter.State anotherStateAtVertex = anotherStreetRouter.getStateAtVertex(three);
 
         assertEquals(60, anotherStateAtVertex.durationSeconds);
+
+        // Time dependent. This should evaluate (t_n = t_n-1 + (t_n-1 + 40), t_0 = 0) at n=2
+        StreetRouter yetAnotherStreetRouter = new StreetRouter(streetLayer, (edge, durationSeconds, streetMode, req) -> durationSeconds + 40);
+        yetAnotherStreetRouter.setOrigin(one);
+        yetAnotherStreetRouter.route();
+        StreetRouter.State yetAnotherStateAtVertex = yetAnotherStreetRouter.getStateAtVertex(three);
+
+        assertEquals(120, yetAnotherStateAtVertex.durationSeconds);
+
 
     }
 

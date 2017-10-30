@@ -71,7 +71,7 @@ public class PointToPointQuery {
     private static final int CAR_PARK_DROPOFF_COST = 120;
 
     public PointToPointQuery(TransportNetwork transportNetwork) {
-        this(transportNetwork, new StreetRouter.DefaultTravelTimeCalculator());
+        this(transportNetwork, new EdgeStore.DefaultTravelTimeCalculator());
     }
 
     public PointToPointQuery(TransportNetwork transportNetwork, TravelTimeCalculator travelTimeCalculator) {

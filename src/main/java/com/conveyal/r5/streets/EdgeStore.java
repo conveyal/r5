@@ -564,8 +564,7 @@ public class EdgeStore implements Serializable {
             }
 
             StreetRouter.State s1 = new StreetRouter.State(vertex, edgeIndex, s0);
-            float speedms = calculateSpeed(req, streetMode);
-            float time = (float) (getLengthM() / speedms);
+            float time = travelTimeCalculator.getTravelTimems(this, streetMode, req);
             float weight = 0;
 
             if (!canTurnFrom(s0, s1, req.reverseSearch)) return null;
@@ -606,7 +605,7 @@ public class EdgeStore implements Serializable {
 
                 if (walking) {
                     //Recalculation of time and speed is needed if we are walking with bike
-                    speedms = calculateSpeed(req, StreetMode.WALK)*0.9f;
+                    float speedms = calculateSpeed(req, StreetMode.WALK)*0.9f;
                     time = (float) (getLengthM() / speedms);
                 }
 
@@ -1119,6 +1118,15 @@ public class EdgeStore implements Serializable {
                 consumer.accept(edge);
                 return true;
             });
+        }
+    }
+
+    public static class DefaultTravelTimeCalculator implements TravelTimeCalculator {
+
+        @Override
+        public float getTravelTimems(EdgeStore.Edge edge, StreetMode streetMode, ProfileRequest req) {
+            float speedms = edge.calculateSpeed(req, streetMode);
+            return (float) (edge.getLengthM() / speedms);
         }
     }
 

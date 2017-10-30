@@ -233,7 +233,11 @@ public class Grid {
                 }
             }
         }
-        return weights;
+        if (pixelWeightCallback == null){
+            return weights;
+        } else {
+            return null;
+        }
     }
 
     /**

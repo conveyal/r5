@@ -164,6 +164,10 @@ public class Grid {
         return getPixelWeights(geometry, false, null);
     }
 
+    // PreparedGeometry is often faster for small numbers of vertices;
+    // see https://github.com/chrisbennight/intersection-test
+    private PreparedGeometryFactory pgFact = new PreparedGeometryFactory();
+
     /**
      * Get the proportions of an input polygon feature that overlap each grid cell, for use in List(x, y, weight)
      * These weight lists can then be fed into the incrementFromPixelWeights function to actually burn a polygon into the
@@ -189,10 +193,6 @@ public class Grid {
             throw new IllegalArgumentException("Geometry is too small");
         }
 
-        // PreparedGeometry is often faster for small numbers of vertices;
-        // see https://github.com/chrisbennight/intersection-test
-
-        PreparedGeometryFactory pgFact = new PreparedGeometryFactory();
         PreparedGeometry preparedGeom = pgFact.create(geometry);
 
         Envelope env = geometry.getEnvelopeInternal();

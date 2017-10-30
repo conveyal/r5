@@ -110,9 +110,16 @@ public class Grid {
     public Grid (int zoom, double north, double east, double south, double west) {
         this.zoom = zoom;
         this.north = latToPixel(north, zoom);
-        this.height = latToPixel(south, zoom) - this.north;
+        /**
+         * The grid extent is computed from the points. If the cell number for the right edge of the grid is rounded
+         * down, some points could fall outside the grid. `latToPixel` and `lonToPixel` naturally round down - which is
+         * the correct behavior for binning points into cells but means the grid is always 1 row too narrow/short.
+         *
+         * So we add 1 to the height and width when a grid is created in this manner.
+         */
+        this.height = (latToPixel(south, zoom) - this.north) + 1; // minimum height is 1
         this.west = lonToPixel(west, zoom);
-        this.width = lonToPixel(east, zoom) - this.west;
+        this.width = (lonToPixel(east, zoom) - this.west) + 1; // minimum width is 1
         this.grid = new double[width][height];
     }
 
@@ -458,12 +465,12 @@ public class Grid {
         reader.readHeaders();
 
         String[] headers = reader.getHeaders();
-        if (!Stream.of(headers).filter(h -> h.equals(latField)).findAny().isPresent()) {
+        if (!Stream.of(headers).anyMatch(h -> h.equals(latField))) {
             LOG.info("Lat field not found!");
             throw new IOException("Latitude field not found in CSV.");
         }
 
-        if (!Stream.of(headers).filter(h -> h.equals(lonField)).findAny().isPresent()) {
+        if (!Stream.of(headers).anyMatch(h -> h.equals(lonField))) {
             LOG.info("Lon field not found!");
             throw new IOException("Longitude field not found in CSV.");
         }
@@ -482,6 +489,7 @@ public class Grid {
 
             envelope.expandToInclude(parseDouble(reader.get(lonField)), parseDouble(reader.get(latField)));
 
+            // Remove columns that cannot be parsed as doubles
             for (Iterator<String> it = numericColumns.iterator(); it.hasNext();) {
                 String field = it.next();
                 String value = reader.get(field);

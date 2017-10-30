@@ -658,7 +658,7 @@ public class Grid {
 
             if (statusListener != null) statusListener.accept(currentCount, total);
 
-            if (currentCount % 100 == 0) {
+            if (currentCount % 10000 == 0) {
                 LOG.info("{} / {} features read", human(currentCount), human(total));
             }
         });

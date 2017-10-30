@@ -71,6 +71,8 @@ public class StreetRouter {
      */
     private TurnCostCalculator turnCostCalculator;
 
+    private TravelTimeCalculator travelTimeCalculator;
+
     // These are used for scaling coordinates in approximate distance calculations.
     // The lon value must be properly scaled to underestimate distances in the region where we're routing.
     private static final double MM_PER_UNIT_LAT_FIXED =
@@ -558,7 +560,7 @@ public class StreetRouter {
             // explore edges leaving this vertex
             edgeList.forEach(eidx -> {
                 edge.seek(eidx);
-                State s1 = edge.traverse(s0, streetMode, profileRequest, turnCostCalculator);
+                State s1 = edge.traverse(s0, streetMode, profileRequest, turnCostCalculator, travelTimeCalculator);
                 if (s1 != null && s1.distance <= distanceLimitMm && s1.getDurationSeconds() < tmpTimeLimitSeconds) {
                     if (!isDominated(s1)) {
                         // Calculate the heuristic (which involves a square root) only when the state is retained.
@@ -1175,5 +1177,8 @@ public class StreetRouter {
         public TIntObjectMap<State> getVertices() {
             return vertices;
         }
+    }
+
+    public static class DefaultTravelTimeCalculator implements TravelTimeCalculator {
     }
 }

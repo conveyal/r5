@@ -553,7 +553,7 @@ public class EdgeStore implements Serializable {
         }
 
         public StreetRouter.State traverse (StreetRouter.State s0, StreetMode streetMode, ProfileRequest req,
-                                            TurnCostCalculator turnCostCalculator) {
+                                            TurnCostCalculator turnCostCalculator, TravelTimeCalculator travelTimeCalculator) {
 
             // The vertex we'll be at after the traversal
             int vertex;

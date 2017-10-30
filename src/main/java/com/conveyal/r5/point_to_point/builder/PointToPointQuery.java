@@ -5,10 +5,7 @@ import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.ProfileOption;
 import com.conveyal.r5.api.util.StreetSegment;
 import com.conveyal.r5.profile.*;
-import com.conveyal.r5.streets.ParkRideRouter;
-import com.conveyal.r5.streets.Split;
-import com.conveyal.r5.streets.StreetRouter;
-import com.conveyal.r5.streets.VertexStore;
+import com.conveyal.r5.streets.*;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -42,6 +39,8 @@ public class PointToPointQuery {
 
     private final TransportNetwork transportNetwork;
 
+    private final TravelTimeCalculator travelTimeCalculator;
+
     // interpretation of below parameters: if biking is less than BIKE_PENALTY seconds faster than walking, we prefer to walk
 
     /** how many seconds worse biking to transit is than walking */
@@ -72,7 +71,12 @@ public class PointToPointQuery {
     private static final int CAR_PARK_DROPOFF_COST = 120;
 
     public PointToPointQuery(TransportNetwork transportNetwork) {
+        this(transportNetwork, new StreetRouter.DefaultTravelTimeCalculator());
+    }
+
+    public PointToPointQuery(TransportNetwork transportNetwork, TravelTimeCalculator travelTimeCalculator) {
         this.transportNetwork = transportNetwork;
+        this.travelTimeCalculator = travelTimeCalculator;
     }
 
     public ZoneId getTimezone() {

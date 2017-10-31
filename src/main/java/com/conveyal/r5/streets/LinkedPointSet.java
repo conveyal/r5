@@ -68,6 +68,9 @@ public class LinkedPointSet implements Serializable {
     /** For each point, distance from the final vertex of the edge to the split point. */
     public int[] distances1_mm;
 
+    /** For each point, distance from the point itself to the split point. */
+    double[] distancesToEdge_mm;
+
     /** For each transit stop, the distances to nearby PointSet points as packed (point_index, distance) pairs. */
     public List<int[]> stopToPointDistanceTables;
 
@@ -257,6 +260,7 @@ public class LinkedPointSet implements Serializable {
                     edges[p] = split.edge;
                     distances0_mm[p] = split.distance0_mm;
                     distances1_mm[p] = split.distance1_mm;
+                    distancesToEdge_mm[p] = Math.sqrt(split.distSquared)*1000;
                 }
                 counter.increment();
             }
@@ -309,10 +313,10 @@ public class LinkedPointSet implements Serializable {
 
             // TODO apply walk speed
             if (time0 != Integer.MAX_VALUE) {
-                time0 += distances0_mm[i] / offstreetTravelSpeedMillimetersPerSecond;
+                time0 += (distances0_mm[i] + distancesToEdge_mm[i]) / offstreetTravelSpeedMillimetersPerSecond;
             }
             if (time1 != Integer.MAX_VALUE) {
-                time1 += distances1_mm[i] / offstreetTravelSpeedMillimetersPerSecond;
+                time1 += (distances1_mm[i] + distancesToEdge_mm[i]) / offstreetTravelSpeedMillimetersPerSecond;
             }
             travelTimes[i] = time0 < time1 ? time0 : time1;
         }

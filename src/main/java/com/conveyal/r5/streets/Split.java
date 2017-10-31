@@ -27,7 +27,7 @@ public class Split {
     public int fixedLon; // the x coordinate of the link point along the edge
     public int fixedLat; // the y coordinate of the link point along the edge
     // We must use a long because squaring a typical search radius in fixed-point _does_ cause signed int32 overflow.
-    public long distSquared = Long.MAX_VALUE;
+    public long distSquared = Long.MAX_VALUE; // squared distance from given point to the split, in meters
 
     // The following fields require more calculations and are only set once a best edge is found.
     public int distance0_mm = 0; // the accumulated distance along the edge geometry up to the split point

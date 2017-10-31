@@ -28,7 +28,10 @@ import java.util.Arrays;
  * So TODO: we should merge these grid formats and update the spec to allow JSON errors at the end.
  */
 public class TravelTimeComputer {
+
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeComputer.class);
+
+    // FIXME pointset cache is never used - why?
     private static final WebMercatorGridPointSetCache pointSetCache = new WebMercatorGridPointSetCache();
 
     public final AnalysisTask request;
@@ -41,6 +44,8 @@ public class TravelTimeComputer {
         this.gridCache = gridCache;
     }
 
+    // TODO rename this - "writing" is only a minor side effect of what it's doing. Perhaps function should not be void return type. Why is this a "streaming" approach?
+    // We also want to decouple the internal representation of the results from how they're serialized to an API.
     public void write (OutputStream os) throws IOException {
         StreetMode accessMode = LegMode.getDominantStreetMode(request.accessModes);
         StreetMode directMode = LegMode.getDominantStreetMode(request.directModes);
@@ -50,6 +55,12 @@ public class TravelTimeComputer {
 
         PointSet destinations = request.getDestinations(network, gridCache);
 
+        // Get the appropriate function for reducing travel time, given the type of request we're handling
+        // (either a travel time surface for a single point or a location based accessibility indicator value for a
+        // regional analysis).
+        // FIXME maybe the reducer function should just be defined on the request.
+        // FIXME the reducer is given the output stream in a pseudo-pipelining approach. However it just accumulates results into memory before writing them out.
+        // Also, some of these classes could probably just be static functions.
         PerTargetPropagater.TravelTimeReducer output = request.getTravelTimeReducer(network, os);
 
         if (request.transitModes.isEmpty()) {
@@ -66,6 +77,7 @@ public class TravelTimeComputer {
             sr.setOrigin(fromLat, fromLon);
             sr.route();
 
+            //FIXME is this where the weird bike-only speeds are coming from?
             int offstreetTravelSpeedMillimetersPerSecond = (int) (request.getSpeedForMode(directMode) * 1000);
 
             LinkedPointSet linkedDestinations = destinations.link(network.streetLayer, directMode);
@@ -88,6 +100,8 @@ public class TravelTimeComputer {
             // linkage below
             // TODO use directMode? Is that a resource limiting issue?
             // also gridcomputer uses accessMode to avoid running two street searches
+            // TODO rename variables (in linkedDestinationsAccess it's not clear what "access" refers to when used below)
+            // They are being linked twice in case access and egress are by different modes.
             LinkedPointSet linkedDestinationsAccess = destinations.link(network.streetLayer, accessMode);
             LinkedPointSet linkedDestinationsEgress = destinations.link(network.streetLayer, StreetMode.WALK);
 
@@ -99,9 +113,20 @@ public class TravelTimeComputer {
             StreetRouter sr = new StreetRouter(network.streetLayer);
             sr.profileRequest = request;
 
+            // TODO short circuit - if no origin point is found, we can return a special value for nothing.
+            // However, how does this method return any data at all?
+            // boolean foundOriginPoint = sr.setOrigin();
+
+            // A map from transit stop vertex indices to the travel time it takes to reach those vertices.
+            // The blocks below essentially serve to fill in this map and produce a grid of non-transit travel times
+            // that will later be merged with the transit travel times.
             TIntIntMap accessTimes;
-            int offstreetTravelSpeedMillimetersPerSecond = (int) (request.getSpeedForMode(accessMode) * 1000);
+            // This will hold the travel times to all destination grid cells reachable without using transit
+            // via only the access/direct mode.
             int[] nonTransitTravelTimesToDestinations;
+
+            // The request has the speed in float meters per second, internally we use integer millimeters per second.
+            int offstreetTravelSpeedMillimetersPerSecond = (int) (request.getSpeedForMode(accessMode) * 1000);
 
             if (request.accessModes.contains(LegMode.CAR_PARK)) {
                 // Currently first search from origin to P+R is hardcoded as time dominance variable for Max car time seconds
@@ -113,7 +138,8 @@ public class TravelTimeComputer {
 
                 if (sr == null) {
                     // Origin not found. Return an empty access times map, as is done by the other conditions for other modes.
-                    // TODO this is ugly. we should have a way to break out of the search early (here and in other methods).
+                    // FIXME this is ugly. we should have a way to break out of the search early (here and in other methods).
+                    // It causes regional analyses to be very slow when there are a large number of disconnected cells.
                     accessTimes = new TIntIntHashMap();
                 } else {
                     accessTimes = sr.getReachedStops();
@@ -126,15 +152,16 @@ public class TravelTimeComputer {
             } else if (accessMode == StreetMode.WALK) {
                 // Special handling for walk search, find distance in seconds and divide to match behavior at egress
                 // (in stop trees). For bike/car searches this is immaterial as the access searches are already asymmetric.
+                // TODO clarify - I think this is referring to the fact that the egress trees are pre-calculated for a standard speed and must be adjusted.
                 sr.streetMode = accessMode;
-                sr.distanceLimitMeters = 2000; // TODO hardwired same as gridcomputer
+                sr.distanceLimitMeters = 2000; // TODO hardwired same as gridcomputer, at least use a symbolic constant
                 sr.setOrigin(request.fromLat, request.fromLon);
                 sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
                 sr.route();
 
                 // Get the travel times to all stops reached in the initial on-street search. Convert distances to speeds.
                 // getReachedStops returns distances in this case since dominance variable is millimeters,
-                // so convert to times in the loop below
+                // so convert to times in the loop below.
                 accessTimes = sr.getReachedStops();
                 for (TIntIntIterator it = accessTimes.iterator(); it.hasNext(); ) {
                     it.advance();
@@ -143,6 +170,7 @@ public class TravelTimeComputer {
 
                 // again, use distance / speed rather than time for symmetry with other searches
                 final StreetRouter effectivelyFinalSr = sr;
+                // FIXME is this iterating over every cell in the destination grid just to get the access times around the origin?
                 nonTransitTravelTimesToDestinations =
                         linkedDestinationsAccess.eval(v -> {
                                     StreetRouter.State state = effectivelyFinalSr.getStateAtVertex(v);
@@ -164,6 +192,11 @@ public class TravelTimeComputer {
                                 .travelTimes;
             }
 
+            // Short circuit unnecessary computation:
+            // If no road was found (e.g. start point is in the ocean) no destination is accessible, return all INF. (or special value)
+            // If a road was found but no transit stations were reached, return the non-transit grid as the final result.
+
+
             // Create a new Raptor Worker.
             FastRaptorWorker worker = new FastRaptorWorker(network.transitLayer, request, accessTimes);
 
@@ -174,6 +207,10 @@ public class TravelTimeComputer {
             // returning a surface representing the distribution of potential travel times to each destination, regional
             // requests that will return bootstrapped accessibility numbers via Amazon SQS.
 
+            // FIXME this is a very Javascript-Lisp style functional approach, not really idiomatic Java.
+            // We've also got methods tail-calling the next step in a process, instead of a method higher on the stack chaining them together.
+            // We should probably set the reducer field on the propagator instance, and give the methods return values.
+            // Actually these could just be two subclasses of the propagator with different TravelTimeReducer definition.
             PerTargetPropagater perTargetPropagater = new PerTargetPropagater(transitTravelTimesToStops, nonTransitTravelTimesToDestinations, linkedDestinationsEgress, request, 120 * 60);
             perTargetPropagater.propagate(output);
         }

@@ -22,6 +22,7 @@ import java.util.Arrays;
  * to nearby stops.
  */
 public class PerTargetPropagater {
+
     private static final Logger LOG = LoggerFactory.getLogger(PerTargetPropagater.class);
 
     /** Times at transit stops for each iteration */
@@ -48,10 +49,10 @@ public class PerTargetPropagater {
     }
 
     /**
-     * Call with either a reducer or a travelTimeReducer, but never both. One of the two must be null.
      * A reducer is only told whether the target was reached within the travel time threshold, which allows some
      * optimizations in certain cases. A travelTimeReducer receives a full list of travel times to the given
      * destination.
+     * TODO change function signature so this returns the resulting grid object
      */
     public void propagate (TravelTimeReducer travelTimeReducer) {
         targets.makePointToStopDistanceTablesIfNeeded();
@@ -130,6 +131,7 @@ public class PerTargetPropagater {
     }
 
     public interface TravelTimeReducer {
+        // TODO rename functions
         /** Receive the travel times for all iterations of the algorithm to a particular target specified by targetIndex */
         void accept (int targetIndex, int[] travelTimesForTarget);
 

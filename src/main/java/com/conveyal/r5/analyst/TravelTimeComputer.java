@@ -44,6 +44,7 @@ public class TravelTimeComputer {
     public void write (OutputStream os) throws IOException {
         StreetMode accessMode = LegMode.getDominantStreetMode(request.accessModes);
         StreetMode directMode = LegMode.getDominantStreetMode(request.directModes);
+        StreetMode egressMode = LegMode.getDominantStreetMode(request.egressModes);
 
         double fromLat = request.fromLat;
         double fromLon = request.fromLon;
@@ -89,7 +90,7 @@ public class TravelTimeComputer {
             // TODO use directMode? Is that a resource limiting issue?
             // also gridcomputer uses accessMode to avoid running two street searches
             LinkedPointSet linkedDestinationsAccess = destinations.link(network.streetLayer, accessMode);
-            LinkedPointSet linkedDestinationsEgress = destinations.link(network.streetLayer, StreetMode.WALK);
+            LinkedPointSet linkedDestinationsEgress = destinations.link(network.streetLayer, egressMode);
 
             if (!request.directModes.equals(request.accessModes)) {
                 LOG.warn("Disparate direct modes and access modes are not supported in analysis mode.");

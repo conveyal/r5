@@ -75,10 +75,10 @@ public class TravelTimeComputer {
                 int x = target % request.width;
                 int y = target / request.width;
 
-                final int travelTimeMinutes =
-                        travelTimesToTargets[target] == FastRaptorWorker.UNREACHED ? FastRaptorWorker.UNREACHED : travelTimesToTargets[target] / 60;
+                final int travelTimeSeconds =
+                        travelTimesToTargets[target] == FastRaptorWorker.UNREACHED ? FastRaptorWorker.UNREACHED : travelTimesToTargets[target];
 
-                output.accept(y * request.width + x, new int[] { travelTimeMinutes });
+                output.accept(y * request.width + x, new int[] { travelTimeSeconds });
             }
 
             output.finish();

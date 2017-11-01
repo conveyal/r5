@@ -177,7 +177,7 @@ public class Split {
         // for routing, we now want to convert the distance to millimeters.
         distanceCalculator.setStartingGeographicPoint(lon, lat);
         distanceCalculator.setDestinationGeographicPoint(
-                VertexStore.floatingDegreesToFixed(best.fixedLon), VertexStore.floatingDegreesToFixed(best.fixedLat)
+                VertexStore.fixedDegreesToFloating(best.fixedLon), VertexStore.fixedDegreesToFloating(best.fixedLat)
         );
         best.distanceToEdge_mm = (int) distanceCalculator.getOrthodromicDistance()*1000;
 

@@ -13,6 +13,7 @@ import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import com.conveyal.r5.streets.EdgeStore.Edge;
 import gnu.trove.set.TIntSet;
+import org.apache.commons.math3.util.FastMath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,7 +70,7 @@ public class LinkedPointSet implements Serializable {
     public int[] distances1_mm;
 
     /** For each point, distance from the point itself to the split point. */
-    double[] distancesToEdge_mm;
+    public int[] distancesToEdge_mm;
 
     /** For each transit stop, the distances to nearby PointSet points as packed (point_index, distance) pairs. */
     public List<int[]> stopToPointDistanceTables;
@@ -107,6 +108,7 @@ public class LinkedPointSet implements Serializable {
             edges = new int[nPoints];
             distances0_mm = new int[nPoints];
             distances1_mm = new int[nPoints];
+            distancesToEdge_mm = new int[nPoints];
             stopToPointDistanceTables = new ArrayList<>();
         } else {
             // The caller has supplied an existing linkage for a scenario StreetLayer's base StreetLayer.
@@ -125,6 +127,7 @@ public class LinkedPointSet implements Serializable {
             edges = Arrays.copyOf(baseLinkage.edges, nPoints);
             distances0_mm = Arrays.copyOf(baseLinkage.distances0_mm, nPoints);
             distances1_mm = Arrays.copyOf(baseLinkage.distances1_mm, nPoints);
+            distancesToEdge_mm = Arrays.copyOf(baseLinkage.distancesToEdge_mm, nPoints);
             stopToPointDistanceTables = new ArrayList<>(baseLinkage.stopToPointDistanceTables);
             // TODO We need to determine which points to re-link and which stops should have their stop-to-point tables re-built.
             // This should be all the points within the (bird-fly) linking radius of any modified edge.
@@ -183,6 +186,7 @@ public class LinkedPointSet implements Serializable {
         edges = new int[nCells];
         distances0_mm = new int[nCells];
         distances1_mm = new int[nCells];
+        distancesToEdge_mm = new int[nCells];
 
         // Copy values over from the source linkage to the new sub-linkage
         // x, y, and pixel are relative to the new linkage
@@ -199,6 +203,7 @@ public class LinkedPointSet implements Serializable {
                     edges[pixel] = sourceLinkage.edges[sourcePixel];
                     distances0_mm[pixel] = sourceLinkage.distances0_mm[sourcePixel];
                     distances1_mm[pixel] = sourceLinkage.distances1_mm[sourcePixel];
+                    distancesToEdge_mm[pixel] = sourceLinkage.distancesToEdge_mm[sourcePixel];
                 }
             }
         }
@@ -260,7 +265,7 @@ public class LinkedPointSet implements Serializable {
                     edges[p] = split.edge;
                     distances0_mm[p] = split.distance0_mm;
                     distances1_mm[p] = split.distance1_mm;
-                    distancesToEdge_mm[p] = Math.sqrt(split.distSquared)*1000;
+                    distancesToEdge_mm[p] = split.distanceToEdge_mm;
                 }
                 counter.increment();
             }

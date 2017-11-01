@@ -7,6 +7,10 @@ import gnu.trove.TIntCollection;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.apache.commons.math3.util.FastMath;
+import org.geotools.referencing.CRS;
+import org.geotools.referencing.GeodeticCalculator;
+import org.geotools.referencing.crs.DefaultGeographicCRS;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,7 +31,8 @@ public class Split {
     public int fixedLon; // the x coordinate of the link point along the edge
     public int fixedLat; // the y coordinate of the link point along the edge
     // We must use a long because squaring a typical search radius in fixed-point _does_ cause signed int32 overflow.
-    public long distSquared = Long.MAX_VALUE; // squared distance from given point to the split, in meters
+    public long distSquared = Long.MAX_VALUE; // squared distance from given point to the split, in degrees
+    public int distanceToEdge_mm = Integer.MAX_VALUE; //distance from given point to the split, in meters
 
     // The following fields require more calculations and are only set once a best edge is found.
     public int distance0_mm = 0; // the accumulated distance along the edge geometry up to the split point
@@ -47,6 +52,8 @@ public class Split {
         fixedLat = other.fixedLat;
         distSquared = other.distSquared;
     }
+
+    private static GeodeticCalculator distanceCalculator = new GeodeticCalculator(DefaultGeographicCRS.WGS84);
 
     /**
      * Find a location on an existing street near the given point, without actually creating any vertices or edges.
@@ -165,6 +172,13 @@ public class Split {
             best.distance0_mm = edge.getLengthMm();
         }
         best.distance1_mm = edge.getLengthMm() - best.distance0_mm;
+
+        // to speed up computation above, distancesquared was calculated above, using degrees
+        // for routing, we now want to convert the distance to millimeters.
+        distanceCalculator.setStartingGeographicPoint(lon, lat);
+        distanceCalculator.setDestinationGeographicPoint(best.fixedLon, best.fixedLat);
+        best.distanceToEdge_mm = (int) distanceCalculator.getOrthodromicDistance()*1000;
+
         return best;
     }
 

@@ -155,7 +155,7 @@ public class TravelTimeComputer {
                 // Other modes are already asymmetric with the egress/stop trees, so just do a time-based on street
                 // search and don't worry about distance limiting.
                 sr.streetMode = accessMode;
-                sr.timeLimitSeconds = request.getMaxAccessTimeForMode(accessMode);
+                sr.timeLimitSeconds = request.getMaxAccessTimeForMode(accessMode)*60;
                 sr.setOrigin(request.fromLat, request.fromLon);
                 sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
                 sr.route();

@@ -155,7 +155,7 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
     }
 
     @Override
-    public void accept(int target, int[] travelTimesForTarget) {
+    public void recordTravelTimesForTarget(int target, int[] travelTimesForTarget) {
         // We use the size of the grid to determine the number of destinations used in the linked point set in
         // TravelTimeComputer, therefore the target indices are relative to the grid, not the task.
         int gridx = target % grid.width;
@@ -175,7 +175,6 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
             if (travelTimesForTarget[0] < task.maxTripDurationMinutes * 60) {
                 bootstrapReplicationsOfAccessibility[0] += opportunityCountAtTarget;
             }
-
             return;
         }
 
@@ -224,7 +223,12 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
         }
     }
 
-    /** Write the origin to SQS */
+    /**
+     * Write the origin to SQS.
+     * If no travel times to destinations have been streamed in by calling recordTravelTimesForTarget, the
+     * bootstrapReplicationsOfAccessibility will all still be zero and the output will be zero, which allows
+     * shortcutting around routing and propagation when the origin point is not connected to the street network.
+     */
     @Override
     public void finish () {
         // now construct the output
@@ -246,7 +250,6 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
         SendMessageRequest smr = new SendMessageRequest(task.outputQueue, base64.encodeToString(baos.toByteArray()));
         smr = smr.addMessageAttributesEntry("jobId", new MessageAttributeValue().withDataType("String").withStringValue(task.jobId));
         sqs.sendMessage(smr);
-
-
     }
+
 }

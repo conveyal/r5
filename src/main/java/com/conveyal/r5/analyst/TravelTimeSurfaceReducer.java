@@ -19,6 +19,9 @@ import java.util.Collection;
  * Take the travel times to targets at each iteration (passed in one target at a time, because storing them all in memory
  * is not practical), and summarize that list to a few percentiles of travel time and return them in an AccessGrid-format
  * file (see AccessGridWriter for format documentation).
+ *
+ * FIXME the destinations are always passed in in order. Why not just stream them through?
+ * i.e. call startWrite() then writeOnePixel() in a loop, then endWrite()
  */
 public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeReducer {
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeSurfaceReducer.class);
@@ -50,7 +53,7 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
     }
 
     @Override
-    public void accept (int target, int[] times) {
+    public void recordTravelTimesForTarget (int target, int[] times) {
         int nPercentiles = task.percentiles.length;
         // sort the times at each target and read off percentiles
         Arrays.sort(times);
@@ -78,13 +81,21 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
         }
     }
 
+    /**
+     * Write the accumulated results out to the output stream.
+     *
+     * If no travel times to destinations have been streamed in by calling recordTravelTimesForTarget, the
+     * AccessGridWriter (encodedResults) will have a buffer full of UNREACHED. This allows shortcutting around
+     * routing and propagation when the origin point is not connected to the street network.
+     */
     @Override
     public void finish () {
         try {
-            LOG.info("Travel time surface of size {}kb complete", encodedResults.getBytes().length / 1000);
+            LOG.info("Travel time surface of size {} kB complete", encodedResults.getBytes().length / 1000);
             outputStream.write(encodedResults.getBytes());
 
-            LOG.info("Travel time surface written, appending metadata with {} warnings", network.scenarioApplicationWarnings.size());
+            LOG.info("Travel time surface written, appending metadata with {} warnings",
+                    network.scenarioApplicationWarnings.size());
 
             // Append scenario application warning JSON to result
             ResultMetadata metadata = new ResultMetadata();
@@ -98,7 +109,6 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
             LOG.warn("Unexpected IOException returning travel time surface to client", e);
         }
     }
-
 
     private static class ResultMetadata {
         public Collection<TaskError> scenarioApplicationWarnings;

@@ -44,85 +44,94 @@ public class TravelTimeComputer {
         this.gridCache = gridCache;
     }
 
-    // TODO rename this - "writing" is only a minor side effect of what it's doing. Perhaps function should not be void return type. Why is this a "streaming" approach?
+    // TODO rename this - "writing" is only a minor side effect of what it's doing.
+    // Perhaps function should not be void return type. Why is this using a streaming or pipelining approach?
     // We also want to decouple the internal representation of the results from how they're serialized to an API.
     public void write (OutputStream os) throws IOException {
+
+        // The mode of travel that will be used to reach transit stations from the origin point.
         StreetMode accessMode = LegMode.getDominantStreetMode(request.accessModes);
+
+        // The mode of travel that would be used to reach the destination directly without using transit.
         StreetMode directMode = LegMode.getDominantStreetMode(request.directModes);
 
-        double fromLat = request.fromLat;
-        double fromLon = request.fromLon;
-
+        // The set of destinations in the one-to-many travel time calculations, not yet linked to the street network.
         PointSet destinations = request.getDestinations(network, gridCache);
 
         // Get the appropriate function for reducing travel time, given the type of request we're handling
         // (either a travel time surface for a single point or a location based accessibility indicator value for a
         // regional analysis).
-        // FIXME maybe the reducer function should just be defined on the request.
+        // FIXME maybe the reducer function should just be defined (overridden) on the request class.
         // FIXME the reducer is given the output stream in a pseudo-pipelining approach. However it just accumulates results into memory before writing them out.
         // Also, some of these classes could probably just be static functions.
-        PerTargetPropagater.TravelTimeReducer output = request.getTravelTimeReducer(network, os);
+        PerTargetPropagater.TravelTimeReducer travelTimeReducer = request.getTravelTimeReducer(network, os);
 
+        // Attempt to set the origin point before progressing any further.
+        // This allows us to short circuit calculations if the network is entirely inaccessible. In the CAR_PARK
+        // case this StreetRouter will be replaced but this still serves to bypass unnecessary computation.
+        StreetRouter sr = new StreetRouter(network.streetLayer);
+        // Request must be provided to the router before setting the origin point.
+        sr.profileRequest = request;
+        boolean foundOriginPoint = sr.setOrigin(request.fromLat, request.fromLon);
+        if (!foundOriginPoint) {
+            // Short circuit around routing and propagation.
+            // Calling finish before streaming in any destinations is designed to produce the right result here.
+            LOG.info("Origin point was outside the transport network. Returning default result.");
+            travelTimeReducer.finish();
+            return;
+        }
+
+        // First we will find travel times to all destinations reachable without using transit.
+        // Simultaneously we will find stations that allow access to the transit network.
         if (request.transitModes.isEmpty()) {
-            // non transit search
-            StreetRouter sr = new StreetRouter(network.streetLayer);
-            sr.timeLimitSeconds = request.maxTripDurationMinutes * 60;
-            sr.streetMode = directMode;
+            // This search will use no transit.
             // When doing a non-transit walk search, we're not trying to match the behavior of egress and transfer
             // searches which use distance as the quantity to minimize (because they are precalculated and stored as distance,
-            // and then converted to times by dividing by speed without regard to weights/penalties for things like stairs)
+            // and then converted to times by dividing by speed without regard to weights/penalties for things like stairs).
             // This does mean that walk-only results will not match the walking portion of walk+transit results.
+            sr.timeLimitSeconds = request.maxTripDurationMinutes * 60;
+            sr.streetMode = directMode;
             sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
-            sr.profileRequest = request;
-            sr.setOrigin(fromLat, fromLon);
             sr.route();
 
-            //FIXME is this where the weird bike-only speeds are coming from?
             int offstreetTravelSpeedMillimetersPerSecond = (int) (request.getSpeedForMode(directMode) * 1000);
 
             LinkedPointSet linkedDestinations = destinations.link(network.streetLayer, directMode);
 
-            int[] travelTimesToTargets = linkedDestinations.eval(sr::getTravelTimeToVertex, offstreetTravelSpeedMillimetersPerSecond).travelTimes;
+            int[] travelTimesToTargets = linkedDestinations
+                    .eval(sr::getTravelTimeToVertex, offstreetTravelSpeedMillimetersPerSecond).travelTimes;
+
+            // FIXME replace with nested x and y loops, we are dividing then re-multiplying below
             for (int target = 0; target < travelTimesToTargets.length; target++) {
                 int x = target % request.width;
                 int y = target / request.width;
-
-                final int travelTimeMinutes =
-                        travelTimesToTargets[target] == FastRaptorWorker.UNREACHED ? FastRaptorWorker.UNREACHED : travelTimesToTargets[target] / 60;
-
-                output.accept(y * request.width + x, new int[] { travelTimeMinutes });
+                final int travelTimeMinutes = travelTimesToTargets[target] == FastRaptorWorker.UNREACHED ?
+                        FastRaptorWorker.UNREACHED : travelTimesToTargets[target] / 60;
+                travelTimeReducer.recordTravelTimesForTarget(y * request.width + x, new int[] { travelTimeMinutes });
             }
 
-            output.finish();
+            travelTimeReducer.finish();
         } else {
-            // we always walk to egress from transit, but we may have a different access mode.
-            // if the access mode is also walk, the pointset's linkage cache will return two references to the same
-            // linkage below
-            // TODO use directMode? Is that a resource limiting issue?
-            // also gridcomputer uses accessMode to avoid running two street searches
-            // TODO rename variables (in linkedDestinationsAccess it's not clear what "access" refers to when used below)
-            // They are being linked twice in case access and egress are by different modes.
-            LinkedPointSet linkedDestinationsAccess = destinations.link(network.streetLayer, accessMode);
-            LinkedPointSet linkedDestinationsEgress = destinations.link(network.streetLayer, StreetMode.WALK);
+            // This search will include transit.
+            // The mode of travel from transit to the destination (egress) is always walking, but we may have a
+            // different access mode. If the access mode is also walk, the pointset's linkage cache will return two
+            // references to the same linkage below.
+            // TODO use directMode? Is that a resource limiting issue? Also, gridcomputer uses accessMode to avoid running two street searches.
+            LinkedPointSet accessModeLinkedDestinations = destinations.link(network.streetLayer, accessMode);
+            LinkedPointSet egressModeLinkedDestinations = destinations.link(network.streetLayer, StreetMode.WALK);
 
             if (!request.directModes.equals(request.accessModes)) {
-                LOG.warn("Disparate direct modes and access modes are not supported in analysis mode.");
+                LOG.warn("Direct mode may not be different than access mode in analysis.");
             }
 
-            // Perform street search to find transit stops and non-transit times.
-            StreetRouter sr = new StreetRouter(network.streetLayer);
-            sr.profileRequest = request;
-
-            // TODO short circuit - if no origin point is found, we can return a special value for nothing.
-            // However, how does this method return any data at all?
-            // boolean foundOriginPoint = sr.setOrigin();
+            // The code blocks below essentially serve to identify transit stations reachable from the origin and
+            // produce a grid of non-transit travel times that will later be merged with the transit travel times.
 
             // A map from transit stop vertex indices to the travel time it takes to reach those vertices.
-            // The blocks below essentially serve to fill in this map and produce a grid of non-transit travel times
-            // that will later be merged with the transit travel times.
             TIntIntMap accessTimes;
+
             // This will hold the travel times to all destination grid cells reachable without using transit
-            // via only the access/direct mode.
+            // (via only the access/direct mode).
             int[] nonTransitTravelTimesToDestinations;
 
             // The request has the speed in float meters per second, internally we use integer millimeters per second.
@@ -147,7 +156,7 @@ public class TravelTimeComputer {
 
                 // disallow non-transit access
                 // TODO should we allow non transit access with park and ride?
-                nonTransitTravelTimesToDestinations = new int[linkedDestinationsAccess.size()];
+                nonTransitTravelTimesToDestinations = new int[accessModeLinkedDestinations.size()];
                 Arrays.fill(nonTransitTravelTimesToDestinations, FastRaptorWorker.UNREACHED);
             } else if (accessMode == StreetMode.WALK) {
                 // Special handling for walk search, find distance in seconds and divide to match behavior at egress
@@ -155,7 +164,6 @@ public class TravelTimeComputer {
                 // TODO clarify - I think this is referring to the fact that the egress trees are pre-calculated for a standard speed and must be adjusted.
                 sr.streetMode = accessMode;
                 sr.distanceLimitMeters = 2000; // TODO hardwired same as gridcomputer, at least use a symbolic constant
-                sr.setOrigin(request.fromLat, request.fromLon);
                 sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
                 sr.route();
 
@@ -172,7 +180,7 @@ public class TravelTimeComputer {
                 final StreetRouter effectivelyFinalSr = sr;
                 // FIXME is this iterating over every cell in the destination grid just to get the access times around the origin?
                 nonTransitTravelTimesToDestinations =
-                        linkedDestinationsAccess.eval(v -> {
+                        accessModeLinkedDestinations.eval(v -> {
                                     StreetRouter.State state = effectivelyFinalSr.getStateAtVertex(v);
                                     if (state == null) return FastRaptorWorker.UNREACHED;
                                     else return state.distance / offstreetTravelSpeedMillimetersPerSecond;
@@ -183,19 +191,16 @@ public class TravelTimeComputer {
                 // search and don't worry about distance limiting.
                 sr.streetMode = accessMode;
                 sr.timeLimitSeconds = request.getMaxAccessTimeForMode(accessMode);
-                sr.setOrigin(request.fromLat, request.fromLon);
                 sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
                 sr.route();
                 accessTimes = sr.getReachedStops(); // already in seconds
                 nonTransitTravelTimesToDestinations =
-                        linkedDestinationsAccess.eval(sr::getTravelTimeToVertex, offstreetTravelSpeedMillimetersPerSecond)
+                        accessModeLinkedDestinations.eval(sr::getTravelTimeToVertex, offstreetTravelSpeedMillimetersPerSecond)
                                 .travelTimes;
             }
 
             // Short circuit unnecessary computation:
-            // If no road was found (e.g. start point is in the ocean) no destination is accessible, return all INF. (or special value)
             // If a road was found but no transit stations were reached, return the non-transit grid as the final result.
-
 
             // Create a new Raptor Worker.
             FastRaptorWorker worker = new FastRaptorWorker(network.transitLayer, request, accessTimes);
@@ -211,8 +216,8 @@ public class TravelTimeComputer {
             // We've also got methods tail-calling the next step in a process, instead of a method higher on the stack chaining them together.
             // We should probably set the reducer field on the propagator instance, and give the methods return values.
             // Actually these could just be two subclasses of the propagator with different TravelTimeReducer definition.
-            PerTargetPropagater perTargetPropagater = new PerTargetPropagater(transitTravelTimesToStops, nonTransitTravelTimesToDestinations, linkedDestinationsEgress, request, 120 * 60);
-            perTargetPropagater.propagate(output);
+            PerTargetPropagater perTargetPropagater = new PerTargetPropagater(transitTravelTimesToStops, nonTransitTravelTimesToDestinations, egressModeLinkedDestinations, request, 120 * 60);
+            perTargetPropagater.propagate(travelTimeReducer);
         }
     }
 }

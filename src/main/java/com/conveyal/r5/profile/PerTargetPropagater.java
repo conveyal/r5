@@ -116,7 +116,7 @@ public class PerTargetPropagater {
                 });
             }
 
-            travelTimeReducer.accept(targetIdx, perIterationTravelTimes);
+            travelTimeReducer.recordTravelTimesForTarget(targetIdx, perIterationTravelTimes);
         }
 
         long totalTimeMillis = System.currentTimeMillis() - startTimeMillis;
@@ -130,12 +130,29 @@ public class PerTargetPropagater {
         travelTimeReducer.finish();
     }
 
+    /**
+     * This interface has two different implementations, one for creating an accessibility indicator and another for
+     * creating a travel time surface. It receives a large number of travel time observations and retains
+     * only a smaller set of summary measures.
+     *
+     * TODO our code always passes the targets into this interface in order, one after another, no need to buffer results.
+     * We could just stream results out immediately.
+     */
     public interface TravelTimeReducer {
-        // TODO rename functions
-        /** Receive the travel times for all iterations of the algorithm to a particular target specified by targetIndex */
-        void accept (int targetIndex, int[] travelTimesForTarget);
 
-        /** Called when propagation is done, used to signal the reducer that it can upload its results to s3 etc; optional */
+        /**
+         * Records a set of travel times to a particular target (for different departure times and MC draws).
+         * TODO Javadoc: Does this need to be called once for each target? What happens if we don't?
+         */
+        void recordTravelTimesForTarget(int targetIndex, int[] travelTimesForTarget);
+
+        /**
+         * Called when propagation is done, used to signal the reducer that it can write / upload its results to s3 etc.
+         * If this is called immediately without supplying any travel times via recordTravelTimesForTarget,
+         * we have bypassed propagation entirely and the implementation should write out a default result for cases
+         * where the network is entirely unreachable.
+         */
         default void finish () {};
+
     }
 }

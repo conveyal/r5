@@ -75,8 +75,8 @@ public class TravelTimeComputer {
         boolean foundOriginPoint = sr.setOrigin(request.fromLat, request.fromLon);
         if (!foundOriginPoint) {
             // Short circuit around routing and propagation.
-            // Calling finish before streaming in any destinations is designed to produce the right result here.
-            LOG.info("Origin point was outside the transport network. Returning default result.");
+            // Calling finish() before streaming in any travel times to destinations is designed to produce the right result here.
+            LOG.info("Origin point was outside the transport network. Skipping routing and propagation, and returning default result.");
             travelTimeReducer.finish();
             return;
         }

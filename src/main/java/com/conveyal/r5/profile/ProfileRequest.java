@@ -239,7 +239,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     }
 
     /**
-     * @return the speed at which the given mode will traverse street edges.
+     * @return the speed at which the given mode will traverse street edges, in floating point meters per second.
      */
     @JsonIgnore
     public float getSpeedForMode (StreetMode streetMode) {

@@ -93,8 +93,10 @@ import java.util.stream.DoubleStream;
  * The results are placed on an Amazon SQS queue for collation by a GridResultQueueConsumer and a GridResultAssembler.
  */
 public class BootstrappingTravelTimeReducer implements PerTargetPropagater.TravelTimeReducer {
+
     /** The number of bootstrap replications used to bootstrap the sampling distribution of the percentiles */
-    public static final int N_BOOTSTRAP_REPLICATIONS = 1000;
+    // This is hardwired to zero until we can make it more controllable, or use it as a calibration tool for number of MC draws.
+    public static final int N_BOOTSTRAP_REPLICATIONS = 0;
 
     /** SQS client. TODO: async? */
     private static final AmazonSQS sqs = new AmazonSQSClient();

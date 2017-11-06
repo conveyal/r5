@@ -87,16 +87,16 @@ public class ProfileRequest implements Serializable, Cloneable {
      */
     public int    maxWalkTime = 30;
     
-    /** Maximum bike time when using transit */
+    /** Maximum bike time when using transit, in minutes */
     public int    maxBikeTime = 30;
     
-    /** Maximum car time before when using transit */ 
+    /** Maximum car time before when using transit, in minutes */
     public int    maxCarTime = 30;
     
-    /** Minimum time to ride a bike (to prevent extremely short bike legs) */
+    /** Minimum time to ride a bike (to prevent extremely short bike legs), in minutes */
     public int    minBikeTime = 5;
     
-    /** Minimum time to drive (to prevent extremely short driving legs) */
+    /** Minimum time to drive (to prevent extremely short driving legs), in minutes */
     public int    minCarTime = 5;
 
     /** The date of the search */

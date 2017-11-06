@@ -37,17 +37,7 @@ public class LinkedPointSet implements Serializable {
      * The distance we search around each PointSet point for a road to link it to.
      * FIXME 1KM is really far to walk off a street. But some places have offices in the middle of big parking lots.
      */
-    public static final int MAX_OFFSTREET_WALK_METERS = 2000;
-
-    /**
-     * Approximate width of a typical regular grid cell, in meters.
-     */
-    public static final int CELL_SIZE = 200;
-
-    /**
-     * Off-roading penalty.  We let people swim, etc., but at a cost.
-     */
-    public static final int OFFROAD_PENALTY = 180;
+    public static final int MAX_OFFSTREET_WALK_METERS = 350;
 
     /**
      * LinkedPointSets are long-lived and not extremely numerous, so we keep references to the objects it was built from.
@@ -78,9 +68,6 @@ public class LinkedPointSet implements Serializable {
 
     /** For each point, distance from the final vertex of the edge to the split point. */
     public int[] distances1_mm;
-
-    /** For each point, distance from the point itself to the split point. */
-    public int[] distancesToEdge_mm;
 
     /** For each transit stop, the distances to nearby PointSet points as packed (point_index, distance) pairs. */
     public List<int[]> stopToPointDistanceTables;
@@ -118,7 +105,6 @@ public class LinkedPointSet implements Serializable {
             edges = new int[nPoints];
             distances0_mm = new int[nPoints];
             distances1_mm = new int[nPoints];
-            distancesToEdge_mm = new int[nPoints];
             stopToPointDistanceTables = new ArrayList<>();
         } else {
             // The caller has supplied an existing linkage for a scenario StreetLayer's base StreetLayer.
@@ -137,7 +123,6 @@ public class LinkedPointSet implements Serializable {
             edges = Arrays.copyOf(baseLinkage.edges, nPoints);
             distances0_mm = Arrays.copyOf(baseLinkage.distances0_mm, nPoints);
             distances1_mm = Arrays.copyOf(baseLinkage.distances1_mm, nPoints);
-            distancesToEdge_mm = Arrays.copyOf(baseLinkage.distancesToEdge_mm, nPoints);
             stopToPointDistanceTables = new ArrayList<>(baseLinkage.stopToPointDistanceTables);
             // TODO We need to determine which points to re-link and which stops should have their stop-to-point tables re-built.
             // This should be all the points within the (bird-fly) linking radius of any modified edge.
@@ -163,7 +148,6 @@ public class LinkedPointSet implements Serializable {
         this.makeStopToPointDistanceTables(treeRebuildZone);
 
     }
-
 
     /**
      * Construct a new LinkedPointSet for a grid that falls entirely within an existing grid LinkedPointSet.
@@ -196,7 +180,6 @@ public class LinkedPointSet implements Serializable {
         edges = new int[nCells];
         distances0_mm = new int[nCells];
         distances1_mm = new int[nCells];
-        distancesToEdge_mm = new int[nCells];
 
         // Copy values over from the source linkage to the new sub-linkage
         // x, y, and pixel are relative to the new linkage
@@ -213,7 +196,6 @@ public class LinkedPointSet implements Serializable {
                     edges[pixel] = sourceLinkage.edges[sourcePixel];
                     distances0_mm[pixel] = sourceLinkage.distances0_mm[sourcePixel];
                     distances1_mm[pixel] = sourceLinkage.distances1_mm[sourcePixel];
-                    distancesToEdge_mm[pixel] = sourceLinkage.distancesToEdge_mm[sourcePixel];
                 }
             }
         }
@@ -275,7 +257,6 @@ public class LinkedPointSet implements Serializable {
                     edges[p] = split.edge;
                     distances0_mm[p] = split.distance0_mm;
                     distances1_mm[p] = split.distance1_mm;
-                    distancesToEdge_mm[p] = split.distanceToEdge_mm;
                 }
                 counter.increment();
             }
@@ -331,24 +312,12 @@ public class LinkedPointSet implements Serializable {
             // but make it costly to walk long distances where there aren't streets.  The approach below
             // accomplishes that, applying a penalty to off-street distances greater than the typical grid cell size.
             // We could use a distance threshold more closely tied to pointset resolution/coverage
-            int scaledLinkDist = distancesToEdge_mm[i] > CELL_SIZE*1000 ?
-                    distancesToEdge_mm[i] + OFFROAD_PENALTY * (distancesToEdge_mm[i] - CELL_SIZE * 1000) : distancesToEdge_mm[i];
-
-            // Check for integer overflows
-            // FIXME clean this up, maybe using FastRaptorWorker.UNLINKED
-            if (scaledLinkDist > MAX_OFFSTREET_WALK_METERS * 1000 || scaledLinkDist < 0 || scaledLinkDist + distances0_mm[i] < 0){
-                time0 = Integer.MAX_VALUE;
-            }
-
-            if (scaledLinkDist > MAX_OFFSTREET_WALK_METERS*1000 || scaledLinkDist < 0 || scaledLinkDist + distances1_mm[i] < 0){
-                time1 = Integer.MAX_VALUE;
-            }
 
             if (time0 != Integer.MAX_VALUE) {
-                time0 += (distances0_mm[i] + scaledLinkDist) / offstreetTravelSpeedMillimetersPerSecond;
+                time0 += (distances0_mm[i]) / offstreetTravelSpeedMillimetersPerSecond;
             }
             if (time1 != Integer.MAX_VALUE) {
-                time1 += (distances1_mm[i] + scaledLinkDist) / offstreetTravelSpeedMillimetersPerSecond;
+                time1 += (distances1_mm[i]) / offstreetTravelSpeedMillimetersPerSecond;
             }
 
             travelTimes[i] = time0 < time1 ? time0 : time1;
@@ -375,14 +344,11 @@ public class LinkedPointSet implements Serializable {
             int t1 = Integer.MAX_VALUE, t2 = Integer.MAX_VALUE;
             // TODO this is not strictly correct when there are turn restrictions onto the edge this is linked to
 
-            int scaledLinkDist = distancesToEdge_mm[p] > CELL_SIZE*1000 ?
-                    distancesToEdge_mm[p] + OFFROAD_PENALTY*(distancesToEdge_mm[p]-CELL_SIZE*1000) : distancesToEdge_mm[p];
-
             if (distanceTableToVertices.containsKey(edge.getFromVertex())) {
-                t1 = distanceTableToVertices.get(edge.getFromVertex()) + distances0_mm[p] + scaledLinkDist;
+                t1 = distanceTableToVertices.get(edge.getFromVertex()) + distances0_mm[p];
             }
             if (distanceTableToVertices.containsKey(edge.getToVertex())) {
-                t2 = distanceTableToVertices.get(edge.getToVertex()) + distances1_mm[p] + scaledLinkDist;
+                t2 = distanceTableToVertices.get(edge.getToVertex()) + distances1_mm[p];
             }
             int t = Math.min(t1, t2);
             if (t != Integer.MAX_VALUE) {

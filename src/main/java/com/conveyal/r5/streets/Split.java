@@ -32,11 +32,21 @@ public class Split {
     public int fixedLat; // the y coordinate of the link point along the edge
     // We must use a long because squaring a typical search radius in fixed-point _does_ cause signed int32 overflow.
     public long distSquared = Long.MAX_VALUE; // squared distance from given point to the split, in degrees
-    public int distanceToEdge_mm = Integer.MAX_VALUE; //distance from given point to the split, in meters
 
     // The following fields require more calculations and are only set once a best edge is found.
-    public int distance0_mm = 0; // the accumulated distance along the edge geometry up to the split point
-    public int distance1_mm = 0; // the accumulated distance along the edge geometry after the split point
+
+    /**
+     * Accumulated distance from the beginning vertex of the edge geometry up to the split point for a link point,
+     * plus the distance from the link point to the split point
+     */
+    public int distance0_mm = 0;
+
+    /**
+     * Accumulated distance from the end vertex of the edge geometry up to the split point for a link point,
+     * plus the distance from the link point to the split point
+     */
+    public int distance1_mm = 0;
+
     public int vertex0; // the vertex at the beginning of the chosen edge
     public int vertex1; // the vertex at the end of the chosen edge
 
@@ -173,18 +183,13 @@ public class Split {
         }
         best.distance1_mm = edge.getLengthMm() - best.distance0_mm;
 
-        // to speed up computation above, distancesquared was calculated above, using degrees
-        // for routing, we now want to convert the distance to millimeters.
-        try {
-            distanceCalculator.setStartingGeographicPoint(lon, lat);
-            distanceCalculator.setDestinationGeographicPoint(
-                    VertexStore.fixedDegreesToFloating(best.fixedLon), VertexStore.fixedDegreesToFloating(best.fixedLat)
-            );
-            best.distanceToEdge_mm = (int) distanceCalculator.getOrthodromicDistance() * 1000;
-        } catch (IllegalStateException e) {
-            LOG.warn("Could not connect point to edge split point.");
-            best.distanceToEdge_mm = Integer.MAX_VALUE;
-        }
+        // To speed up computation above, square roots were avoided and distSquared was calculated using fixed degrees.
+        // We now want to calculate the distance in millimeters, for routing.  To do so, we take the square root of
+        // distSquared, convert to floating point degrees latitude then multiply by the metersPerDegreeLat factor above
+        // and 1000 to convert to millimeters.  This is accurate enough for our purposes.
+        best.distance0_mm += VertexStore.fixedDegreesToFloating(FastMath.sqrt(best.distSquared)) * metersPerDegreeLat * 1000;
+        best.distance1_mm += VertexStore.fixedDegreesToFloating(FastMath.sqrt(best.distSquared)) * metersPerDegreeLat * 1000;
+
         return best;
     }
 

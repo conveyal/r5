@@ -37,7 +37,17 @@ public class LinkedPointSet implements Serializable {
      * The distance we search around each PointSet point for a road to link it to.
      * FIXME 1KM is really far to walk off a street. But some places have offices in the middle of big parking lots.
      */
-    public static final int MAX_OFFSTREET_WALK_METERS = 4000;
+    public static final int MAX_OFFSTREET_WALK_METERS = 2000;
+
+    /**
+     * Approximate width of a typical regular grid cell, in meters.
+     */
+    public static final int CELL_SIZE = 200;
+
+    /**
+     * Off-roading penalty.  We let people swim, etc., but at a cost.
+     */
+    public static final int OFFROAD_PENALTY = 180;
 
     /**
      * LinkedPointSets are long-lived and not extremely numerous, so we keep references to the objects it was built from.
@@ -316,13 +326,31 @@ public class LinkedPointSet implements Serializable {
             int time0 = travelTimeForVertex.getTravelTime(edge.getFromVertex());
             int time1 = travelTimeForVertex.getTravelTime(edge.getToVertex());
 
-            // TODO apply walk speed
+            // An "off-roading" penalty is applied to limit extending isochrones into water bodies, etc.
+            // We may want to keep the MAX_OFFSTREET_WALK_METERS relatively high to avoid holes in the isochrones,
+            // but make it costly to walk long distances where there aren't streets.  The approach below
+            // accomplishes that, applying a penalty to off-street distances greater than the typical grid cell size.
+            // We could use a distance threshold more closely tied to pointset resolution/coverage
+            int scaledLinkDist = distancesToEdge_mm[i] > CELL_SIZE*1000 ?
+                    distancesToEdge_mm[i] + OFFROAD_PENALTY * (distancesToEdge_mm[i] - CELL_SIZE * 1000) : distancesToEdge_mm[i];
+
+            // Check for integer overflows
+            // FIXME clean this up, maybe using FastRaptorWorker.UNLINKED
+            if (scaledLinkDist > MAX_OFFSTREET_WALK_METERS * 1000 || scaledLinkDist < 0 || scaledLinkDist + distances0_mm[i] < 0){
+                time0 = Integer.MAX_VALUE;
+            }
+
+            if (scaledLinkDist > MAX_OFFSTREET_WALK_METERS*1000 || scaledLinkDist < 0 || scaledLinkDist + distances1_mm[i] < 0){
+                time1 = Integer.MAX_VALUE;
+            }
+
             if (time0 != Integer.MAX_VALUE) {
-                time0 += (distances0_mm[i] + distancesToEdge_mm[i]) / offstreetTravelSpeedMillimetersPerSecond;
+                time0 += (distances0_mm[i] + scaledLinkDist) / offstreetTravelSpeedMillimetersPerSecond;
             }
             if (time1 != Integer.MAX_VALUE) {
-                time1 += (distances1_mm[i] + distancesToEdge_mm[i]) / offstreetTravelSpeedMillimetersPerSecond;
+                time1 += (distances1_mm[i] + scaledLinkDist) / offstreetTravelSpeedMillimetersPerSecond;
             }
+
             travelTimes[i] = time0 < time1 ? time0 : time1;
         }
         return new PointSetTimes (pointSet, travelTimes);
@@ -346,11 +374,15 @@ public class LinkedPointSet implements Serializable {
             edge.seek(edges[p]);
             int t1 = Integer.MAX_VALUE, t2 = Integer.MAX_VALUE;
             // TODO this is not strictly correct when there are turn restrictions onto the edge this is linked to
+
+            int scaledLinkDist = distancesToEdge_mm[p] > CELL_SIZE*1000 ?
+                    distancesToEdge_mm[p] + OFFROAD_PENALTY*(distancesToEdge_mm[p]-CELL_SIZE*1000) : distancesToEdge_mm[p];
+
             if (distanceTableToVertices.containsKey(edge.getFromVertex())) {
-                t1 = distanceTableToVertices.get(edge.getFromVertex()) + distances0_mm[p];
+                t1 = distanceTableToVertices.get(edge.getFromVertex()) + distances0_mm[p] + scaledLinkDist;
             }
             if (distanceTableToVertices.containsKey(edge.getToVertex())) {
-                t2 = distanceTableToVertices.get(edge.getToVertex()) + distances1_mm[p];
+                t2 = distanceTableToVertices.get(edge.getToVertex()) + distances1_mm[p] + scaledLinkDist;
             }
             int t = Math.min(t1, t2);
             if (t != Integer.MAX_VALUE) {

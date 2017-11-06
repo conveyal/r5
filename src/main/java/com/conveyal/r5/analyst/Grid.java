@@ -128,9 +128,9 @@ public class Grid {
     }
 
     public static class PixelWeight {
-        final int x;
-        final int y;
-        final double weight;
+        public final int x;
+        public final int y;
+        public final double weight;
 
         private PixelWeight (int x, int y, double weight){
             this.x = x;
@@ -140,28 +140,11 @@ public class Grid {
     }
 
     /**
-     * A functional interface (callback interface) that processes one pixel weight at a time.
-     * This avoids storing massive lists of intermediate results that have been known to eat memory on the server.
-     * This happens when processing geometries that contain a huge amount of pixels, which a user might include in
-     * a shapefile.
-     */
-    public interface PixelWeightCallback {
-        void handlePixelWeight (int x, int y, double weight);
-    }
-
-    /**
-     * Stream pixel weights using a callback, rather than keeping them in memory.
-     */
-    public void streamPixelWeights (Geometry geometry, boolean relativeToPixels, PixelWeightCallback pixelWeightCallback) {
-        getPixelWeights(geometry, relativeToPixels, pixelWeightCallback);
-    }
-
-    /**
      * Version of getPixelWeights which returns the weights as relative to the total area of the input geometry (i.e.
      * the weight at a pixel is the proportion of the input geometry that falls within that pixel.
      */
     public List<PixelWeight> getPixelWeights (Geometry geometry) {
-        return getPixelWeights(geometry, false, null);
+        return getPixelWeights(geometry, false);
     }
 
     // PreparedGeometry is often faster for small numbers of vertices;
@@ -177,16 +160,9 @@ public class Grid {
      * portion of this polygon which is within the given pixel. If using incrementPixelWeights, this should be set to
      * false.
      *
-     * This is an internal private method, called by two different public methods with different signatures,
-     * streamPixelWeights or getPixelWeights above.
-     *
-     * streamPixelWeights includes a callback function, which is called for each pixel.  This function then returns null.
-     * The public getPixelWeights calls this function with a null callback, so this function returns the weights.
-     *
      * This used to return a map from int arrays containing the coordinates to the weight.
-     *
      */
-    private List<PixelWeight> getPixelWeights (Geometry geometry, boolean relativeToPixels, PixelWeightCallback pixelWeightCallback) {
+    public List<PixelWeight> getPixelWeights (Geometry geometry, boolean relativeToPixels) {
         // No need to convert to a local coordinate system
         // Both the supplied polygon and the web mercator pixel geometries are left in WGS84 geographic coordinates.
         // Both are distorted equally along the X axis at a given latitude so the proportion of the geometry within
@@ -225,19 +201,11 @@ public class Grid {
                     Geometry intersection = pixel.intersection(geometry);
                     double denominator = relativeToPixels ? pixelAreaAtLat : area;
                     double weight = intersection.getArea() / denominator;
-                    if (pixelWeightCallback == null){
-                        weights.add(new PixelWeight(x, y, weight));
-                    } else {
-                        pixelWeightCallback.handlePixelWeight(x,y,weight);
-                    }
+                    weights.add(new PixelWeight(x, y, weight));
                 }
             }
         }
-        if (pixelWeightCallback == null){
-            return weights;
-        } else {
-            return null;
-        }
+        return weights;
     }
 
     /**
@@ -534,7 +502,7 @@ public class Grid {
         // Detect which columns are completely numeric by iterating over all the rows and trying to parse the fields
         int total = 0;
         while (reader.readRecord()) {
-            if (++total % 1000 == 0) LOG.info("{} records", human(total));
+            if (++total % 10000 == 0) LOG.info("{} records", human(total));
 
             envelope.expandToInclude(parseDouble(reader.get(lonField)), parseDouble(reader.get(latField)));
 

@@ -175,12 +175,16 @@ public class Split {
 
         // to speed up computation above, distancesquared was calculated above, using degrees
         // for routing, we now want to convert the distance to millimeters.
-        distanceCalculator.setStartingGeographicPoint(lon, lat);
-        distanceCalculator.setDestinationGeographicPoint(
-                VertexStore.fixedDegreesToFloating(best.fixedLon), VertexStore.fixedDegreesToFloating(best.fixedLat)
-        );
-        best.distanceToEdge_mm = (int) distanceCalculator.getOrthodromicDistance()*1000;
-
+        try {
+            distanceCalculator.setStartingGeographicPoint(lon, lat);
+            distanceCalculator.setDestinationGeographicPoint(
+                    VertexStore.fixedDegreesToFloating(best.fixedLon), VertexStore.fixedDegreesToFloating(best.fixedLat)
+            );
+            best.distanceToEdge_mm = (int) distanceCalculator.getOrthodromicDistance() * 1000;
+        } catch (IllegalStateException e) {
+            LOG.warn("Could not connect point to edge split point.");
+            best.distanceToEdge_mm = Integer.MAX_VALUE;
+        }
         return best;
     }
 

@@ -461,7 +461,9 @@ public class FastRaptorWorker {
 
                 for (int frequencyEntryIdx = 0; frequencyEntryIdx < schedule.headwaySeconds.length; frequencyEntryIdx++) {
                     int originalPatternIndex = originalPatternIndexForFrequencyIndex[patternIndex];
-                    int offset = offsets.offsets.get(originalPatternIndex)[tripScheduleIndex][frequencyEntryIdx];
+
+                    int offset = computeDeterministicUpperBound ? -1 : offsets.offsets.get(originalPatternIndex)[tripScheduleIndex][frequencyEntryIdx];
+                    // offset is reset below (i.e. when computeDeterministicUpperBound is false). Otherwise it should not be used.
 
                     int boardTime = -1;
                     int boardStopPositionInPattern = -1;

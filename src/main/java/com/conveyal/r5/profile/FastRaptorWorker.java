@@ -445,6 +445,10 @@ public class FastRaptorWorker {
     /** Do a frequency search. If computeDeterministicUpperBound is true, worst-case frequency boarding time will be used
      * so that the output of this function can be used in a range-RAPTOR search. Otherwise Monte Carlo schedules will be
      * used to improve upon the output of the range-RAPTOR bounds search.
+     *
+     * @param computeDeterministicUpperBound specifies whether to compute a deterministic upper bound, which helps speed up
+     *                                       subsequent frequency searches. If false, a bona fide frequency search is conducted
+     *                                       using randomized offsets.
      */
     private void doFrequencySearchForRound(RaptorState inputState, RaptorState outputState, boolean computeDeterministicUpperBound) {
         BitSet patternsTouched = getPatternsTouchedForStops(inputState, frequencyIndexForOriginalPatternIndex);
@@ -461,7 +465,6 @@ public class FastRaptorWorker {
 
                 for (int frequencyEntryIdx = 0; frequencyEntryIdx < schedule.headwaySeconds.length; frequencyEntryIdx++) {
                     int originalPatternIndex = originalPatternIndexForFrequencyIndex[patternIndex];
-                    int offset = offsets.offsets.get(originalPatternIndex)[tripScheduleIndex][frequencyEntryIdx];
 
                     int boardTime = -1;
                     int boardStopPositionInPattern = -1;
@@ -486,9 +489,15 @@ public class FastRaptorWorker {
                             // if we're computing the upper bound, we want the worst case. This is the only thing that is
                             // valid in a range RAPTOR search; using random schedule draws in range RAPTOR would be problematic
                             // because they need to be independent across minutes.
-                            int newBoardingDepartureTimeAtStop = computeDeterministicUpperBound ?
-                                getWorstCaseFrequencyDepartureTime(schedule, stopPositionInPattern, frequencyEntryIdx, earliestBoardTime) :
-                                getRandomFrequencyDepartureTime(schedule, stopPositionInPattern, offset, frequencyEntryIdx, earliestBoardTime);
+
+                            int newBoardingDepartureTimeAtStop;
+
+                            if (computeDeterministicUpperBound) {
+                                newBoardingDepartureTimeAtStop = getWorstCaseFrequencyDepartureTime(schedule, stopPositionInPattern, frequencyEntryIdx, earliestBoardTime);
+                            } else {
+                                int offset = offsets.offsets.get(originalPatternIndex)[tripScheduleIndex][frequencyEntryIdx];
+                                newBoardingDepartureTimeAtStop = getRandomFrequencyDepartureTime(schedule, stopPositionInPattern, offset, frequencyEntryIdx, earliestBoardTime);
+                            }
 
                             int remainOnBoardDepartureTimeAtStop = Integer.MAX_VALUE;
 

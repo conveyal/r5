@@ -37,7 +37,7 @@ public class LinkedPointSet implements Serializable {
      * The distance we search around each PointSet point for a road to link it to.
      * FIXME 1KM is really far to walk off a street. But some places have offices in the middle of big parking lots.
      */
-    public static final int MAX_OFFSTREET_WALK_METERS = 350;
+    public static final int MAX_OFFSTREET_WALK_METERS = 1000;
 
     /**
      * LinkedPointSets are long-lived and not extremely numerous, so we keep references to the objects it was built from.

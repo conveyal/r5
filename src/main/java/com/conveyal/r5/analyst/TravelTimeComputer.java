@@ -44,6 +44,7 @@ public class TravelTimeComputer {
     public void write (OutputStream os) throws IOException {
         StreetMode accessMode = LegMode.getDominantStreetMode(request.accessModes);
         StreetMode directMode = LegMode.getDominantStreetMode(request.directModes);
+        StreetMode egressMode = LegMode.getDominantStreetMode(request.egressModes);
 
         double fromLat = request.fromLat;
         double fromLon = request.fromLon;
@@ -75,10 +76,10 @@ public class TravelTimeComputer {
                 int x = target % request.width;
                 int y = target / request.width;
 
-                final int travelTimeMinutes =
-                        travelTimesToTargets[target] == FastRaptorWorker.UNREACHED ? FastRaptorWorker.UNREACHED : travelTimesToTargets[target] / 60;
+                final int travelTimeSeconds =
+                        travelTimesToTargets[target] == FastRaptorWorker.UNREACHED ? FastRaptorWorker.UNREACHED : travelTimesToTargets[target];
 
-                output.accept(y * request.width + x, new int[] { travelTimeMinutes });
+                output.accept(y * request.width + x, new int[] { travelTimeSeconds });
             }
 
             output.finish();
@@ -89,7 +90,7 @@ public class TravelTimeComputer {
             // TODO use directMode? Is that a resource limiting issue?
             // also gridcomputer uses accessMode to avoid running two street searches
             LinkedPointSet linkedDestinationsAccess = destinations.link(network.streetLayer, accessMode);
-            LinkedPointSet linkedDestinationsEgress = destinations.link(network.streetLayer, StreetMode.WALK);
+            LinkedPointSet linkedDestinationsEgress = destinations.link(network.streetLayer, egressMode);
 
             if (!request.directModes.equals(request.accessModes)) {
                 LOG.warn("Disparate direct modes and access modes are not supported in analysis mode.");
@@ -154,7 +155,7 @@ public class TravelTimeComputer {
                 // Other modes are already asymmetric with the egress/stop trees, so just do a time-based on street
                 // search and don't worry about distance limiting.
                 sr.streetMode = accessMode;
-                sr.timeLimitSeconds = request.getMaxAccessTimeForMode(accessMode);
+                sr.timeLimitSeconds = request.getMaxAccessTimeForMode(accessMode)*60;
                 sr.setOrigin(request.fromLat, request.fromLon);
                 sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
                 sr.route();

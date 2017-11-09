@@ -130,7 +130,8 @@ public class PerTargetPropagater {
     }
 
     public interface TravelTimeReducer {
-        /** Receive the travel times for all iterations of the algorithm to a particular target specified by targetIndex */
+        /** Receive the travel times (in seconds) for all iterations of the algorithm to a particular target specified
+         *  by targetIndex */
         void accept (int targetIndex, int[] travelTimesForTarget);
 
         /** Called when propagation is done, used to signal the reducer that it can upload its results to s3 etc; optional */

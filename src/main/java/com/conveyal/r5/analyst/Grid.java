@@ -11,9 +11,8 @@ import com.vividsolutions.jts.geom.Geometry;
 import com.vividsolutions.jts.geom.MultiPolygon;
 import com.vividsolutions.jts.geom.Point;
 import com.vividsolutions.jts.geom.Polygon;
-import gnu.trove.iterator.TObjectDoubleIterator;
-import gnu.trove.map.TObjectDoubleMap;
-import gnu.trove.map.hash.TObjectDoubleHashMap;
+import com.vividsolutions.jts.geom.prep.PreparedGeometry;
+import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory;
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
@@ -53,6 +52,8 @@ import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
@@ -136,65 +137,90 @@ public class Grid {
         this.grid = new double[width][height];
     }
 
+    public static class PixelWeight {
+        public final int x;
+        public final int y;
+        public final double weight;
+
+        private PixelWeight (int x, int y, double weight){
+            this.x = x;
+            this.y = y;
+            this.weight = weight;
+        }
+    }
+
     /**
      * Version of getPixelWeights which returns the weights as relative to the total area of the input geometry (i.e.
      * the weight at a pixel is the proportion of the input geometry that falls within that pixel.
      */
-    public TObjectDoubleMap<int[]> getPixelWeights (Geometry geometry) {
+    public List<PixelWeight> getPixelWeights (Geometry geometry) {
         return getPixelWeights(geometry, false);
     }
 
+    // PreparedGeometry is often faster for small numbers of vertices;
+    // see https://github.com/chrisbennight/intersection-test
+    private PreparedGeometryFactory pgFact = new PreparedGeometryFactory();
+
     /**
-     * Get the proportions of an input polygon feature that overlap each grid cell, in the format [x, y] => weight.
-     * This weight object can then be fed into the incrementFromPixelWeights function to actually burn a polygon into the
+     * Get the proportions of an input polygon feature that overlap each grid cell, for use in lists of PixelWeights.
+     * These lists can then be fed into the incrementFromPixelWeights function to actually burn a polygon into the
      * grid.
      *
      * If relativeToPixels is true, the weights are the proportion of the pixel that is covered. Otherwise they are the
-     * portion of this polygon which is within the given grid cell. If using incrementPixelWeights, this should be set to
+     * portion of this polygon which is within the given pixel. If using incrementPixelWeights, this should be set to
      * false.
      *
-     * This returns a map from int arrays containing the coordinates to the weight. I believe int arrays in hashmaps are
-     * hashed based on memory location, meaning lookups will fail. However, we only use this in a streaming fashion, looping
-     * over all values, which is harmless.
-     *
-     * TODO create a class with x, y, and value attributes and just return a list.
+     * This used to return a map from int arrays containing the coordinates to the weight.
      */
-    public TObjectDoubleMap<int[]> getPixelWeights (Geometry geometry, boolean relativeToPixels) {
+    public List<PixelWeight> getPixelWeights (Geometry geometry, boolean relativeToPixels) {
         // No need to convert to a local coordinate system
         // Both the supplied polygon and the web mercator pixel geometries are left in WGS84 geographic coordinates.
         // Both are distorted equally along the X axis at a given latitude so the proportion of the geometry within
         // each pixel is accurate, even though the surface area in WGS84 coordinates is not a usable value.
 
-        TObjectDoubleMap<int[]> weights = new TObjectDoubleHashMap<>();
+        List<PixelWeight> weights = new ArrayList<>();
 
         double area = geometry.getArea();
         if (area < 1e-12) {
             throw new IllegalArgumentException("Geometry is too small");
         }
 
+        PreparedGeometry preparedGeom = pgFact.create(geometry);
+
         Envelope env = geometry.getEnvelopeInternal();
-        for (int worldx = lonToPixel(env.getMinX(), zoom); worldx <= lonToPixel(env.getMaxX(), zoom); worldx++) {
-            // NB web mercator Y is reversed relative to latitude
-            for (int worldy = latToPixel(env.getMaxY(), zoom); worldy <= latToPixel(env.getMinY(), zoom); worldy++) {
+
+        for (int worldy = latToPixel(env.getMaxY(), zoom); worldy <= latToPixel(env.getMinY(), zoom); worldy++) {
+            // NB web mercator Y is reversed relative to latitude.
+            // Iterate over longitude (x) in the inner loop to avoid repeat calculations of pixel areas, which should be
+            // equal at a given latitude (y)
+
+            double pixelAreaAtLat = -1; //Set to -1 to recalculate pixelArea at each latitude.
+
+            for (int worldx = lonToPixel(env.getMinX(), zoom); worldx <= lonToPixel(env.getMaxX(), zoom); worldx++) {
+
                 int x = worldx - west;
                 int y = worldy - north;
 
                 if (x < 0 || x >= width || y < 0 || y >= height) continue; // off the grid
 
                 Geometry pixel = getPixelGeometry(x + west, y + north, zoom);
-                Geometry intersection = pixel.intersection(geometry);
-                double denominator = relativeToPixels ? pixel.getArea() : area;
-                double weight = intersection.getArea() / denominator;
-                weights.put(new int[] { x, y }, weight);
+
+                if (pixelAreaAtLat == -1) pixelAreaAtLat = pixel.getArea(); //Recalculate for a new latitude.
+
+                if (preparedGeom.intersects(pixel)){ // pixel is at least partly inside the feature
+                    Geometry intersection = pixel.intersection(geometry);
+                    double denominator = relativeToPixels ? pixelAreaAtLat : area;
+                    double weight = intersection.getArea() / denominator;
+                    weights.add(new PixelWeight(x, y, weight));
+                }
             }
         }
-
         return weights;
     }
 
     /**
      * Do pycnoplactic mapping:
-     * the value associated with the supplied polygon a polygon will be split out proportionately to
+     * the value associated with the supplied polygon will be split out proportionately to
      * all the web Mercator pixels that intersect it.
      *
      * If you are creating multiple grids of the same size for different attributes of the same input features, you should
@@ -202,22 +228,23 @@ public class Grid {
      * and the attribute value into incrementFromPixelWeights function; this will avoid duplicating expensive geometric
      * math.
      */
-    public void rasterize (Geometry geometry, double value) {
+    private void rasterize (Geometry geometry, double value) {
         incrementFromPixelWeights(getPixelWeights(geometry), value);
     }
 
     /** Using a grid of weights produced by getPixelWeights, burn the value of a polygon into the grid */
-    public void incrementFromPixelWeights (TObjectDoubleMap<int[]> weights, double value) {
-        for (TObjectDoubleIterator<int[]> it = weights.iterator(); it.hasNext();) {
-            it.advance();
-            grid[it.key()[0]][it.key()[1]] += it.value() * value;
+    public void incrementFromPixelWeights (List weights, double value) {
+        Iterator<PixelWeight> pixelWeightIterator = weights.iterator();
+        while(pixelWeightIterator.hasNext()) {
+            PixelWeight pix = pixelWeightIterator.next();
+            grid[pix.x][pix.y] += pix.weight * value;
         }
     }
 
     /**
      * Burn point data into the grid.
      */
-    public void incrementPoint (double lat, double lon, double amount) {
+    private void incrementPoint (double lat, double lon, double amount) {
         int worldx = lonToPixel(lon, zoom);
         int worldy = latToPixel(lat, zoom);
         int x = worldx - west;
@@ -225,7 +252,7 @@ public class Grid {
         if (x >= 0 && x < width && y >= 0 && y < height) {
             grid[x][y] += amount;
         } else {
-            // Warn that an attempt was made to increment outside the grid
+            LOG.warn("{} opportunities are outside regional bounds, at {}, {}", amount, lon, lat);
         }
     }
 
@@ -527,7 +554,7 @@ public class Grid {
 
         int i = 0;
         while (reader.readRecord()) {
-            if (++i % 10000 == 0) {
+            if (++i % 1000 == 0) {
                 LOG.info("{} records", human(i));
             }
 

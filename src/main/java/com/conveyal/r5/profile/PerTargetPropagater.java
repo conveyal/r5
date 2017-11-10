@@ -141,8 +141,9 @@ public class PerTargetPropagater {
     public interface TravelTimeReducer {
 
         /**
-         * Records a set of travel times to a particular target (for different departure times and MC draws).
-         * TODO Javadoc: Does this need to be called once for each target? What happens if we don't?
+         * Records a set of travel times (in seconds) to a particular target. Each travel time in the set represents
+         * a different departure time or Monte Carlo schedule draw.
+         * This should be called once per target, or not at all if we know nothing is accessible.
          */
         void recordTravelTimesForTarget(int targetIndex, int[] travelTimesForTarget);
 

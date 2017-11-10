@@ -13,6 +13,7 @@ import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import com.conveyal.r5.streets.EdgeStore.Edge;
 import gnu.trove.set.TIntSet;
+import org.apache.commons.math3.util.FastMath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,7 +38,7 @@ public class LinkedPointSet implements Serializable {
      * FIXME 1km is really far to walk off a street. But some places have offices in the middle of big parking lots.
      * FIXME and 4km is even more extreme! This needs to be greatly shortened.
      */
-    public static final int MAX_OFFSTREET_WALK_METERS = 4000;
+    public static final int MAX_OFFSTREET_WALK_METERS = 1600;
 
     /**
      * LinkedPointSets are long-lived and not extremely numerous, so we keep references to the objects it was built from.
@@ -148,7 +149,6 @@ public class LinkedPointSet implements Serializable {
         this.makeStopToPointDistanceTables(treeRebuildZone);
 
     }
-
 
     /**
      * Construct a new LinkedPointSet for a grid that falls entirely within an existing grid LinkedPointSet.
@@ -308,13 +308,19 @@ public class LinkedPointSet implements Serializable {
             int time0 = travelTimeForVertex.getTravelTime(edge.getFromVertex());
             int time1 = travelTimeForVertex.getTravelTime(edge.getToVertex());
 
-            // TODO apply walk speed
+            // An "off-roading" penalty is applied to limit extending isochrones into water bodies, etc.
+            // We may want to keep the MAX_OFFSTREET_WALK_METERS relatively high to avoid holes in the isochrones,
+            // but make it costly to walk long distances where there aren't streets.  The approach below
+            // accomplishes that, applying a penalty to off-street distances greater than the typical grid cell size.
+            // We could use a distance threshold more closely tied to pointset resolution/coverage
+
             if (time0 != Integer.MAX_VALUE) {
-                time0 += distances0_mm[i] / offstreetTravelSpeedMillimetersPerSecond;
+                time0 += (distances0_mm[i]) / offstreetTravelSpeedMillimetersPerSecond;
             }
             if (time1 != Integer.MAX_VALUE) {
-                time1 += distances1_mm[i] / offstreetTravelSpeedMillimetersPerSecond;
+                time1 += (distances1_mm[i]) / offstreetTravelSpeedMillimetersPerSecond;
             }
+
             travelTimes[i] = time0 < time1 ? time0 : time1;
         }
         return new PointSetTimes (pointSet, travelTimes);
@@ -338,6 +344,7 @@ public class LinkedPointSet implements Serializable {
             edge.seek(edges[p]);
             int t1 = Integer.MAX_VALUE, t2 = Integer.MAX_VALUE;
             // TODO this is not strictly correct when there are turn restrictions onto the edge this is linked to
+
             if (distanceTableToVertices.containsKey(edge.getFromVertex())) {
                 t1 = distanceTableToVertices.get(edge.getFromVertex()) + distances0_mm[p];
             }

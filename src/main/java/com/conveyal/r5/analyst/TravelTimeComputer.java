@@ -51,7 +51,8 @@ public class TravelTimeComputer {
 
         // The mode of travel that will be used to reach transit stations from the origin point.
         StreetMode accessMode = LegMode.getDominantStreetMode(request.accessModes);
-
+        // The mode of travel that will be used to reach destinations from transit stations.
+        StreetMode egressMode = LegMode.getDominantStreetMode(request.egressModes);
         // The mode of travel that would be used to reach the destination directly without using transit.
         StreetMode directMode = LegMode.getDominantStreetMode(request.directModes);
 
@@ -85,6 +86,7 @@ public class TravelTimeComputer {
         // Simultaneously we will find stations that allow access to the transit network.
         if (request.transitModes.isEmpty()) {
             // This search will use no transit.
+            //
             // When doing a non-transit walk search, we're not trying to match the behavior of egress and transfer
             // searches which use distance as the quantity to minimize (because they are precalculated and stored as distance,
             // and then converted to times by dividing by speed without regard to weights/penalties for things like stairs).
@@ -96,32 +98,32 @@ public class TravelTimeComputer {
 
             int offstreetTravelSpeedMillimetersPerSecond = (int) (request.getSpeedForMode(directMode) * 1000);
 
-            LinkedPointSet linkedDestinations = destinations.link(network.streetLayer, directMode);
-
-            int[] travelTimesToTargets = linkedDestinations
+            LinkedPointSet directModeLinkedDestinations = destinations.link(network.streetLayer, directMode);
+            int[] travelTimesToTargets = directModeLinkedDestinations
                     .eval(sr::getTravelTimeToVertex, offstreetTravelSpeedMillimetersPerSecond).travelTimes;
 
             // FIXME replace with nested x and y loops, we are dividing then re-multiplying below
             for (int target = 0; target < travelTimesToTargets.length; target++) {
                 int x = target % request.width;
                 int y = target / request.width;
-                final int travelTimeMinutes = travelTimesToTargets[target] == FastRaptorWorker.UNREACHED ?
-                        FastRaptorWorker.UNREACHED : travelTimesToTargets[target] / 60;
-                travelTimeReducer.recordTravelTimesForTarget(y * request.width + x, new int[] { travelTimeMinutes });
+                final int travelTimeSeconds = travelTimesToTargets[target] == FastRaptorWorker.UNREACHED ?
+                        FastRaptorWorker.UNREACHED : travelTimesToTargets[target];
+                travelTimeReducer.recordTravelTimesForTarget(y * request.width + x, new int[] { travelTimeSeconds});
             }
 
             travelTimeReducer.finish();
         } else {
             // This search will include transit.
-            // The mode of travel from transit to the destination (egress) is always walking, but we may have a
-            // different access mode. If the access mode is also walk, the pointset's linkage cache will return two
-            // references to the same linkage below.
-            // TODO use directMode? Is that a resource limiting issue? Also, gridcomputer uses accessMode to avoid running two street searches.
+            //
+            // If the access and egress modes are both the same, the pointset's linkage cache will return two
+            // references to the same linkage.
+            // TODO use directMode? Is that a resource limiting issue?
+            // Also, gridcomputer uses accessMode to avoid running two street searches.
             LinkedPointSet accessModeLinkedDestinations = destinations.link(network.streetLayer, accessMode);
-            LinkedPointSet egressModeLinkedDestinations = destinations.link(network.streetLayer, StreetMode.WALK);
+            LinkedPointSet egressModeLinkedDestinations = destinations.link(network.streetLayer, egressMode);
 
             if (!request.directModes.equals(request.accessModes)) {
-                LOG.warn("Direct mode may not be different than access mode in analysis.");
+                LOG.error("Direct mode may not be different than access mode in analysis.");
             }
 
             // The code blocks below essentially serve to identify transit stations reachable from the origin and
@@ -190,7 +192,7 @@ public class TravelTimeComputer {
                 // Other modes are already asymmetric with the egress/stop trees, so just do a time-based on street
                 // search and don't worry about distance limiting.
                 sr.streetMode = accessMode;
-                sr.timeLimitSeconds = request.getMaxAccessTimeForMode(accessMode);
+                sr.timeLimitSeconds = request.getMaxAccessTimeForMode(accessMode) * 60;
                 sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
                 sr.route();
                 accessTimes = sr.getReachedStops(); // already in seconds

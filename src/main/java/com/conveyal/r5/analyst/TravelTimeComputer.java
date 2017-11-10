@@ -106,9 +106,8 @@ public class TravelTimeComputer {
             for (int target = 0; target < travelTimesToTargets.length; target++) {
                 int x = target % request.width;
                 int y = target / request.width;
-                final int travelTimeSeconds = travelTimesToTargets[target] == FastRaptorWorker.UNREACHED ?
-                        FastRaptorWorker.UNREACHED : travelTimesToTargets[target];
-                travelTimeReducer.recordTravelTimesForTarget(y * request.width + x, new int[] { travelTimeSeconds});
+                final int travelTimeSeconds = travelTimesToTargets[target];
+                travelTimeReducer.recordTravelTimesForTarget(y * request.width + x, new int[] { travelTimeSeconds });
             }
 
             travelTimeReducer.finish();

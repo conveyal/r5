@@ -200,8 +200,18 @@ public class TravelTimeComputer {
                                 .travelTimes;
             }
 
-            // Short circuit unnecessary computation:
-            // If a road was found but no transit stations were reached, return the non-transit grid as the final result.
+            // Short circuit unnecessary transit routing: If the origin was linked to a road, but no transit stations
+            // were reached, return the non-transit grid as the final result.
+            if (accessTimes.isEmpty()) {
+                LOG.info("Skipping transit search since no transit stops were reached.");
+                for (int target = 0; target < nonTransitTravelTimesToDestinations.length; target++) {
+                    // TODO abstraction for travel time grid, with method to write it directly to reducer
+                    final int travelTimeSeconds = nonTransitTravelTimesToDestinations[target];
+                    travelTimeReducer.recordTravelTimesForTarget(target, new int[] { travelTimeSeconds });
+                }
+                travelTimeReducer.finish();
+                return;
+            }
 
             // Create a new Raptor Worker.
             FastRaptorWorker worker = new FastRaptorWorker(network.transitLayer, request, accessTimes);

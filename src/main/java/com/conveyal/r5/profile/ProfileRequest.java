@@ -87,10 +87,10 @@ public class ProfileRequest implements Serializable, Cloneable {
      */
     public int    maxWalkTime = 30;
     
-    /** Maximum bike time when using transit */
+    /** Maximum bike time when using transit, in minutes */
     public int    maxBikeTime = 30;
     
-    /** Maximum car time before when using transit */ 
+    /** Maximum car time before when using transit, in minutes */
     public int    maxCarTime = 30;
     
     /** Minimum time to ride a bike (to prevent extremely short bike legs) */
@@ -257,7 +257,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     }
 
     /**
-     * @return the maximum pre-transit travel time for the given mode
+     * @return the maximum pre-transit travel time for the given mode in minutes
      */
     @JsonIgnore
     public int getMaxAccessTimeForMode (StreetMode mode) {

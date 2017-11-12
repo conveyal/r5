@@ -102,10 +102,36 @@ public class Split {
             //and route is never found since point is inaccessible because edges leading to it don't have required permission
             if (edge.getFlag(EdgeStore.EdgeFlag.LINK)) return true;
 
+            boolean canTraverse = true;
             // If an edge does not allow traversal with the specified mode, skip over it.
-            if (streetMode == StreetMode.WALK && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)) return true;
-            if (streetMode == StreetMode.BICYCLE && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE)) return true;
-            if (streetMode == StreetMode.CAR && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_CAR)) return true;
+            if (streetMode == StreetMode.WALK && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)) {
+                canTraverse = false;
+            } else if (streetMode == StreetMode.BICYCLE && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE)) {
+                canTraverse = false;
+            } else if (streetMode == StreetMode.CAR && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_CAR)) {
+                canTraverse = false;
+            }
+
+            //We also check reverse of current edge if we can't traverse on forward edge
+            //This can happen if edges are tagged like oneway=-1 or backward edge has more permissions then forward edge
+            if(!canTraverse) {
+                edge.advance();
+                curr.edge = edge.edgeIndex;
+                canTraverse = true;
+                if (streetMode == StreetMode.WALK && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)) {
+                    canTraverse = false;
+                } else if (streetMode == StreetMode.BICYCLE && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE)) {
+                    canTraverse = false;
+                } else if (streetMode == StreetMode.CAR && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_CAR)) {
+                    canTraverse = false;
+                }
+
+            }
+
+            //Skipps current edge since we can't traverse forward or backward with wanted permissions
+            if (!canTraverse) {
+                return true;
+            }
 
             // The distance to this edge is the distance to the closest segment of its geometry.
             edge.forEachSegment((seg, fixedLat0, fixedLon0, fixedLat1, fixedLon1) -> {

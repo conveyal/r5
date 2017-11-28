@@ -675,6 +675,10 @@ public class Broker implements Runnable {
             return false;
         }
         job.completedTasks.add(taskId);
+        // Once the last task is marked as completed, the job is finished. Purge it from the list to free memory.
+        if (job.isComplete()) {
+            jobs.remove(job);
+        }
         return true;
     }
 

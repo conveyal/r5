@@ -213,7 +213,7 @@ public class EdgeStore implements Serializable {
         NO_THRU_TRAFFIC_BIKE (11),
         NO_THRU_TRAFFIC_CAR (12),
         SLOPE_OVERRIDE (13),
-        /** Link edge, two should not be traversed one-after-another FIXME comment seems incorrect */
+        /** An edge that links a transit stop to the street network; two such edges should not be traversed consecutively. */
         LINK (14),
 
         // Permissions

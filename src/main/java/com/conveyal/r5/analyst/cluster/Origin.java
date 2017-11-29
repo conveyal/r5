@@ -14,9 +14,6 @@ import java.io.OutputStream;
  * a single origin point, and are sent back to the GridResultQueueConsumer via an SQS Queue for assembly into one big
  * result file for the entire job. These results include some metadata about the origin point itself (coordinates) and
  * a large array of accessibility values, which are the bootstrap replications.
- *
- * The job ID for this result is not currently stored here - it's in the SQS message metadata. It should probably be
- * moved in here just so each origin message is self-contained.
  */
 public class Origin {
     public static final Logger LOG = LoggerFactory.getLogger(Origin.class);

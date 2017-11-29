@@ -25,7 +25,7 @@ public class Split {
 
     private static final Logger LOG = LoggerFactory.getLogger(Split.class);
 
-    public int edge = -1;
+    public int edge = -1; // TODO clarify is this the even edge number of a pair?
     public int seg = 0; // the segment within the edge that is closest to the search point
     public double frac = 0; // the fraction along that segment where a link should occur
     public int fixedLon; // the x coordinate of the link point along the edge
@@ -81,6 +81,7 @@ public class Split {
 
         final double metersPerDegreeLat = 111111.111;
         double cosLat = FastMath.cos(FastMath.toRadians(lat)); // The projection factor, Earth is a "sphere"
+
         // Use longs for radii and their square because squaring the fixed-point radius _will_ overflow a signed int32.
         long radiusFixedLat = VertexStore.floatingDegreesToFixed(searchRadiusMeters / metersPerDegreeLat);
         long radiusFixedLon = (int)(radiusFixedLat / cosLat); // Expand the X search space, don't shrink it.
@@ -102,6 +103,7 @@ public class Split {
             //and route is never found since point is inaccessible because edges leading to it don't have required permission
             if (edge.getFlag(EdgeStore.EdgeFlag.LINK)) return true;
 
+            // FIXME this is only checking the forward edge permissions, even though we're iterating over and linking to edge _pairs_
             // If an edge does not allow traversal with the specified mode, skip over it.
             if (streetMode == StreetMode.WALK && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)) return true;
             if (streetMode == StreetMode.BICYCLE && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE)) return true;

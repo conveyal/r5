@@ -281,10 +281,13 @@ public class FastRaptorWorker {
                 doScheduledSearchForRound(scheduleState[round - 1], scheduleState[round]);
                 timeInScheduledSearchTransit += System.nanoTime() - scheduledStartTime;
 
-                // perform a frequency search using worst-case boarding time to provide a tighter upper bound
-                long frequencyStartTime = System.nanoTime();
-                doFrequencySearchForRound(scheduleState[round - 1], scheduleState[round], true);
-                timeInScheduledSearchFrequencyBounds += System.nanoTime() - frequencyStartTime;
+                // perform a frequency search using worst-case boarding time to provide a tighter upper bound,
+                // but only if there are frequency lines.
+                if (transit.hasFrequencies) {
+                    long frequencyStartTime = System.nanoTime();
+                    doFrequencySearchForRound(scheduleState[round - 1], scheduleState[round], true);
+                    timeInScheduledSearchFrequencyBounds += System.nanoTime() - frequencyStartTime;
+                }
 
                 long transferStartTime = System.nanoTime();
                 doTransfers(scheduleState[round]);

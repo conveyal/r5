@@ -23,8 +23,8 @@ script: |
   if [[ "$TRAVIS_PULL_REQUEST" = false ]] && [[ "$TRAVIS_BRANCH" = master || ! -z "$TRAVIS_TAG" ]]; then
     mvn clean deploy --settings maven-settings.xml
   else
-    # otherwise, just run test suite
-    mvn clean verify --settings maven-settings.xml
+    # otherwise, just run test suite (test phase, not verify, because we sign the artifacts in the latter)
+    mvn clean test --settings maven-settings.xml
   fi
 
 # Secure envs are OSSRH_JIRA_USERNAME, OSSRH_JIRA_PASSWORD, GPG_KEY_NAME, GPG_PASSPHRASE

@@ -5,7 +5,9 @@ import com.amazonaws.regions.Region;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.*;
+import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.common.JsonUtilities;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
@@ -291,25 +293,40 @@ public class Broker implements Runnable {
         notify();
     }
 
-    /** Enqueue some tasks for queued execution possibly much later. Results will be saved to S3. */
-    public synchronized void enqueueTasks (List<AnalysisTask> tasks) {
-        Job job = findJob(tasks.get(0)); // creates one if it doesn't exist
+    /**
+     * Enqueue a set of tasks for a regional analysis.
+     * Only a single task is passed in, and the broker expands it into all the individual tasks for a regional job.
+     */
+    public synchronized void enqueueTasksForRegionalJob(RegionalTask templateTask) {
+
+        if (findJob(templateTask.jobId) != null) {
+            LOG.error("Someone tried to enqueue job {} but it already exists.", templateTask.jobId);
+            throw new RuntimeException("Enqueued duplicate job " + templateTask.jobId);
+        }
+        Job job = new Job(templateTask.jobId);
+        job.workerCategory = new WorkerCategory(templateTask.graphId, templateTask.workerVersion);
+        jobs.insertAtTail(job);
 
         if (!workersAvailable(job.getWorkerCategory())) {
             createWorkersInCategory(job.getWorkerCategory());
         }
 
-        for (AnalysisTask task : tasks) {
-            task.taskId = nextTaskId++;
-            job.addTask(task);
-            LOG.debug("Enqueued task id {} in job {}", task.taskId, job.jobId);
-            if (!task.graphId.equals(job.workerCategory.graphId)) {
-                LOG.error("Task graph ID {} does not match job: {}.", task.graphId, job.workerCategory);
-            }
-            if (!task.workerVersion.equals(job.workerCategory.workerVersion)) {
-                LOG.error("Task R5 commit {} does not match job: {}.", task.workerVersion, job.workerCategory);
+        // Now explode this single task into width * height individual tasks for the whole regional origin grid.
+        // All these tasks are accumulated into the new job. Because the tasks are clones, any referenced objects
+        // such as scenarios should be shared, which reduces memory use.
+        // Of course the fact that the tasks are stored as separate objects at all can eventually be optimized away.
+        for (int x = 0; x < templateTask.width; x++) {
+            for (int y = 0; y < templateTask.height; y++) {
+                RegionalTask singleTask = templateTask.clone();
+                singleTask.taskId = nextTaskId++;
+                singleTask.x = x;
+                singleTask.y = y;
+                singleTask.fromLat = Grid.pixelToCenterLat(templateTask.north + y, templateTask.zoom);
+                singleTask.fromLon = Grid.pixelToCenterLon(templateTask.west + x, templateTask.zoom);
+                job.addTask(singleTask);
             }
         }
+        LOG.info("Broker expanded and enqueued {} tasks for job {}.", job.tasksById.size(), job.jobId);
         // Wake up the delivery thread if it's waiting on input.
         // This wakes whatever thread called wait() while holding the monitor for this Broker object.
         notify();
@@ -675,6 +692,10 @@ public class Broker implements Runnable {
             return false;
         }
         job.completedTasks.add(taskId);
+        // Once the last task is marked as completed, the job is finished. Purge it from the list to free memory.
+        if (job.isComplete()) {
+            jobs.remove(job);
+        }
         return true;
     }
 
@@ -700,18 +721,6 @@ public class Broker implements Runnable {
                 return;
             }
         }
-    }
-
-    /** Find the job that should contain a given task, creating that job if it does not exist. */
-    public Job findJob (AnalysisTask task) {
-        Job job = findJob(task.jobId);
-        if (job != null) {
-            return job;
-        }
-        job = new Job(task.jobId);
-        job.workerCategory = new WorkerCategory(task.graphId, task.workerVersion);
-        jobs.insertAtTail(job);
-        return job;
     }
 
     /** Find the job for the given jobId, returning null if that job does not exist. */

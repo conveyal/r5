@@ -94,7 +94,7 @@ import java.util.stream.DoubleStream;
  */
 public class BootstrappingTravelTimeReducer implements PerTargetPropagater.TravelTimeReducer {
     /** The number of bootstrap replications used to bootstrap the sampling distribution of the percentiles */
-    public static final int N_BOOTSTRAP_REPLICATIONS = 1000;
+    public static final int N_BOOTSTRAP_REPLICATIONS = 0;
 
     /** SQS client. TODO: async? */
     private static final AmazonSQS sqs = new AmazonSQSClient();

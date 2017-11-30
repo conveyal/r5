@@ -112,11 +112,11 @@ public class GridResultAssembler {
             is.close();
             os.close();
 
-            LOG.info("GZIP compression reduced regional analysis {} from {}mb to {}mb ({}x compression)",
+            LOG.info("GZIP compression reduced regional analysis {} from {} to {} ({}x compression)",
                     request.jobId,
-                    temporaryFile.length() / 1024 / 1024,
-                    gzipFile.length() / 1024 / 1024,
-                    temporaryFile.length() / gzipFile.length()
+                    human(temporaryFile.length(), "B"),
+                    human(gzipFile.length(), "B"),
+                    (double) temporaryFile.length() / gzipFile.length()
             );
 
             s3.putObject(outputBucket, String.format("%s.access", request.jobId), gzipFile);

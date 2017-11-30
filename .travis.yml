@@ -9,9 +9,12 @@ jdk:
 install: true
 
 # Decrypt and import the artifact signing certificate before running the build
-before_install:
-  - openssl aes-256-cbc -K $encrypted_e5d28768eb0e_key -iv $encrypted_e5d28768eb0e_iv -in maven-artifact-signing-key.asc.enc -out maven-artifact-signing-key.asc -d
-  - gpg --import --batch maven-artifact-signing-key.asc
+before_install: |
+  # only install signing keys under the same circumstances we do a mvn deploy later
+  if [[ "$TRAVIS_PULL_REQUEST" = false ]] && [[ "$TRAVIS_BRANCH" = master || ! -z "$TRAVIS_TAG" ]]; then
+    openssl aes-256-cbc -K $encrypted_e5d28768eb0e_key -iv $encrypted_e5d28768eb0e_iv -in maven-artifact-signing-key.asc.enc -out maven-artifact-signing-key.asc -d
+    gpg --import --batch maven-artifact-signing-key.asc
+  fi
 
 # Replace Travis's default build step.
 # Run all Maven phases at once up through verify, install, and deploy.
@@ -20,8 +23,9 @@ script: |
   if [[ "$TRAVIS_PULL_REQUEST" = false ]] && [[ "$TRAVIS_BRANCH" = master || ! -z "$TRAVIS_TAG" ]]; then
     mvn clean deploy --settings maven-settings.xml
   else
-    # otherwise, just run test suite
-    mvn clean verify --settings maven-settings.xml
+    # Otherwise, just run all the way up to verify, the last phase before installing and deploying.
+    # Setting the gpg.skip property avoids signing artifacts when the encryption keys are not available.
+    mvn clean verify --settings maven-settings.xml -B -V -Dgpg.skip
   fi
 
 # Secure envs are OSSRH_JIRA_USERNAME, OSSRH_JIRA_PASSWORD, GPG_KEY_NAME, GPG_PASSPHRASE

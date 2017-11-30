@@ -217,7 +217,8 @@
         <executions>
           <execution>
             <id>sign-artifacts</id>
-            <!-- We sign in the verify phase, which means it will happen for install and deploy but not package. -->
+            <!-- We sign in the verify phase, which means it will happen before install and deploy (the last two phases)
+                 but not before earlier phases like test or package. -->
             <phase>verify</phase>
             <goals>
               <goal>sign</goal>

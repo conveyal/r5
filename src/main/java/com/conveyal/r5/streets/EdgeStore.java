@@ -213,7 +213,7 @@ public class EdgeStore implements Serializable {
         NO_THRU_TRAFFIC_BIKE (11),
         NO_THRU_TRAFFIC_CAR (12),
         SLOPE_OVERRIDE (13),
-        /** Link edge, two should not be traversed one-after-another FIXME comment seems incorrect */
+        /** An edge that links a transit stop to the street network; two such edges should not be traversed consecutively. */
         LINK (14),
 
         // Permissions
@@ -224,7 +224,7 @@ public class EdgeStore implements Serializable {
         //Set when OSM tags are wheelchair==limited currently unroutable
         LIMITED_WHEELCHAIR(19),
 
-        //If this edge is good idea to use for linking. Skips tunnels, covered and motorways for now
+        // If this edge is good idea to use for linking. Skips tunnels, covered and motorways for now
         LINKABLE(20),
 
         // Bicycle level of traffic stress for this street.
@@ -553,7 +553,7 @@ public class EdgeStore implements Serializable {
         }
 
         public StreetRouter.State traverse (StreetRouter.State s0, StreetMode streetMode, ProfileRequest req,
-                                            TurnCostCalculator turnCostCalculator) {
+                                            TurnCostCalculator turnCostCalculator, TravelTimeCalculator travelTimeCalculator) {
 
             // The vertex we'll be at after the traversal
             int vertex;
@@ -564,8 +564,7 @@ public class EdgeStore implements Serializable {
             }
 
             StreetRouter.State s1 = new StreetRouter.State(vertex, edgeIndex, s0);
-            float speedms = calculateSpeed(req, streetMode);
-            float time = (float) (getLengthM() / speedms);
+            float time = travelTimeCalculator.getTravelTimeMilliseconds(this, s0.durationSeconds, streetMode, req);
             float weight = 0;
 
             if (!canTurnFrom(s0, s1, req.reverseSearch)) return null;
@@ -606,7 +605,7 @@ public class EdgeStore implements Serializable {
 
                 if (walking) {
                     //Recalculation of time and speed is needed if we are walking with bike
-                    speedms = calculateSpeed(req, StreetMode.WALK)*0.9f;
+                    float speedms = calculateSpeed(req, StreetMode.WALK)*0.9f;
                     time = (float) (getLengthM() / speedms);
                 }
 
@@ -1119,6 +1118,15 @@ public class EdgeStore implements Serializable {
                 consumer.accept(edge);
                 return true;
             });
+        }
+    }
+
+    public static class DefaultTravelTimeCalculator implements TravelTimeCalculator {
+
+        @Override
+        public float getTravelTimeMilliseconds(Edge edge, int durationSeconds, StreetMode streetMode, ProfileRequest req) {
+            float speedms = edge.calculateSpeed(req, streetMode);
+            return (float) (edge.getLengthM() / speedms);
         }
     }
 

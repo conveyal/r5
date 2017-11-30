@@ -186,13 +186,13 @@ public class TarjanIslandPruner {
                         // a relatively large (metropolitan Washington, DC) graph.
                         forEachOutgoingEdge(vertex, e -> {
                             int toVertex = e.getToVertex();
-                            if (discoveryIndex[toVertex] > discoveryIndex[vertex]) {
-                                // only update if the to vertex was discovered later than the vertex under consideration
+                            if (discoveryIndex[toVertex] == -1) everySuccessorExplored[0] = false;
+                            if (discoveryIndex[toVertex] > discoveryIndex[vertex] &&
+                                    lowestDiscoveryIndexOfReachableVertexKnownToBePredecessor[vertex] > lowestDiscoveryIndexOfReachableVertexKnownToBePredecessor[toVertex])
+                                // only update if toVertex was discovered later than the vertex under consideration
                                 // i.e. if it was explored downstream of this vertex.
                                 // We don't want to accidentally set lowestDiscoveryIndexOfReachableVertexKnownToBePredecessor to something that is not a predecessor of this vertex
-                                if (discoveryIndex[toVertex] == -1) everySuccessorExplored[0] = false;
-                                else if (lowestDiscoveryIndexOfReachableVertexKnownToBePredecessor[vertex] > lowestDiscoveryIndexOfReachableVertexKnownToBePredecessor[toVertex]) lowestDiscoveryIndexOfReachableVertexKnownToBePredecessor[vertex] = lowestDiscoveryIndexOfReachableVertexKnownToBePredecessor[toVertex];
-                            }
+                                lowestDiscoveryIndexOfReachableVertexKnownToBePredecessor[vertex] = lowestDiscoveryIndexOfReachableVertexKnownToBePredecessor[toVertex];
                         });
 
                         // this is the root of a strong component if every successor has been explored and the lowest reachable

@@ -5,9 +5,11 @@ import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.ProfileOption;
 import com.conveyal.r5.api.util.StreetSegment;
 import com.conveyal.r5.profile.*;
+import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.ParkRideRouter;
 import com.conveyal.r5.streets.Split;
 import com.conveyal.r5.streets.StreetRouter;
+import com.conveyal.r5.streets.TravelTimeCalculator;
 import com.conveyal.r5.streets.VertexStore;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
@@ -42,6 +44,8 @@ public class PointToPointQuery {
 
     private final TransportNetwork transportNetwork;
 
+    private final TravelTimeCalculator travelTimeCalculator;
+
     // interpretation of below parameters: if biking is less than BIKE_PENALTY seconds faster than walking, we prefer to walk
 
     /** how many seconds worse biking to transit is than walking */
@@ -72,7 +76,12 @@ public class PointToPointQuery {
     private static final int CAR_PARK_DROPOFF_COST = 120;
 
     public PointToPointQuery(TransportNetwork transportNetwork) {
+        this(transportNetwork, new EdgeStore.DefaultTravelTimeCalculator());
+    }
+
+    public PointToPointQuery(TransportNetwork transportNetwork, TravelTimeCalculator travelTimeCalculator) {
         this.transportNetwork = transportNetwork;
+        this.travelTimeCalculator = travelTimeCalculator;
     }
 
     public ZoneId getTimezone() {
@@ -203,7 +212,7 @@ public class PointToPointQuery {
         //TODO: this must be reverse search
         request.reverseSearch = true;
         for(LegMode mode: request.egressModes) {
-            StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+            StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer, travelTimeCalculator);
             streetRouter.transitStopSearch = true;
             streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             if (egressUnsupportedModes.contains(mode)) {
@@ -236,7 +245,7 @@ public class PointToPointQuery {
         request.reverseSearch = false;
         //For direct modes
         for(LegMode mode: request.directModes) {
-            StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+            StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer, travelTimeCalculator);
             StreetPath streetPath;
             streetRouter.profileRequest = request;
             if (mode == LegMode.BICYCLE_RENT) {
@@ -294,7 +303,7 @@ public class PointToPointQuery {
         // Routes all access modes
         HashMap<LegMode, StreetRouter> accessRouter = new HashMap<>();
         for(LegMode mode: request.accessModes) {
-            StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
+            StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer, travelTimeCalculator);
             streetRouter.profileRequest = request;
             if (mode == LegMode.CAR_PARK) {
                 streetRouter = findParkRidePath(request, streetRouter, transportNetwork.transitLayer);
@@ -419,7 +428,7 @@ public class PointToPointQuery {
                         });*/
 
             //This finds best cycling path from best start bicycle station to end bicycle station
-            StreetRouter bicycle = new StreetRouter(transportNetwork.streetLayer);
+            StreetRouter bicycle = new StreetRouter(transportNetwork.streetLayer, travelTimeCalculator);
             bicycle.previousRouter = streetRouter;
             bicycle.streetMode = StreetMode.BICYCLE;
             bicycle.profileRequest = request;
@@ -449,7 +458,7 @@ public class PointToPointQuery {
 
                         });*/
             //This searches for walking path from end bicycle station to end point
-            StreetRouter end = new StreetRouter(transportNetwork.streetLayer);
+            StreetRouter end = new StreetRouter(transportNetwork.streetLayer, travelTimeCalculator);
             end.streetMode = StreetMode.WALK;
             end.profileRequest = request;
             end.timeLimitSeconds = bicycle.timeLimitSeconds;

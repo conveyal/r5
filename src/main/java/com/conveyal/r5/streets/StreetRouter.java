@@ -71,6 +71,8 @@ public class StreetRouter {
      */
     private TurnCostCalculator turnCostCalculator;
 
+    private TravelTimeCalculator travelTimeCalculator;
+
     // These are used for scaling coordinates in approximate distance calculations.
     // The lon value must be properly scaled to underestimate distances in the region where we're routing.
     private static final double MM_PER_UNIT_LAT_FIXED =
@@ -177,12 +179,6 @@ public class StreetRouter {
      */
     public StreetRouter previousRouter;
 
-    public StreetRouter (StreetLayer streetLayer) {
-        this.streetLayer = streetLayer;
-        // TODO one of two things: 1) don't hardwire drive-on-right, or 2) https://en.wikipedia.org/wiki/Dagen_H
-        this.turnCostCalculator = new TurnCostCalculator(streetLayer, true);
-    }
-
     /**
      * Supply a RoutingVisitor to track search progress for debugging.
      */
@@ -277,6 +273,18 @@ public class StreetRouter {
         });
         return result;
     }
+
+    public StreetRouter (StreetLayer streetLayer) {
+        this(streetLayer, new EdgeStore.DefaultTravelTimeCalculator());
+    }
+
+    public StreetRouter (StreetLayer streetLayer, TravelTimeCalculator travelTimeCalculator) {
+        this.streetLayer = streetLayer;
+        // TODO one of two things: 1) don't hardwire drive-on-right, or 2) https://en.wikipedia.org/wiki/Dagen_H
+        this.turnCostCalculator = new TurnCostCalculator(streetLayer, true);
+        this.travelTimeCalculator = travelTimeCalculator;
+    }
+
 
     /**
      * Set the origin point of this StreetRouter (before a search is started) to a point along an edge that allows
@@ -558,7 +566,7 @@ public class StreetRouter {
             // explore edges leaving this vertex
             edgeList.forEach(eidx -> {
                 edge.seek(eidx);
-                State s1 = edge.traverse(s0, streetMode, profileRequest, turnCostCalculator);
+                State s1 = edge.traverse(s0, streetMode, profileRequest, turnCostCalculator, travelTimeCalculator);
                 if (s1 != null && s1.distance <= distanceLimitMm && s1.getDurationSeconds() < tmpTimeLimitSeconds) {
                     if (!isDominated(s1)) {
                         // Calculate the heuristic (which involves a square root) only when the state is retained.
@@ -1176,4 +1184,6 @@ public class StreetRouter {
             return vertices;
         }
     }
+
+
 }

@@ -221,17 +221,17 @@ class BrokerHttpHandler extends HttpHandler {
                 // Used by workers to acknowledge completion of a batch task and remove it from queues,
                 // avoiding re-delivery. Practically speaking this means the worker has put the result in a queue
                 String context = pathComponents[1];
-                String id = pathComponents[2];
+                String jobId = pathComponents[2];
                 if ("tasks".equalsIgnoreCase(context)) {
-                    int taskId = Integer.parseInt(id);
+                    int taskId = Integer.parseInt(pathComponents[3]);
                     // This must not have been a priority task. Try to delete it as a normal job task.
-                    if (broker.markTaskCompleted(taskId)) {
+                    if (broker.markTaskCompleted(jobId, taskId)) {
                         response.setStatus(HttpStatus.OK_200);
                     } else {
                         response.setStatus(HttpStatus.NOT_FOUND_404);
                     }
                 } else if ("jobs".equals((context))) {
-                    if (broker.deleteJob(id)) {
+                    if (broker.deleteJob(jobId)) {
                         response.setStatus(HttpStatus.OK_200);
                         response.setDetailMessage("job deleted");
                     } else {

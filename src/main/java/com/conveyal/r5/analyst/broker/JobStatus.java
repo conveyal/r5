@@ -23,11 +23,8 @@ public class JobStatus {
     /** The number of tasks no worker has yet marked complete. */
     public int incomplete;
 
-    /** The number of tasks that are queued for delivery to a worker. */
-    public int queued;
-
-    /** The number of times the queue was emptied but incomplete tasks were re-added to it. */
-    public int redeliveryCount;
+    /** The number of times we have started over at the beginning to redeliver tasks never marked complete. */
+    public int deliveryPass;
 
     /** default constructor for JSON deserialization */
     public JobStatus () { /* do nothing */ }
@@ -37,11 +34,10 @@ public class JobStatus {
         this.jobId = job.jobId;
         this.graphId = job.workerCategory.graphId;
         this.workerCommit = job.workerCategory.workerVersion;
-        this.total = job.tasksById.size();
-        this.complete = job.completedTasks.size();
-        this.incomplete = job.tasksById.size() - job.completedTasks.size();
-        this.queued = job.tasksAwaitingDelivery.size();
-        this.redeliveryCount = job.redeliveryCount;
+        this.total = job.nTasksTotal;
+        this.complete = job.nTasksCompleted;
+        this.incomplete = total - complete;
+        this.deliveryPass = job.deliveryPass;
     }
 
     /** Sum up the summmary info for a bunch of jobs. */
@@ -50,11 +46,9 @@ public class JobStatus {
             this.total += status.total;
             this.complete += status.complete;
             this.incomplete += status.incomplete;
-            this.queued += status.queued;
-            this.redeliveryCount += status.redeliveryCount;
         }
-        this.jobId = "ALL";
-        this.graphId = "ALL";
+        this.jobId = "SUM";
+        this.graphId = "SUM";
     }
 
 }

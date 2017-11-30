@@ -4,7 +4,6 @@ import com.conveyal.r5.analyst.BootstrappingTravelTimeReducer;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.transit.TransportNetwork;
 

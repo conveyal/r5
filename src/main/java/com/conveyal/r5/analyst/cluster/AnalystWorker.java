@@ -48,6 +48,8 @@ import java.util.zip.GZIPOutputStream;
  *
  * The worker can poll for work over two different channels. One is for large asynchronous batch jobs, the other is
  * intended for interactive single point requests that should return as fast as possible.
+ *
+ * TODO rename AnalysisWorker
  */
 public class AnalystWorker implements Runnable {
 
@@ -519,16 +521,16 @@ public class AnalystWorker implements Runnable {
      * Tell the broker that the given message has been successfully processed by a worker (HTTP DELETE).
      */
     public void deleteRequest(AnalysisTask request) {
-        String url = BROKER_BASE_URL + String.format("/tasks/%s", request.taskId);
+        String url = BROKER_BASE_URL + String.format("/tasks/%s/%s", request.jobId, request.taskId);
         HttpDelete httpDelete = new HttpDelete(url);
         try {
             HttpResponse response = httpClient.execute(httpDelete);
             // Signal the http client library that we're done with this response object, allowing connection reuse.
             EntityUtils.consumeQuietly(response.getEntity());
             if (response.getStatusLine().getStatusCode() == 200) {
-                LOG.info("Successfully deleted task {}.", request.taskId);
+                LOG.info("Successfully deleted task {} on job {}.", request.taskId, request.jobId);
             } else {
-                LOG.info("Failed to delete task {} ({}).", request.taskId, response.getStatusLine());
+                LOG.info("Failed to delete task {} on job {} (HTTP status {}).", request.taskId, request.jobId, response.getStatusLine());
             }
         } catch (Exception e) {
             LOG.warn("Failed to delete task {}", request.taskId, e);

@@ -298,35 +298,15 @@ public class Broker implements Runnable {
      * Only a single task is passed in, and the broker expands it into all the individual tasks for a regional job.
      */
     public synchronized void enqueueTasksForRegionalJob(RegionalTask templateTask) {
-
         if (findJob(templateTask.jobId) != null) {
             LOG.error("Someone tried to enqueue job {} but it already exists.", templateTask.jobId);
             throw new RuntimeException("Enqueued duplicate job " + templateTask.jobId);
         }
-        Job job = new Job(templateTask.jobId);
-        job.workerCategory = new WorkerCategory(templateTask.graphId, templateTask.workerVersion);
+        Job job = new Job(templateTask);
         jobs.insertAtTail(job);
-
-        if (!workersAvailable(job.getWorkerCategory())) {
-            createWorkersInCategory(job.getWorkerCategory());
+        if (!workersAvailable(job.workerCategory)) {
+            createWorkersInCategory(job.workerCategory);
         }
-
-        // Now explode this single task into width * height individual tasks for the whole regional origin grid.
-        // All these tasks are accumulated into the new job. Because the tasks are clones, any referenced objects
-        // such as scenarios should be shared, which reduces memory use.
-        // Of course the fact that the tasks are stored as separate objects at all can eventually be optimized away.
-        for (int x = 0; x < templateTask.width; x++) {
-            for (int y = 0; y < templateTask.height; y++) {
-                RegionalTask singleTask = templateTask.clone();
-                singleTask.taskId = nextTaskId++;
-                singleTask.x = x;
-                singleTask.y = y;
-                singleTask.fromLat = Grid.pixelToCenterLat(templateTask.north + y, templateTask.zoom);
-                singleTask.fromLon = Grid.pixelToCenterLon(templateTask.west + x, templateTask.zoom);
-                job.addTask(singleTask);
-            }
-        }
-        LOG.info("Broker expanded and enqueued {} tasks for job {}.", job.tasksById.size(), job.jobId);
         // Wake up the delivery thread if it's waiting on input.
         // This wakes whatever thread called wait() while holding the monitor for this Broker object.
         notify();
@@ -496,7 +476,7 @@ public class Broker implements Runnable {
 
     private boolean noUndeliveredTasks() {
         for (Job job : jobs) {
-            if (!job.tasksAwaitingDelivery.isEmpty()) {
+            if (job.hasTasksToDeliver()) {
                 return false;
             }
         }
@@ -571,12 +551,12 @@ public class Broker implements Runnable {
                 Response consumer = consumers.pop();
 
                 // package tasks into a job
-                Job job = new Job("HIGH PRIORITY");
-                job.workerCategory = workerCategory;
+                List<AnalysisTask> tasksForJob = new ArrayList<>();
                 for (int i = 0; i < MAX_TASKS_PER_WORKER && taskIt.hasNext(); i++) {
-                    job.addTask(taskIt.next());
+                    tasksForJob.add(taskIt.next());
                     taskIt.remove();
                 }
+                Job job = new Job(tasksForJob);
 
                 // TODO inefficiency here: we should mix single point and multipoint in the same response
                 deliver(job, consumer);
@@ -594,12 +574,12 @@ public class Broker implements Runnable {
             // We don't respect graph affinity when working offline, because we can't start more workers
             Job current;
             if (!workOffline) {
-                current = jobs.advanceToElement(job -> !job.tasksAwaitingDelivery.isEmpty() &&
+                current = jobs.advanceToElement(job -> job.hasTasksToDeliver() &&
                         workersByCategory.containsKey(job.workerCategory) &&
                         !workersByCategory.get(job.workerCategory).isEmpty());
             }
             else {
-                current = jobs.advanceToElement(e -> !e.tasksAwaitingDelivery.isEmpty());
+                current = jobs.advanceToElement(e -> e.hasTasksToDeliver());
             }
 
             // nothing to see here
@@ -630,14 +610,14 @@ public class Broker implements Runnable {
      * simultaneous jobs. TODO task IDs should really not be sequential integers should they?
      * @return a Job object that contains the given task ID.
      */
-    public Job getJobForTask (int taskId) {
-        for (Job job : jobs) {
-            if (job.containsTask(taskId)) {
-                return job;
-            }
-        }
-        return null;
-    }
+//    public Job getJobForTask (int taskId) {
+//        for (Job job : jobs) {
+//            if (job.containsTask(taskId)) {
+//                return job;
+//            }
+//        }
+//        return null;
+//    }
 
     /**
      * Attempt to hand some tasks from the given job to a waiting consumer connection.
@@ -655,10 +635,7 @@ public class Broker implements Runnable {
         }
 
         // Get up to N tasks from the tasksAwaitingDelivery deque
-        List<AnalysisTask> tasks = new ArrayList<>();
-        while (tasks.size() < MAX_TASKS_PER_WORKER && !job.tasksAwaitingDelivery.isEmpty()) {
-            tasks.add(job.tasksAwaitingDelivery.poll());
-        }
+        List<AnalysisTask> tasks = job.generateSomeTasksToDeliver(MAX_TASKS_PER_WORKER);
 
         // Attempt to deliver the tasks to the given consumer.
         try {
@@ -671,8 +648,7 @@ public class Broker implements Runnable {
             LOG.debug("Consumer connection caused IO error, it will be removed.");
             response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR_500);
             response.resume();
-            // Delivery failed, put tasks back on (the end of) the queue.
-            job.tasksAwaitingDelivery.addAll(tasks);
+            // Delivery failed, tasks will never be marked complete and should be redelivered by the broker.
             return false;
         }
         LOG.debug("Delivery of {} tasks succeeded.", tasks.size());
@@ -685,15 +661,18 @@ public class Broker implements Runnable {
      * TODO maybe use unique delivery receipts instead of task IDs to handle redelivered tasks independently
      * @return whether the task was found and removed.
      */
-    public synchronized boolean markTaskCompleted (int taskId) {
-        Job job = getJobForTask(taskId);
+    public synchronized boolean markTaskCompleted (String jobId, int taskId) {
+        Job job = findJob(jobId);
         if (job == null) {
-            LOG.error("Could not find a job containing task {}, and therefore could not mark the task as completed.", taskId);
+            LOG.error("Could not find a job with ID {} and therefore could not mark the task as completed.", jobId);
             return false;
         }
-        job.completedTasks.add(taskId);
+        if (!job.markTaskCompleted(taskId)) {
+            LOG.error("Failed to mark task {} completed on job {}.", taskId, jobId);
+        }
         // Once the last task is marked as completed, the job is finished. Purge it from the list to free memory.
         if (job.isComplete()) {
+            job.verifyComplete();
             jobs.remove(job);
         }
         return true;

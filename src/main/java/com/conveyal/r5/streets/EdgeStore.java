@@ -994,6 +994,19 @@ public class EdgeStore implements Serializable {
             setFlag(EdgeFlag.ALLOWS_WHEELCHAIR);
         }
 
+        public boolean allowsStreetMode(StreetMode mode) {
+            if (mode == StreetMode.WALK) {
+                return getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+            }
+            if (mode == StreetMode.BICYCLE) {
+                return getFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+            }
+            if (mode == StreetMode.CAR) {
+                return getFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+            }
+            throw new RuntimeException("Supplied mode not recognized.");
+        }
+
         public long getOSMID() {
             return osmids.get(pairIndex);
         }

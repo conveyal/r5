@@ -98,16 +98,31 @@ public class Split {
 
             curr.edge = e;
             edge.seek(e);
+            //LOG.info("Considering OSM way {}", edge.getOSMID());
             //Skip Link edges those are links between transit stops/P+R/Bike share vertices and graph
             //Without this origin or destination point can link to those edges because they have ALL permissions
             //and route is never found since point is inaccessible because edges leading to it don't have required permission
             if (edge.getFlag(EdgeStore.EdgeFlag.LINK)) return true;
 
-            // FIXME this is only checking the forward edge permissions, even though we're iterating over and linking to edge _pairs_
-            // If an edge does not allow traversal with the specified mode, skip over it.
-            if (streetMode == StreetMode.WALK && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)) return true;
-            if (streetMode == StreetMode.BICYCLE && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE)) return true;
-            if (streetMode == StreetMode.CAR && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_CAR)) return true;
+            if (!edge.allowsStreetMode(streetMode)) {
+                //LOG.info("rejecting edge {} (OSM way {} forward)", edge.edgeIndex, edge.getOSMID());
+                return true;
+            }
+            edge.advance();
+            if (!edge.allowsStreetMode(streetMode)) {
+                //LOG.info("rejecting edge {} (OSM way {} backward)", edge.edgeIndex, edge.getOSMID());
+                return true;
+            }
+            edge.retreat();
+
+//            if (!edge.allowsStreetMode(streetMode)) {
+//                // The edge does not allow forward traversal with the specified mode, try the backward edge.
+//                edge.advance();
+//                // If backward traversal is also not allowed, skip this edge and try the next one.
+//                if (!edge.allowsStreetMode(streetMode)) return true;
+//            }
+            // FIXME we are splitting only one direction, we actually want to split the two directions separately, so either of distance 1 or distance 2 can be infinite.
+            // FIXME we should probably entirely skip over motorways and link only surface streets.
 
             // The distance to this edge is the distance to the closest segment of its geometry.
             edge.forEachSegment((seg, fixedLat0, fixedLon0, fixedLat1, fixedLon1) -> {
@@ -197,7 +212,7 @@ public class Split {
 
     /**
      * Find a split on a particular edge.
-     * FIXME this contains too much duplicate code. We can reuse the code in Split.find()
+     * FIXME this contains way too much duplicate code. We can reuse the code in Split.find().
      * we just need a way to supply an edge or edges, instead of using the spatial index.
      */
     public static Split findOnEdge (double lat, double lon, EdgeStore.Edge edge) {
@@ -212,7 +227,7 @@ public class Split {
         final double metersPerDegreeLat = 111111.111;
         double cosLat = FastMath.cos(FastMath.toRadians(lat)); // The projection factor, Earth is a "sphere"
 
-        // TODO copy paste code
+        // FIXME this looks like copy-pasted code
         // The split location currently being examined and the best one seen so far.
         Split curr = new Split();
         Split best = new Split();

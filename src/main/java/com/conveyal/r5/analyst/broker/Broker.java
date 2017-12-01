@@ -204,9 +204,10 @@ public class Broker implements Runnable {
 
     /**
      * Enqueue a task for execution ASAP, planning to return the response over the same HTTP connection.
-     * Low-reliability, no re-delivery.
-     *
-     * Returns true if the task was delivered and the caller should suspend the response.
+     * For now this is used exclusively for single-point travel time requests.
+     * Low-reliability, no re-delivery in case of failure (unlike regional batch jobs).
+     * @return true if the task was delivered for processing and the caller should hold the connection open waiting
+     * for a response, false if the task cannot be processed at the moment because workers are not yet available.
      */
     public synchronized boolean enqueuePriorityTask (AnalysisTask task, Response response) {
         boolean workersAvailable = workersAvailable(task.getWorkerCategory());
@@ -224,8 +225,7 @@ public class Broker implements Runnable {
                 LOG.error("Could not finish high-priority task, 202 response", e);
             }
         }
-
-        // if we're in offline mode, enqueue anyhow to kick the cluster to build the graph
+        // If we're in offline mode, enqueue anyhow to kick the cluster to build the graph
         // note that this will mean that requests get delivered multiple times in offline mode,
         // so some unnecessary computation takes place
         if (workersAvailable || workOffline) {
@@ -243,10 +243,8 @@ public class Broker implements Runnable {
                 }
             }, 100);
         }
-
-        // do not notify task delivery thread just yet as we haven't put anything in the task delivery queue yet.
-
-        // if workers were available, the caller should wait. Otherwise just return the 202
+        // Do not notify task delivery thread just yet as we haven't put anything in the task delivery queue yet.
+        // If workers were available, the caller should wait. Otherwise just return the 202.
         return workersAvailable;
     }
 

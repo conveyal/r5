@@ -73,6 +73,7 @@ public class TravelTimeComputer {
         StreetRouter sr = new StreetRouter(network.streetLayer);
         // Request must be provided to the router before setting the origin point.
         sr.profileRequest = request;
+        sr.streetMode = accessMode;
         boolean foundOriginPoint = sr.setOrigin(request.fromLat, request.fromLon);
         if (!foundOriginPoint) {
             // Short circuit around routing and propagation.
@@ -163,7 +164,6 @@ public class TravelTimeComputer {
                 // Special handling for walk search, find distance in seconds and divide to match behavior at egress
                 // (in stop trees). For bike/car searches this is immaterial as the access searches are already asymmetric.
                 // TODO clarify - I think this is referring to the fact that the egress trees are pre-calculated for a standard speed and must be adjusted.
-                sr.streetMode = accessMode;
                 sr.distanceLimitMeters = 2000; // TODO hardwired same as gridcomputer, at least use a symbolic constant
                 sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
                 sr.route();
@@ -190,7 +190,6 @@ public class TravelTimeComputer {
             } else {
                 // Other modes are already asymmetric with the egress/stop trees, so just do a time-based on street
                 // search and don't worry about distance limiting.
-                sr.streetMode = accessMode;
                 sr.timeLimitSeconds = request.getMaxAccessTimeForMode(accessMode) * 60;
                 sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
                 sr.route();

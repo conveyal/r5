@@ -94,6 +94,8 @@ public class StreetLayer implements Serializable, Cloneable {
      */
     public static final double LINK_RADIUS_METERS = 300;
 
+    public static final int MAX_LINK_RADIUS_METERS = 300;
+
     // Edge lists should be constructed after the fact from edges. This minimizes serialized size too.
     public transient List<TIntList> outgoingEdges;
     public transient List<TIntList> incomingEdges;
@@ -1308,8 +1310,8 @@ public class StreetLayer implements Serializable, Cloneable {
      */
     public Split findSplit(double lat, double lon, double radiusMeters, StreetMode streetMode) {
         Split split = null;
-        if (radiusMeters > 300) {
-            split = Split.find(lat, lon, 150, this, streetMode);
+        if (radiusMeters > MAX_LINK_RADIUS_METERS) {
+            split = Split.find(lat, lon, MAX_LINK_RADIUS_METERS, this, streetMode);
         }
         if (split == null) {
             split = Split.find(lat, lon, radiusMeters, this, streetMode);

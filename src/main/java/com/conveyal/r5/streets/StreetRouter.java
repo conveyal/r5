@@ -293,6 +293,9 @@ public class StreetRouter {
      * If the given point is not close to an existing vertex, we will create two states, one at each vertex at the
      * ends of the edge that is found.
      *
+     * Note that the mode of travel should be set before calling this, otherwise you may link to a road you can't
+     * travel on!
+     *
      * @param lat Latitude in floating point (not fixed int) degrees.
      * @param lon Longitude in flating point (not fixed int) degrees.
      * @return true if an edge was found near the specified coordinate

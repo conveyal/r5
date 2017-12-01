@@ -143,9 +143,12 @@ public class Broker implements Runnable {
      */
     private TObjectLongMap<WorkerCategory> recentlyRequestedWorkers = new TObjectLongHashMap<>();
 
-    // Queue of tasks to complete Delete, Enqueue etc. to avoid synchronizing all the functions ?
+    // Queue of tasks to complete Delete, Enqueue etc. to avoid synchronizing all the functions?
+    // The synchronization doesn't seem to currently be causing any problematic contention.
     public Broker (Properties brokerConfig, String addr, int port) {
+
         // print out date on startup so that CloudWatch logs has a unique fingerprint
+        // TODO clarify how printing out a date creates a "unique fingerprint"
         LOG.info("Analyst broker starting at {}", LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
 
         this.brokerConfig = brokerConfig;

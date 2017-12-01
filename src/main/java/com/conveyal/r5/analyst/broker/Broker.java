@@ -153,9 +153,7 @@ public class Broker implements Runnable {
 
         this.brokerConfig = brokerConfig;
 
-        Boolean workOffline = Boolean.parseBoolean(brokerConfig.getProperty("work-offline"));
-        if (workOffline == null) workOffline = true;
-        this.workOffline = workOffline;
+        this.workOffline = Boolean.parseBoolean(brokerConfig.getProperty("work-offline", "true"));
 
         if (!workOffline) {
             // create a config for the AWS workers

@@ -44,10 +44,9 @@ public class TravelTimeComputer {
         this.gridCache = gridCache;
     }
 
-    // TODO rename this - "writing" is only a minor side effect of what it's doing.
     // Perhaps function should not be void return type. Why is this using a streaming or pipelining approach?
     // We also want to decouple the internal representation of the results from how they're serialized to an API.
-    public void write (OutputStream os) throws IOException {
+    public Grid computeTravelTimes(OutputStream os) throws IOException {
 
         // The mode of travel that will be used to reach transit stations from the origin point.
         StreetMode accessMode = LegMode.getDominantStreetMode(request.accessModes);

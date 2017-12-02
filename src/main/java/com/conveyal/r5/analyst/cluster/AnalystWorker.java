@@ -379,12 +379,12 @@ public class AnalystWorker implements Runnable {
 
                 finishPriorityTask(request, pis, "application/octet-stream", "gzip");
 
-                computer.write(pos);
+                computer.computeTravelTimes(pos);
                 pos.close();
             } else {
                 // not a high priority task, will not be returned via high-priority channel but rather via an SQS
                 // queue. Explicitly delete the task when done if there have been no exceptions thrown.
-                computer.write(null);
+                computer.computeTravelTimes(null);
                 deleteRequest(request);
             }
         } catch (Exception ex) {

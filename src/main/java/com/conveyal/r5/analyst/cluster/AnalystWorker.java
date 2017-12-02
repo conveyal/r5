@@ -10,6 +10,7 @@ import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
+import com.conveyal.r5.multipoint.MultipointMetadata;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.http.HttpEntity;
@@ -357,6 +358,14 @@ public class AnalystWorker implements Runnable {
                 // Any other kinds of exceptions will be caught by the outer catch clause
                 reportTaskErrors(request.taskId, HttpStatus.BAD_REQUEST_400, scenarioException.taskErrors);
                 return;
+            }
+
+            // replicate previous static site functionality; if this is the first of a batch of tasks, and if there is
+            // an output bucket specified, write the shared metadata for this batch of requests to the output bucket
+            if(request.taskId == 0 && !"".equals(request.outputBucket)){
+                MultipointMetadata mm = new MultipointMetadata(request, transportNetwork);
+                LOG.info("This is the lead-off task for a static site request; writing shared metadata");
+                mm.write();
             }
 
             TravelTimeComputer computer = new TravelTimeComputer(request, transportNetwork, gridCache);

@@ -15,7 +15,7 @@ import java.io.OutputStream;
 
 /**
  * Describe an analysis task to be performed, which could be a single point interactive task for a surface of travel times,
- * or could be a regional task for bootstrapped accessibility values.
+ * a multipoint request to write static results, or a regional task for bootstrapped accessibility values.
  */
 @JsonTypeInfo(use= JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property = "type")
 @JsonSubTypes({
@@ -44,6 +44,17 @@ public abstract class AnalysisTask extends ProfileRequest {
 
     /** A unique identifier for this task assigned by the queue/broker system. */
     public int taskId;
+
+    /** Save results to a bucket.  If blank, the response to this task will be via the default channel (broker for
+     *  single-point requests, queue for regional requests).
+     */
+    public String outputBucket = "";
+
+    /* Directory in the bucket in which to save results */
+    public String outputDirectory = "";
+
+    /** Include paths, used to for transitive-style maps, in results */
+    public boolean includePaths = false;
 
     /** Which percentiles of travel time to calculate. */
     public double[] percentiles = new double[] { 50 };
@@ -84,9 +95,14 @@ public abstract class AnalysisTask extends ProfileRequest {
     }
 
     public enum Type {
-        /** Binary grid of travel time for multiple percentiles returned via broker */
+        /* TODO these could be changed.  We can instead specify whether to return travel time results (i.e. a grid of
+           travel times per origin) or accessibility results (i.e. reduced to one value per origin), and separately,
+           whether there one origin or multiple origins are supplied.  The incremental implementation now uses the
+           includePaths flag to turn a regional analysis into a batch single-point analysis.
+         */
+        /** Binary grid of travel times from a single origin, for multiple percentiles, returned via broker by default */
         TRAVEL_TIME_SURFACE,
-        /** Bootstrapped accessibility results returned over SQS. */
+        /** Bootstrapped accessibility results for multiple origins, returned over SQS by default. */
         REGIONAL_ANALYSIS
     }
 

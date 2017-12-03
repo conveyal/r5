@@ -12,6 +12,7 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import java.io.OutputStream;
+import java.util.List;
 
 /**
  * Describe an analysis task to be performed, which could be a single point interactive task for a surface of travel times,
@@ -78,7 +79,7 @@ public abstract class AnalysisTask extends ProfileRequest {
 
     /** Get the destinations that should be used for this task */
     @JsonIgnore
-    public abstract PointSet getDestinations(TransportNetwork network, GridCache gridCache);
+    public abstract List<PointSet> getDestinations(TransportNetwork network, GridCache gridCache);
 
     /**
      * Get a TravelTimeReducer that will finish this task.

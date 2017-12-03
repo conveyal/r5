@@ -7,6 +7,8 @@ import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.transit.TransportNetwork;
 
 import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Represents a single point, interactive task coming from the Analysis UI and returning a surface of travel
@@ -28,9 +30,11 @@ public class TravelTimeSurfaceTask extends AnalysisTask {
      * Since this may be applied to many different grids, we use the extents defined in the request.
      */
     @Override
-    public PointSet getDestinations(TransportNetwork network, GridCache gridCache) {
+    public List<PointSet> getDestinations(TransportNetwork network, GridCache gridCache) {
+        List pointSets = new ArrayList<>();
         // Use TransportNetwork gridPointSet as base to avoid relinking
-        return gridPointSetCache.get(this.zoom, this.west, this.north, this.width, this.height, network.gridPointSet);
+        pointSets.add(gridPointSetCache.get(this.zoom, this.west, this.north, this.width, this.height, network.gridPointSet));
+        return pointSets;
     }
 
     @Override

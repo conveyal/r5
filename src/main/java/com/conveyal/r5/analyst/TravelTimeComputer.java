@@ -56,7 +56,10 @@ public class TravelTimeComputer {
         StreetMode directMode = LegMode.getDominantStreetMode(request.directModes);
 
         // The set of destinations in the one-to-many travel time calculations, not yet linked to the street network.
-        PointSet destinations = request.getDestinations(network, gridCache);
+        List<PointSet> destinationList = request.getDestinations(network, gridCache);
+
+        //TODO wrap in loop to repeat for multiple destinations pointsets in a regional request;
+        PointSet destinations = destinationList.get(0);
 
         // Get the appropriate function for reducing travel time, given the type of request we're handling
         // (either a travel time surface for a single point or a location based accessibility indicator value for a

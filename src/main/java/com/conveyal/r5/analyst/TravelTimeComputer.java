@@ -104,12 +104,12 @@ public class TravelTimeComputer {
             int[] travelTimesToTargets = directModeLinkedDestinations
                     .eval(sr::getTravelTimeToVertex, offstreetTravelSpeedMillimetersPerSecond).travelTimes;
 
-            // FIXME replace with nested x and y loops, we are dividing then re-multiplying below
-            for (int target = 0; target < travelTimesToTargets.length; target++) {
-                int x = target % request.width;
-                int y = target / request.width;
-                final int travelTimeSeconds = travelTimesToTargets[target];
-                travelTimeReducer.recordTravelTimesForTarget(y * request.width + x, new int[] { travelTimeSeconds });
+            for (int x = 0; x < request.width; x++) {
+                for (int y = 0; y < request.height; y++) {
+                    int targetIndex = y * request.width + x;
+                    final int travelTimeSeconds = travelTimesToTargets[targetIndex];
+                    travelTimeReducer.recordTravelTimesForTarget(targetIndex, new int[] { travelTimeSeconds });
+                }
             }
 
             travelTimeReducer.finish();

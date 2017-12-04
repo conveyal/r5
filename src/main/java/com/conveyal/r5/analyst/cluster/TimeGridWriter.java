@@ -64,8 +64,7 @@ public class TimeGridWriter {
     }
 
     public void initialize(String type, int version){
-        if ("TIMEGRID".equals(type)){
-
+        if ("ACCESSGR".equals(type)){
             buffer.put(type.getBytes(),0,8);
             buffer.putInt(8, version);
             //Fill a time grid with the default unreachable value

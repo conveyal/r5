@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.streets.LinkedPointSet;
 import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
@@ -55,8 +56,10 @@ public class PerTargetPropagater {
     /** Index of path used from origin stop to a given stop in a given iteration of the algorithm  */
     int [][] pathsToStops;
 
-    public PerTargetPropagater(LinkedPointSet targets, int[][] travelTimesToStopsEachIteration, int[] nonTransitTravelTimesToTargets, int[][] inVehicleTimesToStops, int[][] waitTimesToStops, int[][] paths) {
+
+    public PerTargetPropagater(LinkedPointSet targets, AnalysisTask task, int[][] travelTimesToStopsEachIteration, int[] nonTransitTravelTimesToTargets, int[][] inVehicleTimesToStops, int[][] waitTimesToStops, int[][] paths) {
         this.targets = targets;
+        this.request = task;
         this.travelTimesToStopsEachIteration = travelTimesToStopsEachIteration;
         this.nonTransitTravelTimesToTargets = nonTransitTravelTimesToTargets;
         this.inVehicleTimesToStops = inVehicleTimesToStops;

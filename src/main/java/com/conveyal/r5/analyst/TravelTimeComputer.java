@@ -299,13 +299,13 @@ public class TravelTimeComputer {
                     }
                 }
 
-                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, transitTravelTimesToStops, nonTransitTravelTimesToDestinations, inVehicleTimesToStops, waitTimesToStops, pathsToStops);
+                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request, transitTravelTimesToStops, nonTransitTravelTimesToDestinations, inVehicleTimesToStops, waitTimesToStops, pathsToStops);
                 perTargetPropagater.reducer = new TravelTimeSurfaceReducer(request, network, os);
                 perTargetPropagater.pathWriter = new PathWriter(request, network, pathList);
 
             } else {
 
-                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, transitTravelTimesToStops, nonTransitTravelTimesToDestinations, null, null, null);
+                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request, transitTravelTimesToStops, nonTransitTravelTimesToDestinations, null, null, null);
                 perTargetPropagater.reducer = new TravelTimeSurfaceReducer(request, network, os);
             }
             perTargetPropagater.propagate();

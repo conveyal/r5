@@ -59,7 +59,7 @@ public class TimeGridWriter {
         buffer.putInt(20, north);
         buffer.putInt(24, width);
         buffer.putInt(28, height);
-        buffer.putInt(36, nValuesPerPixel);
+        buffer.putInt(32, nValuesPerPixel);
 
     }
 

@@ -163,7 +163,10 @@ public class PerTargetPropagater {
             // may not hold for some summary statistics that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
 
             reducer.recordTravelTimesForTarget(targetIdx, perIterationTravelTimes);
-            pathWriter.recordPathsForTarget(perIterationPaths);
+
+            if (pathWriter != null) {
+                pathWriter.recordPathsForTarget(perIterationPaths);
+            }
         }
 
         long totalTimeMillis = System.currentTimeMillis() - startTimeMillis;
@@ -174,7 +177,9 @@ public class PerTargetPropagater {
                 totalTimeMillis / 1000d
                 );
         reducer.finish();
-        pathWriter.finishPaths();
+        if (pathWriter != null) {
+            pathWriter.finishPaths();
+        }
     }
 
     /**

@@ -101,7 +101,7 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
                 outputStream = MultipointDataStore.getOutputStream(task, task.taskId + "_times.dat", "application/octet-stream");
             }
 
-            outputStream.write(timeResults.buffer.get());
+            outputStream.write(timeResults.buffer.array());
 
             LOG.info("Travel time surface written, appending metadata with {} warnings",
                     network.scenarioApplicationWarnings.size());

@@ -1,23 +1,30 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
+import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.profile.FastRaptorWorker;
+import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.PerTargetPropagater;
+import com.conveyal.r5.profile.RaptorState;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
+import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
+import gnu.trove.map.hash.TObjectIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * This computes a surface representing travel time from one origin to all destination cells, and writes out a
@@ -46,7 +53,7 @@ public class TravelTimeComputer {
 
     // Perhaps function should not be void return type. Why is this using a streaming or pipelining approach?
     // We also want to decouple the internal representation of the results from how they're serialized to an API.
-    public Grid computeTravelTimes(OutputStream os) throws IOException {
+    public void computeTravelTimes(OutputStream os) throws IOException {
 
         // The mode of travel that will be used to reach transit stations from the origin point.
         StreetMode accessMode = LegMode.getDominantStreetMode(request.accessModes);
@@ -218,19 +225,90 @@ public class TravelTimeComputer {
             // Create a new Raptor Worker.
             FastRaptorWorker worker = new FastRaptorWorker(network.transitLayer, request, accessTimes);
 
+            if (request.returnPaths || request.returnInVehicleTimes || request.returnWaitTimes) {
+                worker.saveAllStates = true; // By default, this is false and intermediate results (e.g. paths) are discarded.
+            }
+
             // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
+
+            /* Total travel time from origin stop to a given stop in a given iteration of the algorithm  */
             int[][] transitTravelTimesToStops = worker.route();
 
-            // From this point on the requests are handled separately depending on whether they are single point requests
-            // returning a surface representing the distribution of potential travel times to each destination, regional
-            // requests that will return bootstrapped accessibility numbers via Amazon SQS.
+            PerTargetPropagater perTargetPropagater;
 
-            // FIXME this is a very Javascript-Lisp style functional approach, not really idiomatic Java.
-            // We've also got methods tail-calling the next step in a process, instead of a method higher on the stack chaining them together.
-            // We should probably set the reducer field on the propagator instance, and give the methods return values.
-            // Actually these could just be two subclasses of the propagator with different TravelTimeReducer definition.
-            PerTargetPropagater perTargetPropagater = new PerTargetPropagater(transitTravelTimesToStops, nonTransitTravelTimesToDestinations, egressModeLinkedDestinations, request, 120 * 60);
-            perTargetPropagater.propagate(travelTimeReducer);
+            if (worker.saveAllStates) {
+
+                int iterations = transitTravelTimesToStops.length;
+                int stops = transitTravelTimesToStops[0].length;
+
+                /* In-vehicle component of time from origin stop to a given stop in a given iteration of the algorithm  */
+                int [][] inVehicleTimesToStops = new int[iterations][stops];
+
+                /* Waiting time component of time from origin stop to a given stop in a given iteration of the algorithm  */
+                int [][] waitTimesToStops = new int[iterations][stops];
+
+                /* Index of path used from origin stop to a given stop in a given iteration of the algorithm  */
+                int [][] pathsToStops = new int[iterations][stops];
+
+                /* List of paths used */
+                List<Path> pathList = new ArrayList<>();
+
+                for (int stop = 0; stop < stops; stop++) {
+                    int maxPathIdx = 0;
+
+                    TObjectIntMap<Path> paths = new TObjectIntHashMap<>();
+
+                    for (int iter = 0; iter < iterations; iter++) {
+
+                        int time = transitTravelTimesToStops[iter][stop];
+                        if (time == Integer.MAX_VALUE) time = -1;
+                        else time /= 60;
+
+                        RaptorState state = worker.statesEachIteration.get(iter);
+
+                        if (request.returnWaitTimes || request.returnInVehicleTimes) {
+
+                            int inVehicleTime = state.nonTransferInVehicleTravelTime[stop] / 60;
+                            int waitTime = state.nonTransferWaitTime[stop] / 60;
+
+                            if (inVehicleTime + waitTime > time && time != -1) {
+                                LOG.info("Wait and in vehicle travel time greater than total time");
+                            }
+
+                            inVehicleTimesToStops[iter][stop] = inVehicleTime;
+                            waitTimesToStops[iter][stop] = waitTime;
+
+                        }
+
+                        if (request.returnPaths) {
+                            int pathIdx = -1;
+
+                            // only compute a path if this stop was reached
+                            if (state.bestNonTransferTimes[stop] != FastRaptorWorker.UNREACHED) {
+                                // TODO reuse pathwithtimes?
+                                Path path = new Path(state, stop);
+                                if (!paths.containsKey(path)) {
+                                    paths.put(path, maxPathIdx++);
+                                    pathList.add(path);
+                                }
+                                pathIdx = paths.get(path);
+                            }
+
+                            pathsToStops[iter][stop] = pathIdx;
+                        }
+                    }
+                }
+
+                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, transitTravelTimesToStops, nonTransitTravelTimesToDestinations, inVehicleTimesToStops, waitTimesToStops, pathsToStops);
+                perTargetPropagater.reducer = new TravelTimeSurfaceReducer(request, network, os);
+                perTargetPropagater.pathWriter = new PathWriter(request, network, pathList);
+
+            } else {
+
+                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, transitTravelTimesToStops, nonTransitTravelTimesToDestinations, null, null, null);
+                perTargetPropagater.reducer = new TravelTimeSurfaceReducer(request, network, os);
+            }
+            perTargetPropagater.propagate();
         }
     }
 }

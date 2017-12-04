@@ -15,8 +15,10 @@ import java.io.OutputStream;
 import java.util.List;
 
 /**
- * Describe an analysis task to be performed, which could be a single point interactive task for a surface of travel times,
- * a multipoint request to write static results, or a regional task for bootstrapped accessibility values.
+ * Describes an analysis task to be performed.
+ *
+ * By default, the task will be a travelTimeSurfaceTask for one origin.
+ * This task is completed by returning a grid of total travel times from that origin to all destinations.
  */
 @JsonTypeInfo(use= JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property = "type")
 @JsonSubTypes({
@@ -54,8 +56,14 @@ public abstract class AnalysisTask extends ProfileRequest {
     /* Directory in the bucket in which to save results */
     public String outputDirectory = "";
 
-    /** Include paths, used to for transitive-style maps, in results */
-    public boolean includePaths = false;
+    /** Whether to include the in-vehicle component of overall travel time in results */
+    public boolean returnInVehicleTimes = false;
+
+    /** Whether to include the waiting time component of overall travel time in results */
+    public boolean returnWaitTimes = false;
+
+    /** Whether to include paths, used to for transitive-style maps, in results */
+    public boolean returnPaths = false;
 
     /** Which percentiles of travel time to calculate. */
     public double[] percentiles = new double[] { 50 };
@@ -96,10 +104,10 @@ public abstract class AnalysisTask extends ProfileRequest {
     }
 
     public enum Type {
-        /* TODO these could be changed.  We can instead specify whether to return travel time results (i.e. a grid of
-           travel times per origin) or accessibility results (i.e. reduced to one value per origin), and separately,
-           whether there one origin or multiple origins are supplied.  The incremental implementation now uses the
-           includePaths flag to turn a regional analysis into a batch single-point analysis.
+        /* TODO these could be changed, to SINGLE_POINT and MULTI_POINT. The type of results requested (i.e. a grid of
+           travel times per origin vs. an accessibility value per origin) can be inferred based on whether grids are
+           specified in the profile request.  If travel time results are requested, flags can specify whether components
+           of travel time (e.g. waiting) and paths should also be returned.
          */
         /** Binary grid of travel times from a single origin, for multiple percentiles, returned via broker by default */
         TRAVEL_TIME_SURFACE,

@@ -65,10 +65,10 @@ public class PathWriter implements PerTargetPropagater.PathWriter {
             // write the details for each path used
             for (Path path : pathList) {
                 outputStream.write(path.patterns.length);
-                for (int pattern : path.patterns){
-                    outputStream.write(path.boardStops[pattern]);
-                    outputStream.write(path.patterns[pattern]);
-                    outputStream.write(path.alightStops[pattern]);
+                for (int i = 0 ; i < path.patterns.length; i ++){
+                    outputStream.write(path.boardStops[i]);
+                    outputStream.write(path.patterns[i]);
+                    outputStream.write(path.alightStops[i]);
                 }
 
             }

@@ -23,6 +23,9 @@ public class JobStatus {
     /** The number of tasks no worker has yet marked complete. */
     public int incomplete;
 
+// TODO add indicator of how many have been sent in this pass.
+//    public int nSent
+
     /** The number of times we have started over at the beginning to redeliver tasks never marked complete. */
     public int deliveryPass;
 

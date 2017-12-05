@@ -5,9 +5,9 @@ import com.amazonaws.regions.Region;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.*;
-import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.JsonUtilities;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
@@ -474,15 +474,16 @@ public class Broker implements Runnable {
         }
     }
 
-    private boolean noUndeliveredTasks() {
+    private boolean tasksToBeDelivered() {
+        // If any job has some tasks to deliver, then the whole system has some tasks to deliver.
         for (Job job : jobs) {
             if (job.hasTasksToDeliver()) {
-                return false;
+                return true;
             }
         }
-        // No jobs have any tasks waiting for delivery, but high priority tasks that were not delivered via the side
-        // channel are stored outside the jobs.
-        return stalledHighPriorityTasks.isEmpty();
+        // No jobs have any tasks waiting for delivery, but there may be high priority tasks that were not delivered
+        // via the side channel stored outside the jobs.
+        return stalledHighPriorityTasks.size() > 0;
     }
 
     /**
@@ -500,8 +501,8 @@ public class Broker implements Runnable {
         // See if any tasks failed and need to be re-enqueued.
         checkRedelivery();
 
-        // Wait until there are some undelivered tasks.
-        while (noUndeliveredTasks()) {
+        // Wait in a loop until there are some tasks to be delivered.
+        while (!tasksToBeDelivered()) {
             LOG.debug("Task delivery thread is going to sleep, there are no tasks waiting for delivery.");
             // Thread will be notified when tasks are added or there are new incoming consumer connections.
             wait();
@@ -512,11 +513,11 @@ public class Broker implements Runnable {
         LOG.debug("Task delivery thread is awake and there are some undelivered tasks.");
 
         while (nWaitingConsumers == 0) {
-            LOG.debug("Task delivery thread is going to sleep, there are no consumers waiting.");
-            // Thread will be notified when tasks are added or there are new incoming consumer connections.
+            LOG.debug("Task delivery thread is going to sleep, there are no workers waiting to consume tasks.");
+            // The delivery thread will be notified when tasks are added or there are new incoming consumer connections.
             wait();
         }
-        LOG.debug("Task delivery thread awake; consumers are waiting and tasks are available");
+        LOG.debug("Task delivery thread is awake. Workers are waiting and tasks are available for them to consume.");
 
         // Loop over all jobs and send them to consumers
         // This makes for an as-fair-as-possible allocation: jobs are fairly allocated between

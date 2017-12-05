@@ -312,7 +312,7 @@ public class Broker implements Runnable {
         notify();
     }
 
-    public boolean workersAvailable (WorkerCategory category) {
+    private boolean workersAvailable (WorkerCategory category) {
         // Ensure we don't assign work to dead workers.
         workerCatalog.purgeDeadWorkers();
 
@@ -324,7 +324,7 @@ public class Broker implements Runnable {
     }
 
     /** Create workers for a given job, if need be */
-    public void createWorkersInCategory (WorkerCategory category) {
+    private void createWorkersInCategory (WorkerCategory category) {
 
         String clientToken = UUID.randomUUID().toString().replaceAll("-", "");
 

@@ -35,8 +35,8 @@ public class LinkedPointSet implements Serializable {
 
     /**
      * The distance we search around each PointSet point for a road to link it to.
-     * FIXME 1km is really far to walk off a street. But some places have offices in the middle of big parking lots.
-     * FIXME and 4km is even more extreme! This needs to be greatly shortened.
+     * 1.6km (1 mile) is really far to walk off a street. But some places have offices in the middle of big parking lots, and some
+     * service roads leading to homes and businesses are not in the OSM data set.
      */
     public static final int MAX_OFFSTREET_WALK_METERS = 1600;
 

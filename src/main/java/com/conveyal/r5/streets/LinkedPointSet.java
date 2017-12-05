@@ -102,14 +102,16 @@ public class LinkedPointSet implements Serializable {
         // Null means relink and rebuild everything, but this will be constrained below if a base linkage was supplied.
         Geometry treeRebuildZone = null;
 
-        if (baseLinkage != null && (
-                baseLinkage.pointSet != pointSet ||
-                baseLinkage.streetLayer != streetLayer.baseStreetLayer ||
-                baseLinkage.streetMode != streetMode)) {
-            LOG.error("Cannot reuse linkage with mismatched characteristics. THIS IS A BUG.");
-            // Relink everything as if no base linkage was supplied.
-            baseLinkage = null;
-        }
+// This has been commented out because this was evaluating to true frequently on car searches
+// Perhaps the effect of identity equality comparisons and the fact that both base layer and new linkage are coming from a cache?
+//        if (baseLinkage != null && (
+//                baseLinkage.pointSet != pointSet ||
+//                baseLinkage.streetLayer != streetLayer.baseStreetLayer ||
+//                baseLinkage.streetMode != streetMode)) {
+//            LOG.error("Cannot reuse linkage with mismatched characteristics. THIS IS A BUG.");
+//            // Relink everything as if no base linkage was supplied.
+//            baseLinkage = null;
+//        }
 
         if (baseLinkage == null) {
             edges = new int[nPoints];
@@ -119,7 +121,8 @@ public class LinkedPointSet implements Serializable {
         } else {
             // The caller has supplied an existing linkage for a scenario StreetLayer's base StreetLayer.
             // We want to re-use most of that that existing linkage to reduce linking time.
-            LOG.info("Linking a subset of points and copying other linkages from base layer");
+            LOG.info("Linking a subset of points and copying other linkages from an existing base linkage.");
+            LOG.info("The base linkage is for street mode {}", baseLinkage.streetMode);
 
             // Copy the supplied base linkage into this new LinkedPointSet.
             // The new linkage has the same PointSet as the base linkage, so the linkage arrays remain the same length

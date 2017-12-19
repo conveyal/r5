@@ -129,10 +129,11 @@ public class GridResultAssembler {
         }
     }
 
-    /** Process an SQS message */
-    public void handleMessage (Message message) {
+    /**
+     * Process a single result.
+     */
+    public void handleMessage (byte[] body) {
         try {
-            byte[] body = base64.decode(message.getBody());
             ByteArrayInputStream bais = new ByteArrayInputStream(body);
             Origin origin = Origin.read(bais);
 
@@ -178,7 +179,7 @@ public class GridResultAssembler {
                 if (nComplete == nTotal && !error) finish();
             }
         } catch (Exception e) {
-            error = true; // the file is garbage TODO better resilience
+            error = true; // the file is garbage TODO better resilience, tell the UI, transmit all errors.
             LOG.error("Error assembling results for query {}", request.jobId, e);
             return;
         }

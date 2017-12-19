@@ -65,7 +65,9 @@ public abstract class JsonUtilities {
         return new ByteArrayEntity(objectToJsonBytes(object));
     }
 
-    /** Deserializes an object of the given type from the body of the supplied request. */
+    /**
+     * Deserializes an object of the given type from the body of the supplied request.
+     */
     public static <T> T objectFromRequestBody(Request request, Class<T> classe) {
         try {
             return lenientObjectMapper.readValue(request.getInputStream(), classe);

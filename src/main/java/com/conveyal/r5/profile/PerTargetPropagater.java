@@ -148,12 +148,12 @@ public class PerTargetPropagater {
         void recordTravelTimesForTarget(int targetIndex, int[] travelTimesForTarget);
 
         /**
-         * Called when propagation is done, used to signal the reducer that it can write / upload its results to s3 etc.
+         * Called when propagation is done, used to signal the reducer that it can write the final result to the output stream.
          * If this is called immediately without supplying any travel times via recordTravelTimesForTarget,
          * we have bypassed propagation entirely and the implementation should write out a default result for cases
          * where the network is entirely unreachable.
          */
-        default void finish () {};
+        void finish ();
 
     }
 }

@@ -56,6 +56,9 @@ public class Job {
     // but as an optimization we keep a separate counter to avoid constantly scanning over that whole bitset.
     protected int nTasksCompleted;
 
+    // The total number of task deliveries that have occurred. A task may be counted more than once if it is redelivered.
+    protected int nTasksDelivered;
+
     // Every task in this job will be based on this template task, but have its origin coordinates changed.
     private final RegionalTask templateTask;
 
@@ -189,6 +192,8 @@ public class Job {
             }
             nextTaskToDeliver += 1;
         }
+        this.lastDeliveryTime = System.currentTimeMillis();
+        nTasksDelivered += tasks.size();
         return tasks;
     }
 

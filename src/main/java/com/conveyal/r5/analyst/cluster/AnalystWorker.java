@@ -15,10 +15,10 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.config.SocketConfig;
 import org.apache.http.conn.HttpHostConnectException;
+import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
@@ -96,7 +96,8 @@ public class AnalystWorker implements Runnable {
     /** is there currently a channel open to the broker to receive single point jobs? */
     private volatile boolean sideChannelOpen = false;
 
-    String BROKER_BASE_URL = "http://localhost:9001";
+    /** The common root of all API URLs contacted by this broker, e.g. http://localhost:7070/api/ */
+    protected String brokerBaseUrl;
 
     static final HttpClient httpClient;
 
@@ -167,16 +168,9 @@ public class AnalystWorker implements Runnable {
             LOG.info("Working offline. Avoiding internet connections and hosted services.");
         }
 
-        String addr = config.getProperty("broker-address");
-        String port = config.getProperty("broker-port");
-
-        if (addr != null) {
-            if (port != null) {
-                this.BROKER_BASE_URL = String.format("http://%s:%s", addr, port);
-            } else {
-                this.BROKER_BASE_URL = String.format("http://%s", addr);
-            }
-        }
+        String addr = config.getProperty("broker-address", "localhost");
+        String port = config.getProperty("broker-port", "7070");
+        this.brokerBaseUrl = String.format("http://%s:%s/api", addr, port);
 
         // set the initial graph affinity of this worker (if it is not in the config file it will be
         // set to null, i.e. no graph affinity)
@@ -223,13 +217,13 @@ public class AnalystWorker implements Runnable {
         // Create executors with up to one thread per processor.
         // fix size of highPriorityExecutor to avoid broken pipes when threads are killed off before they are done sending data
         // (not confirmed if this actually works)
-        int nP = Runtime.getRuntime().availableProcessors();
-        highPriorityExecutor = new ThreadPoolExecutor(nP, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
+        int availableProcessors = Runtime.getRuntime().availableProcessors();
+        highPriorityExecutor = new ThreadPoolExecutor(availableProcessors, availableProcessors, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
         highPriorityExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-        batchExecutor = new ThreadPoolExecutor(1, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(nP * 2));
+        batchExecutor = new ThreadPoolExecutor(1, availableProcessors, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(availableProcessors * 2));
         batchExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
 
-        taskDeliveryExecutor = new ThreadPoolExecutor(1, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
+        taskDeliveryExecutor = new ThreadPoolExecutor(1, availableProcessors, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
         // can't use CallerRunsPolicy as that would cause deadlocks, calling thread is writing to inputstream
         taskDeliveryExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
 
@@ -330,7 +324,7 @@ public class AnalystWorker implements Runnable {
                 e.printStackTrace();
             }
             if (random.nextInt(100) >= dryRunFailureRate) {
-                deleteRequest(request);
+                taskCompleted(request, null);
             } else {
                 LOG.info("Intentionally failing to complete task for testing purposes {}", request.taskId);
             }
@@ -375,10 +369,14 @@ public class AnalystWorker implements Runnable {
                 computer.write(pos);
                 pos.close();
             } else {
-                // not a high priority task, will not be returned via high-priority channel but rather via an SQS
-                // queue. Explicitly delete the task when done if there have been no exceptions thrown.
-                computer.write(null);
-                deleteRequest(request);
+                // This is a regional task.
+                // These used to be returned via an SQS queue. Now returning directy to the backend via the HTTP API.
+                // The SQS queue was probably just working around server IO speed problems caused by AWS IOPS limits.
+                // Use of a byte array output stream here is a bit redundant since the grid writer already has a
+                // byte array in it.
+                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                computer.write(baos);
+                taskCompleted(request, baos.toByteArray());
             }
         } catch (Exception ex) {
             // Catch any exceptions that were not handled by more specific catch clauses above.
@@ -419,7 +417,7 @@ public class AnalystWorker implements Runnable {
     public List<AnalysisTask> getSomeWork(WorkType type) {
         // Run a POST task (long-polling for work)
         // The graph and r5 commit of this worker are indicated in the task body.
-        String url = String.join("/", BROKER_BASE_URL, "dequeue", type == WorkType.SINGLE ? "single" : "regional");
+        String url = String.join("/", brokerBaseUrl, "dequeue");
         HttpPost httpPost = new HttpPost(url);
         WorkerStatus workerStatus = new WorkerStatus();
         workerStatus.loadStatus(this);
@@ -427,10 +425,20 @@ public class AnalystWorker implements Runnable {
         try {
             HttpResponse response = httpClient.execute(httpPost);
             HttpEntity entity = response.getEntity();
+            if (response.getStatusLine().getStatusCode() == 204) {
+                // TODO pull this out to the caller
+                LOG.info("No work was provided. Sleeping {} sec.", POLL_TIMEOUT / 1000);
+                try {
+                    Thread.sleep(POLL_TIMEOUT);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+            }
             if (entity == null) {
                 return null;
             }
             if (response.getStatusLine().getStatusCode() != 200) {
+                // TODO log errors!
                 EntityUtils.consumeQuietly(entity);
                 return null;
             }
@@ -443,7 +451,7 @@ public class AnalystWorker implements Runnable {
         } catch (HttpHostConnectException ce) {
             LOG.error("Broker refused connection. Sleeping before retry.");
             try {
-                Thread.currentThread().sleep(5000);
+                Thread.currentThread().sleep(POLL_TIMEOUT);
             } catch (InterruptedException e) {
             }
         } catch (IOException e) {
@@ -468,7 +476,7 @@ public class AnalystWorker implements Runnable {
 
         LOG.info("Returning high-priority results for task {}", request.taskId);
 
-        String url = BROKER_BASE_URL + String.format("/complete/success/%s", request.taskId);
+        String url = brokerBaseUrl + String.format("/complete/success/%s", request.taskId);
         HttpPost httpPost = new HttpPost(url);
 
         // TODO reveal any errors etc. that occurred on the worker.
@@ -503,7 +511,7 @@ public class AnalystWorker implements Runnable {
      * That objects are always the same type (TaskError) so the client knows what to expect.
      */
     public void reportTaskErrors(int taskId, int httpStatusCode, List<TaskError> taskErrors) {
-        String url = BROKER_BASE_URL + String.format("/complete/%d/%s", httpStatusCode, taskId);
+        String url = brokerBaseUrl + String.format("/complete/%d/%s", httpStatusCode, taskId);
         try {
             HttpPost httpPost = new HttpPost(url);
             httpPost.setHeader("Content-type", "application/json");
@@ -518,22 +526,27 @@ public class AnalystWorker implements Runnable {
     }
 
     /**
-     * Tell the broker that the given message has been successfully processed by a worker (HTTP DELETE).
+     * Tell the broker that the given message has been successfully processed by a worker.
+     * The result of the task is supplied as an array of bytes.
+     * TODO supply it in a typed way, with metadata and a grid object.
      */
-    public void deleteRequest(AnalysisTask request) {
-        String url = BROKER_BASE_URL + String.format("/tasks/%s/%s", request.jobId, request.taskId);
-        HttpDelete httpDelete = new HttpDelete(url);
+    public void taskCompleted(AnalysisTask request, byte[] result) {
+        String url = brokerBaseUrl + String.format("/complete/%s/%s", request.jobId, request.taskId);
+        HttpPost httpPost = new HttpPost(url);
+        httpPost.setHeader("Content-type", "application/octet-stream"); // invent our own type application/analysis-grid ?
+        httpPost.setEntity(new ByteArrayEntity(result));
         try {
-            HttpResponse response = httpClient.execute(httpDelete);
+            HttpResponse response = httpClient.execute(httpPost);
             // Signal the http client library that we're done with this response object, allowing connection reuse.
             EntityUtils.consumeQuietly(response.getEntity());
             if (response.getStatusLine().getStatusCode() == 200) {
                 LOG.info("Successfully deleted task {} on job {}.", request.taskId, request.jobId);
             } else {
-                LOG.info("Failed to delete task {} on job {} (HTTP status {}).", request.taskId, request.jobId, response.getStatusLine());
+                LOG.warn("Failed to delete task {} on job {} (HTTP status {}).",
+                        request.taskId, request.jobId, response.getStatusLine());
             }
         } catch (Exception e) {
-            LOG.warn("Failed to delete task {}", request.taskId, e);
+            LOG.warn("Failed to delete task {}. Exception: {}", request.taskId, e.toString());
         }
     }
 

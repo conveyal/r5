@@ -6,7 +6,10 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
- *
+ * This is a data structure that's intended to cycle through a bunch of jobs.
+ * It's probably a bad idea to maintain our own special data structure for this.
+ * We should just find some other way of distributing work fairly from different jobs.
+ * Possibly in a probabilistic way by just assigning enough workers in the right categories.
  */
 public class CircularList<T> implements Iterable<T> {
 

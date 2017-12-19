@@ -21,10 +21,12 @@ import java.util.stream.Collectors;
  * of the listening process. This is only used by the frontend repo - not used within R5 itself.
  * This manages multiple grid result assemblers running for multiple regional analysis jobs simultaneously. It
  * splits a stream of messages so each message goes into the right result file.
+ *
+ * TODO merge into RegionalAnalysisManager
  */
-public class GridResultQueueConsumer implements Runnable {
+public class GridResultQueueConsumer {
+
     private static final Logger LOG = LoggerFactory.getLogger(GridResultQueueConsumer.class);
-    private static final AmazonSQS sqs = new AmazonSQSClient();
 
     public final String sqsUrl;
     public final String outputBucket;
@@ -36,60 +38,15 @@ public class GridResultQueueConsumer implements Runnable {
         this.outputBucket = outputBucket;
     }
 
-    public void run () {
-        while (true) {
-            // TODO if no jobs are registered, don't waste money talking to SQS
-
-            try {
-                ReceiveMessageRequest req = new ReceiveMessageRequest(sqsUrl);
-                req.setWaitTimeSeconds(20);
-                req.setMaxNumberOfMessages(10);
-                req.setMessageAttributeNames(Collections.singleton("jobId"));
-                ReceiveMessageResult res = sqs.receiveMessage(req);
-
-                // parallelStream? ExecutorService?
-                List<DeleteMessageBatchRequestEntry> deleteRequests = res.getMessages().stream()
-                        .map(m -> {
-                            MessageAttributeValue jobIdAttr = m.getMessageAttributes().get("jobId");
-                            String jobId = jobIdAttr != null ? jobIdAttr.getStringValue() : null;
-
-                            if (jobId == null) {
-                                LOG.error("Message does not have a Job ID, silently discarding");
-                                return new DeleteMessageBatchRequestEntry(m.getMessageId(), m.getReceiptHandle());
-                            }
-
-                            if (!assemblers.containsKey(jobId)) {
-                                // TODO is this the right thing to do?
-                                LOG.warn("Received message for invalid job ID {}, silently discarding", jobId);
-                                return new DeleteMessageBatchRequestEntry(m.getMessageId(), m.getReceiptHandle());
-                            }
-
-                            assemblers.get(jobId).handleMessage(m);
-
-                            return new DeleteMessageBatchRequestEntry(m.getMessageId(), m.getReceiptHandle());
-                        })
-                        .filter(Objects::nonNull)
-                        .collect(Collectors.toList());
-
-                if (!deleteRequests.isEmpty()) {
-                    sqs.deleteMessageBatch(sqsUrl, deleteRequests);
-                }
-            } catch (Exception e) {
-                // TODO figure out if exception is permanent
-                LOG.info("Error connecting to regional result queue. Assuming this is a transient network issue. Retrying in 60s");
-                try {
-                    Thread.sleep(3600);
-                } catch (InterruptedException ie) {
-                    LOG.info("Interrupted, shutting down monitor thread");
-                    return;
-                }
-            }
+    /**
+     * The taskId seems to come from the binary result itself.
+     */
+    public void registerResult (String jobId, byte[] result) {
+        if (assemblers.containsKey(jobId)) {
+            assemblers.get(jobId).handleMessage(result);
+        } else {
+            LOG.error("Received message for invalid job ID {}, silently discarding.", jobId);
         }
-    }
-
-    /** Register a particular task using the default grid assembler */
-    public void registerJob (AnalysisTask request) {
-        registerJob(request, new GridResultAssembler(request, outputBucket));
     }
 
     /** Register a grid assembler for a particular task */

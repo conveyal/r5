@@ -7,6 +7,7 @@ import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.*;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.cluster.WorkerStatus;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.JsonUtilities;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -143,7 +144,9 @@ public class Broker implements Runnable {
      */
     private TObjectLongMap<WorkerCategory> recentlyRequestedWorkers = new TObjectLongHashMap<>();
 
-    // Queue of tasks to complete Delete, Enqueue etc. to avoid synchronizing all the functions ?
+    // TODO evaluate whether synchronizing all the functions to make this threadsafe is a performance issue.
+    // We might want to allow a queue of tasks to Complete, Delete, Enqueue etc. but then we have to throttle it.
+
     public Broker (Properties brokerConfig, String addr, int port) {
         // print out date on startup so that CloudWatch logs has a unique fingerprint
         LOG.info("Analyst broker starting at {}", LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
@@ -421,6 +424,7 @@ public class Broker implements Runnable {
     }
 
     /** Consumer long-poll operations are enqueued here. */
+    @Deprecated
     public synchronized void registerSuspendedResponse(WorkerCategory category, Response response) {
         // Shelf this suspended response in a queue grouped by graph affinity.
         Deque<Response> deque = workersByCategory.get(category);
@@ -560,7 +564,7 @@ public class Broker implements Runnable {
                 Job job = new Job(tasksForJob);
 
                 // TODO inefficiency here: we should mix single point and multipoint in the same response
-                deliver(job, consumer);
+                // deliver(job, consumer);
                 nWaitingConsumers--;
             }
         }
@@ -596,7 +600,7 @@ public class Broker implements Runnable {
             }
             // deliver this job to only one consumer
             // This way if there are multiple workers and multiple jobs the jobs will be fairly distributed, more or less
-            deliver(current, consumers.pop());
+            // deliver(current, consumers.pop());
             nWaitingConsumers--;
         }
 
@@ -607,59 +611,32 @@ public class Broker implements Runnable {
     }
 
     /**
-     * This uses a linear search through jobs, which should not be problematic unless there are thousands of
-     * simultaneous jobs. TODO task IDs should really not be sequential integers should they?
-     * @return a Job object that contains the given task ID.
+     * Attempt to find some tasks that match what a worker is requesting.
+     * Always returns a list, which may be empty if there is nothing to deliver.
      */
-//    public Job getJobForTask (int taskId) {
-//        for (Job job : jobs) {
-//            if (job.containsTask(taskId)) {
-//                return job;
-//            }
-//        }
-//        return null;
-//    }
-
-    /**
-     * Attempt to hand some tasks from the given job to a waiting consumer connection.
-     * The write will fail if the consumer has closed the connection but it hasn't been removed from the connection
-     * queue yet. This can happen because the Broker methods are synchronized, and the removal action may be waiting
-     * to get the monitor while we are trying to distribute tasks here.
-     * @return whether the handoff succeeded.
-     */
-    public synchronized boolean deliver (Job job, Response response) {
-
-        // Check up-front whether the connection is still open.
-        if (!response.getRequest().getRequest().getConnection().isOpen()) {
-            LOG.debug("Consumer connection was closed. It will be removed.");
-            return false;
+    public synchronized List<AnalysisTask> getSomeWork (WorkerCategory workerCategory) {
+        Job job;
+        if (workerCategory.graphId == null || "UNKNOWN".equalsIgnoreCase(workerCategory.workerVersion)) {
+            // This worker has no loaded networks or no specified version, get tasks from the first job that has any.
+            // FIXME Note that this is ignoring worker version number! This is useful for debugging though.
+            job = jobs.advanceToElement(j -> j.hasTasksToDeliver());
+        } else {
+            // This worker has a preferred network, get tasks from a job on that network.
+            job = jobs.advanceToElement(j -> j.workerCategory.equals(workerCategory) && j.hasTasksToDeliver());
         }
-
+        if (job == null) {
+            // No matching job was found.
+            return Collections.EMPTY_LIST;
+        }
         // Get up to N tasks from the tasksAwaitingDelivery deque
-        List<AnalysisTask> tasks = job.generateSomeTasksToDeliver(MAX_TASKS_PER_WORKER);
-
-        // Attempt to deliver the tasks to the given consumer.
-        try {
-            response.setStatus(HttpStatus.OK_200);
-            OutputStream out = response.getOutputStream();
-            mapper.writeValue(out, tasks);
-            response.resume();
-        } catch (IOException e) {
-            // The connection was probably closed by the consumer, but treat it as a server error.
-            LOG.debug("Consumer connection caused IO error, it will be removed.");
-            response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR_500);
-            response.resume();
-            // Delivery failed, tasks will never be marked complete and should be redelivered by the broker.
-            return false;
-        }
-        LOG.debug("Delivery of {} tasks succeeded.", tasks.size());
-        job.lastDeliveryTime = System.currentTimeMillis();
-        return true;
+        return job.generateSomeTasksToDeliver(MAX_TASKS_PER_WORKER);
     }
 
     /**
      * Take a normal (non-priority) task out of a job queue, marking it as completed so it will not be re-delivered.
-     * TODO maybe use unique delivery receipts instead of task IDs to handle redelivered tasks independently
+     * The result of the computation is supplied.
+     * TODO separate completion out from returning the work product, since they have different synchronization requirements
+     * this would also allow returning errors as JSON and the grid result separately.
      * @return whether the task was found and removed.
      */
     public synchronized boolean markTaskCompleted (String jobId, int taskId) {
@@ -728,6 +705,7 @@ public class Broker implements Runnable {
         return false;
     }
 
+
     /**
      * We wrap responses in a class that has a machine ID, and then put them in a TreeSet so that
      * the machine with the lowest ID on a given graph always gets single-point work. The reason
@@ -747,4 +725,34 @@ public class Broker implements Runnable {
             return this.machineId.compareTo(wrappedResponse.machineId);
         }
     }
+
+    /**
+     * Get a collection of all the workers that have recently reported to this broker.
+     * The returned objects are designed to be serializable so they can be returned over an HTTP API.
+     */
+    public Collection<WorkerObservation> getWorkerObservations () {
+        return workerCatalog.observationsByWorkerId.values();
+    }
+
+    /**
+     * Get a collection of all unfinished jobs being managed by this broker.
+     * The returned objects are designed to be serializable so they can be returned over an HTTP API.
+     */
+    public Collection<JobStatus> getJobSummary() {
+        List<JobStatus> jobStatusList = new ArrayList<>();
+        for (Job job : this.jobs) {
+            jobStatusList.add(new JobStatus(job));
+        }
+        // Add a summary of all jobs to the list.
+        jobStatusList.add(new JobStatus(jobStatusList));
+        return jobStatusList;
+    }
+
+    /**
+     * Record information that a worker sent about itself.
+     */
+    public void recordWorkerObservation(WorkerStatus workerStatus) {
+        workerCatalog.catalog(workerStatus);
+    }
+
 }

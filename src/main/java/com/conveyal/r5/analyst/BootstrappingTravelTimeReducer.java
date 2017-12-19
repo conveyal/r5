@@ -13,6 +13,7 @@ import org.apache.commons.math3.random.MersenneTwister;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.stream.DoubleStream;
@@ -94,8 +95,11 @@ import java.util.stream.DoubleStream;
  */
 public class BootstrappingTravelTimeReducer implements PerTargetPropagater.TravelTimeReducer {
 
-    /** The number of bootstrap replications used to bootstrap the sampling distribution of the percentiles */
-    // This is hardwired to zero until we can make it more controllable, or use it as a calibration tool for number of MC draws.
+    /**
+     * The number of bootstrap replications used to bootstrap the sampling distribution of the percentiles.
+     * This is hardwired to zero until we can make it more controllable, or use it as a calibration tool for
+     * number of MC draws.
+     */
     public static final int N_BOOTSTRAP_REPLICATIONS = 0;
 
     /** SQS client. TODO: async? */
@@ -115,15 +119,24 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
     private final int minCount;
 
     /**
-     *  This stores the number of times each Monte Carlo draw is included in each bootstrap sample, which could be
+     * This stores the number of times each Monte Carlo draw is included in each bootstrap sample, which could be
      * 0, 1 or more. We store the weights on each iteration rather than a list of iterations because it allows
      * us to easily construct the weights s.t. they sum to the original number of MC draws.
      */
     private final int[][] bootstrapWeights;
 
-    public BootstrappingTravelTimeReducer (RegionalTask request, Grid grid) {
+    private final OutputStream outputStream;
+
+    /**
+     *
+     * @param request the task being processed, for one particular origin point
+     * @param grid the grid of opportunity density to which we are calculating accessibility.
+     * @param outputStream the stream to which the resulting set of accessibility results will be written.
+     */
+    public BootstrappingTravelTimeReducer (RegionalTask request, Grid grid, OutputStream outputStream) {
         this.task = request;
         this.grid = grid;
+        this.outputStream = outputStream;
         int nMinutes = request.getTimeWindowLengthMinutes();
         int monteCarloDrawsPerMinute = request.getMonteCarloDrawsPerMinute();
 
@@ -233,25 +246,22 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
      */
     @Override
     public void finish () {
-        // now construct the output
-        // these things are tiny, no problem storing in memory
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
         int[] intReplications = DoubleStream.of(bootstrapReplicationsOfAccessibility)
                 .mapToInt(d -> (int) Math.round(d))
                 .toArray();
 
         try {
-            new Origin(task, task.percentiles[0], intReplications).write(baos);
+            new Origin(task, task.percentiles[0], intReplications).write(outputStream);
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
         // send this origin to an SQS queue as a binary payload; it will be consumed by GridResultQueueConsumer
         // and GridResultAssembler
-        SendMessageRequest smr = new SendMessageRequest(task.outputQueue, base64.encodeToString(baos.toByteArray()));
-        smr = smr.addMessageAttributesEntry("jobId", new MessageAttributeValue().withDataType("String").withStringValue(task.jobId));
-        sqs.sendMessage(smr);
+//        SendMessageRequest smr = new SendMessageRequest(task.outputQueue, base64.encodeToString(baos.toByteArray()));
+//        smr = smr.addMessageAttributesEntry("jobId", new MessageAttributeValue().withDataType("String").withStringValue(task.jobId));
+//        sqs.sendMessage(smr);
     }
 
 }

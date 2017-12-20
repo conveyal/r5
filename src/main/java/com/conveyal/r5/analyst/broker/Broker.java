@@ -705,6 +705,22 @@ public class Broker implements Runnable {
         return false;
     }
 
+    /**
+     * Given a worker commit and network, return the IP or DNS name of that worker.
+     */
+    public String getWorkerAddress(WorkerCategory workerCategory) {
+        Collection<String> workerIds = workerCatalog.workersByCategory.get(workerCategory);
+        for (String workerId : workerIds) {
+            WorkerObservation observation = workerCatalog.observationsByWorkerId.get(workerId);
+            return observation.status.ipAddress;
+        }
+        // Fall back on any existing worker
+        for (WorkerObservation observation : workerCatalog.observationsByWorkerId.values()) {
+            return observation.status.ipAddress;
+        }
+        return "localhost";
+    }
+
 
     /**
      * We wrap responses in a class that has a machine ID, and then put them in a TreeSet so that

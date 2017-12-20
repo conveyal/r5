@@ -99,19 +99,20 @@ public class AnalystWorker implements Runnable {
     /** The common root of all API URLs contacted by this broker, e.g. http://localhost:7070/api/ */
     protected String brokerBaseUrl;
 
-    static final HttpClient httpClient;
+    static final HttpClient httpClient = makeHttpClient();
 
-    static {
+    /**
+     * This has been pulled out into a method so the broker can also make a similar http client.
+     */
+    public static HttpClient makeHttpClient () {
         PoolingHttpClientConnectionManager mgr = new PoolingHttpClientConnectionManager();
         mgr.setDefaultMaxPerRoute(20);
-
         int timeout = 10 * 1000; // TODO should this be a symbolic constant such as POLL_TIMEOUT ?
         SocketConfig cfg = SocketConfig.custom()
                 .setSoTimeout(timeout)
                 .build();
         mgr.setDefaultSocketConfig(cfg);
-
-        httpClient = HttpClients.custom()
+        return HttpClients.custom()
                 .setConnectionManager(mgr)
                 .build();
     }
@@ -146,6 +147,9 @@ public class AnalystWorker implements Runnable {
 
     /** Thread pool executor for delivering priority tasks. */
     private ThreadPoolExecutor taskDeliveryExecutor;
+
+    /** The HTTP server that receives single-point requests. */
+    private spark.Service httpService;
 
     public AnalystWorker(Properties config) {
         // grr this() must be first call in constructor, even if previous statements do not have side effects.
@@ -242,7 +246,15 @@ public class AnalystWorker implements Runnable {
             }
         }
 
-        // Start filling the work queues.
+        // Before we go into an endless loop polling for regional tasks that can be computed asynchronously, start a
+        // single-endpoint web server on this worker to receive single-point requests that must be handled immediately.
+        // Trying out the new Spark syntax for non-static configuration.
+        spark.Service httpService = spark.Service.ignite()
+            .port(7080)
+            .threadPool(10);
+        httpService.post("/single", new AnalysisWorkerController(this)::handleSinglePoint);
+
+        // Main polling loop to fill the work queues.
         boolean idle = false;
         while (true) {
             long now = System.currentTimeMillis();
@@ -305,8 +317,9 @@ public class AnalystWorker implements Runnable {
     /**
      * This is the callback that processes a single task and returns the results upon completion.
      * It may be called several times simultaneously on different executor threads.
+     * This returns a byte array but only for single point requests at this point.
      */
-    private void handleOneRequest(AnalysisTask request) {
+    protected byte[] handleOneRequest(AnalysisTask request) {
         if (request.isHighPriority()) {
             lastHighPriorityTaskProcessed = System.currentTimeMillis();
             if (!sideChannelOpen) {
@@ -328,7 +341,7 @@ public class AnalystWorker implements Runnable {
             } else {
                 LOG.info("Intentionally failing to complete task for testing purposes {}", request.taskId);
             }
-            return;
+            return null;
         }
 
         try {
@@ -352,31 +365,30 @@ public class AnalystWorker implements Runnable {
                 // Report the error back to the broker, which can then pass it back out to the client.
                 // Any other kinds of exceptions will be caught by the outer catch clause
                 reportTaskErrors(request.taskId, HttpStatus.BAD_REQUEST_400, scenarioException.taskErrors);
-                return;
+                return null;
             }
 
+            // FIXME Single and regional tasks are now handled almost identically here. Only the gzipping is different, and that's handled in the caller.
             TravelTimeComputer computer = new TravelTimeComputer(request, transportNetwork, gridCache);
             if (request.isHighPriority()) {
-                PipedInputStream pis = new PipedInputStream();
-
-                // gzip the data before sending it to the broker. Compression ratios here are extreme (100x is not uncommon)
-                // so this will help avoid broken pipes, connection reset by peer, buffer overflows, etc. since these types
-                // of errors are more common on large files.
-                GZIPOutputStream pos = new GZIPOutputStream(new PipedOutputStream(pis));
-
-                finishPriorityTask(request, pis, "application/octet-stream", "gzip");
-
-                computer.write(pos);
-                pos.close();
+                // This is a single point task.
+                // We want to gzip the data before sending it back to the broker.
+                // Compression ratios here are extreme (100x is not uncommon).
+                // We had many connection reset by peer, buffer overflows on large files.
+                // Handle gzipping with HTTP headers
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                computer.write(outputStream);
+                return outputStream.toByteArray();
             } else {
                 // This is a regional task.
-                // These used to be returned via an SQS queue. Now returning directy to the backend via the HTTP API.
+                // These used to be returned via an SQS queue. Now returning directly to the backend via the HTTP API.
                 // The SQS queue was probably just working around server IO speed problems caused by AWS IOPS limits.
                 // Use of a byte array output stream here is a bit redundant since the grid writer already has a
                 // byte array in it.
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                computer.write(baos);
-                taskCompleted(request, baos.toByteArray());
+                // Write results into a byte array
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                computer.write(outputStream);
+                taskCompleted(request, outputStream.toByteArray());
             }
         } catch (Exception ex) {
             // Catch any exceptions that were not handled by more specific catch clauses above.
@@ -385,6 +397,7 @@ public class AnalystWorker implements Runnable {
             LOG.error("An error occurred while routing", ex);
             reportTaskErrors(request.taskId, HttpStatus.INTERNAL_SERVER_ERROR_500, Arrays.asList(taskError));
         }
+        return null;
     }
 
     /** Open a single point channel to the broker to receive high-priority requests immediately */
@@ -415,8 +428,9 @@ public class AnalystWorker implements Runnable {
     }
 
     public List<AnalysisTask> getSomeWork(WorkType type) {
-        // Run a POST task (long-polling for work)
+        // Run a POST task (poll for work)
         // The graph and r5 commit of this worker are indicated in the task body.
+        // TODO return any work results in this same call
         String url = String.join("/", brokerBaseUrl, "dequeue");
         HttpPost httpPost = new HttpPost(url);
         WorkerStatus workerStatus = new WorkerStatus();
@@ -427,7 +441,7 @@ public class AnalystWorker implements Runnable {
             HttpEntity entity = response.getEntity();
             if (response.getStatusLine().getStatusCode() == 204) {
                 // TODO pull this out to the caller
-                LOG.info("No work was provided. Sleeping {} sec.", POLL_TIMEOUT / 1000);
+                LOG.info("Polling the broker did not yield any regional tasks. Sleeping {} sec.", POLL_TIMEOUT / 1000);
                 try {
                     Thread.sleep(POLL_TIMEOUT);
                 } catch (InterruptedException e) {
@@ -560,7 +574,7 @@ public class AnalystWorker implements Runnable {
      * attributes.
      *
      * broker-address               address of the broker, without protocol or port
-     * broker port                  port broker is running on, default 80.
+     * broker-port                  port broker is running on, default 80.
      * graphs-bucket                S3 bucket in which graphs are stored.
      * pointsets-bucket             S3 bucket in which pointsets are stored
      * auto-shutdown                Should this worker shut down its machine if it is idle (e.g. on throwaway cloud instances)

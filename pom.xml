@@ -400,8 +400,14 @@
     <dependency>
       <groupId>com.sparkjava</groupId>
       <artifactId>spark-core</artifactId>
-      <version>2.3</version>
-   </dependency>
+      <version>2.7.1</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>slf4j-simple</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
    <dependency>
       <groupId>com.conveyal</groupId>
       <artifactId>jackson2-geojson</artifactId>

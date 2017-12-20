@@ -18,6 +18,8 @@ public class AnalysisWorkerController {
     }
 
     public Object handleSinglePoint (Request request, Response response) {
+        // Record the fact that this worker is busy so it will not shut down
+        analystWorker.lastSinglePointTime = System.currentTimeMillis();
         TravelTimeSurfaceTask task = JsonUtilities.objectFromRequestBody(request, TravelTimeSurfaceTask.class);
         byte[] binaryResult = analystWorker.handleOneRequest(task);
         response.header("content-type", "application/octet-stream");

@@ -82,16 +82,20 @@ public class AnalystWorker implements Runnable {
      */
     public int dryRunFailureRate = -1;
 
-    /** How long (minimum, in milliseconds) should this worker stay alive after receiving a single point task? */
-    public static final int SINGLE_POINT_KEEPALIVE_MSEC = 15 * 60 * 1000;
+    /** How long (minimum, in milliseconds) should this worker stay alive after processing a single-point task. */
+    public static final int SINGLE_KEEPALIVE_MINUTES = 30;
+
+    /** How long (minimum, in milliseconds) should this worker stay alive after processing a regional job task. */
+    public static final int REGIONAL_KEEPALIVE_MINUTES = 1;
 
     /** should this worker shut down automatically */
     public final boolean autoShutdown;
 
-    public static final Random random = new Random();
+    long startupTime, nextShutdownCheckTime;
 
-    /** is there currently a channel open to the broker to receive single point jobs? */
-    private volatile boolean sideChannelOpen = false;
+
+
+    public static final Random random = new Random();
 
     /** The common root of all API URLs contacted by this broker, e.g. http://localhost:7070/api/ */
     protected String brokerBaseUrl;
@@ -122,16 +126,20 @@ public class AnalystWorker implements Runnable {
     /** The transport network this worker already has loaded, and therefore prefers to work on. */
     String networkId = null;
 
-    long startupTime, nextShutdownCheckTime;
-
     /** Information about the EC2 instance (if any) this worker is running on. */
     EC2Info ec2info;
 
     /**
-     * The time the last high priority task was processed, in milliseconds since the epoch, used to check if the
-     * machine should be shut down.
+     * The time the last single point task was processed, in milliseconds since the epoch.
+     * Used to check if the machine should be shut down.
      */
-    private long lastHighPriorityTaskProcessed = 0;
+    protected long lastSinglePointTime = 0;
+
+    /**
+     * The time the last regional task was processed, in milliseconds since the epoch.
+     * Used to check if the machine should be shut down.
+     */
+    protected long lastRegionalTaskTime = 0;
 
     /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
     private boolean workOffline;
@@ -209,6 +217,36 @@ public class AnalystWorker implements Runnable {
     }
 
     /**
+     * Consider shutting down if enough time has passed.
+     * The strategy depends on the fact that we are billed by the hour for EC2 machines.
+     * We only need to consider shutting them down once an hour. Leaving them alive for the rest of the hour provides
+     * immediate compute capacity in case someone starts another job.
+     * So a few minutes before each hour of uptime has elapsed, we check how long the machine has been idle.
+     */
+    public void considerShuttingDown() {
+        long now = System.currentTimeMillis();
+        if (now > nextShutdownCheckTime && autoShutdown) {
+            // Check again exactly one hour later (assumes billing in one-hour increments)
+            nextShutdownCheckTime += 60 * 60 * 1000;
+            if (now > lastSinglePointTime + (SINGLE_KEEPALIVE_MINUTES * 60 * 1000) &&
+                now > lastRegionalTaskTime + (REGIONAL_KEEPALIVE_MINUTES * 60 * 1000)) {
+                LOG.info("Machine has been idle for at least {} minutes (single point) and {} minutes (regional), " +
+                        "shutting down.", SINGLE_KEEPALIVE_MINUTES, REGIONAL_KEEPALIVE_MINUTES);
+                try {
+                    Process process = new ProcessBuilder("sudo", "/sbin/shutdown", "-h", "now").start();
+                    process.waitFor();
+                } catch (Exception ex) {
+                    LOG.error("Unable to terminate worker", ex);
+                    // TODO email us or something
+                } finally {
+                    System.exit(0);
+                }
+            }
+        }
+
+    }
+
+    /**
      * This is the main worker event loop which fetches tasks from a broker and schedules them for execution.
      * It maintains a small local queue so the worker doesn't idle while fetching new tasks.
      */
@@ -252,62 +290,33 @@ public class AnalystWorker implements Runnable {
         httpService.post("/single", new AnalysisWorkerController(this)::handleSinglePoint);
 
         // Main polling loop to fill the work queues.
-        boolean idle = false;
         while (true) {
-            long now = System.currentTimeMillis();
-            // Consider shutting down if enough time has passed
-            if (now > nextShutdownCheckTime && autoShutdown) {
-                if (idle && now > lastHighPriorityTaskProcessed + SINGLE_POINT_KEEPALIVE_MSEC) {
-                    LOG.warn("Machine is idle, shutting down.");
-                    try {
-                        Process process = new ProcessBuilder("sudo", "/sbin/shutdown", "-h", "now").start();
-                        process.waitFor();
-                    } catch (Exception ex) {
-                        LOG.error("Unable to terminate worker", ex);
-                    } finally {
-                        System.exit(0);
-                    }
+            List<AnalysisTask> tasks = getSomeWork();
+            if (tasks == null || tasks.isEmpty()) {
+                // Either there was no work, or some kind of error occurred.
+                considerShuttingDown();
+                LOG.info("Polling the broker did not yield any regional tasks. Sleeping {} sec.", POLL_TIMEOUT);
+                try {
+                    TimeUnit.SECONDS.sleep(POLL_TIMEOUT);
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
                 }
-                nextShutdownCheckTime += 60 * 60 * 1000;
-            }
-            LOG.debug("Long-polling for work ({} second timeout).", POLL_TIMEOUT / 1000.0);
-            // Long-poll (wait a few seconds for messages to become available)
-            List<AnalysisTask> tasks = getSomeWork(WorkType.REGIONAL);
-            if (tasks == null) {
-                LOG.debug("Didn't get any work. Retrying.");
-                idle = true;
                 continue;
             }
-
-            // Enqueue high-priority (interactive) tasks first to ensure they are enqueued
-            // even if the low-priority batch queue blocks.
-            tasks.stream().filter(AnalysisTask::isHighPriority)
-                    .forEach(t -> highPriorityExecutor.execute(() -> {
-                        LOG.warn("Handling single point task via normal channel, side channel should open shortly.");
-                        this.handleOneRequest(t);
-                    }));
-
-            // Enqueue low-priority (batch) tasks; note that this may block anywhere in the process
-            logQueueStatus();
-            tasks.stream().filter(t -> !t.isHighPriority())
-                .forEach(t -> {
-                    // attempt to enqueue, waiting if the queue is full
-                    while (true) {
+            for (AnalysisTask task : tasks) {
+                // attempt to enqueue, waiting if the queue is full
+                while (true) {
+                    try {
+                        batchExecutor.execute(() -> this.handleOneRequest(task));
+                        break;
+                    } catch (RejectedExecutionException e) {
+                        // queue is full, wait 200ms and try again
                         try {
-                            batchExecutor.execute(() -> this.handleOneRequest(t));
-                            break;
-                        } catch (RejectedExecutionException e) {
-                            // queue is full, wait 200ms and try again
-                            try {
-                                Thread.sleep(200);
-                            } catch (InterruptedException e1) { /* nothing */}
-                        }
+                            Thread.sleep(200);
+                        } catch (InterruptedException e1) { /* nothing */}
                     }
-                });
-
-            // TODO log info about the high-priority queue as well.
-            logQueueStatus();
-            idle = false;
+                }
+            }
         }
     }
 
@@ -317,13 +326,8 @@ public class AnalystWorker implements Runnable {
      * This returns a byte array but only for single point requests at this point.
      */
     protected byte[] handleOneRequest(AnalysisTask request) {
-        if (request.isHighPriority()) {
-            lastHighPriorityTaskProcessed = System.currentTimeMillis();
-            if (!sideChannelOpen) {
-                openSideChannel();
-            }
-        }
-
+        // Record the fact that the worker is busy so it won't shut down.
+        lastRegionalTaskTime = System.currentTimeMillis();
         if (dryRunFailureRate >= 0) {
             // This worker is running in test mode.
             // It should report all work as completed without actually doing anything,
@@ -397,7 +401,10 @@ public class AnalystWorker implements Runnable {
         return null;
     }
 
-    public List<AnalysisTask> getSomeWork(WorkType type) {
+    /**
+     * @return null if no work could be fetched.
+     */
+    public List<AnalysisTask> getSomeWork () {
         // Run a POST task (poll for work)
         // The graph and r5 commit of this worker are indicated in the task body.
         // TODO return any work results in this same call
@@ -410,13 +417,8 @@ public class AnalystWorker implements Runnable {
             HttpResponse response = httpClient.execute(httpPost);
             HttpEntity entity = response.getEntity();
             if (response.getStatusLine().getStatusCode() == 204) {
-                // TODO pull this out to the caller
-                LOG.info("Polling the broker did not yield any regional tasks. Sleeping {} sec.", POLL_TIMEOUT / 1000);
-                try {
-                    Thread.sleep(POLL_TIMEOUT);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
+                // No work to do.
+                return null;
             }
             if (entity == null) {
                 return null;
@@ -433,11 +435,7 @@ public class AnalystWorker implements Runnable {
         } catch (SocketTimeoutException stex) {
             LOG.debug("Socket timeout while waiting to receive work.");
         } catch (HttpHostConnectException ce) {
-            LOG.error("Broker refused connection. Sleeping before retry.");
-            try {
-                Thread.currentThread().sleep(POLL_TIMEOUT);
-            } catch (InterruptedException e) {
-            }
+            LOG.error("Broker refused connection.");
         } catch (IOException e) {
             LOG.error("IO exception while getting work", e);
         }
@@ -532,11 +530,6 @@ public class AnalystWorker implements Runnable {
         } catch (Exception e) {
             LOG.warn("Failed to delete task {}. Exception: {}", request.taskId, e.toString());
         }
-    }
-
-    /** log queue status */
-    private void logQueueStatus() {
-        LOG.debug("Waiting tasks: high priority: {}, batch: {}", highPriorityExecutor.getQueue().size(), batchExecutor.getQueue().size());
     }
 
     /**

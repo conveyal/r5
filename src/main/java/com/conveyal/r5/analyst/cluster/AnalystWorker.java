@@ -33,7 +33,8 @@ import java.net.SocketTimeoutException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -69,7 +70,7 @@ public class AnalystWorker implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(AnalystWorker.class);
 
-    public static final int POLL_TIMEOUT = 10 * 1000; // TODO add units (milliseconds)
+    public static final int POLL_WAIT_SECONDS = 10;
 
     /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
     final TransportNetworkCache transportNetworkCache;
@@ -87,18 +88,17 @@ public class AnalystWorker implements Runnable {
     /** How long (minimum, in milliseconds) should this worker stay alive after processing a regional job task. */
     public static final int REGIONAL_KEEPALIVE_MINUTES = 1;
 
-    /** should this worker shut down automatically */
+    /** Whether this worker should shut down automatically when idle. */
     public final boolean autoShutdown;
 
     long startupTime, nextShutdownCheckTime;
 
-
-
     public static final Random random = new Random();
 
-    /** The common root of all API URLs contacted by this broker, e.g. http://localhost:7070/api/ */
+    /** The common root of all API URLs contacted by this worker, e.g. http://localhost:7070/api/ */
     protected String brokerBaseUrl;
 
+    /** The HTTP client the worker uses to contact the broker and fetch regional analysis tasks. */
     static final HttpClient httpClient = makeHttpClient();
 
     /**
@@ -107,7 +107,7 @@ public class AnalystWorker implements Runnable {
     public static HttpClient makeHttpClient () {
         PoolingHttpClientConnectionManager mgr = new PoolingHttpClientConnectionManager();
         mgr.setDefaultMaxPerRoute(20);
-        int timeout = 10 * 1000; // TODO should this be a symbolic constant such as POLL_TIMEOUT ?
+        int timeout = 10 * 1000; // TODO should this be a symbolic constant such as POLL_WAIT_SECONDS ?
         SocketConfig cfg = SocketConfig.custom()
                 .setSoTimeout(timeout)
                 .build();
@@ -152,7 +152,7 @@ public class AnalystWorker implements Runnable {
     private ThreadPoolExecutor regionalTaskExecutor;
 
     /** The HTTP server that receives single-point requests. */
-    private spark.Service httpService;
+    private spark.Service sparkHttpService;
 
     public AnalystWorker(Properties config) {
         // grr this() must be first call in constructor, even if previous statements do not have side effects.
@@ -230,6 +230,9 @@ public class AnalystWorker implements Runnable {
                 now > lastRegionalTaskTime + (REGIONAL_KEEPALIVE_MINUTES * 60 * 1000)) {
                 LOG.info("Machine has been idle for at least {} minutes (single point) and {} minutes (regional), " +
                         "shutting down.", SINGLE_KEEPALIVE_MINUTES, REGIONAL_KEEPALIVE_MINUTES);
+                // Stop accepting any new single-point requests while shutdown is happening.
+                // TODO maybe actively tell the broker this worker is shutting down.
+                sparkHttpService.stop();
                 try {
                     Process process = new ProcessBuilder("sudo", "/sbin/shutdown", "-h", "now").start();
                     process.waitFor();
@@ -246,17 +249,15 @@ public class AnalystWorker implements Runnable {
 
     /**
      * This is the main worker event loop which fetches tasks from a broker and schedules them for execution.
-     * It maintains a small local queue so the worker doesn't idle while fetching new tasks.
      */
     @Override
     public void run() {
 
         // Create executors with up to one thread per processor.
-        // fix size of highPriorityExecutor to avoid broken pipes when threads are killed off before they are done sending data
-        // (not confirmed if this actually works)
+        // The default task rejection policy is "Abort".
         int availableProcessors = Runtime.getRuntime().availableProcessors();
-        regionalTaskExecutor = new ThreadPoolExecutor(1, availableProcessors, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(availableProcessors * 2));
-        regionalTaskExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>(availableProcessors * 2);
+        regionalTaskExecutor = new ThreadPoolExecutor(1, availableProcessors, 60, TimeUnit.SECONDS, taskQueue);
 
         // If an initial graph ID was provided in the config file, build or load that TransportNetwork on startup.
         // Pre-loading the graph is necessary because if the graph is not cached it can take several
@@ -276,39 +277,51 @@ public class AnalystWorker implements Runnable {
         // Before we go into an endless loop polling for regional tasks that can be computed asynchronously, start a
         // single-endpoint web server on this worker to receive single-point requests that must be handled immediately.
         // Trying out the new Spark syntax for non-static configuration.
-        spark.Service httpService = spark.Service.ignite()
+        sparkHttpService = spark.Service.ignite()
             .port(7080)
             .threadPool(10);
-        httpService.post("/single", new AnalysisWorkerController(this)::handleSinglePoint);
+        sparkHttpService.post("/single", new AnalysisWorkerController(this)::handleSinglePoint);
 
-        // Main polling loop to fill the work queues.
+        // Main polling loop to fill the regional work queue.
+        // You'd think the ThreadPoolExecutor could just block when the blocking queue is full, but apparently
+        // people all over the world have been jumping through hoops to try to achieve this simple behavior
+        // with no real success, at least without writing bug and deadlock-prone custom executor services.
+        // Two alternative approaches are trying to keep the queue full and waiting for the queue to be almost empty.
+        // To keep the queue full, we repeatedly try to add each task to the queue, pausing and retrying when
+        // it's full. To wait until it's almost empty, we could use wait() in a loop and notify() as tasks are handled.
+        // see https://stackoverflow.com/a/15185004/778449
         while (true) {
             List<AnalysisTask> tasks = getSomeWork();
             if (tasks == null || tasks.isEmpty()) {
                 // Either there was no work, or some kind of error occurred.
                 considerShuttingDown();
-                LOG.info("Polling the broker did not yield any regional tasks. Sleeping {} sec.", POLL_TIMEOUT);
-                try {
-                    TimeUnit.SECONDS.sleep(POLL_TIMEOUT);
-                } catch (InterruptedException e) {
-                    throw new RuntimeException(e);
-                }
+                LOG.info("Polling the broker did not yield any regional tasks. Sleeping {} sec.", POLL_WAIT_SECONDS);
+                sleepSeconds(POLL_WAIT_SECONDS);
                 continue;
             }
             for (AnalysisTask task : tasks) {
-                // attempt to enqueue, waiting if the queue is full
                 while (true) {
                     try {
+                        // TODO define non-anonymous runnable class to instantiate here
                         regionalTaskExecutor.execute(() -> this.handleOneRequest(task));
                         break;
                     } catch (RejectedExecutionException e) {
-                        // queue is full, wait 200ms and try again
-                        try {
-                            Thread.sleep(200);
-                        } catch (InterruptedException e1) { /* nothing */}
+                        // Queue is full, wait a bit and try to feed it more tasks.
+                        sleepSeconds(1);
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Bypass idiotic java checked exceptions.
+     */
+    public void sleepSeconds (int seconds) {
+        try {
+            Thread.sleep(seconds * 1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 

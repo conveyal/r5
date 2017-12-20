@@ -147,3 +147,72 @@ public class TimeGrid {
 
         out.write(buffer.array());
     }
+
+
+    // TODO refactor to avoid copied/pasted code below from Grid class
+    /**
+     * How to get the width of the world in meters according to the EPSG CRS spec:
+     * $ gdaltransform -s_srs epsg:4326 -t_srs epsg:3857
+     * 180, 0
+     * 20037508.3427892 -7.08115455161362e-10 0
+     * You can't do 180, 90 because this projection is cut off above a certain level to make the world square.
+     * You can do the reverse projection to find this latitude:
+     * $ gdaltransform -s_srs epsg:3857 -t_srs epsg:4326
+     * 20037508.342789, 20037508.342789
+     * 179.999999999998 85.0511287798064 0
+     */
+    public Coordinate mercatorPixelToMeters (double xPixel, double yPixel) {
+        double worldWidthPixels = Math.pow(2, zoom) * 256D;
+        // Top left is min x and y because y increases toward the south in web Mercator. Bottom right is max x and y.
+        // The origin is WGS84 (0,0).
+        final double worldWidthMeters = 20037508.342789244 * 2;
+        double xMeters = ((xPixel / worldWidthPixels) - 0.5) * worldWidthMeters;
+        double yMeters = (0.5 - (yPixel / worldWidthPixels)) * worldWidthMeters; // flip y axis
+        return new Coordinate(xMeters, yMeters);
+    }
+
+    /**
+     * At zoom level zero, our coordinates are pixels in a single planetary tile, with coordinates are in the range
+     * [0...256). We want to export with a conventional web Mercator envelope in meters.
+     */
+    public ReferencedEnvelope getMercatorEnvelopeMeters() {
+        Coordinate topLeft = mercatorPixelToMeters(west, north);
+        Coordinate bottomRight = mercatorPixelToMeters(west + width, north + height);
+        Envelope mercatorEnvelope = new Envelope(topLeft, bottomRight);
+        try {
+            // Get Spherical Mercator pseudo-projection CRS
+            CoordinateReferenceSystem webMercator = CRS.decode("EPSG:3857");
+            ReferencedEnvelope env = new ReferencedEnvelope(mercatorEnvelope, webMercator);
+            return env;
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+    }
+
+    /** Write this grid out in GeoTIFF format */
+    public void writeGeotiff (OutputStream out, int whichValue) {
+        try {
+            float [][] data = new float[(int) height][(int) width];
+            for (int x = 0; x < width; x++) {
+                for (int y = 0; y < height; y++) {
+                    //TODO write out all values in different bands
+                    data[y][x] = values[y * (int) width + x + whichValue];
+                }
+            }
+            ReferencedEnvelope env = getMercatorEnvelopeMeters();
+            GridCoverage2D coverage = new GridCoverageFactory().create("GRID", data, env);
+            GeoTiffWriteParams wp = new GeoTiffWriteParams();
+            wp.setCompressionMode(GeoTiffWriteParams.MODE_EXPLICIT);
+            wp.setCompressionType("LZW");
+            ParameterValueGroup params = new GeoTiffFormat().getWriteParameters();
+            params.parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString()).setValue(wp);
+            GeoTiffWriter writer = new GeoTiffWriter(out);
+            writer.write(coverage, params.values().toArray(new GeneralParameterValue[1]));
+            writer.dispose();
+            out.close();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+}

@@ -290,7 +290,7 @@ public class Grid {
      * 20037508.342789, 20037508.342789
      * 179.999999999998 85.0511287798064 0
      */
-    private Coordinate mercatorPixelToMeters (double xPixel, double yPixel) {
+    public Coordinate mercatorPixelToMeters (double xPixel, double yPixel) {
         double worldWidthPixels = Math.pow(2, zoom) * 256D;
         // Top left is min x and y because y increases toward the south in web Mercator. Bottom right is max x and y.
         // The origin is WGS84 (0,0).

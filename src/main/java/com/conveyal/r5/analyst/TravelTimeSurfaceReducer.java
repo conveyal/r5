@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
-import com.conveyal.r5.analyst.cluster.TimeGridWriter;
+import com.conveyal.r5.analyst.cluster.TimeGrid;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.multipoint.MultipointDataStore;
@@ -28,7 +28,7 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeSurfaceReducer.class);
 
     /** Travel time results encoded as an access grid */
-    private TimeGridWriter timeResults;
+    private TimeGrid timeGrid;
 
     /** The output stream to write the result to */
     private OutputStream outputStream;
@@ -46,8 +46,8 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
 
         try {
             // use an in-memory access grid, don't specify disk cache file
-            timeResults = new TimeGridWriter(task.zoom, task.west, task.north, task.width, task.height, task.percentiles.length);
-            timeResults.initialize("ACCESSGR", 0);
+            timeGrid = new TimeGrid(task.zoom, task.west, task.north, task.width, task.height, task.percentiles.length);
+            timeGrid.initialize("ACCESSGR", 0);
 
         } catch (IOException e) {
             // in memory, should not be able to throw this
@@ -77,7 +77,7 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
         int x = target % task.width;
         int y = target / task.width;
         try {
-            timeResults.writePixel(x, y, results);
+            timeGrid.writePixel(x, y, results);
         } catch (IOException e) {
             // can't happen as we're not using a file system backed output
             throw new RuntimeException(e);
@@ -94,14 +94,15 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
     @Override
     public void finish () {
         try {
-            LOG.info("Travel time surface of size {} kB complete", timeResults.buffer.position() / 1000);
+            LOG.info("Travel time surface of size {} kB complete", (timeGrid.nValues * 4 + timeGrid.HEADER_SIZE) / 1000);
 
             // if the outputStream was null in the constructor, write to S3.
             if (outputStream == null) {
                 outputStream = MultipointDataStore.getOutputStream(task, task.taskId + "_times.dat", "application/octet-stream");
             }
 
-            outputStream.write(timeResults.buffer.array());
+
+            timeGrid.writeGrid(outputStream);
 
             LOG.info("Travel time surface written, appending metadata with {} warnings",
                     network.scenarioApplicationWarnings.size());

@@ -444,50 +444,6 @@ public class AnalystWorker implements Runnable {
     }
 
     /**
-     * We have two kinds of output from a worker: we can either write to an object in a bucket on S3, or we can stream
-     * output over HTTP to a waiting web service caller. This function handles the latter case. It connects to the
-     * cluster broker, signals that the task with a certain ID is being completed, and posts the result back through the
-     * broker. The broker then passes the result on to the original requester (usually the analysis web UI).
-     *
-     * This function will run the HTTP Post operation in a new thread so that this function can return, allowing its
-     * caller to write data to the input stream it passed in. This arrangement avoids broken pipes that can happen
-     * when the calling thread dies. TODO clarify when and how which thread can die.
-     */
-    public void finishPriorityTask(AnalysisTask request, InputStream result, String contentType, String contentEncoding) {
-        //CountingInputStream is = new CountingInputStream(result);
-
-        LOG.info("Returning high-priority results for task {}", request.taskId);
-
-        String url = brokerBaseUrl + String.format("/complete/success/%s", request.taskId);
-        HttpPost httpPost = new HttpPost(url);
-
-        // TODO reveal any errors etc. that occurred on the worker.
-        httpPost.setEntity(new InputStreamEntity(result));
-        httpPost.setHeader("Content-Type", contentType);
-        if (contentEncoding != null) httpPost.setHeader("Content-Encoding", contentEncoding);
-        taskDeliveryExecutor.execute(() -> {
-            try {
-                HttpResponse response = httpClient.execute(httpPost);
-                // Signal the http client library that we're done with this response object, allowing connection reuse.
-                EntityUtils.consumeQuietly(response.getEntity());
-
-                //LOG.info("Returned {} bytes to the broker for task {}", is.getCount(), clusterRequest.taskId);
-
-                if (response.getStatusLine().getStatusCode() == 200) {
-                    LOG.info("Successfully marked task {} as completed.", request.taskId);
-                } else if (response.getStatusLine().getStatusCode() == 404) {
-                    LOG.info("Task {} was not marked as completed because it doesn't exist.", request.taskId);
-                } else {
-                    LOG.info("Failed to mark task {} as completed, ({}).", request.taskId,
-                            response.getStatusLine());
-                }
-            } catch (Exception e) {
-                LOG.warn("Failed to mark task {} as completed.", request.taskId, e);
-            }
-        });
-    }
-
-    /**
      * Report to the broker that the task taskId could not be processed due to errors.
      * The broker should then pass the errors back up to the client that enqueued that task.
      * That objects are always the same type (TaskError) so the client knows what to expect.
@@ -572,10 +528,6 @@ public class AnalystWorker implements Runnable {
             LOG.error("Error in analyst worker", e);
             return;
         }
-    }
-
-    public static enum WorkType {
-        SINGLE, REGIONAL;
     }
 
 }

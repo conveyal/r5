@@ -10,6 +10,8 @@ import org.slf4j.LoggerFactory;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.RuntimeMXBean;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -41,14 +43,18 @@ public class WorkerStatus {
     public String jvmName;
     public String jvmVendor;
     public String jvmVersion;
+    public String ipAddress;
 
     /** No-arg constructor used when deserializing. */
     public WorkerStatus() { }
 
     /**
      * Call this method to fill in the fields of the WorkerStatus object.
+     * It must be called on the same machine that the AnalystWorker is running on because it examines the JVM it is
+     * running on.
      * This is not done in the constructor because this class is intended to hold deserialized data, and therefore
      * needs a minimalist no-arg constructor.
+     * TODO why can't we have two constructors? We only ever load into a status object right after creating it.
      */
     public void loadStatus(AnalystWorker worker) {
 
@@ -78,6 +84,17 @@ public class WorkerStatus {
         memoryTotal = runtime.totalMemory();
         memoryFree = runtime.freeMemory();
 
+        if (ec2.privateIp != null) {
+            // Give priority to the private IP address if running on EC2
+            ipAddress = ec2.privateIp;
+        } else {
+            // Get whatever is the default IP address
+            try {
+                ipAddress = InetAddress.getLocalHost().getHostAddress();
+            } catch (UnknownHostException e) {
+                ipAddress = "127.0.0.1";
+            }
+        }
     }
 
     /**

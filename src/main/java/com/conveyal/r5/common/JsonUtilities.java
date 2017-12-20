@@ -66,11 +66,23 @@ public abstract class JsonUtilities {
     }
 
     /**
-     * Deserializes an object of the given type from the body of the supplied request.
+     * Deserializes an object of the given type from the body of the supplied Grizzly request.
      */
     public static <T> T objectFromRequestBody(Request request, Class<T> classe) {
         try {
             return lenientObjectMapper.readValue(request.getInputStream(), classe);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    /**
+     * Deserializes an object of the given type from the body of the supplied Spark request.
+     */
+    public static <T> T objectFromRequestBody(spark.Request request, Class<T> classe) {
+        try {
+            return lenientObjectMapper.readValue(request.bodyAsBytes(), classe);
         } catch (Exception e) {
             e.printStackTrace();
             return null;

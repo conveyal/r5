@@ -38,7 +38,6 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.GZIPOutputStream;
 
 /**
  * This is a main class run by worker machines in our Analysis computation cluster.
@@ -70,8 +69,6 @@ public class AnalystWorker implements Runnable {
     public static final String machineId = UUID.randomUUID().toString().replaceAll("-", "");
 
     private static final Logger LOG = LoggerFactory.getLogger(AnalystWorker.class);
-
-    public static final String WORKER_ID_HEADER = "X-Worker-Id";
 
     public static final int POLL_TIMEOUT = 10 * 1000; // TODO add units (milliseconds)
 
@@ -398,33 +395,6 @@ public class AnalystWorker implements Runnable {
             reportTaskErrors(request.taskId, HttpStatus.INTERNAL_SERVER_ERROR_500, Arrays.asList(taskError));
         }
         return null;
-    }
-
-    /** Open a single point channel to the broker to receive high-priority requests immediately */
-    private synchronized void openSideChannel () {
-        if (sideChannelOpen) {
-            return;
-        }
-        LOG.info("Opening side channel for single point requests.");
-        new Thread(() -> {
-            sideChannelOpen = true;
-            // don't keep single point connections alive forever
-            while (System.currentTimeMillis() < lastHighPriorityTaskProcessed + SINGLE_POINT_KEEPALIVE_MSEC) {
-                LOG.debug("Awaiting high-priority work");
-                try {
-                    List<AnalysisTask> tasks = getSomeWork(WorkType.SINGLE);
-
-                    if (tasks != null)
-                        tasks.stream().forEach(t -> highPriorityExecutor.execute(
-                                () -> this.handleOneRequest(t)));
-
-                    logQueueStatus();
-                } catch (Exception e) {
-                    LOG.error("Unexpected exception getting single point work", e);
-                }
-            }
-            sideChannelOpen = false;
-        }).start();
     }
 
     public List<AnalysisTask> getSomeWork(WorkType type) {

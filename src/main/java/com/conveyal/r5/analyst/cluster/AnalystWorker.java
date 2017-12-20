@@ -362,7 +362,7 @@ public class AnalystWorker implements Runnable {
 
             // replicate previous static site functionality; if this is the first of a batch of tasks, and if there is
             // an output bucket specified, write the shared metadata for this batch of requests to the output bucket
-            if(request.taskId == 0 && !"".equals(request.outputBucket)){
+            if(request.taskId == 0 && request.outputBucket != null && "".equals(request.outputBucket)){
                 MultipointMetadata mm = new MultipointMetadata(request, transportNetwork);
                 LOG.info("This is the lead-off task for a static site request; writing shared metadata");
                 mm.write();

@@ -19,7 +19,6 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.config.SocketConfig;
 import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.entity.ByteArrayEntity;
-import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
@@ -145,13 +144,12 @@ public class AnalystWorker implements Runnable {
     private boolean workOffline;
 
     /**
-     * Queues for high-priority interactive tasks and low-priority batch tasks.
-     * Should be plenty long enough to hold all that have come in - we don't need to block on polling the manager.
+     * A queue to hold a backlog of regional analysis tasks.
+     * This avoids "slow joiner" syndrome where we wait to poll for more work until all N fetched tasks have finished,
+     * but one of the tasks takes much longer than all the rest.
+     * This should be long enough to hold all that have come in - we don't need to block on polling the manager.
      */
-    private ThreadPoolExecutor highPriorityExecutor, batchExecutor;
-
-    /** Thread pool executor for delivering priority tasks. */
-    private ThreadPoolExecutor taskDeliveryExecutor;
+    private ThreadPoolExecutor regionalTaskExecutor;
 
     /** The HTTP server that receives single-point requests. */
     private spark.Service httpService;
@@ -257,14 +255,8 @@ public class AnalystWorker implements Runnable {
         // fix size of highPriorityExecutor to avoid broken pipes when threads are killed off before they are done sending data
         // (not confirmed if this actually works)
         int availableProcessors = Runtime.getRuntime().availableProcessors();
-        highPriorityExecutor = new ThreadPoolExecutor(availableProcessors, availableProcessors, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
-        highPriorityExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-        batchExecutor = new ThreadPoolExecutor(1, availableProcessors, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(availableProcessors * 2));
-        batchExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
-
-        taskDeliveryExecutor = new ThreadPoolExecutor(1, availableProcessors, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
-        // can't use CallerRunsPolicy as that would cause deadlocks, calling thread is writing to inputstream
-        taskDeliveryExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        regionalTaskExecutor = new ThreadPoolExecutor(1, availableProcessors, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(availableProcessors * 2));
+        regionalTaskExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
 
         // If an initial graph ID was provided in the config file, build or load that TransportNetwork on startup.
         // Pre-loading the graph is necessary because if the graph is not cached it can take several
@@ -307,7 +299,7 @@ public class AnalystWorker implements Runnable {
                 // attempt to enqueue, waiting if the queue is full
                 while (true) {
                     try {
-                        batchExecutor.execute(() -> this.handleOneRequest(task));
+                        regionalTaskExecutor.execute(() -> this.handleOneRequest(task));
                         break;
                     } catch (RejectedExecutionException e) {
                         // queue is full, wait 200ms and try again

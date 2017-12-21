@@ -1,6 +1,8 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
+import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
+import com.conveyal.r5.analyst.cluster.TravelTimeComputerResult;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.profile.FastRaptorWorker;
@@ -44,10 +46,13 @@ public class TravelTimeComputer {
         this.gridCache = gridCache;
     }
 
-    // TODO rename this - "writing" is only a minor side effect of what it's doing.
-    // Perhaps function should not be void return type. Why is this using a streaming or pipelining approach?
-    // We also want to decouple the internal representation of the results from how they're serialized to an API.
-    public void write (OutputStream os) throws IOException {
+    /**
+     * TODO rename this - "writing" is only a minor side effect of what it's doing.
+     * Perhaps function should not be void return type. Why is this using a streaming or pipelining approach?
+     * We also want to decouple the internal representation of the results from how they're serialized to an API.
+     * TODO make this return an object that always has a travel time grid and optionally has a regional accessibility result for a destination grid.
+     */
+    public TravelTimeComputerResult compute () throws IOException {
 
         // The mode of travel that will be used to reach transit stations from the origin point.
         StreetMode accessMode = LegMode.getDominantStreetMode(request.accessModes);
@@ -65,7 +70,7 @@ public class TravelTimeComputer {
         // FIXME maybe the reducer function should just be defined (overridden) on the request class.
         // FIXME the reducer is given the output stream in a pseudo-pipelining approach. However it just accumulates results into memory before writing them out.
         // Also, some of these classes could probably just be static functions.
-        PerTargetPropagater.TravelTimeReducer travelTimeReducer = request.getTravelTimeReducer(network, os);
+        PerTargetPropagater.TravelTimeReducer travelTimeReducer = request.getTravelTimeReducer(network);
 
         // Attempt to set the origin point before progressing any further.
         // This allows us to short circuit calculations if the network is entirely inaccessible. In the CAR_PARK
@@ -79,8 +84,7 @@ public class TravelTimeComputer {
             // Short circuit around routing and propagation.
             // Calling finish() before streaming in any travel times to destinations is designed to produce the right result here.
             LOG.info("Origin point was outside the transport network. Skipping routing and propagation, and returning default result.");
-            travelTimeReducer.finish();
-            return;
+            return travelTimeReducer.finish();
         }
 
         // First we will find travel times to all destinations reachable without using transit.
@@ -110,8 +114,7 @@ public class TravelTimeComputer {
                 final int travelTimeSeconds = travelTimesToTargets[target];
                 travelTimeReducer.recordTravelTimesForTarget(y * request.width + x, new int[] { travelTimeSeconds });
             }
-
-            travelTimeReducer.finish();
+            return travelTimeReducer.finish();
         } else {
             // This search will include transit.
             //
@@ -208,8 +211,7 @@ public class TravelTimeComputer {
                     final int travelTimeSeconds = nonTransitTravelTimesToDestinations[target];
                     travelTimeReducer.recordTravelTimesForTarget(target, new int[] { travelTimeSeconds });
                 }
-                travelTimeReducer.finish();
-                return;
+                return travelTimeReducer.finish();
             }
 
             // Create a new Raptor Worker.
@@ -227,7 +229,7 @@ public class TravelTimeComputer {
             // We should probably set the reducer field on the propagator instance, and give the methods return values.
             // Actually these could just be two subclasses of the propagator with different TravelTimeReducer definition.
             PerTargetPropagater perTargetPropagater = new PerTargetPropagater(transitTravelTimesToStops, nonTransitTravelTimesToDestinations, egressModeLinkedDestinations, request, 120 * 60);
-            perTargetPropagater.propagate(travelTimeReducer);
+            return perTargetPropagater.propagate(travelTimeReducer);
         }
     }
 }

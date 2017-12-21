@@ -50,8 +50,8 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
 
     /** Use a bootstrapping reducer for a regional analysis task */
     @Override
-    public PerTargetPropagater.TravelTimeReducer getTravelTimeReducer(TransportNetwork network, OutputStream outputStream) {
-        return new BootstrappingTravelTimeReducer(this, gridData, outputStream);
+    public PerTargetPropagater.TravelTimeReducer getTravelTimeReducer(TransportNetwork network) {
+        return new BootstrappingTravelTimeReducer(this, gridData);
     }
 
     public RegionalTask clone () {

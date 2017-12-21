@@ -18,7 +18,6 @@ import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.config.SocketConfig;
 import org.apache.http.conn.HttpHostConnectException;
-import org.apache.http.entity.ByteArrayEntity;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
@@ -70,6 +69,10 @@ public class AnalystWorker implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(AnalystWorker.class);
 
+    private static final String DEFAULT_BROKER_ADDRESS = "localhost";
+
+    private static final String DEFAULT_BROKER_PORT = "7070";
+
     public static final int POLL_WAIT_SECONDS = 10;
 
     /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
@@ -100,6 +103,14 @@ public class AnalystWorker implements Runnable {
 
     /** The HTTP client the worker uses to contact the broker and fetch regional analysis tasks. */
     static final HttpClient httpClient = makeHttpClient();
+
+    /**
+     * The results of finished work accumulate here, and will be sent in batches back to the broker.
+     * All access to this field should be synchronized since it will is written to by multiple threads.
+     * We don't want to just wrap it in a SynchronizedList because we need an atomic copy-and-empty operation.
+     */
+    private List<RegionalWorkResult> workResults = new ArrayList<>();
+
 
     /**
      * This has been pulled out into a method so the broker can also make a similar http client.
@@ -154,12 +165,13 @@ public class AnalystWorker implements Runnable {
     /** The HTTP server that receives single-point requests. */
     private spark.Service sparkHttpService;
 
-    public AnalystWorker(Properties config) {
-        // grr this() must be first call in constructor, even if previous statements do not have side effects.
-        // Thanks, Java.
-        this(config, new TransportNetworkCache(Boolean.parseBoolean(
-            config.getProperty("work-offline", "false")) ? null : config.getProperty("graphs-bucket"),
-            new File(config.getProperty("cache-dir", "cache/graphs"))));
+    public static AnalystWorker forConfig (Properties config) {
+        // FIXME why is there a separate configuration parsing section here? Why not always make the cache base on the configuration?
+        boolean workOffline = Boolean.parseBoolean(config.getProperty("work-offline", "false"));
+        String graphsBucket = workOffline ? null : config.getProperty("graphs-bucket");
+        String graphDirectory = config.getProperty("cache-dir", "cache/graphs");
+        TransportNetworkCache cache = new TransportNetworkCache(graphsBucket, new File(graphDirectory));
+        return new AnalystWorker(config, cache);
     }
 
     public AnalystWorker(Properties config, TransportNetworkCache cache) {
@@ -167,7 +179,7 @@ public class AnalystWorker implements Runnable {
         LOG.info("Analyst worker {} starting at {}", machineId,
                 LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
 
-        // PARSE THE CONFIGURATION
+        // PARSE THE CONFIGURATION TODO move configuration parsing into a separate method.
 
         // First, check whether we are running Analyst offline.
         workOffline = Boolean.parseBoolean(config.getProperty("work-offline", "false"));
@@ -175,9 +187,11 @@ public class AnalystWorker implements Runnable {
             LOG.info("Working offline. Avoiding internet connections and hosted services.");
         }
 
-        String addr = config.getProperty("broker-address", "localhost");
-        String port = config.getProperty("broker-port", "7070");
-        this.brokerBaseUrl = String.format("http://%s:%s/api", addr, port);
+        {
+            String brokerAddress = config.getProperty("broker-address", DEFAULT_BROKER_ADDRESS);
+            String brokerPort = config.getProperty("broker-port", DEFAULT_BROKER_PORT);
+            this.brokerBaseUrl = String.format("http://%s:%s/api", brokerAddress, brokerPort);
+        }
 
         // set the initial graph affinity of this worker (if it is not in the config file it will be
         // set to null, i.e. no graph affinity)
@@ -187,8 +201,7 @@ public class AnalystWorker implements Runnable {
 
         this.gridCache = new GridCache(config.getProperty("pointsets-bucket"));
         this.transportNetworkCache = cache;
-        Boolean autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown"));
-        this.autoShutdown = autoShutdown == null ? false : autoShutdown;
+        this.autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown", "false"));
 
         // Consider shutting this worker down once per hour, starting 55 minutes after it started up.
         startupTime = System.currentTimeMillis();
@@ -337,13 +350,17 @@ public class AnalystWorker implements Runnable {
             // This worker is running in test mode.
             // It should report all work as completed without actually doing anything,
             // but will fail a certain percentage of the time.
+            // TODO sleep and generate work result in another method
             try {
                 Thread.sleep(random.nextInt(5000) + 1000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
             if (random.nextInt(100) >= dryRunFailureRate) {
-                taskCompleted(request, null);
+                RegionalWorkResult workResult = new RegionalWorkResult(request.jobId, request.taskId, 1, 1, 1);
+                synchronized (workResults) {
+                    workResults.add(workResult);
+                }
             } else {
                 LOG.info("Intentionally failing to complete task for testing purposes {}", request.taskId);
             }
@@ -376,25 +393,25 @@ public class AnalystWorker implements Runnable {
 
             // FIXME Single and regional tasks are now handled almost identically here. Only the gzipping is different, and that's handled in the caller.
             TravelTimeComputer computer = new TravelTimeComputer(request, transportNetwork, gridCache);
+            // FIXME complete weirdness: regional result is returned from method but single point is written directly to outputstream.
+            TravelTimeComputerResult computerResult = computer.compute();
             if (request.isHighPriority()) {
                 // This is a single point task.
                 // We want to gzip the data before sending it back to the broker.
                 // Compression ratios here are extreme (100x is not uncommon).
                 // We had many connection reset by peer, buffer overflows on large files.
                 // Handle gzipping with HTTP headers
-                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                computer.write(outputStream);
-                return outputStream.toByteArray();
+                return computerResult.travelTimesFromOrigin;
             } else {
                 // This is a regional task.
-                // These used to be returned via an SQS queue. Now returning directly to the backend via the HTTP API.
-                // The SQS queue was probably just working around server IO speed problems caused by AWS IOPS limits.
-                // Use of a byte array output stream here is a bit redundant since the grid writer already has a
-                // byte array in it.
-                // Write results into a byte array
-                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                computer.write(outputStream);
-                taskCompleted(request, outputStream.toByteArray());
+                // These used to be returned via an SQS queue. Now returning directly to the backend in batches during
+                // polling. The SQS queue was probably just working around server IO speed problems caused by AWS IOPS
+                // limits. Use of a byte array output stream here is a bit redundant since the grid writer already has
+                // a byte array in it.
+                synchronized (workResults) {
+                    workResults.add(computerResult.accessibilityValuesAtOrigin);
+                }
+                return null;
             }
         } catch (Exception ex) {
             // Catch any exceptions that were not handled by more specific catch clauses above.
@@ -402,8 +419,8 @@ public class AnalystWorker implements Runnable {
             TaskError taskError = new TaskError(ex);
             LOG.error("An error occurred while routing", ex);
             reportTaskErrors(request.taskId, HttpStatus.INTERNAL_SERVER_ERROR_500, Arrays.asList(taskError));
+            return null;
         }
-        return null;
     }
 
     /**
@@ -413,10 +430,16 @@ public class AnalystWorker implements Runnable {
         // Run a POST task (poll for work)
         // The graph and r5 commit of this worker are indicated in the task body.
         // TODO return any work results in this same call
-        String url = brokerBaseUrl + "/dequeue";
+        String url = brokerBaseUrl + "/dequeue"; // TODO rename to "poll" since this does more than dequeue
         HttpPost httpPost = new HttpPost(url);
         WorkerStatus workerStatus = new WorkerStatus();
         workerStatus.loadStatus(this);
+        // Include completed work results when polling the backend.
+        // Atomically copy the list of work results and clear it out while blocking writes from other threads.
+        synchronized (workResults) {
+            workerStatus.results = new ArrayList<>(workResults);
+            workResults.clear();
+        }
         httpPost.setEntity(JsonUtilities.objectToJsonHttpEntity(workerStatus));
         try {
             HttpResponse response = httpClient.execute(httpPost);
@@ -469,31 +492,6 @@ public class AnalystWorker implements Runnable {
     }
 
     /**
-     * Tell the broker that the given message has been successfully processed by a worker.
-     * The result of the task is supplied as an array of bytes.
-     * TODO supply it in a typed way, with metadata and a grid object.
-     */
-    public void taskCompleted(AnalysisTask request, byte[] result) {
-        String url = brokerBaseUrl + String.format("/complete/%s/%s", request.jobId, request.taskId);
-        HttpPost httpPost = new HttpPost(url);
-        httpPost.setHeader("Content-type", "application/octet-stream"); // invent our own type application/analysis-grid ?
-        httpPost.setEntity(new ByteArrayEntity(result));
-        try {
-            HttpResponse response = httpClient.execute(httpPost);
-            // Signal the http client library that we're done with this response object, allowing connection reuse.
-            EntityUtils.consumeQuietly(response.getEntity());
-            if (response.getStatusLine().getStatusCode() == 200) {
-                LOG.info("Successfully deleted task {} on job {}.", request.taskId, request.jobId);
-            } else {
-                LOG.warn("Failed to delete task {} on job {} (HTTP status {}).",
-                        request.taskId, request.jobId, response.getStatusLine());
-            }
-        } catch (Exception e) {
-            LOG.warn("Failed to delete task {}. Exception: {}", request.taskId, e.toString());
-        }
-    }
-
-    /**
      * Requires a worker configuration, which is a Java Properties file with the following
      * attributes.
      *
@@ -510,28 +508,21 @@ public class AnalystWorker implements Runnable {
         LOG.info("R5 commit is {}", R5Version.commit);
         LOG.info("R5 describe is {}", R5Version.describe);
 
+        String configFileName = "worker.conf";
+        if (args.length > 0) {
+            configFileName = args[0];
+        }
         Properties config = new Properties();
-
-        try {
-            File cfg;
-            if (args.length > 0)
-                cfg = new File(args[0]);
-            else
-                cfg = new File("worker.conf");
-
-            InputStream cfgis = new FileInputStream(cfg);
-            config.load(cfgis);
-            cfgis.close();
+        try (InputStream configInputStream = new FileInputStream(new File(configFileName))) {
+            config.load(configInputStream);
         } catch (Exception e) {
-            LOG.info("Error loading worker configuration", e);
+            LOG.error("Error loading worker configuration, shutting down. " + e.toString());
             return;
         }
-
         try {
-            new AnalystWorker(config).run();
+            AnalystWorker.forConfig(config).run();
         } catch (Exception e) {
-            LOG.error("Error in analyst worker", e);
-            return;
+            LOG.error("Unhandled error in analyst worker, shutting down. " + e.toString());
         }
     }
 

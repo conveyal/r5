@@ -28,28 +28,24 @@ public class GridResultQueueConsumer {
 
     private static final Logger LOG = LoggerFactory.getLogger(GridResultQueueConsumer.class);
 
-    public final String sqsUrl;
-    public final String outputBucket;
-
     public Map<String, GridResultAssembler> assemblers = new HashMap<>();
-
-    public GridResultQueueConsumer(String sqsUrl, String outputBucket) {
-        this.sqsUrl = sqsUrl;
-        this.outputBucket = outputBucket;
-    }
 
     /**
      * The taskId seems to come from the binary result itself.
      */
-    public void registerResult (String jobId, byte[] result) {
-        if (assemblers.containsKey(jobId)) {
-            assemblers.get(jobId).handleMessage(result);
+    public void registerResult (RegionalWorkResult regionalWorkResult) {
+        GridResultAssembler assembler = assemblers.get(regionalWorkResult.jobId);
+        if (assembler == null) {
+            LOG.error("Received result for unrecognized job ID {}, discarding.", regionalWorkResult.jobId);
         } else {
-            LOG.error("Received message for invalid job ID {}, silently discarding.", jobId);
+            assembler.handleMessage(regionalWorkResult);
         }
     }
 
-    /** Register a grid assembler for a particular task */
+    /**
+     * Register a grid assembler for a particular task. It's weird to be passing the assembler in here - why is it
+     * in the Analysis project? We can just make the assember within this constructor.
+     */
     public void registerJob (AnalysisTask request, GridResultAssembler assembler) {
         this.assemblers.put(request.jobId, assembler);
     }

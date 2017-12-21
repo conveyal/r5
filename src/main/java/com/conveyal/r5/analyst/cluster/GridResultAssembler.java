@@ -2,7 +2,6 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
-import com.amazonaws.services.sqs.model.Message;
 import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.LittleEndianDataOutputStream;
@@ -11,7 +10,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -20,7 +18,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
-import java.util.Base64;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.BitSet;
 import java.util.zip.GZIPOutputStream;
 
@@ -50,25 +49,22 @@ public class GridResultAssembler {
 
     public static final Logger LOG = LoggerFactory.getLogger(GridResultAssembler.class);
 
-    private static final int INT32_WIDTH_BYTES = 4;
-
     /** The version of the access grids we produce */
-    public static final int VERSION = 0;
+    public static final int ACCESS_GRID_VERSION = 0;
 
-    /** The version of the origins we consume */
-    public static final int ORIGIN_VERSION = 0;
-
-    /** The offset to get to the data section of the access grid file */
-    public static final long DATA_OFFSET = 9 * 4;
+    /** The offset to get to the data section of the access grid file. */
+    public static final long HEADER_LENGTH_BYTES = 9 * Integer.BYTES;
 
     private static final AmazonS3 s3 = new AmazonS3Client();
 
-    private Base64.Decoder base64 = Base64.getDecoder();
-
     public final AnalysisTask request;
 
-    private File temporaryFile;
-    private RandomAccessFile bufferFile;
+    private File bufferFile;
+
+    private RandomAccessFile randomAccessFile;
+
+    /** TODO use Java NewIO file channel for native byte order output to our output file. */
+//    private FileChannel outputFileChannel;
 
     private boolean error = false;
 
@@ -82,102 +78,161 @@ public class GridResultAssembler {
     // one result for the same origin.
     private BitSet originsReceived;
 
+    /** Total number of results expected. */
     public int nTotal;
 
+    /** The bucket on S3 to which the final result will be written. */
     public final String outputBucket;
 
-    /** Number of iterations for this grid task */
-    private int nIterations;
-
+    /**
+     * Construct an assembler for a single regional analysis result grid.
+     * This also creates the on-disk scratch buffer into which the results from the workers will be accumulated.
+     */
     public GridResultAssembler (AnalysisTask request, String outputBucket) {
         this.request = request;
         this.outputBucket = outputBucket;
         nTotal = request.width * request.height;
         originsReceived = new BitSet(nTotal);
+        LOG.info("Expecting results for regional analysis with width {}, height {}, 1 value per origin.",
+                request.width, request.height);
+
+        long outputFileSizeBytes = request.width * request.height * Integer.BYTES;
+        LOG.info("Creating temporary file to store regional analysis results, size is {}.",
+                human(outputFileSizeBytes, "B"));
+        try {
+            bufferFile = File.createTempFile(request.jobId, ".access_grid");
+            // On unexpected server shutdown, these files should be deleted.
+            // We could attempt to recover from shutdowns but that will take a lot of changes and persisted data.
+            bufferFile.deleteOnExit();
+
+            // Write the access grid file header
+            FileOutputStream fos = new FileOutputStream(bufferFile);
+            LittleEndianIntOutputStream data = new LittleEndianIntOutputStream(fos);
+            data.writeAscii("ACCESSGR");
+            data.writeInt(ACCESS_GRID_VERSION);
+            data.writeInt(request.zoom);
+            data.writeInt(request.west);
+            data.writeInt(request.north);
+            data.writeInt(request.width);
+            data.writeInt(request.height);
+            data.writeInt(1); // Hard-wired to one bootstrap replication
+            data.close();
+
+            // We used to fill the file with zeros here, to "overwrite anything that might be in the file already"
+            // according to a code comment. However that creates a burst of up to 1GB of disk activity, which exhausts
+            // our IOPS budget on cloud servers with network storage. That then causes the server to fall behind in
+            // processing incoming results.
+            // This is a newly created temp file, so setting it to a larger size should just create a sparse file
+            // full of blocks of zeros (at least on Linux, I don't know what it does on Windows).
+            this.randomAccessFile = new RandomAccessFile(bufferFile, "rw");
+            randomAccessFile.setLength(outputFileSizeBytes);
+            LOG.info("Created temporary file of {} to accumulate results from workers.", human(randomAccessFile.length(), "B"));
+        } catch (Exception e) {
+            error = true;
+            LOG.error("Exception while creating regional access grid: " + e.toString());
+        }
     }
 
+    /**
+     * Gzip the access grid and upload it to S3.
+     */
     protected synchronized void finish () {
-        // gzip and push up to S3
         LOG.info("Finished receiving data for regional analysis {}, uploading to S3", request.jobId);
-
         try {
-            File gzipFile = File.createTempFile(request.jobId, ".access_grid.gz");
-
-            bufferFile.close();
+            File gzippedGridFile = File.createTempFile(request.jobId, ".access_grid.gz");
+            randomAccessFile.close();
 
             // There's probably a more elegant way to do this with NIO and without closing the buffer
-            InputStream is = new BufferedInputStream(new FileInputStream(temporaryFile));
-            OutputStream os = new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(gzipFile)));
+            InputStream is = new BufferedInputStream(new FileInputStream(bufferFile));
+            OutputStream os = new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(gzippedGridFile)));
             ByteStreams.copy(is, os);
             is.close();
             os.close();
 
             LOG.info("GZIP compression reduced regional analysis {} from {} to {} ({}x compression)",
                     request.jobId,
-                    human(temporaryFile.length(), "B"),
-                    human(gzipFile.length(), "B"),
-                    (double) temporaryFile.length() / gzipFile.length()
+                    human(bufferFile.length(), "B"),
+                    human(gzippedGridFile.length(), "B"),
+                    (double) bufferFile.length() / gzippedGridFile.length()
             );
 
-            s3.putObject(outputBucket, String.format("%s.access", request.jobId), gzipFile);
-
-            // these will fill up the disk lickety-split if we don't keep them cleaned up.
-            gzipFile.delete();
-            temporaryFile.delete();
+            s3.putObject(outputBucket, String.format("%s.access", request.jobId), gzippedGridFile);
+            // Clear temporary files off of the disk because the gzipped version is now on S3.
+            bufferFile.delete();
+            gzippedGridFile.delete();
         } catch (Exception e) {
             LOG.error("Error uploading results of regional analysis {}", request.jobId, e);
         }
     }
 
+    private void checkDimension (RegionalWorkResult workResult, String dimensionName, int seen, int expected) {
+        if (seen != expected) {
+            LOG.error("Result for task {} of job {} has {} {}, expected {}.",
+                    workResult.taskId, workResult.jobId, dimensionName, seen, expected);
+            error = true;
+        }
+    }
+
+
+    public static byte[] intToLittleEndianByteArray (int i) {
+        final ByteBuffer byteBuffer = ByteBuffer.allocate(Integer.BYTES);
+        byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
+        byteBuffer.putInt(i);
+        return byteBuffer.array();
+    }
+
+    // Write to the proper subregion of the buffer for this origin.
+    // The randomAccessFile is not threadsafe and multiple threads may call this, so synchronize.
+    // The origins we receive have 2d coordinates.
+    // Flatten them to compute file offsets and for the origin checklist.
+    private void writeOneValue (int x, int y, int value) throws IOException {
+        int index1d = y * request.width + x;
+        long offset = HEADER_LENGTH_BYTES + index1d * Integer.BYTES;
+        synchronized (this) {
+            randomAccessFile.seek(offset);
+            randomAccessFile.write(intToLittleEndianByteArray(value));
+            // Don't double-count origins if we receive them more than once.
+            if (!originsReceived.get(index1d)) {
+                originsReceived.set(index1d);
+                nComplete += 1;
+            }
+        }
+    }
+
     /**
      * Process a single result.
+     * We have bootstrap replications turned off, so there should be only one accessibility result per origin
+     * and no delta coding is necessary anymore within each origin.
+     * We are also iterating over three dimensions (grids, percentiles, cutoffs) but those should produce completely
+     * separate access grid files, and are all size 1 for now anyway.
      */
-    public void handleMessage (byte[] body) {
+    public void handleMessage (RegionalWorkResult workResult) {
         try {
-            ByteArrayInputStream bais = new ByteArrayInputStream(body);
-            Origin origin = Origin.read(bais);
+            // Infer x and y cell indexes based on the template task
+            int taskNumber = workResult.taskId;
+            int x = taskNumber % request.width;
+            int y = taskNumber / request.width;
 
-            // if this is not the first task, make sure that we have the correct number of accessibility
-            // samples (either instantaneous accessibility values or bootstrap replications of accessibility given median
-            // travel time, depending on worker version)
-            if (bufferFile != null && origin.samples.length != this.nIterations) {
-                LOG.error("Origin {}, {} has {} samples, expected {}",
-                        origin.x, origin.y, origin.samples.length, this.nIterations);
-                error = true;
-            }
+            // Check the dimensions of the result by comparing with fields of this.request
+            int nGrids = 1;
+            int nPercentiles = 1;
+            int nCutoffs = 1;
 
-            // Convert to a delta coded byte array
-            ByteArrayOutputStream pixelByteOutputStream = new ByteArrayOutputStream(origin.samples.length * INT32_WIDTH_BYTES);
-            LittleEndianDataOutputStream pixelDataOutputStream = new LittleEndianDataOutputStream(pixelByteOutputStream);
-            for (int i = 0, prev = 0; i < origin.samples.length; i++) {
-                int current = origin.samples[i];
-                pixelDataOutputStream.writeInt(current - prev);
-                prev = current;
-            }
-            pixelDataOutputStream.close();
-
-            // write to the proper subregion of the buffer for this origin
-            // use a synchronized block to ensure no threading issues
-            synchronized (this) {
-                if (bufferFile == null) this.initialize(origin.samples.length);
-                // The origins we receive have 2d coordinates.
-                // Flatten them to compute file offsets and for the origin checklist.
-                // The 1D index should not overflow an int (the grid would need to be 1000x bigger than the Netherlands)
-                // However the output file size can easily exceed 2^31, and intermediate results in the file offset
-                // computation are susceptible to overflow (see #321).
-                // Casting the 1D offset to long should ensure that each intermediate result is stored in a long.
-                int index1d = origin.y * request.width + origin.x;
-                long offset = DATA_OFFSET + ((long)index1d) * nIterations * INT32_WIDTH_BYTES;
-                bufferFile.seek(offset);
-                bufferFile.write(pixelByteOutputStream.toByteArray());
-                // Don't double-count origins if we receive them more than once.
-                if (!originsReceived.get(index1d)) {
-                    originsReceived.set(index1d);
-                    nComplete += 1;
+            // Drop work results for this particular origin into a little-endian output files.
+            // We only have one file for now because only one grid, percentile, and cutoff value.
+            checkDimension(workResult, "destination grids", workResult.accessibilityValues.length, nGrids);
+            for (int[][] gridResult : workResult.accessibilityValues) {
+                checkDimension(workResult, "percentiles", gridResult.length, nPercentiles);
+                for (int[] percentileResult : gridResult) {
+                    checkDimension(workResult, "cutoffs", percentileResult.length, nCutoffs);
+                    for (int accessibilityForCutoff : percentileResult) {
+                        writeOneValue(x, y, accessibilityForCutoff);
+                    }
                 }
-                // TODO It might be more reliable to double-check the bitset of received results inside finish() instead of just counting.
-                if (nComplete == nTotal && !error) finish();
             }
+            // TODO It might be more reliable to double-check the bitset of received results inside finish() instead of just counting.
+            // FIXME isn't this leaving the files around and the assemblers in memory if the job errors out?
+            if (nComplete == nTotal && !error) finish();
         } catch (Exception e) {
             error = true; // the file is garbage TODO better resilience, tell the UI, transmit all errors.
             LOG.error("Error assembling results for query {}", request.jobId, e);
@@ -185,52 +240,9 @@ public class GridResultAssembler {
         }
     }
 
-    public synchronized void initialize (int nIterations) throws IOException {
-
-        long finalFileSizeBytes = (long) nIterations * (long) request.width * (long) request.height * INT32_WIDTH_BYTES;
-
-        LOG.info("Expecting results for regional analysis with width {}, height {}, iterations {}.", request.width, request.height, nIterations);
-        LOG.info("Creating temporary file to store regional analysis results, size is {}.", human(finalFileSizeBytes, "B"));
-
-        this.nIterations = nIterations;
-
-        // create a temporary file an fill it in with relevant data
-        temporaryFile = File.createTempFile(request.jobId, ".access_grid");
-        temporaryFile.deleteOnExit(); // handle unclean broker shutdown
-
-        // write the header
-        FileOutputStream fos = new FileOutputStream(temporaryFile);
-        LittleEndianIntOutputStream data = new LittleEndianIntOutputStream(fos);
-
-        data.writeAscii("ACCESSGR");
-
-        data.writeInt(VERSION);
-
-        data.writeInt(request.zoom);
-        data.writeInt(request.west);
-        data.writeInt(request.north);
-        data.writeInt(request.width);
-        data.writeInt(request.height);
-        data.writeInt(nIterations);
-        data.close();
-
-        // We used to fill the file with zeros here, to "overwrite anything that might be in the file already"
-        // according to a code comment. However that creates a burst of up to 1GB of disk activity, which exhausts
-        // our IOPS budget on cloud servers with network storage. That then causes the server to fall behind in
-        // processing incoming results.
-        // This is a newly created temp file, so setting it to a larger size should just create a sparse file
-        // full of blocks of zeros (at least on Linux, I don't know what it does on Windows).
-
-        this.bufferFile = new RandomAccessFile(temporaryFile, "rw");
-        bufferFile.setLength(finalFileSizeBytes);
-
-        LOG.info("Created temporary file of {} to store query results", human(bufferFile.length(), "B"));
-
-    }
-
-    /** Clean up and cancel a consumer */
+    /** Clean up and cancel a consumer. */
     public synchronized void terminate () throws IOException {
-        this.bufferFile.close();
-        temporaryFile.delete();
+        this.randomAccessFile.close();
+        bufferFile.delete();
     }
 }

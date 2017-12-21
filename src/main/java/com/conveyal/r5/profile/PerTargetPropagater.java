@@ -1,5 +1,7 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
+import com.conveyal.r5.analyst.cluster.TravelTimeComputerResult;
 import com.conveyal.r5.streets.LinkedPointSet;
 import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
@@ -54,7 +56,7 @@ public class PerTargetPropagater {
      * destination.
      * TODO change function signature so this returns the resulting grid object
      */
-    public void propagate (TravelTimeReducer travelTimeReducer) {
+    public TravelTimeComputerResult propagate (TravelTimeReducer travelTimeReducer) {
         targets.makePointToStopDistanceTablesIfNeeded();
 
         long startTimeMillis = System.currentTimeMillis();
@@ -127,7 +129,7 @@ public class PerTargetPropagater {
                 totalTimeMillis / 1000d
                 );
 
-        travelTimeReducer.finish();
+        return travelTimeReducer.finish();
     }
 
     /**
@@ -153,7 +155,7 @@ public class PerTargetPropagater {
          * we have bypassed propagation entirely and the implementation should write out a default result for cases
          * where the network is entirely unreachable.
          */
-        void finish ();
+        TravelTimeComputerResult finish ();
 
     }
 }

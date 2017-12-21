@@ -76,7 +76,7 @@ public abstract class AnalysisTask extends ProfileRequest {
      * times, bootstrapped accessibility, etc) is not.
      */
     @JsonIgnore
-    public abstract PerTargetPropagater.TravelTimeReducer getTravelTimeReducer(TransportNetwork network, OutputStream os);
+    public abstract PerTargetPropagater.TravelTimeReducer getTravelTimeReducer(TransportNetwork network);
 
     @JsonIgnore
     public WorkerCategory getWorkerCategory () {

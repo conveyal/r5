@@ -13,6 +13,7 @@ import java.lang.management.RuntimeMXBean;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -44,6 +45,7 @@ public class WorkerStatus {
     public String jvmVendor;
     public String jvmVersion;
     public String ipAddress;
+    public List<RegionalWorkResult> results;
 
     /** No-arg constructor used when deserializing. */
     public WorkerStatus() { }

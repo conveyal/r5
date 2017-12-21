@@ -6,6 +6,8 @@ import com.amazonaws.services.sqs.model.MessageAttributeValue;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
 import com.conveyal.r5.analyst.cluster.Origin;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
+import com.conveyal.r5.analyst.cluster.TravelTimeComputerResult;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
@@ -125,18 +127,20 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
      */
     private final int[][] bootstrapWeights;
 
-    private final OutputStream outputStream;
+    /**
+     * The result of the whole calculation, which will be returned to communicate the accessibility value for one origin.
+     */
+    RegionalWorkResult regionalWorkResult;
 
     /**
      *
      * @param request the task being processed, for one particular origin point
      * @param grid the grid of opportunity density to which we are calculating accessibility.
-     * @param outputStream the stream to which the resulting set of accessibility results will be written.
      */
-    public BootstrappingTravelTimeReducer (RegionalTask request, Grid grid, OutputStream outputStream) {
+    public BootstrappingTravelTimeReducer (RegionalTask request, Grid grid) {
         this.task = request;
         this.grid = grid;
-        this.outputStream = outputStream;
+        this.regionalWorkResult = new RegionalWorkResult(request.jobId, request.taskId, 1, 1, 1);
         int nMinutes = request.getTimeWindowLengthMinutes();
         int monteCarloDrawsPerMinute = request.getMonteCarloDrawsPerMinute();
 
@@ -245,23 +249,20 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
      * shortcutting around routing and propagation when the origin point is not connected to the street network.
      */
     @Override
-    public void finish () {
+    public TravelTimeComputerResult finish () {
 
         int[] intReplications = DoubleStream.of(bootstrapReplicationsOfAccessibility)
                 .mapToInt(d -> (int) Math.round(d))
                 .toArray();
 
-        try {
-            new Origin(task, task.percentiles[0], intReplications).write(outputStream);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        // Check that there were no replications beyond the point estimate
+        if (intReplications.length != 1) throw new AssertionError();
+        regionalWorkResult.setAcccessibilityValue(0, 0, 0, intReplications[0]);
 
-        // send this origin to an SQS queue as a binary payload; it will be consumed by GridResultQueueConsumer
-        // and GridResultAssembler
-//        SendMessageRequest smr = new SendMessageRequest(task.outputQueue, base64.encodeToString(baos.toByteArray()));
-//        smr = smr.addMessageAttributesEntry("jobId", new MessageAttributeValue().withDataType("String").withStringValue(task.jobId));
-//        sqs.sendMessage(smr);
+        TravelTimeComputerResult result = new TravelTimeComputerResult();
+        result.accessibilityValuesAtOrigin = regionalWorkResult;
+        return result;
+
     }
 
 }

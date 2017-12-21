@@ -43,7 +43,7 @@ public class RedeliveryTest {
         Properties workerConfig = new Properties();
         List<Thread> workerThreads = new ArrayList<>();
         for (int i = 0; i < N_WORKERS; i++) {
-            AnalystWorker worker = new AnalystWorker(workerConfig);
+            AnalystWorker worker = AnalystWorker.forConfig(workerConfig);
             worker.dryRunFailureRate = FAILURE_RATE;
             Thread workerThread = new Thread(worker);
             workerThreads.add(workerThread);

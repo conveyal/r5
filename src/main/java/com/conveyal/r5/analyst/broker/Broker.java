@@ -7,6 +7,7 @@ import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.*;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.conveyal.r5.analyst.cluster.WorkerStatus;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.JsonUtilities;
@@ -310,7 +311,9 @@ public class Broker {
      * this would also allow returning errors as JSON and the grid result separately.
      * @return whether the task was found and removed.
      */
-    public synchronized boolean markTaskCompleted (String jobId, int taskId) {
+    public synchronized boolean markTaskCompleted (RegionalWorkResult workResult) {
+        String jobId = workResult.jobId;
+        int taskId = workResult.taskId;
         Job job = findJob(jobId);
         if (job == null) {
             LOG.error("Could not find a job with ID {} and therefore could not mark the task as completed.", jobId);

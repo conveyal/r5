@@ -1,12 +1,15 @@
 package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AccessGridWriter;
+import com.conveyal.r5.analyst.cluster.TravelTimeComputerResult;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.primitives.Bytes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,20 +32,15 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
     /** The results encoded as an access grid */
     private AccessGridWriter encodedResults;
 
-    /** The output stream to write the result to */
-    private OutputStream outputStream;
-
     /** The network used to compute the travel time results */
     public final TransportNetwork network;
 
     /** The task used to create travel times being reduced herein */
     public final TravelTimeSurfaceTask task;
 
-    public TravelTimeSurfaceReducer (TravelTimeSurfaceTask task, TransportNetwork network, OutputStream outputStream) {
+    public TravelTimeSurfaceReducer (TravelTimeSurfaceTask task, TransportNetwork network) {
         this.task = task;
         this.network = network;
-        this.outputStream = outputStream;
-
         try {
             // use an in-memory access grid, don't specify disk cache file
             encodedResults = new AccessGridWriter(task.zoom, task.west, task.north, task.width, task.height, task.percentiles.length);
@@ -89,25 +87,20 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
      * routing and propagation when the origin point is not connected to the street network.
      */
     @Override
-    public void finish () {
+    public TravelTimeComputerResult finish () {
+        LOG.info("Travel time surface of size {} kB complete", encodedResults.getBytes().length / 1000);
+        LOG.info("Appending metadata with {} warnings", network.scenarioApplicationWarnings.size());
+        ResultMetadata metadata = new ResultMetadata();
+        metadata.scenarioApplicationWarnings = network.scenarioApplicationWarnings;
+        byte[] errorsJsonBytes = new byte[0];
         try {
-            LOG.info("Travel time surface of size {} kB complete", encodedResults.getBytes().length / 1000);
-            outputStream.write(encodedResults.getBytes());
-
-            LOG.info("Travel time surface written, appending metadata with {} warnings",
-                    network.scenarioApplicationWarnings.size());
-
-            // Append scenario application warning JSON to result
-            ResultMetadata metadata = new ResultMetadata();
-            metadata.scenarioApplicationWarnings = network.scenarioApplicationWarnings;
-            JsonUtilities.objectMapper.writeValue(outputStream, metadata);
-
-            LOG.info("Done writing");
-
-            outputStream.close();
-        } catch (IOException e) {
-            LOG.warn("Unexpected IOException returning travel time surface to client", e);
+            errorsJsonBytes = JsonUtilities.objectMapper.writeValueAsBytes(metadata);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
         }
+        TravelTimeComputerResult result = new TravelTimeComputerResult();
+        result.travelTimesFromOrigin = Bytes.concat(encodedResults.getBytes(), errorsJsonBytes);
+        return result;
     }
 
     private static class ResultMetadata {

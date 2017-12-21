@@ -414,11 +414,6 @@
       <version>0.8</version>
     </dependency>
     <dependency>
-      <groupId>org.mapdb</groupId>
-      <artifactId>elsa</artifactId>
-      <version>3.0.0-M5</version>
-    </dependency>
-    <dependency>
       <groupId>com.axiomalaska</groupId>
       <artifactId>polyline-encoder</artifactId>
       <version>0.1</version>

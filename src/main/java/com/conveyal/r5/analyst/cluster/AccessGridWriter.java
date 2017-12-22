@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.profile.FastRaptorWorker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,32 +34,27 @@ public class AccessGridWriter {
     /** The offset to get to the data section of the access grid file */
     public static final long HEADER_SIZE = 9 * 4;
 
-    /** File backing this access grid writer, if it's using a file */
-    public final File file;
-
     private BufferAbstraction buffer;
 
     // store as longs so we can use with impunity without fear of overflow
     private final long zoom, west, north, width, height, nValuesPerPixel;
 
-    /** Create a new access grid writer for a width x height x nValuesPerPixel array. */
+    /**
+     * Create a new in-memory access grid writer for a width x height x nValuesPerPixel array.
+     */
     public AccessGridWriter (int zoom, int west, int north, int width, int height, int nValuesPerPixel) throws IOException {
-        this(null, zoom, west, north, width, height, nValuesPerPixel);
-    }
-
-    /** Create a file-backed AccessGridWriter */
-    public AccessGridWriter (File gridFile, int zoom, int west, int north, int width, int height, int nValuesPerPixel) throws IOException {
         this.zoom = zoom;
         this.west = west;
         this.north = north;
         this.width = width;
         this.height = height;
         this.nValuesPerPixel = nValuesPerPixel;
-        this.file = gridFile;
 
         long nBytes = (long) width * height * nValuesPerPixel * 4 + HEADER_SIZE;
-        this.buffer = new BufferAbstraction(gridFile, nBytes);
-
+        if (nBytes > Integer.MAX_VALUE) {
+            throw new RuntimeException("Grid size exceeds 31-bit addressable space.");
+        }
+        this.buffer = new BufferAbstraction((int)nBytes);
         buffer.writeString(0, "ACCESSGR");
         buffer.writeInt(8, VERSION);
         buffer.writeInt(12, zoom);
@@ -82,29 +78,28 @@ public class AccessGridWriter {
         }
     }
 
-    public void close () throws IOException {
-        this.buffer.close();
-    }
-
     public byte[] getBytes () {
         return buffer.getBytes();
     }
 
+    // TODO confirm why we need this homemade implementation.
+    // I think we can just remove this abstraction and write into an in-memory array.
+    // It looks like it was to allow writing disk or memory-based grids interchangeably.
+    // RandomAccessFile supports the DataInput and DataOutput interfaces. The issue seems to be that this output
+    // data will be read by Javascript, where typed arrays follow the endianness of the underlying processor
+    // architecture. That is uniformly little-endian these days, but unfortunately Java data output is big-endian.
+    // "The way to address this in Java is via NIO and ByteBuffer, using native byte order instead of the default."
+    // Also consider that the destinations are always streamed in in order! So this doesn't even need to be random access.
     private static class BufferAbstraction {
-        private RandomAccessFile file;
+
         private byte[] buffer;
 
-        public BufferAbstraction (File file, long length) throws IOException {
-            if (file != null) {
-                this.file = new RandomAccessFile(file, "rw");
-                this.file.setLength(length);
-                // clear the contents of the file, don't accidentally leak disk contents
-                for (long i = 0; i < length; i++) {
-                    this.file.writeByte(0);
-                }
-            } else {
-                if (length > Integer.MAX_VALUE) throw new IllegalArgumentException("Attempt to create in memory buffer larger than 2GB");
-                this.buffer = new byte[(int) length];
+        public BufferAbstraction (int length) throws IOException {
+            this.buffer = new byte[length];
+            // Fill the buffer with UNREACHED so that if a destination is not filled in, it's automatically UNREACHED.
+            // The header is a multiple of four bytes in length.
+            for (int i = 0; i < length; i += 4) {
+                writeInt(i, FastRaptorWorker.UNREACHED);
             }
         }
 
@@ -113,43 +108,24 @@ public class AccessGridWriter {
             byte b = (byte) (value >> 8);
             byte c = (byte) (value >> 16);
             byte d = (byte) (value >> 24);
-
-            if (file != null) {
-                file.seek(offset);
-                // can't use file.writeInt, as it is in typical Java fashion big-endian . . .
-                file.writeByte(a);
-                file.writeByte(b);
-                file.writeByte(c);
-                file.writeByte(d);
-            } else {
-                int offsetInt = (int) offset;
-                buffer[offsetInt] = a;
-                buffer[offsetInt + 1] = b;
-                buffer[offsetInt + 2] = c;
-                buffer[offsetInt + 3] = d;
-            }
+            int offsetInt = (int) offset;
+            buffer[offsetInt] = a;
+            buffer[offsetInt + 1] = b;
+            buffer[offsetInt + 2] = c;
+            buffer[offsetInt + 3] = d;
         }
 
         public void writeString (long offset, String value) throws IOException {
-            if (file != null) {
-                file.seek(offset);
-                file.writeBytes(value);
-            } else {
-                int offsetInt = (int) offset;
-                byte[] bytes = value.getBytes();
-                for (byte byt : bytes) {
-                    buffer[offsetInt++] = byt;
-                }
+            int offsetInt = (int) offset;
+            byte[] bytes = value.getBytes();
+            for (byte byt : bytes) {
+                buffer[offsetInt++] = byt;
             }
         }
 
         public byte[] getBytes () {
-            if (buffer != null) return buffer;
-            else throw new UnsupportedOperationException("Attempt to retrieve bytes for on-disk access grid.");
+            return buffer;
         }
 
-        public void close () throws IOException {
-            if (this.file != null) this.file.close();
-        }
     }
 }

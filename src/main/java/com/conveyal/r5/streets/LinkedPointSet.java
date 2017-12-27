@@ -34,13 +34,6 @@ public class LinkedPointSet implements Serializable {
     private static final Logger LOG = LoggerFactory.getLogger(LinkedPointSet.class);
 
     /**
-     * The distance we search around each PointSet point for a road to link it to.
-     * FIXME 1km is really far to walk off a street. But some places have offices in the middle of big parking lots.
-     * FIXME and 4km is even more extreme! This needs to be greatly shortened.
-     */
-    public static final int MAX_OFFSTREET_WALK_METERS = 1600;
-
-    /**
      * LinkedPointSets are long-lived and not extremely numerous, so we keep references to the objects it was built from.
      * Besides these fields are useful for later processing of LinkedPointSets.
      */
@@ -259,7 +252,9 @@ public class LinkedPointSet implements Serializable {
             // hit edges on all sides or reach some predefined maximum.
             if (all || (streetLayer.edgeStore.temporarilyDeletedEdges != null &&
                         streetLayer.edgeStore.temporarilyDeletedEdges.contains(edges[p]))) {
-                Split split = streetLayer.findSplit(pointSet.getLat(p), pointSet.getLon(p), MAX_OFFSTREET_WALK_METERS, streetMode);
+                // Use radius from StreetLayer such that maximum origin and destination walk distances are symmetric.
+                Split split = streetLayer.findSplit(pointSet.getLat(p), pointSet.getLon(p),
+                        StreetLayer.LINK_RADIUS_METERS, streetMode);
                 if (split == null) {
                     edges[p] = -1;
                 } else {

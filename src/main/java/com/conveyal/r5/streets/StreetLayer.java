@@ -91,8 +91,9 @@ public class StreetLayer implements Serializable, Cloneable {
      * This should not necessarily be a constant, but even if it's made settable it should be stored in a field on this
      * class to avoid cluttering method signatures. Generally you'd set this once at startup and always use the same
      * value afterward.
+     * 1.6km is really far to walk off a street. But some places have offices in the middle of big parking lots.
      */
-    public static final double LINK_RADIUS_METERS = 300;
+    public static final double LINK_RADIUS_METERS = 1600;
 
     /**
      * Searching for streets takes a fair amount of computation, and the number of streets examined grows roughly as

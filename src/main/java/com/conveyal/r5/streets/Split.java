@@ -95,34 +95,36 @@ public class Split {
         Split curr = new Split();
         Split best = new Split();
         candidateEdges.forEach(e -> {
-
             curr.edge = e;
             edge.seek(e);
-            //LOG.info("Considering OSM way {}", edge.getOSMID());
-            //Skip Link edges those are links between transit stops/P+R/Bike share vertices and graph
-            //Without this origin or destination point can link to those edges because they have ALL permissions
-            //and route is never found since point is inaccessible because edges leading to it don't have required permission
+
+            // Do not consider linking to edges that are links to streets from transit stops, P+Rs, and bike shares.
+            // These edges allow all modes to traverse, but may be connected to roads with more restrictive permissions.
+            // On a given edge pair both directions will have the same flag.
             if (edge.getFlag(EdgeStore.EdgeFlag.LINK)) return true;
 
-            if (!edge.allowsStreetMode(streetMode)) {
-                //LOG.info("rejecting edge {} (OSM way {} forward)", edge.edgeIndex, edge.getOSMID());
+            // If either direction of the current edge doesn't allow the specified mode of travel, skip it.
+            // It is arguably better to skip it only if BOTH directions forbid the specified mode (see commented block
+            // below). This system has odd effects in areas with lots of one-way streets or divided roads.
+            // TODO Really, we want to allow linking to two different edge-pairs in such cases but that is more complex.
+            // Do not consider linking to edges that are not marked "linkable". This excludes e.g. tunnels and motorways.
+            if (!edge.allowsStreetMode(streetMode) || !edge.getFlag(EdgeStore.EdgeFlag.LINKABLE)) {
                 return true;
             }
             edge.advance();
-            if (!edge.allowsStreetMode(streetMode)) {
-                //LOG.info("rejecting edge {} (OSM way {} backward)", edge.edgeIndex, edge.getOSMID());
+            if (!edge.allowsStreetMode(streetMode) || !edge.getFlag(EdgeStore.EdgeFlag.LINKABLE)) {
                 return true;
             }
             edge.retreat();
 
-//            if (!edge.allowsStreetMode(streetMode)) {
-//                // The edge does not allow forward traversal with the specified mode, try the backward edge.
-//                edge.advance();
-//                // If backward traversal is also not allowed, skip this edge and try the next one.
-//                if (!edge.allowsStreetMode(streetMode)) return true;
-//            }
-            // FIXME we are splitting only one direction, we actually want to split the two directions separately, so either of distance 1 or distance 2 can be infinite.
-            // FIXME we should probably entirely skip over motorways and link only surface streets.
+            /*
+            if (!edge.allowsStreetMode(streetMode)) {
+                // The edge does not allow forward traversal with the specified mode, try the backward edge.
+                edge.advance();
+                // If backward traversal is also not allowed, skip this edge and try the next one.
+                if (!edge.allowsStreetMode(streetMode)) return true;
+            }
+            */
 
             // The distance to this edge is the distance to the closest segment of its geometry.
             edge.forEachSegment((seg, fixedLat0, fixedLon0, fixedLat1, fixedLon1) -> {

@@ -56,6 +56,17 @@ public abstract class AnalysisTask extends ProfileRequest {
     /* Directory in the bucket in which to save results */
     public String outputDirectory = "";
 
+    /** Whether to download as a Conveyal flat binary file for display in analysis-ui, or a geotiff */
+    public enum Format {
+        /** Flat binary grid format */
+        GRID,
+        /** GeoTIFF file for download and use in GIS */
+        GEOTIFF
+    }
+
+    /** Default format is a Conveyal flat binary file */
+    public Format format = Format.GRID;
+
     /** Whether to include the in-vehicle component of overall travel time in results */
     public boolean returnInVehicleTimes = false;
 

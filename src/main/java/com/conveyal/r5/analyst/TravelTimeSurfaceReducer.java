@@ -70,7 +70,8 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
             int offset = (int) Math.round(task.percentiles[i] / 100d * (times.length-1));
             // Int divide will floor; this is correct because value 0 has travel times of up to one minute, etc.
             // This means that anything less than a cutoff of (say) 60 minutes (in seconds) will have value 59,
-            // which is what we want. But maybe this is tying the backend and frontend too closely.
+            // which is what we want. But maybe converting to minutes before we actually export a binary format is tying
+            // the backend and frontend (which makes use of UInt8 typed arrays) too closely.
             results[i] = times[offset] == FastRaptorWorker.UNREACHED ? FastRaptorWorker.UNREACHED : times[offset] / 60;
         }
 
@@ -101,8 +102,11 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
                 outputStream = MultipointDataStore.getOutputStream(task, task.taskId + "_times.dat", "application/octet-stream");
             }
 
-
-            timeGrid.writeGrid(outputStream);
+            if (task.format == AnalysisTask.Format.GRID) {
+                timeGrid.writeGrid(outputStream);
+            } else if (task.format == AnalysisTask.Format.GEOTIFF) {
+                timeGrid.writeGeotiff(outputStream);
+            }
 
             LOG.info("Travel time surface written, appending metadata with {} warnings",
                     network.scenarioApplicationWarnings.size());

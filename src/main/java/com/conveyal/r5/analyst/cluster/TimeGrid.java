@@ -18,6 +18,10 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.media.jai.RasterFactory;
+import java.awt.image.DataBuffer;
+import java.awt.image.WritableRaster;
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
@@ -39,7 +43,7 @@ import java.nio.ByteOrder;
  * (4 byte int) width of the grid in pixels
  * (4 byte int) height of the grid in pixels
  * (4 byte int) number of values per pixel
- * (repeated 4-byte int) values of each pixel in row major order. Values within a given pixel are delta coded.
+ * (repeated 4-byte int) values of each pixel in row major order. Values are not delta coded here.
  */
 public class TimeGrid {
     public static final Logger LOG = LoggerFactory.getLogger(GridResultAssembler.class);
@@ -54,8 +58,8 @@ public class TimeGrid {
 
     private int version = 0;
 
-    // store as longs so we can use with impunity without fear of overflow
-    private final long zoom, west, north, width, height, nValuesPerPixel;
+    // used to be stored as longs, but can probably still use with impunity without fear of overflow
+    private final int zoom, west, north, width, height, nValuesPerPixel;
 
     // 1-d array of pixel values
     private int[] values;
@@ -108,10 +112,8 @@ public class TimeGrid {
             throw new RuntimeException("Pixel coordinates are too large for this grid.");
         }
 
-        int prev = 0;
         for (int i : pixelValues) {
-            values[(int) index1d] = i - prev;
-            prev = i;
+            values[(int) index1d] = i;
             index1d ++;
         }
     }
@@ -125,6 +127,10 @@ public class TimeGrid {
 
     public void writeGrid(OutputStream out) throws IOException {
 
+        out.write(writeGrid());
+    }
+
+    public byte[] writeGrid() {
         ByteBuffer buffer;
 
         buffer = ByteBuffer.allocate((int) nValues * 4 + HEADER_SIZE);
@@ -133,19 +139,25 @@ public class TimeGrid {
         // Write header
         buffer.put(gridType.getBytes(),0,8);
         buffer.putInt(8, version);
-        buffer.putInt(12, (int) zoom);
+        buffer.putInt(12, zoom);
         buffer.putInt(16, (int) west);
         buffer.putInt(20, (int) north);
         buffer.putInt(24, (int) width);
         buffer.putInt(28, (int) height);
         buffer.putInt(32, (int) nValuesPerPixel);
 
-        // Write values
+        //TODO wrap below in gzip output stream, once other changes are made
+
+        // Write values, delta coded
         for (int i = 0; i < nValues; i ++) {
-            buffer.putInt(HEADER_SIZE + i * 4, values[i]);
+            int prev = 0;
+            if (i % nValuesPerPixel == 0) prev = 0;
+            int val = values[i] - prev;
+            buffer.putInt(HEADER_SIZE + i * 4, val);
+            prev = val;
         }
 
-        out.write(buffer.array());
+        return buffer.array();
     }
 
 
@@ -190,17 +202,22 @@ public class TimeGrid {
     }
 
     /** Write this grid out in GeoTIFF format */
-    public void writeGeotiff (OutputStream out, int whichValue) {
+    public void writeGeotiff (OutputStream out) {
         try {
-            float [][] data = new float[(int) height][(int) width];
-            for (int x = 0; x < width; x++) {
-                for (int y = 0; y < height; y++) {
-                    //TODO write out all values in different bands
-                    data[y][x] = values[y * (int) width + x + whichValue];
+            // Inspired by org.geotools.coverage.grid.GridCoverageFactory
+            final WritableRaster raster =
+                    RasterFactory.createBandedRaster(DataBuffer.TYPE_INT, width, height, nValuesPerPixel, null);
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    for (int n = 0; n < nValuesPerPixel; n ++) {
+                        raster.setSample(x, y, 0, values[y * width + x + n]);
+                    }
                 }
             }
+
+            GridCoverageFactory gcf = new GridCoverageFactory();
             ReferencedEnvelope env = getMercatorEnvelopeMeters();
-            GridCoverage2D coverage = new GridCoverageFactory().create("GRID", data, env);
+            GridCoverage2D coverage = gcf.create("TIMEGRID", raster, env);
             GeoTiffWriteParams wp = new GeoTiffWriteParams();
             wp.setCompressionMode(GeoTiffWriteParams.MODE_EXPLICIT);
             wp.setCompressionType("LZW");
@@ -209,7 +226,6 @@ public class TimeGrid {
             GeoTiffWriter writer = new GeoTiffWriter(out);
             writer.write(coverage, params.values().toArray(new GeneralParameterValue[1]));
             writer.dispose();
-            out.close();
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

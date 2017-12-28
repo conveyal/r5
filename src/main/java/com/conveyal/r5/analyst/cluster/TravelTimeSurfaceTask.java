@@ -26,6 +26,17 @@ public class TravelTimeSurfaceTask extends AnalysisTask {
         return true;
     }
 
+    /** Whether to download as a Conveyal flat binary file for display in analysis-ui, or a geotiff */
+    public enum Format {
+        /** Flat binary grid format */
+        GRID,
+        /** GeoTIFF file for download and use in GIS */
+        GEOTIFF
+    }
+
+    /** Default format is a Conveyal flat binary file */
+    public Format format = Format.GRID;
+
     /**
      * Since this may be applied to many different grids, we use the extents defined in the request.
      */

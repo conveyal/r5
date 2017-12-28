@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.TimeGrid;
+import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.multipoint.MultipointDataStore;
@@ -102,9 +103,11 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
                 outputStream = MultipointDataStore.getOutputStream(task, task.taskId + "_times.dat", "application/octet-stream");
             }
 
-            if (task.format == AnalysisTask.Format.GRID) {
+            TravelTimeSurfaceTask timeSurfaceTask = (TravelTimeSurfaceTask) task;
+
+            if (timeSurfaceTask.format == TravelTimeSurfaceTask.Format.GRID) {
                 timeGrid.writeGrid(outputStream);
-            } else if (task.format == AnalysisTask.Format.GEOTIFF) {
+            } else if (timeSurfaceTask.format == TravelTimeSurfaceTask.Format.GEOTIFF) {
                 timeGrid.writeGeotiff(outputStream);
             }
 

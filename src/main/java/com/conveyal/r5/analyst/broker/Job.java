@@ -64,6 +64,9 @@ public class Job {
     /**
      * Check if there are any tasks that were delivered to workers but never marked as completed.
      * This could happen if the workers are spot instances and they are terminated by AWS while processing some tasks.
+     * @return the number of tasks that have not been marked complete and will be redelivered.
+     * FIXME we don't actually materialize a list of things to deliver so this method is no longer necessary except for logging purposes
+     * FIXME this is getting called constantly, really we could just do it once in a while on a timer and wake up the broker.
      */
     public int redeliver () {
 

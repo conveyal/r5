@@ -102,7 +102,7 @@ public class TypeOfEdgeLabeler {
             forwardFlags.add(EdgeStore.EdgeFlag.STAIRS);
             backFlags.add(EdgeStore.EdgeFlag.STAIRS);
         }
-        // If the road doesn't have those tags it's LINKABLE AKA it will be used for linking P+R (only currently)
+        // Tunnels, covered roads and motorways are unlikely places for origins, destinations, or park and rides.
         if (!(way.hasTag("tunnel", "yes") || way.hasTag("covered", "yes") || way.hasTag("highway", "motorway"))) {
             forwardFlags.add(EdgeStore.EdgeFlag.LINKABLE);
             backFlags.add(EdgeStore.EdgeFlag.LINKABLE);

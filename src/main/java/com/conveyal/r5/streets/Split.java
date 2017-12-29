@@ -95,19 +95,36 @@ public class Split {
         Split curr = new Split();
         Split best = new Split();
         candidateEdges.forEach(e -> {
-
             curr.edge = e;
             edge.seek(e);
-            //Skip Link edges those are links between transit stops/P+R/Bike share vertices and graph
-            //Without this origin or destination point can link to those edges because they have ALL permissions
-            //and route is never found since point is inaccessible because edges leading to it don't have required permission
+
+            // Do not consider linking to edges that are links to streets from transit stops, P+Rs, and bike shares.
+            // These edges allow all modes to traverse, but may be connected to roads with more restrictive permissions.
+            // On a given edge pair both directions will have the same flag.
             if (edge.getFlag(EdgeStore.EdgeFlag.LINK)) return true;
 
-            // FIXME this is only checking the forward edge permissions, even though we're iterating over and linking to edge _pairs_
-            // If an edge does not allow traversal with the specified mode, skip over it.
-            if (streetMode == StreetMode.WALK && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)) return true;
-            if (streetMode == StreetMode.BICYCLE && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE)) return true;
-            if (streetMode == StreetMode.CAR && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_CAR)) return true;
+            // If either direction of the current edge doesn't allow the specified mode of travel, skip it.
+            // It is arguably better to skip it only if BOTH directions forbid the specified mode (see commented block
+            // below). This system has odd effects in areas with lots of one-way streets or divided roads.
+            // TODO Really, we want to allow linking to two different edge-pairs in such cases but that is more complex.
+            // Do not consider linking to edges that are not marked "linkable". This excludes e.g. tunnels and motorways.
+            if (!edge.allowsStreetMode(streetMode) || !edge.getFlag(EdgeStore.EdgeFlag.LINKABLE)) {
+                return true;
+            }
+            edge.advance();
+            if (!edge.allowsStreetMode(streetMode) || !edge.getFlag(EdgeStore.EdgeFlag.LINKABLE)) {
+                return true;
+            }
+            edge.retreat();
+
+            /*
+            if (!edge.allowsStreetMode(streetMode)) {
+                // The edge does not allow forward traversal with the specified mode, try the backward edge.
+                edge.advance();
+                // If backward traversal is also not allowed, skip this edge and try the next one.
+                if (!edge.allowsStreetMode(streetMode)) return true;
+            }
+            */
 
             // The distance to this edge is the distance to the closest segment of its geometry.
             edge.forEachSegment((seg, fixedLat0, fixedLon0, fixedLat1, fixedLon1) -> {
@@ -197,7 +214,7 @@ public class Split {
 
     /**
      * Find a split on a particular edge.
-     * FIXME this contains too much duplicate code. We can reuse the code in Split.find()
+     * FIXME this contains way too much duplicate code. We can reuse the code in Split.find().
      * we just need a way to supply an edge or edges, instead of using the spatial index.
      */
     public static Split findOnEdge (double lat, double lon, EdgeStore.Edge edge) {
@@ -212,7 +229,7 @@ public class Split {
         final double metersPerDegreeLat = 111111.111;
         double cosLat = FastMath.cos(FastMath.toRadians(lat)); // The projection factor, Earth is a "sphere"
 
-        // TODO copy paste code
+        // FIXME this looks like copy-pasted code
         // The split location currently being examined and the best one seen so far.
         Split curr = new Split();
         Split best = new Split();

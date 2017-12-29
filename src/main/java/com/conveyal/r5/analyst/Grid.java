@@ -429,9 +429,7 @@ public class Grid {
     }
 
     public boolean hasEqualExtents(Grid comparisonGrid){
-        if (this.zoom != comparisonGrid.zoom || this.west != comparisonGrid.west || this.north != comparisonGrid.north ||
-                this.width != comparisonGrid.width || this.height != comparisonGrid.height) return false;
-        else return true;
+        return this.zoom == comparisonGrid.zoom && this.west == comparisonGrid.west && this.north == comparisonGrid.north && this.width == comparisonGrid.width && this.height == comparisonGrid.height;
     }
 
     /* functions below from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */

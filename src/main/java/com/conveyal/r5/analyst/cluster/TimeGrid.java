@@ -51,7 +51,7 @@ public class TimeGrid {
     /**
      * The offset to get to the data section of the access grid file
      */
-    public static final int HEADER_SIZE = 9 * 4;
+    public static final int HEADER_SIZE = 9 * Integer.BYTES;
 
     // type of grid
     private String gridType = "ACCESSGR";

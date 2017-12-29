@@ -13,7 +13,7 @@ import java.util.zip.GZIPOutputStream;
 /**
  * Store static site publication data in S3.
  */
-public class MultipointDataStore {
+public abstract class MultipointDataStore {
     private static AmazonS3 s3 = new AmazonS3Client();
 
     /**

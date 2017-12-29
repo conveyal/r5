@@ -14,6 +14,7 @@ import java.util.List;
 /**
  * Writes path for each departure minute, and list of all paths used, from a given origin to every destination.
  *
+ * This could be useful for static sites, for displaying paths in the UI on top of isochrones, etc.
  * At the moment, we return all paths (i.e. we don't reduce them); users might be confused if the path that happened to be associated with
  * the median travel time was not a commonly used one, etc.
  *

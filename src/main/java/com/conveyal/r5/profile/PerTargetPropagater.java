@@ -87,13 +87,23 @@ public class PerTargetPropagater {
         // Total time
         int[] perIterationTravelTimes = new int[travelTimesToStopsEachIteration.length];
 
-        // In-vehicle component of total time
-        int[] perIterationInVehicleTimes = new int[travelTimesToStopsEachIteration.length];
+        // Components of travel time, and paths used
+        int[] perIterationInVehicleTimes, perIterationWaitTimes, perIterationPaths;
 
-        // Waiting component of total time
-        int[] perIterationWaitTimes = new int[travelTimesToStopsEachIteration.length];
+        boolean calculateComponents = inVehicleTimesToStops != null && waitTimesToStops !=null && pathsToStops != null;
 
-        int[] perIterationPaths = new int[travelTimesToStopsEachIteration.length];
+        if (calculateComponents){
+            // In-vehicle component of total time
+            perIterationInVehicleTimes = new int[travelTimesToStopsEachIteration.length];
+            // Waiting component of total time
+            perIterationWaitTimes = new int[travelTimesToStopsEachIteration.length];
+            // Paths used
+            perIterationPaths = new int[travelTimesToStopsEachIteration.length];
+        } else {
+            perIterationInVehicleTimes = null;
+            perIterationWaitTimes = null;
+            perIterationPaths = null;
+        }
 
         // Invert the travel times to stops array, to provide better memory locality in the tight loop below. Confirmed
         // that this provides a significant speedup, which makes sense; Java doesn't have true multidimensional arrays
@@ -140,15 +150,9 @@ public class PerTargetPropagater {
                                 // using this stop to get to this target is faster than previously checked stops
                                 perIterationTravelTimes[iteration] = timeAtTargetThisStop;
 
-                                if (inVehicleTimesToStops != null){
+                                if (calculateComponents){
                                     perIterationInVehicleTimes[iteration] = inVehicleTimesToStops[iteration][stop];
-                                }
-
-                                if (waitTimesToStops != null){
                                     perIterationWaitTimes[iteration] = waitTimesToStops[iteration][stop];
-                                }
-
-                                if (pathsToStops != null){
                                     perIterationPaths[iteration] = pathsToStops[iteration][stop];
                                 }
 

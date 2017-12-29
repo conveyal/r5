@@ -166,10 +166,14 @@ public class TimeGrid {
             // Inspired by org.geotools.coverage.grid.GridCoverageFactory
             final WritableRaster raster =
                     RasterFactory.createBandedRaster(DataBuffer.TYPE_INT, width, height, nValuesPerPixel, null);
-            for (int y = 0; y < height; y++) {
-                for (int x = 0; x < width; x++) {
+
+            int val;
+
+            for (int y = 0; y < height; y ++) {
+                for (int x = 0; x < width; x ++) {
                     for (int n = 0; n < nValuesPerPixel; n ++) {
-                        raster.setSample(x, y, 0, values[y * width + x + n]);
+                        val = values[(y * width + x) * nValuesPerPixel + n];
+                        if (val < FastRaptorWorker.UNREACHED) raster.setSample(x, y, n, val);
                     }
                 }
             }

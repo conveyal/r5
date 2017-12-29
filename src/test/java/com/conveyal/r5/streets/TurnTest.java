@@ -14,6 +14,7 @@ public abstract class TurnTest {
     private static final Logger LOG = LoggerFactory.getLogger(TurnTest.class);
 
     // center vertex index, n/s/e/w vertex indices, n/s/e/w edge indices (always starting from center).
+    // FIXME capital letters should only be used for constants
     public int VCENTER, VN, VS, VE, VW, VNE, VNW, VSW, EN, ES, EE, EW, ENE, ENW, ESW;
 
     public void setUp (boolean southernHemisphere) {
@@ -52,6 +53,7 @@ public abstract class TurnTest {
         do {
             e.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
             e.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+            e.setFlag(EdgeStore.EdgeFlag.LINKABLE);
         } while (e.advance());
 
         streetLayer.indexStreets();

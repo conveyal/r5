@@ -314,6 +314,9 @@ public class Broker implements Runnable {
         // All these tasks are accumulated into the new job. Because the tasks are clones, any referenced objects
         // such as scenarios should be shared, which reduces memory use.
         // Of course the fact that the tasks are stored as separate objects at all can eventually be optimized away.
+
+        // TODO add extra loop for multiple destination pointsets with different extents;
+
         for (int x = 0; x < templateTask.width; x++) {
             for (int y = 0; y < templateTask.height; y++) {
                 RegionalTask singleTask = templateTask.clone();

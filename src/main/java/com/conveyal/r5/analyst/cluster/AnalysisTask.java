@@ -12,10 +12,13 @@ import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import java.io.OutputStream;
+import java.util.List;
 
 /**
- * Describe an analysis task to be performed, which could be a single point interactive task for a surface of travel times,
- * or could be a regional task for bootstrapped accessibility values.
+ * Describes an analysis task to be performed.
+ *
+ * By default, the task will be a travelTimeSurfaceTask for one origin.
+ * This task is completed by returning a grid of total travel times from that origin to all destinations.
  */
 @JsonTypeInfo(use= JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property = "type")
 @JsonSubTypes({
@@ -45,6 +48,23 @@ public abstract class AnalysisTask extends ProfileRequest {
     /** A unique identifier for this task assigned by the queue/broker system. */
     public int taskId;
 
+    /** Save results to a bucket.  If blank, the response to this task will be via the default channel (broker for
+     *  single-point requests, queue for regional requests).
+     */
+    public String outputBucket = "";
+
+    /* Directory in the bucket in which to save results */
+    public String outputDirectory = "";
+
+    /** Whether to include the in-vehicle component of overall travel time in results */
+    public boolean returnInVehicleTimes = false;
+
+    /** Whether to include the waiting time component of overall travel time in results */
+    public boolean returnWaitTimes = false;
+
+    /** Whether to include paths, used to for transitive-style maps, in results */
+    public boolean returnPaths = false;
+
     /** Which percentiles of travel time to calculate. */
     public double[] percentiles = new double[] { 50 };
 
@@ -67,7 +87,7 @@ public abstract class AnalysisTask extends ProfileRequest {
 
     /** Get the destinations that should be used for this task */
     @JsonIgnore
-    public abstract PointSet getDestinations(TransportNetwork network, GridCache gridCache);
+    public abstract List<PointSet> getDestinations(TransportNetwork network, GridCache gridCache);
 
     /**
      * Get a TravelTimeReducer that will finish this task.
@@ -84,9 +104,14 @@ public abstract class AnalysisTask extends ProfileRequest {
     }
 
     public enum Type {
-        /** Binary grid of travel time for multiple percentiles returned via broker */
+        /* TODO these could be changed, to SINGLE_POINT and MULTI_POINT. The type of results requested (i.e. a grid of
+           travel times per origin vs. an accessibility value per origin) can be inferred based on whether grids are
+           specified in the profile request.  If travel time results are requested, flags can specify whether components
+           of travel time (e.g. waiting) and paths should also be returned.
+         */
+        /** Binary grid of travel times from a single origin, for multiple percentiles, returned via broker by default */
         TRAVEL_TIME_SURFACE,
-        /** Bootstrapped accessibility results returned over SQS. */
+        /** Bootstrapped accessibility results for multiple origins, returned over SQS by default. */
         REGIONAL_ANALYSIS
     }
 

@@ -1,9 +1,11 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.analyst.cluster.AccessGridWriter;
+import com.conveyal.r5.analyst.cluster.AnalysisTask;
+import com.conveyal.r5.analyst.cluster.TimeGrid;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.multipoint.MultipointDataStore;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -26,8 +28,8 @@ import java.util.Collection;
 public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeReducer {
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeSurfaceReducer.class);
 
-    /** The results encoded as an access grid */
-    private AccessGridWriter encodedResults;
+    /** Travel time results encoded as an access grid */
+    private TimeGrid timeGrid;
 
     /** The output stream to write the result to */
     private OutputStream outputStream;
@@ -36,16 +38,18 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
     public final TransportNetwork network;
 
     /** The task used to create travel times being reduced herein */
-    public final TravelTimeSurfaceTask task;
+    public final AnalysisTask task;
 
-    public TravelTimeSurfaceReducer (TravelTimeSurfaceTask task, TransportNetwork network, OutputStream outputStream) {
+    public TravelTimeSurfaceReducer (AnalysisTask task, TransportNetwork network, OutputStream outputStream) {
         this.task = task;
         this.network = network;
         this.outputStream = outputStream;
 
         try {
             // use an in-memory access grid, don't specify disk cache file
-            encodedResults = new AccessGridWriter(task.zoom, task.west, task.north, task.width, task.height, task.percentiles.length);
+            timeGrid = new TimeGrid(task.zoom, task.west, task.north, task.width, task.height, task.percentiles.length);
+            timeGrid.initialize("ACCESSGR", 0);
+
         } catch (IOException e) {
             // in memory, should not be able to throw this
             throw new RuntimeException(e);
@@ -67,14 +71,15 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
             int offset = (int) Math.round(task.percentiles[i] / 100d * (times.length-1));
             // Int divide will floor; this is correct because value 0 has travel times of up to one minute, etc.
             // This means that anything less than a cutoff of (say) 60 minutes (in seconds) will have value 59,
-            // which is what we want. But maybe this is tying the backend and frontend too closely.
+            // which is what we want. But maybe converting to minutes before we actually export a binary format is tying
+            // the backend and frontend (which makes use of UInt8 typed arrays) too closely.
             results[i] = times[offset] == FastRaptorWorker.UNREACHED ? FastRaptorWorker.UNREACHED : times[offset] / 60;
         }
 
         int x = target % task.width;
         int y = target / task.width;
         try {
-            encodedResults.writePixel(x, y, results);
+            timeGrid.writePixel(x, y, results);
         } catch (IOException e) {
             // can't happen as we're not using a file system backed output
             throw new RuntimeException(e);
@@ -82,7 +87,7 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
     }
 
     /**
-     * Write the accumulated results out to the output stream.
+     * Write the accumulated results out to the location specified in the request, or the output stream.
      *
      * If no travel times to destinations have been streamed in by calling recordTravelTimesForTarget, the
      * AccessGridWriter (encodedResults) will have a buffer full of UNREACHED. This allows shortcutting around
@@ -91,8 +96,20 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
     @Override
     public void finish () {
         try {
-            LOG.info("Travel time surface of size {} kB complete", encodedResults.getBytes().length / 1000);
-            outputStream.write(encodedResults.getBytes());
+            LOG.info("Travel time surface of size {} kB complete", (timeGrid.nValues * 4 + timeGrid.HEADER_SIZE) / 1000);
+
+            // if the outputStream was null in the constructor, write to S3.
+            if (outputStream == null) {
+                outputStream = MultipointDataStore.getOutputStream(task, task.taskId + "_times.dat", "application/octet-stream");
+            }
+
+            TravelTimeSurfaceTask timeSurfaceTask = (TravelTimeSurfaceTask) task;
+
+            if (timeSurfaceTask.format == TravelTimeSurfaceTask.Format.GRID) {
+                timeGrid.writeGrid(outputStream);
+            } else if (timeSurfaceTask.format == TravelTimeSurfaceTask.Format.GEOTIFF) {
+                timeGrid.writeGeotiff(outputStream);
+            }
 
             LOG.info("Travel time surface written, appending metadata with {} warnings",
                     network.scenarioApplicationWarnings.size());

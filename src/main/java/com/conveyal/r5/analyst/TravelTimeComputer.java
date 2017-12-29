@@ -231,11 +231,12 @@ public class TravelTimeComputer {
 
             // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
 
-            /* Total travel time from origin stop to a given stop in a given iteration of the algorithm  */
+            /* Total travel time, 2D array of [destinationStopIndex][searchIteration]  */
             int[][] transitTravelTimesToStops = worker.route();
 
             PerTargetPropagater perTargetPropagater;
 
+            // The components of travel time or paths were requested
             if (worker.saveAllStates) {
 
                 int iterations = transitTravelTimesToStops.length;
@@ -266,6 +267,7 @@ public class TravelTimeComputer {
 
                         RaptorState state = worker.statesEachIteration.get(iter);
 
+                        // Calculate the components of travel time (waiting, in-vehicle)
                         if (request.returnWaitTimes || request.returnInVehicleTimes) {
 
                             int inVehicleTime = state.nonTransferInVehicleTravelTime[stop] / 60;
@@ -280,6 +282,7 @@ public class TravelTimeComputer {
 
                         }
 
+                        // Record the paths used
                         if (request.returnPaths) {
                             int pathIdx = -1;
 

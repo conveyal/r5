@@ -16,13 +16,13 @@ public class TurnCostCalculatorTest extends TurnTest {
     public void testAngle() throws Exception {
         setUp(false);
         TurnCostCalculator calculator = new TurnCostCalculator(streetLayer, true);
-        assertEquals(0.5 * Math.PI, calculator.computeAngle(EE + 1, ES), 1e-6);
-        assertEquals(Math.PI, calculator.computeAngle(EE, EE + 1), 1e-6);
-        assertEquals(0, calculator.computeAngle(EW + 1, EE), 1e-6);
-        double angle = calculator.computeAngle(EW + 1, ENE);
+        assertEquals(0.5 * Math.PI, calculator.computeAngle(ee + 1, es), 1e-6);
+        assertEquals(Math.PI, calculator.computeAngle(ee, ee + 1), 1e-6);
+        assertEquals(0, calculator.computeAngle(ew + 1, ee), 1e-6);
+        double angle = calculator.computeAngle(ew + 1, ene);
         assertTrue(angle < 0.15 * Math.PI);
-        assertEquals(1.5 * Math.PI, calculator.computeAngle(EE + 1, EN), 1e-6);
-        assertEquals(1.5 * Math.PI, calculator.computeAngle(ES + 1, EE), 1e-6);
+        assertEquals(1.5 * Math.PI, calculator.computeAngle(ee + 1, en), 1e-6);
+        assertEquals(1.5 * Math.PI, calculator.computeAngle(es + 1, ee), 1e-6);
     }
 
     /** Make sure angles are right in the southern hemisphere as well. We scale by the cosine of latitude, which is negative in the southern hemisphere. */
@@ -30,20 +30,20 @@ public class TurnCostCalculatorTest extends TurnTest {
     public void testAngleSouthernHemisphere() throws Exception {
         setUp(true);
         TurnCostCalculator calculator = new TurnCostCalculator(streetLayer, true);
-        assertEquals(0.5 * Math.PI, calculator.computeAngle(EE + 1, ES), 1e-6);
-        assertEquals(Math.PI, calculator.computeAngle(EE, EE + 1), 1e-6);
-        assertEquals(0, calculator.computeAngle(EW + 1, EE), 1e-6);
-        double angle = calculator.computeAngle(EW + 1, ENE);
+        assertEquals(0.5 * Math.PI, calculator.computeAngle(ee + 1, es), 1e-6);
+        assertEquals(Math.PI, calculator.computeAngle(ee, ee + 1), 1e-6);
+        assertEquals(0, calculator.computeAngle(ew + 1, ee), 1e-6);
+        double angle = calculator.computeAngle(ew + 1, ene);
         assertTrue(angle < 0.15 * Math.PI);
-        assertEquals(1.5 * Math.PI, calculator.computeAngle(EE + 1, EN), 1e-6);
-        assertEquals(1.5 * Math.PI, calculator.computeAngle(ES + 1, EE), 1e-6);
+        assertEquals(1.5 * Math.PI, calculator.computeAngle(ee + 1, en), 1e-6);
+        assertEquals(1.5 * Math.PI, calculator.computeAngle(es + 1, ee), 1e-6);
     }
 
     @Test
     public void testCost () throws Exception {
         setUp(false);
         TurnCostCalculator calculator = new TurnCostCalculator(streetLayer, true);
-        assertEquals(calculator.LEFT_TURN, calculator.computeTurnCost(EE + 1, ES, StreetMode.CAR));
+        assertEquals(calculator.LEFT_TURN, calculator.computeTurnCost(ee + 1, es, StreetMode.CAR));
     }
 
     /**

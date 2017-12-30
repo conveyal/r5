@@ -149,12 +149,12 @@ public class TimeGrid {
         //TODO wrap below in gzip output stream, once other changes are made
 
         // Write values, delta coded
+        int prev = 0;
         for (int i = 0; i < nValues; i ++) {
-            int prev = 0;
             if (i % nValuesPerPixel == 0) prev = 0;
             int val = values[i] - prev;
             buffer.putInt(HEADER_SIZE + i * 4, val);
-            prev = val;
+            prev = values[i];
         }
 
         return buffer.array();

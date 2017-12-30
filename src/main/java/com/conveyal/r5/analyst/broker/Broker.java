@@ -167,6 +167,7 @@ public class Broker {
      * Only a single task is passed in, and the broker expands it into all the individual tasks for a regional job.
      */
     public synchronized void enqueueTasksForRegionalJob(RegionalTask templateTask) {
+        LOG.info("Enqueuing tasks for job {} using template task.", templateTask.jobId);
         if (findJob(templateTask.jobId) != null) {
             LOG.error("Someone tried to enqueue job {} but it already exists.", templateTask.jobId);
             throw new RuntimeException("Enqueued duplicate job " + templateTask.jobId);
@@ -338,6 +339,13 @@ public class Broker {
             }
         }
         return null;
+    }
+
+    /** Delete the job with the given ID. */
+    public synchronized boolean deleteJob (String jobId) {
+        Job job = findJob(jobId);
+        if (job == null) return false;
+        return jobs.remove(job);
     }
 
     /**

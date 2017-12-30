@@ -37,6 +37,7 @@ public abstract class JsonUtilities {
     public static final ObjectMapper lenientObjectMapper = createBaseObjectMapper();
 
     static {
+        // Configure the two ObjectMappers to have opposite behavior with respect to unrecognized fields.
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
         lenientObjectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     }

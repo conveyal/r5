@@ -290,7 +290,7 @@ public class Grid {
      * 20037508.342789, 20037508.342789
      * 179.999999999998 85.0511287798064 0
      */
-    private Coordinate mercatorPixelToMeters (double xPixel, double yPixel) {
+    public Coordinate mercatorPixelToMeters (double xPixel, double yPixel) {
         double worldWidthPixels = Math.pow(2, zoom) * 256D;
         // Top left is min x and y because y increases toward the south in web Mercator. Bottom right is max x and y.
         // The origin is WGS84 (0,0).
@@ -426,6 +426,10 @@ public class Grid {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public boolean hasEqualExtents(Grid comparisonGrid){
+        return this.zoom == comparisonGrid.zoom && this.west == comparisonGrid.west && this.north == comparisonGrid.north && this.width == comparisonGrid.width && this.height == comparisonGrid.height;
     }
 
     /* functions below from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */

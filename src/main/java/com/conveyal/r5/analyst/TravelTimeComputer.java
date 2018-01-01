@@ -250,7 +250,7 @@ public class TravelTimeComputer {
                 /* Index of path used from origin stop to a given stop in a given iteration of the algorithm  */
                 int [][] pathsToStops = new int[iterations][stops];
 
-                /* List of paths used */
+                /* List of paths, which are sequences of transit trips and stops used to reach the destination */
                 List<Path> pathList = new ArrayList<>();
 
                 for (int stop = 0; stop < stops; stop++) {

@@ -59,12 +59,15 @@ public abstract class AnalysisTask extends ProfileRequest {
     public String outputDirectory = "";
 
     /** Whether to include the in-vehicle component of overall travel time in results */
+    @JsonIgnore
     public boolean returnInVehicleTimes = false;
 
     /** Whether to include the waiting time component of overall travel time in results */
+    @JsonIgnore
     public boolean returnWaitTimes = false;
 
     /** Whether to include paths, used to for transitive-style maps, in results */
+    @JsonIgnore
     public boolean returnPaths = false;
 
     /** Which percentiles of travel time to calculate. */

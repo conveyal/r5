@@ -10,6 +10,7 @@ import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
+import com.conveyal.r5.multipoint.MultipointMetadata;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.http.HttpEntity;
@@ -359,6 +360,14 @@ public class AnalystWorker implements Runnable {
                 return;
             }
 
+            // replicate previous static site functionality; if this is the first of a batch of tasks, and if there is
+            // an output bucket specified, write the shared metadata for this batch of requests to the output bucket
+            if(request.taskId == 0 && request.outputBucket != null && !request.outputBucket.isEmpty()){
+                MultipointMetadata mm = new MultipointMetadata(request, transportNetwork);
+                LOG.info("This is the lead-off task for a static site request; writing shared metadata");
+                mm.write();
+            }
+
             TravelTimeComputer computer = new TravelTimeComputer(request, transportNetwork, gridCache);
             if (request.isHighPriority()) {
                 PipedInputStream pis = new PipedInputStream();
@@ -370,12 +379,12 @@ public class AnalystWorker implements Runnable {
 
                 finishPriorityTask(request, pis, "application/octet-stream", "gzip");
 
-                computer.write(pos);
+                computer.computeTravelTimes(pos);
                 pos.close();
             } else {
                 // not a high priority task, will not be returned via high-priority channel but rather via an SQS
-                // queue. Explicitly delete the task when done if there have been no exceptions thrown.
-                computer.write(null);
+                // queue or using MultipointDataStore. Explicitly delete the task when done if there have been no exceptions thrown.
+                computer.computeTravelTimes(null);
                 deleteRequest(request);
             }
         } catch (Exception ex) {

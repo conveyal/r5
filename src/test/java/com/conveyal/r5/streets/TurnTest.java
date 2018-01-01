@@ -1,7 +1,6 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
-import junit.framework.TestCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,44 +13,45 @@ public abstract class TurnTest {
     private static final Logger LOG = LoggerFactory.getLogger(TurnTest.class);
 
     // center vertex index, n/s/e/w vertex indices, n/s/e/w edge indices (always starting from center).
-    public int VCENTER, VN, VS, VE, VW, VNE, VNW, VSW, EN, ES, EE, EW, ENE, ENW, ESW;
+    public int vcenter, vn, vs, ve, vw, vne, vnw, vsw, en, es, ee, ew, ene, enw, esw;
 
     public void setUp (boolean southernHemisphere) {
         // generate a street layer that looks like this
-        // VNW VN
+        // vnw vn
         // |   |
-        // |   |/--VNE
-        // VW--*-- VE
+        // |   |/--vne
+        // vw--*-- ve
         // |   |
-        // VSW VS
-        // Edges have the same names (EW, EE, etc), and all start from the central vertex (except ENW/VSW which starts at VW)
+        // vsw vs
+        // Edges have the same names (ew, ee, etc), and all start from the central vertex (except enw/vsw which starts at vw)
 
         double latOffset = southernHemisphere ? -60 : 0;
 
         streetLayer = new StreetLayer(new TNBuilderConfig());
-        VCENTER = streetLayer.vertexStore.addVertex(37.363 + latOffset, -122.123);
-        VN = streetLayer.vertexStore.addVertex(37.364 + latOffset, -122.123);
-        VS = streetLayer.vertexStore.addVertex(37.362 + latOffset, -122.123);
-        VE = streetLayer.vertexStore.addVertex(37.363 + latOffset, -122.122);
-        VNE = streetLayer.vertexStore.addVertex(37.3631 + latOffset, -122.122);
-        VW = streetLayer.vertexStore.addVertex(37.363 + latOffset, -122.124);
-        VNW = streetLayer.vertexStore.addVertex(37.364 + latOffset, -122.124);
+        vcenter = streetLayer.vertexStore.addVertex(37.363 + latOffset, -122.123);
+        vn = streetLayer.vertexStore.addVertex(37.364 + latOffset, -122.123);
+        vs = streetLayer.vertexStore.addVertex(37.362 + latOffset, -122.123);
+        ve = streetLayer.vertexStore.addVertex(37.363 + latOffset, -122.122);
+        vne = streetLayer.vertexStore.addVertex(37.3631 + latOffset, -122.122);
+        vw = streetLayer.vertexStore.addVertex(37.363 + latOffset, -122.124);
+        vnw = streetLayer.vertexStore.addVertex(37.364 + latOffset, -122.124);
 
-        VSW = streetLayer.vertexStore.addVertex(37.362 + latOffset, -122.124);
+        vsw = streetLayer.vertexStore.addVertex(37.362 + latOffset, -122.124);
 
-        EN = streetLayer.edgeStore.addStreetPair(VCENTER, VN, 15000, 4).getEdgeIndex();
-        EE = streetLayer.edgeStore.addStreetPair(VCENTER, VE, 15000, 2).getEdgeIndex();
-        ES = streetLayer.edgeStore.addStreetPair(VCENTER, VS, 15000, 3).getEdgeIndex();
-        EW = streetLayer.edgeStore.addStreetPair(VCENTER, VW, 15000, 1).getEdgeIndex();
-        ENE = streetLayer.edgeStore.addStreetPair(VCENTER, VNE, 15000, 5).getEdgeIndex();
-        ENW = streetLayer.edgeStore.addStreetPair(VW, VNW, 15000, 6).getEdgeIndex();
-        ESW = streetLayer.edgeStore.addStreetPair(VW, VSW, 15000, 7).getEdgeIndex();
+        en = streetLayer.edgeStore.addStreetPair(vcenter, vn, 15000, 4).getEdgeIndex();
+        ee = streetLayer.edgeStore.addStreetPair(vcenter, ve, 15000, 2).getEdgeIndex();
+        es = streetLayer.edgeStore.addStreetPair(vcenter, vs, 15000, 3).getEdgeIndex();
+        ew = streetLayer.edgeStore.addStreetPair(vcenter, vw, 15000, 1).getEdgeIndex();
+        ene = streetLayer.edgeStore.addStreetPair(vcenter, vne, 15000, 5).getEdgeIndex();
+        enw = streetLayer.edgeStore.addStreetPair(vw, vnw, 15000, 6).getEdgeIndex();
+        esw = streetLayer.edgeStore.addStreetPair(vw, vsw, 15000, 7).getEdgeIndex();
 
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor(0);
 
         do {
             e.setFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
             e.setFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+            e.setFlag(EdgeStore.EdgeFlag.LINKABLE);
         } while (e.advance());
 
         streetLayer.indexStreets();

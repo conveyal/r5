@@ -49,11 +49,13 @@ public abstract class AnalysisTask extends ProfileRequest {
     public int taskId;
 
     /** Save results to a bucket.  If blank, the response to this task will be via the default channel (broker for
-     *  single-point requests, queue for regional requests).
+     *  single-point requests, queue for regional requests).  Not yet compatible with UI.
      */
+    @JsonIgnore
     public String outputBucket = "";
 
-    /* Directory in the bucket in which to save results */
+    /* Directory in the bucket in which to save results; not yet compatible with UI */
+    @JsonIgnore
     public String outputDirectory = "";
 
     /** Whether to include the in-vehicle component of overall travel time in results */

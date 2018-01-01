@@ -5,6 +5,7 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.TravelTimeSurfaceReducer;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -35,6 +36,7 @@ public class TravelTimeSurfaceTask extends AnalysisTask {
     }
 
     /** Default format is a Conveyal flat binary file */
+    @JsonIgnore
     public Format format = Format.GRID;
 
     /**

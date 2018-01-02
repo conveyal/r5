@@ -101,7 +101,7 @@ public class ReverseRoutingTest extends TestCase {
         streetRouter.streetMode = StreetMode.BICYCLE;
         VertexStore.Vertex AVertex = streetLayer.vertexStore.getCursor(A);
         VertexStore.Vertex EVertex = streetLayer.vertexStore.getCursor(E);
-        Split split = streetLayer.findSplit(AVertex.getLat(), AVertex.getLon(),500, null);
+        Split split = streetLayer.findSplit(AVertex.getLat(), AVertex.getLon(),500, StreetMode.WALK);
         //assertTrue(streetRouter.setDestination(AVertex.getLat(), AVertex.getLon()));
         streetRouter.setOrigin(E); // EVertex.getLat(), EVertex.getLon());
         streetRouter.route();

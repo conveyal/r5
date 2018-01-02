@@ -1,5 +1,5 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <name>r5</name>
@@ -8,9 +8,8 @@
 
   <groupId>com.conveyal</groupId>
   <artifactId>r5</artifactId>
-  <version>3.1.0-SNAPSHOT</version>
+  <version>4.0.0-SNAPSHOT</version>
   <packaging>jar</packaging>
-
   <licenses>
     <license>
       <name>MIT</name>
@@ -115,38 +114,50 @@
         <!-- Create a version of the JAR that includes all dependencies.
              We don't want this to be attached and deployed, but we'll have Travis upload it to S3. -->
         <executions>
-            <execution>
-              <phase>package</phase>
-              <goals><goal>shade</goal></goals>
-              <configuration>
-                <!-- Name the shaded JAR after the git describe string. This makes it uniquely identifiable so we can
-                     run analysis workers with a specific commit or tag of R5. The shaded JAR is not "attached" to
-                     deployments because this will cause it to be renamed to the standard timestamped name and sorted
-                     into a Maven repo directory by version number. -->
-                <finalName>${git.commit.id.describe}</finalName>
-                <transformers>
-                  <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                    <manifestEntries>
-                      <Main-Class>com.conveyal.r5.R5Main</Main-Class>
-                    </manifestEntries>
-                  </transformer>
-                  <!-- files overwrite each other and geotools does not function without this.
-                       http://docs.geotools.org/latest/userguide/faq.html#how-do-i-create-an-executable-jar-for-my-geotools-app -->
-                  <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
-                </transformers>
-                <!-- signature files from included jars cause problems: http://stackoverflow.com/questions/999489 -->
-                <filters>
-                  <filter>
-                    <artifact>*:*</artifact>
-                    <excludes>
-                      <exclude>META-INF/*.SF</exclude>
-                      <exclude>META-INF/*.DSA</exclude>
-                      <exclude>META-INF/*.RSA</exclude>
-                    </excludes>
-                  </filter>
-                </filters>
-              </configuration>
-            </execution>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <!-- Name the shaded JAR after the git describe string. This makes it uniquely identifiable so we can
+                   run analysis workers with a specific commit or tag of R5. The shaded JAR is not "attached" to
+                   deployments because this will cause it to be renamed to the standard timestamped name and sorted
+                   into a Maven repo directory by version number. -->
+              <finalName>${git.commit.id.describe}</finalName>
+              <transformers>
+                <transformer
+                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <manifestEntries>
+                    <Main-Class>com.conveyal.r5.R5Main</Main-Class>
+                    <!-- The ImageIO lines allow some image reader plugins to work see https://stackoverflow.com/questions/7051603/jai-vendorname-null#18495658 -->
+                    <Specification-Title>Java Advanced Imaging Image I/O Tools</Specification-Title>
+                    <Specification-Version>1.1</Specification-Version>
+                    <Specification-Vendor>Sun Microsystems, Inc.</Specification-Vendor>
+                    <Implementation-Title>com.sun.media.imageio</Implementation-Title>
+                    <Implementation-Version>1.1</Implementation-Version>
+                    <Implementation-Vendor>Sun Microsystems, Inc.</Implementation-Vendor>
+                    <Extension-Name>com.sun.media.imageio</Extension-Name>
+                  </manifestEntries>
+                </transformer>
+                <!-- files overwrite each other and geotools does not function without this.
+                     http://docs.geotools.org/latest/userguide/faq.html#how-do-i-create-an-executable-jar-for-my-geotools-app -->
+                <transformer
+                        implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+              </transformers>
+              <!-- signature files from included jars cause problems: http://stackoverflow.com/questions/999489 -->
+              <filters>
+                <filter>
+                  <artifact>*:*</artifact>
+                  <excludes>
+                    <exclude>META-INF/*.SF</exclude>
+                    <exclude>META-INF/*.DSA</exclude>
+                    <exclude>META-INF/*.RSA</exclude>
+                  </excludes>
+                </filter>
+              </filters>
+            </configuration>
+          </execution>
         </executions>
       </plugin>
 
@@ -217,7 +228,8 @@
         <executions>
           <execution>
             <id>sign-artifacts</id>
-            <!-- We sign in the verify phase, which means it will happen for install and deploy but not package. -->
+            <!-- We sign in the verify phase, which means it will happen before install and deploy (the last two phases)
+                 but not before earlier phases like test or package. -->
             <phase>verify</phase>
             <goals>
               <goal>sign</goal>
@@ -406,37 +418,11 @@
       <artifactId>aws-java-sdk-sqs</artifactId>
       <version>1.11.18</version>
     </dependency>
-    <!-- This is used to validate API responses against a JSONSchema. -->
-    <dependency>
-      <groupId>io.rest-assured</groupId>
-      <artifactId>json-schema-validator</artifactId>
-      <version>3.0.5</version>
-    </dependency>
-    <!-- Rest Assured is an assertion library that makes testing web apis easy. -->
-    <dependency>
-      <groupId>io.rest-assured</groupId>
-      <artifactId>rest-assured</artifactId>
-      <version>3.0.3</version>
-      <scope>test</scope>
-    </dependency>
-    <!-- JUnit is a java testing framework. -->
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>4.12</version>
       <scope>test</scope>
-    </dependency>
-    <!-- Hamcrest is an assertion library that prints pretty messages when assertions fail -->
-    <dependency>
-      <groupId>org.hamcrest</groupId>
-      <artifactId>java-hamcrest</artifactId>
-      <version>2.0.0.0</version>
-    </dependency>
-    <!-- JSONPath helps in extracting from a JSON document.  -->
-    <dependency>
-      <groupId>com.jayway.jsonpath</groupId>
-      <artifactId>json-path</artifactId>
-      <version>2.3.0</version>
     </dependency>
     <dependency>
       <groupId>com.graphql-java</groupId>
@@ -447,8 +433,8 @@
       <groupId>com.sparkjava</groupId>
       <artifactId>spark-core</artifactId>
       <version>2.3</version>
-   </dependency>
-   <dependency>
+    </dependency>
+    <dependency>
       <groupId>com.conveyal</groupId>
       <artifactId>jackson2-geojson</artifactId>
       <version>0.8</version>
@@ -462,6 +448,31 @@
       <groupId>com.axiomalaska</groupId>
       <artifactId>polyline-encoder</artifactId>
       <version>0.1</version>
+    </dependency>
+    <!-- This is used to validate API responses against a JSONSchema. -->
+    <dependency>
+      <groupId>io.rest-assured</groupId>
+      <artifactId>json-schema-validator</artifactId>
+      <version>3.0.5</version>
+    </dependency>
+    <!-- Rest Assured is an assertion library that makes testing web apis easy. -->
+    <dependency>
+      <groupId>io.rest-assured</groupId>
+      <artifactId>rest-assured</artifactId>
+      <version>3.0.3</version>
+      <scope>test</scope>
+    </dependency>
+    <!-- Hamcrest is an assertion library that prints pretty messages when assertions fail -->
+    <dependency>
+      <groupId>org.hamcrest</groupId>
+      <artifactId>java-hamcrest</artifactId>
+      <version>2.0.0.0</version>
+    </dependency>
+    <!-- JSONPath helps in extracting from a JSON document.  -->
+    <dependency>
+      <groupId>com.jayway.jsonpath</groupId>
+      <artifactId>json-path</artifactId>
+      <version>2.3.0</version>
     </dependency>
   </dependencies>
 </project>

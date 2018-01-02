@@ -1,5 +1,7 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
@@ -197,8 +199,10 @@ public class FastRaptorWorker {
         int scheduledIndex = 0;
         for (TripPattern pattern : transit.tripPatterns) {
             patternIndex++;
-            if (pattern.servicesActive.intersects(servicesActive)) {
-                // at least one trip on this pattern is relevant
+            RouteInfo routeInfo = transit.routes.get(pattern.routeIndex);
+            TransitModes mode = TransitLayer.getTransitModes(routeInfo.route_type);
+            if (pattern.servicesActive.intersects(servicesActive) && request.transitModes.contains(mode)) {
+                // at least one trip on this pattern is relevant, based on the profile request's date and modes
                 if (pattern.hasFrequencies) {
                     frequencyPatterns.add(patternIndex);
                     frequencyIndexForOriginalPatternIndex[patternIndex] = frequencyIndex++;
@@ -277,10 +281,13 @@ public class FastRaptorWorker {
                 doScheduledSearchForRound(scheduleState[round - 1], scheduleState[round]);
                 timeInScheduledSearchTransit += System.nanoTime() - scheduledStartTime;
 
-                // perform a frequency search using worst-case boarding time to provide a tighter upper bound
-                long frequencyStartTime = System.nanoTime();
-                doFrequencySearchForRound(scheduleState[round - 1], scheduleState[round], true);
-                timeInScheduledSearchFrequencyBounds += System.nanoTime() - frequencyStartTime;
+                // perform a frequency search using worst-case boarding time to provide a tighter upper bound,
+                // but only if there are frequency lines.
+                if (transit.hasFrequencies) {
+                    long frequencyStartTime = System.nanoTime();
+                    doFrequencySearchForRound(scheduleState[round - 1], scheduleState[round], true);
+                    timeInScheduledSearchFrequencyBounds += System.nanoTime() - frequencyStartTime;
+                }
 
                 long transferStartTime = System.nanoTime();
                 doTransfers(scheduleState[round]);
@@ -441,6 +448,10 @@ public class FastRaptorWorker {
     /** Do a frequency search. If computeDeterministicUpperBound is true, worst-case frequency boarding time will be used
      * so that the output of this function can be used in a range-RAPTOR search. Otherwise Monte Carlo schedules will be
      * used to improve upon the output of the range-RAPTOR bounds search.
+     *
+     * @param computeDeterministicUpperBound specifies whether to compute a deterministic upper bound, which helps speed up
+     *                                       subsequent frequency searches. If false, a bona fide frequency search is conducted
+     *                                       using randomized offsets.
      */
     private void doFrequencySearchForRound(RaptorState inputState, RaptorState outputState, boolean computeDeterministicUpperBound) {
         BitSet patternsTouched = getPatternsTouchedForStops(inputState, frequencyIndexForOriginalPatternIndex);
@@ -457,7 +468,6 @@ public class FastRaptorWorker {
 
                 for (int frequencyEntryIdx = 0; frequencyEntryIdx < schedule.headwaySeconds.length; frequencyEntryIdx++) {
                     int originalPatternIndex = originalPatternIndexForFrequencyIndex[patternIndex];
-                    int offset = offsets.offsets.get(originalPatternIndex)[tripScheduleIndex][frequencyEntryIdx];
 
                     int boardTime = -1;
                     int boardStopPositionInPattern = -1;
@@ -482,9 +492,15 @@ public class FastRaptorWorker {
                             // if we're computing the upper bound, we want the worst case. This is the only thing that is
                             // valid in a range RAPTOR search; using random schedule draws in range RAPTOR would be problematic
                             // because they need to be independent across minutes.
-                            int newBoardingDepartureTimeAtStop = computeDeterministicUpperBound ?
-                                getWorstCaseFrequencyDepartureTime(schedule, stopPositionInPattern, frequencyEntryIdx, earliestBoardTime) :
-                                getRandomFrequencyDepartureTime(schedule, stopPositionInPattern, offset, frequencyEntryIdx, earliestBoardTime);
+
+                            int newBoardingDepartureTimeAtStop;
+
+                            if (computeDeterministicUpperBound) {
+                                newBoardingDepartureTimeAtStop = getWorstCaseFrequencyDepartureTime(schedule, stopPositionInPattern, frequencyEntryIdx, earliestBoardTime);
+                            } else {
+                                int offset = offsets.offsets.get(originalPatternIndex)[tripScheduleIndex][frequencyEntryIdx];
+                                newBoardingDepartureTimeAtStop = getRandomFrequencyDepartureTime(schedule, stopPositionInPattern, offset, frequencyEntryIdx, earliestBoardTime);
+                            }
 
                             int remainOnBoardDepartureTimeAtStop = Integer.MAX_VALUE;
 

@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.broker;
 
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.AnalystWorker;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.WorkerStatus;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
@@ -162,24 +163,10 @@ class BrokerHttpHandler extends HttpHandler {
                 }
                 else if ("regional".equals(workType)) {
                     // Enqueue a list of tasks that all belong to one job.
-                    List<AnalysisTask> tasks = mapper.readValue(request.getInputStream(),
-                            new TypeReference<List<AnalysisTask>>() { });
-                    // Pre-validate tasks checking that they are all on the same job
-                    AnalysisTask exemplar = tasks.get(0);
-                    for (AnalysisTask task : tasks) {
-                        if (!task.jobId.equals(exemplar.jobId) ||
-                            !task.graphId.equals(exemplar.graphId) ||
-                            !task.workerVersion.equals(exemplar.workerVersion)) {
-                            response.setStatus(HttpStatus.BAD_REQUEST_400);
-                            response.setDetailMessage("All tasks must be for the same graph, job, and worker commit.");
-                            TaskError error = new TaskError(null, "All tasks must be for the same graph, job, and worker commit.", "");
-                            OutputStream os = response.getOutputStream();
-                            mapper.writeValue(os, new TaskError[] { error });
-                            os.close();
-                            return;
-                        }
-                    }
-                    broker.enqueueTasks(tasks);
+                    // A single task can represent all those tasks. The broker will expand it into a whole job.
+                    RegionalTask templateTask =
+                            mapper.readValue(request.getInputStream(), new TypeReference<RegionalTask>() { });
+                    broker.enqueueTasksForRegionalJob(templateTask);
                     response.setStatus(HttpStatus.ACCEPTED_202);
                 }
                 else {

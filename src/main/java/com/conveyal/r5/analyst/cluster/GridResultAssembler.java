@@ -24,6 +24,8 @@ import java.util.Base64;
 import java.util.BitSet;
 import java.util.zip.GZIPOutputStream;
 
+import static com.conveyal.r5.common.Util.human;
+
 /**
  * Assemble the results of GridComputer into AccessGrids.
  *
@@ -66,7 +68,7 @@ public class GridResultAssembler {
     public final AnalysisTask request;
 
     private File temporaryFile;
-    private RandomAccessFile buffer;
+    private RandomAccessFile bufferFile;
 
     private boolean error = false;
 
@@ -101,7 +103,7 @@ public class GridResultAssembler {
         try {
             File gzipFile = File.createTempFile(request.jobId, ".access_grid.gz");
 
-            buffer.close();
+            bufferFile.close();
 
             // There's probably a more elegant way to do this with NIO and without closing the buffer
             InputStream is = new BufferedInputStream(new FileInputStream(temporaryFile));
@@ -137,13 +139,13 @@ public class GridResultAssembler {
             // if this is not the first task, make sure that we have the correct number of accessibility
             // samples (either instantaneous accessibility values or bootstrap replications of accessibility given median
             // travel time, depending on worker version)
-            if (buffer != null && origin.samples.length != this.nIterations) {
+            if (bufferFile != null && origin.samples.length != this.nIterations) {
                 LOG.error("Origin {}, {} has {} samples, expected {}",
                         origin.x, origin.y, origin.samples.length, this.nIterations);
                 error = true;
             }
 
-            // convert to a delta coded byte array
+            // Convert to a delta coded byte array
             ByteArrayOutputStream pixelByteOutputStream = new ByteArrayOutputStream(origin.samples.length * INT32_WIDTH_BYTES);
             LittleEndianDataOutputStream pixelDataOutputStream = new LittleEndianDataOutputStream(pixelByteOutputStream);
             for (int i = 0, prev = 0; i < origin.samples.length; i++) {
@@ -156,7 +158,7 @@ public class GridResultAssembler {
             // write to the proper subregion of the buffer for this origin
             // use a synchronized block to ensure no threading issues
             synchronized (this) {
-                if (buffer == null) this.initialize(origin.samples.length);
+                if (bufferFile == null) this.initialize(origin.samples.length);
                 // The origins we receive have 2d coordinates.
                 // Flatten them to compute file offsets and for the origin checklist.
                 // The 1D index should not overflow an int (the grid would need to be 1000x bigger than the Netherlands)
@@ -165,8 +167,8 @@ public class GridResultAssembler {
                 // Casting the 1D offset to long should ensure that each intermediate result is stored in a long.
                 int index1d = origin.y * request.width + origin.x;
                 long offset = DATA_OFFSET + ((long)index1d) * nIterations * INT32_WIDTH_BYTES;
-                buffer.seek(offset);
-                buffer.write(pixelByteOutputStream.toByteArray());
+                bufferFile.seek(offset);
+                bufferFile.write(pixelByteOutputStream.toByteArray());
                 // Don't double-count origins if we receive them more than once.
                 if (!originsReceived.get(index1d)) {
                     originsReceived.set(index1d);
@@ -183,6 +185,12 @@ public class GridResultAssembler {
     }
 
     public synchronized void initialize (int nIterations) throws IOException {
+
+        long finalFileSizeBytes = (long) nIterations * (long) request.width * (long) request.height * INT32_WIDTH_BYTES;
+
+        LOG.info("Expecting results for regional analysis with width {}, height {}, iterations {}.", request.width, request.height, nIterations);
+        LOG.info("Creating temporary file to store regional analysis results, size is {}.", human(finalFileSizeBytes, "B"));
+
         this.nIterations = nIterations;
 
         // create a temporary file an fill it in with relevant data
@@ -203,23 +211,25 @@ public class GridResultAssembler {
         data.writeInt(request.width);
         data.writeInt(request.height);
         data.writeInt(nIterations);
-
-        // cast to long, file might be bigger than 2GB
-        // overwrite anything that might be in the file already
-        for (long i = 0; i < (long) nIterations * (long) request.width * (long) request.height; i++) {
-            data.writeInt(0);
-        }
-
         data.close();
 
-        LOG.info("Allocated temporary file of {}mb to store query results", temporaryFile.length() / 1024 / 1024);
+        // We used to fill the file with zeros here, to "overwrite anything that might be in the file already"
+        // according to a code comment. However that creates a burst of up to 1GB of disk activity, which exhausts
+        // our IOPS budget on cloud servers with network storage. That then causes the server to fall behind in
+        // processing incoming results.
+        // This is a newly created temp file, so setting it to a larger size should just create a sparse file
+        // full of blocks of zeros (at least on Linux, I don't know what it does on Windows).
 
-        this.buffer = new RandomAccessFile(temporaryFile, "rw");
+        this.bufferFile = new RandomAccessFile(temporaryFile, "rw");
+        bufferFile.setLength(finalFileSizeBytes);
+
+        LOG.info("Created temporary file of {} to store query results", human(bufferFile.length(), "B"));
+
     }
 
     /** Clean up and cancel a consumer */
     public synchronized void terminate () throws IOException {
-        this.buffer.close();
+        this.bufferFile.close();
         temporaryFile.delete();
     }
 }

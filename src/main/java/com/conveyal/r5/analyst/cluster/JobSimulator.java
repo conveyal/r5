@@ -54,6 +54,8 @@ public class JobSimulator {
         mapper.registerModule(JavaLocalDateSerializer.makeModule());
         mapper.registerModule(TraverseModeSetSerializer.makeModule());*/
 
+        // FIXME API now expects one single request defining a grid, rather than a list of requests
+
         List<AnalysisTask> requests = new ArrayList<>();
 
         IntStream.range(0, nOrigins).forEach(i -> {

@@ -7,6 +7,10 @@ import gnu.trove.TIntCollection;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.apache.commons.math3.util.FastMath;
+import org.geotools.referencing.CRS;
+import org.geotools.referencing.GeodeticCalculator;
+import org.geotools.referencing.crs.DefaultGeographicCRS;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,17 +25,28 @@ public class Split {
 
     private static final Logger LOG = LoggerFactory.getLogger(Split.class);
 
-    public int edge = -1;
+    public int edge = -1; // TODO clarify is this the even edge number of a pair?
     public int seg = 0; // the segment within the edge that is closest to the search point
     public double frac = 0; // the fraction along that segment where a link should occur
     public int fixedLon; // the x coordinate of the link point along the edge
     public int fixedLat; // the y coordinate of the link point along the edge
     // We must use a long because squaring a typical search radius in fixed-point _does_ cause signed int32 overflow.
-    public long distSquared = Long.MAX_VALUE;
+    public long distSquared = Long.MAX_VALUE; // squared distance from given point to the split, in degrees
 
     // The following fields require more calculations and are only set once a best edge is found.
-    public int distance0_mm = 0; // the accumulated distance along the edge geometry up to the split point
-    public int distance1_mm = 0; // the accumulated distance along the edge geometry after the split point
+
+    /**
+     * Accumulated distance from the beginning vertex of the edge geometry up to the split point for a link point,
+     * plus the distance from the link point to the split point
+     */
+    public int distance0_mm = 0;
+
+    /**
+     * Accumulated distance from the end vertex of the edge geometry up to the split point for a link point,
+     * plus the distance from the link point to the split point
+     */
+    public int distance1_mm = 0;
+
     public int vertex0; // the vertex at the beginning of the chosen edge
     public int vertex1; // the vertex at the end of the chosen edge
 
@@ -47,6 +62,8 @@ public class Split {
         fixedLat = other.fixedLat;
         distSquared = other.distSquared;
     }
+
+    private static GeodeticCalculator distanceCalculator = new GeodeticCalculator(DefaultGeographicCRS.WGS84);
 
     /**
      * Find a location on an existing street near the given point, without actually creating any vertices or edges.
@@ -64,6 +81,7 @@ public class Split {
 
         final double metersPerDegreeLat = 111111.111;
         double cosLat = FastMath.cos(FastMath.toRadians(lat)); // The projection factor, Earth is a "sphere"
+
         // Use longs for radii and their square because squaring the fixed-point radius _will_ overflow a signed int32.
         long radiusFixedLat = VertexStore.floatingDegreesToFixed(searchRadiusMeters / metersPerDegreeLat);
         long radiusFixedLon = (int)(radiusFixedLat / cosLat); // Expand the X search space, don't shrink it.
@@ -77,18 +95,36 @@ public class Split {
         Split curr = new Split();
         Split best = new Split();
         candidateEdges.forEach(e -> {
-
             curr.edge = e;
             edge.seek(e);
-            //Skip Link edges those are links between transit stops/P+R/Bike share vertices and graph
-            //Without this origin or destination point can link to those edges because they have ALL permissions
-            //and route is never found since point is inaccessible because edges leading to it don't have required permission
+
+            // Do not consider linking to edges that are links to streets from transit stops, P+Rs, and bike shares.
+            // These edges allow all modes to traverse, but may be connected to roads with more restrictive permissions.
+            // On a given edge pair both directions will have the same flag.
             if (edge.getFlag(EdgeStore.EdgeFlag.LINK)) return true;
 
-            // If an edge does not allow traversal with the specified mode, skip over it.
-            if (streetMode == StreetMode.WALK && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN)) return true;
-            if (streetMode == StreetMode.BICYCLE && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE)) return true;
-            if (streetMode == StreetMode.CAR && !edge.getFlag(EdgeStore.EdgeFlag.ALLOWS_CAR)) return true;
+            // If either direction of the current edge doesn't allow the specified mode of travel, skip it.
+            // It is arguably better to skip it only if BOTH directions forbid the specified mode (see commented block
+            // below). This system has odd effects in areas with lots of one-way streets or divided roads.
+            // TODO Really, we want to allow linking to two different edge-pairs in such cases but that is more complex.
+            // Do not consider linking to edges that are not marked "linkable". This excludes e.g. tunnels and motorways.
+            if (!edge.allowsStreetMode(streetMode) || !edge.getFlag(EdgeStore.EdgeFlag.LINKABLE)) {
+                return true;
+            }
+            edge.advance();
+            if (!edge.allowsStreetMode(streetMode) || !edge.getFlag(EdgeStore.EdgeFlag.LINKABLE)) {
+                return true;
+            }
+            edge.retreat();
+
+            /*
+            if (!edge.allowsStreetMode(streetMode)) {
+                // The edge does not allow forward traversal with the specified mode, try the backward edge.
+                edge.advance();
+                // If backward traversal is also not allowed, skip this edge and try the next one.
+                if (!edge.allowsStreetMode(streetMode)) return true;
+            }
+            */
 
             // The distance to this edge is the distance to the closest segment of its geometry.
             edge.forEachSegment((seg, fixedLat0, fixedLon0, fixedLat1, fixedLon1) -> {
@@ -165,12 +201,20 @@ public class Split {
             best.distance0_mm = edge.getLengthMm();
         }
         best.distance1_mm = edge.getLengthMm() - best.distance0_mm;
+
+        // To speed up computation above, square roots were avoided and distSquared was calculated using fixed degrees.
+        // We now want to calculate the distance in millimeters, for routing.  To do so, we take the square root of
+        // distSquared, convert to floating point degrees latitude then multiply by the metersPerDegreeLat factor above
+        // and 1000 to convert to millimeters.  This is accurate enough for our purposes.
+        best.distance0_mm += VertexStore.fixedDegreesToFloating(FastMath.sqrt(best.distSquared)) * metersPerDegreeLat * 1000;
+        best.distance1_mm += VertexStore.fixedDegreesToFloating(FastMath.sqrt(best.distSquared)) * metersPerDegreeLat * 1000;
+
         return best;
     }
 
     /**
      * Find a split on a particular edge.
-     * FIXME this contains too much duplicate code. We can reuse the code in Split.find()
+     * FIXME this contains way too much duplicate code. We can reuse the code in Split.find().
      * we just need a way to supply an edge or edges, instead of using the spatial index.
      */
     public static Split findOnEdge (double lat, double lon, EdgeStore.Edge edge) {
@@ -185,7 +229,7 @@ public class Split {
         final double metersPerDegreeLat = 111111.111;
         double cosLat = FastMath.cos(FastMath.toRadians(lat)); // The projection factor, Earth is a "sphere"
 
-        // TODO copy paste code
+        // FIXME this looks like copy-pasted code
         // The split location currently being examined and the best one seen so far.
         Split curr = new Split();
         Split best = new Split();

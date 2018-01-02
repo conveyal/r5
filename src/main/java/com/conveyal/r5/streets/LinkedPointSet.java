@@ -13,6 +13,7 @@ import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import com.conveyal.r5.streets.EdgeStore.Edge;
 import gnu.trove.set.TIntSet;
+import org.apache.commons.math3.util.FastMath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,12 +32,6 @@ import java.util.stream.IntStream;
 public class LinkedPointSet implements Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(LinkedPointSet.class);
-
-    /**
-     * The distance we search around each PointSet point for a road to link it to.
-     * FIXME 1KM is really far to walk off a street. But some places have offices in the middle of big parking lots.
-     */
-    public static final int MAX_OFFSTREET_WALK_METERS = 4000;
 
     /**
      * LinkedPointSets are long-lived and not extremely numerous, so we keep references to the objects it was built from.
@@ -100,6 +95,17 @@ public class LinkedPointSet implements Serializable {
         // Null means relink and rebuild everything, but this will be constrained below if a base linkage was supplied.
         Geometry treeRebuildZone = null;
 
+// This has been commented out because this was evaluating to true frequently on car searches
+// Perhaps the effect of identity equality comparisons and the fact that both base layer and new linkage are coming from a cache?
+//        if (baseLinkage != null && (
+//                baseLinkage.pointSet != pointSet ||
+//                baseLinkage.streetLayer != streetLayer.baseStreetLayer ||
+//                baseLinkage.streetMode != streetMode)) {
+//            LOG.error("Cannot reuse linkage with mismatched characteristics. THIS IS A BUG.");
+//            // Relink everything as if no base linkage was supplied.
+//            baseLinkage = null;
+//        }
+
         if (baseLinkage == null) {
             edges = new int[nPoints];
             distances0_mm = new int[nPoints];
@@ -108,12 +114,8 @@ public class LinkedPointSet implements Serializable {
         } else {
             // The caller has supplied an existing linkage for a scenario StreetLayer's base StreetLayer.
             // We want to re-use most of that that existing linkage to reduce linking time.
-            // TODO switch on assertions, they are off by default
-            assert baseLinkage.pointSet == pointSet;
-            assert baseLinkage.streetLayer == streetLayer.baseStreetLayer;
-            assert baseLinkage.streetMode == streetMode;
-
-            LOG.info("Linking a subset of points and copying other linkages from base layer");
+            LOG.info("Linking a subset of points and copying other linkages from an existing base linkage.");
+            LOG.info("The base linkage is for street mode {}", baseLinkage.streetMode);
 
             // Copy the supplied base linkage into this new LinkedPointSet.
             // The new linkage has the same PointSet as the base linkage, so the linkage arrays remain the same length
@@ -140,14 +142,14 @@ public class LinkedPointSet implements Serializable {
         // If dealing with a base network linkage, fill the stop trees list entirely with nulls.
         while (stopToPointDistanceTables.size() < nStops) stopToPointDistanceTables.add(null);
 
-        /* First, link the points in this PointSet to specific street vertices. If there is no base linkage, link all streets. */
+        // First, link the points in this PointSet to specific street vertices.
+        // If there is no base linkage, link all streets.
         this.linkPointsToStreets(baseLinkage == null);
 
-        /* Second, make a table of distances from each transit stop to the points in this PointSet. */
+        // Second, make a table of distances from each transit stop to the points in this PointSet.
         this.makeStopToPointDistanceTables(treeRebuildZone);
 
     }
-
 
     /**
      * Construct a new LinkedPointSet for a grid that falls entirely within an existing grid LinkedPointSet.
@@ -250,7 +252,9 @@ public class LinkedPointSet implements Serializable {
             // hit edges on all sides or reach some predefined maximum.
             if (all || (streetLayer.edgeStore.temporarilyDeletedEdges != null &&
                         streetLayer.edgeStore.temporarilyDeletedEdges.contains(edges[p]))) {
-                Split split = streetLayer.findSplit(pointSet.getLat(p), pointSet.getLon(p), MAX_OFFSTREET_WALK_METERS, streetMode);
+                // Use radius from StreetLayer such that maximum origin and destination walk distances are symmetric.
+                Split split = streetLayer.findSplit(pointSet.getLat(p), pointSet.getLon(p),
+                        StreetLayer.LINK_RADIUS_METERS, streetMode);
                 if (split == null) {
                     edges[p] = -1;
                 } else {
@@ -307,13 +311,19 @@ public class LinkedPointSet implements Serializable {
             int time0 = travelTimeForVertex.getTravelTime(edge.getFromVertex());
             int time1 = travelTimeForVertex.getTravelTime(edge.getToVertex());
 
-            // TODO apply walk speed
+            // An "off-roading" penalty is applied to limit extending isochrones into water bodies, etc.
+            // We may want to keep the MAX_OFFSTREET_WALK_METERS relatively high to avoid holes in the isochrones,
+            // but make it costly to walk long distances where there aren't streets.  The approach below
+            // accomplishes that, applying a penalty to off-street distances greater than the typical grid cell size.
+            // We could use a distance threshold more closely tied to pointset resolution/coverage
+
             if (time0 != Integer.MAX_VALUE) {
-                time0 += distances0_mm[i] / offstreetTravelSpeedMillimetersPerSecond;
+                time0 += (distances0_mm[i]) / offstreetTravelSpeedMillimetersPerSecond;
             }
             if (time1 != Integer.MAX_VALUE) {
-                time1 += distances1_mm[i] / offstreetTravelSpeedMillimetersPerSecond;
+                time1 += (distances1_mm[i]) / offstreetTravelSpeedMillimetersPerSecond;
             }
+
             travelTimes[i] = time0 < time1 ? time0 : time1;
         }
         return new PointSetTimes (pointSet, travelTimes);
@@ -337,6 +347,7 @@ public class LinkedPointSet implements Serializable {
             edge.seek(edges[p]);
             int t1 = Integer.MAX_VALUE, t2 = Integer.MAX_VALUE;
             // TODO this is not strictly correct when there are turn restrictions onto the edge this is linked to
+
             if (distanceTableToVertices.containsKey(edge.getFromVertex())) {
                 t1 = distanceTableToVertices.get(edge.getFromVertex()) + distances0_mm[p];
             }

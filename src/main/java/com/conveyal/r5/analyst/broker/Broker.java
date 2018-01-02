@@ -5,7 +5,9 @@ import com.amazonaws.regions.Region;
 import com.amazonaws.services.ec2.AmazonEC2;
 import com.amazonaws.services.ec2.AmazonEC2Client;
 import com.amazonaws.services.ec2.model.*;
+import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.common.JsonUtilities;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ArrayListMultimap;
@@ -141,16 +143,17 @@ public class Broker implements Runnable {
      */
     private TObjectLongMap<WorkerCategory> recentlyRequestedWorkers = new TObjectLongHashMap<>();
 
-    // Queue of tasks to complete Delete, Enqueue etc. to avoid synchronizing all the functions ?
+    // Queue of tasks to complete Delete, Enqueue etc. to avoid synchronizing all the functions?
+    // The synchronization doesn't seem to currently be causing any problematic contention.
     public Broker (Properties brokerConfig, String addr, int port) {
+
         // print out date on startup so that CloudWatch logs has a unique fingerprint
+        // TODO clarify how printing out a date creates a "unique fingerprint"
         LOG.info("Analyst broker starting at {}", LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
 
         this.brokerConfig = brokerConfig;
 
-        Boolean workOffline = Boolean.parseBoolean(brokerConfig.getProperty("work-offline"));
-        if (workOffline == null) workOffline = true;
-        this.workOffline = workOffline;
+        this.workOffline = Boolean.parseBoolean(brokerConfig.getProperty("work-offline", "true"));
 
         if (!workOffline) {
             // create a config for the AWS workers
@@ -201,9 +204,10 @@ public class Broker implements Runnable {
 
     /**
      * Enqueue a task for execution ASAP, planning to return the response over the same HTTP connection.
-     * Low-reliability, no re-delivery.
-     *
-     * Returns true if the task was delivered and the caller should suspend the response.
+     * For now this is used exclusively for single-point travel time requests.
+     * Low-reliability, no re-delivery in case of failure (unlike regional batch jobs).
+     * @return true if the task was delivered for processing and the caller should hold the connection open waiting
+     * for a response, false if the task cannot be processed at the moment because workers are not yet available.
      */
     public synchronized boolean enqueuePriorityTask (AnalysisTask task, Response response) {
         boolean workersAvailable = workersAvailable(task.getWorkerCategory());
@@ -221,8 +225,7 @@ public class Broker implements Runnable {
                 LOG.error("Could not finish high-priority task, 202 response", e);
             }
         }
-
-        // if we're in offline mode, enqueue anyhow to kick the cluster to build the graph
+        // If we're in offline mode, enqueue anyhow to kick the cluster to build the graph
         // note that this will mean that requests get delivered multiple times in offline mode,
         // so some unnecessary computation takes place
         if (workersAvailable || workOffline) {
@@ -240,10 +243,8 @@ public class Broker implements Runnable {
                 }
             }, 100);
         }
-
-        // do not notify task delivery thread just yet as we haven't put anything in the task delivery queue yet.
-
-        // if workers were available, the caller should wait. Otherwise just return the 202
+        // Do not notify task delivery thread just yet as we haven't put anything in the task delivery queue yet.
+        // If workers were available, the caller should wait. Otherwise just return the 202.
         return workersAvailable;
     }
 
@@ -291,25 +292,43 @@ public class Broker implements Runnable {
         notify();
     }
 
-    /** Enqueue some tasks for queued execution possibly much later. Results will be saved to S3. */
-    public synchronized void enqueueTasks (List<AnalysisTask> tasks) {
-        Job job = findJob(tasks.get(0)); // creates one if it doesn't exist
+    /**
+     * Enqueue a set of tasks for a regional analysis.
+     * Only a single task is passed in, and the broker expands it into all the individual tasks for a regional job.
+     */
+    public synchronized void enqueueTasksForRegionalJob(RegionalTask templateTask) {
+
+        if (findJob(templateTask.jobId) != null) {
+            LOG.error("Someone tried to enqueue job {} but it already exists.", templateTask.jobId);
+            throw new RuntimeException("Enqueued duplicate job " + templateTask.jobId);
+        }
+        Job job = new Job(templateTask.jobId);
+        job.workerCategory = new WorkerCategory(templateTask.graphId, templateTask.workerVersion);
+        jobs.insertAtTail(job);
 
         if (!workersAvailable(job.getWorkerCategory())) {
             createWorkersInCategory(job.getWorkerCategory());
         }
 
-        for (AnalysisTask task : tasks) {
-            task.taskId = nextTaskId++;
-            job.addTask(task);
-            LOG.debug("Enqueued task id {} in job {}", task.taskId, job.jobId);
-            if (!task.graphId.equals(job.workerCategory.graphId)) {
-                LOG.error("Task graph ID {} does not match job: {}.", task.graphId, job.workerCategory);
-            }
-            if (!task.workerVersion.equals(job.workerCategory.workerVersion)) {
-                LOG.error("Task R5 commit {} does not match job: {}.", task.workerVersion, job.workerCategory);
+        // Now explode this single task into width * height individual tasks for the whole regional origin grid.
+        // All these tasks are accumulated into the new job. Because the tasks are clones, any referenced objects
+        // such as scenarios should be shared, which reduces memory use.
+        // Of course the fact that the tasks are stored as separate objects at all can eventually be optimized away.
+
+        // TODO add extra loop for multiple destination pointsets with different extents;
+
+        for (int x = 0; x < templateTask.width; x++) {
+            for (int y = 0; y < templateTask.height; y++) {
+                RegionalTask singleTask = templateTask.clone();
+                singleTask.taskId = nextTaskId++;
+                singleTask.x = x;
+                singleTask.y = y;
+                singleTask.fromLat = Grid.pixelToCenterLat(templateTask.north + y, templateTask.zoom);
+                singleTask.fromLon = Grid.pixelToCenterLon(templateTask.west + x, templateTask.zoom);
+                job.addTask(singleTask);
             }
         }
+        LOG.info("Broker expanded and enqueued {} tasks for job {}.", job.tasksById.size(), job.jobId);
         // Wake up the delivery thread if it's waiting on input.
         // This wakes whatever thread called wait() while holding the monitor for this Broker object.
         notify();
@@ -675,6 +694,10 @@ public class Broker implements Runnable {
             return false;
         }
         job.completedTasks.add(taskId);
+        // Once the last task is marked as completed, the job is finished. Purge it from the list to free memory.
+        if (job.isComplete()) {
+            jobs.remove(job);
+        }
         return true;
     }
 
@@ -700,18 +723,6 @@ public class Broker implements Runnable {
                 return;
             }
         }
-    }
-
-    /** Find the job that should contain a given task, creating that job if it does not exist. */
-    public Job findJob (AnalysisTask task) {
-        Job job = findJob(task.jobId);
-        if (job != null) {
-            return job;
-        }
-        job = new Job(task.jobId);
-        job.workerCategory = new WorkerCategory(task.graphId, task.workerVersion);
-        jobs.insertAtTail(job);
-        return job;
     }
 
     /** Find the job for the given jobId, returning null if that job does not exist. */

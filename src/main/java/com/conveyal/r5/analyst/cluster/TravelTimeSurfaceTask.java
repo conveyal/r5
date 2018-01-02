@@ -39,15 +39,12 @@ public class TravelTimeSurfaceTask extends AnalysisTask {
     }
 
     /** Default format is a Conveyal flat binary file */
-    @JsonIgnore
     private Format format = Format.GRID;
 
-    @JsonIgnore
     public void setFormat(Format format){
         this.format = format;
     }
 
-    @JsonIgnore
     public Format getFormat(){
         return format;
     }

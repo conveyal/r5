@@ -105,9 +105,9 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
 
             TravelTimeSurfaceTask timeSurfaceTask = (TravelTimeSurfaceTask) task;
 
-            if (timeSurfaceTask.format == TravelTimeSurfaceTask.Format.GRID) {
+            if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GRID) {
                 timeGrid.writeGrid(outputStream);
-            } else if (timeSurfaceTask.format == TravelTimeSurfaceTask.Format.GEOTIFF) {
+            } else if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
                 timeGrid.writeGeotiff(outputStream);
             }
 

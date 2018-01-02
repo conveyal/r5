@@ -49,20 +49,25 @@ public abstract class AnalysisTask extends ProfileRequest {
     public int taskId;
 
     /** Save results to a bucket.  If blank, the response to this task will be via the default channel (broker for
-     *  single-point requests, queue for regional requests).
+     *  single-point requests, queue for regional requests).  Not yet compatible with UI.
      */
+    @JsonIgnore
     public String outputBucket = "";
 
-    /* Directory in the bucket in which to save results */
+    /* Directory in the bucket in which to save results; not yet compatible with UI */
+    @JsonIgnore
     public String outputDirectory = "";
 
     /** Whether to include the in-vehicle component of overall travel time in results */
+    @JsonIgnore
     public boolean returnInVehicleTimes = false;
 
     /** Whether to include the waiting time component of overall travel time in results */
+    @JsonIgnore
     public boolean returnWaitTimes = false;
 
     /** Whether to include paths, used to for transitive-style maps, in results */
+    @JsonIgnore
     public boolean returnPaths = false;
 
     /** Which percentiles of travel time to calculate. */

@@ -10,6 +10,18 @@
     <artifactId>r5</artifactId>
     <version>4.0.0-SNAPSHOT</version>
     <packaging>jar</packaging>
+    <configuration>
+        <archive>
+            <manifest>
+                <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
+            </manifest>
+            <manifestEntries>
+                <Specification-Vendor>Conveyal</Specification-Vendor>
+                <Implementation-Vendor>Conveyal</Implementation-Vendor>
+            </manifestEntries>
+        </archive>
+    </configuration>
     <licenses>
         <license>
             <name>MIT</name>

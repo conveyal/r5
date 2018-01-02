@@ -6,6 +6,7 @@ import com.conveyal.r5.analyst.TravelTimeSurfaceReducer;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -27,6 +28,8 @@ public class TravelTimeSurfaceTask extends AnalysisTask {
         return true;
     }
 
+    @JsonIgnoreProperties(ignoreUnknown=true)
+
     /** Whether to download as a Conveyal flat binary file for display in analysis-ui, or a geotiff */
     public enum Format {
         /** Flat binary grid format */
@@ -37,7 +40,17 @@ public class TravelTimeSurfaceTask extends AnalysisTask {
 
     /** Default format is a Conveyal flat binary file */
     @JsonIgnore
-    public Format format = Format.GRID;
+    private Format format = Format.GRID;
+
+    @JsonIgnore
+    public void setFormat(Format format){
+        this.format = format;
+    }
+
+    @JsonIgnore
+    public Format getFormat(){
+        return format;
+    }
 
     /**
      * Since this may be applied to many different grids, we use the extents defined in the request.

@@ -391,7 +391,8 @@ public class AnalystWorker implements Runnable {
             // Catch any exceptions that were not handled by more specific catch clauses above.
             // This ensures that some form of error message is passed all the way back up to the web UI.
             TaskError taskError = new TaskError(ex);
-            LOG.error("An error occurred while routing", ex);
+            LOG.error("An error occurred while routing: {}", ex.toString());
+            ex.printStackTrace();
             reportTaskErrors(request.taskId, HttpStatus.INTERNAL_SERVER_ERROR_500, Arrays.asList(taskError));
         }
     }

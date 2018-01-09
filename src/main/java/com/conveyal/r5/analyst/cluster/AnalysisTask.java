@@ -48,26 +48,18 @@ public abstract class AnalysisTask extends ProfileRequest {
     /** A unique identifier for this task assigned by the queue/broker system. */
     public int taskId;
 
-    /** Save results to a bucket.  If blank, the response to this task will be via the default channel (broker for
-     *  single-point requests, queue for regional requests).  Not yet compatible with UI.
+    /**
+     * Whether to save results on S3. If null or empty, the response to this task will be via the
+     * default channel (broker for single-point requests, queue for regional requests).
+     * The results will actually be stored in a sub-bucket named after the job ID.
+     * FIXME in practice this always implies travelTimeBreakdown and returnPaths, so we've got redundant and potentially incoherent information.
      */
-    @JsonIgnore
-    public String outputBucket = "";
+    public boolean makeStaticSite = false;
 
-    /* Directory in the bucket in which to save results; not yet compatible with UI */
-    @JsonIgnore
-    public String outputDirectory = "";
+    /** Whether to break travel time down into in-vehicle, wait, and access/egress time. */
+    public boolean travelTimeBreakdown = false;
 
-    /** Whether to include the in-vehicle component of overall travel time in results */
-    @JsonIgnore
-    public boolean returnInVehicleTimes = false;
-
-    /** Whether to include the waiting time component of overall travel time in results */
-    @JsonIgnore
-    public boolean returnWaitTimes = false;
-
-    /** Whether to include paths, used to for transitive-style maps, in results */
-    @JsonIgnore
+    /** Whether to include paths in results. This allows rendering transitive-style schematic maps. */
     public boolean returnPaths = false;
 
     /** Which percentiles of travel time to calculate. */
@@ -90,7 +82,7 @@ public abstract class AnalysisTask extends ProfileRequest {
     @JsonIgnore
     public abstract boolean isHighPriority();
 
-    /** Get the destinations that should be used for this task */
+    /** Get the set of points to which we are measuring travel time. */
     @JsonIgnore
     public abstract List<PointSet> getDestinations(TransportNetwork network, GridCache gridCache);
 

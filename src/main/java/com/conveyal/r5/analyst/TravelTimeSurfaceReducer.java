@@ -103,12 +103,19 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
                 outputStream = MultipointDataStore.getOutputStream(task, task.taskId + "_times.dat", "application/octet-stream");
             }
 
-            TravelTimeSurfaceTask timeSurfaceTask = (TravelTimeSurfaceTask) task;
-
-            if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GRID) {
+            if (task instanceof TravelTimeSurfaceTask) {
+                // This travel time surface is being produced by a single-origin task.
+                // We could be making a grid or a TIFF.
+                TravelTimeSurfaceTask timeSurfaceTask = (TravelTimeSurfaceTask) task;
+                if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GRID) {
+                    timeGrid.writeGrid(outputStream);
+                } else if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
+                    timeGrid.writeGeotiff(outputStream);
+                }
+            } else {
+                // This travel time surface is being produced by a regional task. We must be making a static site.
+                // Write the grid format.
                 timeGrid.writeGrid(outputStream);
-            } else if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
-                timeGrid.writeGeotiff(outputStream);
             }
 
             LOG.info("Travel time surface written, appending metadata with {} warnings",

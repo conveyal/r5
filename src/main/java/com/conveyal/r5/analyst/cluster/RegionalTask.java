@@ -24,15 +24,20 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
      */
     public int x = -1, y = -1;
 
-    /** The grid key on S3 to compute access to. If this is not blank, the default TravelTimeSurfaceTask will be
+    /**
+     * The grid key on S3 to compute access to. If this is not blank, the default TravelTimeSurfaceTask will be
      * overridden; returnInVehicleTimes, returnWaitTimes, and returnPaths will be set to false; and the returned results
-     * will be an accessibility value per origin, rather than a grid of travel times from that origin.*/
+     * will be an accessibility value per origin, rather than a grid of travel times from that origin.
+     */
     public String grid;
 
-    /** An array of grid keys on S3 to compute access to. If this is not blank, the default TravelTimeSurfaceTask will be
+    /**
+     * An array of grid keys on S3 to compute access to. If this is not blank, the default TravelTimeSurfaceTask will be
      * overridden; returnInVehicleTimes, returnWaitTimes, and returnPaths will be set to false; and the returned results
      * will be an accessibility value per origin for each destination grid, rather than a grid of travel times from
-     * that origin.*/
+     * that origin.
+     * NOT YET IMPLEMENTED AND TESTED
+     */
     public List <String> grids;
 
     /** Where should output of this job be saved */

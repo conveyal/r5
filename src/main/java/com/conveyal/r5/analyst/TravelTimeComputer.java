@@ -295,19 +295,18 @@ public class TravelTimeComputer {
                                 }
                                 pathIdx = paths.get(path);
                             }
-
                             pathsToStops[iter][stop] = pathIdx;
                         }
                     }
                 }
-
-                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request, transitTravelTimesToStops, nonTransitTravelTimesToDestinations, inVehicleTimesToStops, waitTimesToStops, pathsToStops);
+                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request,
+                        transitTravelTimesToStops, nonTransitTravelTimesToDestinations, inVehicleTimesToStops,
+                        waitTimesToStops, pathsToStops);
                 perTargetPropagater.reducer = travelTimeReducer;
                 perTargetPropagater.pathWriter = new PathWriter(request, network, pathList);
-
             } else {
-
-                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request, transitTravelTimesToStops, nonTransitTravelTimesToDestinations, null, null, null);
+                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request,
+                        transitTravelTimesToStops, nonTransitTravelTimesToDestinations, null, null, null);
                 perTargetPropagater.reducer = travelTimeReducer;
             }
             perTargetPropagater.propagate();

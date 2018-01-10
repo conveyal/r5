@@ -1,21 +1,11 @@
 package com.conveyal.r5.analyst;
 
-import com.amazonaws.services.sqs.AmazonSQS;
-import com.amazonaws.services.sqs.AmazonSQSClient;
-import com.amazonaws.services.sqs.model.MessageAttributeValue;
-import com.amazonaws.services.sqs.model.SendMessageRequest;
+import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.Origin;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.profile.PerTargetPropagater;
-import gnu.trove.list.TIntList;
-import gnu.trove.list.array.TIntArrayList;
-import org.apache.commons.math3.random.MersenneTwister;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.util.Arrays;
 import java.util.Base64;
-import java.util.stream.DoubleStream;
 
 /**
  * Computes an accessibility indicator at a single origin cell in a Web Mercator grid, using destination densities from
@@ -31,10 +21,6 @@ import java.util.stream.DoubleStream;
  * this to allow use of multiple percentiles).
  */
 public class BootstrappingTravelTimeReducer implements PerTargetPropagater.TravelTimeReducer {
-
-    /** SQS client and Base64 encoding: to be removed with new broker. */
-    private static final AmazonSQS sqs = new AmazonSQSClient();
-    private static final Base64.Encoder base64 = Base64.getEncoder();
 
     private final RegionalTask task;
 
@@ -120,25 +106,9 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
      * shortcutting around routing and propagation when the origin point is not connected to the street network.
      */
     @Override
-    public void finish () {
-        // now construct the output
-        // these things are tiny, no problem storing in memory
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
-        // Only one accessibility figure
-        int[] intReplications = new int[] { (int) Math.round(accessibility) };
-
-        try {
-            new Origin(task, task.percentiles[0], intReplications).write(baos);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-
-        // send this origin to an SQS queue as a binary payload; it will be consumed by GridResultQueueConsumer
-        // and GridResultAssembler
-        SendMessageRequest smr = new SendMessageRequest(task.outputQueue, base64.encodeToString(baos.toByteArray()));
-        smr = smr.addMessageAttributesEntry("jobId", new MessageAttributeValue().withDataType("String").withStringValue(task.jobId));
-        sqs.sendMessage(smr);
+    public OneOriginResult finish () {
+        // Only one accessibility figure, no bootstrapping.
+        return new OneOriginResult(task, null,
+                new Origin(task, task.percentiles[0], new int[]{(int) Math.round(accessibility)}));
     }
-
 }

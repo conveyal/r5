@@ -4,6 +4,7 @@ import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
@@ -374,20 +375,20 @@ public class AnalystWorker implements Runnable {
             TravelTimeComputer computer = new TravelTimeComputer(request, transportNetwork, gridCache);
             if (request.isHighPriority()) {
                 PipedInputStream pis = new PipedInputStream();
-
                 // gzip the data before sending it to the broker. Compression ratios here are extreme (100x is not uncommon)
                 // so this will help avoid broken pipes, connection reset by peer, buffer overflows, etc. since these types
                 // of errors are more common on large files.
                 GZIPOutputStream pos = new GZIPOutputStream(new PipedOutputStream(pis));
-
                 finishPriorityTask(request, pis, "application/octet-stream", "gzip");
-
-                computer.computeTravelTimes(pos);
+                OneOriginResult oneOriginResult = computer.computeTravelTimes();
+                oneOriginResult.writeTravelTimes(pos, transportNetwork.scenarioApplicationWarnings);
                 pos.close();
             } else {
                 // not a high priority task, will not be returned via high-priority channel but rather via an SQS
                 // queue or using MultipointDataStore. Explicitly delete the task when done if there have been no exceptions thrown.
-                computer.computeTravelTimes(null);
+                // TODO: for static sites, if task.makeStaticSite is true call the travel time writer with no outputstream.
+                OneOriginResult oneOriginResult = computer.computeTravelTimes();
+                oneOriginResult.accessibilityToSqs();
                 deleteRequest(request);
             }
         } catch (Exception ex) {

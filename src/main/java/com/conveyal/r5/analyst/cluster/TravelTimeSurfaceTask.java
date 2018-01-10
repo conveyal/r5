@@ -67,7 +67,7 @@ public class TravelTimeSurfaceTask extends AnalysisTask {
     }
 
     @Override
-    public PerTargetPropagater.TravelTimeReducer getTravelTimeReducer(TransportNetwork network, OutputStream os) {
-        return new TravelTimeSurfaceReducer(this, network, os);
+    public PerTargetPropagater.TravelTimeReducer getTravelTimeReducer() {
+        return new TravelTimeSurfaceReducer(this);
     }
 }

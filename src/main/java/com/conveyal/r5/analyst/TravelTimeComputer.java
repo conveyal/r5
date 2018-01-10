@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.api.util.LegMode;
@@ -53,7 +54,7 @@ public class TravelTimeComputer {
 
     // Perhaps function should not be void return type. Why is this using a streaming or pipelining approach?
     // We also want to decouple the internal representation of the results from how they're serialized to an API.
-    public void computeTravelTimes(OutputStream os) throws IOException {
+    public OneOriginResult computeTravelTimes() throws IOException {
 
         // The mode of travel that will be used to reach transit stations from the origin point.
         StreetMode accessMode = LegMode.getDominantStreetMode(request.accessModes);
@@ -74,7 +75,7 @@ public class TravelTimeComputer {
         // FIXME maybe the reducer function should just be defined (overridden) on the request class.
         // FIXME the reducer is given the output stream in a pseudo-pipelining approach. However it just accumulates results into memory before writing them out.
         // Also, some of these classes could probably just be static functions.
-        PerTargetPropagater.TravelTimeReducer travelTimeReducer = request.getTravelTimeReducer(network, os);
+        PerTargetPropagater.TravelTimeReducer travelTimeReducer = request.getTravelTimeReducer();
 
         // Attempt to set the origin point before progressing any further.
         // This allows us to short circuit calculations if the network is entirely inaccessible. In the CAR_PARK
@@ -88,8 +89,7 @@ public class TravelTimeComputer {
             // Short circuit around routing and propagation. Calling finish() before streaming in any travel times to
             // destinations is designed to produce the right result here.
             LOG.info("Origin point was outside the transport network. Skipping routing and propagation, and returning default result.");
-            travelTimeReducer.finish();
-            return;
+            return travelTimeReducer.finish();
         }
 
         // First we will find travel times to all destinations reachable without using transit.
@@ -120,7 +120,7 @@ public class TravelTimeComputer {
                 }
             }
 
-            travelTimeReducer.finish();
+            return travelTimeReducer.finish();
         } else {
             // This search will include transit.
             //
@@ -217,8 +217,7 @@ public class TravelTimeComputer {
                     final int travelTimeSeconds = nonTransitTravelTimesToDestinations[target];
                     travelTimeReducer.recordTravelTimesForTarget(target, new int[] { travelTimeSeconds });
                 }
-                travelTimeReducer.finish();
-                return;
+                return travelTimeReducer.finish();
             }
 
             // Create a new Raptor Worker.
@@ -304,7 +303,7 @@ public class TravelTimeComputer {
                         transitTravelTimesToStops, nonTransitTravelTimesToDestinations, null, null, null);
                 perTargetPropagater.reducer = travelTimeReducer;
             }
-            perTargetPropagater.propagate();
+            return perTargetPropagater.propagate();
         }
     }
 }

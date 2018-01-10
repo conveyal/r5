@@ -1,21 +1,13 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.TimeGrid;
-import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
-import com.conveyal.r5.analyst.error.TaskError;
-import com.conveyal.r5.common.JsonUtilities;
-import com.conveyal.r5.multipoint.MultipointDataStore;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.PerTargetPropagater;
-import com.conveyal.r5.transit.TransportNetwork;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.Arrays;
-import java.util.Collection;
 
 /**
  * Take the travel times to targets at each iteration (passed in one target at a time, because storing them all in memory
@@ -26,30 +18,19 @@ import java.util.Collection;
  * i.e. call startWrite() then writeOnePixel() in a loop, then endWrite()
  */
 public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeReducer {
-    private static final Logger LOG = LoggerFactory.getLogger(TravelTimeSurfaceReducer.class);
 
     /** Travel time results encoded as an access grid */
     private TimeGrid timeGrid;
 
-    /** The output stream to write the result to */
-    private OutputStream outputStream;
-
-    /** The network used to compute the travel time results */
-    public final TransportNetwork network;
-
     /** The task used to create travel times being reduced herein */
     public final AnalysisTask task;
 
-    public TravelTimeSurfaceReducer (AnalysisTask task, TransportNetwork network, OutputStream outputStream) {
+    public TravelTimeSurfaceReducer (AnalysisTask task) {
         this.task = task;
-        this.network = network;
-        this.outputStream = outputStream;
-
         try {
             // use an in-memory access grid, don't specify disk cache file
             timeGrid = new TimeGrid(task.zoom, task.west, task.north, task.width, task.height, task.percentiles.length);
             timeGrid.initialize("ACCESSGR", 0);
-
         } catch (IOException e) {
             // in memory, should not be able to throw this
             throw new RuntimeException(e);
@@ -79,6 +60,7 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
         int x = target % task.width;
         int y = target / task.width;
         try {
+            // TODO Add timeGrid.writePixel(n, results);
             timeGrid.writePixel(x, y, results);
         } catch (IOException e) {
             // can't happen as we're not using a file system backed output
@@ -94,47 +76,8 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
      * routing and propagation when the origin point is not connected to the street network.
      */
     @Override
-    public void finish () {
-        try {
-            LOG.info("Travel time surface of size {} kB complete", (timeGrid.nValues * 4 + timeGrid.HEADER_SIZE) / 1000);
-
-            // if the outputStream was null in the constructor, write to S3.
-            if (outputStream == null) {
-                outputStream = MultipointDataStore.getOutputStream(task, task.taskId + "_times.dat", "application/octet-stream");
-            }
-
-            if (task instanceof TravelTimeSurfaceTask) {
-                // This travel time surface is being produced by a single-origin task.
-                // We could be making a grid or a TIFF.
-                TravelTimeSurfaceTask timeSurfaceTask = (TravelTimeSurfaceTask) task;
-                if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GRID) {
-                    timeGrid.writeGrid(outputStream);
-                } else if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
-                    timeGrid.writeGeotiff(outputStream);
-                }
-            } else {
-                // This travel time surface is being produced by a regional task. We must be making a static site.
-                // Write the grid format.
-                timeGrid.writeGrid(outputStream);
-            }
-
-            LOG.info("Travel time surface written, appending metadata with {} warnings",
-                    network.scenarioApplicationWarnings.size());
-
-            // Append scenario application warning JSON to result
-            ResultMetadata metadata = new ResultMetadata();
-            metadata.scenarioApplicationWarnings = network.scenarioApplicationWarnings;
-            JsonUtilities.objectMapper.writeValue(outputStream, metadata);
-
-            LOG.info("Done writing");
-
-            outputStream.close();
-        } catch (IOException e) {
-            LOG.warn("Unexpected IOException returning travel time surface to client", e);
-        }
+    public OneOriginResult finish () {
+        return new OneOriginResult(task, timeGrid, null);
     }
 
-    private static class ResultMetadata {
-        public Collection<TaskError> scenarioApplicationWarnings;
-    }
 }

@@ -109,10 +109,10 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
     /** Use the standard single-point TravelTimeSurfaceReducer if no grid has been specified in the request.
      * Otherwise, use a reducer that returns accessibility values. */
     @Override
-    public PerTargetPropagater.TravelTimeReducer getTravelTimeReducer(TransportNetwork network, OutputStream os) {
+    public PerTargetPropagater.TravelTimeReducer getTravelTimeReducer() {
         if (gridData == null || makeStaticSite) {
             // When making a static site, we want to save travel time surfaces for no particular grid.
-            return new TravelTimeSurfaceReducer(this, network, os);
+            return new TravelTimeSurfaceReducer(this);
         } else {
             return new BootstrappingTravelTimeReducer(this, gridData);
         }

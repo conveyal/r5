@@ -58,6 +58,7 @@ public class TimeGrid {
 
     private int version = 0;
 
+    // TODO a WEBMERCATOREXTENTS class
     // used to be stored as longs, but can probably still use with impunity without fear of overflow
     private final int zoom, west, north, width, height, nValuesPerPixel;
 
@@ -68,6 +69,7 @@ public class TimeGrid {
 
     /**
      * Create a new in-memory access grid writer for a width x height x nValuesPerPixel array.
+     * TODO remove unnecessary throws clause and try block in caller
      */
     public TimeGrid(int zoom, int west, int north, int width, int height, int nValuesPerPixel) throws IOException {
         this.zoom = zoom;
@@ -87,6 +89,7 @@ public class TimeGrid {
 
     }
 
+    // TODO inline initialization into constructor.
     public void initialize(String gridType, int version){
         if ("ACCESSGR".equals(gridType)){
 

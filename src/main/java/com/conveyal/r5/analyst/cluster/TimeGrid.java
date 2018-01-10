@@ -63,7 +63,7 @@ public class TimeGrid {
     // 1-d array of pixel values
     private int[] values;
 
-    public final long nValues;
+    public final int nValues;
 
     /**
      * Create a new in-memory access grid writer for a width x height x nValuesPerPixel array.
@@ -85,26 +85,23 @@ public class TimeGrid {
         // Initialization: Fill the values array the default unreachable value.
         // This way the grid is valid even if we don't write anything into it
         // (rather than saying everything is reachable in zero minutes).
-        values = new int[(int) nValues];
-        for (int i = 0; i < (int) nValues; i ++) {
+        values = new int[nValues];
+        for (int i = 0; i < nValues; i ++) {
             values[i] = FastRaptorWorker.UNREACHED;
         }
 
     }
 
     public void writePixel(int x, int y, int[] pixelValues) throws IOException {
-        if (pixelValues.length != nValuesPerPixel)
+        if (pixelValues.length != nValuesPerPixel) {
             throw new IllegalArgumentException("Incorrect number of values per pixel.");
-
-        long index1d = (y * width + x) * nValuesPerPixel;
-
-        if (index1d * Integer.BYTES + HEADER_SIZE> Integer.MAX_VALUE) {
-            throw new RuntimeException("Pixel coordinates are too large for this grid.");
         }
-
+        // At 2 million destinations and 100 values per destination (every percentile) we still only are at 800M.
+        // So no real risk of overflowing an int.
+        int index1d = (y * width + x) * nValuesPerPixel;
         for (int i : pixelValues) {
-            values[(int) index1d] = i;
-            index1d ++;
+            values[index1d] = i;
+            index1d += 1;
         }
     }
 
@@ -124,18 +121,18 @@ public class TimeGrid {
     public byte[] writeGrid() {
         ByteBuffer buffer;
 
-        buffer = ByteBuffer.allocate((int) nValues * Integer.BYTES + HEADER_SIZE);
+        buffer = ByteBuffer.allocate(nValues * Integer.BYTES + HEADER_SIZE);
         buffer.order(ByteOrder.LITTLE_ENDIAN);
 
         // Write header
         buffer.put(gridType.getBytes(), 0, 8);
         buffer.putInt(8, version);
         buffer.putInt(12, zoom);
-        buffer.putInt(16, (int) west);
-        buffer.putInt(20, (int) north);
-        buffer.putInt(24, (int) width);
-        buffer.putInt(28, (int) height);
-        buffer.putInt(32, (int) nValuesPerPixel);
+        buffer.putInt(16, west);
+        buffer.putInt(20, north);
+        buffer.putInt(24, width);
+        buffer.putInt(28, height);
+        buffer.putInt(32, nValuesPerPixel);
 
         //TODO wrap below in gzip output stream, once other changes are made
 

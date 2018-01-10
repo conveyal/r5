@@ -60,7 +60,7 @@ public class TimeGrid {
     // used to be stored as longs, but can probably still use with impunity without fear of overflow
     private final int zoom, west, north, width, height, nValuesPerPixel;
 
-    // 1-d array of pixel values
+    // Flattened 1-d array of pixel values
     private int[] values;
 
     public final int nValues;
@@ -75,11 +75,11 @@ public class TimeGrid {
         this.width = width;
         this.height = height;
         this.nValuesPerPixel = nValuesPerPixel;
-        nValues = width * height * nValuesPerPixel;
+        this.nValues = width * height * nValuesPerPixel;
 
-        long nBytes = nValues * Integer.BYTES + HEADER_SIZE;
+        long nBytes = ((long)nValues) * Integer.BYTES + HEADER_SIZE;
         if (nBytes > Integer.MAX_VALUE) {
-            throw new RuntimeException("Grid size exceeds 31-bit addressable space.");
+            throw new RuntimeException("Grid size in bytes exceeds 31-bit addressable space.");
         }
 
         // Initialization: Fill the values array the default unreachable value.
@@ -105,7 +105,8 @@ public class TimeGrid {
         }
     }
 
-    /** Writes the flat binary format (header, followed by values for each pixel) to an output stream.
+    /**
+     * Writes the flat binary format (header, followed by values for each pixel) to an output stream.
      *
      * Uses Java NIO ByteBuffer so ByteOrder.LITTLE_ENDIAN can be set
      * @param out
@@ -118,31 +119,34 @@ public class TimeGrid {
     }
 
     // FIXME why don't we write this straight to a stream instead of buffering and doing address math?
+    // Do we really want to buffer this in memory?
+    // It seems like the main reason is just getting little-endian byte order for JavaScript typed arrays.
+    // Could we use a Guava little-endian output stream?
     public byte[] writeGrid() {
-        ByteBuffer buffer;
-
-        buffer = ByteBuffer.allocate(nValues * Integer.BYTES + HEADER_SIZE);
+        ByteBuffer buffer = ByteBuffer.allocate(nValues * Integer.BYTES + HEADER_SIZE);
         buffer.order(ByteOrder.LITTLE_ENDIAN);
-
         // Write header
-        buffer.put(gridType.getBytes(), 0, 8);
-        buffer.putInt(8, version);
-        buffer.putInt(12, zoom);
-        buffer.putInt(16, west);
-        buffer.putInt(20, north);
-        buffer.putInt(24, width);
-        buffer.putInt(28, height);
-        buffer.putInt(32, nValuesPerPixel);
+        buffer.put(gridType.getBytes());
+        buffer.putInt(version);
+        buffer.putInt(zoom);
+        buffer.putInt(west);
+        buffer.putInt(north);
+        buffer.putInt(width);
+        buffer.putInt(height);
+        buffer.putInt(nValuesPerPixel);
 
         //TODO wrap below in gzip output stream, once other changes are made
 
-        // Write values, delta coded
-        int prev = 0;
-        for (int i = 0; i < nValues; i ++) {
-            if (i % nValuesPerPixel == 0) prev = 0;
-            int val = values[i] - prev;
-            buffer.putInt(HEADER_SIZE + i * Integer.BYTES, val);
-            prev = values[i];
+        // Write values, delta coded TODO why are we delta-coding within pixels?
+        int i = 0;
+        while (i < nValues) {
+            int prev = 0;
+            for (int v = 0; v < nValuesPerPixel; v++, i++) {
+                int curr = values[i];
+                int delta = curr - prev;
+                buffer.putInt(delta);
+                prev = curr;
+            }
         }
 
         return buffer.array();

@@ -48,15 +48,13 @@ import java.nio.ByteOrder;
 public class TimeGrid {
     public static final Logger LOG = LoggerFactory.getLogger(GridResultAssembler.class);
 
-    /**
-     * The offset to get to the data section of the access grid file
-     */
-    public static final int HEADER_SIZE = 9 * Integer.BYTES;
+    /** 8 bytes long to maintain integer alignment. */
+    private static final String gridType = "ACCESSGR";
 
-    // type of grid
-    private String gridType = "ACCESSGR";
+    /** The offset to get to the data section of the access grid file. The gridType string amounts to 2 ints. */
+    public static final int HEADER_SIZE = 7 * Integer.BYTES + gridType.getBytes().length;
 
-    private int version = 0;
+    private static final int version = 0;
 
     // TODO a WEBMERCATOREXTENTS class
     // used to be stored as longs, but can probably still use with impunity without fear of overflow
@@ -79,29 +77,19 @@ public class TimeGrid {
         this.nValuesPerPixel = nValuesPerPixel;
         nValues = width * height * nValuesPerPixel;
 
-        long nBytes = nValues * 4 + HEADER_SIZE;
+        long nBytes = nValues * Integer.BYTES + HEADER_SIZE;
         if (nBytes > Integer.MAX_VALUE) {
             throw new RuntimeException("Grid size exceeds 31-bit addressable space.");
         }
 
+        // Initialization: Fill the values array the default unreachable value.
+        // This way the grid is valid even if we don't write anything into it
+        // (rather than saying everything is reachable in zero minutes).
         values = new int[(int) nValues];
-
-    }
-
-    // TODO inline initialization into constructor.
-    public void initialize(String gridType, int version){
-        if ("ACCESSGR".equals(gridType)){
-
-            this.gridType = gridType;
-            this.version = version;
-
-            //Fill the values array the default unreachable value
-            for (int i = 0; i < (int) nValues; i ++) {
-                values[i] = FastRaptorWorker.UNREACHED;
-            }
-        } else {
-            LOG.warn("Unsupported grid type");
+        for (int i = 0; i < (int) nValues; i ++) {
+            values[i] = FastRaptorWorker.UNREACHED;
         }
+
     }
 
     public void writePixel(int x, int y, int[] pixelValues) throws IOException {
@@ -110,7 +98,7 @@ public class TimeGrid {
 
         long index1d = (y * width + x) * nValuesPerPixel;
 
-        if (index1d * 4 + HEADER_SIZE> Integer.MAX_VALUE) {
+        if (index1d * Integer.BYTES + HEADER_SIZE> Integer.MAX_VALUE) {
             throw new RuntimeException("Pixel coordinates are too large for this grid.");
         }
 
@@ -132,14 +120,15 @@ public class TimeGrid {
         out.write(writeGrid());
     }
 
+    // FIXME why don't we write this straight to a stream instead of buffering and doing address math?
     public byte[] writeGrid() {
         ByteBuffer buffer;
 
-        buffer = ByteBuffer.allocate((int) nValues * 4 + HEADER_SIZE);
+        buffer = ByteBuffer.allocate((int) nValues * Integer.BYTES + HEADER_SIZE);
         buffer.order(ByteOrder.LITTLE_ENDIAN);
 
         // Write header
-        buffer.put(gridType.getBytes(),0,8);
+        buffer.put(gridType.getBytes(), 0, 8);
         buffer.putInt(8, version);
         buffer.putInt(12, zoom);
         buffer.putInt(16, (int) west);
@@ -155,7 +144,7 @@ public class TimeGrid {
         for (int i = 0; i < nValues; i ++) {
             if (i % nValuesPerPixel == 0) prev = 0;
             int val = values[i] - prev;
-            buffer.putInt(HEADER_SIZE + i * 4, val);
+            buffer.putInt(HEADER_SIZE + i * Integer.BYTES, val);
             prev = values[i];
         }
 

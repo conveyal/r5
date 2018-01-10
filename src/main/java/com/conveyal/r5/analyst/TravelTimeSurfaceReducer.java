@@ -59,7 +59,7 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
     @Override
     public void recordTravelTimesForTarget (int target, int[] times) {
         int nPercentiles = task.percentiles.length;
-        // sort the times at each target and read off percentiles
+        // Sort the times at each target and read off percentiles
         Arrays.sort(times);
         int[] results = new int[nPercentiles];
 

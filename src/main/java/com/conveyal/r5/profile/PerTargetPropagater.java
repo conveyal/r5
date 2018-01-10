@@ -217,8 +217,9 @@ public class PerTargetPropagater {
         default void finish () {}
     }
 
-    /** Uses streaming to write paths from a given origin to all targets.
-     *
+    /**
+     * Uses streaming to write paths from a given origin to all targets.
+     * TODO merge interface into its only implementation.
      */
     public interface PathWriter {
 

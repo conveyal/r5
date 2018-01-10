@@ -224,8 +224,10 @@ public class TravelTimeComputer {
             // Create a new Raptor Worker.
             FastRaptorWorker worker = new FastRaptorWorker(network.transitLayer, request, accessTimes);
 
-            if (request.returnPaths || request.returnInVehicleTimes || request.returnWaitTimes) {
-                worker.saveAllStates = true; // By default, this is false and intermediate results (e.g. paths) are discarded.
+            if (request.returnPaths || request.travelTimeBreakdown) {
+                // By default, this is false and intermediate results (e.g. paths) are discarded.
+                // TODO do we really need to save all states just to get the travel time breakdown?
+                worker.saveAllStates = true;
             }
 
             // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
@@ -266,25 +268,18 @@ public class TravelTimeComputer {
 
                         RaptorState state = worker.statesEachIteration.get(iter);
 
-                        // Calculate the components of travel time (waiting, in-vehicle)
-                        if (request.returnWaitTimes || request.returnInVehicleTimes) {
-
+                        if (request.travelTimeBreakdown) {
                             int inVehicleTime = state.nonTransferInVehicleTravelTime[stop] / 60;
                             int waitTime = state.nonTransferWaitTime[stop] / 60;
-
                             if (inVehicleTime + waitTime > time && time != -1) {
                                 LOG.info("Wait and in vehicle travel time greater than total time");
                             }
-
                             inVehicleTimesToStops[iter][stop] = inVehicleTime;
                             waitTimesToStops[iter][stop] = waitTime;
-
                         }
-
                         // Record the paths used
                         if (request.returnPaths) {
                             int pathIdx = -1;
-
                             // only compute a path if this stop was reached
                             if (state.bestNonTransferTimes[stop] != FastRaptorWorker.UNREACHED) {
                                 // TODO reuse pathwithtimes?
@@ -295,19 +290,18 @@ public class TravelTimeComputer {
                                 }
                                 pathIdx = paths.get(path);
                             }
-
                             pathsToStops[iter][stop] = pathIdx;
                         }
                     }
                 }
-
-                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request, transitTravelTimesToStops, nonTransitTravelTimesToDestinations, inVehicleTimesToStops, waitTimesToStops, pathsToStops);
+                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request,
+                        transitTravelTimesToStops, nonTransitTravelTimesToDestinations, inVehicleTimesToStops,
+                        waitTimesToStops, pathsToStops);
                 perTargetPropagater.reducer = travelTimeReducer;
                 perTargetPropagater.pathWriter = new PathWriter(request, network, pathList);
-
             } else {
-
-                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request, transitTravelTimesToStops, nonTransitTravelTimesToDestinations, null, null, null);
+                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request,
+                        transitTravelTimesToStops, nonTransitTravelTimesToDestinations, null, null, null);
                 perTargetPropagater.reducer = travelTimeReducer;
             }
             perTargetPropagater.propagate();

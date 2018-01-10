@@ -360,12 +360,15 @@ public class AnalystWorker implements Runnable {
                 return;
             }
 
-            // replicate previous static site functionality; if this is the first of a batch of tasks, and if there is
-            // an output bucket specified, write the shared metadata for this batch of requests to the output bucket
-            if(request.taskId == 0 && request.outputBucket != null && !request.outputBucket.isEmpty()){
-                MultipointMetadata mm = new MultipointMetadata(request, transportNetwork);
-                LOG.info("This is the lead-off task for a static site request; writing shared metadata");
-                mm.write();
+            // If we are generating a static site, there must be a single metadata file for an entire batch of results.
+            // Arbitrarily we create this metadata as part of the first task in the job.
+            if (request instanceof RegionalTask) {
+                // TODO with new broker that numbers tasks inside a job, use request.taskId == 0
+                if (request.makeStaticSite && ((RegionalTask)request).x == 0 && ((RegionalTask)request).y == 0) {
+                    MultipointMetadata mm = new MultipointMetadata(request, transportNetwork);
+                    LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
+                    mm.write();
+                }
             }
 
             TravelTimeComputer computer = new TravelTimeComputer(request, transportNetwork, gridCache);
@@ -391,7 +394,8 @@ public class AnalystWorker implements Runnable {
             // Catch any exceptions that were not handled by more specific catch clauses above.
             // This ensures that some form of error message is passed all the way back up to the web UI.
             TaskError taskError = new TaskError(ex);
-            LOG.error("An error occurred while routing", ex);
+            LOG.error("An error occurred while routing: {}", ex.toString());
+            ex.printStackTrace();
             reportTaskErrors(request.taskId, HttpStatus.INTERNAL_SERVER_ERROR_500, Arrays.asList(taskError));
         }
     }

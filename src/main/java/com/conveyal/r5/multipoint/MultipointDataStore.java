@@ -16,6 +16,10 @@ import java.util.zip.GZIPOutputStream;
 public abstract class MultipointDataStore {
     private static AmazonS3 s3 = new AmazonS3Client();
 
+//    static {
+//        s3.setRegion(Region.getRegion(Regions.EU_WEST_1));
+//    }
+
     /**
      * Get an output stream to upload an object to S3 for the given static site request.
      * There is no need to gzip data going into this stream, it will be gzipped on upload in storage and when downloaded
@@ -30,10 +34,7 @@ public abstract class MultipointDataStore {
         PipedOutputStream pipeOut = new PipedOutputStream();
         PipedInputStream pipeIn = new PipedInputStream(pipeOut);
 
-        //TODO use a better key
-        String key = "static-results/" + req.outputDirectory + "/" + filename;
-
-        PutObjectRequest por = new PutObjectRequest(req.outputBucket, key, pipeIn, md);
+        PutObjectRequest por = new PutObjectRequest("analysis-static/" + req.jobId, filename, pipeIn, md);
         // buffer files up to 100MB
         por.getRequestClientOptions().setReadLimit(100 * 1024 * 1024 + 1);
 

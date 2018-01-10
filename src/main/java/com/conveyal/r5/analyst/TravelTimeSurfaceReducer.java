@@ -27,14 +27,8 @@ public class TravelTimeSurfaceReducer implements PerTargetPropagater.TravelTimeR
 
     public TravelTimeSurfaceReducer (AnalysisTask task) {
         this.task = task;
-        try {
-            // use an in-memory access grid, don't specify disk cache file
-            timeGrid = new TimeGrid(task.zoom, task.west, task.north, task.width, task.height, task.percentiles.length);
-            timeGrid.initialize("ACCESSGR", 0);
-        } catch (IOException e) {
-            // in memory, should not be able to throw this
-            throw new RuntimeException(e);
-        }
+        timeGrid = new TimeGrid(task.zoom, task.west, task.north, task.width, task.height, task.percentiles.length);
+        timeGrid.initialize("ACCESSGR", 0);
     }
 
     @Override

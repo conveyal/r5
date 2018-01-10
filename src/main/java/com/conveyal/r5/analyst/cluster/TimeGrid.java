@@ -69,9 +69,8 @@ public class TimeGrid {
 
     /**
      * Create a new in-memory access grid writer for a width x height x nValuesPerPixel array.
-     * TODO remove unnecessary throws clause and try block in caller
      */
-    public TimeGrid(int zoom, int west, int north, int width, int height, int nValuesPerPixel) throws IOException {
+    public TimeGrid(int zoom, int west, int north, int width, int height, int nValuesPerPixel) {
         this.zoom = zoom;
         this.west = west;
         this.north = north;

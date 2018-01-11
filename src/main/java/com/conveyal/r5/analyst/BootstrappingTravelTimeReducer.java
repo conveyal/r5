@@ -53,13 +53,11 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
     public BootstrappingTravelTimeReducer (RegionalTask request, Grid grid) {
         this.task = request;
         this.grid = grid;
-        int nMinutes = request.getTimeWindowLengthMinutes();
-        int monteCarloDrawsPerMinute = request.getMonteCarloDrawsPerMinute();
+        int nIterations = request.getTimeWindowLengthMinutes() * request.getMonteCarloDrawsPerMinute();
         // TODO handle multiple percentiles, request already has an array to hold more than one of them
         if (request.percentiles.length != 1) {
             throw new IllegalArgumentException("Bootstrapped travel times only support a single percentile of travel time!");
         }
-        int nIterations = nMinutes * monteCarloDrawsPerMinute;
         // The disatance between the first value (0th percentile) and last value (100th percentile) is nIterations-1.
         // minCount should range from 1 (for 0th percentile / minimum) to N (for 100th percentile / maximum)
         minCount = (int) ((nIterations - 1) * (request.percentiles[0] / 100d)) + 1;
@@ -80,6 +78,7 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
 
         // If there is no variation in travel time to the destination, there is no need to compute percentiles.
         // This happens with non-transit modes like biking and walking.
+        // FIXME identifier naming: we're using < so this is not a "max" trip duration (which would be <=)
         if (travelTimesForTarget.length == 1) {
             if (travelTimesForTarget[0] < task.maxTripDurationMinutes * 60) {
                 accessibility += opportunityCountAtTarget;

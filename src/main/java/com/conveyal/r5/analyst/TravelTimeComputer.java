@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
+import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.profile.FastRaptorWorker;
@@ -72,10 +73,8 @@ public class TravelTimeComputer {
         // Get the appropriate function for reducing travel time, given the type of request we're handling
         // (either a travel time surface for a single point or a location based accessibility indicator value for a
         // regional analysis).
-        // FIXME maybe the reducer function should just be defined (overridden) on the request class.
-        // FIXME the reducer is given the output stream in a pseudo-pipelining approach. However it just accumulates results into memory before writing them out.
-        // Also, some of these classes could probably just be static functions.
-        PerTargetPropagater.TravelTimeReducer travelTimeReducer = request.getTravelTimeReducer();
+        // TODO Some of these classes could probably just be static functions.
+        PerTargetPropagater.TravelTimeReducer travelTimeReducer = new GenericReducer(request);
 
         // Attempt to set the origin point before progressing any further.
         // This allows us to short circuit calculations if the network is entirely inaccessible. In the CAR_PARK

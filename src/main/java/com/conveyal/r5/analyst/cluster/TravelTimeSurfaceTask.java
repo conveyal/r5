@@ -2,10 +2,7 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.TravelTimeSurfaceReducer;
-import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import java.io.OutputStream;
@@ -66,8 +63,4 @@ public class TravelTimeSurfaceTask extends AnalysisTask {
         return pointSets;
     }
 
-    @Override
-    public PerTargetPropagater.TravelTimeReducer getTravelTimeReducer() {
-        return new TravelTimeSurfaceReducer(this);
-    }
 }

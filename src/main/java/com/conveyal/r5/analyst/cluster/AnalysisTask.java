@@ -86,15 +86,6 @@ public abstract class AnalysisTask extends ProfileRequest {
     @JsonIgnore
     public abstract List<PointSet> getDestinations(TransportNetwork network, GridCache gridCache);
 
-    /**
-     * Get a TravelTimeReducer that will finish this task.
-     *
-     * The computation of travel times is the same for all task types, but how they are summarized (a surface of travel
-     * times, bootstrapped accessibility, etc) is not.
-     */
-    @JsonIgnore
-    public abstract PerTargetPropagater.TravelTimeReducer getTravelTimeReducer();
-
     @JsonIgnore
     public WorkerCategory getWorkerCategory () {
         return new WorkerCategory(graphId, workerVersion);

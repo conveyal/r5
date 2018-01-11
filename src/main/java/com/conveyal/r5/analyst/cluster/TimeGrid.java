@@ -31,7 +31,7 @@ import java.nio.ByteOrder;
  * Grid for recording travel times, which can be written to flat binary output
  *
  * This is similar to com.conveyal.r5.analyst.Grid, but it uses ints for the pixel values, and allows multiple values
- * per pixe.
+ * per pixel.
  *
  *  * Time grids look like this:
  * Header (ASCII text "TIMEGRID") (note that this header is eight bytes, so the full grid can be mapped into a
@@ -92,13 +92,13 @@ public class TimeGrid {
 
     }
 
-    public void writePixel(int x, int y, int[] pixelValues) throws IOException {
+    // At 2 million destinations and 100 int values per destination (every percentile) we still only are at 800MB.
+    // So no real risk of overflowing an int index.
+    public void setTarget(int targetIndex, int[] pixelValues) {
         if (pixelValues.length != nValuesPerPixel) {
             throw new IllegalArgumentException("Incorrect number of values per pixel.");
         }
-        // At 2 million destinations and 100 values per destination (every percentile) we still only are at 800M.
-        // So no real risk of overflowing an int.
-        int index1d = (y * width + x) * nValuesPerPixel;
+        int index1d = targetIndex * nValuesPerPixel;
         for (int i : pixelValues) {
             values[index1d] = i;
             index1d += 1;
@@ -112,7 +112,6 @@ public class TimeGrid {
      * @param out
      * @throws IOException
      */
-
     public void writeGrid(OutputStream out) throws IOException {
 
         out.write(writeGrid());

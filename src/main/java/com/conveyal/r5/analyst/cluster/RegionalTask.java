@@ -1,14 +1,10 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.analyst.BootstrappingTravelTimeReducer;
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.TravelTimeSurfaceReducer;
-import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.transit.TransportNetwork;
 
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -44,7 +40,7 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
     public String outputQueue;
 
     /** The grid we are calculating accessibility to */
-    private transient Grid gridData;
+    public transient Grid gridData;
 
     @Override
     public Type getType() {
@@ -104,18 +100,6 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
         }
         // Use the network point set as the base point set, so that the cached linkages are used
         return pointSets;
-    }
-
-    /** Use the standard single-point TravelTimeSurfaceReducer if no grid has been specified in the request.
-     * Otherwise, use a reducer that returns accessibility values. */
-    @Override
-    public PerTargetPropagater.TravelTimeReducer getTravelTimeReducer() {
-        if (gridData == null || makeStaticSite) {
-            // When making a static site, we want to save travel time surfaces for no particular grid.
-            return new TravelTimeSurfaceReducer(this);
-        } else {
-            return new BootstrappingTravelTimeReducer(this, gridData);
-        }
     }
 
     public RegionalTask clone () {

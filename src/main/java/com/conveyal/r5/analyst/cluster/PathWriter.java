@@ -20,7 +20,7 @@ import java.util.List;
  *
  * This implementation streams, which might be an example for how to reimplement TravelTimeSurfaceReducer.
  */
-public class PathWriter implements PerTargetPropagater.PathWriter {
+public class PathWriter {
     private static final Logger LOG = LoggerFactory.getLogger(PathWriter.class);
 
         /** The network used to compute the travel time results */

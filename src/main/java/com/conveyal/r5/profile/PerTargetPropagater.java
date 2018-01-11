@@ -3,6 +3,7 @@ package com.conveyal.r5.profile;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.GenericReducer;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
+import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.streets.LinkedPointSet;
 import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
@@ -185,23 +186,4 @@ public class PerTargetPropagater {
         return reducer.finish();
     }
 
-    /**
-     * Uses streaming to write paths from a given origin to all targets.
-     * TODO merge interface into its only implementation.
-     */
-    public interface PathWriter {
-
-        /** Records paths to a given target.
-         *
-         * @param paths an array with one path index per departure minute.
-         */
-
-        void recordPathsForTarget(int[] paths);
-
-        /** Signals the pathWriter to close its output stream.
-         *
-         * This is called when propagation is done.
-         */
-        default void finishPaths () {}
-    }
 }

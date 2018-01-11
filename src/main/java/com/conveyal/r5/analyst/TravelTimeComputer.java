@@ -40,9 +40,6 @@ public class TravelTimeComputer {
 
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeComputer.class);
 
-    // FIXME pointset cache is never used - why?
-    private static final WebMercatorGridPointSetCache pointSetCache = new WebMercatorGridPointSetCache();
-
     public final AnalysisTask request;
     public final TransportNetwork network;
     public final GridCache gridCache;
@@ -74,7 +71,7 @@ public class TravelTimeComputer {
         // (either a travel time surface for a single point or a location based accessibility indicator value for a
         // regional analysis).
         // TODO Some of these classes could probably just be static functions.
-        PerTargetPropagater.TravelTimeReducer travelTimeReducer = new GenericReducer(request);
+        GenericReducer travelTimeReducer = new GenericReducer(request);
 
         // Attempt to set the origin point before progressing any further.
         // This allows us to short circuit calculations if the network is entirely inaccessible. In the CAR_PARK

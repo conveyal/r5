@@ -15,9 +15,9 @@ import org.slf4j.LoggerFactory;
 import java.util.Arrays;
 
 /**
- * Merge the two existing reducers.
+ *
  */
-public class GenericReducer implements PerTargetPropagater.TravelTimeReducer {
+public class GenericReducer {
 
     private static final Logger LOG = LoggerFactory.getLogger(GenericReducer.class);
 
@@ -89,7 +89,7 @@ public class GenericReducer implements PerTargetPropagater.TravelTimeReducer {
         return (int) Math.round(percentile / 100 * nElements);
     }
 
-    @Override
+    // TODO rename, this does not "record" the travel times, it consumes them or processes them
     public void recordTravelTimesForTarget (int target, int[] times) {
         // Sort the times at each target and read off percentiles at the pre-calculated indexes.
         int[] percentileTravelTimesMinutes = new int[nPercentiles];
@@ -135,7 +135,6 @@ public class GenericReducer implements PerTargetPropagater.TravelTimeReducer {
      * TimeGrid will have a buffer full of UNREACHED. This allows shortcutting around
      * routing and propagation when the origin point is not connected to the street network.
      */
-    @Override
     public OneOriginResult finish () {
         Origin origin = null;
         if (calculateAccessibility) {

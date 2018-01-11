@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.OneOriginResult;
+import com.conveyal.r5.analyst.GenericReducer;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.streets.LinkedPointSet;
 import gnu.trove.map.TIntIntMap;
@@ -12,32 +13,30 @@ import java.util.Arrays;
 /**
  * This class propagates from times at transit stops to times at destinations (targets). It is called with a function
  * that will be called with the target index (which is the row-major 1D index of the destination that is being
- * propagated to) and the array of whether the target was reached within the travel time cutoff in each Monte Carlo
- * draw. This is used in GridComputer to perform bootstrapping of accessibility given median travel time. This function
- * is only called for targets that were ever reached. It may seem needlessly generic to use a lambda function, but it
- * allows us to confine the bootstrapping code to GridComputer.
+ * propagated to).
  *
- * We propagate to a single target (grid cell) at a time because we only intend to store a few percentiles of travel time
- * at each target. Propagating the other direction, from stops out to targets, requires storing every travel time for
- * every MC draw/departure time, at every target. This would be impractically huge. To handle one target at a time we
- * need to invert the table of distances from stops to nearby targets: we instead use a table of distances from targets
- * to nearby stops.
+ * We propagate to a single target (grid cell) at a time because we only intend to store a few percentiles of travel
+ * time at each target (rather than the travel time for every Monte Carlo schedule at every departure minute).
+ * Propagating the other direction, from stops out to targets, requires retaining every travel time for every Monte
+ * Carlo draw/departure time combination at every target. This would be impractically huge. To handle one target at a
+ * time we need to invert the table of distances from stops to their nearby targets: we instead use a table of distances
+ * to targets from their nearby stops.
  */
 public class PerTargetPropagater {
 
     private static final Logger LOG = LoggerFactory.getLogger(PerTargetPropagater.class);
 
-    /** The travel time cutoff in this regional analysis */
+    /** The travel time cutoff in this regional analysis FIXME why would this have a default value? */
     public int cutoffSeconds = 120 * 60;
 
-    /** The linked targets */
+    /** The targets, linked to the street network. */
     public LinkedPointSet targets;
 
     /** the profilerequest (used for walk speed etc.) */
     public ProfileRequest request;
 
-    /** how travel times are summarized and written or streamed back to a client */
-    public TravelTimeReducer reducer;
+    /** how travel times are summarized and written or streamed back to a client TODO inline that whole class here. */
+    public GenericReducer reducer;
 
     /** how paths are grouped and written */
     public PathWriter pathWriter;
@@ -73,7 +72,6 @@ public class PerTargetPropagater {
      * A reducer is only told whether the target was reached within the travel time threshold, which allows some
      * optimizations in certain cases. A travelTimeReducer receives a full list of travel times to the given
      * destination.
-     * TODO change function signature so this returns the resulting grid object
      */
     public OneOriginResult propagate () {
         targets.makePointToStopDistanceTablesIfNeeded();
@@ -85,7 +83,7 @@ public class PerTargetPropagater {
         // than floats.
         int speedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
 
-        // Total time
+        // Total travel time to each destination
         int[] perIterationTravelTimes = new int[travelTimesToStopsEachIteration.length];
 
         // Components of travel time, and paths used
@@ -180,43 +178,11 @@ public class PerTargetPropagater {
                 travelTimesToStopsEachIteration[0].length,
                 targets.size(),
                 totalTimeMillis / 1000d
-                );
+        );
         if (pathWriter != null) {
             pathWriter.finishPaths();
         }
         return reducer.finish();
-    }
-
-    /**
-     * Reduces many travel times to summary values, then writes them.
-     *
-     * This interface has two different implementations, one for creating an accessibility indicator and another for
-     * creating a travel time surface. It receives a large number of travel time observations and retains
-     * only a smaller set of summary measures.
-     *
-     * TODO our code always passes the targets into this interface in order, one after another, no need to buffer results.
-     * We could just stream results out immediately.
-     */
-    public interface TravelTimeReducer {
-
-        /**
-         * Records a set of travel times (in seconds) to a particular target.
-         *
-         * @param targetIndex the target (e.g. grid cell) that has been propagated to.
-         * @param travelTimesForTarget an array of travel times (in seconds), with each representing a different
-         *                            departure time or Monte Carlo schedule draw.
-         * This should be called once per target, or not at all if we know nothing is accessible.
-         */
-        void recordTravelTimesForTarget(int targetIndex, int[] travelTimesForTarget);
-
-        /**
-         * Called when propagation is done, used to signal the reducer that it can write / upload its results to s3 etc.
-         * If this is called immediately without supplying any travel times via recordTravelTimesForTarget,
-         * we have bypassed propagation entirely and the implementation should write out a default result for cases
-         * where the network is entirely unreachable.
-         */
-        OneOriginResult finish ();
-
     }
 
     /**

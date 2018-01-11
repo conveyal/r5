@@ -13,6 +13,7 @@ import java.util.Base64;
  * certain percentile of the travel times to each destination (described below and in Conway, Byrd and van Eggermond 2017).
  *
  * NOTE THIS NO LONGER DOES ANY BOOTSTRAPPING, the name is a remnant of additional computations it used to do.
+ * THIS CLASS IS ONLY HERE so we can copy optimizations and comments out of it.
  * TODO This is in fact just a point estimate, and you will get different results when re-running the MC draws.
  * We have a bootstrapping method for estimating the error, but we've decided to hide that from the user, using it as
  * a calibration technique for setting a sufficient number of MC draws.
@@ -20,7 +21,7 @@ import java.util.Base64;
  * The accessibility is calculated using a percentile of travel time to all destinations (there are plans to change
  * this to allow use of multiple percentiles).
  */
-public class BootstrappingTravelTimeReducer implements PerTargetPropagater.TravelTimeReducer {
+public class BootstrappingTravelTimeReducer {
 
     private final RegionalTask task;
 
@@ -63,8 +64,6 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
         minCount = (int) ((nIterations - 1) * (request.percentiles[0] / 100d)) + 1;
     }
 
-    // TODO rename, this does not "record" the travel times, it consumes them or processes them
-    @Override
     public void recordTravelTimesForTarget(int target, int[] travelTimesForTarget) {
         // We use the size of the grid to determine the number of destinations used in the linked point set in
         // TravelTimeComputer, therefore the target indices are relative to the grid, not the task.
@@ -104,7 +103,6 @@ public class BootstrappingTravelTimeReducer implements PerTargetPropagater.Trave
      * bootstrapReplicationsOfAccessibility will all still be zero and the output will be zero, which allows
      * shortcutting around routing and propagation when the origin point is not connected to the street network.
      */
-    @Override
     public OneOriginResult finish () {
         // Only one accessibility figure, no bootstrapping.
         return new OneOriginResult(task, null,

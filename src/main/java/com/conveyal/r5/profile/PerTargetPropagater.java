@@ -49,8 +49,8 @@ public class PerTargetPropagater {
     /** Times at targets using the street network */
     public int[] nonTransitTravelTimesToTargets;
 
-    /** Times at transit stops for each iteration. */
-    public int[][] travelTimesToStopsEachIteration, invertedTravelTimesToStops;
+    /** Times at transit stops for each iteration. Plus a transposed version of that same matrix as an optimization. */
+    public int[][] travelTimesToStopsForIteration, travelTimesToStop;
 
     /** The number of "iterations" (departure minutes & Monte Carlo schedules) and the number of stops. */
     private int nIterations, nStops;
@@ -81,18 +81,18 @@ public class PerTargetPropagater {
      */
     private int[] perIterationPaths, perIterationTravelTimes, perIterationWaitTimes, perIterationInVehicleTimes;
 
-    public PerTargetPropagater(LinkedPointSet targets, AnalysisTask task, int[][] travelTimesToStopsEachIteration, int[] nonTransitTravelTimesToTargets, int[][] inVehicleTimesToStops, int[][] waitTimesToStops, int[][] paths) {
+    public PerTargetPropagater(LinkedPointSet targets, AnalysisTask task, int[][] travelTimesToStopsForIteration, int[] nonTransitTravelTimesToTargets, int[][] inVehicleTimesToStops, int[][] waitTimesToStops, int[][] paths) {
         this.targets = targets;
         this.request = task;
-        this.travelTimesToStopsEachIteration = travelTimesToStopsEachIteration;
+        this.travelTimesToStopsForIteration = travelTimesToStopsForIteration;
         this.nonTransitTravelTimesToTargets = nonTransitTravelTimesToTargets;
         this.inVehicleTimesToStops = inVehicleTimesToStops;
         this.waitTimesToStops = waitTimesToStops;
         this.pathsToStops = paths;
         this.calculateComponents = inVehicleTimesToStops != null && waitTimesToStops !=null && pathsToStops != null;
         speedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
-        nIterations = travelTimesToStopsEachIteration.length;
-        nStops = travelTimesToStopsEachIteration[0].length;
+        nIterations = travelTimesToStopsForIteration.length;
+        nStops = travelTimesToStopsForIteration[0].length;
         invertTravelTimes();
     }
 
@@ -163,10 +163,10 @@ public class PerTargetPropagater {
      */
     private void invertTravelTimes() {
         long startTime = System.currentTimeMillis();
-        invertedTravelTimesToStops = new int[nStops][nIterations];
+        travelTimesToStop = new int[nStops][nIterations];
         for (int iteration = 0; iteration < nIterations; iteration++) {
             for (int stop = 0; stop < nStops; stop++) {
-                invertedTravelTimesToStops[stop][iteration] = travelTimesToStopsEachIteration[iteration][stop];
+                travelTimesToStop[stop][iteration] = travelTimesToStopsForIteration[iteration][stop];
             }
         }
         LOG.info("Travel time matrix transposition took {} msec", System.currentTimeMillis() - startTime);
@@ -185,7 +185,7 @@ public class PerTargetPropagater {
         if (pointToStopDistanceTable != null) {
             pointToStopDistanceTable.forEachEntry((stop, distanceMillimeters) -> {
                 for (int iteration = 0; iteration < nIterations; iteration++) {
-                    int timeAtStop = invertedTravelTimesToStops[stop][iteration];
+                    int timeAtStop = travelTimesToStop[stop][iteration];
                     if (timeAtStop > cutoffSeconds || timeAtStop > perIterationTravelTimes[iteration]) {
                         continue; // avoid overflow
                     }

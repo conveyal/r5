@@ -81,10 +81,6 @@ public class TravelTimeReducer {
     // In an array with N values this interval is N-1 elements. We should be scaling N-1, which makes the result
     // always defined even when using a high percentile and low number of elements.  Previously, this caused
     // an error below when requesting the 95th percentile when times.length = 1 (or any length less than 10).
-    // Int divide will floor; this is correct because value 0 has travel times of up to one minute, etc.
-    // This means that anything less than a cutoff of (say) 60 minutes (in seconds) will have value 59,
-    // which is what we want. But maybe converting to minutes before we actually export a binary format is tying
-    // the backend and frontend (which makes use of UInt8 typed arrays) too closely.
     private static int findPercentileIndex(int nElements, double percentile) {
         // FIXME this should be floor not round. The definition uses ceiling for one-based indexes and we have zero-based indexes.
         return (int) Math.round(percentile / 100 * nElements);
@@ -106,6 +102,10 @@ public class TravelTimeReducer {
                 if (timeSeconds == FastRaptorWorker.UNREACHED) {
                     percentileTravelTimesMinutes[p] = FastRaptorWorker.UNREACHED;
                 } else {
+                    // Int divide will floor; this is correct because value 0 has travel times of up to one minute, etc.
+                    // This means that anything less than a cutoff of (say) 60 minutes (in seconds) will have value 59,
+                    // which is what we want. But maybe converting to minutes before we actually export a binary format is tying
+                    // the backend and frontend (which makes use of UInt8 typed arrays) too closely.
                     int timeMinutes = timeSeconds / 60;
                     percentileTravelTimesMinutes[p] = timeMinutes;
                 }

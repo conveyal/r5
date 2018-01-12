@@ -49,8 +49,11 @@ public class PerTargetPropagater {
     /** Times at targets using the street network */
     public int[] nonTransitTravelTimesToTargets;
 
-    /** Times at transit stops for each iteration TODO make convenience field for number of iterations (length) */
+    /** Times at transit stops for each iteration. */
     public int[][] travelTimesToStopsEachIteration, invertedTravelTimesToStops;
+
+    /** The number of "iterations" (departure minutes & Monte Carlo schedules) and the number of stops. */
+    private int nIterations, nStops;
 
     /**
      * For the origin stop being handled by this propagator, the various components of the travel time as well as the
@@ -88,6 +91,8 @@ public class PerTargetPropagater {
         this.pathsToStops = paths;
         this.calculateComponents = inVehicleTimesToStops != null && waitTimesToStops !=null && pathsToStops != null;
         speedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
+        nIterations = travelTimesToStopsEachIteration.length;
+        nStops = travelTimesToStopsEachIteration[0].length;
         invertTravelTimes();
     }
 
@@ -98,11 +103,11 @@ public class PerTargetPropagater {
         targets.makePointToStopDistanceTablesIfNeeded();
         long startTimeMillis = System.currentTimeMillis();
 
-        perIterationTravelTimes = new int[travelTimesToStopsEachIteration.length];
+        perIterationTravelTimes = new int[nIterations];
         if (calculateComponents){
-            perIterationInVehicleTimes = new int[travelTimesToStopsEachIteration.length];
-            perIterationWaitTimes = new int[travelTimesToStopsEachIteration.length];
-            perIterationPaths = new int[travelTimesToStopsEachIteration.length];
+            perIterationInVehicleTimes = new int[nIterations];
+            perIterationWaitTimes = new int[nIterations];
+            perIterationPaths = new int[nIterations];
         }
 
         for (int targetIdx = 0; targetIdx < targets.size(); targetIdx++) {
@@ -120,13 +125,8 @@ public class PerTargetPropagater {
                 pathWriter.recordPathsForTarget(perIterationPaths);
             }
         }
-
-        long totalTimeMillis = System.currentTimeMillis() - startTimeMillis;
         LOG.info("Propagating {} iterations from {} stops to {} targets took {}s",
-                travelTimesToStopsEachIteration.length,
-                travelTimesToStopsEachIteration[0].length,
-                targets.size(),
-                totalTimeMillis / 1000d
+                nIterations, nStops, targets.size(), (System.currentTimeMillis() - startTimeMillis) / 1000d
         );
         if (pathWriter != null) {
             pathWriter.finishPaths();
@@ -163,9 +163,9 @@ public class PerTargetPropagater {
      */
     private void invertTravelTimes() {
         long startTime = System.currentTimeMillis();
-        invertedTravelTimesToStops = new int[travelTimesToStopsEachIteration[0].length][travelTimesToStopsEachIteration.length];
-        for (int iteration = 0; iteration < travelTimesToStopsEachIteration.length; iteration++) {
-            for (int stop = 0; stop < travelTimesToStopsEachIteration[0].length; stop++) {
+        invertedTravelTimesToStops = new int[nStops][nIterations];
+        for (int iteration = 0; iteration < nIterations; iteration++) {
+            for (int stop = 0; stop < nStops; stop++) {
                 invertedTravelTimesToStops[stop][iteration] = travelTimesToStopsEachIteration[iteration][stop];
             }
         }
@@ -184,10 +184,11 @@ public class PerTargetPropagater {
         // the reducer below, because you can walk even where there is no transit.
         if (pointToStopDistanceTable != null) {
             pointToStopDistanceTable.forEachEntry((stop, distanceMillimeters) -> {
-                for (int iteration = 0; iteration < perIterationTravelTimes.length; iteration++) {
+                for (int iteration = 0; iteration < nIterations; iteration++) {
                     int timeAtStop = invertedTravelTimesToStops[stop][iteration];
-                    if (timeAtStop > cutoffSeconds || timeAtStop > perIterationTravelTimes[iteration])
+                    if (timeAtStop > cutoffSeconds || timeAtStop > perIterationTravelTimes[iteration]) {
                         continue; // avoid overflow
+                    }
                     int timeAtTargetThisStop = timeAtStop + distanceMillimeters / speedMillimetersPerSecond;
                     if (timeAtTargetThisStop < cutoffSeconds) {
                         if (timeAtTargetThisStop < perIterationTravelTimes[iteration]) {

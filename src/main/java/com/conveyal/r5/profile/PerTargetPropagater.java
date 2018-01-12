@@ -1,7 +1,7 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.OneOriginResult;
-import com.conveyal.r5.analyst.GenericReducer;
+import com.conveyal.r5.analyst.TravelTimeReducer;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -41,7 +41,7 @@ public class PerTargetPropagater {
     public ProfileRequest request;
 
     /** how travel times are summarized and written or streamed back to a client TODO inline that whole class here. */
-    public GenericReducer reducer;
+    public TravelTimeReducer travelTimeReducer;
 
     /** how paths are grouped and written */
     public PathWriter pathWriter;
@@ -122,7 +122,7 @@ public class PerTargetPropagater {
 
             // TODO add reducer for components of total travel time; walkTime should be calculated per-iteration, as it
             // may not hold for some summary statistics that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
-            reducer.recordTravelTimesForTarget(targetIdx, perIterationTravelTimes);
+            travelTimeReducer.recordTravelTimesForTarget(targetIdx, perIterationTravelTimes);
 
             if (pathWriter != null) {
                 pathWriter.recordPathsForTarget(perIterationPaths);
@@ -135,7 +135,7 @@ public class PerTargetPropagater {
             pathWriter.finishPaths();
         }
         targets = null; // Prevent later reuse of this propagator instance.
-        return reducer.finish();
+        return travelTimeReducer.finish();
     }
 
     /**
@@ -144,7 +144,7 @@ public class PerTargetPropagater {
      */
     public OneOriginResult skipPropagation () {
         targets = null; // Prevent later reuse of this propagator instance.
-        return reducer.finish();
+        return travelTimeReducer.finish();
     }
 
     /**

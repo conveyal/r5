@@ -3,7 +3,6 @@ package com.conveyal.r5.analyst;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
-import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.profile.FastRaptorWorker;
@@ -23,7 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -68,7 +66,7 @@ public class TravelTimeComputer {
         PointSet destinations = destinationList.get(0);
 
         // TODO Create and encapsulate this within the propagator.
-        GenericReducer travelTimeReducer = new GenericReducer(request);
+        TravelTimeReducer travelTimeReducer = new TravelTimeReducer(request);
 
         // Attempt to set the origin point before progressing any further.
         // This allows us to skip routing calculations if the network is entirely inaccessible. In the CAR_PARK
@@ -289,12 +287,13 @@ public class TravelTimeComputer {
                 perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request,
                         transitTravelTimesToStops, nonTransitTravelTimesToDestinations, inVehicleTimesToStops,
                         waitTimesToStops, pathsToStops);
-                perTargetPropagater.reducer = travelTimeReducer;
+                // TODO factor out idential lines in else clause
+                perTargetPropagater.travelTimeReducer = travelTimeReducer;
                 perTargetPropagater.pathWriter = new PathWriter(request, network, pathList);
             } else {
                 perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request,
                         transitTravelTimesToStops, nonTransitTravelTimesToDestinations, null, null, null);
-                perTargetPropagater.reducer = travelTimeReducer;
+                perTargetPropagater.travelTimeReducer = travelTimeReducer;
             }
             return perTargetPropagater.propagate();
         }

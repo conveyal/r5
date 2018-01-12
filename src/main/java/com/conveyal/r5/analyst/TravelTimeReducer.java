@@ -8,18 +8,19 @@ import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.TimeGrid;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.profile.FastRaptorWorker;
-import com.conveyal.r5.profile.PerTargetPropagater;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 
 /**
- *
+ * Given a bunch of travel times from an origin to a single destination grid cell, this collapses that long list into a
+ * limited number of percentiles, then optionally accumulates that destination's opportunity count into the appropriate
+ * cumulative opportunities accessibility indicators at that origin.
  */
-public class GenericReducer {
+public class TravelTimeReducer {
 
-    private static final Logger LOG = LoggerFactory.getLogger(GenericReducer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(TravelTimeReducer.class);
 
     /** The task used to create travel times being reduced herein. */
     public final AnalysisTask task;
@@ -39,7 +40,7 @@ public class GenericReducer {
 
     private final int timesPerDestination;
 
-    public GenericReducer(AnalysisTask task) {
+    public TravelTimeReducer(AnalysisTask task) {
 
         this.task = task;
         this.timesPerDestination = task.getMonteCarloDrawsPerMinute() * task.getTimeWindowLengthMinutes();
@@ -91,6 +92,7 @@ public class GenericReducer {
 
     // TODO rename, this does not "record" the travel times, it consumes them or processes them
     public void recordTravelTimesForTarget (int target, int[] times) {
+        // TODO factor out getPercentiles method for clarity
         // Sort the times at each target and read off percentiles at the pre-calculated indexes.
         int[] percentileTravelTimesMinutes = new int[nPercentiles];
         if (times.length == 1) {
@@ -111,10 +113,7 @@ public class GenericReducer {
         } else {
             throw new ParameterException("Must supply expected number of times or only one time.");
         }
-
-        if (retainTravelTimes) {
-            timeGrid.setTarget(target, percentileTravelTimesMinutes);
-        }
+        if (retainTravelTimes) timeGrid.setTarget(target, percentileTravelTimesMinutes);
         if (calculateAccessibility) {
             // This x/y addressing can only work with one grid at a time,
             // needs to be made absolute to handle multiple different extents.

@@ -67,23 +67,20 @@ public class TravelTimeComputer {
         //TODO wrap in loop to repeat for multiple destinations pointsets in a regional request;
         PointSet destinations = destinationList.get(0);
 
-        // Get the appropriate function for reducing travel time, given the type of request we're handling
-        // (either a travel time surface for a single point or a location based accessibility indicator value for a
-        // regional analysis).
-        // TODO Some of these classes could probably just be static functions.
+        // TODO Create and encapsulate this within the propagator.
         GenericReducer travelTimeReducer = new GenericReducer(request);
 
         // Attempt to set the origin point before progressing any further.
-        // This allows us to short circuit calculations if the network is entirely inaccessible. In the CAR_PARK
+        // This allows us to skip routing calculations if the network is entirely inaccessible. In the CAR_PARK
         // case this StreetRouter will be replaced but this still serves to bypass unnecessary computation.
+        // The request must be provided to the StreetRouter before setting the origin point.
         StreetRouter sr = new StreetRouter(network.streetLayer);
-        // Request must be provided to the router before setting the origin point.
         sr.profileRequest = request;
         sr.streetMode = accessMode;
         boolean foundOriginPoint = sr.setOrigin(request.fromLat, request.fromLon);
         if (!foundOriginPoint) {
             // Short circuit around routing and propagation. Calling finish() before streaming in any travel times to
-            // destinations is designed to produce the right result here.
+            // destinations is designed to produce the right result.
             LOG.info("Origin point was outside the transport network. Skipping routing and propagation, and returning default result.");
             return travelTimeReducer.finish();
         }

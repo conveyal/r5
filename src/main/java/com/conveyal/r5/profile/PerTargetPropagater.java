@@ -81,6 +81,9 @@ public class PerTargetPropagater {
      */
     private int[] perIterationPaths, perIterationTravelTimes, perIterationWaitTimes, perIterationInVehicleTimes;
 
+    /**
+     * TODO reduce number of positional parameters
+     */
     public PerTargetPropagater(LinkedPointSet targets, AnalysisTask task, int[][] travelTimesToStopsForIteration, int[] nonTransitTravelTimesToTargets, int[][] inVehicleTimesToStops, int[][] waitTimesToStops, int[][] paths) {
         this.targets = targets;
         this.request = task;

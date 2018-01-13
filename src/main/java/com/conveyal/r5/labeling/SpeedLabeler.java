@@ -61,7 +61,6 @@ public class SpeedLabeler {
     public float getSpeedMS(Way way, boolean back) {
         // first, check for maxspeed tags
         Float speed = null;
-        Float currentSpeed;
 
         if (way.hasTag("maxspeed:motorcar"))
             speed = getMetersSecondFromSpeed(way.getTag("maxspeed:motorcar"));
@@ -74,7 +73,7 @@ public class SpeedLabeler {
 
         if (speed == null && way.hasTag("maxspeed:lanes")) {
             for (String lane : way.getTag("maxspeed:lanes").split("\\|")) {
-                currentSpeed = getMetersSecondFromSpeed(lane);
+                Float currentSpeed = getMetersSecondFromSpeed(lane);
                 // Pick the largest speed from the tag
                 // currentSpeed might be null if it was invalid, for instance 10|fast|20
                 if (currentSpeed != null && (speed == null || currentSpeed > speed))
@@ -87,9 +86,10 @@ public class SpeedLabeler {
 
         // this would be bad, as the segment could never be traversed by an automobile
         // The small epsilon is to account for possible rounding errors
-        if (speed != null && speed < 0.0001)
-            LOG.warn("Zero or negative automobile speed detected at {} based on OSM " +
-                "maxspeed tags; ignoring these tags", this);
+        if (speed != null && speed < 0.0001) {
+            LOG.warn("Automobile speed of {} based on OSM maxspeed tags. Ignoring these tags.", speed);
+            speed = null;
+        }
 
         // if there was a defined speed and it's not 0, we're done
         if (speed != null)

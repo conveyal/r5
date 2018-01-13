@@ -224,7 +224,7 @@ public class EdgeStore implements Serializable {
         //Set when OSM tags are wheelchair==limited currently unroutable
         LIMITED_WHEELCHAIR(19),
 
-        // If this edge is good idea to use for linking. Skips tunnels, covered and motorways for now
+        // If this flag is present, the edge is good idea to use for linking. Excludes runnels, motorways, and covered roads.
         LINKABLE(20),
 
         // Bicycle level of traffic stress for this street.
@@ -992,6 +992,19 @@ public class EdgeStore implements Serializable {
             setFlag(EdgeFlag.ALLOWS_BIKE);
             setFlag(EdgeFlag.ALLOWS_CAR);
             setFlag(EdgeFlag.ALLOWS_WHEELCHAIR);
+        }
+
+        public boolean allowsStreetMode(StreetMode mode) {
+            if (mode == StreetMode.WALK) {
+                return getFlag(EdgeStore.EdgeFlag.ALLOWS_PEDESTRIAN);
+            }
+            if (mode == StreetMode.BICYCLE) {
+                return getFlag(EdgeStore.EdgeFlag.ALLOWS_BIKE);
+            }
+            if (mode == StreetMode.CAR) {
+                return getFlag(EdgeStore.EdgeFlag.ALLOWS_CAR);
+            }
+            throw new RuntimeException("Supplied mode not recognized.");
         }
 
         public long getOSMID() {

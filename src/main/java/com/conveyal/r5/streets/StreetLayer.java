@@ -42,7 +42,6 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
@@ -89,10 +88,20 @@ public class StreetLayer implements Serializable, Cloneable {
 
     /**
      * The radius of a circle in meters within which to search for nearby streets.
-     * This should not necessarily be a constant, but even if it's made settable it should be a field to avoid
-     * cluttering method signatures. Generally you'd set this once at startup and always use the same value afterward.
+     * This should not necessarily be a constant, but even if it's made settable it should be stored in a field on this
+     * class to avoid cluttering method signatures. Generally you'd set this once at startup and always use the same
+     * value afterward.
+     * 1.6km is really far to walk off a street. But some places have offices in the middle of big parking lots.
      */
-    public static final double LINK_RADIUS_METERS = 300;
+    public static final double LINK_RADIUS_METERS = 1600;
+
+    /**
+     * Searching for streets takes a fair amount of computation, and the number of streets examined grows roughly as
+     * the square of the radius. In most cases, the closest street is close to the search center point. If the specified
+     * search radius exceeds this value, a mini-search will first be conducted to check for close-by streets before
+     * examining every street within the full specified search radius.
+     */
+    public static final int INITIAL_LINK_RADIUS_METERS = 300;
 
     // Edge lists should be constructed after the fact from edges. This minimizes serialized size too.
     public transient List<TIntList> outgoingEdges;
@@ -1296,21 +1305,24 @@ public class StreetLayer implements Serializable, Cloneable {
 
     /**
      * Find a location on an existing street near the given point, without actually creating any vertices or edges.
-     * The search radius can be specified freely here because we use this function to link transit stops to streets but
-     * also to link pointsets to streets, and currently we use different distances for these two things.
      * This is a nondestructive operation: it simply finds a candidate split point without modifying anything.
      * This function starts with a small search envelope and expands it as needed under the assumption that most
-     * search envelopes will be close to a road.
-     * TODO favor platforms and pedestrian paths when requested
+     * search points will be close to a road.
+     * TODO favor transit station platforms and pedestrian paths when requested
      * @param lat latitude in floating point geographic coordinates (not fixed point int coordinates)
      * @param lon longitude in floating point geographic coordinates (not fixed point int coordinates)
-     * @return a Split object representing a point along a sub-segment of a specific edge, or null if there are no streets nearby.
+*      @param streetMode a mode of travel that the street must allow
+     * @return a Split object representing a point along a sub-segment of a specific edge, or null if there are no
+     *         streets nearby allowing the specified mode of travel.
      */
     public Split findSplit(double lat, double lon, double radiusMeters, StreetMode streetMode) {
         Split split = null;
-        if (radiusMeters > 300) {
-            split = Split.find(lat, lon, 150, this, streetMode);
+        // If the specified radius is large, first try a mini-search on the assumption
+        // that most linking points are close to roads.
+        if (radiusMeters > INITIAL_LINK_RADIUS_METERS) {
+            split = Split.find(lat, lon, INITIAL_LINK_RADIUS_METERS, this, streetMode);
         }
+        // If no split point was found by the first search (or no search was yet conducted) search with the full radius.
         if (split == null) {
             split = Split.find(lat, lon, radiusMeters, this, streetMode);
         }

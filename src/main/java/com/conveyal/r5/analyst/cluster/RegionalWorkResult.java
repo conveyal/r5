@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
+ * This is the model class used to report accessibility indicators to the backend/broker
  * We report accessibility for a particular travel time cutoff, with travel time defined as a particular percentile.
  * So the rows are the percentiles, and the columns are the accessibility values for particular cutoffs of that percentile of travel time.
  * There are also more cutoffs than percentiles, so given Java's 2D array representation this is more efficient.
@@ -29,7 +30,6 @@ public class RegionalWorkResult {
         // The array values will default to zero, which is what we want for accessibility
         this.accessibilityValues = new int[nGrids][nPercentiles][nTravelTimeCutoffs];
     }
-
 
     public void setAcccessibilityValue (int gridIndex, int percentileIndex, int cutoffMinutesIndex, int value) {
         accessibilityValues[gridIndex][percentileIndex][cutoffMinutesIndex] = value;

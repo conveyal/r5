@@ -4,12 +4,14 @@ import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
+import com.conveyal.r5.multipoint.MultipointMetadata;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.http.HttpEntity;
@@ -110,7 +112,6 @@ public class AnalystWorker implements Runnable {
      * We don't want to just wrap it in a SynchronizedList because we need an atomic copy-and-empty operation.
      */
     private List<RegionalWorkResult> workResults = new ArrayList<>();
-
 
     /**
      * This has been pulled out into a method so the broker can also make a similar http client.
@@ -342,10 +343,12 @@ public class AnalystWorker implements Runnable {
      * This is the callback that processes a single task and returns the results upon completion.
      * It may be called several times simultaneously on different executor threads.
      * This returns a byte array but only for single point requests at this point.
+     * It handles both regional and single point requests... and maybe that's a good thing, and we should make them
+     * ever more interchangeable.
      */
     protected byte[] handleOneRequest(AnalysisTask request) {
         // Record the fact that the worker is busy so it won't shut down.
-        lastRegionalTaskTime = System.currentTimeMillis();
+        lastRegionalTaskTime = System.currentTimeMillis(); // FIXME both regional and single-point are handled here
         if (dryRunFailureRate >= 0) {
             // This worker is running in test mode.
             // It should report all work as completed without actually doing anything,
@@ -391,17 +394,31 @@ public class AnalystWorker implements Runnable {
                 return null;
             }
 
+            // If we are generating a static site, there must be a single metadata file for an entire batch of results.
+            // Arbitrarily we create this metadata as part of the first task in the job.
+            if (request instanceof RegionalTask) {
+                // TODO with new broker that numbers tasks inside a job, use request.taskId == 0
+                if (request.makeStaticSite && ((RegionalTask)request).x == 0 && ((RegionalTask)request).y == 0) {
+                    MultipointMetadata mm = new MultipointMetadata(request, transportNetwork);
+                    LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
+                    mm.write();
+                }
+            }
+
             // FIXME Single and regional tasks are now handled almost identically here. Only the gzipping is different, and that's handled in the caller.
             TravelTimeComputer computer = new TravelTimeComputer(request, transportNetwork, gridCache);
             // FIXME complete weirdness: regional result is returned from method but single point is written directly to outputstream.
-            TravelTimeComputerResult computerResult = computer.compute();
+            OneOriginResult oneOriginResult = computer.computeTravelTimes();
+            // TODO TravelTimeComputerResult computerResult = computer.computeTravelTimes();
             if (request.isHighPriority()) {
-                // This is a single point task.
+                // This is a single point task. Return the travel time grid which will be written back to the client.
                 // We want to gzip the data before sending it back to the broker.
                 // Compression ratios here are extreme (100x is not uncommon).
                 // We had many connection reset by peer, buffer overflows on large files.
-                // Handle gzipping with HTTP headers
-                return computerResult.travelTimesFromOrigin;
+                // Handle gzipping with HTTP headers (caller should already be doing this)
+                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                oneOriginResult.writeTravelTimes(byteArrayOutputStream, transportNetwork.scenarioApplicationWarnings);
+                return byteArrayOutputStream.toByteArray();
             } else {
                 // This is a regional task.
                 // These used to be returned via an SQS queue. Now returning directly to the backend in batches during
@@ -409,18 +426,19 @@ public class AnalystWorker implements Runnable {
                 // limits. Use of a byte array output stream here is a bit redundant since the grid writer already has
                 // a byte array in it.
                 synchronized (workResults) {
-                    workResults.add(computerResult.accessibilityValuesAtOrigin);
+                    // TODO workResults.add(computerResult.accessibilityValuesAtOrigin);
                 }
-                return null;
+                // TODO integrate: oneOriginResult.accessibilityToSqs();
             }
         } catch (Exception ex) {
             // Catch any exceptions that were not handled by more specific catch clauses above.
             // This ensures that some form of error message is passed all the way back up to the web UI.
             TaskError taskError = new TaskError(ex);
-            LOG.error("An error occurred while routing", ex);
+            LOG.error("An error occurred while routing: {}", ex.toString());
+            ex.printStackTrace();
             reportTaskErrors(request.taskId, HttpStatus.INTERNAL_SERVER_ERROR_500, Arrays.asList(taskError));
-            return null;
         }
+        return null;
     }
 
     /**

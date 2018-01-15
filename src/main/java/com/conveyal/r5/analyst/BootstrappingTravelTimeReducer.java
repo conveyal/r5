@@ -105,7 +105,6 @@ public class BootstrappingTravelTimeReducer {
      */
     public OneOriginResult finish () {
         // Only one accessibility figure, no bootstrapping.
-        return new OneOriginResult(task, null,
-                new Origin(task, task.percentiles[0], new int[]{(int) Math.round(accessibility)}));
+        return null;
     }
 }

@@ -32,9 +32,8 @@ public class AccessibilityResult {
         values[gridIndex][cutoffIndex][percentileIndex] += amount;
     }
 
-    // TEMPORARY ADAPTER
-    public Origin makeOrigin(RegionalTask task) {
-        return new Origin(task, percentiles[0], new int[]{(int) Math.round(values[0][0][0])});
+    public double getAccessibility(int gridIndex, int cutoffIndex, int percentileIndex) {
+        return values[gridIndex][cutoffIndex][percentileIndex];
     }
 
 }

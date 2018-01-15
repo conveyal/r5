@@ -135,11 +135,7 @@ public class TravelTimeReducer {
      * routing and propagation when the origin point is not connected to the street network.
      */
     public OneOriginResult finish () {
-        Origin origin = null;
-        if (calculateAccessibility) {
-            origin = accessibilityResult.makeOrigin((RegionalTask)task);
-        }
-        return new OneOriginResult(task, timeGrid, origin);
+        return new OneOriginResult(task, timeGrid, accessibilityResult);
     }
 
 }

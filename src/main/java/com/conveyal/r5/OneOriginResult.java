@@ -4,9 +4,11 @@ import com.amazonaws.services.sqs.AmazonSQS;
 import com.amazonaws.services.sqs.AmazonSQSClient;
 import com.amazonaws.services.sqs.model.MessageAttributeValue;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
+import com.conveyal.r5.analyst.AccessibilityResult;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.Origin;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
+import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.conveyal.r5.analyst.cluster.TimeGrid;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.analyst.error.TaskError;
@@ -34,17 +36,13 @@ public class OneOriginResult {
 
     private static final Logger LOG = LoggerFactory.getLogger(OneOriginResult.class);
 
-    /** SQS client and Base64 encoding: to be removed with new broker. */
-    private static final AmazonSQS sqs = new AmazonSQSClient();
-    private static final Base64.Encoder base64 = Base64.getEncoder();
-
     public final AnalysisTask task; // The task for which this instance holds the results TODO eliminate field
 
     public final TimeGrid timeGrid;
 
-    public final Origin accessibility;
+    public final AccessibilityResult accessibility;
 
-    public OneOriginResult(AnalysisTask task, TimeGrid timeGrid, Origin accessibility) {
+    public OneOriginResult(AnalysisTask task, TimeGrid timeGrid, AccessibilityResult accessibility) {
         this.task = task;
         this.timeGrid = timeGrid;
         this.accessibility = accessibility;
@@ -94,21 +92,16 @@ public class OneOriginResult {
         }
     }
 
-
-    // Will fail if task is not a RegionalTask
-    public void accessibilityToSqs() {
-        // now construct the output
-        // these things are tiny, no problem storing in memory
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        try {
-            accessibility.write(baos);
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        // send this origin to an SQS queue as a binary payload; it will be consumed by GridResultQueueConsumer
-        // and GridResultAssembler
-        SendMessageRequest smr = new SendMessageRequest(((RegionalTask)task).outputQueue, base64.encodeToString(baos.toByteArray()));
-        smr = smr.addMessageAttributesEntry("jobId", new MessageAttributeValue().withDataType("String").withStringValue(task.jobId));
-        sqs.sendMessage(smr);
+    // Convert the accessibility results for this origin into a RegionalWorkResult.
+    // This is a stopgap adapter that should eventually be eliminated. There's no real reason for two different
+    // accessibility classes to exist. AccessibilityResult and RegionalWorkResult should probably be merged into one
+    // class, they were just created in parallel to serve essentially the same purpose.
+    // Or, maybe we should just nest an accessibilityResult inside the RegionalWorkResult, which just adds task ID info.
+    public RegionalWorkResult toRegionalWorkResult(AnalysisTask task) {
+        RegionalWorkResult result = new RegionalWorkResult(task.jobId, task.taskId,
+                accessibility.grids.length, accessibility.percentiles.length, accessibility.cutoffs.length);
+        result.setAcccessibilityValue(0, 0, 0, (int) accessibility.getAccessibility(0, 0, 0));
+        return result;
     }
+
 }

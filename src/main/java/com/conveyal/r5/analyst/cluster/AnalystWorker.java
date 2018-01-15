@@ -406,10 +406,9 @@ public class AnalystWorker implements Runnable {
             }
 
             // FIXME Single and regional tasks are now handled almost identically here. Only the gzipping is different, and that's handled in the caller.
-            TravelTimeComputer computer = new TravelTimeComputer(request, transportNetwork, gridCache);
             // FIXME complete weirdness: regional result is returned from method but single point is written directly to outputstream.
+            TravelTimeComputer computer = new TravelTimeComputer(request, transportNetwork, gridCache);
             OneOriginResult oneOriginResult = computer.computeTravelTimes();
-            // TODO TravelTimeComputerResult computerResult = computer.computeTravelTimes();
             if (request.isHighPriority()) {
                 // This is a single point task. Return the travel time grid which will be written back to the client.
                 // We want to gzip the data before sending it back to the broker.
@@ -426,9 +425,8 @@ public class AnalystWorker implements Runnable {
                 // limits. Use of a byte array output stream here is a bit redundant since the grid writer already has
                 // a byte array in it.
                 synchronized (workResults) {
-                    // TODO workResults.add(computerResult.accessibilityValuesAtOrigin);
+                    workResults.add(oneOriginResult.toRegionalWorkResult(request));
                 }
-                // TODO integrate: oneOriginResult.accessibilityToSqs();
             }
         } catch (Exception ex) {
             // Catch any exceptions that were not handled by more specific catch clauses above.

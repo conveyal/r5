@@ -14,7 +14,7 @@ public class RegionalWorkResult {
 
     public String jobId;
     public int taskId;
-    public int[][][] accessibilityValues;
+    public int[][][] accessibilityValues; // TODO Should this be floating point?
 
     // TODO add a way to signal that an error occurred when processing this task.
     // public String errors;

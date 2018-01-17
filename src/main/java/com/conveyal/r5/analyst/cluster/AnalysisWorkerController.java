@@ -8,9 +8,9 @@ import spark.Response;
 import java.io.ByteArrayOutputStream;
 
 /**
- * This class contains Spark HTTP request handler methods that are provided by the Analysis worker.
- * Currently this is only one method allowing the broker to push single point requests.
- * Created by abyrd on 2017-12-20
+ * This class contains Spark HTTP request handler methods that are served up by Analysis workers.
+ * Currently the broker exposes only a single method that allows the broker to push it single point requests for
+ * immediate processing.
  */
 public class AnalysisWorkerController {
 

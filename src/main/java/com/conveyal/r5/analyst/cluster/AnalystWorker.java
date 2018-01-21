@@ -419,11 +419,9 @@ public class AnalystWorker implements Runnable {
                 oneOriginResult.writeTravelTimes(byteArrayOutputStream, transportNetwork.scenarioApplicationWarnings);
                 return byteArrayOutputStream.toByteArray();
             } else {
-                // This is a regional task.
-                // These used to be returned via an SQS queue. Now returning directly to the backend in batches during
-                // polling. The SQS queue was probably just working around server IO speed problems caused by AWS IOPS
-                // limits. Use of a byte array output stream here is a bit redundant since the grid writer already has
-                // a byte array in it.
+                // This is a regional accessibility indicator task. These used to be returned via an SQS queue.
+                // Now returning directly to the backend in batches of JSON during polling.
+                // The SQS queue was probably just working around server IO speed problems caused by AWS IOPS limits.
                 synchronized (workResults) {
                     workResults.add(oneOriginResult.toRegionalWorkResult(request));
                 }
@@ -450,8 +448,8 @@ public class AnalystWorker implements Runnable {
         HttpPost httpPost = new HttpPost(url);
         WorkerStatus workerStatus = new WorkerStatus();
         workerStatus.loadStatus(this);
-        // Include completed work results when polling the backend.
-        // Atomically copy the list of work results and clear it out while blocking writes from other threads.
+        // Include all completed work results when polling the backend.
+        // Atomically copy and clear the accumulated work results, while blocking writes from other threads.
         synchronized (workResults) {
             workerStatus.results = new ArrayList<>(workResults);
             workResults.clear();

@@ -227,6 +227,7 @@ public class TravelTimeComputer {
             PerTargetPropagater perTargetPropagater;
 
             // The components of travel time or paths were requested
+            // TODO bundle all these into a class RaptorPathDetails
             if (worker.saveAllStates) {
 
                 int iterations = transitTravelTimesToStops.length;
@@ -286,7 +287,7 @@ public class TravelTimeComputer {
                 perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request,
                         transitTravelTimesToStops, nonTransitTravelTimesToDestinations, inVehicleTimesToStops,
                         waitTimesToStops, pathsToStops);
-                // TODO factor out idential lines in else clause
+                // TODO factor out identical lines in else clause
                 perTargetPropagater.travelTimeReducer = travelTimeReducer;
                 perTargetPropagater.pathWriter = new PathWriter(request, network, pathList);
             } else {

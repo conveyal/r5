@@ -221,7 +221,7 @@ public class TravelTimeComputer {
 
             // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
 
-            /* Total travel time, 2D array of [destinationStopIndex][searchIteration]  */
+            /* Total travel time, 2D array of [searchIteration][destinationStopIndex] */
             int[][] transitTravelTimesToStops = worker.route();
 
             PerTargetPropagater perTargetPropagater;

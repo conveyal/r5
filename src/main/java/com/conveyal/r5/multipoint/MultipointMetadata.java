@@ -31,7 +31,6 @@ public class MultipointMetadata {
 
     public void write () {
         // generate and write out metadata
-
         try {
             OutputStream os = MultipointDataStore.getOutputStream(request, "query.json", "application/json");
             writeMetadata(os);

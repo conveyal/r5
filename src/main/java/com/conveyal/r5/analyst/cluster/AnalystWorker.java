@@ -11,6 +11,7 @@ import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
+import com.conveyal.r5.multipoint.MultipointDataStore;
 import com.conveyal.r5.multipoint.MultipointMetadata;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -345,6 +346,8 @@ public class AnalystWorker implements Runnable {
      * This returns a byte array but only for single point requests at this point.
      * It handles both regional and single point requests... and maybe that's a good thing, and we should make them
      * ever more interchangeable.
+     *
+     * TODO split this out into one "handle immediately" method that returns a byte[] and a void method for async tasks
      */
     protected byte[] handleOneRequest(AnalysisTask request) {
         // Record the fact that the worker is busy so it won't shut down.
@@ -396,19 +399,15 @@ public class AnalystWorker implements Runnable {
 
             // If we are generating a static site, there must be a single metadata file for an entire batch of results.
             // Arbitrarily we create this metadata as part of the first task in the job.
-            if (request instanceof RegionalTask) {
-                // TODO with new broker that numbers tasks inside a job, use request.taskId == 0
-                if (request.makeStaticSite && ((RegionalTask)request).x == 0 && ((RegionalTask)request).y == 0) {
-                    MultipointMetadata mm = new MultipointMetadata(request, transportNetwork);
-                    LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
-                    mm.write();
-                }
+            if (request instanceof RegionalTask && request.makeStaticSite && request.taskId == 0) {
+                LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
+                MultipointMetadata mm = new MultipointMetadata(request, transportNetwork);
+                mm.write();
             }
 
-            // FIXME Single and regional tasks are now handled almost identically here. Only the gzipping is different, and that's handled in the caller.
-            // FIXME complete weirdness: regional result is returned from method but single point is written directly to outputstream.
             TravelTimeComputer computer = new TravelTimeComputer(request, transportNetwork, gridCache);
             OneOriginResult oneOriginResult = computer.computeTravelTimes();
+            // TODO switch mainly on what's present in the result, not on the request type
             if (request.isHighPriority()) {
                 // This is a single point task. Return the travel time grid which will be written back to the client.
                 // We want to gzip the data before sending it back to the broker.
@@ -416,12 +415,32 @@ public class AnalystWorker implements Runnable {
                 // We had many connection reset by peer, buffer overflows on large files.
                 // Handle gzipping with HTTP headers (caller should already be doing this)
                 ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                oneOriginResult.writeTravelTimes(byteArrayOutputStream, transportNetwork.scenarioApplicationWarnings);
+                // This travel time surface is being produced by a single-origin task.
+                // We could be making a grid or a TIFF.
+                TravelTimeSurfaceTask timeSurfaceTask = (TravelTimeSurfaceTask) request;
+                if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GRID) {
+                    // Return raw byte array representing grid to caller, for return to client over HTTP.
+                    byteArrayOutputStream.write(oneOriginResult.timeGrid.writeGrid());
+                    addErrorJson(byteArrayOutputStream, transportNetwork.scenarioApplicationWarnings);
+                } else if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
+                    oneOriginResult.timeGrid.writeGeotiff(byteArrayOutputStream);
+                }
+                // FIXME strangeness, only travel time results are returned from method, accessibility results return null and are accumulated for async delivery.
+                // Return raw byte array containing grid or TIFF file to caller, for return to client over HTTP.
+                byteArrayOutputStream.close();
                 return byteArrayOutputStream.toByteArray();
             } else {
-                // This is a regional accessibility indicator task. These used to be returned via an SQS queue.
-                // Now returning directly to the backend in batches of JSON during polling.
-                // The SQS queue was probably just working around server IO speed problems caused by AWS IOPS limits.
+                // This is a single task within a regional analysis with many origins.
+                if (request.makeStaticSite) {
+                    // This is actually a time grid, because we're generating a bunch of those for a static site.
+                    OutputStream s3stream = MultipointDataStore.getOutputStream(request, request.taskId + "_times.dat", "application/octet-stream");
+                    s3stream.write(oneOriginResult.timeGrid.writeGrid());
+                    // TODO ? addErrorJson(s3stream, transportNetwork.scenarioApplicationWarnings);
+                    s3stream.close();
+                }
+                // Accumulate accessibility results to return to the backend in batches.
+                // This is usually an accessibility indicator value for one of many origins, but in the case of a static
+                // site we still want to return dummy / zero accessibility results so the backend is aware of progress.
                 synchronized (workResults) {
                     workResults.add(oneOriginResult.toRegionalWorkResult(request));
                 }
@@ -435,6 +454,20 @@ public class AnalystWorker implements Runnable {
             reportTaskErrors(request.taskId, HttpStatus.INTERNAL_SERVER_ERROR_500, Arrays.asList(taskError));
         }
         return null;
+    }
+
+    /**
+     * This is somewhat hackish - when we want to return errors to the UI, we just append them as JSON at the end of
+     * a binary result. We always append this JSON even when there are no errors so the UI has something to decode,
+     * even if it's an empty list.
+     */
+    public static void addErrorJson (OutputStream outputStream, List<TaskError> scenarioApplicationWarnings) throws IOException {
+        LOG.info("Travel time surface written, appending metadata with scenario application {} warnings", scenarioApplicationWarnings.size());
+        // We create a single-entry map because this converts easily to a JSON object.
+        Map<String, List<TaskError>> errorsToSerialize = new HashMap<>();
+        errorsToSerialize.put("scenarioApplicationWarnings", scenarioApplicationWarnings);
+        JsonUtilities.objectMapper.writeValue(outputStream, errorsToSerialize);
+        LOG.info("Done writing");
     }
 
     /**
@@ -470,7 +503,7 @@ public class AnalystWorker implements Runnable {
                 EntityUtils.consumeQuietly(entity);
                 return null;
             }
-            // Use the lenient object mapper here in case the broker belongs to a newer
+            // Use the lenient object mapper here in case the broker is a newer version so sending unrecognizable fields
             return JsonUtilities.lenientObjectMapper.readValue(entity.getContent(), new TypeReference<List<AnalysisTask>>() {});
         } catch (JsonProcessingException e) {
             LOG.error("JSON processing exception while getting work", e);
@@ -509,13 +542,13 @@ public class AnalystWorker implements Runnable {
      * Requires a worker configuration, which is a Java Properties file with the following
      * attributes.
      *
-     * broker-address               address of the broker, without protocol or port
-     * broker-port                  port broker is running on, default 80.
-     * graphs-bucket                S3 bucket in which graphs are stored.
-     * pointsets-bucket             S3 bucket in which pointsets are stored
-     * auto-shutdown                Should this worker shut down its machine if it is idle (e.g. on throwaway cloud instances)
-     * statistics-queue             SQS queue to which to send statistics (optional)
-     * initial-graph-id             The graph ID for this worker to start on
+     * broker-address     address of the broker, without protocol or port
+     * broker-port        port broker is running on, default 80.
+     * graphs-bucket      S3 bucket in which graphs are stored.
+     * pointsets-bucket   S3 bucket in which pointsets are stored
+     * auto-shutdown      Should this worker shut down its machine if it is idle (e.g. on throwaway cloud instances)
+     * statistics-queue   SQS queue to which to send statistics (optional)
+     * initial-graph-id   The graph ID for this worker to start on
      */
     public static void main(String[] args) {
         LOG.info("Starting R5 Analyst Worker version {}", R5Version.version);

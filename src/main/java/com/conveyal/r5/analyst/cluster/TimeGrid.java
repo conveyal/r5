@@ -105,24 +105,14 @@ public class TimeGrid {
         }
     }
 
-    /**
-     * Writes the flat binary format (header, followed by values for each pixel) to an output stream.
-     *
-     * Uses Java NIO ByteBuffer so ByteOrder.LITTLE_ENDIAN can be set
-     * @param out
-     * @throws IOException
-     */
-    public void writeGrid(OutputStream out) throws IOException {
-
-        out.write(writeGrid());
-    }
-
     // FIXME why don't we write this straight to a stream instead of buffering and doing address math?
     // Do we really want to buffer this in memory?
-    // It seems like the main reason is just getting little-endian byte order for JavaScript typed arrays.
+    // It seems like the main reason to use a byte array is to get little-endian byte order for JavaScript typed arrays.
     // Could we use a Guava little-endian output stream?
     public byte[] writeGrid() {
-        ByteBuffer buffer = ByteBuffer.allocate(nValues * Integer.BYTES + HEADER_SIZE);
+        int sizeInBytes = nValues * Integer.BYTES + HEADER_SIZE;
+        LOG.info("Writing travel time surface of size {} kB", sizeInBytes / 1000);
+        ByteBuffer buffer = ByteBuffer.allocate(sizeInBytes);
         buffer.order(ByteOrder.LITTLE_ENDIAN);
         // Write header
         buffer.put(gridType.getBytes());

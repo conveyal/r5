@@ -86,24 +86,12 @@ public class SelectingGridReducer {
                 for (int iteration = 0, val = 0; iteration < nSamples; iteration++) {
                     valuesThisOrigin[iteration] = (val += input.readInt());
                 }
-
                 // compute percentiles
-                outputGrid.grid[x][y] = computeValueForOrigin(x, y, valuesThisOrigin, zoom, west, north, width, height);
+                outputGrid.grid[x][y] = valuesThisOrigin[index];
             }
         }
-
         input.close();
-
         return outputGrid;
     }
 
-    /**
-     * Compute a single value summarizing all the samples of accessibility at a given origin point.
-     * In this case, just extract a single value out of the list of values.
-     * This function could easily be inlined, but we're leaving it separate as an indicator of how to make grid
-     * reduce operations abstract (so you could have more than one different one).
-     */
-    protected double computeValueForOrigin(int x, int y, int[] valuesThisOrigin, int zoom, int west, int north, int width, int height) {
-        return valuesThisOrigin[index];
-    }
 }

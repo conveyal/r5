@@ -550,7 +550,7 @@ public class AnalystWorker implements Runnable {
      * statistics-queue   SQS queue to which to send statistics (optional)
      * initial-graph-id   The graph ID for this worker to start on
      */
-    public static void main(String[] args) {
+    public static void main (String[] args) {
         LOG.info("Starting R5 Analyst Worker version {}", R5Version.version);
         LOG.info("R5 commit is {}", R5Version.commit);
         LOG.info("R5 describe is {}", R5Version.describe);

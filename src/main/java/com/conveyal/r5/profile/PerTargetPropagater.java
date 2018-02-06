@@ -31,7 +31,10 @@ public class PerTargetPropagater {
 
     // FIXME why are these fields public?
 
-    /** The travel time cutoff in this regional analysis FIXME why would this have a default value? */
+    /**
+     * The maximum travel time we will record and report. To limit calculation time and avoid overflow places this
+     * many seconds from the origin are just considered unreachable.
+     */
     public int cutoffSeconds = 120 * 60;
 
     /** The targets, linked to the street network. */
@@ -161,7 +164,7 @@ public class PerTargetPropagater {
      * targets with geographic locality (adjacent cells in the destination grid are geographically adjacent),
      * it is likely that the stops pulled into cache by handling one target will be reused when handling the next target.
      * This should not increase memory consumption very much as we're only duplicating the travel times to transit
-     * stops. For eacmple, the Netherlands has about 70,000 stops, if you do 1,000 iterations to 70,000 stops, the
+     * stops. For example, the Netherlands has about 70,000 stops, if you do 1,000 iterations to 70,000 stops, the
      * array being transposed and duplicated is 70,000 * 1000 * 4 bytes per int ~= 267 megabytes. It does not seem
      * worthwhile to change the routing algorithm to output already-transposed data, as that will create memory
      * locality problems elsewhere (since the pathfinding algorithm solves one iteration for all stops simultaneously).

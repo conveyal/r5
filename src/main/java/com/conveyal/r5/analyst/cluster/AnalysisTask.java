@@ -47,10 +47,14 @@ public abstract class AnalysisTask extends ProfileRequest {
     public int taskId;
 
     /**
-     * Whether to save results on S3. If null or empty, the response to this task will be via the
-     * default channel (broker for single-point requests, queue for regional requests).
-     * The results will actually be stored in a sub-bucket named after the job ID.
-     * FIXME in practice this always implies travelTimeBreakdown and returnPaths, so we've got redundant and potentially incoherent information.
+     * Whether to save results on S3.
+     * If false, the results will only be sent back to the broker or UI.
+     * If true, travel time surfaces will be saved to S3
+     * Currently this only works on regional requests, and causes them to produce travel time surfaces instead of
+     * accessibility indicator values.
+     * FIXME in practice this always implies travelTimeBreakdown and returnPaths, so we've got redundant and potentially incoherent information in the request.
+     * The intent is in the future to make all these options separate - we can make either travel time surfaces or
+     * accessibility indicators or both, and they may or may not be saved to S3.
      */
     public boolean makeStaticSite = false;
 

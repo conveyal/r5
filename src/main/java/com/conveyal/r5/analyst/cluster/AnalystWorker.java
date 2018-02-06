@@ -89,9 +89,10 @@ public class AnalystWorker implements Runnable {
     public int dryRunFailureRate = -1;
 
     /** How long (minimum, in milliseconds) should this worker stay alive after processing a single-point task. */
+    /** The minimum amount of time (in minutes) that this worker should stay alive after processing a single-point task. */
     public static final int SINGLE_KEEPALIVE_MINUTES = 30;
 
-    /** How long (minimum, in milliseconds) should this worker stay alive after processing a regional job task. */
+    /** The minimum amount of time (in minutes) that this worker should stay alive after processing a regional job task. */
     public static final int REGIONAL_KEEPALIVE_MINUTES = 1;
 
     /** Whether this worker should shut down automatically when idle. */
@@ -168,7 +169,7 @@ public class AnalystWorker implements Runnable {
     private spark.Service sparkHttpService;
 
     public static AnalystWorker forConfig (Properties config) {
-        // FIXME why is there a separate configuration parsing section here? Why not always make the cache base on the configuration?
+        // FIXME why is there a separate configuration parsing section here? Why not always make the cache based on the configuration?
         boolean workOffline = Boolean.parseBoolean(config.getProperty("work-offline", "false"));
         String graphsBucket = workOffline ? null : config.getProperty("graphs-bucket");
         String graphDirectory = config.getProperty("cache-dir", "cache/graphs");
@@ -542,13 +543,10 @@ public class AnalystWorker implements Runnable {
      * Requires a worker configuration, which is a Java Properties file with the following
      * attributes.
      *
-     * broker-address     address of the broker, without protocol or port
-     * broker-port        port broker is running on, default 80.
      * graphs-bucket      S3 bucket in which graphs are stored.
      * pointsets-bucket   S3 bucket in which pointsets are stored
      * auto-shutdown      Should this worker shut down its machine if it is idle (e.g. on throwaway cloud instances)
-     * statistics-queue   SQS queue to which to send statistics (optional)
-     * initial-graph-id   The graph ID for this worker to start on
+     * initial-graph-id   The graph ID for this worker to load immediately upon startup
      */
     public static void main (String[] args) {
         LOG.info("Starting R5 Analyst Worker version {}", R5Version.version);

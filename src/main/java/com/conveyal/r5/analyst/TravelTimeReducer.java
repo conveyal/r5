@@ -111,7 +111,7 @@ public class TravelTimeReducer {
                 }
             }
         } else {
-            throw new ParameterException("Must supply expected number of times or only one time.");
+            throw new ParameterException("You must supply the expected number of travel time values (or only one value).");
         }
         if (retainTravelTimes) timeGrid.setTarget(target, percentileTravelTimesMinutes);
         if (calculateAccessibility) {

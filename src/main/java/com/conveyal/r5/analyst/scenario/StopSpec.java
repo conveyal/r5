@@ -8,18 +8,28 @@ import java.util.Set;
 
 /**
  * This represents either an existing or a new stop in Modifications when creating or inserting stops into routes.
- * If the id already exists, the existing stop is used. If not, a new stop is created.
+ * If an ID is specified, an existing stop with that ID is referenced. If no ID is specified, a new stop is created
+ * at the specified coordinates.
+ * NOTE: either an ID or coodinate should be specified but not both. If an ID is specified, coordinates should remain
+ * at their default value of (0,0).
 */
 public class StopSpec implements Serializable {
 
     public static final long serialVersionUID = 1L;
 
-    /** create a stop spec for a particular stop ID */
+    /**
+     * Re-use an existing stop from baseline GTFS data, given a stop ID.
+     * In this case the StopSpec object will have a non-null ID field,
+     * but lat and lon remain at their default values of zero.
+     */
     public StopSpec (String id) {
         this.id = id;
     }
 
-    /** Create a stop spec at a particular location */
+    /**
+     * Create a new stop at a particular location, rather than reusing a stop from the baseline GTFS.
+     * In this case the StopSpec object should have a non-zero lat and lon, but should have a null ID.
+     */
     public StopSpec (double lon, double lat) {
         this.lat = lat;
         this.lon = lon;

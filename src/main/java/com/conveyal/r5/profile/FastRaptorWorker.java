@@ -140,7 +140,10 @@ public class FastRaptorWorker {
         monteCarloDrawsPerMinute = request.getMonteCarloDrawsPerMinute();
     }
 
-    /** For each iteration, return the travel time to each transit stop */
+    /**
+     * For each iteration (minute + MC draw combination), return the minimum travel time to each transit stop in seconds.
+     * Return value dimension order is [searchIteration][transitStopIndex]
+     */
     public int[][] route () {
         startClockTime = System.nanoTime();
 
@@ -162,7 +165,7 @@ public class FastRaptorWorker {
             // run the search
             int[][] resultsForMinute = runRaptorForMinute(departureTime, monteCarloDrawsPerMinute);
 
-            // effectively final nonsense
+            // effectively final nonsense FIXME we could avoid this "final" weirdness by just using non-stream loop syntax
             final int finalDepartureTime = departureTime;
             for (int[] resultsForIteration : resultsForMinute) {
                 // NB this copies the array, so we don't have issues with it being updated later

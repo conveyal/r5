@@ -193,7 +193,7 @@ public class AnalystWorker implements Runnable {
         {
             String brokerAddress = config.getProperty("broker-address", DEFAULT_BROKER_ADDRESS);
             String brokerPort = config.getProperty("broker-port", DEFAULT_BROKER_PORT);
-            this.brokerBaseUrl = String.format("http://%s:%s/api", brokerAddress, brokerPort);
+            this.brokerBaseUrl = String.format("http://%s:%s/internal", brokerAddress, brokerPort);
         }
 
         // set the initial graph affinity of this worker (if it is not in the config file it will be
@@ -522,7 +522,9 @@ public class AnalystWorker implements Runnable {
     /**
      * Report to the broker that the task taskId could not be processed due to errors.
      * The broker should then pass the errors back up to the client that enqueued that task.
-     * That objects are always the same type (TaskError) so the client knows what to expect.
+     * Those objects are always the same type (TaskError) so the client knows what to expect.
+     * FIXME this task reporting mechanism seems to be using an endpoint that's no longer defined.
+     * We should probably just include errors in the regional results JSON returned to the backend.
      */
     public void reportTaskErrors(int taskId, int httpStatusCode, List<TaskError> taskErrors) {
         String url = brokerBaseUrl + String.format("/complete/%d/%s", httpStatusCode, taskId);

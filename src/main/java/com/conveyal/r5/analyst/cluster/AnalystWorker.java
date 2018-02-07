@@ -478,7 +478,7 @@ public class AnalystWorker implements Runnable {
         // Run a POST task (poll for work)
         // The graph and r5 commit of this worker are indicated in the task body.
         // TODO return any work results in this same call
-        String url = brokerBaseUrl + "/dequeue"; // TODO rename to "poll" since this does more than dequeue
+        String url = brokerBaseUrl + "/poll";
         HttpPost httpPost = new HttpPost(url);
         WorkerStatus workerStatus = new WorkerStatus();
         workerStatus.loadStatus(this);

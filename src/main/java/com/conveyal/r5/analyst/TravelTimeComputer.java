@@ -289,7 +289,7 @@ public class TravelTimeComputer {
                         waitTimesToStops, pathsToStops);
                 // TODO factor out identical lines in else clause
                 perTargetPropagater.travelTimeReducer = travelTimeReducer;
-                perTargetPropagater.pathWriter = new PathWriter(request, network, pathList);
+                perTargetPropagater.pathWriter = new PathWriter(request, network, pathList, egressModeLinkedDestinations.size(), transitTravelTimesToStops.length);
             } else {
                 perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request,
                         transitTravelTimesToStops, nonTransitTravelTimesToDestinations, null, null, null);

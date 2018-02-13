@@ -5,9 +5,11 @@ import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
-import org.joda.time.DateTime;
+import com.google.common.io.LittleEndianDataOutputStream;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.util.zip.GZIPOutputStream;
 
 /**
@@ -24,7 +26,7 @@ public abstract class MultipointDataStore {
      * Get an output stream to upload an object to S3 for the given static site request.
      * There is no need to gzip data going into this stream, it will be gzipped on upload in storage and when downloaded
      */
-    public static OutputStream getOutputStream (AnalysisTask req, String filename, String type) throws IOException {
+    public static LittleEndianDataOutputStream getOutputStream (AnalysisTask req, String filename, String type) throws IOException {
         ObjectMetadata md = new ObjectMetadata();
         // This way the browser will decompress on download
         // http://www.rightbrainnetworks.com/blog/serving-compressed-gzipped-static-files-from-amazon-s3-or-cloudfront/
@@ -44,6 +46,6 @@ public abstract class MultipointDataStore {
             s3.putObject(por);
         }).start();
 
-        return new GZIPOutputStream(pipeOut);
+        return new LittleEndianDataOutputStream(new GZIPOutputStream(pipeOut));
     }
 }

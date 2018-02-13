@@ -92,6 +92,7 @@ public class WorkerStatus {
         } else {
             // Get whatever is the default IP address
             try {
+                // FIXME this appears to be favoring IPv6 which makes for buggy URLs
                 ipAddress = InetAddress.getLocalHost().getHostAddress();
             } catch (UnknownHostException e) {
                 ipAddress = "127.0.0.1";

@@ -22,7 +22,7 @@ import java.util.List;
 public class PathWriter {
     private static final Logger LOG = LoggerFactory.getLogger(PathWriter.class);
 
-        /** The network used to compute the travel time results */
+    /** The network used to compute the travel time results */
     public final TransportNetwork network;
 
     /** The task used to create travel times being reduced herein */

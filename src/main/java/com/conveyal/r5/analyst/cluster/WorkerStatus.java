@@ -36,6 +36,7 @@ public class WorkerStatus {
     public String workerId;
     public Set<String> networks = new HashSet<>();
     public Set<String> scenarios = new HashSet<>();
+    public double secondsSinceLastPoll;
     public double tasksPerMinute;
     @JsonUnwrapped(prefix = "ec2")
     public EC2Info ec2;

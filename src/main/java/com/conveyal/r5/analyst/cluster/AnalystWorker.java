@@ -13,14 +13,12 @@ import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
 import com.conveyal.r5.multipoint.MultipointDataStore;
 import com.conveyal.r5.multipoint.MultipointMetadata;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.config.SocketConfig;
-import org.apache.http.conn.HttpHostConnectException;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
@@ -31,7 +29,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
-import java.net.SocketTimeoutException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -114,6 +111,16 @@ public class AnalystWorker implements Runnable {
      * We don't want to just wrap it in a SynchronizedList because we need an atomic copy-and-empty operation.
      */
     private List<RegionalWorkResult> workResults = new ArrayList<>();
+
+    /** The last time (in milliseconds since the epoch) that we polled for work. */
+    private long lastPollingTime;
+
+    /**
+     * A list of times at which tasks have been completed. Regularly truncated to only times in the last minute.
+     */
+    // TODO replace with TaskStats containing more info about timing breakdown
+    // private List<TaskStats> taskStats = new LinkedList<>();
+    List<Long> recentTaskCompletionTimes = new LinkedList<>();
 
     /**
      * This has been pulled out into a method so the broker can also make a similar http client.
@@ -292,7 +299,9 @@ public class AnalystWorker implements Runnable {
 
         // Before we go into an endless loop polling for regional tasks that can be computed asynchronously, start a
         // single-endpoint web server on this worker to receive single-point requests that must be handled immediately.
+        // This is listening on a different port than the backend API so that a worker can be running on the backend.
         // Trying out the new Spark syntax for non-static configuration.
+        // TODO symbolic constants for the backend and worker ports
         sparkHttpService = spark.Service.ignite()
             .port(7080)
             .threadPool(10);
@@ -429,6 +438,9 @@ public class AnalystWorker implements Runnable {
                 // FIXME strangeness, only travel time results are returned from method, accessibility results return null and are accumulated for async delivery.
                 // Return raw byte array containing grid or TIFF file to caller, for return to client over HTTP.
                 byteArrayOutputStream.close();
+                synchronized (recentTaskCompletionTimes) {
+                    recentTaskCompletionTimes.add(System.currentTimeMillis());
+                }
                 return byteArrayOutputStream.toByteArray();
             } else {
                 // This is a single task within a regional analysis with many origins.
@@ -444,6 +456,9 @@ public class AnalystWorker implements Runnable {
                 // site we still want to return dummy / zero accessibility results so the backend is aware of progress.
                 synchronized (workResults) {
                     workResults.add(oneOriginResult.toRegionalWorkResult(request));
+                }
+                synchronized (recentTaskCompletionTimes) {
+                    recentTaskCompletionTimes.add(System.currentTimeMillis());
                 }
             }
         } catch (Exception ex) {
@@ -472,12 +487,12 @@ public class AnalystWorker implements Runnable {
     }
 
     /**
-     * @return null if no work could be fetched.
+     * Ask the backend if it has any work for this worker, considering its software version and loaded networks.
+     * Also report the worker status to the backend, serving as a heartbeat so the backend knows this worker is alive.
+     * Also returns any accumulated work results to the backend.
+     * @return a list of work tasks, or null if there was no work to do, or if no work could be fetched.
      */
     public List<AnalysisTask> getSomeWork () {
-        // Run a POST task (poll for work)
-        // The graph and r5 commit of this worker are indicated in the task body.
-        // TODO return any work results in this same call
         String url = brokerBaseUrl + "/poll";
         HttpPost httpPost = new HttpPost(url);
         WorkerStatus workerStatus = new WorkerStatus(this);
@@ -487,6 +502,23 @@ public class AnalystWorker implements Runnable {
             workerStatus.results = new ArrayList<>(workResults);
             workResults.clear();
         }
+
+        // Compute throughput in tasks per minute and include it in the worker status report.
+        // We poll too frequently to compute throughput just since the last poll operation.
+        // TODO reduce polling frequency (larger queue in worker), compute shorter-term throughput.
+        synchronized (recentTaskCompletionTimes) {
+            long oneMinuteAgo = System.currentTimeMillis() - 1000 * 60;
+            while (!recentTaskCompletionTimes.isEmpty() && recentTaskCompletionTimes.get(0) < oneMinuteAgo) {
+                recentTaskCompletionTimes.remove(0);
+            }
+            workerStatus.tasksPerMinute = recentTaskCompletionTimes.size();
+        }
+
+        // Report how often we're polling for work, just for monitoring.
+        long timeNow = System.currentTimeMillis();
+        workerStatus.secondsSinceLastPoll = (timeNow - lastPollingTime) / 1000D;
+        lastPollingTime = timeNow;
+
         httpPost.setEntity(JsonUtilities.objectToJsonHttpEntity(workerStatus));
         try {
             HttpResponse response = httpClient.execute(httpPost);

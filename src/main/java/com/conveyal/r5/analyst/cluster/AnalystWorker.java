@@ -480,8 +480,7 @@ public class AnalystWorker implements Runnable {
         // TODO return any work results in this same call
         String url = brokerBaseUrl + "/poll";
         HttpPost httpPost = new HttpPost(url);
-        WorkerStatus workerStatus = new WorkerStatus();
-        workerStatus.loadStatus(this);
+        WorkerStatus workerStatus = new WorkerStatus(this);
         // Include all completed work results when polling the backend.
         // Atomically copy and clear the accumulated work results, while blocking writes from other threads.
         synchronized (workResults) {

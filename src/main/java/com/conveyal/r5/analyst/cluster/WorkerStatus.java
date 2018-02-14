@@ -50,19 +50,12 @@ public class WorkerStatus {
     /** No-arg constructor used when deserializing. */
     public WorkerStatus() { }
 
-    /**
-     * Call this method to fill in the fields of the WorkerStatus object.
-     * It must be called on the same machine that the AnalystWorker is running on because it examines the JVM it is
-     * running on.
-     * This is not done in the constructor because this class is intended to hold deserialized data, and therefore
-     * needs a minimalist no-arg constructor.
-     * TODO why can't we have two constructors? We only ever load into a status object right after creating it.
-     */
-    public void loadStatus(AnalystWorker worker) {
+    /** Constructor that fills in all the fields with information about the machine it's running on. */
+    public WorkerStatus (AnalystWorker worker) {
 
         workerName = "R5";
         workerVersion = R5Version.describe;
-        workerId = worker.machineId;
+        workerId = worker.machineId; // TODO overwrite with cloud provider (EC2) machine ID in a generic way
         networks = worker.transportNetworkCache.getLoadedNetworkIds();
         scenarios = worker.transportNetworkCache.getAppliedScenarios();
         ec2 = worker.ec2info;
@@ -91,8 +84,8 @@ public class WorkerStatus {
             ipAddress = ec2.privateIp;
         } else {
             // Get whatever is the default IP address
+            // FIXME this appears to be favoring IPv6 on MacOS which makes for buggy URLs
             try {
-                // FIXME this appears to be favoring IPv6 which makes for buggy URLs
                 ipAddress = InetAddress.getLocalHost().getHostAddress();
             } catch (UnknownHostException e) {
                 ipAddress = "127.0.0.1";

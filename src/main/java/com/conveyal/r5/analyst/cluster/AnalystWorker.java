@@ -505,17 +505,10 @@ public class AnalystWorker implements Runnable {
             }
             // Use the lenient object mapper here in case the broker is a newer version so sending unrecognizable fields
             return JsonUtilities.lenientObjectMapper.readValue(entity.getContent(), new TypeReference<List<AnalysisTask>>() {});
-        } catch (JsonProcessingException e) {
-            LOG.error("JSON processing exception while getting work", e);
-        } catch (SocketTimeoutException stex) {
-            LOG.debug("Socket timeout while waiting to receive work.");
-        } catch (HttpHostConnectException ce) {
-            LOG.error("Broker refused connection.");
-        } catch (IOException e) {
-            LOG.error("IO exception while getting work", e);
+        } catch (Exception e) {
+            LOG.error("Exception while polling backend for work: {}", e.toString());
         }
         return null;
-
     }
 
     /**

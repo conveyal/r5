@@ -332,6 +332,8 @@ public class AnalystWorker implements Runnable {
                         break;
                     } catch (RejectedExecutionException e) {
                         // Queue is full, wait a bit and try to feed it more tasks.
+                        // FIXME on analyses where we burn through the internal queue in less than 1 second this is the limiting factor on speed
+                        // This happens with regions unconnected to transit and with very small travel time cutoffs
                         sleepSeconds(1);
                     }
                 }

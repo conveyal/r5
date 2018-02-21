@@ -1,29 +1,9 @@
 package com.conveyal.r5;
 
-import com.amazonaws.services.sqs.AmazonSQS;
-import com.amazonaws.services.sqs.AmazonSQSClient;
-import com.amazonaws.services.sqs.model.MessageAttributeValue;
-import com.amazonaws.services.sqs.model.SendMessageRequest;
 import com.conveyal.r5.analyst.AccessibilityResult;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
-import com.conveyal.r5.analyst.cluster.Origin;
-import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.conveyal.r5.analyst.cluster.TimeGrid;
-import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
-import com.conveyal.r5.analyst.error.TaskError;
-import com.conveyal.r5.common.JsonUtilities;
-import com.conveyal.r5.multipoint.MultipointDataStore;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * This provides a single return type for all the kinds of results we can get from a travel time computer and reducer

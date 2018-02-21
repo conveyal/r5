@@ -47,7 +47,7 @@ import java.util.concurrent.TimeUnit;
  * The worker can poll for work over two different channels. One is for large asynchronous batch jobs, the other is
  * intended for interactive single point requests that should return as fast as possible.
  *
- * TODO rename AnalysisWorker
+ * TODO rename AnalysisWorker <---
  */
 public class AnalystWorker implements Runnable {
 
@@ -117,6 +117,7 @@ public class AnalystWorker implements Runnable {
 
     /**
      * A list of times at which tasks have been completed. Regularly truncated to only times in the last minute.
+     * This allows reporting average throughput over different timescales up to one minute.
      */
     // TODO replace with TaskStats containing more info about timing breakdown
     // private List<TaskStats> taskStats = new LinkedList<>();

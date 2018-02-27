@@ -1,9 +1,9 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.TravelTimeComputer;
@@ -13,7 +13,10 @@ import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
 import com.conveyal.r5.multipoint.MultipointDataStore;
 import com.conveyal.r5.multipoint.MultipointMetadata;
+import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TransportNetworkCache;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.common.io.LittleEndianDataOutputStream;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -22,16 +25,27 @@ import org.apache.http.config.SocketConfig;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
-import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.transit.TransportNetworkCache;
 import org.eclipse.jetty.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
@@ -142,6 +156,10 @@ public class AnalystWorker implements Runnable {
     GridCache gridCache;
 
     // Clients for communicating with Amazon web services
+    // When creating the S3 and SQS clients use the default credentials chain.
+    // This will check environment variables and ~/.aws/credentials first, then fall back on
+    // the auto-assigned IAM role if this code is running on an EC2 instance.
+    // http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/java-dg-roles.html
     AmazonS3 s3;
 
     /** The transport network this worker already has loaded, and therefore prefers to work on. */
@@ -230,12 +248,9 @@ public class AnalystWorker implements Runnable {
             ec2info.region = Regions.EU_WEST_1.getName();
         }
 
-        // When creating the S3 and SQS clients use the default credentials chain.
-        // This will check environment variables and ~/.aws/credentials first, then fall back on
-        // the auto-assigned IAM role if this code is running on an EC2 instance.
-        // http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/java-dg-roles.html
-        s3 = new AmazonS3Client();
-        s3.setRegion(Region.getRegion(Regions.fromName(ec2info.region)));
+        AmazonS3ClientBuilder builder = AmazonS3Client.builder();
+        builder.setRegion(ec2info.region);
+        s3 = builder.build();
     }
 
     /**
@@ -433,7 +448,8 @@ public class AnalystWorker implements Runnable {
                 TravelTimeSurfaceTask timeSurfaceTask = (TravelTimeSurfaceTask) request;
                 if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GRID) {
                     // Return raw byte array representing grid to caller, for return to client over HTTP.
-                    byteArrayOutputStream.write(oneOriginResult.timeGrid.writeGrid());
+                    oneOriginResult.timeGrid.writeGridToStream(new LittleEndianDataOutputStream(byteArrayOutputStream));
+
                     addErrorJson(byteArrayOutputStream, transportNetwork.scenarioApplicationWarnings);
                 } else if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
                     oneOriginResult.timeGrid.writeGeotiff(byteArrayOutputStream);
@@ -449,8 +465,8 @@ public class AnalystWorker implements Runnable {
                 // This is a single task within a regional analysis with many origins.
                 if (request.makeStaticSite) {
                     // This is actually a time grid, because we're generating a bunch of those for a static site.
-                    OutputStream s3stream = MultipointDataStore.getOutputStream(request, request.taskId + "_times.dat", "application/octet-stream");
-                    s3stream.write(oneOriginResult.timeGrid.writeGrid());
+                    LittleEndianDataOutputStream s3stream = MultipointDataStore.getOutputStream(request, request.taskId + "_times.dat", "application/octet-stream");
+                    oneOriginResult.timeGrid.writeGridToStream(s3stream);
                     // TODO ? addErrorJson(s3stream, transportNetwork.scenarioApplicationWarnings);
                     s3stream.close();
                 }

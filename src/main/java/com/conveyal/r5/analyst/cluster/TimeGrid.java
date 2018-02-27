@@ -2,8 +2,7 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.profile.FastRaptorWorker;
-import com.vividsolutions.jts.geom.Coordinate;
-import com.vividsolutions.jts.geom.Envelope;
+import com.google.common.io.LittleEndianDataOutputStream;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
@@ -11,21 +10,16 @@ import org.geotools.gce.geotiff.GeoTiffFormat;
 import org.geotools.gce.geotiff.GeoTiffWriteParams;
 import org.geotools.gce.geotiff.GeoTiffWriter;
 import org.geotools.geometry.jts.ReferencedEnvelope;
-import org.geotools.referencing.CRS;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValueGroup;
-import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.media.jai.RasterFactory;
 import java.awt.image.DataBuffer;
 import java.awt.image.WritableRaster;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 
 /**
  * Grid for recording travel times, which can be written to flat binary output
@@ -105,40 +99,33 @@ public class TimeGrid {
         }
     }
 
-    // FIXME why don't we write this straight to a stream instead of buffering and doing address math?
-    // Do we really want to buffer this in memory?
-    // It seems like the main reason to use a byte array is to get little-endian byte order for JavaScript typed arrays.
-    // Could we use a Guava little-endian output stream?
-    public byte[] writeGrid() {
+    /**
+     * Write the grid to a LittleEndianDataOutputStream
+     */
+    public void writeGridToStream(LittleEndianDataOutputStream outputStream) throws IOException {
         int sizeInBytes = nValues * Integer.BYTES + HEADER_SIZE;
         LOG.info("Writing travel time surface of size {} kB", sizeInBytes / 1000);
-        ByteBuffer buffer = ByteBuffer.allocate(sizeInBytes);
-        buffer.order(ByteOrder.LITTLE_ENDIAN);
+
         // Write header
-        buffer.put(gridType.getBytes());
-        buffer.putInt(version);
-        buffer.putInt(zoom);
-        buffer.putInt(west);
-        buffer.putInt(north);
-        buffer.putInt(width);
-        buffer.putInt(height);
-        buffer.putInt(nValuesPerPixel);
+        outputStream.write(gridType.getBytes());
+        outputStream.writeInt(version);
+        outputStream.writeInt(zoom);
+        outputStream.writeInt(west);
+        outputStream.writeInt(north);
+        outputStream.writeInt(width);
+        outputStream.writeInt(height);
+        outputStream.writeInt(nValuesPerPixel);
 
-        //TODO wrap below in gzip output stream, once other changes are made
-
-        // Write values, delta coded TODO why are we delta-coding within pixels?
-        int i = 0;
-        while (i < nValues) {
-            int prev = 0;
-            for (int v = 0; v < nValuesPerPixel; v++, i++) {
-                int curr = values[i];
+        // Write values, delta coded
+        for (int i = 0; i < nValuesPerPixel; i++) {
+            int prev = 0; // delta code within each percentile grid
+            for (int j = 0; j < width * height; j++) {
+                int curr = values[j * nValuesPerPixel + i];
                 int delta = curr - prev;
-                buffer.putInt(delta);
+                outputStream.writeInt(delta);
                 prev = curr;
             }
         }
-
-        return buffer.array();
     }
 
     /** Write this grid out in GeoTIFF format */
@@ -174,7 +161,6 @@ public class TimeGrid {
             GeoTiffWriter writer = new GeoTiffWriter(out);
             writer.write(coverage, params.values().toArray(new GeneralParameterValue[1]));
             writer.dispose();
-
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

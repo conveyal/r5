@@ -16,11 +16,7 @@ import java.util.zip.GZIPOutputStream;
  * Store static site publication data in S3.
  */
 public abstract class MultipointDataStore {
-    private static AmazonS3 s3 = new AmazonS3Client();
-
-//    static {
-//        s3.setRegion(Region.getRegion(Regions.EU_WEST_1));
-//    }
+    private static AmazonS3 s3 = AmazonS3Client.builder().build();
 
     /**
      * Get an output stream to upload an object to S3 for the given static site request.

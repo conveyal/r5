@@ -10,6 +10,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * Given minimum travel times from a single origin point to all transit stops, this class finds minimum travel times to
@@ -29,7 +31,7 @@ public class PerTargetPropagater {
 
     private static final Logger LOG = LoggerFactory.getLogger(PerTargetPropagater.class);
 
-    // FIXME why are these fields public?
+    // FIXME why are all these fields public?
 
     /**
      * The maximum travel time we will record and report. To limit calculation time and avoid overflow places this
@@ -46,7 +48,7 @@ public class PerTargetPropagater {
     /** how travel times are summarized and written or streamed back to a client TODO inline that whole class here. */
     public TravelTimeReducer travelTimeReducer;
 
-    /** how paths are grouped and written */
+    /** If non-null, methods will be called on this object to select and write out paths for a static site.*/
     public PathWriter pathWriter;
 
     /** Times at targets using the street network */
@@ -58,12 +60,8 @@ public class PerTargetPropagater {
     /** The number of "iterations" (departure minutes & Monte Carlo schedules) and the number of stops. */
     private int nIterations, nStops;
 
-    /**
-     * For the origin stop being handled by this propagator, the various components of the travel time as well as the
-     * index of the path producing that travel time, to each stop, in each iteration (departure minute + MC draw) of
-     * RAPTOR. Dimension order: array[stop][iteration]
-     */
-    private int[][] inVehicleTimesToStops, waitTimesToStops, pathsToStops;
+    /** If non-null, the propagator should use these states to propagate out all the details of the paths, not just total travel time. */
+    public List<RaptorState> statesEachIteration = null;
 
     /** Whether to break travel times down into walk, wait, and ride time. */
     private boolean calculateComponents;
@@ -82,30 +80,81 @@ public class PerTargetPropagater {
      * Retains the best known total travel time, the breakdown of that travel time, and the path used to achieve that
      * best known travel time, for each iteration of the RAPTOR algorithm.
      */
-    private int[] perIterationPaths, perIterationTravelTimes, perIterationWaitTimes, perIterationInVehicleTimes;
+    private int[] perIterationTravelTimes;
+    private PathDetails[] perIterationDetails; // If travel time breakdown and paths are needed, groups the stop number and travel time so they can be sorted together.
 
     /**
-     * TODO reduce number of positional parameters
+     * Constructor.
      */
-    public PerTargetPropagater(LinkedPointSet targets, AnalysisTask task, int[][] travelTimesToStopsForIteration,
-                               int[] nonTransitTravelTimesToTargets, int[][] inVehicleTimesToStops,
-                               int[][] waitTimesToStops, int[][] paths) {
+    public PerTargetPropagater(LinkedPointSet targets, AnalysisTask task,
+                               int[][] travelTimesToStopsForIteration,
+                               int[] nonTransitTravelTimesToTargets) {
         this.targets = targets;
         this.request = task;
         this.travelTimesToStopsForIteration = travelTimesToStopsForIteration;
         this.nonTransitTravelTimesToTargets = nonTransitTravelTimesToTargets;
-        this.inVehicleTimesToStops = inVehicleTimesToStops;
-        this.waitTimesToStops = waitTimesToStops;
-        this.pathsToStops = paths;
-        this.calculateComponents = inVehicleTimesToStops != null && waitTimesToStops !=null && pathsToStops != null;
+        // If the caller supplied states for every iteration and stop of the RAPTOR algorithm,
+        // we will break travel time down into components.
+        this.calculateComponents = (statesEachIteration != null);
         speedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
         nIterations = travelTimesToStopsForIteration.length;
         nStops = travelTimesToStopsForIteration[0].length;
         invertTravelTimes();
     }
 
+
     /**
-     * After constructing a propagator, call this method to actually perform the travel time propagation.
+     * Extra work if breakdown of travel time and paths requested (for a static site).
+     */
+    private void calculateComponentsAndPaths() {
+
+        // We only want to build the few full paths we will actually use, based on the stop and iteration number
+        // that was used to achieve the total travel time.
+        // This is hackish, but outside the travel time reducer we are going to re-sort the travel times.
+        // AND I'm always returning the median even though the TravelTimeReducer knows the indexes of the selected percentiles!
+        Arrays.sort(perIterationDetails, Comparator.comparing(details -> details.travelTime));
+        int medianIndex = perIterationDetails.length / 2;
+        PathDetails medianPathDetails = perIterationDetails[medianIndex];
+
+        int totalTravelTime = 0;
+        int inVehicleTime = 0;
+        int waitTime = 0;
+        Path path = null;
+
+        // Set the travel time components to something non-zero if this target was reached by transit.
+        if (medianPathDetails != null) {
+            // Grab the full state vector for the iteration that was used to achieve the total travel time.
+            int iteration = medianPathDetails.iteration;
+            RaptorState state = statesEachIteration.get(iteration);
+            int stop = medianPathDetails.stop;
+            // Build up other components of travel time from that state.
+            inVehicleTime = state.nonTransferInVehicleTravelTime[stop] / 60;
+            waitTime = state.nonTransferWaitTime[stop] / 60;
+            totalTravelTime = medianPathDetails.travelTime / 60;
+            if (inVehicleTime + waitTime > totalTravelTime) {
+                LOG.info("Wait and in vehicle travel time greater than total time");
+            }
+            // Only compute a path if this stop was reached.
+            if (state.bestNonTransferTimes[stop] != FastRaptorWorker.UNREACHED) {
+                path = new Path(state, stop);
+            }
+        }
+
+        // TODO Somehow report these in-vehicle, wait and walk breakdown values alongside the total travel time.
+        // TODO WalkTime should be calculated per-iteration, as it may not hold for some summary statistics that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
+
+        if (pathWriter != null) {
+            // Call with null if this target is unreached, because this method must be called for every target in order.
+            pathWriter.recordPathsForTarget(path);
+        }
+
+    }
+
+
+
+    /**
+     * After constructing a propagator and setting any additional options or optional fields,
+     * call this method to actually perform the travel time propagation.
      */
     public OneOriginResult propagate () {
         targets.makePointToStopDistanceTablesIfNeeded();
@@ -113,24 +162,23 @@ public class PerTargetPropagater {
 
         perIterationTravelTimes = new int[nIterations];
         if (calculateComponents){
-            perIterationInVehicleTimes = new int[nIterations];
-            perIterationWaitTimes = new int[nIterations];
-            perIterationPaths = new int[nIterations];
+            // Retain additional information to report travel time breakdown and paths to targets.
+            perIterationDetails = new PathDetails[nIterations];
         }
 
         for (int targetIdx = 0; targetIdx < targets.size(); targetIdx++) {
-            // Initialize the travel times to that achieved without transit (if any), which does not vary with MC draw.
+
+            // Initialize the travel times to that achieved without transit (if any).
+            // These travel times do not vary with departure time or MC draw, so they are all the same.
             Arrays.fill(perIterationTravelTimes, nonTransitTravelTimesToTargets[targetIdx]);
 
-            // Improve upon the non-transit travel time based transit travel times to nearby stops.
+            // Improve upon these non-transit travel times based on transit travel times to nearby stops.
             propagateTransit(targetIdx);
 
-            // TODO add reducer for components of total travel time; walkTime should be calculated per-iteration, as it
-            // may not hold for some summary statistics that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
             travelTimeReducer.recordTravelTimesForTarget(targetIdx, perIterationTravelTimes);
 
-            if (pathWriter != null) {
-                pathWriter.recordPathsForTarget(perIterationPaths);
+            if (calculateComponents) {
+                calculateComponentsAndPaths();
             }
         }
         LOG.info("Propagating {} iterations from {} stops to {} targets took {}s",
@@ -139,15 +187,6 @@ public class PerTargetPropagater {
         if (pathWriter != null) {
             pathWriter.finishAndStorePaths();
         }
-        targets = null; // Prevent later reuse of this propagator instance.
-        return travelTimeReducer.finish();
-    }
-
-    /**
-     * Do not actually perform propagation, e.g. in locations where we know there is no transit service.
-     * TODO call this in travelTimeComputer instead of directly calling reducer, which allows encapsulating reducer construction.
-     */
-    public OneOriginResult skipPropagation () {
         targets = null; // Prevent later reuse of this propagator instance.
         return travelTimeReducer.finish();
     }
@@ -187,6 +226,11 @@ public class PerTargetPropagater {
     private void propagateTransit (int targetIndex) {
         // Grab the set of nearby stops for this target, with their distances.
         TIntIntMap pointToStopDistanceTable = targets.pointToStopDistanceTables.get(targetIndex);
+        // Clear out the details array if we're building one. These details are for transit,
+        // so are null until we find a good transit solution.
+        if (perIterationDetails != null) {
+            Arrays.fill(perIterationDetails, null);
+        }
         // Only try to propagate transit travel times if there are transit stops near this target.
         // Even if we don't propagate transit travel times, we still need to pass these non-transit times to
         // the reducer below, because you can walk even where there is no transit.
@@ -200,12 +244,14 @@ public class PerTargetPropagater {
                     int timeAtTargetThisStop = timeAtStop + distanceMillimeters / speedMillimetersPerSecond;
                     if (timeAtTargetThisStop < cutoffSeconds) {
                         if (timeAtTargetThisStop < perIterationTravelTimes[iteration]) {
-                            // using this stop to get to this target is faster than previously checked stops
+                            // Alighting at this stop to reach this target is faster than any previously checked stop.
                             perIterationTravelTimes[iteration] = timeAtTargetThisStop;
                             if (calculateComponents) {
-                                perIterationInVehicleTimes[iteration] = inVehicleTimesToStops[iteration][stop];
-                                perIterationWaitTimes[iteration] = waitTimesToStops[iteration][stop];
-                                perIterationPaths[iteration] = pathsToStops[iteration][stop];
+                                PathDetails pathDetails = new PathDetails();
+                                pathDetails.stop = stop;
+                                pathDetails.iteration = iteration;
+                                pathDetails.travelTime = timeAtTargetThisStop;
+                                perIterationDetails[iteration] = pathDetails;
                             }
                         }
                     }
@@ -213,6 +259,18 @@ public class PerTargetPropagater {
                 return true; // Trove "continue iteration" signal.
             });
         }
+
+    }
+
+    /**
+     * This associates a bunch of information including the iteration number with the total travel time, so that when
+     * we sort on travel time and select some specific percentiles, we know which iteration of which stop that travel
+     * time came from.
+     */
+    private static class PathDetails {
+        public int stop;
+        public int iteration;
+        public int travelTime;
     }
 
 }

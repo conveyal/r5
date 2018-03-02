@@ -64,7 +64,7 @@ public class TravelTimeComputer {
         // The set of destinations in the one-to-many travel time calculations, not yet linked to the street network.
         List<PointSet> destinationList = request.getDestinations(network, gridCache);
 
-        //TODO wrap in loop to repeat for multiple destinations pointsets in a regional request;
+        // TODO wrap in loop to repeat for multiple destinations pointsets in a regional request.
         PointSet destinations = destinationList.get(0);
 
         // TODO Create and encapsulate this within the propagator.
@@ -222,87 +222,22 @@ public class TravelTimeComputer {
             }
 
             // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
-
-            /* Total travel time, 2D array of [searchIteration][destinationStopIndex] */
+            // Returns the total travel times as a 2D array of [searchIteration][destinationStopIndex].
+            // Additional detailed path information is retained in the FastRaptorWorker after routing.
             int[][] transitTravelTimesToStops = worker.route();
 
-            PerTargetPropagater perTargetPropagater;
+            PerTargetPropagater perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request,
+                    transitTravelTimesToStops, nonTransitTravelTimesToDestinations);
 
-            // The components of travel time or paths were requested
-            // TODO bundle all these into a class RaptorPathDetails
+            // We cannot yet merge the functionality of the TravelTimeReducer into the PerTargetPropagator
+            // because in the non-transit case we call the reducer directly (see above).
+            perTargetPropagater.travelTimeReducer = travelTimeReducer;
+
             if (worker.saveAllStates) {
-
-                // Instead of saving nIterations paths, save only a few near the selected percentile value.
-                final int N_EXEMPLAR_STATES = 3;
-                TIntList exemplarIterations = new TIntArrayList();
-
-                int nStates = N_EXEMPLAR_STATES;
-
-                int iterations = transitTravelTimesToStops.length;
-                int stops = transitTravelTimesToStops[0].length;
-
-                /* In-vehicle component of time from origin stop to a given stop in a given iteration of the algorithm  */
-                int [][] inVehicleTimesToStops = new int[iterations][stops];
-
-                /* Waiting time component of time from origin stop to a given stop in a given iteration of the algorithm  */
-                int [][] waitTimesToStops = new int[iterations][stops];
-
-                /* Index of path used from origin stop to a given stop in a given iteration of the algorithm  */
-                int [][] pathsToStops = new int[iterations][stops];
-
-                /* List of paths, which are sequences of transit trips and stops used to reach the destination */
-                List<Path> pathList = new ArrayList<>();
-
-                for (int stop = 0; stop < stops; stop++) {
-                    int maxPathIdx = 0;
-
-                    TObjectIntMap<Path> paths = new TObjectIntHashMap<>();
-
-                    for (int iter = 0; iter < iterations; iter++) {
-
-                        int time = transitTravelTimesToStops[iter][stop];
-                        if (time == Integer.MAX_VALUE) time = -1;
-                        else time /= 60;
-
-                        RaptorState state = worker.statesEachIteration.get(iter);
-
-                        if (request.travelTimeBreakdown) {
-                            int inVehicleTime = state.nonTransferInVehicleTravelTime[stop] / 60;
-                            int waitTime = state.nonTransferWaitTime[stop] / 60;
-                            if (inVehicleTime + waitTime > time && time != -1) {
-                                LOG.info("Wait and in vehicle travel time greater than total time");
-                            }
-                            inVehicleTimesToStops[iter][stop] = inVehicleTime;
-                            waitTimesToStops[iter][stop] = waitTime;
-                        }
-                        // Record the paths used
-                        if (request.returnPaths) {
-                            int pathIdx = -1;
-                            // only compute a path if this stop was reached
-                            if (state.bestNonTransferTimes[stop] != FastRaptorWorker.UNREACHED) {
-                                // TODO reuse pathwithtimes?
-                                Path path = new Path(state, stop);
-                                if (!paths.containsKey(path)) {
-                                    paths.put(path, maxPathIdx++);
-                                    pathList.add(path);
-                                }
-                                pathIdx = paths.get(path);
-                            }
-                            pathsToStops[iter][stop] = pathIdx;
-                        }
-                    }
-                }
-                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request,
-                        transitTravelTimesToStops, nonTransitTravelTimesToDestinations, inVehicleTimesToStops,
-                        waitTimesToStops, pathsToStops);
-                // TODO factor out identical lines in else clause
-                perTargetPropagater.travelTimeReducer = travelTimeReducer;
-                perTargetPropagater.pathWriter = new PathWriter(request, network, pathList, egressModeLinkedDestinations.size(), iterations);
-            } else {
-                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request,
-                        transitTravelTimesToStops, nonTransitTravelTimesToDestinations, null, null, null);
-                perTargetPropagater.travelTimeReducer = travelTimeReducer;
+                perTargetPropagater.statesEachIteration = worker.statesEachIteration;
+                perTargetPropagater.pathWriter = new PathWriter(request, network);
             }
+
             return perTargetPropagater.propagate();
         }
     }

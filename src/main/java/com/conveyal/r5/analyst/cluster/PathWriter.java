@@ -1,13 +1,19 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.PersistenceBuffer;
+import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.transit.TransportNetwork;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.TObjectIntMap;
+import gnu.trove.map.hash.TObjectIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.DataOutput;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -20,37 +26,62 @@ import java.util.List;
  * This implementation streams, which might be an example for how to reimplement TravelTimeSurfaceReducer.
  */
 public class PathWriter {
+
     private static final Logger LOG = LoggerFactory.getLogger(PathWriter.class);
 
     /** The network used to compute the travel time results */
-    public final TransportNetwork network;
+    private final TransportNetwork network;
 
     /** The task used to create travel times being reduced herein */
-    public final AnalysisTask task;
+    private final AnalysisTask task;
 
-    List<Path> pathList;
+    /** This map de-duplicates paths (as keys), associating each one with a zero-based integer index. */
+    private TObjectIntMap<Path> indexForPath = new TObjectIntHashMap<>();
 
-    PersistenceBuffer persistenceBuffer = new PersistenceBuffer();
+    private List<Path> pathForIndex = new ArrayList<>();
 
-    DataOutput dataOutput;
+    private TIntList pathIndexForTarget = new TIntArrayList();
 
-    public PathWriter (AnalysisTask task, TransportNetwork network, List<Path> pathList, int nDestinations, int nIterations) {
+    public PathWriter (AnalysisTask task, TransportNetwork network) {
         this.task = task;
         this.network = network;
-        this.pathList = pathList;
+    }
+
+    /**
+     * This must be called on every target in order. It accepts null if there's no transit path to that target.
+     */
+    public void recordPathsForTarget (Path path) {
+        if (path == null) {
+            // This path was not reached. FIXME standardize no-entry value.
+            pathIndexForTarget.add(-1);
+            return;
+        }
+        // Deduplicate paths. TODO use no-entry value.
+        if (!indexForPath.containsKey(path)) {
+            int pathIndex = pathForIndex.size();
+            indexForPath.put(path, pathIndex);
+            pathForIndex.add(path);
+        }
+        int pathIndex = indexForPath.get(path);
+        // Always add one path per target.
+        pathIndexForTarget.add(pathIndex);
+    }
+
+    public void finishAndStorePaths () {
+        PersistenceBuffer persistenceBuffer = new PersistenceBuffer();
         try {
-            dataOutput = persistenceBuffer.getDataOutput();
+            DataOutput dataOutput = persistenceBuffer.getDataOutput();
             dataOutput.write("PATHGRID".getBytes());
 
-            // In the header store the number of destinations and the number of iterations at each destination
-            dataOutput.writeInt(nDestinations);
-            dataOutput.writeInt(nIterations);
+            // In the header, store the number of destinations and the number of paths at each destination.
+            dataOutput.writeInt(pathIndexForTarget.size());
+            dataOutput.writeInt(1); // Storing only one path per target now.
 
-            // Write the number of different paths used to reach all destination cells
-            dataOutput.writeInt(pathList.size());
+            // Write the number of different distinct paths used to reach all destination cells.
+            dataOutput.writeInt(pathForIndex.size());
 
-            // Write the details for each of those paths
-            for (Path path : pathList) {
+            // Write the details for each of those distinct paths.
+            for (Path path : pathForIndex) {
                 dataOutput.writeInt(path.patterns.length);
                 for (int i = 0 ; i < path.patterns.length; i ++){
                     dataOutput.writeInt(path.boardStops[i]);
@@ -58,25 +89,20 @@ public class PathWriter {
                     dataOutput.writeInt(path.alightStops[i]);
                 }
             }
+
+            // Record the paths used
+            pathIndexForTarget.forEach(pi -> {
+                try {
+                    dataOutput.write(pi);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                return true; // Trove continue iterating signal.
+            });
+
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-    }
-
-    public void recordPathsForTarget (int[] paths) {
-        try {
-            // Write the path indexes used to reach this target at each iteration, delta coded within each target.
-            int prev = 0;
-            for (int pathIdx : paths) {
-                dataOutput.writeInt(pathIdx - prev);
-                prev = pathIdx;
-            }
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public void finishAndStorePaths () {
         persistenceBuffer.doneWriting();
         AnalystWorker.filePersistence.saveStaticSiteData(task, "_paths.dat", persistenceBuffer);
     }

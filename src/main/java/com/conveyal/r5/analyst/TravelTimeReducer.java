@@ -23,7 +23,7 @@ public class TravelTimeReducer {
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeReducer.class);
 
     /** The task used to create travel times being reduced herein. */
-    public final AnalysisTask task;
+    private int maxTripDurationMinutes;
 
     /** Travel time results for a whole grid of destinations. May be null if we're only recording accessibility. */
     private TimeGrid timeGrid = null;
@@ -40,11 +40,13 @@ public class TravelTimeReducer {
 
     private final int timesPerDestination;
 
-    public TravelTimeReducer(AnalysisTask task) {
+    public TravelTimeReducer (AnalysisTask task) {
 
-        this.task = task;
+        this.maxTripDurationMinutes = task.maxTripDurationMinutes;
         this.timesPerDestination = task.getMonteCarloDrawsPerMinute() * task.getTimeWindowLengthMinutes();
         this.nPercentiles = task.percentiles.length;
+
+        // We pre-compute the indexes at which we'll find each percentile in a sorted list of the given length.
         this.percentileIndexes = new int[nPercentiles];
         for (int p = 0; p < nPercentiles; p++) {
             percentileIndexes[p] = findPercentileIndex(timesPerDestination, task.percentiles[p]);
@@ -113,7 +115,9 @@ public class TravelTimeReducer {
         } else {
             throw new ParameterException("You must supply the expected number of travel time values (or only one value).");
         }
-        if (retainTravelTimes) timeGrid.setTarget(target, percentileTravelTimesMinutes);
+        if (retainTravelTimes) {
+            timeGrid.setTarget(target, percentileTravelTimesMinutes);
+        }
         if (calculateAccessibility) {
             // This x/y addressing can only work with one grid at a time,
             // needs to be made absolute to handle multiple different extents.
@@ -122,7 +126,7 @@ public class TravelTimeReducer {
             int y = target / grid.width;
             double amount = grid.grid[x][y];
             for (int p = 0; p < nPercentiles; p++) {
-                if (percentileTravelTimesMinutes[p] < task.maxTripDurationMinutes) { // TODO less than or equal?
+                if (percentileTravelTimesMinutes[p] < maxTripDurationMinutes) { // TODO less than or equal?
                     accessibilityResult.incrementAccessibility(0, 0, p, amount);
                 }
             }

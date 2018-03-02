@@ -1,19 +1,20 @@
 package com.conveyal.r5.transit;
 
 import com.amazonaws.AmazonServiceException;
+import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
 import com.conveyal.gtfs.BaseGTFSCache;
 import com.conveyal.gtfs.GTFSCache;
-import com.conveyal.gtfs.GTFSFeed;
-import com.conveyal.osmlib.OSMCache;
 import com.conveyal.r5.analyst.cluster.BundleManifest;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.streets.StreetLayer;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -46,7 +47,7 @@ public class TransportNetworkCache {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransportNetworkCache.class);
 
-    private AmazonS3Client s3 = new AmazonS3Client();
+    private AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
 
     private final File cacheDir;
 

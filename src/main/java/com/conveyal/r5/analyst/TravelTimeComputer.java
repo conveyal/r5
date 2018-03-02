@@ -14,6 +14,8 @@ import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.iterator.TIntIntIterator;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
@@ -229,6 +231,12 @@ public class TravelTimeComputer {
             // The components of travel time or paths were requested
             // TODO bundle all these into a class RaptorPathDetails
             if (worker.saveAllStates) {
+
+                // Instead of saving nIterations paths, save only a few near the selected percentile value.
+                final int N_EXEMPLAR_STATES = 3;
+                TIntList exemplarIterations = new TIntArrayList();
+
+                int nStates = N_EXEMPLAR_STATES;
 
                 int iterations = transitTravelTimesToStops.length;
                 int stops = transitTravelTimesToStops[0].length;

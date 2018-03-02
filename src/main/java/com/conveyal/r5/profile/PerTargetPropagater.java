@@ -137,7 +137,7 @@ public class PerTargetPropagater {
                 nIterations, nStops, targets.size(), (System.currentTimeMillis() - startTimeMillis) / 1000d
         );
         if (pathWriter != null) {
-            pathWriter.finishPaths();
+            pathWriter.finishAndStorePaths();
         }
         targets = null; // Prevent later reuse of this propagator instance.
         return travelTimeReducer.finish();

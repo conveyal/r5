@@ -1,7 +1,9 @@
 package com.conveyal.r5.multipoint;
 
+import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
+import com.conveyal.r5.analyst.cluster.AnalystWorker;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.ProfileRequest;
@@ -10,13 +12,12 @@ import com.conveyal.r5.transitive.TransitiveNetwork;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.OutputStream;
 import java.io.Serializable;
 import java.util.List;
 
 /**
- * Create metadata that can be shared by a batch of requests
+ * Create metadata that provides the context for a whole bucket/directory full of static site output.
+ * TODO refactor to merge with the static inner class Metadata, using public/private fields.
  */
 public class MultipointMetadata {
     private static final Logger LOG = LoggerFactory.getLogger(MultipointMetadata.class);
@@ -29,33 +30,31 @@ public class MultipointMetadata {
         this.network = network;
     }
 
+    // generate and write out metadata
     public void write () {
-        // generate and write out metadata
         try {
-            OutputStream os = MultipointDataStore.getOutputStream(request, "query.json", "application/json");
-            writeMetadata(os);
-            os.close();
+            Metadata metadata = new Metadata();
+            WebMercatorGridPointSet ps = network.gridPointSet;
+            metadata.zoom = ps.zoom;
+            metadata.west = ps.west;
+            metadata.north = ps.north;
+            metadata.width = ps.width;
+            metadata.height = ps.height;
+            metadata.transportNetwork = request.graphId;
+            metadata.transitiveData = new TransitiveNetwork(network.transitLayer);
+            metadata.request = request;
+            metadata.scenarioApplicationWarnings = network.scenarioApplicationWarnings;
+
+            PersistenceBuffer persistenceBuffer = new PersistenceBuffer();
+            persistenceBuffer.setMimeType("application/json");
+            // Retrieving the PersistenceBuffer's InputStream will automatically close this OutputStream.
+            JsonUtilities.objectMapper.writeValue(persistenceBuffer.getOutputStream(), metadata);
+            persistenceBuffer.doneWriting();
+            AnalystWorker.filePersistence.saveStaticSiteData(request, "query.json", persistenceBuffer);
         } catch (Exception e) {
             LOG.error("Exception saving static metadata", e);
             return;
         }
-    }
-
-    /** Write metadata for this query */
-    private void writeMetadata (OutputStream out) throws IOException {
-        Metadata metadata = new Metadata();
-        WebMercatorGridPointSet ps = network.gridPointSet;
-        metadata.zoom = ps.zoom;
-        metadata.west = ps.west;
-        metadata.north = ps.north;
-        metadata.width = ps.width;
-        metadata.height = ps.height;
-        metadata.transportNetwork = request.graphId;
-        metadata.transitiveData = new TransitiveNetwork(network.transitLayer);
-        metadata.request = request;
-        metadata.scenarioApplicationWarnings = network.scenarioApplicationWarnings;
-
-        JsonUtilities.objectMapper.writeValue(out, metadata);
     }
 
     public static class Metadata implements Serializable {

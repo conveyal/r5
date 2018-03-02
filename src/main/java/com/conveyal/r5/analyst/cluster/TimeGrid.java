@@ -1,6 +1,7 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.Grid;
+import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.google.common.io.LittleEndianDataOutputStream;
 import org.geotools.coverage.grid.GridCoverage2D;
@@ -18,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import javax.media.jai.RasterFactory;
 import java.awt.image.DataBuffer;
 import java.awt.image.WritableRaster;
+import java.io.DataOutput;
 import java.io.IOException;
 import java.io.OutputStream;
 
@@ -100,31 +102,44 @@ public class TimeGrid {
     }
 
     /**
-     * Write the grid to a LittleEndianDataOutputStream
+     * Write the grid out to a persistence buffer, an abstraction that will perform compression and allow us to save
+     * it to a local or remote storage location.
      */
-    public void writeGridToStream(LittleEndianDataOutputStream outputStream) throws IOException {
+    public PersistenceBuffer writeToPersistenceBuffer() {
+        PersistenceBuffer persistenceBuffer = new PersistenceBuffer();
+        this.writeGridToDataOutput(persistenceBuffer.getDataOutput());
+        persistenceBuffer.doneWriting();
+        return persistenceBuffer;
+    }
+
+    /**
+     * Write the grid to an object implementing the DataOutput interface.
+     */
+    public void writeGridToDataOutput(DataOutput dataOutput) {
         int sizeInBytes = nValues * Integer.BYTES + HEADER_SIZE;
-        LOG.info("Writing travel time surface of size {} kB", sizeInBytes / 1000);
-
-        // Write header
-        outputStream.write(gridType.getBytes());
-        outputStream.writeInt(version);
-        outputStream.writeInt(zoom);
-        outputStream.writeInt(west);
-        outputStream.writeInt(north);
-        outputStream.writeInt(width);
-        outputStream.writeInt(height);
-        outputStream.writeInt(nValuesPerPixel);
-
-        // Write values, delta coded
-        for (int i = 0; i < nValuesPerPixel; i++) {
-            int prev = 0; // delta code within each percentile grid
-            for (int j = 0; j < width * height; j++) {
-                int curr = values[j * nValuesPerPixel + i];
-                int delta = curr - prev;
-                outputStream.writeInt(delta);
-                prev = curr;
+        LOG.info("Writing travel time surface with uncompressed size {} kiB", sizeInBytes / 1024);
+        try {
+            // Write header
+            dataOutput.write(gridType.getBytes());
+            dataOutput.writeInt(version);
+            dataOutput.writeInt(zoom);
+            dataOutput.writeInt(west);
+            dataOutput.writeInt(north);
+            dataOutput.writeInt(width);
+            dataOutput.writeInt(height);
+            dataOutput.writeInt(nValuesPerPixel);
+            // Write values, delta coded
+            for (int i = 0; i < nValuesPerPixel; i++) {
+                int prev = 0; // delta code within each percentile grid
+                for (int j = 0; j < width * height; j++) {
+                    int curr = values[j * nValuesPerPixel + i];
+                    int delta = curr - prev;
+                    dataOutput.writeInt(delta);
+                    prev = curr;
+                }
             }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 

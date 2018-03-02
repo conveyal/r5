@@ -1,12 +1,12 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.multipoint.MultipointDataStore;
+import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.google.common.io.LittleEndianDataOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.DataOutput;
 import java.io.IOException;
 import java.util.List;
 
@@ -30,28 +30,32 @@ public class PathWriter {
 
     List<Path> pathList;
 
-    LittleEndianDataOutputStream outputStream;
+    PersistenceBuffer persistenceBuffer = new PersistenceBuffer();
+
+    DataOutput dataOutput;
 
     public PathWriter (AnalysisTask task, TransportNetwork network, List<Path> pathList, int nDestinations, int nIterations) {
         this.task = task;
         this.network = network;
         this.pathList = pathList;
         try {
-            outputStream = MultipointDataStore.getOutputStream(task, task.taskId + "_paths.dat", "application/octet-stream");
-            outputStream.write("PATHGRID".getBytes());
+            dataOutput = persistenceBuffer.getDataOutput();
+            dataOutput.write("PATHGRID".getBytes());
+
             // In the header store the number of destinations and the number of iterations at each destination
-            outputStream.writeInt(nDestinations);
-            outputStream.writeInt(nIterations);
+            dataOutput.writeInt(nDestinations);
+            dataOutput.writeInt(nIterations);
 
             // Write the number of different paths used to reach all destination cells
-            outputStream.writeInt(pathList.size());
+            dataOutput.writeInt(pathList.size());
+
             // Write the details for each of those paths
             for (Path path : pathList) {
-                outputStream.writeInt(path.patterns.length);
+                dataOutput.writeInt(path.patterns.length);
                 for (int i = 0 ; i < path.patterns.length; i ++){
-                    outputStream.writeInt(path.boardStops[i]);
-                    outputStream.writeInt(path.patterns[i]);
-                    outputStream.writeInt(path.alightStops[i]);
+                    dataOutput.writeInt(path.boardStops[i]);
+                    dataOutput.writeInt(path.patterns[i]);
+                    dataOutput.writeInt(path.alightStops[i]);
                 }
             }
         } catch (IOException e) {
@@ -64,7 +68,7 @@ public class PathWriter {
             // Write the path indexes used to reach this target at each iteration, delta coded within each target.
             int prev = 0;
             for (int pathIdx : paths) {
-                outputStream.writeInt(pathIdx - prev);
+                dataOutput.writeInt(pathIdx - prev);
                 prev = pathIdx;
             }
         } catch (IOException e) {
@@ -72,12 +76,9 @@ public class PathWriter {
         }
     }
 
-    public void finishPaths(){
-        try{
-            outputStream.close();
-        } catch (IOException e) {
-            LOG.warn("Unexpected IOException closing pathWriter OutputStream", e);
-        }
-
+    public void finishAndStorePaths () {
+        persistenceBuffer.doneWriting();
+        AnalystWorker.filePersistence.saveStaticSiteData(task, "_paths.dat", persistenceBuffer);
     }
+
 }

@@ -153,7 +153,7 @@ public class GridResultAssembler {
                     human(gzippedGridFile.length(), "B"),
                     (double) bufferFile.length() / gzippedGridFile.length()
             );
-
+            // TODO use generic filePersistence instead of specific S3 client
             s3.putObject(outputBucket, String.format("%s.access", request.jobId), gzippedGridFile);
             // Clear temporary files off of the disk because the gzipped version is now on S3.
             bufferFile.delete();

@@ -720,7 +720,7 @@ public class StreetLayer implements Serializable, Cloneable {
             if (bad[0]) return; // log message already printed
 
             if (fromEdge[0] == -1 || toEdge[0] == -1) {
-                LOG.error("Did not find from/to edges for restriction {}, skipping", osmRelationId);
+                LOG.warn("Did not find from/to edges for restriction {}, skipping", osmRelationId);
                 return;
             }
 

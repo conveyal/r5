@@ -2,7 +2,6 @@ package com.conveyal.r5.transit;
 
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.GetObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
@@ -60,18 +59,9 @@ public class TransportNetworkCache {
     private final BaseGTFSCache gtfsCache;
     private final OSMCache osmCache;
 
-    @Deprecated
-    public TransportNetworkCache(String sourceBucket) {
-        this(sourceBucket, new File("cache", "graphs")); // reuse cached graphs from old analyst worker
-    }
-
     /** Create a transport network cache. If source bucket is null, will work offline. */
     public TransportNetworkCache(String sourceBucket, File cacheDir) {
         this(sourceBucket, cacheDir, DEFAULT_CACHE_SIZE, null);
-    }
-
-    public TransportNetworkCache(String sourceBucket, File cacheDir, String bucketFolder) {
-        this(sourceBucket, cacheDir, DEFAULT_CACHE_SIZE, bucketFolder);
     }
 
     /** Create a transport network cache. If source bucket is null, will work offline. */

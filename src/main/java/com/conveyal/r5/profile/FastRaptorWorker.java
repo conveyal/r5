@@ -114,7 +114,10 @@ public class FastRaptorWorker {
 
     private final RaptorState[] scheduleState;
 
-    /** set to true to save all states for path reconstruction */
+    /**
+     * Set to true to save all states for path reconstruction.
+     * Change underway: do not save all states, only N at or near the selected travel time percentile
+     */
     public boolean saveAllStates = false;
 
     public List<RaptorState> statesEachIteration;

@@ -1,17 +1,16 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.regions.Regions;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3Client;
-import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.conveyal.r5.OneOriginResult;
+import com.conveyal.r5.analyst.FilePersistence;
 import com.conveyal.r5.analyst.GridCache;
+import com.conveyal.r5.analyst.PersistenceBuffer;
+import com.conveyal.r5.analyst.S3FilePersistence;
 import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
-import com.conveyal.r5.multipoint.MultipointDataStore;
 import com.conveyal.r5.multipoint.MultipointMetadata;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
@@ -30,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
+import java.io.DataOutput;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -87,7 +87,13 @@ public class AnalystWorker implements Runnable {
 
     private static final String DEFAULT_BROKER_PORT = "7070";
 
-    public static final int POLL_WAIT_SECONDS = 10;
+    public static final int POLL_WAIT_SECONDS = 15;
+
+    public static final int POLL_MAX_RANDOM_WAIT = 5;
+
+    // TODO make non-static and make implementations swappable
+    // This is very ugly because it's static but initialized at class instantiation.
+    public static FilePersistence filePersistence;
 
     /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
     final TransportNetworkCache transportNetworkCache;
@@ -155,13 +161,6 @@ public class AnalystWorker implements Runnable {
 
     GridCache gridCache;
 
-    // Clients for communicating with Amazon web services
-    // When creating the S3 and SQS clients use the default credentials chain.
-    // This will check environment variables and ~/.aws/credentials first, then fall back on
-    // the auto-assigned IAM role if this code is running on an EC2 instance.
-    // http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/java-dg-roles.html
-    AmazonS3 s3;
-
     /** The transport network this worker already has loaded, and therefore prefers to work on. */
     String networkId = null;
 
@@ -196,10 +195,12 @@ public class AnalystWorker implements Runnable {
 
     public static AnalystWorker forConfig (Properties config) {
         // FIXME why is there a separate configuration parsing section here? Why not always make the cache based on the configuration?
+        // FIXME why is some configuration done here and some in the constructor?
         boolean workOffline = Boolean.parseBoolean(config.getProperty("work-offline", "false"));
         String graphsBucket = workOffline ? null : config.getProperty("graphs-bucket");
         String graphDirectory = config.getProperty("cache-dir", "cache/graphs");
         TransportNetworkCache cache = new TransportNetworkCache(graphsBucket, new File(graphDirectory));
+
         return new AnalystWorker(config, cache);
     }
 
@@ -209,6 +210,9 @@ public class AnalystWorker implements Runnable {
                 LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
 
         // PARSE THE CONFIGURATION TODO move configuration parsing into a separate method.
+
+        // Region region = Region.getRegion(Regions.fromName(config.getProperty("aws-region")));
+        filePersistence = new S3FilePersistence(config.getProperty("aws-region"));
 
         // First, check whether we are running Analyst offline.
         workOffline = Boolean.parseBoolean(config.getProperty("work-offline", "false"));
@@ -247,10 +251,6 @@ public class AnalystWorker implements Runnable {
             // We're working offline and/or not running on EC2. Set a default region rather than detecting one.
             ec2info.region = Regions.EU_WEST_1.getName();
         }
-
-        AmazonS3ClientBuilder builder = AmazonS3Client.builder();
-        builder.setRegion(ec2info.region);
-        s3 = builder.build();
     }
 
     /**
@@ -335,9 +335,11 @@ public class AnalystWorker implements Runnable {
             List<AnalysisTask> tasks = getSomeWork();
             if (tasks == null || tasks.isEmpty()) {
                 // Either there was no work, or some kind of error occurred.
+                // Sleep for a while before polling again, adding a random component to spread out the polling load.
                 considerShuttingDown();
-                LOG.info("Polling the broker did not yield any regional tasks. Sleeping {} sec.", POLL_WAIT_SECONDS);
-                sleepSeconds(POLL_WAIT_SECONDS);
+                int randomWait = random.nextInt(POLL_MAX_RANDOM_WAIT);
+                LOG.info("Polling the broker did not yield any regional tasks. Sleeping {} + {} sec.", POLL_WAIT_SECONDS, randomWait);
+                sleepSeconds(POLL_WAIT_SECONDS + randomWait);
                 continue;
             }
             for (AnalysisTask task : tasks) {
@@ -448,8 +450,8 @@ public class AnalystWorker implements Runnable {
                 TravelTimeSurfaceTask timeSurfaceTask = (TravelTimeSurfaceTask) request;
                 if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GRID) {
                     // Return raw byte array representing grid to caller, for return to client over HTTP.
-                    oneOriginResult.timeGrid.writeGridToStream(new LittleEndianDataOutputStream(byteArrayOutputStream));
-
+                    // TODO eventually reuse same code path as static site time grid saving
+                    oneOriginResult.timeGrid.writeGridToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
                     addErrorJson(byteArrayOutputStream, transportNetwork.scenarioApplicationWarnings);
                 } else if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
                     oneOriginResult.timeGrid.writeGeotiff(byteArrayOutputStream);
@@ -464,11 +466,10 @@ public class AnalystWorker implements Runnable {
             } else {
                 // This is a single task within a regional analysis with many origins.
                 if (request.makeStaticSite) {
-                    // This is actually a time grid, because we're generating a bunch of those for a static site.
-                    LittleEndianDataOutputStream s3stream = MultipointDataStore.getOutputStream(request, request.taskId + "_times.dat", "application/octet-stream");
-                    oneOriginResult.timeGrid.writeGridToStream(s3stream);
-                    // TODO ? addErrorJson(s3stream, transportNetwork.scenarioApplicationWarnings);
-                    s3stream.close();
+                    // Despite this being a regional task, this is actually writing a time grid because we're
+                    // generating a bunch of those for a static site.
+                    PersistenceBuffer persistenceBuffer = oneOriginResult.timeGrid.writeToPersistenceBuffer();
+                    filePersistence.saveStaticSiteData(request, "_times.dat", persistenceBuffer);
                 }
                 // Accumulate accessibility results to return to the backend in batches.
                 // This is usually an accessibility indicator value for one of many origins, but in the case of a static

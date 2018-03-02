@@ -71,8 +71,6 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     private TIntObjectMap<McRaptorStateBag> bestStates = new TIntObjectHashMap<>();
 
-
-
     private int round = 0;
     // used in hashing
     //private int roundSquared = 0;

@@ -93,9 +93,9 @@ public class PerTargetPropagater {
         this.request = task;
         this.travelTimesToStopsForIteration = travelTimesToStopsForIteration;
         this.nonTransitTravelTimesToTargets = nonTransitTravelTimesToTargets;
-        // If the caller supplied states for every iteration and stop of the RAPTOR algorithm,
-        // we will break travel time down into components.
-        this.calculateComponents = (statesEachIteration != null);
+        // If we're making a static site we'll break travel times down into components and make paths.
+        // This expects the statesEachIteration and pathWriter fields to be set separately by the caller.
+        this.calculateComponents = task.makeStaticSite;
         speedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
         nIterations = travelTimesToStopsForIteration.length;
         nStops = travelTimesToStopsForIteration[0].length;
@@ -112,8 +112,16 @@ public class PerTargetPropagater {
         // that was used to achieve the total travel time.
         // This is hackish, but outside the travel time reducer we are going to re-sort the travel times.
         // AND I'm always returning the median even though the TravelTimeReducer knows the indexes of the selected percentiles!
-        Arrays.sort(perIterationDetails, Comparator.comparing(details -> details.travelTime));
+        // FIXME this comparator might be slow because it's extracting the keys as objects not primitives
+        // FIXME weirdly the perIterationDetails often only has a few non-null entries and therefore no median
+        // Even weirder they all seem to have the same stop and travel time. How can the travel time be identical at different departure minutes?
+        Arrays.sort(perIterationDetails, Comparator.comparing(details -> {
+            // Sort null (no path) above all other travel times as "unreachable".
+            if (details == null) return Integer.MAX_VALUE;
+            else return details.travelTime;
+        }));
         int medianIndex = perIterationDetails.length / 2;
+        medianIndex = 0; // FIXME temporary measure, record fastest path instead of median
         PathDetails medianPathDetails = perIterationDetails[medianIndex];
 
         int totalTravelTime = 0;
@@ -135,6 +143,7 @@ public class PerTargetPropagater {
                 LOG.info("Wait and in vehicle travel time greater than total time");
             }
             // Only compute a path if this stop was reached.
+            // FIXME aren't we already certain it was reached based on non-null pathDetails?
             if (state.bestNonTransferTimes[stop] != FastRaptorWorker.UNREACHED) {
                 path = new Path(state, stop);
             }
@@ -160,6 +169,7 @@ public class PerTargetPropagater {
         targets.makePointToStopDistanceTablesIfNeeded();
         long startTimeMillis = System.currentTimeMillis();
 
+        // perIterationTravelTimes and perIterationDetails are reused when processing each target.
         perIterationTravelTimes = new int[nIterations];
         if (calculateComponents){
             // Retain additional information to report travel time breakdown and paths to targets.
@@ -169,8 +179,12 @@ public class PerTargetPropagater {
         for (int targetIdx = 0; targetIdx < targets.size(); targetIdx++) {
 
             // Initialize the travel times to that achieved without transit (if any).
-            // These travel times do not vary with departure time or MC draw, so they are all the same.
+            // These travel times do not vary with departure time or MC draw, so they are all the same at a given target.
             Arrays.fill(perIterationTravelTimes, nonTransitTravelTimesToTargets[targetIdx]);
+
+            // Clear out the details array if we're building one. These are transit solution details, so they remain
+            // null until we find a good transit solution.
+            if (perIterationDetails != null) Arrays.fill(perIterationDetails, null);
 
             // Improve upon these non-transit travel times based on transit travel times to nearby stops.
             propagateTransit(targetIdx);
@@ -222,15 +236,11 @@ public class PerTargetPropagater {
     /**
      * For every "iteration" (departure minute and Monte Carlo schedule), find a complete travel time to the current
      * target from the given nearby stop, and update the best known time for that iteration and target.
+     * Also record the best paths if we're going to be saving transit path details.
      */
     private void propagateTransit (int targetIndex) {
         // Grab the set of nearby stops for this target, with their distances.
         TIntIntMap pointToStopDistanceTable = targets.pointToStopDistanceTables.get(targetIndex);
-        // Clear out the details array if we're building one. These details are for transit,
-        // so are null until we find a good transit solution.
-        if (perIterationDetails != null) {
-            Arrays.fill(perIterationDetails, null);
-        }
         // Only try to propagate transit travel times if there are transit stops near this target.
         // Even if we don't propagate transit travel times, we still need to pass these non-transit times to
         // the reducer below, because you can walk even where there is no transit.
@@ -239,20 +249,22 @@ public class PerTargetPropagater {
                 for (int iteration = 0; iteration < nIterations; iteration++) {
                     int timeAtStop = travelTimesToStop[stop][iteration];
                     if (timeAtStop > cutoffSeconds || timeAtStop > perIterationTravelTimes[iteration]) {
-                        continue; // avoid overflow
+                        // Skip propagation if all resulting times will be greater than the cutoff and
+                        // cannot improve on the best known time at this iteration. Also avoids overflow.
+                        continue;
                     }
-                    int timeAtTargetThisStop = timeAtStop + distanceMillimeters / speedMillimetersPerSecond;
-                    if (timeAtTargetThisStop < cutoffSeconds) {
-                        if (timeAtTargetThisStop < perIterationTravelTimes[iteration]) {
-                            // Alighting at this stop to reach this target is faster than any previously checked stop.
-                            perIterationTravelTimes[iteration] = timeAtTargetThisStop;
-                            if (calculateComponents) {
-                                PathDetails pathDetails = new PathDetails();
-                                pathDetails.stop = stop;
-                                pathDetails.iteration = iteration;
-                                pathDetails.travelTime = timeAtTargetThisStop;
-                                perIterationDetails[iteration] = pathDetails;
-                            }
+                    // Propagate from the current stop out to the target.
+                    int timeAtTarget = timeAtStop + distanceMillimeters / speedMillimetersPerSecond;
+                    if (timeAtTarget < cutoffSeconds &&
+                        timeAtTarget < perIterationTravelTimes[iteration]) {
+                        // To reach this target, alighting at this stop is faster than any previously checked stop.
+                        perIterationTravelTimes[iteration] = timeAtTarget;
+                        if (calculateComponents) {
+                            PathDetails pathDetails = new PathDetails();
+                            pathDetails.stop = stop;
+                            pathDetails.iteration = iteration;
+                            pathDetails.travelTime = timeAtTarget;
+                            perIterationDetails[iteration] = pathDetails;
                         }
                     }
                 }

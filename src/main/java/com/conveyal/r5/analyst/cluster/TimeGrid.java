@@ -57,12 +57,14 @@ public class TimeGrid {
     private final int zoom, west, north, width, height, nValuesPerPixel;
 
     // Flattened 1-d array of pixel values
+    // FIXME its weird that we're storing this as a flattened array using a completely different order than we're writing out to the file.
+    // Should this really be flattenend until it's written out?
     private int[] values;
 
     public final int nValues;
 
     /**
-     * Create a new in-memory access grid writer for a width x height x nValuesPerPixel array.
+     * Create a new in-memory access grid writer for a width x height x nValuesPerPixel 3D array.
      */
     public TimeGrid(int zoom, int west, int north, int width, int height, int nValuesPerPixel) {
         this.zoom = zoom;
@@ -132,6 +134,7 @@ public class TimeGrid {
             for (int i = 0; i < nValuesPerPixel; i++) {
                 int prev = 0; // delta code within each percentile grid
                 for (int j = 0; j < width * height; j++) {
+                    // FIXME this is doing extra math to rearrange the ordering of the flattened array it's reading.
                     int curr = values[j * nValuesPerPixel + i];
                     int delta = curr - prev;
                     dataOutput.writeInt(delta);

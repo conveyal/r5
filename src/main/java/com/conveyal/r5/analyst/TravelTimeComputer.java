@@ -235,7 +235,7 @@ public class TravelTimeComputer {
 
             if (worker.saveAllStates) {
                 perTargetPropagater.statesEachIteration = worker.statesEachIteration;
-                perTargetPropagater.pathWriter = new PathWriter(request, network);
+                perTargetPropagater.pathWriter = new PathWriter(request);
             }
 
             return perTargetPropagater.propagate();

@@ -46,12 +46,11 @@ public class TransportNetworkCache {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransportNetworkCache.class);
 
-    private AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
+    private final AmazonS3 s3;
 
     private final File cacheDir;
 
-    private final String sourceBucket;
-    private final String bucketFolder;
+    private final String bucket;
 
     private static final int DEFAULT_CACHE_SIZE = 1;
 
@@ -60,37 +59,23 @@ public class TransportNetworkCache {
     private final OSMCache osmCache;
 
     /** Create a transport network cache. If source bucket is null, will work offline. */
-    public TransportNetworkCache(String sourceBucket, File cacheDir) {
-        this(sourceBucket, cacheDir, DEFAULT_CACHE_SIZE, null);
-    }
-
-    /** Create a transport network cache. If source bucket is null, will work offline. */
-    public TransportNetworkCache(String sourceBucket, File cacheDir, int cacheSize, String bucketFolder) {
+    public TransportNetworkCache(String bucket, File cacheDir) {
         this.cacheDir = cacheDir;
-        this.sourceBucket = sourceBucket;
-        this.bucketFolder = bucketFolder != null ? bucketFolder.replaceAll("\\/","") : null;
-        this.cache = createCache(cacheSize);
-        this.gtfsCache = new GTFSCache(sourceBucket, cacheDir);
-        this.osmCache = new OSMCache(sourceBucket, cacheDir);
+        this.bucket = bucket;
+        this.cache = createCache(DEFAULT_CACHE_SIZE);
+        this.gtfsCache = new GTFSCache(bucket, cacheDir);
+        this.osmCache = new OSMCache(bucket, cacheDir);
+        this.s3 = (bucket == null) ? null : AmazonS3ClientBuilder.defaultClient();
     }
 
     public TransportNetworkCache(BaseGTFSCache gtfsCache, OSMCache osmCache) {
-        this(gtfsCache, osmCache, DEFAULT_CACHE_SIZE);
-    }
-
-    public TransportNetworkCache(BaseGTFSCache gtfsCache, OSMCache osmCache, int cacheSize) {
-        this(gtfsCache, osmCache, cacheSize, null);
-    }
-
-    public TransportNetworkCache(BaseGTFSCache gtfsCache, OSMCache osmCache, int cacheSize, String bucketFolder) {
         this.gtfsCache = gtfsCache;
         this.osmCache = osmCache;
-        this.cache = createCache(cacheSize);
+        this.cache = createCache(DEFAULT_CACHE_SIZE);
         this.cacheDir = gtfsCache.cacheDir;
-        this.sourceBucket = gtfsCache.bucket;
-        // we don't necessarily want to put r5 networks in the gtfsCache bucketFolder
-        // (e.g., "s3://bucket/gtfs"), but we'll go ahead and use the same bucket
-        this.bucketFolder = bucketFolder;
+        this.bucket = gtfsCache.bucket;
+        // This constructor is only called when working offline, so don't create an S3 client to avoid region settings.
+        s3 = null;
     }
 
     /** Convenience method that returns transport network from cache. */
@@ -140,7 +125,7 @@ public class TransportNetworkCache {
 
                 if (!scenarioFile.exists()) {
                     try {
-                        S3Object obj = s3.getObject(sourceBucket, getScenarioKey(networkId, scenarioId));
+                        S3Object obj = s3.getObject(bucket, getScenarioFilename(networkId, scenarioId));
                         InputStream is = obj.getObjectContent();
                         OutputStream os = new BufferedOutputStream(new FileOutputStream(scenarioFile));
                         ByteStreams.copy(is, os);
@@ -184,11 +169,6 @@ public class TransportNetworkCache {
         return String.format("%s_%s.json", networkId, scenarioId);
     }
 
-    private String getScenarioKey(String networkId, String scenarioId) {
-        String filename = getScenarioFilename(networkId, scenarioId);
-        return bucketFolder != null ? String.join("/", bucketFolder, filename) : filename;
-    }
-
     /** If this transport network is already built and cached, fetch it quick */
     private TransportNetwork checkCached (String networkId) {
         try {
@@ -198,11 +178,11 @@ public class TransportNetworkCache {
             else {
                 LOG.info("No locally cached transport network at {}.", cacheLocation);
 
-                if (sourceBucket != null) {
+                if (bucket != null) {
                     LOG.info("Checking for cached transport network on S3.");
                     S3Object tn;
                     try {
-                        tn = s3.getObject(sourceBucket, getR5NetworkKey(networkId));
+                        tn = s3.getObject(bucket, getR5NetworkFilename(networkId));
                     } catch (AmazonServiceException ex) {
                         LOG.info("No cached transport network was found in S3. It will be built from scratch.");
                         return null;
@@ -231,12 +211,6 @@ public class TransportNetworkCache {
         }
     }
 
-
-    private String getR5NetworkKey(String networkId) {
-        String filename = getR5NetworkFilename(networkId);
-        return bucketFolder != null ? String.join("/", bucketFolder, filename) : filename;
-    }
-
     private String getR5NetworkFilename(String networkId) {
         return networkId + "_" + R5Version.version + ".dat";
     }
@@ -248,7 +222,7 @@ public class TransportNetworkCache {
 
         // check if we have a new-format bundle with a JSON manifest
         String manifestFile = GTFSCache.cleanId(networkId) + ".json";
-        if (new File(cacheDir, manifestFile).exists() || sourceBucket != null && s3.doesObjectExist(sourceBucket, manifestFile)) {
+        if (new File(cacheDir, manifestFile).exists() || bucket != null && s3.doesObjectExist(bucket, manifestFile)) {
             LOG.info("Detected new-format bundle with manifest.");
             network = buildNetworkFromManifest(networkId);
         } else {
@@ -272,9 +246,9 @@ public class TransportNetworkCache {
             // Serialize TransportNetwork to local cache on this worker
             network.write(cacheLocation);
             // Upload the serialized TransportNetwork to S3
-            if (sourceBucket != null) {
+            if (bucket != null) {
                 LOG.info("Uploading the serialized TransportNetwork to S3 for use by other workers.");
-                s3.putObject(sourceBucket, getR5NetworkKey(networkId), cacheLocation);
+                s3.putObject(bucket, getR5NetworkFilename(networkId), cacheLocation);
                 LOG.info("Done uploading the serialized TransportNetwork to S3.");
             } else {
                 LOG.info("Network saved to cache directory, not uploading to S3 while working offline.");
@@ -294,11 +268,11 @@ public class TransportNetworkCache {
 
         // If we don't have a local copy of the inputs, fetch graph data as a ZIP from S3 and unzip it.
         if( ! dataDirectory.exists() || dataDirectory.list().length == 0) {
-            if (sourceBucket != null) {
+            if (bucket != null) {
                 LOG.info("Downloading graph input files from S3.");
                 dataDirectory.mkdirs();
-                String networkZipKey = bucketFolder != null ? String.join("/", bucketFolder, networkId + ".zip") : networkId + ".zip";
-                S3Object graphDataZipObject = s3.getObject(sourceBucket, networkZipKey);
+                String networkZipKey = networkId + ".zip";
+                S3Object graphDataZipObject = s3.getObject(bucket, networkZipKey);
                 ZipInputStream zis = new ZipInputStream(graphDataZipObject.getObjectContent());
                 try {
                     ZipEntry entry;
@@ -352,10 +326,10 @@ public class TransportNetworkCache {
         File manifestFile = new File(cacheDir, manifestFileName);
 
         // TODO handle manifest not in S3
-        if (!manifestFile.exists() && sourceBucket != null) {
+        if (!manifestFile.exists() && bucket != null) {
             LOG.info("Manifest file not found locally, downloading from S3");
-            String manifestKey = getManifestKey(networkId);
-            s3.getObject(new GetObjectRequest(sourceBucket, manifestKey), manifestFile);
+            String manifestKey = getManifestFilename(networkId);
+            s3.getObject(new GetObjectRequest(bucket, manifestKey), manifestFile);
         }
 
         BundleManifest manifest;
@@ -396,11 +370,6 @@ public class TransportNetworkCache {
         return network;
     }
 
-    private String getManifestKey(String networkId) {
-        String filename = getManifestFilename(networkId);
-        return bucketFolder != null ? String.join("/", bucketFolder, filename) : filename;
-    }
-
     private String getManifestFilename(String networkId) {
         return GTFSCache.cleanId(networkId) + ".json";
     }
@@ -410,7 +379,7 @@ public class TransportNetworkCache {
             String id = removalNotification.getKey();
 
             // delete local files ONLY if using s3
-            if (sourceBucket != null) {
+            if (bucket != null) {
                 String[] extensions = {".db", ".db.p", ".zip"};
                 // delete local cache files (including zip) when feed removed from cache
                 for (String type : extensions) {

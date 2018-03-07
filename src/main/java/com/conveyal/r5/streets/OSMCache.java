@@ -23,14 +23,19 @@ import java.util.concurrent.ExecutionException;
  * have this functionality.
  */
 public class OSMCache {
+
     public final String bucket;
     public final File cacheDir;
+    private final AmazonS3 s3;
 
-    private AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
-
+    /**
+     * Construct a new OSMCache.
+     * If bucket is null, we will work offline (will not create an S3 client, avoiding need to set an AWS region).
+     */
     public OSMCache (String bucket, File cacheDir) {
         this.bucket = bucket;
         this.cacheDir = cacheDir;
+        this.s3 = (this.bucket == null) ? null : AmazonS3ClientBuilder.defaultClient();
     }
 
     private Cache<String, OSM> osmCache = CacheBuilder.newBuilder()

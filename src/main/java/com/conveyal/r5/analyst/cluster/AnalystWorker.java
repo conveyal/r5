@@ -199,7 +199,6 @@ public class AnalystWorker implements Runnable {
         String graphsBucket = workOffline ? null : config.getProperty("graphs-bucket");
         String graphDirectory = config.getProperty("cache-dir", "cache/graphs");
         TransportNetworkCache cache = new TransportNetworkCache(graphsBucket, new File(graphDirectory));
-
         return new AnalystWorker(config, cache);
     }
 

@@ -314,6 +314,7 @@ public class AnalystWorker implements Runnable {
     private void handleOneRequest(AnalysisTask request) {
         if (request.isHighPriority()) {
             lastHighPriorityTaskProcessed = System.currentTimeMillis();
+            request.percentiles = new double[] {5,10,15,20,25};
             if (!sideChannelOpen) {
                 openSideChannel();
             }

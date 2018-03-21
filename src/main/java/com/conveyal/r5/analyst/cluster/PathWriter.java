@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -94,6 +95,11 @@ public class PathWriter {
             throw new AssertionError(String.format("PathWriter expected to receive %d paths, received %d.",
                     nExpectedPaths, pathIndexes.size()));
         }
+        if (!hasAnyPaths()) {
+            // No cells were reached with any paths. Do not write anything out.
+            // TODO check that this code is ever reached - we may already be effectively bypassing this method.
+            return;
+        }
         // The path grid file will be built up in this buffer.
         PersistenceBuffer persistenceBuffer = new PersistenceBuffer();
         try {
@@ -132,4 +138,15 @@ public class PathWriter {
         AnalystWorker.filePersistence.saveStaticSiteData(task, "_paths.dat", persistenceBuffer);
     }
 
+    private boolean hasAnyPaths() {
+        for (TIntIterator iterator = pathIndexes.iterator(); iterator.hasNext(); ) {
+            int p = iterator.next();
+            if (p != NO_PATH) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }
+

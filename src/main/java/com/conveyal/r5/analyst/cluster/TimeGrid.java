@@ -22,6 +22,7 @@ import java.awt.image.WritableRaster;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
 
 /**
  * Grid for recording travel times, which can be written to flat binary output
@@ -137,6 +138,7 @@ public class TimeGrid {
                 for (int j = 0; j < width * height; j++) {
                     // FIXME this is doing extra math to rearrange the ordering of the flattened array it's reading.
                     int curr = values[j * nValuesPerPixel + i];
+                    // TODO try not delta-coding the "unreachable" value, and retaining the prev value across unreachable areas.
                     int delta = curr - prev;
                     dataOutput.writeInt(delta);
                     prev = curr;
@@ -183,6 +185,10 @@ public class TimeGrid {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public boolean anyCellReached() {
+        return Arrays.stream(values).anyMatch(v -> v != FastRaptorWorker.UNREACHED);
     }
 
 }

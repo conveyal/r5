@@ -473,9 +473,11 @@ public class AnalystWorker implements Runnable {
                 // This is a single task within a regional analysis with many origins.
                 if (request.makeStaticSite) {
                     // Despite this being a regional task, this is actually writing a time grid because we're
-                    // generating a bunch of those for a static site.
-                    PersistenceBuffer persistenceBuffer = oneOriginResult.timeGrid.writeToPersistenceBuffer();
-                    filePersistence.saveStaticSiteData(request, "_times.dat", persistenceBuffer);
+                    // generating a bunch of those for a static site. Only save a file if it has non-default contents.
+                    if (oneOriginResult.timeGrid.anyCellReached()) {
+                        PersistenceBuffer persistenceBuffer = oneOriginResult.timeGrid.writeToPersistenceBuffer();
+                        filePersistence.saveStaticSiteData(request, "_times.dat", persistenceBuffer);
+                    }
                 }
                 // Accumulate accessibility results to return to the backend in batches.
                 // This is usually an accessibility indicator value for one of many origins, but in the case of a static

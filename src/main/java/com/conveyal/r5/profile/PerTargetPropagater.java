@@ -9,6 +9,7 @@ import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -31,7 +32,8 @@ public class PerTargetPropagater {
 
     private static final Logger LOG = LoggerFactory.getLogger(PerTargetPropagater.class);
 
-    // FIXME why are all these fields public?
+    /** When writing out paths to targets (for static sites), how many paths to save (centered on the median). */
+    public static final int N_PATHS_PER_TARGET = 3;
 
     /**
      * The maximum travel time we will record and report. To limit calculation time and avoid overflow places this
@@ -120,46 +122,49 @@ public class PerTargetPropagater {
             if (details == null) return Integer.MAX_VALUE;
             else return details.travelTime;
         }));
-        int medianIndex = perIterationDetails.length / 2;
-        medianIndex = 0; // FIXME temporary measure, record fastest path instead of median
-        PathDetails medianPathDetails = perIterationDetails[medianIndex];
-
-        int totalTravelTime = 0;
-        int inVehicleTime = 0;
-        int waitTime = 0;
-        Path path = null;
-
-        // Set the travel time components to something non-zero if this target was reached by transit.
-        if (medianPathDetails != null) {
+        // Try to find the requested number of paths around and below the median travel time.
+        List<Path> paths = new ArrayList<>();
+        int iterationIndex = (perIterationDetails.length / 2) + (N_PATHS_PER_TARGET / 2);
+        while (iterationIndex > 0) {
+            PathDetails pathDetails = perIterationDetails[iterationIndex];
+            if (pathDetails == null) {
+                continue;
+            }
+            int totalTravelTime = 0;
+            int inVehicleTime = 0;
+            int waitTime = 0;
+            // Set the travel time components to something non-zero if this target was reached by transit.
             // Grab the full state vector for the iteration that was used to achieve the total travel time.
-            int iteration = medianPathDetails.iteration;
-            RaptorState state = statesEachIteration.get(iteration);
-            int stop = medianPathDetails.stop;
+            if (pathDetails.iteration != iterationIndex) {
+                throw new AssertionError("Iteration index mismatch.");
+            }
+            RaptorState state = statesEachIteration.get(iterationIndex);
+            int stop = pathDetails.stop;
             // Build up other components of travel time from that state.
             inVehicleTime = state.nonTransferInVehicleTravelTime[stop] / 60;
             waitTime = state.nonTransferWaitTime[stop] / 60;
-            totalTravelTime = medianPathDetails.travelTime / 60;
+            totalTravelTime = pathDetails.travelTime / 60;
             if (inVehicleTime + waitTime > totalTravelTime) {
                 LOG.info("Wait and in vehicle travel time greater than total time");
             }
             // Only compute a path if this stop was reached.
             // FIXME aren't we already certain it was reached based on non-null pathDetails?
             if (state.bestNonTransferTimes[stop] != FastRaptorWorker.UNREACHED) {
-                path = new Path(state, stop);
+                paths.add(new Path(state, stop));
             }
         }
-
+        // If we didn't find the required number of paths, pad the list with nulls.
+        while (paths.size() < N_PATHS_PER_TARGET) {
+            paths.add(null);
+        }
         // TODO Somehow report these in-vehicle, wait and walk breakdown values alongside the total travel time.
         // TODO WalkTime should be calculated per-iteration, as it may not hold for some summary statistics that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
-
         if (pathWriter != null) {
             // Call with null if this target is unreached, because this method must be called for every target in order.
-            pathWriter.recordPathsForTarget(path);
+            pathWriter.recordPathsForTarget(paths);
         }
 
     }
-
-
 
     /**
      * After constructing a propagator and setting any additional options or optional fields,

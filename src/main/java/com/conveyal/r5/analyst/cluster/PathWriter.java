@@ -39,16 +39,22 @@ public class PathWriter {
     /** The inverse of pathForIndex, giving the position of each path within that list. Used to deduplicate paths. */
     private final TObjectIntMap<Path> indexForPath;
 
+    public final int nTargets;
+
+    public final int nPathsPerTarget;
+
     /**
      * For each target, the index number of the path that was used to reach that target at a selected percentile
      * of travel time.
      */
-    private final TIntList pathIndexForTarget = new TIntArrayList();
+    private final TIntList pathIndexes = new TIntArrayList();
 
     /** Constructor. Holds onto the task object, which is used to create unique names for the results files. */
-    public PathWriter (AnalysisTask task) {
+    public PathWriter (AnalysisTask task, int nPathsPerTarget) {
         this.task = task;
-        indexForPath = new TObjectIntHashMap<>(task.width * task.height / 2, 0.5f, NO_PATH);
+        this.nTargets = task.width * task.height;
+        indexForPath = new TObjectIntHashMap<>(nTargets / 2, 0.5f, NO_PATH);
+        this.nPathsPerTarget = nPathsPerTarget;
     }
 
     /**
@@ -58,19 +64,24 @@ public class PathWriter {
      * per destination in the future. Note that if adjacent destinations have common paths, then adjacent origins
      * should also have common paths. We currently don't have an optimization to deal with that.
      */
-    public void recordPathsForTarget (Path path) {
-        if (path == null) {
-            pathIndexForTarget.add(NO_PATH);
-            return;
+    public void recordPathsForTarget (List<Path> paths) {
+        if (paths.size() != nPathsPerTarget) {
+            throw new AssertionError("Must supply the expected number of paths: " + nPathsPerTarget);
         }
-        // Deduplicate paths using the map.
-        int pathIndex = indexForPath.get(path);
-        if (pathIndex == NO_PATH) {
-            pathIndex = pathForIndex.size();
-            pathForIndex.add(path);
-            indexForPath.put(path, pathIndex);
+        for (Path path : paths) {
+            if (path == null) {
+                pathIndexes.add(NO_PATH);
+            } else {
+                // Deduplicate paths using the map.
+                int pathIndex = indexForPath.get(path);
+                if (pathIndex == NO_PATH) {
+                    pathIndex = pathForIndex.size();
+                    pathForIndex.add(path);
+                    indexForPath.put(path, pathIndex);
+                }
+                pathIndexes.add(pathIndex);
+            }
         }
-        pathIndexForTarget.add(pathIndex);
     }
 
     /**
@@ -78,11 +89,10 @@ public class PathWriter {
      * full set of paths to a buffer, which is then saved to S3 (or other equivalent persistence system).
      */
     public void finishAndStorePaths () {
-        int nExpectedTargets = task.width * task.height;
-        if (pathIndexForTarget.size() != nExpectedTargets) {
-            String message = String.format("PathWriter expected to receive %d paths, received %d.",
-                    nExpectedTargets, pathIndexForTarget.size());
-            throw new IllegalStateException(message);
+        int nExpectedPaths = nTargets * nPathsPerTarget;
+        if (pathIndexes.size() != nExpectedPaths) {
+            throw new AssertionError(String.format("PathWriter expected to receive %d paths, received %d.",
+                    nExpectedPaths, pathIndexes.size()));
         }
         // The path grid file will be built up in this buffer.
         PersistenceBuffer persistenceBuffer = new PersistenceBuffer();
@@ -91,8 +101,8 @@ public class PathWriter {
             // the number of destinations and the number of paths at each destination.
             DataOutput dataOutput = persistenceBuffer.getDataOutput();
             dataOutput.write("PATHGRID".getBytes());
-            dataOutput.writeInt(pathIndexForTarget.size());
-            dataOutput.writeInt(1); // Storing exactly one path per target now.
+            dataOutput.writeInt(nTargets);
+            dataOutput.writeInt(nPathsPerTarget);
 
             // Write the number of different distinct paths used to reach all destination cells,
             // followed by the details for each of those distinct paths.
@@ -109,7 +119,7 @@ public class PathWriter {
             // Record the paths used to reach each target in the grid. They are delta coded to improve gzip compression,
             // on the assumption that adjacent targets use paths with similar index numbers (often the same index number).
             int prevIndex = 0;
-            for (TIntIterator iterator = pathIndexForTarget.iterator(); iterator.hasNext(); ) {
+            for (TIntIterator iterator = pathIndexes.iterator(); iterator.hasNext(); ) {
                 int pathIndex = iterator.next();
                 int indexDelta = pathIndex - prevIndex;
                 dataOutput.writeInt(indexDelta);

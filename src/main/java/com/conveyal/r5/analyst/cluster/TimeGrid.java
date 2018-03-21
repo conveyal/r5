@@ -42,7 +42,8 @@ import java.io.OutputStream;
  * (repeated 4-byte int) values of each pixel in row major order. Values are not delta coded here.
  */
 public class TimeGrid {
-    public static final Logger LOG = LoggerFactory.getLogger(GridResultAssembler.class);
+
+    public static final Logger LOG = LoggerFactory.getLogger(TimeGrid.class);
 
     /** 8 bytes long to maintain integer alignment. */
     private static final String gridType = "ACCESSGR";

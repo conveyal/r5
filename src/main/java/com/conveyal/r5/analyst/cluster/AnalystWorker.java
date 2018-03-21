@@ -23,6 +23,7 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.config.SocketConfig;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
+import org.apache.http.protocol.HTTP;
 import org.apache.http.util.EntityUtils;
 import org.eclipse.jetty.http.HttpStatus;
 import org.slf4j.Logger;
@@ -125,6 +126,13 @@ public class AnalystWorker implements Runnable {
     static final HttpClient httpClient = makeHttpClient();
 
     /**
+     * This timeout should be longer than the longest expected worker calculation for a single-point request.
+     * Of course when linking a large grid, a worker could take much longer. We're just going to have to accept
+     * timeouts in those situations until we implement fail-fast 202 responses from workers for long lived operations.
+     */
+    private static final int HTTP_CLIENT_TIMEOUT_SEC = 30;
+
+    /**
      * The results of finished work accumulate here, and will be sent in batches back to the broker.
      * All access to this field should be synchronized since it will is written to by multiple threads.
      * We don't want to just wrap it in a SynchronizedList because we need an atomic copy-and-empty operation.
@@ -148,12 +156,12 @@ public class AnalystWorker implements Runnable {
     public static HttpClient makeHttpClient () {
         PoolingHttpClientConnectionManager mgr = new PoolingHttpClientConnectionManager();
         mgr.setDefaultMaxPerRoute(20);
-        int timeout = 10 * 1000; // TODO should this be a symbolic constant such as POLL_WAIT_SECONDS ?
+        int timeoutMilliseconds = HTTP_CLIENT_TIMEOUT_SEC * 1000;
         SocketConfig cfg = SocketConfig.custom()
-                .setSoTimeout(timeout)
+                .setSoTimeout(timeoutMilliseconds)
                 .build();
         mgr.setDefaultSocketConfig(cfg);
-        return HttpClients.custom()
+        return HttpClients.custom().disableAutomaticRetries()
                 .setConnectionManager(mgr)
                 .build();
     }

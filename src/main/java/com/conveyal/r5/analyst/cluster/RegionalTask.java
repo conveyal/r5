@@ -108,4 +108,16 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
     public RegionalTask clone () {
         return (RegionalTask) super.clone();
     }
+
+    @Override
+    public String toString() {
+        // Having job ID and allows us to follow regional analysis progress in log messages.
+        return "RegionalTask{" +
+                "jobId=" + jobId +
+                ", task=" + taskId +
+                ", x=" + x +
+                ", y=" + y +
+                '}';
+    }
+
 }

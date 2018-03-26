@@ -477,6 +477,8 @@ public class AnalystWorker implements Runnable {
                     if (oneOriginResult.timeGrid.anyCellReached()) {
                         PersistenceBuffer persistenceBuffer = oneOriginResult.timeGrid.writeToPersistenceBuffer();
                         filePersistence.saveStaticSiteData(request, "_times.dat", persistenceBuffer);
+                    } else {
+                        LOG.info("No destination cells reached. Not saving static site file to reduce storage space.");
                     }
                 }
                 // Accumulate accessibility results to return to the backend in batches.

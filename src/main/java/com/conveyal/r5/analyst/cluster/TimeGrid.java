@@ -118,6 +118,7 @@ public class TimeGrid {
 
     /**
      * Write the grid to an object implementing the DataOutput interface.
+     * TODO maybe shrink the dimensions of the resulting timeGrid to contain only the reached cells.
      */
     public void writeGridToDataOutput(DataOutput dataOutput) {
         int sizeInBytes = nValues * Integer.BYTES + HEADER_SIZE;
@@ -187,6 +188,11 @@ public class TimeGrid {
         }
     }
 
+    /**
+     * @return true if the search reached any destination cell, false if it did not reach any cells. No cells will be
+     * reached when the origin point is outside the transport network. Some cells will still be reached via the street
+     * network when we are outside the transit network but within the street network.
+     */
     public boolean anyCellReached() {
         return Arrays.stream(values).anyMatch(v -> v != FastRaptorWorker.UNREACHED);
     }

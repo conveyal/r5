@@ -122,33 +122,31 @@ public class PerTargetPropagater {
             if (details == null) return Integer.MAX_VALUE;
             else return details.travelTime;
         }));
-        // Try to find the requested number of paths around and below the median travel time.
+        // Try to find the requested number of paths at and below the median travel time.
         List<Path> paths = new ArrayList<>();
-        int iterationIndex = (perIterationDetails.length / 2) + (N_PATHS_PER_TARGET / 2);
-        while (iterationIndex > 0) {
+        for (int iterationIndex = perIterationDetails.length / 2;
+             iterationIndex >= 0 && paths.size() < N_PATHS_PER_TARGET;
+             iterationIndex--) {
             PathDetails pathDetails = perIterationDetails[iterationIndex];
-            if (pathDetails == null) {
-                continue;
-            }
-            int totalTravelTime = 0;
-            int inVehicleTime = 0;
-            int waitTime = 0;
+            if (pathDetails == null) continue;
+            int totalTravelTimeMinutes = 0;
+            int inVehicleTimeMinutes = 0;
+            int waitTimeMinutes = 0;
             // Set the travel time components to something non-zero if this target was reached by transit.
             // Grab the full state vector for the iteration that was used to achieve the total travel time.
-            if (pathDetails.iteration != iterationIndex) {
-                throw new AssertionError("Iteration index mismatch.");
-            }
+            // At this point we have sorted all the path details by travel time, with the missing ones at the high end.
+            // Therefore pathDetails.iteration will no longer match the iteration index.
             RaptorState state = statesEachIteration.get(iterationIndex);
             int stop = pathDetails.stop;
             // Build up other components of travel time from that state.
-            inVehicleTime = state.nonTransferInVehicleTravelTime[stop] / 60;
-            waitTime = state.nonTransferWaitTime[stop] / 60;
-            totalTravelTime = pathDetails.travelTime / 60;
-            if (inVehicleTime + waitTime > totalTravelTime) {
-                LOG.info("Wait and in vehicle travel time greater than total time");
+            inVehicleTimeMinutes = state.nonTransferInVehicleTravelTime[stop] / 60;
+            waitTimeMinutes = state.nonTransferWaitTime[stop] / 60;
+            totalTravelTimeMinutes = pathDetails.travelTime / 60;
+            if (inVehicleTimeMinutes + waitTimeMinutes > totalTravelTimeMinutes) {
+                LOG.warn("Wait and in vehicle travel time greater than total time");
             }
             // Only compute a path if this stop was reached.
-            // FIXME aren't we already certain it was reached based on non-null pathDetails?
+            // TODO explore why there is missing path information despite non-null pathDetails. Maybe non-transit paths.
             if (state.bestNonTransferTimes[stop] != FastRaptorWorker.UNREACHED) {
                 paths.add(new Path(state, stop));
             }

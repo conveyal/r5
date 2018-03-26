@@ -437,8 +437,7 @@ public class AnalystWorker implements Runnable {
             // Arbitrarily we create this metadata as part of the first task in the job.
             if (request instanceof RegionalTask && request.makeStaticSite && request.taskId == 0) {
                 LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
-                MultipointMetadata mm = new MultipointMetadata(request, transportNetwork);
-                mm.write();
+                MultipointMetadata.persist(request, transportNetwork);
             }
 
             TravelTimeComputer computer = new TravelTimeComputer(request, transportNetwork, gridCache);
@@ -476,7 +475,7 @@ public class AnalystWorker implements Runnable {
                     // generating a bunch of those for a static site. Only save a file if it has non-default contents.
                     if (oneOriginResult.timeGrid.anyCellReached()) {
                         PersistenceBuffer persistenceBuffer = oneOriginResult.timeGrid.writeToPersistenceBuffer();
-                        filePersistence.saveStaticSiteData(request, "_times.dat", persistenceBuffer);
+                        filePersistence.saveStaticSiteData(request, "times.dat", true, persistenceBuffer);
                     } else {
                         LOG.info("No destination cells reached. Not saving static site file to reduce storage space.");
                     }

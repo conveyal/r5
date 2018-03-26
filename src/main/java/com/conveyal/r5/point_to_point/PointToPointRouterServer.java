@@ -135,6 +135,8 @@ public class PointToPointRouterServer {
         PointToPointQuery pointToPointQuery = new PointToPointQuery(transportNetwork);
 
         //TODO: executor strategies
+        // TODO Clarify why this is generating the GraphQL schema as a function of a point to point query, this is bizarre.
+        // And why is that parameter called "profileResponse" in the GraphQLSchema constructor?
         GraphQL graphQL = new GraphQL(new com.conveyal.r5.GraphQLSchema(pointToPointQuery).indexSchema);
         // add cors header
         before((req, res) -> res.header("Access-Control-Allow-Origin", "*"));

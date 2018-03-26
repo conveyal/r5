@@ -13,10 +13,14 @@ public abstract class FilePersistence {
 
     /**
      * Convenience wrapper to generate consistent directory and file names when storing static site data.
+     * TODO too many positional parameters, maybe move the name into the PersistenceBuffer.
      */
-    public void saveStaticSiteData (AnalysisTask task, String fileSuffix, PersistenceBuffer persistenceBuffer) {
+    public void saveStaticSiteData (AnalysisTask task, String fileName, boolean prependTaskNumber,
+                                    PersistenceBuffer persistenceBuffer) {
         String directoryName = "analysis-static/" + task.jobId;
-        String fileName = task.taskId + fileSuffix;
+        if (prependTaskNumber) {
+            fileName = task.taskId + "_" + fileName;
+        }
         saveData(directoryName, fileName, persistenceBuffer);
     }
 

@@ -345,13 +345,17 @@ public class TransportNetwork implements Serializable {
      * Build an efficient implicit grid PointSet for this TransportNetwork if it doesn't already exist. Then link that
      * grid pointset to the street layer. This is called when a network is built for analysis purposes, and also after a
      * scenario is applied to rebuild the grid pointset on the scenario copy of the network.
+     *
+     * This grid PointSet will cover the entire street network layer of this TransportNetwork, which should include
+     * every point we can route from or to. Any other destination grid (for the same mode, walking) can be made as a
+     * subset of this one since it includes every potentially accessible point.
      */
     public void rebuildLinkedGridPointSet() {
         if (gridPointSet == null) {
             gridPointSet = new WebMercatorGridPointSet(this);
         }
         // Here we are bypassing the GridPointSet's internal cache of linkages because we want this particular
-        // linkage to be serialized with the network. The internal cache does not serialize its contents.
+        // linkage to be serialized with the network. The internal Guava cache does not serialize its contents (by design).
         linkedGridPointSet = new LinkedPointSet(gridPointSet, streetLayer, StreetMode.WALK, linkedGridPointSet);
     }
 

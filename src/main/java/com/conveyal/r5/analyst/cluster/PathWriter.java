@@ -96,7 +96,8 @@ public class PathWriter {
                     nExpectedPaths, pathIndexes.size()));
         }
         if (pathForIndex.isEmpty()) {
-            // No cells were reached with any paths. Do not write anything out to save storage space.
+            // No cells were reached with any transit paths. Do not write anything out to save storage space.
+            LOG.info("No transit paths were found for task {}, not saving static site path file.", task.taskId);
             return;
         }
         // The path grid file will be built up in this buffer.
@@ -134,7 +135,7 @@ public class PathWriter {
             throw new RuntimeException("IO exception while writing path grid.", e);
         }
         persistenceBuffer.doneWriting();
-        AnalystWorker.filePersistence.saveStaticSiteData(task, "_paths.dat", persistenceBuffer);
+        AnalystWorker.filePersistence.saveStaticSiteData(task, "paths.dat", true, persistenceBuffer);
     }
 
 }

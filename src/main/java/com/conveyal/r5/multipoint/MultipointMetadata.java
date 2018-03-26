@@ -12,76 +12,58 @@ import com.conveyal.r5.transitive.TransitiveNetwork;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.awt.image.MultiPixelPackedSampleModel;
 import java.io.Serializable;
 import java.util.List;
 
 /**
  * Create metadata that provides the context for a whole bucket/directory full of static site output.
- * TODO refactor to merge with the static inner class Metadata, using public/private fields.
+ *
+ * Some useful information can be found inside the request:
+ * Transport Network ID: request.graphId
+ * The output extents come from request as well (west, north, width, height).
  */
-public class MultipointMetadata {
+public class MultipointMetadata implements Serializable {
+
     private static final Logger LOG = LoggerFactory.getLogger(MultipointMetadata.class);
 
-    private AnalysisTask request;
-    private TransportNetwork network;
+    private static final long serialVersionUID = 2L;
 
-    public MultipointMetadata (AnalysisTask req, TransportNetwork network) {
-        this.request = req;
-        this.network = network;
-    }
+    /** The request object sent to the workers to generate these static site regional results. */
+    public ProfileRequest request;
 
-    // generate and write out metadata
-    public void write () {
+    /** Non-fatal warnings encountered applying the scenario to the network for this regional analysis. */
+    public List<TaskError> scenarioApplicationWarnings;
+
+    /** Private constructor, so it's only possible to make an instance within the persist() method. */
+    private MultipointMetadata() {};
+
+    /**
+     * Generate and write out static site metadata files.
+     * FIXME this is saving the extents of the entire street layer, rather than the extents set in the request.
+     * That's the safe option since static site travel time surfaces could be intersected with any opportunity grid.
+     * However the street network may be significantly bigger than the area we actually want to analyze.
+     */
+    public static void persist (AnalysisTask analysisTask, TransportNetwork network) {
         try {
-            Metadata metadata = new Metadata();
-            WebMercatorGridPointSet ps = network.gridPointSet;
-            metadata.zoom = ps.zoom;
-            metadata.west = ps.west;
-            metadata.north = ps.north;
-            metadata.width = ps.width;
-            metadata.height = ps.height;
-            metadata.transportNetwork = request.graphId;
-            metadata.transitiveData = new TransitiveNetwork(network.transitLayer);
-            metadata.request = request;
+
+            MultipointMetadata metadata = new MultipointMetadata();
+            metadata.request = analysisTask;
             metadata.scenarioApplicationWarnings = network.scenarioApplicationWarnings;
 
-            PersistenceBuffer persistenceBuffer = new PersistenceBuffer();
-            persistenceBuffer.setMimeType("application/json");
-            // Retrieving the PersistenceBuffer's InputStream will automatically close this OutputStream.
-            JsonUtilities.objectMapper.writeValue(persistenceBuffer.getOutputStream(), metadata);
-            persistenceBuffer.doneWriting();
-            AnalystWorker.filePersistence.saveStaticSiteData(request, "query.json", persistenceBuffer);
+            // Save the regional analysis request, giving the UI some context to display the results.
+            PersistenceBuffer requestBuffer = PersistenceBuffer.serializeAsJson(metadata);
+            AnalystWorker.filePersistence.saveStaticSiteData(analysisTask, "request.json", false, requestBuffer);
+
+            // Save transit route data that allows rendering paths with the Transitive library in a separate file.
+            TransitiveNetwork transitiveNetwork = new TransitiveNetwork(network.transitLayer);
+            PersistenceBuffer transitiveBuffer = PersistenceBuffer.serializeAsJson(transitiveNetwork);
+            AnalystWorker.filePersistence.saveStaticSiteData(analysisTask, "transitive.json", false, transitiveBuffer);
+
         } catch (Exception e) {
             LOG.error("Exception saving static metadata", e);
             return;
         }
     }
 
-    public static class Metadata implements Serializable {
-        private static final long serialVersionUID = 1L;
-
-        /** Zoom level */
-        public int zoom;
-
-        /** westermost pixel */
-        public long west;
-
-        /** northernmost pixel */
-        public long north;
-
-        /** width, pixels */
-        public long width;
-
-        /** height, pixels */
-        public long height;
-
-        public String transportNetwork;
-
-        public ProfileRequest request;
-
-        public TransitiveNetwork transitiveData;
-
-        /** Non fatal warnings encountered applying the scenario */
-        public List<TaskError> scenarioApplicationWarnings;
-    }
 }

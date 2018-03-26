@@ -142,9 +142,7 @@ public class PerTargetPropagater {
             inVehicleTimeMinutes = state.nonTransferInVehicleTravelTime[stop] / 60;
             waitTimeMinutes = state.nonTransferWaitTime[stop] / 60;
             totalTravelTimeMinutes = pathDetails.travelTime / 60;
-            if (inVehicleTimeMinutes + waitTimeMinutes > totalTravelTimeMinutes) {
-                LOG.warn("Wait and in vehicle travel time greater than total time");
-            }
+            // FIXME the sum of the wait and in-vehicle travel time is often greater than the total time. Why?
             // Only compute a path if this stop was reached.
             // TODO explore why there is missing path information despite non-null pathDetails. Maybe non-transit paths.
             if (state.bestNonTransferTimes[stop] != FastRaptorWorker.UNREACHED) {

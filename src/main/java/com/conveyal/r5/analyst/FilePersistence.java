@@ -12,6 +12,16 @@ import java.io.OutputStream;
 public abstract class FilePersistence {
 
     /**
+     * Convenience method to ensure that all results files for a particular static site end up in the same place,
+     * which is typically a bucket on S3. The top level directory is hard-coded for now but could be configurable
+     * if and when actual use cases require it.
+     */
+    public void saveStaticSiteData (AnalysisTask task, String fileName, PersistenceBuffer persistenceBuffer) {
+        String directoryName = "analysis-static/" + task.jobId;
+        saveData(directoryName, fileName, persistenceBuffer);
+    }
+
+    /**
      * This is a blocking call and should only return when the file is completely uploaded.
      * That prevents our workers from producing output faster than uploads can complete,
      * and building up a queue of waiting uploads.

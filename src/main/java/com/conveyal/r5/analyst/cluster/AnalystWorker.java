@@ -475,7 +475,7 @@ public class AnalystWorker implements Runnable {
                     if (oneOriginResult.timeGrid.anyCellReached()) {
                         PersistenceBuffer persistenceBuffer = oneOriginResult.timeGrid.writeToPersistenceBuffer();
                         String timesFileName = request.taskId + "_times.dat";
-                        filePersistence.saveData(request.getStaticSiteDirectory(), timesFileName, persistenceBuffer);
+                        filePersistence.saveStaticSiteData(request, timesFileName, persistenceBuffer);
                     } else {
                         LOG.info("No destination cells reached. Not saving static site file to reduce storage space.");
                     }
@@ -602,16 +602,16 @@ public class AnalystWorker implements Runnable {
             // Save the regional analysis request, giving the UI some context to display the results.
             // This is the request object sent to the workers to generate these static site regional results.
             PersistenceBuffer buffer = PersistenceBuffer.serializeAsJson(analysisTask);
-            AnalystWorker.filePersistence.saveData(analysisTask.getStaticSiteDirectory(), "request.json", buffer);
+            AnalystWorker.filePersistence.saveStaticSiteData(analysisTask, "request.json", buffer);
 
             // Save non-fatal warnings encountered applying the scenario to the network for this regional analysis.
             buffer = PersistenceBuffer.serializeAsJson(network.scenarioApplicationWarnings);
-            AnalystWorker.filePersistence.saveData(analysisTask.getStaticSiteDirectory(), "warnings.json", buffer);
+            AnalystWorker.filePersistence.saveStaticSiteData(analysisTask, "warnings.json", buffer);
 
             // Save transit route data that allows rendering paths with the Transitive library in a separate file.
             TransitiveNetwork transitiveNetwork = new TransitiveNetwork(network.transitLayer);
             buffer = PersistenceBuffer.serializeAsJson(transitiveNetwork);
-            AnalystWorker.filePersistence.saveData(analysisTask.getStaticSiteDirectory(), "transitive.json", buffer);
+            AnalystWorker.filePersistence.saveStaticSiteData(analysisTask, "transitive.json", buffer);
         } catch (Exception e) {
             LOG.error("Exception saving static metadata: {}", e.toString());
             throw new RuntimeException(e);

@@ -136,7 +136,7 @@ public class PathWriter {
         }
         persistenceBuffer.doneWriting();
         String pathFileName = task.taskId + "_paths.dat";
-        AnalystWorker.filePersistence.saveData(task.getStaticSiteDirectory(), pathFileName, persistenceBuffer);
+        AnalystWorker.filePersistence.saveStaticSiteData(task, pathFileName, persistenceBuffer);
     }
 
 }

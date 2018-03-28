@@ -66,7 +66,10 @@
 
         <resources>
             <resource>
-                <!-- This allows Maven to substitute build and version details into a properties file for use at runtime. -->
+                <!-- Filtering means Maven will substitute some variables into files in the resources directory before
+                    including them in the JAR. This allows Maven to substitute build details and version number
+                    into a properties file, making them known to R5 at runtime. Some other files that server other
+                    purposes are also listed for inclusion in the JAR. -->
                 <directory>src/main/resources</directory>
                 <filtering>true</filtering>
                 <includes>

@@ -135,7 +135,8 @@ public class PathWriter {
             throw new RuntimeException("IO exception while writing path grid.", e);
         }
         persistenceBuffer.doneWriting();
-        AnalystWorker.filePersistence.saveStaticSiteData(task, "paths.dat", true, persistenceBuffer);
+        String pathFileName = task.taskId + "_paths.dat";
+        AnalystWorker.filePersistence.saveData(task.getStaticSiteDirectory(), pathFileName, persistenceBuffer);
     }
 
 }

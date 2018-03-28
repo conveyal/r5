@@ -11,9 +11,9 @@ import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
-import com.conveyal.r5.multipoint.MultipointMetadata;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
+import com.conveyal.r5.transitive.TransitiveNetwork;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.io.LittleEndianDataOutputStream;
 import org.apache.http.HttpEntity;
@@ -23,7 +23,6 @@ import org.apache.http.client.methods.HttpPost;
 import org.apache.http.config.SocketConfig;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
-import org.apache.http.protocol.HTTP;
 import org.apache.http.util.EntityUtils;
 import org.eclipse.jetty.http.HttpStatus;
 import org.slf4j.Logger;
@@ -437,7 +436,7 @@ public class AnalystWorker implements Runnable {
             // Arbitrarily we create this metadata as part of the first task in the job.
             if (request instanceof RegionalTask && request.makeStaticSite && request.taskId == 0) {
                 LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
-                MultipointMetadata.persist(request, transportNetwork);
+                saveStaticSiteMetadata(request, transportNetwork);
             }
 
             TravelTimeComputer computer = new TravelTimeComputer(request, transportNetwork, gridCache);
@@ -475,7 +474,8 @@ public class AnalystWorker implements Runnable {
                     // generating a bunch of those for a static site. Only save a file if it has non-default contents.
                     if (oneOriginResult.timeGrid.anyCellReached()) {
                         PersistenceBuffer persistenceBuffer = oneOriginResult.timeGrid.writeToPersistenceBuffer();
-                        filePersistence.saveStaticSiteData(request, "times.dat", true, persistenceBuffer);
+                        String timesFileName = request.taskId + "_times.dat";
+                        filePersistence.saveData(request.getStaticSiteDirectory(), timesFileName, persistenceBuffer);
                     } else {
                         LOG.info("No destination cells reached. Not saving static site file to reduce storage space.");
                     }
@@ -591,6 +591,30 @@ public class AnalystWorker implements Runnable {
             EntityUtils.consumeQuietly(response.getEntity());
         } catch (Exception e) {
             LOG.error("An exception occurred while attempting to report an error to the broker:\n" + e.getStackTrace());
+        }
+    }
+
+    /**
+     * Generate and write out metadata describing what's in a directory of static site output.
+     */
+    public static void saveStaticSiteMetadata (AnalysisTask analysisTask, TransportNetwork network) {
+        try {
+            // Save the regional analysis request, giving the UI some context to display the results.
+            // This is the request object sent to the workers to generate these static site regional results.
+            PersistenceBuffer buffer = PersistenceBuffer.serializeAsJson(analysisTask);
+            AnalystWorker.filePersistence.saveData(analysisTask.getStaticSiteDirectory(), "request.json", buffer);
+
+            // Save non-fatal warnings encountered applying the scenario to the network for this regional analysis.
+            buffer = PersistenceBuffer.serializeAsJson(network.scenarioApplicationWarnings);
+            AnalystWorker.filePersistence.saveData(analysisTask.getStaticSiteDirectory(), "warnings.json", buffer);
+
+            // Save transit route data that allows rendering paths with the Transitive library in a separate file.
+            TransitiveNetwork transitiveNetwork = new TransitiveNetwork(network.transitLayer);
+            buffer = PersistenceBuffer.serializeAsJson(transitiveNetwork);
+            AnalystWorker.filePersistence.saveData(analysisTask.getStaticSiteDirectory(), "transitive.json", buffer);
+        } catch (Exception e) {
+            LOG.error("Exception saving static metadata: {}", e.toString());
+            throw new RuntimeException(e);
         }
     }
 

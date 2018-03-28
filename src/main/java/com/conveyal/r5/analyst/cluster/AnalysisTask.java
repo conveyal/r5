@@ -109,4 +109,13 @@ public abstract class AnalysisTask extends ProfileRequest {
         // no need to catch CloneNotSupportedException, it's caught in ProfileRequest::clone
         return (AnalysisTask) super.clone();
     }
+
+    /**
+     * For a given regional analysis, if we're making a static site we want all the results files to end up in the same
+     * place, which is typically a bucket on S3. This method generates the name for that directory.
+     * The top level directory is hard-coded for now but could be configurable if and when actual use cases require it.
+     */
+    public String getStaticSiteDirectory() {
+        return "analysis-static/" + this.jobId;
+    }
 }

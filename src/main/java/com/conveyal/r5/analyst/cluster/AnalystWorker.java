@@ -336,6 +336,8 @@ public class AnalystWorker implements Runnable {
         // To keep the queue full, we repeatedly try to add each task to the queue, pausing and retrying when
         // it's full. To wait until it's almost empty, we could use wait() in a loop and notify() as tasks are handled.
         // see https://stackoverflow.com/a/15185004/778449
+        // A simpler approach might be to spin-wait checking whether the queue is low and sleeping briefly,
+        // then fetch more work only when the queue is getting empty.
         while (true) {
             List<AnalysisTask> tasks = getSomeWork();
             if (tasks == null || tasks.isEmpty()) {

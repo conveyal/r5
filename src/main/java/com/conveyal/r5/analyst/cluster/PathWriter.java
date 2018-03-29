@@ -18,11 +18,13 @@ import java.util.List;
 
 /**
  * Accumulates information about paths from a given origin to all destinations in a grid, then writes them out for
- * use in a static site. This could also be useful for displaying paths in the UI on top of isochrones.
+ * use in a static site. This could also be useful for displaying paths interactively on top of isochrones in the UI.
  *
- * This used to write one path for every departure minute (and every MC draw) at every destination, which the client
+ * This used to write one path for every departure minute / MC draw at every destination, which the client
  * filtered down to only a few for display, but that leads to huge files and a lot of post-processing.
- * Users may be surprised to see an uncommon path that happenes to be associated with the median travel time.
+ *
+ * Users may be surprised to see an uncommon path that happens to be associated with the median travel time, so we now
+ * save several different ones.
  */
 public class PathWriter {
 
@@ -40,13 +42,19 @@ public class PathWriter {
     /** The inverse of pathForIndex, giving the position of each path within that list. Used to deduplicate paths. */
     private final TObjectIntMap<Path> indexForPath;
 
-    public final int nTargets;
-
-    public final int nPathsPerTarget;
+    /** The total number of targets for which we're recording paths, i.e. width * height of the destination grid. */
+    private final int nTargets;
 
     /**
-     * For each target, the index number of the path that was used to reach that target at a selected percentile
-     * of travel time.
+     * The number of paths being recorded at each destination location.
+     * This may be much smaller than the number of iterations (MC draws). We only want to record a few paths with
+     * travel times near the selected percentile of travel time.
+     */
+    private final int nPathsPerTarget;
+
+    /**
+     * For each target, the index number of N paths that reach that target at roughly a selected percentile
+     * of all observed travel times. This is a flattened width * height * nPaths array.
      */
     private final TIntList pathIndexes = new TIntArrayList();
 
@@ -59,11 +67,13 @@ public class PathWriter {
     }
 
     /**
-     * After construction, this method is called on every target in order. It accepts null if there's no transit path
-     * to a particular target. Currently we're recording only one path per target, but retaining the path deduplication
-     * code on the assumption that many adjacent destinations might use the same path, and we might want multiple paths
-     * per destination in the future. Note that if adjacent destinations have common paths, then adjacent origins
+     * After construction, this method is called on every target in order.
+     * The list of paths may contain nulls if there are not N transit paths to a particular target.
+     * Many adjacent destinations might use the same path, so we deduplicate them.
+     * Note that if adjacent destinations have common paths, then adjacent origins
      * should also have common paths. We currently don't have an optimization to deal with that.
+     *
+     * TODO perform the creation and selection of N paths here rather than in the caller, for better deduplication.
      */
     public void recordPathsForTarget (List<Path> paths) {
         if (paths.size() != nPathsPerTarget) {

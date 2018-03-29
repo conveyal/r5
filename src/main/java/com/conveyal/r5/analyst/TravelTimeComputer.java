@@ -6,25 +6,18 @@ import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.profile.FastRaptorWorker;
-import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.PerTargetPropagater;
-import com.conveyal.r5.profile.RaptorState;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.iterator.TIntIntIterator;
-import gnu.trove.list.TIntList;
-import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
-import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
-import gnu.trove.map.hash.TObjectIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -50,8 +43,7 @@ public class TravelTimeComputer {
         this.gridCache = gridCache;
     }
 
-    // Perhaps function should not be void return type. Why is this using a streaming or pipelining approach?
-    // We also want to decouple the internal representation of the results from how they're serialized to an API.
+    // We should try to decouple the internal representation of the results from how they're serialized to an API.
     public OneOriginResult computeTravelTimes() throws IOException {
 
         // The mode of travel that will be used to reach transit stations from the origin point.
@@ -212,13 +204,11 @@ public class TravelTimeComputer {
                 return travelTimeReducer.finish();
             }
 
-            // Create a new Raptor Worker.
             FastRaptorWorker worker = new FastRaptorWorker(network.transitLayer, request, accessTimes);
-
             if (request.returnPaths || request.travelTimeBreakdown) {
                 // By default, this is false and intermediate results (e.g. paths) are discarded.
                 // TODO do we really need to save all states just to get the travel time breakdown?
-                worker.saveAllStates = true;
+                worker.retainPaths = true;
             }
 
             // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
@@ -233,8 +223,8 @@ public class TravelTimeComputer {
             // because in the non-transit case we call the reducer directly (see above).
             perTargetPropagater.travelTimeReducer = travelTimeReducer;
 
-            if (worker.saveAllStates) {
-                perTargetPropagater.statesEachIteration = worker.statesEachIteration;
+            if (worker.retainPaths) {
+                perTargetPropagater.pathsPerIteration = worker.pathsPerIteration;
                 perTargetPropagater.pathWriter = new PathWriter(request, PerTargetPropagater.N_PATHS_PER_TARGET);
             }
 

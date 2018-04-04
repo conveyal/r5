@@ -14,6 +14,7 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -67,23 +68,22 @@ public class PathWriter {
     }
 
     /**
-     * After construction, this method is called on every target in order.
+     * After construction, this method is called on every destination in order.
      * The list of paths may contain nulls if there are not N transit paths to a particular target.
-     * Many adjacent destinations might use the same path, so we deduplicate them.
+     * Many adjacent destinations from the same origin might use the same path, so we deduplicate them.
      * Note that if adjacent destinations have common paths, then adjacent origins
      * should also have common paths. We currently don't have an optimization to deal with that.
      *
-     * TODO perform the creation and selection of N paths here rather than in the caller, for better deduplication.
+     * @param paths a collection of paths that reach a single destination. Only the first n paths will be recorded.
+     *              This collection should be pre-filtered to not include duplicate paths.
+     *
+     * TODO perform the creation and selection of N paths here rather than in the caller, for clearer deduplication.
      */
-    public void recordPathsForTarget (List<Path> paths) {
-        if (paths.size() != nPathsPerTarget) {
-            throw new AssertionError("Must supply the expected number of paths: " + nPathsPerTarget);
-        }
+    public void recordPathsForTarget (Collection<Path> paths) {
+        int nPathsRecorded = 0;
         for (Path path : paths) {
-            if (path == null) {
-                pathIndexes.add(NO_PATH);
-            } else {
-                // Deduplicate paths using the map.
+            if (path != null) {
+                // Deduplicate paths across destinations using the map.
                 int pathIndex = indexForPath.get(path);
                 if (pathIndex == NO_PATH) {
                     pathIndex = pathForIndex.size();
@@ -91,7 +91,16 @@ public class PathWriter {
                     indexForPath.put(path, pathIndex);
                 }
                 pathIndexes.add(pathIndex);
+                nPathsRecorded += 1;
+                if (nPathsRecorded == nPathsPerTarget) {
+                    break;
+                }
             }
+        }
+        // Pad output to ensure that we record exactly the same number of paths per destination.
+        while (nPathsRecorded < nPathsPerTarget) {
+            pathIndexes.add(NO_PATH);
+            nPathsRecorded += 1;
         }
     }
 

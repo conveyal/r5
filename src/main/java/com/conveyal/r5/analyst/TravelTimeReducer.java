@@ -40,6 +40,10 @@ public class TravelTimeReducer {
 
     private final int timesPerDestination;
 
+    /**
+     * Knowing the number of times that will be provided per destination and holding that constant allows us to
+     * pre-compute and cache the positions within the sorted array at which percentiles will be found.
+     */
     public TravelTimeReducer (AnalysisTask task) {
 
         this.maxTripDurationMinutes = task.maxTripDurationMinutes;
@@ -74,30 +78,43 @@ public class TravelTimeReducer {
      * Compute the index into a sorted list of N elements at which a particular percentile will be found.
      * Our method does not interpolate, it always reports a value actually appearing in the list of elements.
      * That is to say, the percentile will be found at an integer-valued index into the sorted array of elements.
-     * Definition of non-interpolated percentile: the smallest value in the list such that no more than P percent of
-     * the data is strictly less than the value and at least P percent of the data is less than or equal to that value.
-     * The 100th percentile is defined as the largest value in the list.
+     * The definition of a non-interpolated percentile is as follows: the smallest value in the list such that no more
+     * than P percent of the data is strictly less than the value and at least P percent of the data is less than or
+     * equal to that value. The 100th percentile is defined as the largest value in the list.
      * See https://en.wikipedia.org/wiki/Percentile#Definitions
+     *
+     * We scale the interval between the beginning and end elements of the array (the min and max values).
+     * In an array with N values this interval is N-1 elements. We should be scaling N-1, which makes the result
+     * always defined even when using a high percentile and low number of elements. Previously, this caused
+     * an error when requesting the 95th percentile when times.length = 1 (or any length less than 10).
      */
-    // We scale the interval between the beginning and end elements of the array (the min and max values).
-    // In an array with N values this interval is N-1 elements. We should be scaling N-1, which makes the result
-    // always defined even when using a high percentile and low number of elements.  Previously, this caused
-    // an error below when requesting the 95th percentile when times.length = 1 (or any length less than 10).
     private static int findPercentileIndex(int nElements, double percentile) {
-        // FIXME this should be floor not round. The definition uses ceiling for one-based indexes and we have zero-based indexes.
+        // The definition uses ceiling for one-based indexes but we use zero-based indexes so we can truncate.
+        // FIXME truncate rather than rounding.
+        // TODO check the difference in results caused by using the revised formula in both single and regional analyses.
         return (int) Math.round(percentile / 100 * nElements);
     }
 
-    // TODO rename, this does not "record" the travel times, it consumes them or processes them
-    public void recordTravelTimesForTarget (int target, int[] times) {
+    /**
+     * Given a list of travel times of the expected length, extract the requested percentiles. Either the extracted
+     * percentiles or the resulting accessibility values (or both) are then stored.
+     * WARNING: this method destructively sorts the supplied times in place.
+     * Their positions in the array will no longer correspond to the raptor iterations that produced them.
+     * @param times which will be destructively sorted in place to extract percentiles.
+     * @return the extracted travel times, in minutes. This is a hack to enable scoring paths in the caller.
+     */
+    public int[] recordTravelTimesForTarget (int target, int[] times) {
         // TODO factor out getPercentiles method for clarity
         // Sort the times at each target and read off percentiles at the pre-calculated indexes.
         int[] percentileTravelTimesMinutes = new int[nPercentiles];
         if (times.length == 1) {
             // Handle results with no variation
-            // TODO instead of conditionals maybe overload this function to have one version that takes a single int time.
+            // TODO instead of conditionals maybe overload this function to have one version that takes a single int time and wraps this array function.
             Arrays.fill(percentileTravelTimesMinutes, times[0]);
         } else if (times.length == timesPerDestination) {
+            // Instead of general purpose sort this could be done by performing a counting sort on the times,
+            // converting them to minutes in the process and reusing the small histogram array (120 elements) which
+            // should remain largely in processor cache. That's a lot of division though. Would need to be profiled.
             Arrays.sort(times);
             for (int p = 0; p < nPercentiles; p++) {
                 int timeSeconds = times[percentileIndexes[p]];
@@ -131,6 +148,7 @@ public class TravelTimeReducer {
                 }
             }
         }
+        return percentileTravelTimesMinutes;
     }
 
     /**

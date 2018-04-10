@@ -108,9 +108,12 @@ public class TravelTimeReducer {
         // Sort the times at each target and read off percentiles at the pre-calculated indexes.
         int[] percentileTravelTimesMinutes = new int[nPercentiles];
         if (times.length == 1) {
-            // Handle results with no variation
+            // Handle results with no variation, e.g. from walking, biking, or driving.
             // TODO instead of conditionals maybe overload this function to have one version that takes a single int time and wraps this array function.
-            Arrays.fill(percentileTravelTimesMinutes, times[0]);
+            int travelTimeSeconds = times[0];
+            int travelTimeMinutes = (travelTimeSeconds == FastRaptorWorker.UNREACHED) ?
+                    FastRaptorWorker.UNREACHED : travelTimeSeconds / 60;
+            Arrays.fill(percentileTravelTimesMinutes, travelTimeMinutes);
         } else if (times.length == timesPerDestination) {
             // Instead of general purpose sort this could be done by performing a counting sort on the times,
             // converting them to minutes in the process and reusing the small histogram array (120 elements) which

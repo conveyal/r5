@@ -90,6 +90,18 @@ public class AnalystWorker implements Runnable {
 
     public static final int POLL_MAX_RANDOM_WAIT = 5;
 
+    /** The port on which the worker will listen for single point tasks forwarded from the backend. */
+    public static final int WORKER_LISTEN_PORT = 7080;
+
+    /**
+     * The number of threads the worker will use to receive HTTP connections. This crudely limits memory consumption
+     * from the worker handling single point requests.
+     * Unfortunately we can't set this very low. We get a message saying we need at least 10 threads:
+     * max=2 < needed(acceptors=1 + selectors=8 + request=1)
+     * TODO find a more effective way to limit simultaneous computations, e.g. feed them through the regional thread pool.
+     */
+    public static final int WORKER_SINGLE_POINT_THREADS = 10;
+
     // TODO make non-static and make implementations swappable
     // This is very ugly because it's static but initialized at class instantiation.
     public static FilePersistence filePersistence;
@@ -324,8 +336,8 @@ public class AnalystWorker implements Runnable {
         // Trying out the new Spark syntax for non-static configuration.
         // TODO symbolic constants for the backend and worker ports
         sparkHttpService = spark.Service.ignite()
-            .port(7080)
-            .threadPool(10);
+            .port(WORKER_LISTEN_PORT)
+            .threadPool(WORKER_SINGLE_POINT_THREADS);
         sparkHttpService.post("/single", new AnalysisWorkerController(this)::handleSinglePoint);
 
         // Main polling loop to fill the regional work queue.

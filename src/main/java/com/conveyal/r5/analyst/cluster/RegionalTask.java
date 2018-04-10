@@ -12,6 +12,7 @@ import java.util.List;
  * Represents a task to be performed as part of a regional analysis.
  */
 public class RegionalTask extends AnalysisTask implements Cloneable {
+
     /**
      * Coordinates of origin cell in grid defined in AnalysisTask.
      *
@@ -39,7 +40,10 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
     /** Where should output of this job be saved */
     public String outputQueue;
 
-    /** The grid we are calculating accessibility to */
+    /**
+     * The grid we are calculating accessibility to. This is not serialized int the request, it's looked up by the worker.
+     * TODO use distinct terms for grid extents and gridded opportunity density data.
+     */
     public transient Grid gridData;
 
     @Override

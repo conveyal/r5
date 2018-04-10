@@ -76,6 +76,7 @@ import static org.apache.commons.math3.util.FastMath.tan;
  * the edges of the world.
  */
 public class Grid {
+
     public static final Logger LOG = LoggerFactory.getLogger(Grid.class);
 
     /** The web mercator zoom level for this grid. */

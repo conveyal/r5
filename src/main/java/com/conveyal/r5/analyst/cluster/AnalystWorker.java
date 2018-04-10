@@ -311,8 +311,9 @@ public class AnalystWorker implements Runnable {
 
         // Create executors with up to one thread per processor.
         // The default task rejection policy is "Abort".
+        // The executor's queue is rather long because some tasks complete very fast and we poll max once per second.
         int availableProcessors = Runtime.getRuntime().availableProcessors();
-        BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>(availableProcessors * 2);
+        BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>(availableProcessors * 6);
         regionalTaskExecutor = new ThreadPoolExecutor(1, availableProcessors, 60, TimeUnit.SECONDS, taskQueue);
 
         // If an initial graph ID was provided in the config file, build or load that TransportNetwork on startup.
@@ -369,8 +370,9 @@ public class AnalystWorker implements Runnable {
                         break;
                     } catch (RejectedExecutionException e) {
                         // Queue is full, wait a bit and try to feed it more tasks.
-                        // FIXME on analyses where we burn through the internal queue in less than 1 second this is the limiting factor on speed
-                        // This happens with regions unconnected to transit and with very small travel time cutoffs
+                        // FIXME if we burn through the internal queue in less than 1 second this is a speed bottleneck.
+                        // This happens with regions unconnected to transit and with very small travel time cutoffs.
+                        // FIXME this is really using the list of fetched tasks as a secondary queue, it's awkward.
                         sleepSeconds(1);
                     }
                 }

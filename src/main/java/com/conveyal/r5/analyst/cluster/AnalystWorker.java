@@ -14,6 +14,7 @@ import com.conveyal.r5.common.R5Version;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
 import com.conveyal.r5.transitive.TransitiveNetwork;
+import com.conveyal.r5.util.ExceptionUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.io.LittleEndianDataOutputStream;
 import org.apache.http.HttpEntity;
@@ -510,8 +511,7 @@ public class AnalystWorker implements Runnable {
             // Catch any exceptions that were not handled by more specific catch clauses above.
             // This ensures that some form of error message is passed all the way back up to the web UI.
             TaskError taskError = new TaskError(ex);
-            LOG.error("An error occurred while routing: {}", ex.toString());
-            ex.printStackTrace();
+            LOG.error("An error occurred while routing: {}", ExceptionUtils.asString(ex));
             reportTaskErrors(request.taskId, HttpStatus.INTERNAL_SERVER_ERROR_500, Arrays.asList(taskError));
         }
         return null;

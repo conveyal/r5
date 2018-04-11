@@ -100,27 +100,27 @@ public class TravelTimeReducer {
      * percentiles or the resulting accessibility values (or both) are then stored.
      * WARNING: this method destructively sorts the supplied times in place.
      * Their positions in the array will no longer correspond to the raptor iterations that produced them.
-     * @param times which will be destructively sorted in place to extract percentiles.
+     * @param timesSeconds which will be destructively sorted in place to extract percentiles.
      * @return the extracted travel times, in minutes. This is a hack to enable scoring paths in the caller.
      */
-    public int[] recordTravelTimesForTarget (int target, int[] times) {
+    public int[] recordTravelTimesForTarget (int target, int[] timesSeconds) {
         // TODO factor out getPercentiles method for clarity
         // Sort the times at each target and read off percentiles at the pre-calculated indexes.
         int[] percentileTravelTimesMinutes = new int[nPercentiles];
-        if (times.length == 1) {
+        if (timesSeconds.length == 1) {
             // Handle results with no variation, e.g. from walking, biking, or driving.
             // TODO instead of conditionals maybe overload this function to have one version that takes a single int time and wraps this array function.
-            int travelTimeSeconds = times[0];
+            int travelTimeSeconds = timesSeconds[0];
             int travelTimeMinutes = (travelTimeSeconds == FastRaptorWorker.UNREACHED) ?
                     FastRaptorWorker.UNREACHED : travelTimeSeconds / 60;
             Arrays.fill(percentileTravelTimesMinutes, travelTimeMinutes);
-        } else if (times.length == timesPerDestination) {
+        } else if (timesSeconds.length == timesPerDestination) {
             // Instead of general purpose sort this could be done by performing a counting sort on the times,
             // converting them to minutes in the process and reusing the small histogram array (120 elements) which
             // should remain largely in processor cache. That's a lot of division though. Would need to be profiled.
-            Arrays.sort(times);
+            Arrays.sort(timesSeconds);
             for (int p = 0; p < nPercentiles; p++) {
-                int timeSeconds = times[percentileIndexes[p]];
+                int timeSeconds = timesSeconds[percentileIndexes[p]];
                 if (timeSeconds == FastRaptorWorker.UNREACHED) {
                     percentileTravelTimesMinutes[p] = FastRaptorWorker.UNREACHED;
                 } else {

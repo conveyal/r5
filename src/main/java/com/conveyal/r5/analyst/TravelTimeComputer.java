@@ -97,12 +97,10 @@ public class TravelTimeComputer {
             int[] travelTimesToTargets = directModeLinkedDestinations
                     .eval(sr::getTravelTimeToVertex, offstreetTravelSpeedMillimetersPerSecond).travelTimes;
 
-            for (int x = 0; x < request.width; x++) {
-                for (int y = 0; y < request.height; y++) {
-                    int targetIndex = y * request.width + x;
-                    final int travelTimeSeconds = travelTimesToTargets[targetIndex];
-                    travelTimeReducer.recordTravelTimesForTarget(targetIndex, new int[] { travelTimeSeconds });
-                }
+            // Iterate over all destinations ("targets") and at each destination, save the same travel time for all percentiles.
+            for (int d = 0; d < travelTimesToTargets.length; d++) {
+                final int travelTimeSeconds = travelTimesToTargets[d];
+                travelTimeReducer.recordTravelTimesForTarget(d, new int[] { travelTimeSeconds });
             }
             return travelTimeReducer.finish();
         } else {

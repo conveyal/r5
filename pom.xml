@@ -397,7 +397,7 @@
         <dependency>
             <groupId>com.graphql-java</groupId>
             <artifactId>graphql-java</artifactId>
-            <version>2016-02-19T11-51-00</version>
+            <version>2018-03-18T04-10-36</version>
         </dependency>
         <dependency>
             <groupId>com.sparkjava</groupId>

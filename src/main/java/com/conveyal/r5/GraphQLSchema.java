@@ -122,6 +122,8 @@ public class GraphQLSchema {
     public static GraphQLEnumType transitmodeEnum = GraphQLEnumType.newEnum()
         .name("TransitModes")
         .description("Types of transit mode transport from GTFS")
+        .value("AIR", TransitModes.AIR,
+            "Air")
         .value("TRAM", TransitModes.TRAM,
             " Tram, Streetcar, Light rail. Any light rail or street level system within a metropolitan area.")
         .value("SUBWAY", TransitModes.SUBWAY,

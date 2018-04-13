@@ -7,12 +7,17 @@ import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.csvreader.CsvReader;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
 
 import java.io.File;
+import java.io.IOException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.List;
 
 /**
  * Test response times for a large batch of origin/destination points.
@@ -20,9 +25,9 @@ import java.util.EnumSet;
  */
 public class SpeedTest {
 
-    public static final String NETWORK_DIR = "/Users/abyrd/r5/norway";
+    public static final String NETWORK_DIR = "./src/main/resources/speed_test/";
 
-    public static final String STOP_PAIRS = "~/norway-stops.csv";
+    public static final String COORD_PAIRS = "./src/main/resources/speed_test/travelSearch.csv";
 
     private TransportNetwork transportNetwork;
 
@@ -31,45 +36,48 @@ public class SpeedTest {
     }
 
     public void run () throws Exception {
-
-        // CsvReader csvReader = new CsvReader(STOP_PAIRS))
+        List<CoordPair> coordPairs = getCoordPairs();
 
         transportNetwork = TransportNetwork.read(new File(NETWORK_DIR, "network.dat"));
 
         long startTime = System.currentTimeMillis();
         int nRoutesComputed = 0;
-        while (true) {
-            boolean routingSucceeded = route();
-            if (routingSucceeded) {
-                nRoutesComputed += 1;
+        for (CoordPair coordPair : coordPairs) {
+            try {
+                boolean routingSucceeded = route(coordPair);
+                if (routingSucceeded) {
+                    nRoutesComputed += 1;
+                }
             }
-            if (nRoutesComputed % 10 == 0) {
-                long elapsedTime = System.currentTimeMillis() - startTime;
-                System.out.println("Average path search time (msec): " +  elapsedTime / nRoutesComputed);
+            catch (Exception e) {
+                System.out.println("Search failed");
             }
         }
 
+        long elapsedTime = System.currentTimeMillis() - startTime;
+
+        System.out.println("Average path search time (msec): " + elapsedTime / nRoutesComputed);
+        System.out.println("Successful searches: " + nRoutesComputed + " / " + coordPairs.size());
+        System.out.println("Total time: " + elapsedTime / 1000 + " seconds");
     }
 
     /**
      *
      * @return true if the search succeeded.
      */
-    public boolean route () {
+    public boolean route (CoordPair coordPair) {
         ProfileRequest request = new ProfileRequest();
         request.accessModes =  request.egressModes = request.directModes = EnumSet.of(LegMode.WALK);
         request.maxWalkTime = 20;
+        request.maxTripDurationMinutes = 1200;
         request.transitModes = EnumSet.of(TransitModes.TRAM, TransitModes.SUBWAY, TransitModes.RAIL, TransitModes.BUS);
-        // fromLat: 59.90965, fromLon: 10.754923, toLat: 60.390495, toLon: 5.332859,
-        // fromTime: "2018-03-21T09:00:00+01:00", toTime: "2018-03-21T09:10:00+01:00",
-        // accessModes: [WALK], egressModes: [WALK]
-        request.fromLat = 59.90965;
-        request.fromLon = 10.754923;
-        request.toLat = 60.390495;
-        request.toLon = 5.332859;
+        request.fromLat = coordPair.fromLat;
+        request.fromLon = coordPair.fromLon;
+        request.toLat = coordPair.toLat;
+        request.toLon = coordPair.toLon;
         request.fromTime = 8 * 60 * 60; // 8AM in seconds since midnight
         request.toTime = request.fromTime + 60;
-        request.date = LocalDate.of(2018, 03, 21);
+        request.date = LocalDate.of(2018, 04, 13);
 
         TIntIntMap accessTimesToStopsInSeconds = streetRoute(request, false);
         TIntIntMap egressTimesToStopsInSeconds = streetRoute(request, true);
@@ -84,10 +92,11 @@ public class SpeedTest {
         int bestKnownTime = Integer.MAX_VALUE; // Hack to bypass Java stupid "effectively final" requirement.
         Path bestKnownPath = null;
         TIntIntIterator egressTimeIterator = egressTimesToStopsInSeconds.iterator();
+        int egressTime = 0;
         while (egressTimeIterator.hasNext()) {
             egressTimeIterator.advance();
             int stopIndex = egressTimeIterator.key();
-            int egressTime = egressTimeIterator.value();
+            egressTime = egressTimeIterator.value();
             int travelTimeToStop = transitTravelTimesToStops[0][stopIndex];
             if (travelTimeToStop != FastRaptorWorker.UNREACHED) {
                 int totalTime = travelTimeToStop + egressTime;
@@ -98,6 +107,8 @@ public class SpeedTest {
             }
         }
         System.out.println("Best path: " + (bestKnownPath == null ? "NONE" : bestKnownPath.toString()));
+        List<String> plan = generateTripPlan(request, bestKnownPath, 0, egressTime);
+        plan.stream().forEach(p -> System.out.println(p));
         return true;
     }
 
@@ -105,7 +116,7 @@ public class SpeedTest {
         // Search for access to / egress from transit on streets.
         StreetRouter sr = new StreetRouter(transportNetwork.streetLayer);
         sr.profileRequest = request;
-        if ( ! sr.setOrigin(request.fromLat, request.fromLon)) {
+        if ( !fromDest ? !sr.setOrigin(request.fromLat, request.fromLon) : !sr.setOrigin(request.toLat, request.toLon)) {
             throw new RuntimeException("Point not near a road.");
         }
         sr.timeLimitSeconds = request.maxWalkTime * 60;
@@ -114,4 +125,46 @@ public class SpeedTest {
         return sr.getReachedStops();
     }
 
+    private List<String> generateTripPlan(ProfileRequest request, Path path, int accessTime, int egressTime) {
+        List<String> legs = new ArrayList<>();
+        if (path == null) { return legs; }
+
+        LocalDateTime date = request.date.atStartOfDay();
+
+        for (int i = 0; i < path.patterns.length; i++) {
+            String boardStop = transportNetwork.transitLayer.stopNames.get(path.boardStops[i]);
+            String alightStop = transportNetwork.transitLayer.stopNames.get(path.alightStops[i]);
+            String routeid = transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).routeId;
+
+            LocalDateTime alightTime = date.plusSeconds(path.alightTimes[i]);
+
+            legs.add("Board stop: " + boardStop + " Alight stop: " + alightStop + " Alight: " + alightTime.toString() + " Pattern: " + routeid);
+        }
+
+        legs.add("Arrival time: " + date.plusSeconds(path.alightTimes[path.alightTimes.length-1] + egressTime));
+
+        return legs;
+    }
+
+    private List<CoordPair> getCoordPairs() throws IOException {
+        List<CoordPair> coordPairs = new ArrayList<>();
+        CsvReader csvReader = new CsvReader(COORD_PAIRS);
+        csvReader.readRecord(); // Skip header
+        while (csvReader.readRecord()) {
+            CoordPair coordPair = new CoordPair();
+            coordPair.fromLat = Double.parseDouble(csvReader.get(2));
+            coordPair.fromLon = Double.parseDouble(csvReader.get(3));
+            coordPair.toLat = Double.parseDouble(csvReader.get(6));
+            coordPair.toLon = Double.parseDouble(csvReader.get(7));
+            coordPairs.add(coordPair);
+        }
+        return coordPairs;
+    }
+
+    public class CoordPair {
+        public double fromLat;
+        public double fromLon;
+        public double toLat;
+        public double toLon;
+    }
 }

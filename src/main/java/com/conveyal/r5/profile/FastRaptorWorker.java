@@ -112,7 +112,11 @@ public class FastRaptorWorker {
     /** Services active on the date of the search */
     private final BitSet servicesActive;
 
-    // TODO add javadoc to field
+    /**
+     * The state resulting from the scheduled search at a particular departure minute.
+     * This state is reused at each departure minute without re-initializng it (this is the range-raptor optimization).
+     * The randomized schedules at each departure minute are applied on top of this scheduled state.
+     */
     private final RaptorState[] scheduleState;
 
     /** Set to true to save path details for all optimal paths. */

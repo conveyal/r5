@@ -13,6 +13,7 @@ import gnu.trove.map.TIntIntMap;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -131,15 +132,28 @@ public class SpeedTest {
 
         LocalDateTime date = request.date.atStartOfDay();
 
+        legs.add("Departure time: " + date.plusSeconds(path.boardTimes[0] - accessTime));
+
+        legs.add("Access time: " + Duration.ofSeconds(accessTime));
+
         for (int i = 0; i < path.patterns.length; i++) {
             String boardStop = transportNetwork.transitLayer.stopNames.get(path.boardStops[i]);
             String alightStop = transportNetwork.transitLayer.stopNames.get(path.alightStops[i]);
             String routeid = transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).routeId;
+            String tripId = transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).tripSchedules.get(path.trips[i]).tripId;
 
+            LocalDateTime boardTime = date.plusSeconds(path.boardTimes[i]);
             LocalDateTime alightTime = date.plusSeconds(path.alightTimes[i]);
+            Duration transferTime = Duration.ofSeconds(path.transferTimes[i]);
 
-            legs.add("Board stop: " + boardStop + " Alight stop: " + alightStop + " Alight: " + alightTime.toString() + " Pattern: " + routeid);
+            if (transferTime.getSeconds() != -1) {
+                legs.add("Transfer time: " + transferTime.toString());
+            }
+
+            legs.add(" Board stop: " + boardStop + " Alight stop: " + alightStop + "Board: " + boardTime.toString() + " Alight: " + alightTime.toString() + " Pattern: " + routeid + " Trip: " + tripId);
         }
+
+        legs.add("Egress time: " + Duration.ofSeconds(egressTime));
 
         legs.add("Arrival time: " + date.plusSeconds(path.alightTimes[path.alightTimes.length-1] + egressTime));
 

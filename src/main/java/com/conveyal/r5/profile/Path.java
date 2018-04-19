@@ -24,6 +24,8 @@ public class Path {
     public int[] boardStops;
     public int[] alightStops;
     public int[] alightTimes;
+    public int[] boardTimes;
+    public int[] transferTimes;
     public int[] trips;
     public int[] boardStopPositions;
     public int[] alightStopPositions;
@@ -35,11 +37,15 @@ public class Path {
     public Path(RaptorState state, int stop) {
         // trace the path back from this RaptorState
         int previousPattern;
+        int previousTrip;
         TIntList patterns = new TIntArrayList();
         TIntList boardStops = new TIntArrayList();
         TIntList alightStops = new TIntArrayList();
         TIntList times = new TIntArrayList();
         TIntList alightTimes = new TIntArrayList();
+        TIntList boardTimes = new TIntArrayList();
+        TIntList transferTimes = new TIntArrayList();
+        TIntList trips = new TIntArrayList();
 
         while (state.previous != null) {
             // find the fewest-transfers trip that is still optimal in terms of travel time
@@ -53,11 +59,14 @@ public class Path {
             }
 
             previousPattern = state.previousPatterns[stop];
+            previousTrip = state.previousTrips[stop];
 
             patterns.add(previousPattern);
+            trips.add(previousTrip);
             alightStops.add(stop);
             times.add(state.bestTimes[stop]);
             alightTimes.add(state.bestNonTransferTimes[stop]);
+            boardTimes.add(state.boardTimes[stop]);
             stop = state.previousStop[stop];
             boardStops.add(stop);
 
@@ -66,7 +75,11 @@ public class Path {
 
             // handle transfers
             if (state.transferStop[stop] != -1) {
+                transferTimes.add(state.transferTimes[stop]);
                 stop = state.transferStop[stop];
+            }
+            else {
+                transferTimes.add(-1);
             }
         }
 
@@ -76,11 +89,18 @@ public class Path {
         boardStops.reverse();
         alightStops.reverse();
         alightTimes.reverse();
+        boardTimes.reverse();
+        trips.reverse();
+        transferTimes.reverse();
 
         this.patterns = patterns.toArray();
         this.boardStops = boardStops.toArray();
         this.alightStops = alightStops.toArray();
         this.alightTimes = alightTimes.toArray();
+        this.boardTimes = boardTimes.toArray();
+        this.trips = trips.toArray();
+        this.transferTimes = transferTimes.toArray();
+
         this.length = this.patterns.length;
 
         if (this.patterns.length == 0)

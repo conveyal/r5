@@ -264,7 +264,7 @@ public class FastRaptorWorker {
         // add initial stops
         RaptorState initialState = scheduleState[0];
         accessStops.forEachEntry((stop, accessTime) -> {
-            initialState.setTimeAtStop(stop, accessTime + nextMinuteDepartureTime, -1, -1, 0, 0, true);
+            initialState.setTimeAtStop(stop, accessTime + nextMinuteDepartureTime, -1, -1, 0, 0, true, -1, -1, -1);
             return true; // continue iteration
         });
     }
@@ -430,7 +430,7 @@ public class FastRaptorWorker {
                         LOG.error("Components of travel time are larger than travel time!");
                     }
 
-                    outputState.setTimeAtStop(stop, alightTime, originalPatternIndex, boardStop, waitTime, onVehicleTime, false);
+                    outputState.setTimeAtStop(stop, alightTime, originalPatternIndex, boardStop, waitTime, onVehicleTime, false, pattern.tripSchedules.indexOf(schedule), boardTime, -1);
                 }
 
                 int sourcePatternIndex = inputState.previousStop[stop] == -1 ?
@@ -648,7 +648,7 @@ public class FastRaptorWorker {
                             LOG.error("Negative transfer time!!");
                         }
 
-                        state.setTimeAtStop(targetStop, timeAtTargetStop, -1, stop, 0, 0, true);
+                        state.setTimeAtStop(targetStop, timeAtTargetStop, -1, stop, 0, 0, true, -1, -1, walkTimeToTargetStopSeconds);
                     }
                 }
             }

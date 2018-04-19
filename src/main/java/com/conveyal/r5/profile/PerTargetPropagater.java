@@ -32,9 +32,6 @@ public class PerTargetPropagater {
 
     private static final Logger LOG = LoggerFactory.getLogger(PerTargetPropagater.class);
 
-    /** When writing out paths to targets (for static sites), how many paths to save (centered on the median). */
-    public static final int N_PATHS_PER_TARGET = 3;
-
     /**
      * The maximum travel time we will record and report. To limit calculation time and avoid overflow places this
      * many seconds from the origin are just considered unreachable.
@@ -160,7 +157,7 @@ public class PerTargetPropagater {
                 // TODO Somehow report these in-vehicle, wait and walk breakdown values alongside the total travel time.
                 // TODO WalkTime should be calculated per-iteration, as it may not hold for some summary statistics that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
                 // NOTE this is currently using only the first of what could be N percentiles.
-                Set<Path> selectedPaths = pathScorer.getTopPaths(N_PATHS_PER_TARGET, percentilesMinutes[0] * 60);
+                Set<Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, percentilesMinutes[0] * 60);
                 pathWriter.recordPathsForTarget(selectedPaths);
             }
         }

@@ -223,7 +223,7 @@ public class TravelTimeComputer {
 
             if (worker.retainPaths) {
                 perTargetPropagater.pathsToStopsForIteration = worker.pathsPerIteration;
-                perTargetPropagater.pathWriter = new PathWriter(request, PerTargetPropagater.N_PATHS_PER_TARGET);
+                perTargetPropagater.pathWriter = new PathWriter(request);
             }
 
             return perTargetPropagater.propagate();

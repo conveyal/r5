@@ -51,7 +51,7 @@ public class PathWriter {
      * This may be much smaller than the number of iterations (MC draws). We only want to record a few paths with
      * travel times near the selected percentile of travel time.
      */
-    private final int nPathsPerTarget;
+    public final int nPathsPerTarget;
 
     /**
      * For each target, the index number of N paths that reach that target at roughly a selected percentile
@@ -60,11 +60,11 @@ public class PathWriter {
     private final TIntList pathIndexes = new TIntArrayList();
 
     /** Constructor. Holds onto the task object, which is used to create unique names for the results files. */
-    public PathWriter (AnalysisTask task, int nPathsPerTarget) {
+    public PathWriter (AnalysisTask task) {
         this.task = task;
         this.nTargets = task.width * task.height;
         indexForPath = new TObjectIntHashMap<>(nTargets / 2, 0.5f, NO_PATH);
-        this.nPathsPerTarget = nPathsPerTarget;
+        nPathsPerTarget = task.nPathsPerTarget;
     }
 
     /**

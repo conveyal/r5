@@ -105,6 +105,9 @@ public class Grid {
     /** Maximum area allowed for the bounding box of an uploaded shapefile -- large enough for New York State.  */
     private static final double MAX_BOUNDING_BOX_AREA_SQ_KM = 250000;
 
+    /** Maximum area allowed for features in a shapefile upload */
+    double MAX_FEATURE_AREA_SQ_DEG = 0.01;
+
     /**
      * @param zoom web mercator zoom level for the grid.
      * @param north latitude in decimal degrees of the north edge of this grid.

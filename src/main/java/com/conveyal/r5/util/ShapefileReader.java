@@ -77,6 +77,14 @@ public class ShapefileReader {
         return source.getBounds();
     }
 
+    public double getAreaSqKm () throws IOException, TransformException, FactoryException {
+        CoordinateReferenceSystem webMercatorCRS = CRS.decode("EPSG:3857");
+        MathTransform webMercatorTransform = CRS.findMathTransform(crs, webMercatorCRS, true);
+        Envelope mercatorEnvelope = JTS.transform(getBounds(), webMercatorTransform);
+        return mercatorEnvelope.getArea() / 1000 / 1000;
+
+    }
+
     public Stream<SimpleFeature> wgs84Stream () throws IOException, TransformException {
         return stream().map(f -> {
             Geometry g = (Geometry) f.getDefaultGeometry();

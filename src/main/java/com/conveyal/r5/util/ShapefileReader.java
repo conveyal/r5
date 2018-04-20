@@ -52,6 +52,11 @@ public class ShapefileReader {
 
         features = source.getFeatures(filter);
         crs = features.getSchema().getCoordinateReferenceSystem();
+
+        if (crs == null) {
+            throw new IllegalArgumentException("Unrecognized shapefile projection");
+        }
+
         transform = CRS.findMathTransform(crs, DefaultGeographicCRS.WGS84, true);
     }
 

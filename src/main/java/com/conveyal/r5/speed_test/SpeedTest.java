@@ -5,6 +5,10 @@ import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.speed_test.api.model.Itinerary;
+import com.conveyal.r5.speed_test.api.model.Leg;
+import com.conveyal.r5.speed_test.api.model.Place;
+import com.conveyal.r5.speed_test.api.model.TripPlan;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.csvreader.CsvReader;
@@ -17,8 +21,11 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.TimeZone;
 
 /**
  * Test response times for a large batch of origin/destination points.
@@ -108,7 +115,7 @@ public class SpeedTest {
             }
         }
         System.out.println("Best path: " + (bestKnownPath == null ? "NONE" : bestKnownPath.toString()));
-        List<String> plan = generateTripPlan(request, bestKnownPath, 0, egressTime);
+        List<String> plan = generateTripPlanString(request, bestKnownPath, 0, egressTime);
         plan.stream().forEach(p -> System.out.println(p));
         return true;
     }
@@ -126,7 +133,7 @@ public class SpeedTest {
         return sr.getReachedStops();
     }
 
-    private List<String> generateTripPlan(ProfileRequest request, Path path, int accessTime, int egressTime) {
+    private List<String> generateTripPlanString(ProfileRequest request, Path path, int accessTime, int egressTime) {
         List<String> legs = new ArrayList<>();
         if (path == null) { return legs; }
 
@@ -158,6 +165,68 @@ public class SpeedTest {
         legs.add("Arrival time: " + date.plusSeconds(path.alightTimes[path.alightTimes.length-1] + egressTime));
 
         return legs;
+    }
+
+    public TripPlan generateTripPlan(ProfileRequest request, Path path, int accessTime, int egressTime) {
+        TimeZone timeZone = TimeZone.getTimeZone("Europe/Oslo");
+
+        TripPlan tripPlan = new TripPlan();
+        tripPlan.date = java.sql.Timestamp.valueOf(request.date.atStartOfDay());
+        tripPlan.from = new Place(request.fromLon, request.fromLat, "");
+        tripPlan.to = new Place(request.toLon, request.toLat, "");
+
+        if (path == null) { return tripPlan; }
+
+        Itinerary itinerary = new Itinerary();
+
+        // Access leg
+        Leg accessLeg = new Leg();
+        accessLeg.startTime = Calendar.getInstance(timeZone);
+        accessLeg.startTime.set(accessLeg.startTime.SECOND, path.boardTimes[0] - accessTime);
+        accessLeg.endTime = Calendar.getInstance(timeZone);
+        accessLeg.endTime.set(accessLeg.startTime.SECOND, path.boardTimes[0]);
+        itinerary.addLeg(accessLeg);
+
+        for (int i = 0; i < path.patterns.length; i++) {
+            // Transfer leg if present
+            if (i > 0 && path.transferTimes[i] != -1) {
+                Leg transferLeg = new Leg();
+                transferLeg.startTime = Calendar.getInstance(timeZone);
+                transferLeg.startTime.set(transferLeg.startTime.SECOND, path.alightTimes[i - 1]);
+                transferLeg.endTime = Calendar.getInstance(timeZone);
+                transferLeg.endTime.set(transferLeg.startTime.SECOND, path.alightTimes[i - 1] + path.transferTimes[i]);
+                itinerary.addLeg(transferLeg);
+            }
+
+            // Transit leg
+            Leg transitLeg = new Leg();
+
+            String boardStop = transportNetwork.transitLayer.stopNames.get(path.boardStops[i]);
+            String alightStop = transportNetwork.transitLayer.stopNames.get(path.alightStops[i]);
+            String routeid = transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).routeId;
+            String tripId = transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).tripSchedules.get(path.trips[i]).tripId;
+
+            transitLeg.stop.add(new Place(1.0, 1.0, boardStop));
+            transitLeg.stop.add(new Place(1.0, 1.0, alightStop));
+            transitLeg.route = routeid;
+            transitLeg.tripShortName = tripId;
+
+            transitLeg.startTime = Calendar.getInstance(timeZone);
+            transitLeg.startTime.set(transitLeg.startTime.SECOND, path.boardTimes[i]);
+            transitLeg.endTime = Calendar.getInstance(timeZone);
+            transitLeg.endTime.set(transitLeg.startTime.SECOND, path.alightTimes[i]);
+            itinerary.addLeg(transitLeg);
+        }
+
+        // Egress leg
+        Leg egressLeg = new Leg();
+        egressLeg.startTime = Calendar.getInstance(timeZone);
+        egressLeg.startTime.set(egressLeg.startTime.SECOND, path.alightTimes[path.alightTimes.length-1]);
+        egressLeg.endTime = Calendar.getInstance(timeZone);
+        egressLeg.endTime.set(egressLeg.startTime.SECOND, path.alightTimes[path.alightTimes.length-1] + egressTime);
+        itinerary.addLeg(egressLeg);
+
+        return new TripPlan();
     }
 
     private List<CoordPair> getCoordPairs() throws IOException {

@@ -1,7 +1,6 @@
 package com.conveyal.r5.speed_test.api.model;
 
 import com.google.common.collect.Sets;
-import org.opentripplanner.routing.core.RoutingRequest;
 
 import java.io.Serializable;
 import java.security.InvalidParameterException;
@@ -37,29 +36,6 @@ public class QualifiedMode implements Serializable {
             sb.append(qualifier);
         }
         return sb.toString();
-    }
-
-    public void applyToRoutingRequest (RoutingRequest req, boolean usingTransit) {
-        req.modes.setMode(this.mode, true);
-        if (this.mode == TraverseMode.BICYCLE) {
-            if (this.qualifiers.contains(Qualifier.RENT)) {
-                req.modes.setMode(TraverseMode.WALK, true); // turn on WALK for bike rental mode
-                req.allowBikeRental = true;
-            }
-            if (usingTransit) {
-                req.bikeParkAndRide = this.qualifiers.contains(Qualifier.PARK);
-            }
-        }
-        if (usingTransit && this.mode == TraverseMode.CAR) {
-            if (this.qualifiers.contains(Qualifier.PARK)) {
-                req.parkAndRide = true;
-            } else if (this.qualifiers.contains(Qualifier.PICKUP)) {
-                req.rideAndKiss = true;
-            } else {
-                req.kissAndRide = true;
-            }
-            req.modes.setWalk(true); // need to walk after dropping the car off
-        }
     }
 
     @Override

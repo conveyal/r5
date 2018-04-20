@@ -13,6 +13,8 @@
 
 package com.conveyal.r5.speed_test.api;
 
+import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.speed_test.api.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +22,9 @@ import org.slf4j.LoggerFactory;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
+import java.time.LocalDate;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import com.conveyal.r5.profile.ProfileRequest;
@@ -380,202 +384,20 @@ public abstract class RoutingResource {
      * @throws ParameterException when there is a problem interpreting a query parameter
      */
     protected ProfileRequest buildRequest() throws ParameterException {
-        /*
-        Router router = otpServer.getRouter(routerId);
         ProfileRequest request = new ProfileRequest();
-        request.routerId = routerId;
-        // The routing request should already contain defaults, which are set when it is initialized or in the JSON
-        // router configuration and cloned. We check whether each parameter was supplied before overwriting the default.
-        if (fromPlace != null)
-            request.setFromString(fromPlace);
 
-        if (toPlace != null)
-            request.setToString(toPlace);
+        request.accessModes =  request.egressModes = request.directModes = EnumSet.of(LegMode.WALK);
+        request.maxWalkTime = 20;
+        request.maxTripDurationMinutes = 1200;
+        request.transitModes = EnumSet.of(TransitModes.TRAM, TransitModes.SUBWAY, TransitModes.RAIL, TransitModes.BUS);
+        request.fromLat = 1.0;
+        request.fromLon = 1.0;
+        request.toLat = 1.0;
+        request.toLon = 1.0;
+        request.fromTime = 8 * 60 * 60; // 8AM in seconds since midnight
+        request.toTime = request.fromTime + 60;
+        request.date = LocalDate.of(2018, 04, 13);
 
-        request.parseTime(router.graph.getTimeZone(), this.date, this.time);
-
-        if (wheelchair != null)
-            request.setWheelchairAccessible(wheelchair);
-
-        if (numItineraries != null)
-            request.setNumItineraries(numItineraries);
-
-        if (maxWalkDistance != null) {
-            request.setMaxWalkDistance(maxWalkDistance);
-            request.maxTransferWalkDistance = maxWalkDistance;
-        }
-
-        if (maxPreTransitTime != null)
-            request.setMaxPreTransitTime(maxPreTransitTime);
-
-        if (walkReluctance != null)
-            request.setWalkReluctance(walkReluctance);
-
-        if (waitReluctance != null)
-            request.setWaitReluctance(waitReluctance);
-
-        if (walkOnStreetReluctance != null)
-            request.setWalkOnStreetReluctance(walkOnStreetReluctance);
-
-        if (waitAtBeginningFactor != null)
-            request.setWaitAtBeginningFactor(waitAtBeginningFactor);
-
-        if (walkSpeed != null)
-            request.walkSpeed = walkSpeed;
-
-        if (bikeSpeed != null)
-            request.bikeSpeed = bikeSpeed;
-
-        if (bikeSwitchTime != null)
-            request.bikeSwitchTime = bikeSwitchTime;
-
-        if (bikeSwitchCost != null)
-            request.bikeSwitchCost = bikeSwitchCost;
-
-        if (optimize != null) {
-            // Optimize types are basically combined presets of routing parameters, except for triangle
-            request.setOptimize(optimize);
-            if (optimize == OptimizeType.TRIANGLE) {
-                RoutingRequest.assertTriangleParameters(triangleSafetyFactor, triangleTimeFactor, triangleSlopeFactor);
-                request.setTriangleSafetyFactor(this.triangleSafetyFactor);
-                request.setTriangleSlopeFactor(this.triangleSlopeFactor);
-                request.setTriangleTimeFactor(this.triangleTimeFactor);
-            }
-        }
-
-        if (arriveBy != null)
-            request.setArriveBy(arriveBy);
-
-        if (showIntermediateStops != null)
-            request.showIntermediateStops = showIntermediateStops;
-
-        if (intermediatePlaces != null)
-            request.setIntermediatePlacesFromStrings(intermediatePlaces);
-
-        if (preferredRoutes != null)
-            request.setPreferredRoutes(preferredRoutes);
-
-        if (otherThanPreferredRoutesPenalty != null)
-            request.setOtherThanPreferredRoutesPenalty(otherThanPreferredRoutesPenalty);
-
-        if (preferredAgencies != null)
-            request.setPreferredAgencies(preferredAgencies);
-
-        if (unpreferredRoutes != null)
-            request.setUnpreferredRoutes(unpreferredRoutes);
-
-        if (unpreferredAgencies != null)
-            request.setUnpreferredAgencies(unpreferredAgencies);
-
-        if (walkBoardCost != null)
-            request.setWalkBoardCost(walkBoardCost);
-
-        if (bikeBoardCost != null)
-            request.setBikeBoardCost(bikeBoardCost);
-
-        if (bannedRoutes != null)
-            request.setBannedRoutes(bannedRoutes);
-
-        if (whiteListedRoutes != null)
-            request.setWhiteListedRoutes(whiteListedRoutes);
-
-        if (bannedAgencies != null)
-            request.setBannedAgencies(bannedAgencies);
-
-        if (whiteListedAgencies != null)
-            request.setWhiteListedAgencies(whiteListedAgencies);
-
-        HashMap<AgencyAndId, BannedStopSet> bannedTripMap = makeBannedTripMap(bannedTrips);
-        if (bannedTripMap != null)
-            request.bannedTrips = bannedTripMap;
-
-        if (bannedStops != null)
-            request.setBannedStops(bannedStops);
-
-        if (bannedStopsHard != null)
-            request.setBannedStopsHard(bannedStopsHard);
-        
-        // The "Least transfers" optimization is accomplished via an increased transfer penalty.
-        // See comment on RoutingRequest.transferPentalty.
-        if (transferPenalty != null) request.transferPenalty = transferPenalty;
-        if (optimize == OptimizeType.TRANSFERS) {
-            optimize = OptimizeType.QUICK;
-            request.transferPenalty += 1800;
-        }
-
-        if (batch != null)
-            request.batch = batch;
-
-        if (optimize != null)
-            request.setOptimize(optimize);
-
-        if (modes != null) {
-            modes.applyToRoutingRequest(request);
-            request.setModes(request.modes);
-        }
-
-        if (request.allowBikeRental && bikeSpeed == null) {
-            //slower bike speed for bike sharing, based on empirical evidence from DC.
-            request.bikeSpeed = 4.3;
-        }
-
-        if (boardSlack != null)
-            request.boardSlack = boardSlack;
-
-        if (alightSlack != null)
-            request.alightSlack = alightSlack;
-
-        if (minTransferTime != null)
-            request.transferSlack = minTransferTime; // TODO rename field in routingrequest
-
-        if (nonpreferredTransferPenalty != null)
-            request.nonpreferredTransferPenalty = nonpreferredTransferPenalty;
-
-        request.assertSlack();
-
-        if (maxTransfers != null)
-            request.maxTransfers = maxTransfers;
-
-        final long NOW_THRESHOLD_MILLIS = 15 * 60 * 60 * 1000;
-        boolean tripPlannedForNow = Math.abs(request.getDateTime().getTime() - new Date().getTime()) < NOW_THRESHOLD_MILLIS;
-        request.useBikeRentalAvailabilityInformation = (tripPlannedForNow); // TODO the same thing for GTFS-RT
-
-        if (startTransitStopId != null && !startTransitStopId.isEmpty())
-            request.startingTransitStopId = AgencyAndId.convertFromString(startTransitStopId);
-
-        if (startTransitTripId != null && !startTransitTripId.isEmpty())
-            request.startingTransitTripId = AgencyAndId.convertFromString(startTransitTripId);
-
-        if (clampInitialWait != null)
-            request.clampInitialWait = clampInitialWait;
-
-        if (reverseOptimizeOnTheFly != null)
-            request.reverseOptimizeOnTheFly = reverseOptimizeOnTheFly;
-
-        if (ignoreRealtimeUpdates != null)
-            request.ignoreRealtimeUpdates = ignoreRealtimeUpdates;
-
-        if (disableRemainingWeightHeuristic != null)
-            request.disableRemainingWeightHeuristic = disableRemainingWeightHeuristic;
-
-        if (maxHours != null)
-            request.maxHours = maxHours;
-
-        if (useRequestedDateTimeInMaxHours != null)
-            request.useRequestedDateTimeInMaxHours = useRequestedDateTimeInMaxHours;
-
-        if (disableAlertFiltering != null)
-            request.disableAlertFiltering = disableAlertFiltering;
-
-        if (geoidElevation != null)
-            request.geoidElevation = geoidElevation;
-
-        if (heuristicStepsPerMainStep != null)
-            request.heuristicStepsPerMainStep = heuristicStepsPerMainStep;
-
-        //getLocale function returns defaultLocale if locale is null
-        request.locale = ResourceBundleSingleton.INSTANCE.getLocale(locale);
-        */
-        return null;
+        return request;
     }
 }

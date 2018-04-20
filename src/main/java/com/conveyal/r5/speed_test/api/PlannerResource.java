@@ -13,6 +13,7 @@
 package com.conveyal.r5.speed_test.api;
 
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.speed_test.SpeedTest;
 import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,24 +46,16 @@ public class PlannerResource extends RoutingResource {
     @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_XML })
     public Response plan(@Context UriInfo uriInfo, @Context Request grizzlyRequest) {
 
-        /*
-         * TODO: add Lang / Locale parameter, and thus get localized content (Messages & more...)
-         * TODO: from/to inputs should be converted / geocoded / etc... here, and maybe send coords 
-         *       or vertex ids to planner (or error back to user)
-         * TODO: org.opentripplanner.routing.module.PathServiceImpl has COOORD parsing. Abstract that
-         *       out so it's used here too...
-         */
-
         // Create response object, containing a copy of all request parameters. Maybe they should be in the debug section of the response.
         Response response = new Response(uriInfo);
-        ProfileRequest request = null;
+        ProfileRequest request = new ProfileRequest();
         try {
-
-            /* Fill in request fields from query parameters via shared superclass method, catching any errors. */
             request = super.buildRequest();
 
-            /* Convert the internal GraphPaths to a TripPlan object that is included in an OTP web service Response. */
-            TripPlan plan = null;
+            SpeedTest speedTest = new SpeedTest();
+            speedTest.run();
+
+            TripPlan plan = speedTest.generateTripPlan(request, null, 0, 0);
             response.setPlan(plan);
 
         } catch (Exception e) {

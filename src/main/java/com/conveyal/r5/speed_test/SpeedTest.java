@@ -1,4 +1,4 @@
-package com.conveyal.r5;
+package com.conveyal.r5.speed_test;
 
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;

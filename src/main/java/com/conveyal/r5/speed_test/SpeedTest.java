@@ -6,6 +6,7 @@ import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.speed_test.api.model.AgencyAndId;
 import com.conveyal.r5.speed_test.api.model.EncodedPolylineBean;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.Leg;
@@ -56,14 +57,14 @@ public class SpeedTest {
         long startTime = System.currentTimeMillis();
         int nRoutesComputed = 0;
         for (CoordPair coordPair : coordPairs) {
-            //try {
+            try {
                 ProfileRequest request = buildDefaultRequest(coordPair);
                 tripPlans.add(route(request));
                 nRoutesComputed++;
-            //}
-            //catch (Exception e) {
-            //    System.out.println("Search failed");
-            //}
+            }
+            catch (Exception e) {
+                System.out.println("Search failed");
+            }
         }
 
         long elapsedTime = System.currentTimeMillis() - startTime;
@@ -158,6 +159,9 @@ public class SpeedTest {
 
         accessLeg.startTime = getCalendarFromTimeInSeconds(request.date, (path.boardTimes[0] - accessTime));
         accessLeg.endTime = getCalendarFromTimeInSeconds(request.date, path.boardTimes[0]);
+        accessLeg.from = tripPlan.from;
+        accessLeg.to = new Place(firstStop.stop_lat, firstStop.stop_lon, firstStop.stop_name);
+        accessLeg.to.stopId = new AgencyAndId("RB", firstStop.stop_id);
         accessLeg.mode = "WALK";
         accessLeg.legGeometry = PolylineEncoder.createEncodings(new double []{request.fromLat, firstStop.stop_lat}
                 , new double[]{request.fromLon, firstStop.stop_lon});
@@ -188,7 +192,9 @@ public class SpeedTest {
             TripSchedule tripSchedule = transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).tripSchedules.get(path.trips[i]);
 
             transitLeg.from = new Place(boardStop.stop_lat, boardStop.stop_lon, boardStop.stop_name);
+            transitLeg.from.stopId = new AgencyAndId("RB", boardStop.stop_id);
             transitLeg.to = new Place(alightStop.stop_lat, alightStop.stop_lon, alightStop.stop_name);
+            transitLeg.to.stopId = new AgencyAndId("RB", alightStop.stop_id);
 
             transitLeg.route = routeInfo.route_short_name;
             transitLeg.agencyName = routeInfo.agency_name;
@@ -211,6 +217,9 @@ public class SpeedTest {
         Stop lastStop = transportNetwork.transitLayer.stopForIndex.get(path.alightStops[path.length - 1]);
         egressLeg.startTime = getCalendarFromTimeInSeconds(request.date, path.alightTimes[path.alightTimes.length-1]);
         egressLeg.endTime = getCalendarFromTimeInSeconds(request.date, path.alightTimes[path.alightTimes.length-1] + egressTime);
+        egressLeg.from = new Place(lastStop.stop_lat, lastStop.stop_lon, lastStop.stop_name);
+        egressLeg.from.stopId = new AgencyAndId("RB", lastStop.stop_id);
+        egressLeg.to = tripPlan.from;
         egressLeg.mode = "WALK";
         egressLeg.legGeometry = PolylineEncoder.createEncodings(new double []{lastStop.stop_lat, request.toLat}
                 , new double[]{lastStop.stop_lon, request.toLon});

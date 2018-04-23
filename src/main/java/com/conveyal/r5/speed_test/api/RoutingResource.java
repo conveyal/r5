@@ -22,12 +22,22 @@ import org.slf4j.LoggerFactory;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
+import javax.xml.datatype.DatatypeConfigurationException;
+import javax.xml.datatype.DatatypeConstants;
+import javax.xml.datatype.DatatypeFactory;
+import javax.xml.datatype.XMLGregorianCalendar;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Date;
 import java.util.EnumSet;
+import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
+import java.util.TimeZone;
+
 import com.conveyal.r5.profile.ProfileRequest;
 
 /**
@@ -402,15 +412,49 @@ public abstract class RoutingResource {
         if (modes.qModes.contains(TraverseMode.AIRPLANE)) { request.transitModes.add(TransitModes.AIR); }
         if (modes.qModes.contains(TraverseMode.FERRY)) { request.transitModes.add(TransitModes.FERRY); }
 
+        TimeZone timeZone = TimeZone.getTimeZone("Europe/Oslo");
+        long timeSeconds = parseTime(timeZone, date, time);
+        LocalDateTime localDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(timeSeconds * 1000), timeZone.toZoneId());
+
         request.transitModes = EnumSet.of(TransitModes.TRAM, TransitModes.SUBWAY, TransitModes.RAIL, TransitModes.BUS);
         request.fromLat = fromLocation.lat;
         request.fromLon = fromLocation.lng;
         request.toLat = toLocation.lat;
         request.toLon = toLocation.lng;
-        request.fromTime = LocalTime.parse(time).getSecond(); // Seconds since midnight
+        request.fromTime = (int)Duration.between(localDateTime.toLocalDate().atStartOfDay(), localDateTime).getSeconds(); // Seconds since midnight
         request.toTime = request.fromTime + 60;
-        request.date = LocalDate.parse(date);
+        request.date = localDateTime.toLocalDate();
 
         return request;
+    }
+
+    public long parseTime(TimeZone tz, String date, String time) {
+        if (date == null && time != null) { // Time was provided but not date
+            LOG.debug("parsing ISO datetime {}", time);
+            try {
+                // If the time query param doesn't specify a timezone, use the graph's default. See issue #1373.
+                DatatypeFactory df = DatatypeFactory.newInstance();
+                XMLGregorianCalendar xmlGregCal = df.newXMLGregorianCalendar(time);
+                GregorianCalendar gregCal = xmlGregCal.toGregorianCalendar();
+                if (xmlGregCal.getTimezone() == DatatypeConstants.FIELD_UNDEFINED) {
+                    gregCal.setTimeZone(tz);
+                }
+                Date d2 = gregCal.getTime();
+                return setDateTime(d2);
+            } catch (DatatypeConfigurationException e) {
+                return setDateTime(date, time, tz);
+            }
+        } else {
+           return  setDateTime(date, time, tz);
+        }
+    }
+
+    public long setDateTime(String date, String time, TimeZone tz) {
+        Date dateObject = DateUtils.toDate(date, time, tz);
+        return setDateTime(dateObject);
+    }
+
+    public long setDateTime(Date dateTime) {
+        return dateTime.getTime() / 1000;
     }
 }

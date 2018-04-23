@@ -15,20 +15,23 @@ public class SpeedTestHttpServer {
 
     private static final Logger LOG = LoggerFactory.getLogger(SpeedTestHttpServer.class);
 
+    private SpeedTest speedTest;
+
+    private SpeedTestHttpServer(String[] args) throws Exception {
+        this.speedTest = new SpeedTest(args);
+    }
+
     public static void main(String[] args) {
         try {
-            new SpeedTestHttpServer().start();
+            new SpeedTestHttpServer(args).start();
         } catch (Exception e) {
             LOG.error(e.getMessage(), e);
         }
     }
 
     public void start() throws Exception {
-
-            SpeedTest.initTransportNetwork();
-
             createHttpServer(
-                    new SpeedTestApplication()
+                    new SpeedTestApplication(speedTest)
             ).start();
 
             waitForApplicationToShutdown();

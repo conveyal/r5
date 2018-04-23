@@ -7,7 +7,6 @@ import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.speed_test.api.model.AgencyAndId;
-import com.conveyal.r5.speed_test.api.model.EncodedPolylineBean;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.Leg;
 import com.conveyal.r5.speed_test.api.model.Place;
@@ -43,19 +42,23 @@ public class SpeedTest {
 
     private static TransportNetwork transportNetwork;
 
-    public SpeedTest() throws Exception {
-        initTransportNetwork();
+    SpeedTest(String[] args) throws Exception {
+        this(rootDirArgument(args));
     }
 
-    synchronized static void initTransportNetwork() throws Exception {
+    private SpeedTest(File rootDir) throws Exception {
+        initTransportNetwork(rootDir);
+    }
+
+    synchronized static void initTransportNetwork(File rootDir) throws Exception {
         if (transportNetwork == null) {
-            transportNetwork = TransportNetwork.read(new File(NETWORK_DIR, "network.dat"));
+            transportNetwork = TransportNetwork.read(new File(rootDir, "network.dat"));
             transportNetwork.rebuildTransientIndexes();
         }
     }
 
     public static void main(String[] args) throws Exception {
-        new SpeedTest().run();
+        new SpeedTest(args).run();
     }
 
     public void run() throws Exception {
@@ -273,7 +276,20 @@ public class SpeedTest {
         return coordPairs;
     }
 
+    private static File rootDirArgument(String[] args) {
+        if(args.length != 1) {
+            return new File(".");
+        }
+        File rootDir = new File(args[0]);
+
+        if(!rootDir.exists()) {
+            throw new IllegalArgumentException("Unable to find SpeedTest root directory: " + args[0]);
+        }
+        return rootDir;
+    }
+
     private class CoordPair {
+
         public double fromLat;
         public double fromLon;
         public double toLat;

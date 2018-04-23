@@ -19,6 +19,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.conveyal.r5.speed_test.api.model.*;
 
+import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.Produces;
@@ -39,6 +40,9 @@ public class PlannerResource extends RoutingResource {
 
     private static final Logger LOG = LoggerFactory.getLogger(PlannerResource.class);
 
+    @Inject
+    SpeedTest speedTest;
+
     // We inject info about the incoming request so we can include the incoming query
     // parameters in the outgoing response. This is a TriMet requirement.
     // Jersey uses @Context to inject internal types and @InjectParam or @Resource for DI objects.
@@ -52,7 +56,6 @@ public class PlannerResource extends RoutingResource {
         try {
             request = super.buildRequest();
 
-            SpeedTest speedTest = new SpeedTest();
             TripPlan plan = speedTest.route(request);
             response.setPlan(plan);
         } catch (Exception e) {

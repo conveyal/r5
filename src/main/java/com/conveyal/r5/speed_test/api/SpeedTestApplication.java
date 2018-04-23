@@ -1,7 +1,10 @@
 package com.conveyal.r5.speed_test.api;
 
 
+import com.conveyal.r5.speed_test.SpeedTest;
 import com.google.common.collect.Sets;
+import org.glassfish.hk2.utilities.Binder;
+import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,6 +17,12 @@ import static com.google.common.collect.Sets.newHashSet;
 
 public class SpeedTestApplication extends Application {
     private static final Logger LOG = LoggerFactory.getLogger(SpeedTestApplication.class);
+
+    private SpeedTest speedTestSingelton;
+
+    public SpeedTestApplication(SpeedTest speedTestSingelton) {
+        this.speedTestSingelton = speedTestSingelton;
+    }
 
     @Override
     public Set<Class<?>> getClasses() {
@@ -31,8 +40,18 @@ public class SpeedTestApplication extends Application {
                 // Serialize POJOs (unannotated) JSON using Jackson
                 //new JSONObjectMapperProvider(),
                 // Allow injecting the OTP server object into Jersey resource classes
-                // server.makeBinder()
+                speedTestBinder(),
+                speedTestSingelton
         );
+    }
+
+    private Binder speedTestBinder() {
+        return new AbstractBinder() {
+            @Override
+            protected void configure() {
+                bind(speedTestSingelton).to(SpeedTest.class);
+            }
+        };
     }
 
     private static ExceptionMapper<Exception> errorHandler() {

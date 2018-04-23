@@ -10,6 +10,7 @@ import com.conveyal.r5.speed_test.api.model.Leg;
 import com.conveyal.r5.speed_test.api.model.Place;
 import com.conveyal.r5.speed_test.api.model.TripPlan;
 import com.conveyal.r5.streets.StreetRouter;
+import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.csvreader.CsvReader;
 import gnu.trove.iterator.TIntIntIterator;
@@ -45,21 +46,21 @@ public class SpeedTest {
 
     public void run () throws Exception {
         List<CoordPair> coordPairs = getCoordPairs();
+        List<TripPlan> tripPlans = new ArrayList<>();
 
         transportNetwork = TransportNetwork.read(new File(NETWORK_DIR, "network.dat"));
 
         long startTime = System.currentTimeMillis();
         int nRoutesComputed = 0;
         for (CoordPair coordPair : coordPairs) {
-            try {
-                boolean routingSucceeded = route(coordPair);
-                if (routingSucceeded) {
-                    nRoutesComputed += 1;
-                }
-            }
-            catch (Exception e) {
-                System.out.println("Search failed");
-            }
+            //try {
+                ProfileRequest request = buildRequest(coordPair);
+                tripPlans.add(route(request));
+                nRoutesComputed++;
+            //}
+            //catch (Exception e) {
+            //    System.out.println("Search failed");
+            //}
         }
 
         long elapsedTime = System.currentTimeMillis() - startTime;
@@ -73,8 +74,9 @@ public class SpeedTest {
      *
      * @return true if the search succeeded.
      */
-    public boolean route (CoordPair coordPair) {
+    public ProfileRequest buildRequest (CoordPair coordPair) {
         ProfileRequest request = new ProfileRequest();
+
         request.accessModes =  request.egressModes = request.directModes = EnumSet.of(LegMode.WALK);
         request.maxWalkTime = 20;
         request.maxTripDurationMinutes = 1200;
@@ -87,6 +89,10 @@ public class SpeedTest {
         request.toTime = request.fromTime + 60;
         request.date = LocalDate.of(2018, 04, 13);
 
+        return request;
+    }
+
+    public TripPlan route (ProfileRequest request) {
         TIntIntMap accessTimesToStopsInSeconds = streetRoute(request, false);
         TIntIntMap egressTimesToStopsInSeconds = streetRoute(request, true);
 
@@ -115,9 +121,8 @@ public class SpeedTest {
             }
         }
         System.out.println("Best path: " + (bestKnownPath == null ? "NONE" : bestKnownPath.toString()));
-        List<String> plan = generateTripPlanString(request, bestKnownPath, 0, egressTime);
-        plan.stream().forEach(p -> System.out.println(p));
-        return true;
+        TripPlan plan = generateTripPlan(request, bestKnownPath, 0, egressTime);
+        return plan;
     }
 
     private TIntIntMap streetRoute (ProfileRequest request, boolean fromDest) {
@@ -168,8 +173,6 @@ public class SpeedTest {
     }
 
     public TripPlan generateTripPlan(ProfileRequest request, Path path, int accessTime, int egressTime) {
-        TimeZone timeZone = TimeZone.getTimeZone("Europe/Oslo");
-
         TripPlan tripPlan = new TripPlan();
         tripPlan.date = java.sql.Timestamp.valueOf(request.date.atStartOfDay());
         tripPlan.from = new Place(request.fromLon, request.fromLat, "");
@@ -181,52 +184,54 @@ public class SpeedTest {
 
         // Access leg
         Leg accessLeg = new Leg();
-        accessLeg.startTime = Calendar.getInstance(timeZone);
-        accessLeg.startTime.set(accessLeg.startTime.SECOND, path.boardTimes[0] - accessTime);
-        accessLeg.endTime = Calendar.getInstance(timeZone);
-        accessLeg.endTime.set(accessLeg.startTime.SECOND, path.boardTimes[0]);
+        accessLeg.startTime = getCalendarFromTimeInSeconds(request.date, (path.boardTimes[0] - accessTime));
+        accessLeg.endTime = getCalendarFromTimeInSeconds(request.date, path.boardTimes[0]);
+
         itinerary.addLeg(accessLeg);
 
         for (int i = 0; i < path.patterns.length; i++) {
             // Transfer leg if present
             if (i > 0 && path.transferTimes[i] != -1) {
                 Leg transferLeg = new Leg();
-                transferLeg.startTime = Calendar.getInstance(timeZone);
-                transferLeg.startTime.set(transferLeg.startTime.SECOND, path.alightTimes[i - 1]);
-                transferLeg.endTime = Calendar.getInstance(timeZone);
-                transferLeg.endTime.set(transferLeg.startTime.SECOND, path.alightTimes[i - 1] + path.transferTimes[i]);
+                transferLeg.startTime = getCalendarFromTimeInSeconds(request.date, path.alightTimes[i - 1]);
+                transferLeg.endTime = getCalendarFromTimeInSeconds(request.date, path.alightTimes[i - 1] + path.transferTimes[i]);
                 itinerary.addLeg(transferLeg);
             }
 
             // Transit leg
             Leg transitLeg = new Leg();
 
-            String boardStop = transportNetwork.transitLayer.stopNames.get(path.boardStops[i]);
-            String alightStop = transportNetwork.transitLayer.stopNames.get(path.alightStops[i]);
             String routeid = transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).routeId;
             String tripId = transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).tripSchedules.get(path.trips[i]).tripId;
 
-            transitLeg.stop.add(new Place(1.0, 1.0, boardStop));
-            transitLeg.stop.add(new Place(1.0, 1.0, alightStop));
             transitLeg.route = routeid;
             transitLeg.tripShortName = tripId;
+            transitLeg.mode = TransitLayer.getTransitModes(transportNetwork.transitLayer.routes
+                    .get(transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).routeIndex).route_type).toString();
 
-            transitLeg.startTime = Calendar.getInstance(timeZone);
-            transitLeg.startTime.set(transitLeg.startTime.SECOND, path.boardTimes[i]);
-            transitLeg.endTime = Calendar.getInstance(timeZone);
-            transitLeg.endTime.set(transitLeg.startTime.SECOND, path.alightTimes[i]);
+            transitLeg.startTime = getCalendarFromTimeInSeconds(request.date, path.boardTimes[i]);
+            transitLeg.endTime = getCalendarFromTimeInSeconds(request.date, path.alightTimes[i]);
             itinerary.addLeg(transitLeg);
         }
 
         // Egress leg
         Leg egressLeg = new Leg();
-        egressLeg.startTime = Calendar.getInstance(timeZone);
-        egressLeg.startTime.set(egressLeg.startTime.SECOND, path.alightTimes[path.alightTimes.length-1]);
-        egressLeg.endTime = Calendar.getInstance(timeZone);
-        egressLeg.endTime.set(egressLeg.startTime.SECOND, path.alightTimes[path.alightTimes.length-1] + egressTime);
+        egressLeg.startTime = getCalendarFromTimeInSeconds(request.date, path.alightTimes[path.alightTimes.length-1]);
+        egressLeg.endTime = getCalendarFromTimeInSeconds(request.date, path.alightTimes[path.alightTimes.length-1] + egressTime);
+
         itinerary.addLeg(egressLeg);
 
-        return new TripPlan();
+        tripPlan.itinerary.add(itinerary);
+
+        return tripPlan;
+    }
+
+    private Calendar getCalendarFromTimeInSeconds(LocalDate date, int seconds) {
+        Calendar calendar = Calendar.getInstance(TimeZone.getTimeZone("Europe/Oslo"));
+        calendar.set(date.getYear(), date.getMonth().getValue(), date.getDayOfMonth()
+                , 0, 0, 0);
+        calendar.add(Calendar.SECOND, seconds);
+        return calendar;
     }
 
     private List<CoordPair> getCoordPairs() throws IOException {

@@ -23,6 +23,7 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.HashMap;
@@ -386,17 +387,29 @@ public abstract class RoutingResource {
     protected ProfileRequest buildRequest() throws ParameterException {
         ProfileRequest request = new ProfileRequest();
 
+        GenericLocation fromLocation = new GenericLocation("", fromPlace);
+        GenericLocation toLocation = new GenericLocation("", toPlace);
+
         request.accessModes =  request.egressModes = request.directModes = EnumSet.of(LegMode.WALK);
-        request.maxWalkTime = 20;
-        request.maxTripDurationMinutes = 1200;
+        request.maxWalkTime = (int)Math.floor(maxWalkDistance / 0.58); // Meters to minute at walk speed 1.3 mph
+        request.maxTripDurationMinutes = 1440; // 24 hours
+
+        if (modes.qModes.contains(TraverseMode.TRANSIT)) { request.transitModes.add(TransitModes.TRANSIT); }
+        if (modes.qModes.contains(TraverseMode.BUS)) { request.transitModes.add(TransitModes.BUS); }
+        if (modes.qModes.contains(TraverseMode.RAIL)) { request.transitModes.add(TransitModes.RAIL); }
+        if (modes.qModes.contains(TraverseMode.TRAM)) { request.transitModes.add(TransitModes.TRAM); }
+        if (modes.qModes.contains(TraverseMode.SUBWAY)) { request.transitModes.add(TransitModes.SUBWAY); }
+        if (modes.qModes.contains(TraverseMode.AIRPLANE)) { request.transitModes.add(TransitModes.AIR); }
+        if (modes.qModes.contains(TraverseMode.FERRY)) { request.transitModes.add(TransitModes.FERRY); }
+
         request.transitModes = EnumSet.of(TransitModes.TRAM, TransitModes.SUBWAY, TransitModes.RAIL, TransitModes.BUS);
-        request.fromLat = 1.0;
-        request.fromLon = 1.0;
-        request.toLat = 1.0;
-        request.toLon = 1.0;
-        request.fromTime = 8 * 60 * 60; // 8AM in seconds since midnight
+        request.fromLat = fromLocation.lat;
+        request.fromLon = fromLocation.lng;
+        request.toLat = toLocation.lat;
+        request.toLon = toLocation.lng;
+        request.fromTime = LocalTime.parse(time).getSecond(); // Seconds since midnight
         request.toTime = request.fromTime + 60;
-        request.date = LocalDate.of(2018, 04, 13);
+        request.date = LocalDate.parse(date);
 
         return request;
     }

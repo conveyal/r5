@@ -48,16 +48,13 @@ public class PlannerResource extends RoutingResource {
 
         // Create response object, containing a copy of all request parameters. Maybe they should be in the debug section of the response.
         Response response = new Response(uriInfo);
-        ProfileRequest request = new ProfileRequest();
+        ProfileRequest request;
         try {
             request = super.buildRequest();
 
             SpeedTest speedTest = new SpeedTest();
-            speedTest.run();
-
-            TripPlan plan = speedTest.generateTripPlan(request, null, 0, 0);
+            TripPlan plan = speedTest.route(request);
             response.setPlan(plan);
-
         } catch (Exception e) {
         }
         return response;

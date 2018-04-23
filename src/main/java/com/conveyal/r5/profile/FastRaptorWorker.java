@@ -112,15 +112,18 @@ public class FastRaptorWorker {
     /** Services active on the date of the search */
     private final BitSet servicesActive;
 
+    /**
+     * The state resulting from the scheduled search at a particular departure minute.
+     * This state is reused at each departure minute without re-initializng it (this is the range-raptor optimization).
+     * The randomized schedules at each departure minute are applied on top of this scheduled state.
+     */
     private final RaptorState[] scheduleState;
 
-    /**
-     * Set to true to save all states for path reconstruction.
-     * Change underway: do not save all states, only N at or near the selected travel time percentile
-     */
-    public boolean saveAllStates = false;
+    /** Set to true to save path details for all optimal paths. */
+    public boolean retainPaths = false;
 
-    public List<RaptorState> statesEachIteration;
+    /** If we're going to store paths to every destination (e.g. for static sites) then they'll be retained here. */
+    public List<Path[]> pathsPerIteration;
 
     public FastRaptorWorker (TransitLayer transitLayer, ProfileRequest request, TIntIntMap accessStops) {
         this.transit = transitLayer;
@@ -148,31 +151,36 @@ public class FastRaptorWorker {
      * Return value dimension order is [searchIteration][transitStopIndex]
      */
     public int[][] route () {
+
         startClockTime = System.nanoTime();
-
-        if (saveAllStates) statesEachIteration = new ArrayList<>();
-
         prefilterPatterns();
-
         LOG.info("Performing {} scheduled iterations each with {} Monte Carlo draws for a total of {} iterations",
                 nMinutes, monteCarloDrawsPerMinute, nMinutes * monteCarloDrawsPerMinute);
 
-        int[][] results = new int[nMinutes * monteCarloDrawsPerMinute][];
+        // Initialize result storage.
+        // Results are one arrival time at each stop, for every raptor iteration.
+        int[][] arrivalTimesAtStopsPerIteration = new int[nMinutes * monteCarloDrawsPerMinute][];
+        if (retainPaths) pathsPerIteration = new ArrayList<>();
         int currentIteration = 0;
 
-        // main loop over departure times
+        // The main outer loop iterates backward over all minutes in the departure times window.
         for (int departureTime = request.toTime - DEPARTURE_STEP_SEC, minute = nMinutes;
-             departureTime >= request.fromTime; departureTime -= DEPARTURE_STEP_SEC, minute--) {
-            if (minute % 15 == 0) LOG.info("  minute {}", minute);
+             departureTime >= request.fromTime;
+             departureTime -= DEPARTURE_STEP_SEC, minute--) {
 
-            // run the search
+            if (minute % 15 == 0) LOG.debug("  minute {}", minute);
+
+            // Run the raptor search. For this particular departure time, we receive N arrays of arrival times at all
+            // stops, one for each randomized schedule: resultsForMinute[randScheduleNumber][transitStop]
             int[][] resultsForMinute = runRaptorForMinute(departureTime, monteCarloDrawsPerMinute);
 
-            // effectively final nonsense FIXME we could avoid this "final" weirdness by just using non-stream loop syntax
+            // Bypass Java's "effectively final" nonsense.
+            // FIXME we could avoid this "final" weirdness by just using non-stream explicit loop syntax over the stops.
+            // TODO clarify identifiers and explain how results are being unrolled from minutes into 'iterations'.
             final int finalDepartureTime = departureTime;
-            for (int[] resultsForIteration : resultsForMinute) {
+            for (int[] arrivalTimesAtStops : resultsForMinute) {
                 // NB this copies the array, so we don't have issues with it being updated later
-                results[currentIteration++] = IntStream.of(resultsForIteration)
+                arrivalTimesAtStopsPerIteration[currentIteration++] = IntStream.of(arrivalTimesAtStops)
                         .map(r -> r != UNREACHED ? r - finalDepartureTime : r)
                         .toArray();
             }
@@ -188,7 +196,7 @@ public class FastRaptorWorker {
         LOG.info("  - Resulting updates to scheduled component: {}s", timeInFrequencySearchScheduled / 1e9d);
         LOG.info("  - Transfers: {}s", timeInFrequencySearchTransfers / 1e9d);
 
-        return results;
+        return arrivalTimesAtStopsPerIteration;
     }
 
     /** Prefilter the patterns to only ones that are running */
@@ -340,27 +348,54 @@ public class FastRaptorWorker {
                     doTransfers(frequencyState[round]);
                     timeInFrequencySearchTransfers += System.nanoTime() - transferStart;
                 }
-
-                // we are doing frequencies, this is already copy, no need for a protective copy
-                if (saveAllStates) statesEachIteration.add(frequencyState[request.maxRides]);
-                result[iteration] = frequencyState[request.maxRides].bestNonTransferTimes;
+                // We are processing frequency routes, states are already a copy of the retained scheduled search state,
+                // no need to make an additional protective copy.
+                RaptorState finalRoundState = frequencyState[request.maxRides];
+                result[iteration] = finalRoundState.bestNonTransferTimes;
+                if (retainPaths) {
+                    pathsPerIteration.add(pathToEachStop(finalRoundState));
+                }
             }
-
             timeInFrequencySearch += System.nanoTime() - startTime;
-
             return result;
         } else {
-            // No frequencies, return result of scheduled search, but multiplied by the number of
-            // MC draws so that the scheduled search accessibility avoids potential bugs where assumptions
-            // are made about how many results will be returned from a search, e.g., in
+            // If there are no frequency trips, return the result of the scheduled search, but repeated as many times
+            // as there are requested MC draws, so that the scheduled search accessibility avoids potential bugs
+            // where assumptions are made about how many results will be returned from a search, e.g., in
             // https://github.com/conveyal/r5/issues/306
+            // FIXME on large networks with no frequency routes this seems extremely inefficient.
+            // It may be somewhat less inefficient than it seems if we make arrays of references all to the same object.
+            // TODO check whether we're actually hitting this code with iterationsPerMinute > 1 on scheduled networks.
             int[][] result = new int[iterationsPerMinute][];
-            for (int i = 0; i < monteCarloDrawsPerMinute; i++) {
-                if (saveAllStates) statesEachIteration.add(scheduleState[request.maxRides].deepCopy());
-                result[i] = scheduleState[request.maxRides].bestNonTransferTimes;
+            RaptorState finalRoundState = scheduleState[request.maxRides];
+            // This scheduleState is repeatedly modified as the outer loop progresses over departure minutes.
+            // We have to be careful here that creating these paths does not modify the state, and makes
+            // protective copies of any information we want to retain.
+            Path[] paths = retainPaths ? pathToEachStop(finalRoundState) : null;
+            for (int iteration = 0; iteration < monteCarloDrawsPerMinute; iteration++) {
+                result[iteration] = finalRoundState.bestNonTransferTimes;
+                if (retainPaths) {
+                    pathsPerIteration.add(paths);
+                }
             }
             return result;
         }
+    }
+
+    /**
+     * Create the optimal path to each stop in the transit network, based on the given RaptorState.
+     */
+    private static Path[] pathToEachStop (RaptorState state) {
+        int nStops = state.bestNonTransferTimes.length;
+        Path[] paths = new Path[nStops];
+        for (int s = 0; s < nStops; s++) {
+            if (state.bestNonTransferTimes[s] == UNREACHED) {
+                paths[s] = null;
+            } else {
+                paths[s] = new Path(state, s);
+            }
+        }
+        return paths;
     }
 
     /** Perform a scheduled search */

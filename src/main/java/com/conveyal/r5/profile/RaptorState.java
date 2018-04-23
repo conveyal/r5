@@ -71,11 +71,6 @@ public class RaptorState {
     /** Maximum duration of trips stored by this RaptorState */
     public int maxDurationSeconds;
 
-    @Deprecated
-    public RaptorState(int nStops) {
-        this(nStops, 7200);
-    }
-
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
     public RaptorState (int nStops, int maxDurationSeconds) {
         this.bestTimes = new int[nStops];
@@ -214,7 +209,7 @@ public class RaptorState {
         return optimal;
     }
 
-    /** Debug functionn: dump the path up to this state as a string */
+    /** Debug function: dump the path up to this state as a string */
     public String dump (int stop) {
         Path p = new Path(this, stop);
 

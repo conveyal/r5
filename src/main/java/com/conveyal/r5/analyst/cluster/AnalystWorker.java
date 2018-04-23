@@ -11,9 +11,10 @@ import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
-import com.conveyal.r5.multipoint.MultipointMetadata;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
+import com.conveyal.r5.transitive.TransitiveNetwork;
+import com.conveyal.r5.util.ExceptionUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.io.LittleEndianDataOutputStream;
 import org.apache.http.HttpEntity;
@@ -90,6 +91,18 @@ public class AnalystWorker implements Runnable {
 
     public static final int POLL_MAX_RANDOM_WAIT = 5;
 
+    /** The port on which the worker will listen for single point tasks forwarded from the backend. */
+    public static final int WORKER_LISTEN_PORT = 7080;
+
+    /**
+     * The number of threads the worker will use to receive HTTP connections. This crudely limits memory consumption
+     * from the worker handling single point requests.
+     * Unfortunately we can't set this very low. We get a message saying we need at least 10 threads:
+     * max=2 < needed(acceptors=1 + selectors=8 + request=1)
+     * TODO find a more effective way to limit simultaneous computations, e.g. feed them through the regional thread pool.
+     */
+    public static final int WORKER_SINGLE_POINT_THREADS = 10;
+
     // TODO make non-static and make implementations swappable
     // This is very ugly because it's static but initialized at class instantiation.
     public static FilePersistence filePersistence;
@@ -125,6 +138,13 @@ public class AnalystWorker implements Runnable {
     static final HttpClient httpClient = makeHttpClient();
 
     /**
+     * This timeout should be longer than the longest expected worker calculation for a single-point request.
+     * Of course when linking a large grid, a worker could take much longer. We're just going to have to accept
+     * timeouts in those situations until we implement fail-fast 202 responses from workers for long lived operations.
+     */
+    private static final int HTTP_CLIENT_TIMEOUT_SEC = 30;
+
+    /**
      * The results of finished work accumulate here, and will be sent in batches back to the broker.
      * All access to this field should be synchronized since it will is written to by multiple threads.
      * We don't want to just wrap it in a SynchronizedList because we need an atomic copy-and-empty operation.
@@ -148,12 +168,12 @@ public class AnalystWorker implements Runnable {
     public static HttpClient makeHttpClient () {
         PoolingHttpClientConnectionManager mgr = new PoolingHttpClientConnectionManager();
         mgr.setDefaultMaxPerRoute(20);
-        int timeout = 10 * 1000; // TODO should this be a symbolic constant such as POLL_WAIT_SECONDS ?
+        int timeoutMilliseconds = HTTP_CLIENT_TIMEOUT_SEC * 1000;
         SocketConfig cfg = SocketConfig.custom()
-                .setSoTimeout(timeout)
+                .setSoTimeout(timeoutMilliseconds)
                 .build();
         mgr.setDefaultSocketConfig(cfg);
-        return HttpClients.custom()
+        return HttpClients.custom().disableAutomaticRetries()
                 .setConnectionManager(mgr)
                 .build();
     }
@@ -292,8 +312,9 @@ public class AnalystWorker implements Runnable {
 
         // Create executors with up to one thread per processor.
         // The default task rejection policy is "Abort".
+        // The executor's queue is rather long because some tasks complete very fast and we poll max once per second.
         int availableProcessors = Runtime.getRuntime().availableProcessors();
-        BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>(availableProcessors * 2);
+        BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>(availableProcessors * 6);
         regionalTaskExecutor = new ThreadPoolExecutor(1, availableProcessors, 60, TimeUnit.SECONDS, taskQueue);
 
         // If an initial graph ID was provided in the config file, build or load that TransportNetwork on startup.
@@ -317,8 +338,8 @@ public class AnalystWorker implements Runnable {
         // Trying out the new Spark syntax for non-static configuration.
         // TODO symbolic constants for the backend and worker ports
         sparkHttpService = spark.Service.ignite()
-            .port(7080)
-            .threadPool(10);
+            .port(WORKER_LISTEN_PORT)
+            .threadPool(WORKER_SINGLE_POINT_THREADS);
         sparkHttpService.post("/single", new AnalysisWorkerController(this)::handleSinglePoint);
 
         // Main polling loop to fill the regional work queue.
@@ -329,6 +350,8 @@ public class AnalystWorker implements Runnable {
         // To keep the queue full, we repeatedly try to add each task to the queue, pausing and retrying when
         // it's full. To wait until it's almost empty, we could use wait() in a loop and notify() as tasks are handled.
         // see https://stackoverflow.com/a/15185004/778449
+        // A simpler approach might be to spin-wait checking whether the queue is low and sleeping briefly,
+        // then fetch more work only when the queue is getting empty.
         while (true) {
             List<AnalysisTask> tasks = getSomeWork();
             if (tasks == null || tasks.isEmpty()) {
@@ -348,8 +371,9 @@ public class AnalystWorker implements Runnable {
                         break;
                     } catch (RejectedExecutionException e) {
                         // Queue is full, wait a bit and try to feed it more tasks.
-                        // FIXME on analyses where we burn through the internal queue in less than 1 second this is the limiting factor on speed
-                        // This happens with regions unconnected to transit and with very small travel time cutoffs
+                        // FIXME if we burn through the internal queue in less than 1 second this is a speed bottleneck.
+                        // This happens with regions unconnected to transit and with very small travel time cutoffs.
+                        // FIXME this is really using the list of fetched tasks as a secondary queue, it's awkward.
                         sleepSeconds(1);
                     }
                 }
@@ -429,8 +453,7 @@ public class AnalystWorker implements Runnable {
             // Arbitrarily we create this metadata as part of the first task in the job.
             if (request instanceof RegionalTask && request.makeStaticSite && request.taskId == 0) {
                 LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
-                MultipointMetadata mm = new MultipointMetadata(request, transportNetwork);
-                mm.write();
+                saveStaticSiteMetadata(request, transportNetwork);
             }
 
             TravelTimeComputer computer = new TravelTimeComputer(request, transportNetwork, gridCache);
@@ -465,9 +488,14 @@ public class AnalystWorker implements Runnable {
                 // This is a single task within a regional analysis with many origins.
                 if (request.makeStaticSite) {
                     // Despite this being a regional task, this is actually writing a time grid because we're
-                    // generating a bunch of those for a static site.
-                    PersistenceBuffer persistenceBuffer = oneOriginResult.timeGrid.writeToPersistenceBuffer();
-                    filePersistence.saveStaticSiteData(request, "_times.dat", persistenceBuffer);
+                    // generating a bunch of those for a static site. Only save a file if it has non-default contents.
+                    if (oneOriginResult.timeGrid.anyCellReached()) {
+                        PersistenceBuffer persistenceBuffer = oneOriginResult.timeGrid.writeToPersistenceBuffer();
+                        String timesFileName = request.taskId + "_times.dat";
+                        filePersistence.saveStaticSiteData(request, timesFileName, persistenceBuffer);
+                    } else {
+                        LOG.info("No destination cells reached. Not saving static site file to reduce storage space.");
+                    }
                 }
                 // Accumulate accessibility results to return to the backend in batches.
                 // This is usually an accessibility indicator value for one of many origins, but in the case of a static
@@ -483,8 +511,7 @@ public class AnalystWorker implements Runnable {
             // Catch any exceptions that were not handled by more specific catch clauses above.
             // This ensures that some form of error message is passed all the way back up to the web UI.
             TaskError taskError = new TaskError(ex);
-            LOG.error("An error occurred while routing: {}", ex.toString());
-            ex.printStackTrace();
+            LOG.error("An error occurred while routing: {}", ExceptionUtils.asString(ex));
             reportTaskErrors(request.taskId, HttpStatus.INTERNAL_SERVER_ERROR_500, Arrays.asList(taskError));
         }
         return null;
@@ -580,6 +607,30 @@ public class AnalystWorker implements Runnable {
             EntityUtils.consumeQuietly(response.getEntity());
         } catch (Exception e) {
             LOG.error("An exception occurred while attempting to report an error to the broker:\n" + e.getStackTrace());
+        }
+    }
+
+    /**
+     * Generate and write out metadata describing what's in a directory of static site output.
+     */
+    public static void saveStaticSiteMetadata (AnalysisTask analysisTask, TransportNetwork network) {
+        try {
+            // Save the regional analysis request, giving the UI some context to display the results.
+            // This is the request object sent to the workers to generate these static site regional results.
+            PersistenceBuffer buffer = PersistenceBuffer.serializeAsJson(analysisTask);
+            AnalystWorker.filePersistence.saveStaticSiteData(analysisTask, "request.json", buffer);
+
+            // Save non-fatal warnings encountered applying the scenario to the network for this regional analysis.
+            buffer = PersistenceBuffer.serializeAsJson(network.scenarioApplicationWarnings);
+            AnalystWorker.filePersistence.saveStaticSiteData(analysisTask, "warnings.json", buffer);
+
+            // Save transit route data that allows rendering paths with the Transitive library in a separate file.
+            TransitiveNetwork transitiveNetwork = new TransitiveNetwork(network.transitLayer);
+            buffer = PersistenceBuffer.serializeAsJson(transitiveNetwork);
+            AnalystWorker.filePersistence.saveStaticSiteData(analysisTask, "transitive.json", buffer);
+        } catch (Exception e) {
+            LOG.error("Exception saving static metadata: {}", e.toString());
+            throw new RuntimeException(e);
         }
     }
 

@@ -27,6 +27,10 @@ script: |
     # Setting the gpg.skip property avoids signing artifacts when the encryption keys are not available.
     mvn clean verify --settings maven-settings.xml -B -V -Dgpg.skip
   fi
+  # Wipe out all the Conveyal artifacts in the local Maven repo before they get cached.
+  # This forces download of fresh SNAPSHOT artifacts on the next build.
+  # The cache seems to be uploaded immediately after the Travis stage "script" so we include this deletion in the script.
+  rm -rf $HOME/.m2/repository/com/conveyal
 
 # Secure envs are OSSRH_JIRA_USERNAME, OSSRH_JIRA_PASSWORD, GPG_KEY_NAME, GPG_PASSPHRASE
 # Then the credentials for an IAM account that is allowed to write to the R5-builds buckets on S3
@@ -59,6 +63,8 @@ sudo: true # sudo: true gets us more memory, which we need, at the expense of sl
 git:
   depth: 150 # how many commits to clone, need to catch most recent tag for describe and 50 may not be enough
 
+# Retain the local Maven repository to speed up builds.
+# The Conveyal subdirectory is deleted in the script above to prevent retaining Conveyal snapshot artifacts across builds.
 cache:
   directories:
   - $HOME/.m2/repository

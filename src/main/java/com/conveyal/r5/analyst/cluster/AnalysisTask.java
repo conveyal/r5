@@ -25,6 +25,7 @@ import java.util.List;
     @JsonSubTypes.Type(name = "REGIONAL_ANALYSIS", value = RegionalTask.class)
 })
 public abstract class AnalysisTask extends ProfileRequest {
+
     public int zoom;
     public int west;
     public int north;
@@ -68,6 +69,13 @@ public abstract class AnalysisTask extends ProfileRequest {
     public double[] percentiles = new double[] { 50 };
 
     /**
+     * When recording paths as in a static site, how many distinct paths should be saved to each destination?
+     * Currently this only makes sense in regional tasks, but it could also become relevant for travel time surfaces
+     * so it's in this superclass.
+     */
+    public int nPathsPerTarget = 3;
+
+    /**
      * Is this a task that should return a binary travel time surface or compute accessibility and return it via SQS
      * to be saved in a regional analysis grid file?
      */
@@ -109,4 +117,5 @@ public abstract class AnalysisTask extends ProfileRequest {
         // no need to catch CloneNotSupportedException, it's caught in ProfileRequest::clone
         return (AnalysisTask) super.clone();
     }
+
 }

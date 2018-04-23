@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.r5.common.JsonUtilities;
 import com.google.common.io.LittleEndianDataOutputStream;
 
 import java.io.DataOutput;
@@ -35,6 +36,18 @@ public class PersistenceBuffer {
             outputStream = new GZIPOutputStream(buffer);
             littleEndianDataOutputStream = new LittleEndianDataOutputStream(outputStream);
         } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static PersistenceBuffer serializeAsJson (Object object) {
+        try {
+            PersistenceBuffer buffer = new PersistenceBuffer();
+            buffer.setMimeType("application/json");
+            JsonUtilities.objectMapper.writeValue(buffer.getOutputStream(), object);
+            buffer.doneWriting();
+            return buffer;
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }

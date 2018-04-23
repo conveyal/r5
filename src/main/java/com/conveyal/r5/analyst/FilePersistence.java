@@ -12,11 +12,12 @@ import java.io.OutputStream;
 public abstract class FilePersistence {
 
     /**
-     * Convenience wrapper to generate consistent directory and file names when storing static site data.
+     * Convenience method to ensure that all results files for a particular static site end up in the same place,
+     * which is typically a bucket on S3. The top level directory is hard-coded for now but could be configurable
+     * if and when actual use cases require it.
      */
-    public void saveStaticSiteData (AnalysisTask task, String fileSuffix, PersistenceBuffer persistenceBuffer) {
+    public void saveStaticSiteData (AnalysisTask task, String fileName, PersistenceBuffer persistenceBuffer) {
         String directoryName = "analysis-static/" + task.jobId;
-        String fileName = task.taskId + fileSuffix;
         saveData(directoryName, fileName, persistenceBuffer);
     }
 

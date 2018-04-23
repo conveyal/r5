@@ -22,6 +22,7 @@ import java.awt.image.WritableRaster;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
 
 /**
  * Grid for recording travel times, which can be written to flat binary output
@@ -42,7 +43,8 @@ import java.io.OutputStream;
  * (repeated 4-byte int) values of each pixel in row major order. Values are not delta coded here.
  */
 public class TimeGrid {
-    public static final Logger LOG = LoggerFactory.getLogger(GridResultAssembler.class);
+
+    public static final Logger LOG = LoggerFactory.getLogger(TimeGrid.class);
 
     /** 8 bytes long to maintain integer alignment. */
     private static final String gridType = "ACCESSGR";
@@ -116,6 +118,7 @@ public class TimeGrid {
 
     /**
      * Write the grid to an object implementing the DataOutput interface.
+     * TODO maybe shrink the dimensions of the resulting timeGrid to contain only the reached cells.
      */
     public void writeGridToDataOutput(DataOutput dataOutput) {
         int sizeInBytes = nValues * Integer.BYTES + HEADER_SIZE;
@@ -136,6 +139,7 @@ public class TimeGrid {
                 for (int j = 0; j < width * height; j++) {
                     // FIXME this is doing extra math to rearrange the ordering of the flattened array it's reading.
                     int curr = values[j * nValuesPerPixel + i];
+                    // TODO try not delta-coding the "unreachable" value, and retaining the prev value across unreachable areas.
                     int delta = curr - prev;
                     dataOutput.writeInt(delta);
                     prev = curr;
@@ -182,6 +186,15 @@ public class TimeGrid {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * @return true if the search reached any destination cell, false if it did not reach any cells. No cells will be
+     * reached when the origin point is outside the transport network. Some cells will still be reached via the street
+     * network when we are outside the transit network but within the street network.
+     */
+    public boolean anyCellReached() {
+        return Arrays.stream(values).anyMatch(v -> v != FastRaptorWorker.UNREACHED);
     }
 
 }

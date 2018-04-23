@@ -22,17 +22,19 @@ public class TransitModeSetDeserializer extends JsonDeserializer<EnumSet<Transit
     public EnumSet<TransitModes> deserialize(JsonParser jsonParser, DeserializationContext deserializationContext) throws IOException, JsonProcessingException {
         String str = jsonParser.getValueAsString();
         EnumSet<TransitModes> modes = EnumSet.noneOf(TransitModes.class);
-        Stream.of(str.split(",")).forEach(m -> {
-            TransitModes mode;
-            try {
-                mode = TransitModes.valueOf(m.toUpperCase().trim());
-            } catch (IllegalArgumentException e) {
-                LOG.info("TransitModes {} not found, ignoring (if this is an obscure transit mode, this message is safe to ignore)", m);
-                return;
-            }
+        if (! str.isEmpty()) {
+            Stream.of(str.split(",")).forEach(m -> {
+                TransitModes mode;
+                try {
+                    mode = TransitModes.valueOf(m.toUpperCase().trim());
+                } catch (IllegalArgumentException e) {
+                    LOG.info("TransitModes {} not found, ignoring (if this is an obscure transit mode, this message is safe to ignore)", m);
+                    return;
+                }
 
-            modes.add(mode);
-        });
+                modes.add(mode);
+            });
+        }
         return modes;
     }
 }

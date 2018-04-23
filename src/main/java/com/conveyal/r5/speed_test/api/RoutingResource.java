@@ -19,22 +19,18 @@ import com.conveyal.r5.speed_test.api.model.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.ws.rs.PathParam;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.core.Context;
 import javax.xml.datatype.DatatypeConfigurationException;
 import javax.xml.datatype.DatatypeConstants;
 import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.GregorianCalendar;
-import java.util.HashMap;
 import java.util.List;
 import java.util.TimeZone;
 
@@ -57,14 +53,6 @@ public abstract class RoutingResource {
 
     private static final Logger LOG = LoggerFactory.getLogger(RoutingResource.class);
 
-    /**
-     * The routerId selects between several graphs on the same server. The routerId is pulled from
-     * the path, not the query parameters. However, the class RoutingResource is not annotated with
-     * a path because we don't want it to be instantiated as an endpoint. Instead, the {routerId}
-     * path parameter should be included in the path annotations of all its subclasses.
-     */
-    @PathParam("routerId") 
-    public String routerId;
 
     /** The start location -- either latitude, longitude pair in degrees or a Vertex
      *  label. For example, <code>40.714476,-74.005966</code> or
@@ -98,6 +86,7 @@ public abstract class RoutingResource {
 
     /** The maximum distance (in meters) the user is willing to walk. Defaults to unlimited. */
     @QueryParam("maxWalkDistance")
+    @DefaultValue("2000")
     protected Double maxWalkDistance;
 
     /**
@@ -176,6 +165,7 @@ public abstract class RoutingResource {
     
     /** The set of modes that a user is willing to use, with qualifiers stating whether vehicles should be parked, rented, etc. */
     @QueryParam("mode")
+    @DefaultValue("WALK,BICYCLE,CAR,TRAM,SUBWAY,RAIL,BUS,FERRY,AIRPLANE")
     protected QualifiedModeSet modes;
 
     /** The minimum time, in seconds, between successive trips on different vehicles.
@@ -416,7 +406,6 @@ public abstract class RoutingResource {
         long timeSeconds = parseTime(timeZone, date, time);
         LocalDateTime localDateTime = LocalDateTime.ofInstant(Instant.ofEpochMilli(timeSeconds * 1000), timeZone.toZoneId());
 
-        request.transitModes = EnumSet.of(TransitModes.TRAM, TransitModes.SUBWAY, TransitModes.RAIL, TransitModes.BUS);
         request.fromLat = fromLocation.lat;
         request.fromLon = fromLocation.lng;
         request.toLat = toLocation.lat;
@@ -428,7 +417,7 @@ public abstract class RoutingResource {
         return request;
     }
 
-    public long parseTime(TimeZone tz, String date, String time) {
+    private long parseTime(TimeZone tz, String date, String time) {
         if (date == null && time != null) { // Time was provided but not date
             LOG.debug("parsing ISO datetime {}", time);
             try {
@@ -449,12 +438,12 @@ public abstract class RoutingResource {
         }
     }
 
-    public long setDateTime(String date, String time, TimeZone tz) {
+    private long setDateTime(String date, String time, TimeZone tz) {
         Date dateObject = DateUtils.toDate(date, time, tz);
         return setDateTime(dateObject);
     }
 
-    public long setDateTime(Date dateTime) {
+    private long setDateTime(Date dateTime) {
         return dateTime.getTime() / 1000;
     }
 }

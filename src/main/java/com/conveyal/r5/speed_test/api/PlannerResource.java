@@ -34,7 +34,7 @@ import javax.ws.rs.core.UriInfo;
  * In order for inheritance to work, the REST resources are request-scoped (constructed at each request)
  * rather than singleton-scoped (a single instance existing for the lifetime of the OTP server).
  */
-@Path("routers/{routerId}/plan") // final element needed here rather than on method to distinguish from routers API
+@Path("plan") // final element needed here rather than on method to distinguish from routers API
 public class PlannerResource extends RoutingResource {
 
     private static final Logger LOG = LoggerFactory.getLogger(PlannerResource.class);
@@ -56,6 +56,7 @@ public class PlannerResource extends RoutingResource {
             TripPlan plan = speedTest.route(request);
             response.setPlan(plan);
         } catch (Exception e) {
+            LOG.error(e.getMessage(), e);
         }
         return response;
     }

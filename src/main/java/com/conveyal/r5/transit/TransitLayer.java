@@ -121,7 +121,7 @@ public class TransitLayer implements Serializable, Cloneable {
     public BitSet stopsWheelchair;
 
     // TODO there is probably a better way to do this, but for now we need to retain stop object for linking to streets
-    public transient List<Stop> stopForIndex = new ArrayList<>();
+    public List<Stop> stopForIndex = new ArrayList<>();
 
     // The coordinates of a place roughly in the center of the transit network, for centering maps and coordinate systems.
     public double centerLon;

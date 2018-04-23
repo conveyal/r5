@@ -1,29 +1,31 @@
 package com.conveyal.r5.speed_test;
 
+import com.conveyal.gtfs.model.Stop;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.speed_test.api.model.EncodedPolylineBean;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.Leg;
 import com.conveyal.r5.speed_test.api.model.Place;
+import com.conveyal.r5.speed_test.api.model.PolylineEncoder;
 import com.conveyal.r5.speed_test.api.model.TripPlan;
 import com.conveyal.r5.streets.StreetRouter;
+import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TripSchedule;
 import com.csvreader.CsvReader;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
 
 import java.io.File;
 import java.io.IOException;
-import java.time.Duration;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.TimeZone;
@@ -53,14 +55,14 @@ public class SpeedTest {
         long startTime = System.currentTimeMillis();
         int nRoutesComputed = 0;
         for (CoordPair coordPair : coordPairs) {
-            //try {
-                ProfileRequest request = buildRequest(coordPair);
+            try {
+                ProfileRequest request = buildDefaultRequest(coordPair);
                 tripPlans.add(route(request));
                 nRoutesComputed++;
-            //}
-            //catch (Exception e) {
-            //    System.out.println("Search failed");
-            //}
+            }
+            catch (Exception e) {
+                System.out.println("Search failed");
+            }
         }
 
         long elapsedTime = System.currentTimeMillis() - startTime;
@@ -68,28 +70,6 @@ public class SpeedTest {
         System.out.println("Average path search time (msec): " + elapsedTime / nRoutesComputed);
         System.out.println("Successful searches: " + nRoutesComputed + " / " + coordPairs.size());
         System.out.println("Total time: " + elapsedTime / 1000 + " seconds");
-    }
-
-    /**
-     *
-     * @return true if the search succeeded.
-     */
-    public ProfileRequest buildRequest (CoordPair coordPair) {
-        ProfileRequest request = new ProfileRequest();
-
-        request.accessModes =  request.egressModes = request.directModes = EnumSet.of(LegMode.WALK);
-        request.maxWalkTime = 20;
-        request.maxTripDurationMinutes = 1200;
-        request.transitModes = EnumSet.of(TransitModes.TRAM, TransitModes.SUBWAY, TransitModes.RAIL, TransitModes.BUS);
-        request.fromLat = coordPair.fromLat;
-        request.fromLon = coordPair.fromLon;
-        request.toLat = coordPair.toLat;
-        request.toLon = coordPair.toLon;
-        request.fromTime = 8 * 60 * 60; // 8AM in seconds since midnight
-        request.toTime = request.fromTime + 60;
-        request.date = LocalDate.of(2018, 04, 13);
-
-        return request;
     }
 
     public TripPlan route (ProfileRequest request) {
@@ -125,6 +105,28 @@ public class SpeedTest {
         return plan;
     }
 
+    /**
+     *
+     * @return true if the search succeeded.
+     */
+    private ProfileRequest buildDefaultRequest(CoordPair coordPair) {
+        ProfileRequest request = new ProfileRequest();
+
+        request.accessModes =  request.egressModes = request.directModes = EnumSet.of(LegMode.WALK);
+        request.maxWalkTime = 20;
+        request.maxTripDurationMinutes = 1200;
+        request.transitModes = EnumSet.of(TransitModes.TRAM, TransitModes.SUBWAY, TransitModes.RAIL, TransitModes.BUS);
+        request.fromLat = coordPair.fromLat;
+        request.fromLon = coordPair.fromLon;
+        request.toLat = coordPair.toLat;
+        request.toLon = coordPair.toLon;
+        request.fromTime = 8 * 60 * 60; // 8AM in seconds since midnight
+        request.toTime = request.fromTime + 60;
+        request.date = LocalDate.of(2018, 04, 13);
+
+        return request;
+    }
+
     private TIntIntMap streetRoute (ProfileRequest request, boolean fromDest) {
         // Search for access to / egress from transit on streets.
         StreetRouter sr = new StreetRouter(transportNetwork.streetLayer);
@@ -138,41 +140,7 @@ public class SpeedTest {
         return sr.getReachedStops();
     }
 
-    private List<String> generateTripPlanString(ProfileRequest request, Path path, int accessTime, int egressTime) {
-        List<String> legs = new ArrayList<>();
-        if (path == null) { return legs; }
-
-        LocalDateTime date = request.date.atStartOfDay();
-
-        legs.add("Departure time: " + date.plusSeconds(path.boardTimes[0] - accessTime));
-
-        legs.add("Access time: " + Duration.ofSeconds(accessTime));
-
-        for (int i = 0; i < path.patterns.length; i++) {
-            String boardStop = transportNetwork.transitLayer.stopNames.get(path.boardStops[i]);
-            String alightStop = transportNetwork.transitLayer.stopNames.get(path.alightStops[i]);
-            String routeid = transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).routeId;
-            String tripId = transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).tripSchedules.get(path.trips[i]).tripId;
-
-            LocalDateTime boardTime = date.plusSeconds(path.boardTimes[i]);
-            LocalDateTime alightTime = date.plusSeconds(path.alightTimes[i]);
-            Duration transferTime = Duration.ofSeconds(path.transferTimes[i]);
-
-            if (transferTime.getSeconds() != -1) {
-                legs.add("Transfer time: " + transferTime.toString());
-            }
-
-            legs.add(" Board stop: " + boardStop + " Alight stop: " + alightStop + "Board: " + boardTime.toString() + " Alight: " + alightTime.toString() + " Pattern: " + routeid + " Trip: " + tripId);
-        }
-
-        legs.add("Egress time: " + Duration.ofSeconds(egressTime));
-
-        legs.add("Arrival time: " + date.plusSeconds(path.alightTimes[path.alightTimes.length-1] + egressTime));
-
-        return legs;
-    }
-
-    public TripPlan generateTripPlan(ProfileRequest request, Path path, int accessTime, int egressTime) {
+    private TripPlan generateTripPlan(ProfileRequest request, Path path, int accessTime, int egressTime) {
         TripPlan tripPlan = new TripPlan();
         tripPlan.date = java.sql.Timestamp.valueOf(request.date.atStartOfDay());
         tripPlan.from = new Place(request.fromLon, request.fromLat, "");
@@ -184,8 +152,14 @@ public class SpeedTest {
 
         // Access leg
         Leg accessLeg = new Leg();
+
+        Stop firstStop = transportNetwork.transitLayer.stopForIndex.get(path.boardStops[0]);
+
         accessLeg.startTime = getCalendarFromTimeInSeconds(request.date, (path.boardTimes[0] - accessTime));
         accessLeg.endTime = getCalendarFromTimeInSeconds(request.date, path.boardTimes[0]);
+        accessLeg.mode = "WALK";
+        accessLeg.legGeometry = PolylineEncoder.createEncodings(new double []{request.fromLat, firstStop.stop_lat}
+                , new double[]{request.fromLon, firstStop.stop_lon});
 
         itinerary.addLeg(accessLeg);
 
@@ -201,13 +175,26 @@ public class SpeedTest {
             // Transit leg
             Leg transitLeg = new Leg();
 
-            String routeid = transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).routeId;
-            String tripId = transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).tripSchedules.get(path.trips[i]).tripId;
+            RouteInfo routeInfo = transportNetwork.transitLayer.routes
+                    .get(transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).routeIndex);
+            TripSchedule tripSchedule = transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).tripSchedules.get(path.trips[i]);
 
-            transitLeg.route = routeid;
-            transitLeg.tripShortName = tripId;
-            transitLeg.mode = TransitLayer.getTransitModes(transportNetwork.transitLayer.routes
-                    .get(transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).routeIndex).route_type).toString();
+            Stop boardStop = transportNetwork.transitLayer.stopForIndex.get(path.boardStops[i]);
+            Stop alightStop = transportNetwork.transitLayer.stopForIndex.get(path.alightStops[i]);
+
+            transitLeg.from = new Place(boardStop.stop_lat, boardStop.stop_lon, boardStop.stop_name);
+            transitLeg.to = new Place(alightStop.stop_lat, alightStop.stop_lon, alightStop.stop_name);
+
+            transitLeg.route = routeInfo.route_short_name;
+            transitLeg.agencyName = routeInfo.agency_name;
+            transitLeg.routeColor = routeInfo.color;
+            transitLeg.tripShortName = tripSchedule.tripId;
+            transitLeg.agencyId = routeInfo.agency_id;
+            transitLeg.routeShortName = routeInfo.route_short_name;
+            transitLeg.routeLongName = routeInfo.route_long_name;
+            transitLeg.mode = TransitLayer.getTransitModes(routeInfo.route_type).toString();
+            transitLeg.legGeometry = PolylineEncoder.createEncodings(new double []{boardStop.stop_lat, alightStop.stop_lat}
+            , new double[]{boardStop.stop_lon, alightStop.stop_lon});
 
             transitLeg.startTime = getCalendarFromTimeInSeconds(request.date, path.boardTimes[i]);
             transitLeg.endTime = getCalendarFromTimeInSeconds(request.date, path.alightTimes[i]);
@@ -216,8 +203,12 @@ public class SpeedTest {
 
         // Egress leg
         Leg egressLeg = new Leg();
+        Stop lastStop = transportNetwork.transitLayer.stopForIndex.get(path.alightStops[path.length - 1]);
         egressLeg.startTime = getCalendarFromTimeInSeconds(request.date, path.alightTimes[path.alightTimes.length-1]);
         egressLeg.endTime = getCalendarFromTimeInSeconds(request.date, path.alightTimes[path.alightTimes.length-1] + egressTime);
+        accessLeg.mode = "WALK";
+        accessLeg.legGeometry = PolylineEncoder.createEncodings(new double []{lastStop.stop_lat, request.toLat}
+                , new double[]{lastStop.stop_lon, request.toLon});
 
         itinerary.addLeg(egressLeg);
 
@@ -249,7 +240,7 @@ public class SpeedTest {
         return coordPairs;
     }
 
-    public class CoordPair {
+    private class CoordPair {
         public double fromLat;
         public double fromLon;
         public double toLat;

@@ -394,13 +394,25 @@ public abstract class RoutingResource {
         request.maxWalkTime = (int)Math.floor(maxWalkDistance / 0.58); // Meters to minute at walk speed 1.3 mph
         request.maxTripDurationMinutes = 1440; // 24 hours
 
-        if (modes.qModes.contains(TraverseMode.TRANSIT)) { request.transitModes.add(TransitModes.TRANSIT); }
-        if (modes.qModes.contains(TraverseMode.BUS)) { request.transitModes.add(TransitModes.BUS); }
-        if (modes.qModes.contains(TraverseMode.RAIL)) { request.transitModes.add(TransitModes.RAIL); }
-        if (modes.qModes.contains(TraverseMode.TRAM)) { request.transitModes.add(TransitModes.TRAM); }
-        if (modes.qModes.contains(TraverseMode.SUBWAY)) { request.transitModes.add(TransitModes.SUBWAY); }
-        if (modes.qModes.contains(TraverseMode.AIRPLANE)) { request.transitModes.add(TransitModes.AIR); }
-        if (modes.qModes.contains(TraverseMode.FERRY)) { request.transitModes.add(TransitModes.FERRY); }
+        request.transitModes = EnumSet.noneOf(TransitModes.class);
+        for (QualifiedMode qualifiedMode : modes.qModes) {
+            switch (qualifiedMode.mode) {
+                case TRANSIT:
+                    request.transitModes.add(TransitModes.TRANSIT);
+                case BUS:
+                    request.transitModes.add(TransitModes.BUS);
+                case RAIL:
+                    request.transitModes.add(TransitModes.RAIL);
+                case TRAM:
+                    request.transitModes.add(TransitModes.TRAM);
+                case SUBWAY:
+                    request.transitModes.add(TransitModes.SUBWAY);
+                case AIRPLANE:
+                    request.transitModes.add(TransitModes.AIR);
+                case FERRY:
+                    request.transitModes.add(TransitModes.FERRY);
+            }
+        }
 
         TimeZone timeZone = TimeZone.getTimeZone("Europe/Oslo");
         long timeSeconds = parseTime(timeZone, date, time);

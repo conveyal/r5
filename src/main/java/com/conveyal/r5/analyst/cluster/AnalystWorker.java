@@ -474,8 +474,8 @@ public class AnalystWorker implements Runnable {
                 // FIXME strangeness, only travel time results are returned from method, accessibility results return null and are accumulated for async delivery.
                 // Return raw byte array containing grid or TIFF file to caller, for return to client over HTTP.
                 byteArrayOutputStream.close();
-                // Single-point tasks don't have a job ID. Should we categorize them by scenario ID?
-                throughputTracker.recordTaskCompletion("SINGLE");
+                // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
+                throughputTracker.recordTaskCompletion("SINGLE-" + transportNetwork.scenarioId);
                 return byteArrayOutputStream.toByteArray();
             } else {
                 // This is a single task within a regional analysis with many origins.

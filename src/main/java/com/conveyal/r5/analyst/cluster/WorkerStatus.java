@@ -14,6 +14,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -37,7 +38,7 @@ public class WorkerStatus {
     public Set<String> networks = new HashSet<>();
     public Set<String> scenarios = new HashSet<>();
     public double secondsSinceLastPoll;
-    public double tasksPerMinute;
+    public Map<String, Integer> tasksPerMinuteByScenario;
     @JsonUnwrapped(prefix = "ec2")
     public EC2Info ec2;
     public long jvmStartTime;

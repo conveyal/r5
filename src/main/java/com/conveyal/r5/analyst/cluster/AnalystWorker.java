@@ -474,7 +474,8 @@ public class AnalystWorker implements Runnable {
                 // FIXME strangeness, only travel time results are returned from method, accessibility results return null and are accumulated for async delivery.
                 // Return raw byte array containing grid or TIFF file to caller, for return to client over HTTP.
                 byteArrayOutputStream.close();
-                throughputTracker.recordTaskCompletion(transportNetwork.scenarioId);
+                // Single-point tasks don't have a job ID. Should we categorize them by scenario ID?
+                throughputTracker.recordTaskCompletion("SINGLE");
                 return byteArrayOutputStream.toByteArray();
             } else {
                 // This is a single task within a regional analysis with many origins.
@@ -495,7 +496,7 @@ public class AnalystWorker implements Runnable {
                 synchronized (workResults) {
                     workResults.add(oneOriginResult.toRegionalWorkResult(request));
                 }
-                throughputTracker.recordTaskCompletion(transportNetwork.scenarioId);
+                throughputTracker.recordTaskCompletion(request.jobId);
             }
         } catch (Exception ex) {
             // Catch any exceptions that were not handled by more specific catch clauses above.
@@ -541,7 +542,7 @@ public class AnalystWorker implements Runnable {
         // Compute throughput in tasks per minute and include it in the worker status report.
         // We poll too frequently to compute throughput just since the last poll operation.
         // TODO reduce polling frequency (larger queue in worker), compute shorter-term throughput.
-        workerStatus.tasksPerMinuteByScenario = throughputTracker.getTasksPerMinuteByScenarioId();
+        workerStatus.tasksPerMinuteByJobId = throughputTracker.getTasksPerMinuteByJobId();
 
         // Report how often we're polling for work, just for monitoring.
         long timeNow = System.currentTimeMillis();

@@ -38,7 +38,7 @@ public class WorkerStatus {
     public Set<String> networks = new HashSet<>();
     public Set<String> scenarios = new HashSet<>();
     public double secondsSinceLastPoll;
-    public Map<String, Integer> tasksPerMinuteByScenario;
+    public Map<String, Integer> tasksPerMinuteByJobId;
     @JsonUnwrapped(prefix = "ec2")
     public EC2Info ec2;
     public long jvmStartTime;

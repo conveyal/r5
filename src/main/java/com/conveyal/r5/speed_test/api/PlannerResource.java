@@ -47,7 +47,7 @@ public class PlannerResource extends RoutingResource {
     // parameters in the outgoing response. This is a TriMet requirement.
     // Jersey uses @Context to inject internal types and @InjectParam or @Resource for DI objects.
     @GET
-    @Produces({ MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML, MediaType.TEXT_XML })
+    @Produces({ MediaType.APPLICATION_JSON })
     public Response plan(@Context UriInfo uriInfo, @Context Request grizzlyRequest) {
 
         // Create response object, containing a copy of all request parameters. Maybe they should be in the debug section of the response.

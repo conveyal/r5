@@ -2,6 +2,7 @@ package com.conveyal.r5.speed_test.api;
 
 
 import com.conveyal.r5.speed_test.SpeedTest;
+import com.fasterxml.jackson.jaxrs.json.JacksonJsonProvider;
 import com.google.common.collect.Sets;
 import org.glassfish.hk2.utilities.Binder;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -34,11 +35,11 @@ public class SpeedTestApplication extends Application {
         return Sets.newHashSet (
                 // errorHandler()
                 // Enable Jackson JSON response serialization
-                // new JacksonJsonProvider()
+                new JacksonJsonProvider(),
                 // Enable Jackson XML response serialization
                 //new JacksonXMLProvider(),
                 // Serialize POJOs (unannotated) JSON using Jackson
-                //new JSONObjectMapperProvider(),
+                // new JSONObjectMapperProvider(),
                 // Allow injecting the OTP server object into Jersey resource classes
                 speedTestBinder(),
                 speedTestSingelton

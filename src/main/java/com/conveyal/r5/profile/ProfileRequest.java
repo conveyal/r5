@@ -453,6 +453,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      */
     @JsonIgnore
     public int getMonteCarloDrawsPerMinute() {
-        return (int) Math.ceil((double) monteCarloDraws / getTimeWindowLengthMinutes());
+        return 1;
+        //return (int) Math.ceil((double) monteCarloDraws / getTimeWindowLengthMinutes());
     }
 }

@@ -178,6 +178,8 @@ public class SpeedTest {
         accessLeg.legGeometry = PolylineEncoder.createEncodings(new double[]{request.fromLat, firstStop.stop_lat}
                 , new double[]{request.fromLon, firstStop.stop_lon});
 
+        accessLeg.distance = 0.0;
+
         itinerary.addLeg(accessLeg);
 
         for (int i = 0; i < path.patterns.length; i++) {
@@ -191,13 +193,20 @@ public class SpeedTest {
                 transferLeg.startTime = getCalendarFromTimeInSeconds(request.date, path.alightTimes[i - 1]);
                 transferLeg.endTime = getCalendarFromTimeInSeconds(request.date, path.alightTimes[i - 1] + path.transferTimes[i]);
                 transferLeg.mode = "WALK";
+                transferLeg.from = new Place(previousAlightStop.stop_lat, previousAlightStop.stop_lon, previousAlightStop.stop_name);
+                transferLeg.to = new Place(boardStop.stop_lat, boardStop.stop_lon, boardStop.stop_name);
                 transferLeg.legGeometry = PolylineEncoder.createEncodings(new double[]{previousAlightStop.stop_lat, boardStop.stop_lat}
                         , new double[]{previousAlightStop.stop_lon, boardStop.stop_lon});
+
+                transferLeg.distance = 0.0;
+
                 itinerary.addLeg(transferLeg);
             }
 
             // Transit leg
             Leg transitLeg = new Leg();
+
+            transitLeg.distance = 0.0;
 
             RouteInfo routeInfo = transportNetwork.transitLayer.routes
                     .get(transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).routeIndex);
@@ -235,6 +244,8 @@ public class SpeedTest {
         egressLeg.mode = "WALK";
         egressLeg.legGeometry = PolylineEncoder.createEncodings(new double[]{lastStop.stop_lat, request.toLat}
                 , new double[]{lastStop.stop_lon, request.toLon});
+
+        egressLeg.distance = 0.0;
 
         itinerary.addLeg(egressLeg);
 

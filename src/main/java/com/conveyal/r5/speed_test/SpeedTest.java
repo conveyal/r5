@@ -23,6 +23,7 @@ import gnu.trove.map.TIntIntMap;
 
 import java.io.File;
 import java.io.IOException;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -70,7 +71,7 @@ public class SpeedTest {
         for (CoordPair coordPair : coordPairs) {
             try {
                 ProfileRequest request = buildDefaultRequest(coordPair);
-                tripPlans.add(route(request));
+                tripPlans.add(route(request, 1));
                 nRoutesComputed++;
             } catch (Exception e) {
                 System.out.println("Search failed");
@@ -84,38 +85,57 @@ public class SpeedTest {
         System.out.println("Total time: " + elapsedTime / 1000 + " seconds");
     }
 
-    public TripPlan route(ProfileRequest request) {
-        TIntIntMap accessTimesToStopsInSeconds = streetRoute(request, false);
-        TIntIntMap egressTimesToStopsInSeconds = streetRoute(request, true);
+    public TripPlan route(ProfileRequest request, int numberOfItineraries) {
+        TripPlan tripPlan = new TripPlan();
+        tripPlan.date = java.sql.Timestamp.valueOf(request.date.atStartOfDay());
+        tripPlan.from = new Place(request.fromLon, request.fromLat, "Origin");
+        tripPlan.to = new Place(request.toLon, request.toLat, "Destination");
 
-        FastRaptorWorker worker = new FastRaptorWorker(transportNetwork.transitLayer, request, accessTimesToStopsInSeconds);
-        worker.retainPaths = true;
+        for (int i = 0; i < numberOfItineraries; i++) {
+            TIntIntMap egressTimesToStopsInSeconds = streetRoute(request, true);
+            TIntIntMap accessTimesToStopsInSeconds = streetRoute(request, false);
 
-        // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
-        // Returns the total travel times as a 2D array of [searchIteration][destinationStopIndex].
-        // Additional detailed path information is retained in the FastRaptorWorker after routing.
-        int[][] transitTravelTimesToStops = worker.route();
+            FastRaptorWorker worker = new FastRaptorWorker(transportNetwork.transitLayer, request, accessTimesToStopsInSeconds);
+            worker.retainPaths = true;
 
-        int bestKnownTime = Integer.MAX_VALUE; // Hack to bypass Java stupid "effectively final" requirement.
-        Path bestKnownPath = null;
-        TIntIntIterator egressTimeIterator = egressTimesToStopsInSeconds.iterator();
-        int egressTime = 0;
-        while (egressTimeIterator.hasNext()) {
-            egressTimeIterator.advance();
-            int stopIndex = egressTimeIterator.key();
-            egressTime = egressTimeIterator.value();
-            int travelTimeToStop = transitTravelTimesToStops[0][stopIndex];
-            if (travelTimeToStop != FastRaptorWorker.UNREACHED) {
-                int totalTime = travelTimeToStop + egressTime;
-                if (totalTime < bestKnownTime) {
-                    bestKnownTime = totalTime;
-                    bestKnownPath = worker.pathsPerIteration.get(0)[stopIndex];
+            // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
+            // Returns the total travel times as a 2D array of [searchIteration][destinationStopIndex].
+            // Additional detailed path information is retained in the FastRaptorWorker after routing.
+            int[][] transitTravelTimesToStops = worker.route();
+
+            int bestKnownTime = Integer.MAX_VALUE; // Hack to bypass Java stupid "effectively final" requirement.
+            Path bestKnownPath = null;
+            TIntIntIterator egressTimeIterator = egressTimesToStopsInSeconds.iterator();
+            int egressTime = 0;
+            while (egressTimeIterator.hasNext()) {
+                egressTimeIterator.advance();
+                int stopIndex = egressTimeIterator.key();
+                egressTime = egressTimeIterator.value();
+                int travelTimeToStop = transitTravelTimesToStops[0][stopIndex];
+                if (travelTimeToStop != FastRaptorWorker.UNREACHED) {
+                    int totalTime = travelTimeToStop + egressTime;
+                    if (totalTime < bestKnownTime) {
+                        bestKnownTime = totalTime;
+                        bestKnownPath = worker.pathsPerIteration.get(0)[stopIndex];
+                    }
                 }
             }
+            System.out.println("Best path: " + (bestKnownPath == null ? "NONE" : bestKnownPath.toString()));
+            Itinerary itinerary = generateItinerary(request, bestKnownPath, 0, egressTime);
+            if (itinerary != null) {
+                tripPlan.itinerary.add(itinerary);
+                Calendar fromMidnight = (Calendar)itinerary.startTime.clone();
+                fromMidnight.set(Calendar.HOUR, 0);
+                fromMidnight.set(Calendar.MINUTE, 0);
+                fromMidnight.set(Calendar.SECOND, 0);
+                fromMidnight.set(Calendar.MILLISECOND, 0);
+                request.fromTime = (int)(itinerary.startTime.getTimeInMillis() - fromMidnight.getTimeInMillis()) / 1000 + 60;
+                request.toTime = request.fromTime + 60;
+            } else {
+                break;
+            }
         }
-        System.out.println("Best path: " + (bestKnownPath == null ? "NONE" : bestKnownPath.toString()));
-        TripPlan plan = generateTripPlan(request, bestKnownPath, 0, egressTime);
-        return plan;
+        return tripPlan;
     }
 
     /**
@@ -152,17 +172,11 @@ public class SpeedTest {
         return sr.getReachedStops();
     }
 
-    private TripPlan generateTripPlan(ProfileRequest request, Path path, int accessTime, int egressTime) {
-        TripPlan tripPlan = new TripPlan();
-        tripPlan.date = java.sql.Timestamp.valueOf(request.date.atStartOfDay());
-        tripPlan.from = new Place(request.fromLon, request.fromLat, "Origin");
-        tripPlan.to = new Place(request.toLon, request.toLat, "Destination");
-
-        if (path == null) {
-            return tripPlan;
-        }
-
+    private Itinerary generateItinerary(ProfileRequest request, Path path, int accessTime, int egressTime) {
         Itinerary itinerary = new Itinerary();
+        if (path == null) {
+            return null;
+        }
 
         // Access leg
         Leg accessLeg = new Leg();
@@ -171,7 +185,7 @@ public class SpeedTest {
 
         accessLeg.startTime = getCalendarFromTimeInSeconds(request.date, (path.boardTimes[0] - accessTime));
         accessLeg.endTime = getCalendarFromTimeInSeconds(request.date, path.boardTimes[0]);
-        accessLeg.from = tripPlan.from;
+        accessLeg.from = new Place(request.fromLon, request.fromLat, "Origin");
         accessLeg.to = new Place(firstStop.stop_lat, firstStop.stop_lon, firstStop.stop_name);
         accessLeg.to.stopId = new AgencyAndId("RB", firstStop.stop_id);
         accessLeg.mode = "WALK";
@@ -240,7 +254,7 @@ public class SpeedTest {
         egressLeg.endTime = getCalendarFromTimeInSeconds(request.date, path.alightTimes[path.alightTimes.length - 1] + egressTime);
         egressLeg.from = new Place(lastStop.stop_lat, lastStop.stop_lon, lastStop.stop_name);
         egressLeg.from.stopId = new AgencyAndId("RB", lastStop.stop_id);
-        egressLeg.to = tripPlan.from;
+        egressLeg.to = new Place(request.toLon, request.toLat, "Destination");
         egressLeg.mode = "WALK";
         egressLeg.legGeometry = PolylineEncoder.createEncodings(new double[]{lastStop.stop_lat, request.toLat}
                 , new double[]{lastStop.stop_lon, request.toLon});
@@ -259,9 +273,7 @@ public class SpeedTest {
         //itinerary.waitingTime = 0;
         //itinerary.weight = 0;
 
-        tripPlan.itinerary.add(itinerary);
-
-        return tripPlan;
+        return itinerary;
     }
 
     private Calendar getCalendarFromTimeInSeconds(LocalDate date, int seconds) {

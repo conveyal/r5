@@ -213,6 +213,11 @@ public class SpeedTest {
             return null;
         }
 
+        itinerary.walkDistance = 0.0;
+        itinerary.transitTime = 0;
+        itinerary.waitingTime = 0;
+        itinerary.weight = 0;
+
         int accessTime = accessPath.getDuration();
         int egressTime = egressPath.getDuration();
 
@@ -233,10 +238,11 @@ public class SpeedTest {
         accessLeg.to = new Place(firstStop.stop_lat, firstStop.stop_lon, firstStop.stop_name);
         accessLeg.to.stopId = new AgencyAndId("RB", firstStop.stop_id);
         accessLeg.mode = "WALK";
-        //accessLeg.agencyTimeZoneOffset = 7200000;
         accessLeg.legGeometry = PolylineEncoder.createEncodings(acessCoords);
 
         accessLeg.distance = (double)accessPath.getDistance();
+
+        itinerary.walkDistance += accessLeg.distance;
 
         itinerary.addLeg(accessLeg);
 
@@ -260,8 +266,9 @@ public class SpeedTest {
                 transferLeg.to = new Place(boardStop.stop_lat, boardStop.stop_lon, boardStop.stop_name);
                 transferLeg.legGeometry = PolylineEncoder.createEncodings(transferCoords);
 
-                //transferLeg.agencyTimeZoneOffset = 7200000;
                 transferLeg.distance = (double)transferPath.getDistance();
+
+                itinerary.walkDistance += transferLeg.distance;
 
                 itinerary.addLeg(transferLeg);
             }
@@ -275,6 +282,10 @@ public class SpeedTest {
                     .get(transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).routeIndex);
             TripSchedule tripSchedule = transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]).tripSchedules.get(path.trips[i]);
             TripPattern tripPattern = transportNetwork.transitLayer.tripPatterns.get(path.patterns[i]);
+
+            itinerary.transitTime += path.alightTimes[i] - path.boardTimes[i];
+
+            itinerary.waitingTime += path.boardTimes[i] - path.transferTimes[i];
 
             transitLeg.from = new Place(boardStop.stop_lat, boardStop.stop_lon, boardStop.stop_name);
             transitLeg.from.stopId = new AgencyAndId("RB", boardStop.stop_id);
@@ -309,7 +320,6 @@ public class SpeedTest {
 
             transitLeg.startTime = getCalendarFromTimeInSeconds(request.date, path.boardTimes[i]);
             transitLeg.endTime = getCalendarFromTimeInSeconds(request.date, path.alightTimes[i]);
-            //transitLeg.agencyTimeZoneOffset = 7200000;
             itinerary.addLeg(transitLeg);
         }
 
@@ -325,7 +335,8 @@ public class SpeedTest {
         egressLeg.legGeometry = PolylineEncoder.createEncodings(egressCoords);
 
         egressLeg.distance = (double)egressPath.getDistance();
-        //egressLeg.agencyTimeZoneOffset = 7200000;
+
+        itinerary.walkDistance += egressLeg.distance;
 
         itinerary.addLeg(egressLeg);
 
@@ -333,11 +344,7 @@ public class SpeedTest {
         itinerary.startTime = accessLeg.startTime;
         itinerary.endTime = egressLeg.endTime;
 
-        // TODO
-        //itinerary.walkDistance = 0.0;
-        //itinerary.transitTime = 0;
-        //itinerary.waitingTime = 0;
-        //itinerary.weight = 0;
+        itinerary.transfers = path.patterns.length - 1;
 
         return itinerary;
     }

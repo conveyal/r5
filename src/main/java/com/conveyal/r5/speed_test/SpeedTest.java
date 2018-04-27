@@ -132,8 +132,17 @@ public class SpeedTest {
                     }
                 }
             }
+
+            StreetRouter.State accessState = accessRouter.getStateAtVertex(transportNetwork.transitLayer.streetVertexForStop
+                    .get(bestKnownPath.boardStops[0]));
+            StreetRouter.State egressState = egressRouter.getStateAtVertex(transportNetwork.transitLayer.streetVertexForStop
+                    .get(bestKnownPath.alightStops[bestKnownPath.alightStops.length - 1]));
+
+            StreetPath accessPath = new StreetPath(accessState, transportNetwork, false);
+            StreetPath egressPath = new StreetPath(egressState, transportNetwork, false);
+
             System.out.println("Best path: " + (bestKnownPath == null ? "NONE" : bestKnownPath.toString()));
-            Itinerary itinerary = generateItinerary(request, bestKnownPath, accessRouter, egressRouter);
+            Itinerary itinerary = generateItinerary(request, bestKnownPath, accessPath, egressPath);
             if (itinerary != null) {
                 tripPlan.itinerary.add(itinerary);
                 Calendar fromMidnight = (Calendar)itinerary.startTime.clone();
@@ -198,19 +207,11 @@ public class SpeedTest {
         return transferPath;
     }
 
-    private Itinerary generateItinerary(ProfileRequest request, Path path, StreetRouter accessRouter, StreetRouter egressRouter) {
+    private Itinerary generateItinerary(ProfileRequest request, Path path, StreetPath accessPath, StreetPath egressPath) {
         Itinerary itinerary = new Itinerary();
         if (path == null) {
             return null;
         }
-
-        StreetRouter.State accessState = accessRouter.getStateAtVertex(transportNetwork.transitLayer.streetVertexForStop
-                .get(path.boardStops[0]));
-        StreetRouter.State egressState = egressRouter.getStateAtVertex(transportNetwork.transitLayer.streetVertexForStop
-                .get(path.alightStops[path.alightStops.length - 1]));
-
-        StreetPath accessPath = new StreetPath(accessState, transportNetwork, false);
-        StreetPath egressPath = new StreetPath(egressState, transportNetwork, false);
 
         int accessTime = accessPath.getDuration();
         int egressTime = egressPath.getDuration();

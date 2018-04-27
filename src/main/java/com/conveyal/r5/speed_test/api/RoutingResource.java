@@ -408,7 +408,7 @@ public abstract class RoutingResource {
                 case SUBWAY:
                     request.transitModes.add(TransitModes.SUBWAY);
                 case AIRPLANE:
-                    request.transitModes.add(TransitModes.AIR);
+                    //request.transitModes.add(TransitModes.AIR);
                 case FERRY:
                     request.transitModes.add(TransitModes.FERRY);
             }

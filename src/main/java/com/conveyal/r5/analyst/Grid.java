@@ -102,6 +102,12 @@ public class Grid {
     /** The data values for each pixel within this grid. */
     public final double[][] grid;
 
+    /** Maximum area allowed for the bounding box of an uploaded shapefile -- large enough for New York State.  */
+    private static final double MAX_BOUNDING_BOX_AREA_SQ_KM = 250 000;
+
+    /** Maximum area allowed for features in a shapefile upload */
+    double MAX_FEATURE_AREA_SQ_DEG = 0.01;
+
     /**
      * @param zoom web mercator zoom level for the grid.
      * @param north latitude in decimal degrees of the north edge of this grid.
@@ -183,7 +189,11 @@ public class Grid {
 
         double area = geometry.getArea();
         if (area < 1e-12) {
-            throw new IllegalArgumentException("Geometry is too small");
+            throw new IllegalArgumentException("Feature geometry is too small");
+        }
+
+        if (area > MAX_FEATURE_AREA_SQ_DEG) {
+            throw new IllegalArgumentException("Feature geometry is too large");
         }
 
         PreparedGeometry preparedGeom = pgFact.create(geometry);
@@ -595,6 +605,13 @@ public class Grid {
     public static Map<String, Grid> fromShapefile (File shapefile, int zoom, BiConsumer<Integer, Integer> statusListener) throws IOException, FactoryException, TransformException {
         Map<String, Grid> grids = new HashMap<>();
         ShapefileReader reader = new ShapefileReader(shapefile);
+
+        double boundingBoxAreaSqKm = reader.getAreaSqKm();
+
+        if (boundingBoxAreaSqKm > MAX_BOUNDING_BOX_AREA_SQ_KM){
+            throw new IllegalArgumentException("Shapefile extent (" + boundingBoxAreaSqKm + " sq. km.) exceeds limit (" +
+                    MAX_BOUNDING_BOX_AREA_SQ_KM + "sq. km.).");
+        }
 
         Envelope envelope = reader.wgs84Bounds();
         int total = reader.getFeatureCount();

@@ -40,7 +40,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -154,13 +153,8 @@ public class AnalystWorker implements Runnable {
     /** The last time (in milliseconds since the epoch) that we polled for work. */
     private long lastPollingTime;
 
-    /**
-     * A list of times at which tasks have been completed. Regularly truncated to only times in the last minute.
-     * This allows reporting average throughput over different timescales up to one minute.
-     */
-    // TODO replace with TaskStats containing more info about timing breakdown
-    // private List<TaskStats> taskStats = new LinkedList<>();
-    List<Long> recentTaskCompletionTimes = new LinkedList<>();
+    /** Keep track of how many tasks per minute this worker is processing, broken down by scenario ID. */
+    ThroughputTracker throughputTracker = new ThroughputTracker();
 
     /**
      * This has been pulled out into a method so the broker can also make a similar http client.
@@ -480,9 +474,8 @@ public class AnalystWorker implements Runnable {
                 // FIXME strangeness, only travel time results are returned from method, accessibility results return null and are accumulated for async delivery.
                 // Return raw byte array containing grid or TIFF file to caller, for return to client over HTTP.
                 byteArrayOutputStream.close();
-                synchronized (recentTaskCompletionTimes) {
-                    recentTaskCompletionTimes.add(System.currentTimeMillis());
-                }
+                // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
+                throughputTracker.recordTaskCompletion("SINGLE-" + transportNetwork.scenarioId);
                 return byteArrayOutputStream.toByteArray();
             } else {
                 // This is a single task within a regional analysis with many origins.
@@ -503,9 +496,7 @@ public class AnalystWorker implements Runnable {
                 synchronized (workResults) {
                     workResults.add(oneOriginResult.toRegionalWorkResult(request));
                 }
-                synchronized (recentTaskCompletionTimes) {
-                    recentTaskCompletionTimes.add(System.currentTimeMillis());
-                }
+                throughputTracker.recordTaskCompletion(request.jobId);
             }
         } catch (Exception ex) {
             // Catch any exceptions that were not handled by more specific catch clauses above.
@@ -551,13 +542,7 @@ public class AnalystWorker implements Runnable {
         // Compute throughput in tasks per minute and include it in the worker status report.
         // We poll too frequently to compute throughput just since the last poll operation.
         // TODO reduce polling frequency (larger queue in worker), compute shorter-term throughput.
-        synchronized (recentTaskCompletionTimes) {
-            long oneMinuteAgo = System.currentTimeMillis() - 1000 * 60;
-            while (!recentTaskCompletionTimes.isEmpty() && recentTaskCompletionTimes.get(0) < oneMinuteAgo) {
-                recentTaskCompletionTimes.remove(0);
-            }
-            workerStatus.tasksPerMinute = recentTaskCompletionTimes.size();
-        }
+        workerStatus.tasksPerMinuteByJobId = throughputTracker.getTasksPerMinuteByJobId();
 
         // Report how often we're polling for work, just for monitoring.
         long timeNow = System.currentTimeMillis();

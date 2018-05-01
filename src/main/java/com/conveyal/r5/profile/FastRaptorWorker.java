@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.r5.transit.PickDropType;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
@@ -373,9 +374,9 @@ public class FastRaptorWorker {
             for (int stopPositionInPattern = 0; stopPositionInPattern < pattern.stops.length; stopPositionInPattern++) {
                 int stop = pattern.stops[stopPositionInPattern];
 
-                // attempt to alight if we're on board, done above the board search so that we don't check for alighting
-                // when boarding
-                if (onTrip > -1) {
+                // attempt to alight if we're on board and if drop off is allowed, done above the board search so
+                // that we don't check for alighting when boarding
+                if (onTrip > -1 && pattern.dropoffs[stopPositionInPattern] != PickDropType.NONE) {
                     int alightTime = schedule.arrivals[stopPositionInPattern];
                     int onVehicleTime = alightTime - boardTime;
 
@@ -390,9 +391,9 @@ public class FastRaptorWorker {
                         inputState.previousPatterns[stop] :
                         inputState.previousPatterns[inputState.previousStop[stop]];
 
-                // Don't attempt to board if this stop was not reached in the last round, and don't attempt to
-                // reboard the same pattern
-                if (inputState.bestStopsTouched.get(stop) && sourcePatternIndex != originalPatternIndex) {
+                // Don't attempt to board if this stop was not reached in the last round or if pick up is not allowed,
+                // and don't attempt to reboard the same pattern
+                if (inputState.bestStopsTouched.get(stop) && sourcePatternIndex != originalPatternIndex && pattern.pickups[stopPositionInPattern] != PickDropType.NONE) {
                     int earliestBoardTime = inputState.bestTimes[stop] + MINIMUM_BOARD_WAIT_SEC;
 
                     // only attempt to board if the stop was touched
@@ -476,8 +477,8 @@ public class FastRaptorWorker {
                     for (int stopPositionInPattern = 0; stopPositionInPattern < pattern.stops.length; stopPositionInPattern++) {
                         int stop = pattern.stops[stopPositionInPattern];
 
-                        // attempt to alight if boarded
-                        if (boardTime > -1) {
+                        // attempt to alight if boarded and if drop off is allowed
+                        if (boardTime > -1 && pattern.dropoffs[stopPositionInPattern] != PickDropType.NONE) {
                             // attempt to alight
                             int travelTime = schedule.arrivals[stopPositionInPattern] - schedule.departures[boardStopPositionInPattern];
                             int alightTime = boardTime + travelTime;
@@ -485,8 +486,9 @@ public class FastRaptorWorker {
                             outputState.setTimeAtStop(stop, alightTime, originalPatternIndex, boardStop, waitTime, travelTime, false);
                         }
 
-                        // attempt to board (even if already boarded, since this is a frequency trip and we could move back)
-                        if (inputState.bestStopsTouched.get(stop)) {
+                        // attempt to board if pick up is allowed
+                        // (even if already boarded, since this is a frequency trip and we could move back)
+                        if (inputState.bestStopsTouched.get(stop) && pattern.pickups[stopPositionInPattern] != PickDropType.NONE) {
                             int earliestBoardTime = inputState.bestTimes[stop] + MINIMUM_BOARD_WAIT_SEC;
 
                             // if we're computing the upper bound, we want the worst case. This is the only thing that is

@@ -103,7 +103,7 @@ public class Grid {
     public final double[][] grid;
 
     /** Maximum area allowed for the bounding box of an uploaded shapefile -- large enough for New York State.  */
-    private static final double MAX_BOUNDING_BOX_AREA_SQ_KM = 250000;
+    private static final double MAX_BOUNDING_BOX_AREA_SQ_KM = 250 000;
 
     /** Maximum area allowed for features in a shapefile upload */
     double MAX_FEATURE_AREA_SQ_DEG = 0.01;

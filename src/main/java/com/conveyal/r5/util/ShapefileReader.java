@@ -52,6 +52,11 @@ public class ShapefileReader {
 
         features = source.getFeatures(filter);
         crs = features.getSchema().getCoordinateReferenceSystem();
+
+        if (crs == null) {
+            throw new IllegalArgumentException("Unrecognized shapefile projection");
+        }
+
         transform = CRS.findMathTransform(crs, DefaultGeographicCRS.WGS84, true);
     }
 
@@ -75,6 +80,14 @@ public class ShapefileReader {
 
     public ReferencedEnvelope getBounds () throws IOException {
         return source.getBounds();
+    }
+
+    public double getAreaSqKm () throws IOException, TransformException, FactoryException {
+        CoordinateReferenceSystem webMercatorCRS = CRS.decode("EPSG:3857");
+        MathTransform webMercatorTransform = CRS.findMathTransform(crs, webMercatorCRS, true);
+        Envelope mercatorEnvelope = JTS.transform(getBounds(), webMercatorTransform);
+        return mercatorEnvelope.getArea() / 1000 / 1000;
+
     }
 
     public Stream<SimpleFeature> wgs84Stream () throws IOException, TransformException {

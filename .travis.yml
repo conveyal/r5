@@ -27,10 +27,6 @@ script: |
     # Setting the gpg.skip property avoids signing artifacts when the encryption keys are not available.
     mvn clean verify --settings maven-settings.xml -B -V -Dgpg.skip
   fi
-  # Wipe out all the Conveyal artifacts in the local Maven repo before they get cached.
-  # This forces download of fresh SNAPSHOT artifacts on the next build.
-  # The cache seems to be uploaded immediately after the Travis stage "script" so we include this deletion in the script.
-  rm -rf $HOME/.m2/repository/com/conveyal
 
 # Secure envs are OSSRH_JIRA_USERNAME, OSSRH_JIRA_PASSWORD, GPG_KEY_NAME, GPG_PASSPHRASE
 # Then the credentials for an IAM account that is allowed to write to the R5-builds buckets on S3
@@ -42,6 +38,10 @@ env:
   - secure: "xouAUfJoFUHv6ipBwC2KfwF80nE46tqz/Jl1YQOxO4H2lVyD83LJzHUP1Ydx48ViYYKUdELobc2HB4NIC19nXSZjOJj8bMK0zG2tWuSKG7sqZqu+r8P/PAWV/7SWCFJpRDbhyWbRQMDk1xePBI7vo6D/bTT88OeVYBPaXfOSYBVXFgBm0CaEzBny8ucVppIcKlXljEBrr2DJK4rJEzQbD59LUMuRT1i0mYqgwyuLo/+eDzfKWMH3c/Lo5Deq5IwYIGJ8E+kEL5WbiMl+8E4Bx0EqTwFDn2ykmrabAXnX4m/9Y+zxgyRodKeTD+KhO8j91u3XmqpT6GzsqVMyusgtcqQdwSc7YkKJK0iyhz9gwNtwdxKjPJ2TpDJH9irjGTC21HNTOKfEAP2k+WjtNVdBtZ9tBBWaw9nUy8Hcksx0gxWip6wIx4VSylJLuE8DYHZ8PXJAr09duBAqZrDgU7YC+tQ6/8rF7m7FFFMvvfBYvAu2ucigzrSlvgANpT1Nfvv8P9BOiBp+wkYim959q17nwSeJTl0OJy8FrzPzyl1Nr/Qh8IUHWjujbm56VZ1xgRS20tnV3pJEt64TH3lp16iP6J00dN4U85f4dqZSJYd/MRwLNzt7Ie3JKKiBguuq2Jk4cJawVvWPyLVMcCUZj+zX1zlTKrHvXEBcu6G9isAHtCU="
   - secure: ti0pCe4W0mbc/wYrcAbemHYQFUGaCrPDPjHvaD2rU5Xyd7a1Z/p2aIPvApg+YtnUKXr7X718fFWGmz+U0kQgDfv05ZiRQeaSX8cQ2jWUxQurTax7EhqWjh6loxbKwZlKKjritDlcyS9/kwHxNQdTPNcmcHvM+7l+J8mndwhPs9Si9ln+FLALEgilDMRZwqqhpVkejZ3LQMJmvD7SGqz4kthlieSMo5m7AvwY3Kjs1o7d3ll9dRuOdt7rZHvIzXe7aH0RfhizrmDuxLLlLAxzonomxaPRtOj/qq3arpn+iVlXYjkO5A9nAAdJi6VYBO9Em+Ru0jMRuh57PjSpy6KngqywUBXvmZ6wTUyXthL0+VSqn/G4u6edQDewMINUQUfEfHiFY5y+oDUGlYll4J2T0T1eO6hTo03KfqUUF8Fz9T8dnIld8OLiqjF/uEAXmuOPWZIPtYekoZE4QSAaulDm8168ksXefWnUODBN/94kUxewNDFrpUVhL8QHTBU8oRlwMIhsudeFiCM3HZ+XlvjVSv4QoePiCOQVxdy5Od3M0xSNCFsgoW4fEzfQavjPUQm8HKUyLKjjMbxOQXjk2BdqBv3BdkMDja15wesf6BzFsZf/iSAKwKYW6OeeFPw+sXMvxtCi4xFD3y34tHeXYbaMtMpFDRKMlman56ujR/Cd+EI=
   - secure: dw6bS2P1iaoUaJKo18EtfwpycfcjDWbo7uhUegrA5CGUXnk5o3D7j0yz9uNwvxUByOWq8qRWoz/Y6rUC6cwrV596O/H3mk8Z+YU8kYHUptBJOSch3NtpyBFdc8ry4tV7qtW4Fg4WAcZWzGyT7KiKA532vXLWweHKKv/YqxscLneSgchBOCT2DnG0+mvDoQ+TB8kODo4AjSaSpciIhpq0EqagrJppRUW0DL2m8MYOmqjnMURaPkPqv4XRIdRDQH0d1CUgNDOM4l3ZrCTRFdZHOeryiLujLLtiTF1K7d1bFC6kS7WVEdqLJzOs2NGwVS8s/4dgc4GVHOwx8SJLor3sfzduh4Jk1YT46SMBHwwP3K4vsAIaw2NOu0ewjufC/LH1ZjfBeouS5sx7R4cCcPsEJr0hmg1jgFtTOIJrvINNl936eMLAG4maICXveGOrWmKflFKL8EiaO5E3p1NRCJkL/Yt27BL+kNz5GLByIfLS+CqsSBySG3WM5QrUw2EKpjWE6gqRml7o0c1Jmn+9yDLQhWtJ0JLN7Y3pP4HDtBgCO1WgN/0YAWdCc0e968gY9NeSm1SYZkUmpkWSMYb88kpjjQRW6BlDh1O+jnYa66o1GgmpI2XoBc6edDLg998nKzsbGFCuiwkLPO+Ccqk3vAlED0ZpoDt44cUn4Pl9ZBcpFe0=
+
+# Wipe out all the Conveyal artifacts in the local Maven repo before they get cached.
+# This forces download of fresh SNAPSHOT artifacts on the next build.
+before_cache: rm -rf $HOME/.m2/repository/com/conveyal
 
 after_success:
   # Upload shaded JAR to S3. The un-shaded jar was deployed to our Maven repo during the main build.

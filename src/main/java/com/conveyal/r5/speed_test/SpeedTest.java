@@ -44,24 +44,28 @@ import java.util.stream.Collectors;
  */
 public class SpeedTest {
 
-    private static final String NETWORK_DIR = "./src/main/resources/speed_test/";
-
-    private static final String COORD_PAIRS = "./src/main/resources/speed_test/travelSearch.csv";
+    private static final String COORD_PAIRS = "travelSearch.csv";
+    private static final String NETWORK_DATA_FILE = "network.dat";
 
     private static TransportNetwork transportNetwork;
+
+    private final File rootDir;
 
     SpeedTest(String[] args) throws Exception {
         this(rootDirArgument(args));
     }
 
     private SpeedTest(File rootDir) throws Exception {
-        initTransportNetwork(rootDir);
+        this.rootDir = rootDir;
+        initTransportNetwork();
     }
 
-    synchronized static void initTransportNetwork(File rootDir) throws Exception {
-        if (transportNetwork == null) {
-            transportNetwork = TransportNetwork.read(new File(rootDir, "network.dat"));
-            transportNetwork.rebuildTransientIndexes();
+    private void initTransportNetwork() throws Exception {
+        synchronized (NETWORK_DATA_FILE) {
+            if (transportNetwork == null) {
+                transportNetwork = TransportNetwork.read(new File(rootDir, NETWORK_DATA_FILE));
+                transportNetwork.rebuildTransientIndexes();
+            }
         }
     }
 
@@ -359,7 +363,7 @@ public class SpeedTest {
 
     private List<CoordPair> getCoordPairs() throws IOException {
         List<CoordPair> coordPairs = new ArrayList<>();
-        CsvReader csvReader = new CsvReader(COORD_PAIRS);
+        CsvReader csvReader = new CsvReader(new File(rootDir, COORD_PAIRS).getAbsolutePath());
         csvReader.readRecord(); // Skip header
         while (csvReader.readRecord()) {
             CoordPair coordPair = new CoordPair();

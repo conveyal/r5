@@ -157,11 +157,12 @@ public class FastRaptorWorker {
      * Return value dimension order is [searchIteration][transitStopIndex]
      */
     public int[][] route () {
+        LOG.info("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
+        LOG.info("Performing {} scheduled iterations each with {} Monte Carlo draws for a total of {} iterations",
+                nMinutes, monteCarloDrawsPerMinute, nMinutes * monteCarloDrawsPerMinute);
 
         startClockTime = System.nanoTime();
         prefilterPatterns();
-        LOG.info("Performing {} scheduled iterations each with {} Monte Carlo draws for a total of {} iterations",
-                nMinutes, monteCarloDrawsPerMinute, nMinutes * monteCarloDrawsPerMinute);
 
         // Initialize result storage.
         // Results are one arrival time at each stop, for every raptor iteration.
@@ -173,8 +174,6 @@ public class FastRaptorWorker {
         for (int departureTime = request.toTime - DEPARTURE_STEP_SEC, minute = nMinutes;
              departureTime >= request.fromTime;
              departureTime -= DEPARTURE_STEP_SEC, minute--) {
-
-            if (minute % 15 == 0) LOG.debug("  minute {}", minute);
 
             // Run the raptor search. For this particular departure time, we receive N arrays of arrival times at all
             // stops, one for each randomized schedule: resultsForMinute[randScheduleNumber][transitStop]

@@ -7,8 +7,8 @@ import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetPath;
+import com.conveyal.r5.profile.mcrr.MultiCriteriaRangeRaptorWorker;
 import com.conveyal.r5.speed_test.api.model.AgencyAndId;
-import com.conveyal.r5.speed_test.api.model.EncodedPolylineBean;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.Leg;
 import com.conveyal.r5.speed_test.api.model.Place;
@@ -24,6 +24,8 @@ import com.csvreader.CsvReader;
 import com.vividsolutions.jts.geom.Coordinate;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
@@ -43,6 +45,8 @@ import java.util.stream.Collectors;
  * Also demonstrates how to run basic searches without using the graphQL profile routing API.
  */
 public class SpeedTest {
+    private static final Logger LOG = LoggerFactory.getLogger(SpeedTest.class);
+
 
     private static final String COORD_PAIRS = "travelSearch.csv";
     private static final String NETWORK_DATA_FILE = "network.dat";
@@ -50,13 +54,12 @@ public class SpeedTest {
     private static TransportNetwork transportNetwork;
 
     private final File rootDir;
+    private boolean useMultiCriteriaSearch;
 
     SpeedTest(String[] args) throws Exception {
-        this(rootDirArgument(args));
-    }
-
-    private SpeedTest(File rootDir) throws Exception {
-        this.rootDir = rootDir;
+        SpeedTestCommandLineArgs opts = new SpeedTestCommandLineArgs(args);
+        this.rootDir = opts.rootDir();
+        this.useMultiCriteriaSearch = opts.useMultiCriteriaSearch();
         initTransportNetwork();
     }
 
@@ -84,19 +87,27 @@ public class SpeedTest {
                 ProfileRequest request = buildDefaultRequest(coordPair);
                 tripPlans.add(route(request, 1));
                 nRoutesComputed++;
+            } catch (NullPointerException e) {
+                printError(coordPair, e);
+                e.printStackTrace();
             } catch (Exception e) {
-                System.out.println("Search failed");
+                printError(coordPair, e);
             }
         }
 
         long elapsedTime = System.currentTimeMillis() - startTime;
 
-        System.out.println("Average path search time (msec): " + elapsedTime / nRoutesComputed);
-        System.out.println("Successful searches: " + nRoutesComputed + " / " + coordPairs.size());
-        System.out.println("Total time: " + elapsedTime / 1000 + " seconds");
+        LOG.info("Average path search time (msec): " + elapsedTime / nRoutesComputed);
+        LOG.info("Successful searches: " + nRoutesComputed + " / " + coordPairs.size());
+        LOG.info("Total time: " + elapsedTime / 1000 + " seconds");
     }
 
     public TripPlan route(ProfileRequest request, int numberOfItineraries) {
+        return useMultiCriteriaSearch ? routeMcrr(request, numberOfItineraries) : routeRangeRaptor(request, numberOfItineraries);
+    }
+
+
+    public TripPlan routeRangeRaptor(ProfileRequest request, int numberOfItineraries) {
         TripPlan tripPlan = new TripPlan();
         tripPlan.date = new Date(request.date.atStartOfDay(ZoneId.of("Europe/Oslo")).toInstant().toEpochMilli() + request.fromTime * 1000);
         tripPlan.from = new Place(request.fromLon, request.fromLat, "Origin");
@@ -137,6 +148,11 @@ public class SpeedTest {
                 }
             }
 
+            if(bestKnownPath == null) {
+                LOG.info("\n\n!!! NO RESULT FOR INPUT. From ({}, {}) to ({}, {}).\n", request.fromLat, request.fromLon, request.toLat, request.toLon);
+                break;
+            }
+
             StreetRouter.State accessState = accessRouter.getStateAtVertex(transportNetwork.transitLayer.streetVertexForStop
                     .get(bestKnownPath.boardStops[0]));
             StreetRouter.State egressState = egressRouter.getStateAtVertex(transportNetwork.transitLayer.streetVertexForStop
@@ -145,7 +161,6 @@ public class SpeedTest {
             StreetPath accessPath = new StreetPath(accessState, transportNetwork, false);
             StreetPath egressPath = new StreetPath(egressState, transportNetwork, false);
 
-            System.out.println("Best path: " + (bestKnownPath == null ? "NONE" : bestKnownPath.toString()));
             Itinerary itinerary = generateItinerary(request, bestKnownPath, accessPath, egressPath);
             if (itinerary != null) {
                 tripPlan.itinerary.add(itinerary);
@@ -161,6 +176,85 @@ public class SpeedTest {
             }
         }
         return tripPlan;
+    }
+
+    public TripPlan routeMcrr(ProfileRequest request, int numberOfItineraries) {
+        TripPlan tripPlan = new TripPlan();
+        tripPlan.date = new Date(request.date.atStartOfDay(ZoneId.of("Europe/Oslo")).toInstant().toEpochMilli() + request.fromTime * 1000);
+        tripPlan.from = new Place(request.fromLon, request.fromLat, "Origin");
+        tripPlan.to = new Place(request.toLon, request.toLat, "Destination");
+
+        for (int i = 0; i < numberOfItineraries; i++) {
+            StreetRouter egressRouter = streetRoute(request, true);
+            StreetRouter accessRouter = streetRoute(request, false);
+
+            TIntIntMap egressTimesToStopsInSeconds = egressRouter.getReachedStops();
+            TIntIntMap accessTimesToStopsInSeconds = accessRouter.getReachedStops();
+
+            MultiCriteriaRangeRaptorWorker worker = new MultiCriteriaRangeRaptorWorker(
+                    transportNetwork.transitLayer, request, accessTimesToStopsInSeconds
+            );
+
+            // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
+            // Returns the total travel times as a 2D array of [searchIteration][destinationStopIndex].
+            // Additional detailed path information is retained in the FastRaptorWorker after routing.
+            worker.retainPaths = true;
+            int[][] transitTravelTimesToStops = worker.route();
+
+            int bestKnownTime = Integer.MAX_VALUE; // Hack to bypass Java stupid "effectively final" requirement.
+            Path bestKnownPath = null;
+            TIntIntIterator egressTimeIterator = egressTimesToStopsInSeconds.iterator();
+            int egressTime = 0;
+            int accessTime = 0;
+
+            while (egressTimeIterator.hasNext()) {
+                egressTimeIterator.advance();
+                int stopIndex = egressTimeIterator.key();
+                egressTime = egressTimeIterator.value();
+                int travelTimeToStop = transitTravelTimesToStops[0][stopIndex];
+
+                if (travelTimeToStop != MultiCriteriaRangeRaptorWorker.UNREACHED) {
+                    int totalTime = travelTimeToStop + egressTime;
+                    if (totalTime < bestKnownTime) {
+                        bestKnownTime = totalTime;
+                        bestKnownPath = worker.pathsPerIteration.get(0)[stopIndex];
+                        accessTime = accessTimesToStopsInSeconds.get(worker.pathsPerIteration.get(0)[stopIndex].boardStops[0]);
+                    }
+                }
+            }
+
+            if(bestKnownPath == null) {
+                LOG.info("\n\n!!! NO RESULT FOR INPUT. From ({}, {}) to ({}, {}).\n", request.fromLat, request.fromLon, request.toLat, request.toLon);
+                break;
+            }
+
+            StreetRouter.State accessState = accessRouter.getStateAtVertex(transportNetwork.transitLayer.streetVertexForStop
+                    .get(bestKnownPath.boardStops[0]));
+            StreetRouter.State egressState = egressRouter.getStateAtVertex(transportNetwork.transitLayer.streetVertexForStop
+                    .get(bestKnownPath.alightStops[bestKnownPath.alightStops.length - 1]));
+
+            StreetPath accessPath = new StreetPath(accessState, transportNetwork, false);
+            StreetPath egressPath = new StreetPath(egressState, transportNetwork, false);
+
+            Itinerary itinerary = generateItinerary(request, bestKnownPath, accessPath, egressPath);
+            if (itinerary != null) {
+                tripPlan.itinerary.add(itinerary);
+                Calendar fromMidnight = (Calendar)itinerary.startTime.clone();
+                fromMidnight.set(Calendar.HOUR, 0);
+                fromMidnight.set(Calendar.MINUTE, 0);
+                fromMidnight.set(Calendar.SECOND, 0);
+                fromMidnight.set(Calendar.MILLISECOND, 0);
+                request.fromTime = (int)(itinerary.startTime.getTimeInMillis() - fromMidnight.getTimeInMillis()) / 1000 + 60;
+                request.toTime = request.fromTime + 60;
+            } else {
+                break;
+            }
+        }
+        return tripPlan;
+    }
+
+    private void printError(CoordPair coordPair , Exception e) {
+        System.err.println("Search failed for " + coordPair + ": " + e.getClass().getSimpleName() + " - " + e.getMessage());
     }
 
     /**
@@ -394,5 +488,11 @@ public class SpeedTest {
         public double fromLon;
         public double toLat;
         public double toLon;
+
+
+        @Override
+        public String toString() {
+            return String.format("from (%.3f, %.3f) to (%.3f, %.3f)", fromLat, fromLon, toLat, toLon);
+        }
     }
 }

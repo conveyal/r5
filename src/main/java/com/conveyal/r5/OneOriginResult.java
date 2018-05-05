@@ -35,7 +35,7 @@ public class OneOriginResult {
         } else {
             result = new RegionalWorkResult(task.jobId, task.taskId, accessibility.grids.length,
                     accessibility.percentiles.length, accessibility.cutoffs.length);
-            result.setAcccessibilityValue(0, 0, 0, (int) accessibility.getAccessibility(0, 0, 0));
+            result.setAcccessibilityValue(0, 0, 0, (float) accessibility.getAccessibility(0, 0, 0));
         }
         return result;
     }

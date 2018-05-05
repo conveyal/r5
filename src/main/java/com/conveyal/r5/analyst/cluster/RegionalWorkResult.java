@@ -14,7 +14,7 @@ public class RegionalWorkResult {
 
     public String jobId;
     public int taskId;
-    public int[][][] accessibilityValues; // TODO Should this be floating point?
+    public float[][][] accessibilityValues;
 
     // TODO add a way to signal that an error occurred when processing this task.
     // public String errors;
@@ -28,10 +28,10 @@ public class RegionalWorkResult {
         this.jobId = jobId;
         this.taskId = taskId;
         // The array values will default to zero, which is what we want for accessibility
-        this.accessibilityValues = new int[nGrids][nPercentiles][nTravelTimeCutoffs];
+        this.accessibilityValues = new float[nGrids][nPercentiles][nTravelTimeCutoffs];
     }
 
-    public void setAcccessibilityValue (int gridIndex, int percentileIndex, int cutoffMinutesIndex, int value) {
+    public void setAcccessibilityValue (int gridIndex, int percentileIndex, int cutoffMinutesIndex, float value) {
         accessibilityValues[gridIndex][percentileIndex][cutoffMinutesIndex] = value;
     }
 

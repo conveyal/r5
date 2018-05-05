@@ -172,10 +172,10 @@ public class GridResultAssembler {
     }
 
 
-    public static byte[] intToLittleEndianByteArray (int i) {
+    public static byte[] floatToLittleEndianByteArray (float i) {
         final ByteBuffer byteBuffer = ByteBuffer.allocate(Integer.BYTES);
         byteBuffer.order(ByteOrder.LITTLE_ENDIAN);
-        byteBuffer.putInt(i);
+        byteBuffer.putFloat(i);
         return byteBuffer.array();
     }
 
@@ -183,12 +183,12 @@ public class GridResultAssembler {
     // The randomAccessFile is not threadsafe and multiple threads may call this, so synchronize.
     // The origins we receive have 2d coordinates.
     // Flatten them to compute file offsets and for the origin checklist.
-    private void writeOneValue (int x, int y, int value) throws IOException {
+    private void writeOneValue (int x, int y, float value) throws IOException {
         int index1d = y * request.width + x;
         long offset = HEADER_LENGTH_BYTES + index1d * Integer.BYTES;
         synchronized (this) {
             randomAccessFile.seek(offset);
-            randomAccessFile.write(intToLittleEndianByteArray(value));
+            randomAccessFile.write(floatToLittleEndianByteArray(value));
             // Don't double-count origins if we receive them more than once.
             if (!originsReceived.get(index1d)) {
                 originsReceived.set(index1d);
@@ -219,11 +219,11 @@ public class GridResultAssembler {
             // Drop work results for this particular origin into a little-endian output files.
             // We only have one file for now because only one grid, percentile, and cutoff value.
             checkDimension(workResult, "destination grids", workResult.accessibilityValues.length, nGrids);
-            for (int[][] gridResult : workResult.accessibilityValues) {
+            for (float[][] gridResult : workResult.accessibilityValues) {
                 checkDimension(workResult, "percentiles", gridResult.length, nPercentiles);
-                for (int[] percentileResult : gridResult) {
+                for (float[] percentileResult : gridResult) {
                     checkDimension(workResult, "cutoffs", percentileResult.length, nCutoffs);
-                    for (int accessibilityForCutoff : percentileResult) {
+                    for (float accessibilityForCutoff : percentileResult) {
                         writeOneValue(x, y, accessibilityForCutoff);
                     }
                 }

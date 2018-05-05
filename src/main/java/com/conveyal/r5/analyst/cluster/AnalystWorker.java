@@ -436,11 +436,8 @@ public class AnalystWorker implements Runnable {
                 transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, request);
             } catch (ScenarioApplicationException scenarioException) {
                 // Handle exceptions specifically representing a failure to apply the scenario.
-                // These exceptions can be turned into structured JSON.
-                // Report the error back to the broker, which can then pass it back out to the client.
                 // Any other kinds of exceptions will be caught by the outer catch clause
-                reportTaskErrors(request.taskId, HttpStatus.BAD_REQUEST_400, scenarioException.taskErrors);
-                return null;
+                return reportTaskErrors(request, scenarioException.taskErrors);
             }
 
             // If we are generating a static site, there must be a single metadata file for an entire batch of results.
@@ -503,7 +500,7 @@ public class AnalystWorker implements Runnable {
             // This ensures that some form of error message is passed all the way back up to the web UI.
             TaskError taskError = new TaskError(ex);
             LOG.error("An error occurred while routing: {}", ExceptionUtils.asString(ex));
-            reportTaskErrors(request.taskId, HttpStatus.INTERNAL_SERVER_ERROR_500, Arrays.asList(taskError));
+            reportTaskErrors(request, Arrays.asList(taskError));
         }
         return null;
     }
@@ -580,19 +577,25 @@ public class AnalystWorker implements Runnable {
      * FIXME this task reporting mechanism seems to be using an endpoint that's no longer defined.
      * We should probably just include errors in the regional results JSON returned to the backend.
      */
-    public void reportTaskErrors(int taskId, int httpStatusCode, List<TaskError> taskErrors) {
-        String url = brokerBaseUrl + String.format("/complete/%d/%s", httpStatusCode, taskId);
+    public byte[] reportTaskErrors(AnalysisTask request, List<TaskError> taskErrors) {
         try {
-            HttpPost httpPost = new HttpPost(url);
-            httpPost.setHeader("Content-type", "application/json");
-            httpPost.setEntity(JsonUtilities.objectToJsonHttpEntity(taskErrors));
-            // Send the JSON serialized error object to the broker.
-            HttpResponse response = httpClient.execute(httpPost);
-            // Tell the http client library that we won't do anything with the broker's response, allowing connection reuse.
-            EntityUtils.consumeQuietly(response.getEntity());
+            if (request.isHighPriority()) {
+                // For single-point requests, return a TimeGrid filled with UNREACHABLE, with the errors appended
+                LOG.warn("Reporting errors in response to single-point request:\n" + taskErrors.toString());
+                TimeGrid emptyTimeGrid = new TimeGrid(request.zoom, request.west, request.north, request.width, request.height, request.percentiles.length);
+                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                emptyTimeGrid.writeGridToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
+                addErrorJson(byteArrayOutputStream, taskErrors);
+                byteArrayOutputStream.close();
+                return byteArrayOutputStream.toByteArray();
+            } else {
+                // TODO handle regional result errors, or force users to "preflight" regional results by running single-point request in UI
+                LOG.warn("Errors while completing task:\n" + taskErrors.toString());
+            }
         } catch (Exception e) {
-            LOG.error("An exception occurred while attempting to report an error to the broker:\n" + e.getStackTrace());
+            LOG.error("An exception occurred while attempting to report an error:\n" + e.toString());
         }
+        return null;
     }
 
     /**

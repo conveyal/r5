@@ -23,10 +23,9 @@ public class RegionalWorkResult {
     /** Trivial no-arg constructor for deserialization. */
     public RegionalWorkResult () {};
 
-    // TODO constructor that takes a request and extracts the necessary numbers
-    public RegionalWorkResult(String jobId, int taskId, int nGrids, int nPercentiles, int nTravelTimeCutoffs) {
-        this.jobId = jobId;
-        this.taskId = taskId;
+    public RegionalWorkResult(AnalysisTask request, int nGrids, int nPercentiles, int nTravelTimeCutoffs){
+        this.jobId = request.jobId;
+        this.taskId = request.taskId;
         // The array values will default to zero, which is what we want for accessibility
         this.accessibilityValues = new float[nGrids][nPercentiles][nTravelTimeCutoffs];
     }

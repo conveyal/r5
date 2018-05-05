@@ -31,9 +31,9 @@ public class OneOriginResult {
         RegionalWorkResult result;
         if (accessibility == null) {
             // Stopgap: when doing static sites, make an empty 1x1x1 result just to signal work progress to the backend.
-            result = new RegionalWorkResult(task.jobId, task.taskId, 1, 1, 1);
+            result = new RegionalWorkResult(task, 1, 1, 1);
         } else {
-            result = new RegionalWorkResult(task.jobId, task.taskId, accessibility.grids.length,
+            result = new RegionalWorkResult(task, accessibility.grids.length,
                     accessibility.percentiles.length, accessibility.cutoffs.length);
             result.setAcccessibilityValue(0, 0, 0, (float) accessibility.getAccessibility(0, 0, 0));
         }

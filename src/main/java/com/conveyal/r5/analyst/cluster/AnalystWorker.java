@@ -409,7 +409,7 @@ public class AnalystWorker implements Runnable {
                 e.printStackTrace();
             }
             if (random.nextInt(100) >= dryRunFailureRate) {
-                RegionalWorkResult workResult = new RegionalWorkResult(request.jobId, request.taskId, 1, 1, 1);
+                RegionalWorkResult workResult = new RegionalWorkResult(request, 1, 1, 1);
                 synchronized (workResults) {
                     workResults.add(workResult);
                 }

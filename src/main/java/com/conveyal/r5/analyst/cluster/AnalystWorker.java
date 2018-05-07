@@ -571,11 +571,8 @@ public class AnalystWorker implements Runnable {
     }
 
     /**
-     * Report to the broker that the task taskId could not be processed due to errors.
-     * The broker should then pass the errors back up to the client that enqueued that task.
-     * Those objects are always the same type (TaskError) so the client knows what to expect.
-     * FIXME this task reporting mechanism seems to be using an endpoint that's no longer defined.
-     * We should probably just include errors in the regional results JSON returned to the backend.
+     * Report that the task could not be processed due to errors.
+     * For the moment, we are sending back the list of TaskErrors appended as json to a default response.
      */
     public byte[] reportTaskErrors(AnalysisTask request, List<TaskError> taskErrors) {
         try {

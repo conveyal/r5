@@ -88,7 +88,7 @@ public class TransportNetwork implements Serializable {
 
     public static TransportNetwork read (File file) throws Exception {
         LOG.info("Reading transport network...");
-        TransportNetwork result = ExpandingMMFBytez.readObjectFromFile(file);
+        TransportNetwork result = ExpandingMMFBytez.readObjectFromFile(file, TransportNetwork.class);
         LOG.info("Done reading.");
         if (result.fareCalculator != null) {
             result.fareCalculator.transitLayer = result.transitLayer;

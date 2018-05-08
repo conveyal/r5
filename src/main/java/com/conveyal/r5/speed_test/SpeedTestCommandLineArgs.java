@@ -10,6 +10,7 @@ import org.apache.commons.cli.ParseException;
 import java.io.File;
 
 class SpeedTestCommandLineArgs {
+    public static final boolean OPTION_UNKNOWN_THEN_FAIL = false;
     private CommandLine cmd;
     private static final String ROOT_DIR_OPT = "d";
     private static final String MULTI_CRITERIA_RR_OPT = "c";
@@ -25,11 +26,16 @@ class SpeedTestCommandLineArgs {
 
 
         try {
-            cmd = cmdParser.parse(options, args);
+            cmd = cmdParser.parse(options, args, OPTION_UNKNOWN_THEN_FAIL);
 
             if(printHelpOptSet()) {
                 printHelp(options);
                 System.exit(0);
+            }
+            if(!cmd.getArgList().isEmpty()) {
+                System.err.println("Unexpected argument(s): " + cmd.getArgList());
+                printHelp(options);
+                System.exit(-2);
             }
 
         } catch (ParseException e) {

@@ -1,4 +1,5 @@
 .idea
+.DS_Store
 target
 hs_err_pid*
 cache

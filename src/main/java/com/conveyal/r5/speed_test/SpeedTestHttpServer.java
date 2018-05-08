@@ -2,6 +2,7 @@ package com.conveyal.r5.speed_test;
 
 import com.conveyal.r5.speed_test.api.SpeedTestApplication;
 import org.glassfish.grizzly.http.CompressionConfig;
+import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpHandler;
 import org.glassfish.grizzly.http.server.HttpServer;
 import org.glassfish.grizzly.http.server.NetworkListener;
@@ -46,14 +47,27 @@ public class SpeedTestHttpServer {
         httpServer.addListener(networkListener());
 
         httpServer.getServerConfiguration().addHttpHandler(
-                ContainerFactory.createContainer(HttpHandler.class, application)
+                ContainerFactory.createContainer(HttpHandler.class, application),
+                "/r5/"
         );
+
+
+        /* 2. A static content handler to serve the client JS apps etc. from the classpath. */
+        CLStaticHttpHandler staticHandler = new CLStaticHttpHandler(getClass().getClassLoader(), "/client/");
+
+        // LOG.info("Disabling HTTP server static file cache.");
+        // staticHandler.setFileCacheEnabled(false);
+
+        httpServer.getServerConfiguration().addHttpHandler(staticHandler, "/");
+
+
+
         return httpServer;
     }
 
     private NetworkListener networkListener() {
         /* HTTP (non-encrypted) listener */
-        NetworkListener httpListener = new NetworkListener("spped-test-main", "0.0.0.0", 8075);
+        NetworkListener httpListener = new NetworkListener("speed-test-main", "0.0.0.0", 8075);
         httpListener.setSecure(false);
 
         // For both HTTP and HTTPS listeners: enable gzip compression, set thread pool, add listener to httpServer.

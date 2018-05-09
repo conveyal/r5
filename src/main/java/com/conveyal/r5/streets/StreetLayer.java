@@ -1290,15 +1290,9 @@ public class StreetLayer implements Serializable, Cloneable {
             return -1; // Unlinked
         }
 
-        double streetVertexLat = vertexStore.fixedLats.get(streetVertex)/FIXED_FACTOR;
-        double streetVertexLon = vertexStore.fixedLons.get(streetVertex)/FIXED_FACTOR;
-
-        ArrayList<Node> edgeNodes = new ArrayList<>();
-        edgeNodes.add(new Node(lat, lon));
-        edgeNodes.add(new Node(streetVertexLat,streetVertexLon));
-        int length = getEdgeLengthMillimeters(edgeNodes);
+        int length_mm = (int) (GeometryUtils.distance(lat,lon, vertexStore.getCursor(streetVertex).getLat(), vertexStore.getCursor(streetVertex).getLon())*1000);
         // Set OSM way ID is -1 because this edge is not derived from any OSM way.
-        Edge e = edgeStore.addStreetPair(stopVertex, streetVertex, length, -1);
+        Edge e = edgeStore.addStreetPair(stopVertex, streetVertex, length_mm, -1);
 
         // Allow all modes to traverse street-to-transit link edges.
         // In practice, mode permissions will be controlled by whatever street edges lead up to these link edges.

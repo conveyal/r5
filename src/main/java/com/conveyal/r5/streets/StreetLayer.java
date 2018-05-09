@@ -45,6 +45,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
+import static com.conveyal.r5.streets.VertexStore.FIXED_FACTOR;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreeGeometryToFloating;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
@@ -1289,9 +1290,15 @@ public class StreetLayer implements Serializable, Cloneable {
             return -1; // Unlinked
         }
 
-        // TODO give link edges a length.
+        double streetVertexLat = vertexStore.fixedLats.get(streetVertex)/FIXED_FACTOR;
+        double streetVertexLon = vertexStore.fixedLons.get(streetVertex)/FIXED_FACTOR;
+
+        ArrayList<Node> edgeNodes = new ArrayList<>();
+        edgeNodes.add(new Node(lat, lon));
+        edgeNodes.add(new Node(streetVertexLat,streetVertexLon));
+        int length = getEdgeLengthMillimeters(edgeNodes);
         // Set OSM way ID is -1 because this edge is not derived from any OSM way.
-        Edge e = edgeStore.addStreetPair(stopVertex, streetVertex, 1, -1);
+        Edge e = edgeStore.addStreetPair(stopVertex, streetVertex, length, -1);
 
         // Allow all modes to traverse street-to-transit link edges.
         // In practice, mode permissions will be controlled by whatever street edges lead up to these link edges.

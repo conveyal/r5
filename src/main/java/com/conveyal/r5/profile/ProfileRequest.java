@@ -208,6 +208,20 @@ public class ProfileRequest implements Serializable, Cloneable {
      */
     public int monteCarloDraws = 220;
 
+
+
+    /* PARAMETERS ADDED AT ENTUR */
+
+    /**
+     * Number of itineraries to search for. #Entur
+     */
+    public Integer numberOfItineraries = 1;
+
+    /** #Entur */
+    public SearchAlgorithm algorithm;
+
+
+
     public ProfileRequest clone () {
         try {
             return (ProfileRequest) super.clone();

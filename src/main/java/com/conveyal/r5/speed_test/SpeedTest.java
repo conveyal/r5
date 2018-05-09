@@ -6,6 +6,7 @@ import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.profile.SearchAlgorithm;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.profile.mcrr.MultiCriteriaRangeRaptorWorker;
 import com.conveyal.r5.speed_test.api.model.AgencyAndId;
@@ -34,17 +35,27 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
+import java.util.ConcurrentModificationException;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.TimeZone;
 import java.util.stream.Collectors;
 
+import static com.conveyal.r5.profile.SearchAlgorithm.MultiCriteriaRangeRaptor;
+import static com.conveyal.r5.profile.SearchAlgorithm.RangeRaptor;
+
 /**
  * Test response times for a large batch of origin/destination points.
  * Also demonstrates how to run basic searches without using the graphQL profile routing API.
  */
 public class SpeedTest {
+
+    long totalMsUsedInRaptor = 0L;
+    long numberOfRaptorCalls = 0L;
+    long totalMsUsedInRaptorSuccess = 0L;
+    long numberOfRaptorCallsSuccess = 0L;
+
     private static final Logger LOG = LoggerFactory.getLogger(SpeedTest.class);
 
 
@@ -53,41 +64,47 @@ public class SpeedTest {
 
     private static TransportNetwork transportNetwork;
 
-    private final File rootDir;
-    private boolean useMultiCriteriaSearch;
+    private CommandLineOpts opts;
 
-    SpeedTest(String[] args) throws Exception {
-        SpeedTestCommandLineArgs opts = new SpeedTestCommandLineArgs(args);
-        this.rootDir = opts.rootDir();
-        this.useMultiCriteriaSearch = opts.useMultiCriteriaSearch();
+    SpeedTest(CommandLineOpts opts) throws Exception {
+        this.opts = opts;
         initTransportNetwork();
     }
 
     private void initTransportNetwork() throws Exception {
         synchronized (NETWORK_DATA_FILE) {
             if (transportNetwork == null) {
-                transportNetwork = TransportNetwork.read(new File(rootDir, NETWORK_DATA_FILE));
+                transportNetwork = TransportNetwork.read(new File(opts.rootDir(), NETWORK_DATA_FILE));
                 transportNetwork.rebuildTransientIndexes();
             }
         }
     }
 
     public static void main(String[] args) throws Exception {
-        new SpeedTest(args).run();
+        SpeedTestCmdLineOpts opts = new SpeedTestCmdLineOpts(args);
+        new SpeedTest(opts).run(opts);
     }
 
-    public void run() throws Exception {
+    public void run(SpeedTestCmdLineOpts opts) throws Exception {
         List<CoordPair> coordPairs = getCoordPairs();
         List<TripPlan> tripPlans = new ArrayList<>();
 
+        LOG.info("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [ START ]");
+
         long startTime = System.currentTimeMillis();
         int nRoutesComputed = 0;
+        totalMsUsedInRaptor = 0L;
+        numberOfRaptorCalls = 0L;
+        totalMsUsedInRaptorSuccess = 0L;
+        numberOfRaptorCallsSuccess = 0L;
+
         for (CoordPair coordPair : coordPairs) {
             try {
-                ProfileRequest request = buildDefaultRequest(coordPair);
-                tripPlans.add(route(request, 1));
+                ProfileRequest request = buildDefaultRequest(coordPair, opts);
+                TripPlan route = route(request);
+                tripPlans.add(route);
                 nRoutesComputed++;
-            } catch (NullPointerException e) {
+            } catch (ConcurrentModificationException | NullPointerException e) {
                 printError(coordPair, e);
                 e.printStackTrace();
             } catch (Exception e) {
@@ -97,23 +114,34 @@ public class SpeedTest {
 
         long elapsedTime = System.currentTimeMillis() - startTime;
 
-        LOG.info("Average path search time (msec): " + elapsedTime / nRoutesComputed);
+        LOG.info("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [ OPPSUMERING ]");
+
+        LOG.info("Average time in RangeRaptor (msec): " + totalMsUsedInRaptor / Math.max(1, numberOfRaptorCalls));
+        LOG.info("Average time in RangeRaptor with success (msec): " + totalMsUsedInRaptorSuccess / Math.max(1, numberOfRaptorCallsSuccess));
+        LOG.info("Average path search time (msec): " + elapsedTime / Math.max(1, nRoutesComputed));
         LOG.info("Successful searches: " + nRoutesComputed + " / " + coordPairs.size());
         LOG.info("Total time: " + elapsedTime / 1000 + " seconds");
     }
 
-    public TripPlan route(ProfileRequest request, int numberOfItineraries) {
-        return useMultiCriteriaSearch ? routeMcrr(request, numberOfItineraries) : routeRangeRaptor(request, numberOfItineraries);
+    public TripPlan route(ProfileRequest request) {
+        SearchAlgorithm algorithm = request.algorithm;
+        if(algorithm == null) {
+            algorithm = opts.useMultiCriteriaSearch() ? MultiCriteriaRangeRaptor : RangeRaptor;
+        }
+        switch (algorithm) {
+            case RangeRaptor:
+                return routeRangeRaptor(request);
+            case MultiCriteriaRangeRaptor:
+                return routeMcrr(request);
+        }
+        throw new IllegalArgumentException("Algorithm not suported: " + request.algorithm);
     }
 
 
-    public TripPlan routeRangeRaptor(ProfileRequest request, int numberOfItineraries) {
-        TripPlan tripPlan = new TripPlan();
-        tripPlan.date = new Date(request.date.atStartOfDay(ZoneId.of("Europe/Oslo")).toInstant().toEpochMilli() + request.fromTime * 1000);
-        tripPlan.from = new Place(request.fromLon, request.fromLat, "Origin");
-        tripPlan.to = new Place(request.toLon, request.toLat, "Destination");
+    public TripPlan routeRangeRaptor(ProfileRequest request) {
+        TripPlan tripPlan = createTripPlanForRequest(request);
 
-        for (int i = 0; i < numberOfItineraries; i++) {
+        for (int i = 0; i < request.numberOfItineraries; i++) {
             StreetRouter egressRouter = streetRoute(request, true);
             StreetRouter accessRouter = streetRoute(request, false);
 
@@ -178,78 +206,84 @@ public class SpeedTest {
         return tripPlan;
     }
 
-    public TripPlan routeMcrr(ProfileRequest request, int numberOfItineraries) {
-        TripPlan tripPlan = new TripPlan();
-        tripPlan.date = new Date(request.date.atStartOfDay(ZoneId.of("Europe/Oslo")).toInstant().toEpochMilli() + request.fromTime * 1000);
-        tripPlan.from = new Place(request.fromLon, request.fromLat, "Origin");
-        tripPlan.to = new Place(request.toLon, request.toLat, "Destination");
+    public TripPlan routeMcrr(ProfileRequest request) {
+        TripPlan tripPlan = createTripPlanForRequest(request);
 
-        for (int i = 0; i < numberOfItineraries; i++) {
-            StreetRouter egressRouter = streetRoute(request, true);
-            StreetRouter accessRouter = streetRoute(request, false);
+        StreetRouter egressRouter = streetRoute(request, true);
+        StreetRouter accessRouter = streetRoute(request, false);
 
-            TIntIntMap egressTimesToStopsInSeconds = egressRouter.getReachedStops();
-            TIntIntMap accessTimesToStopsInSeconds = accessRouter.getReachedStops();
+        TIntIntMap egressTimesToStopsInSeconds = egressRouter.getReachedStops();
+        TIntIntMap accessTimesToStopsInSeconds = accessRouter.getReachedStops();
 
-            MultiCriteriaRangeRaptorWorker worker = new MultiCriteriaRangeRaptorWorker(
-                    transportNetwork.transitLayer, request, accessTimesToStopsInSeconds
-            );
+        MultiCriteriaRangeRaptorWorker worker = new MultiCriteriaRangeRaptorWorker(
+                transportNetwork.transitLayer, request, accessTimesToStopsInSeconds
+        );
 
-            // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
-            // Returns the total travel times as a 2D array of [searchIteration][destinationStopIndex].
-            // Additional detailed path information is retained in the FastRaptorWorker after routing.
-            worker.retainPaths = true;
-            int[][] transitTravelTimesToStops = worker.route();
+        // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
+        // Returns the total travel times as a 2D array of [searchIteration][destinationStopIndex].
+        // Additional detailed path information is retained in the FastRaptorWorker after routing.
+        worker.retainPaths = true;
+        long startTime = System.currentTimeMillis();
+        int[][] transitTravelTimesToStops = worker.route();
+        long timeInRaptor = System.currentTimeMillis() - startTime;
+        totalMsUsedInRaptor += timeInRaptor;
+        ++numberOfRaptorCalls;
 
-            int bestKnownTime = Integer.MAX_VALUE; // Hack to bypass Java stupid "effectively final" requirement.
-            Path bestKnownPath = null;
-            TIntIntIterator egressTimeIterator = egressTimesToStopsInSeconds.iterator();
-            int egressTime = 0;
-            int accessTime = 0;
+        System.err.printf("%n  ====>  %d millis%n%n", timeInRaptor);
 
-            while (egressTimeIterator.hasNext()) {
-                egressTimeIterator.advance();
-                int stopIndex = egressTimeIterator.key();
-                egressTime = egressTimeIterator.value();
-                int travelTimeToStop = transitTravelTimesToStops[0][stopIndex];
+
+
+        BestKnownResults results = new BestKnownResults(request.numberOfItineraries);
+
+        TIntIntIterator egressTimeIterator = egressTimesToStopsInSeconds.iterator();
+
+        while (egressTimeIterator.hasNext()) {
+            egressTimeIterator.advance();
+            int stopIndex = egressTimeIterator.key();
+            int egressTime = egressTimeIterator.value();
+
+            for (int range = 0; range < transitTravelTimesToStops.length; range++) {
+                int travelTimeToStop = transitTravelTimesToStops[range][stopIndex];
 
                 if (travelTimeToStop != MultiCriteriaRangeRaptorWorker.UNREACHED) {
                     int totalTime = travelTimeToStop + egressTime;
-                    if (totalTime < bestKnownTime) {
-                        bestKnownTime = totalTime;
-                        bestKnownPath = worker.pathsPerIteration.get(0)[stopIndex];
-                        accessTime = accessTimesToStopsInSeconds.get(worker.pathsPerIteration.get(0)[stopIndex].boardStops[0]);
-                    }
+                    results.addResult(totalTime, range, stopIndex);
+                    //accessTime = accessTimesToStopsInSeconds.get(worker.pathsPerIteration.get(range)[stopIndex].boardStops[0]);
                 }
             }
+        }
 
-            if(bestKnownPath == null) {
-                LOG.info("\n\n!!! NO RESULT FOR INPUT. From ({}, {}) to ({}, {}).\n", request.fromLat, request.fromLon, request.toLat, request.toLon);
-                break;
-            }
+        if(results.isEmpty()) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "NO RESULT FOR INPUT. From (%s, %s) to (%s, %s).",
+                            request.fromLat, request.fromLon, request.toLat, request.toLon
+                    )
+            );
+        }
+
+        totalMsUsedInRaptorSuccess += timeInRaptor;
+        ++numberOfRaptorCallsSuccess;
+
+        for (BestResult result : results.results) {
+            Path path = result.path(worker.pathsPerIteration);
 
             StreetRouter.State accessState = accessRouter.getStateAtVertex(transportNetwork.transitLayer.streetVertexForStop
-                    .get(bestKnownPath.boardStops[0]));
+                    .get(path.boardStops[0]));
             StreetRouter.State egressState = egressRouter.getStateAtVertex(transportNetwork.transitLayer.streetVertexForStop
-                    .get(bestKnownPath.alightStops[bestKnownPath.alightStops.length - 1]));
+                    .get(path.alightStops[path.alightStops.length - 1]));
 
             StreetPath accessPath = new StreetPath(accessState, transportNetwork, false);
             StreetPath egressPath = new StreetPath(egressState, transportNetwork, false);
 
-            Itinerary itinerary = generateItinerary(request, bestKnownPath, accessPath, egressPath);
+            Itinerary itinerary = generateItinerary(request, path, accessPath, egressPath);
+
             if (itinerary != null) {
                 tripPlan.itinerary.add(itinerary);
-                Calendar fromMidnight = (Calendar)itinerary.startTime.clone();
-                fromMidnight.set(Calendar.HOUR, 0);
-                fromMidnight.set(Calendar.MINUTE, 0);
-                fromMidnight.set(Calendar.SECOND, 0);
-                fromMidnight.set(Calendar.MILLISECOND, 0);
-                request.fromTime = (int)(itinerary.startTime.getTimeInMillis() - fromMidnight.getTimeInMillis()) / 1000 + 60;
-                request.toTime = request.fromTime + 60;
-            } else {
-                break;
             }
+            tripPlan.sort();
         }
+        LOG.info("Number of itineraries found: " + results.results.size());
         return tripPlan;
     }
 
@@ -257,10 +291,18 @@ public class SpeedTest {
         System.err.println("Search failed for " + coordPair + ": " + e.getClass().getSimpleName() + " - " + e.getMessage());
     }
 
+    private static TripPlan createTripPlanForRequest(ProfileRequest request) {
+        TripPlan tripPlan = new TripPlan();
+        tripPlan.date = new Date(request.date.atStartOfDay(ZoneId.of("Europe/Oslo")).toInstant().toEpochMilli() + request.fromTime * 1000);
+        tripPlan.from = new Place(request.fromLon, request.fromLat, "Origin");
+        tripPlan.to = new Place(request.toLon, request.toLat, "Destination");
+        return tripPlan;
+    }
+
     /**
      * @return true if the search succeeded.
      */
-    private ProfileRequest buildDefaultRequest(CoordPair coordPair) {
+    private ProfileRequest buildDefaultRequest(CoordPair coordPair, SpeedTestCmdLineOpts opts) {
         ProfileRequest request = new ProfileRequest();
 
         request.accessModes = request.egressModes = request.directModes = EnumSet.of(LegMode.WALK);
@@ -272,8 +314,9 @@ public class SpeedTest {
         request.toLat = coordPair.toLat;
         request.toLon = coordPair.toLon;
         request.fromTime = 8 * 60 * 60; // 8AM in seconds since midnight
-        request.toTime = request.fromTime + 60;
+        request.toTime = request.fromTime + 60 * opts.searchWindowInMinutes();
         request.date = LocalDate.of(2018, 04, 13);
+        request.numberOfItineraries = opts.numOfItineraries();
 
         return request;
     }
@@ -457,7 +500,7 @@ public class SpeedTest {
 
     private List<CoordPair> getCoordPairs() throws IOException {
         List<CoordPair> coordPairs = new ArrayList<>();
-        CsvReader csvReader = new CsvReader(new File(rootDir, COORD_PAIRS).getAbsolutePath());
+        CsvReader csvReader = new CsvReader(new File(opts.rootDir(), COORD_PAIRS).getAbsolutePath());
         csvReader.readRecord(); // Skip header
         while (csvReader.readRecord()) {
             CoordPair coordPair = new CoordPair();

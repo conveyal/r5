@@ -17,6 +17,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import javax.xml.bind.annotation.XmlElementWrapper;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 
@@ -49,5 +50,9 @@ public class TripPlan {
 
     public void addItinerary(Itinerary itinerary) {
         this.itinerary.add(itinerary);
+    }
+
+    public void sort() {
+        itinerary.sort(Comparator.comparing(o -> o.endTime));
     }
 }

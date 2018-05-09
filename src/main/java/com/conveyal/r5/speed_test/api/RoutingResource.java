@@ -176,7 +176,8 @@ public abstract class RoutingResource {
 
     /** The maximum number of possible itineraries to return. */
     @QueryParam("numItineraries")
-    protected Integer numItineraries;
+    @DefaultValue("3")
+    protected Integer numItineraries = 3;
 
     /**
      * The list of preferred routes. The format is agency_[routename][_routeid], so TriMet_100 (100 is route short name)
@@ -425,6 +426,7 @@ public abstract class RoutingResource {
         request.fromTime = (int)Duration.between(localDateTime.toLocalDate().atStartOfDay(), localDateTime).getSeconds(); // Seconds since midnight
         request.toTime = request.fromTime + 60;
         request.date = localDateTime.toLocalDate();
+        request.numberOfItineraries = numItineraries;
 
         return request;
     }

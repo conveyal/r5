@@ -19,7 +19,7 @@ public class SpeedTestHttpServer {
     private SpeedTest speedTest;
 
     private SpeedTestHttpServer(String[] args) throws Exception {
-        this.speedTest = new SpeedTest(args);
+        this.speedTest = new SpeedTest(new CommandLineOpts(args));
     }
 
     public static void main(String[] args) {

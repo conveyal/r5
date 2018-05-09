@@ -9,18 +9,15 @@ import org.apache.commons.cli.ParseException;
 
 import java.io.File;
 
-class SpeedTestCommandLineArgs {
-    public static final boolean OPTION_UNKNOWN_THEN_FAIL = false;
-    private CommandLine cmd;
+class CommandLineOpts {
+    private static final boolean OPTION_UNKNOWN_THEN_FAIL = false;
+    protected CommandLine cmd;
     private static final String ROOT_DIR_OPT = "d";
     private static final String MULTI_CRITERIA_RR_OPT = "c";
     private static final String HELP_OPT = "h";
 
-    SpeedTestCommandLineArgs(String[] args) {
-        Options options = new Options();
-        options.addOption(ROOT_DIR_OPT, "rootDir", true, "Root directory where network and input files are located. (Optional)");
-        options.addOption(MULTI_CRITERIA_RR_OPT, "multiCriteria", false, "Use multi criteria version of range raptor. (Optional)");
-        options.addOption(HELP_OPT, "help", false, "Print all command line options, then exit. (Optional)");
+    CommandLineOpts(String[] args) {
+        Options options = speedTestOptions();
 
         CommandLineParser cmdParser = new DefaultParser();
 
@@ -43,6 +40,14 @@ class SpeedTestCommandLineArgs {
             printHelp(options);
             System.exit(-1);
         }
+    }
+
+    Options speedTestOptions() {
+        Options options = new Options();
+        options.addOption(ROOT_DIR_OPT, "rootDir", true, "Root directory where network and input files are located. (Optional)");
+        options.addOption(MULTI_CRITERIA_RR_OPT, "multiCriteria", false, "Use multi criteria version of range raptor. (Optional)");
+        options.addOption(HELP_OPT, "help", false, "Print all command line options, then exit. (Optional)");
+        return options;
     }
 
     File rootDir() {

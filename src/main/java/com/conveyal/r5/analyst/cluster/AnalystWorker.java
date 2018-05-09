@@ -565,7 +565,7 @@ public class AnalystWorker implements Runnable {
             // Use the lenient object mapper here in case the broker is a newer version so sending unrecognizable fields
             return JsonUtilities.lenientObjectMapper.readValue(entity.getContent(), new TypeReference<List<AnalysisTask>>() {});
         } catch (Exception e) {
-            LOG.error("Exception while polling backend for work: {}", e.toString());
+            LOG.error("Exception while polling backend for work: {}",ExceptionUtils.asString(e));
         }
         return null;
     }
@@ -590,7 +590,7 @@ public class AnalystWorker implements Runnable {
                 LOG.warn("Errors while completing task:\n" + taskErrors.toString());
             }
         } catch (Exception e) {
-            LOG.error("An exception occurred while attempting to report an error:\n" + e.toString());
+            LOG.error("An exception occurred while attempting to report an error:\n" + ExceptionUtils.asString(e));
         }
         return null;
     }
@@ -614,7 +614,7 @@ public class AnalystWorker implements Runnable {
             buffer = PersistenceBuffer.serializeAsJson(transitiveNetwork);
             AnalystWorker.filePersistence.saveStaticSiteData(analysisTask, "transitive.json", buffer);
         } catch (Exception e) {
-            LOG.error("Exception saving static metadata: {}", e.toString());
+            LOG.error("Exception saving static metadata: {}", ExceptionUtils.asString(e));
             throw new RuntimeException(e);
         }
     }
@@ -641,13 +641,13 @@ public class AnalystWorker implements Runnable {
         try (InputStream configInputStream = new FileInputStream(new File(configFileName))) {
             config.load(configInputStream);
         } catch (Exception e) {
-            LOG.error("Error loading worker configuration, shutting down. " + e.toString());
+            LOG.error("Error loading worker configuration, shutting down. " + ExceptionUtils.asString(e));
             return;
         }
         try {
             AnalystWorker.forConfig(config).run();
         } catch (Exception e) {
-            LOG.error("Unhandled error in analyst worker, shutting down. " + e.toString());
+            LOG.error("Unhandled error in analyst worker, shutting down. " + ExceptionUtils.asString(e));
         }
     }
 

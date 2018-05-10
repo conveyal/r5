@@ -1,28 +1,23 @@
 package com.conveyal.r5.analyst;
 
+import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.profile.FastRaptorWorker;
-import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.PerTargetPropagater;
-import com.conveyal.r5.profile.RaptorState;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
-import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
-import gnu.trove.map.hash.TObjectIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.OutputStream;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -38,9 +33,6 @@ public class TravelTimeComputer {
 
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeComputer.class);
 
-    // FIXME pointset cache is never used - why?
-    private static final WebMercatorGridPointSetCache pointSetCache = new WebMercatorGridPointSetCache();
-
     public final AnalysisTask request;
     public final TransportNetwork network;
     public final GridCache gridCache;
@@ -51,9 +43,8 @@ public class TravelTimeComputer {
         this.gridCache = gridCache;
     }
 
-    // Perhaps function should not be void return type. Why is this using a streaming or pipelining approach?
-    // We also want to decouple the internal representation of the results from how they're serialized to an API.
-    public void computeTravelTimes(OutputStream os) throws IOException {
+    // We should try to decouple the internal representation of the results from how they're serialized to an API.
+    public OneOriginResult computeTravelTimes() throws IOException {
 
         // The mode of travel that will be used to reach transit stations from the origin point.
         StreetMode accessMode = LegMode.getDominantStreetMode(request.accessModes);
@@ -65,31 +56,25 @@ public class TravelTimeComputer {
         // The set of destinations in the one-to-many travel time calculations, not yet linked to the street network.
         List<PointSet> destinationList = request.getDestinations(network, gridCache);
 
-        //TODO wrap in loop to repeat for multiple destinations pointsets in a regional request;
+        // TODO wrap in loop to repeat for multiple destinations pointsets in a regional request.
         PointSet destinations = destinationList.get(0);
 
-        // Get the appropriate function for reducing travel time, given the type of request we're handling
-        // (either a travel time surface for a single point or a location based accessibility indicator value for a
-        // regional analysis).
-        // FIXME maybe the reducer function should just be defined (overridden) on the request class.
-        // FIXME the reducer is given the output stream in a pseudo-pipelining approach. However it just accumulates results into memory before writing them out.
-        // Also, some of these classes could probably just be static functions.
-        PerTargetPropagater.TravelTimeReducer travelTimeReducer = request.getTravelTimeReducer(network, os);
+        // TODO Create and encapsulate this within the propagator.
+        TravelTimeReducer travelTimeReducer = new TravelTimeReducer(request);
 
         // Attempt to set the origin point before progressing any further.
-        // This allows us to short circuit calculations if the network is entirely inaccessible. In the CAR_PARK
+        // This allows us to skip routing calculations if the network is entirely inaccessible. In the CAR_PARK
         // case this StreetRouter will be replaced but this still serves to bypass unnecessary computation.
+        // The request must be provided to the StreetRouter before setting the origin point.
         StreetRouter sr = new StreetRouter(network.streetLayer);
-        // Request must be provided to the router before setting the origin point.
         sr.profileRequest = request;
         sr.streetMode = accessMode;
         boolean foundOriginPoint = sr.setOrigin(request.fromLat, request.fromLon);
         if (!foundOriginPoint) {
             // Short circuit around routing and propagation. Calling finish() before streaming in any travel times to
-            // destinations is designed to produce the right result here.
+            // destinations is designed to produce the right result.
             LOG.info("Origin point was outside the transport network. Skipping routing and propagation, and returning default result.");
-            travelTimeReducer.finish();
-            return;
+            return travelTimeReducer.finish();
         }
 
         // First we will find travel times to all destinations reachable without using transit.
@@ -112,15 +97,12 @@ public class TravelTimeComputer {
             int[] travelTimesToTargets = directModeLinkedDestinations
                     .eval(sr::getTravelTimeToVertex, offstreetTravelSpeedMillimetersPerSecond).travelTimes;
 
-            for (int x = 0; x < request.width; x++) {
-                for (int y = 0; y < request.height; y++) {
-                    int targetIndex = y * request.width + x;
-                    final int travelTimeSeconds = travelTimesToTargets[targetIndex];
-                    travelTimeReducer.recordTravelTimesForTarget(targetIndex, new int[] { travelTimeSeconds });
-                }
+            // Iterate over all destinations ("targets") and at each destination, save the same travel time for all percentiles.
+            for (int d = 0; d < travelTimesToTargets.length; d++) {
+                final int travelTimeSeconds = travelTimesToTargets[d];
+                travelTimeReducer.recordTravelTimesForTarget(d, new int[] { travelTimeSeconds });
             }
-
-            travelTimeReducer.finish();
+            return travelTimeReducer.finish();
         } else {
             // This search will include transit.
             //
@@ -217,100 +199,34 @@ public class TravelTimeComputer {
                     final int travelTimeSeconds = nonTransitTravelTimesToDestinations[target];
                     travelTimeReducer.recordTravelTimesForTarget(target, new int[] { travelTimeSeconds });
                 }
-                travelTimeReducer.finish();
-                return;
+                return travelTimeReducer.finish();
             }
 
-            // Create a new Raptor Worker.
             FastRaptorWorker worker = new FastRaptorWorker(network.transitLayer, request, accessTimes);
-
-            if (request.returnPaths || request.returnInVehicleTimes || request.returnWaitTimes) {
-                worker.saveAllStates = true; // By default, this is false and intermediate results (e.g. paths) are discarded.
+            if (request.returnPaths || request.travelTimeBreakdown) {
+                // By default, this is false and intermediate results (e.g. paths) are discarded.
+                // TODO do we really need to save all states just to get the travel time breakdown?
+                worker.retainPaths = true;
             }
 
             // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
-
-            /* Total travel time, 2D array of [destinationStopIndex][searchIteration]  */
+            // Returns the total travel times as a 2D array of [searchIteration][destinationStopIndex].
+            // Additional detailed path information is retained in the FastRaptorWorker after routing.
             int[][] transitTravelTimesToStops = worker.route();
 
-            PerTargetPropagater perTargetPropagater;
+            PerTargetPropagater perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request,
+                    transitTravelTimesToStops, nonTransitTravelTimesToDestinations);
 
-            // The components of travel time or paths were requested
-            if (worker.saveAllStates) {
+            // We cannot yet merge the functionality of the TravelTimeReducer into the PerTargetPropagator
+            // because in the non-transit case we call the reducer directly (see above).
+            perTargetPropagater.travelTimeReducer = travelTimeReducer;
 
-                int iterations = transitTravelTimesToStops.length;
-                int stops = transitTravelTimesToStops[0].length;
-
-                /* In-vehicle component of time from origin stop to a given stop in a given iteration of the algorithm  */
-                int [][] inVehicleTimesToStops = new int[iterations][stops];
-
-                /* Waiting time component of time from origin stop to a given stop in a given iteration of the algorithm  */
-                int [][] waitTimesToStops = new int[iterations][stops];
-
-                /* Index of path used from origin stop to a given stop in a given iteration of the algorithm  */
-                int [][] pathsToStops = new int[iterations][stops];
-
-                /* List of paths, which are sequences of transit trips and stops used to reach the destination */
-                List<Path> pathList = new ArrayList<>();
-
-                for (int stop = 0; stop < stops; stop++) {
-                    int maxPathIdx = 0;
-
-                    TObjectIntMap<Path> paths = new TObjectIntHashMap<>();
-
-                    for (int iter = 0; iter < iterations; iter++) {
-
-                        int time = transitTravelTimesToStops[iter][stop];
-                        if (time == Integer.MAX_VALUE) time = -1;
-                        else time /= 60;
-
-                        RaptorState state = worker.statesEachIteration.get(iter);
-
-                        // Calculate the components of travel time (waiting, in-vehicle)
-                        if (request.returnWaitTimes || request.returnInVehicleTimes) {
-
-                            int inVehicleTime = state.nonTransferInVehicleTravelTime[stop] / 60;
-                            int waitTime = state.nonTransferWaitTime[stop] / 60;
-
-                            if (inVehicleTime + waitTime > time && time != -1) {
-                                LOG.info("Wait and in vehicle travel time greater than total time");
-                            }
-
-                            inVehicleTimesToStops[iter][stop] = inVehicleTime;
-                            waitTimesToStops[iter][stop] = waitTime;
-
-                        }
-
-                        // Record the paths used
-                        if (request.returnPaths) {
-                            int pathIdx = -1;
-
-                            // only compute a path if this stop was reached
-                            if (state.bestNonTransferTimes[stop] != FastRaptorWorker.UNREACHED) {
-                                // TODO reuse pathwithtimes?
-                                Path path = new Path(state, stop);
-                                if (!paths.containsKey(path)) {
-                                    paths.put(path, maxPathIdx++);
-                                    pathList.add(path);
-                                }
-                                pathIdx = paths.get(path);
-                            }
-
-                            pathsToStops[iter][stop] = pathIdx;
-                        }
-                    }
-                }
-
-                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request, transitTravelTimesToStops, nonTransitTravelTimesToDestinations, inVehicleTimesToStops, waitTimesToStops, pathsToStops);
-                perTargetPropagater.reducer = travelTimeReducer;
-                perTargetPropagater.pathWriter = new PathWriter(request, network, pathList);
-
-            } else {
-
-                perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request, transitTravelTimesToStops, nonTransitTravelTimesToDestinations, null, null, null);
-                perTargetPropagater.reducer = travelTimeReducer;
+            if (worker.retainPaths) {
+                perTargetPropagater.pathsToStopsForIteration = worker.pathsPerIteration;
+                perTargetPropagater.pathWriter = new PathWriter(request);
             }
-            perTargetPropagater.propagate();
+
+            return perTargetPropagater.propagate();
         }
     }
 }

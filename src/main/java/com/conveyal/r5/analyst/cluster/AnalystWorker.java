@@ -1,45 +1,55 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3Client;
+import com.conveyal.r5.OneOriginResult;
+import com.conveyal.r5.analyst.FilePersistence;
 import com.conveyal.r5.analyst.GridCache;
+import com.conveyal.r5.analyst.PersistenceBuffer;
+import com.conveyal.r5.analyst.S3FilePersistence;
 import com.conveyal.r5.analyst.TravelTimeComputer;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
-import com.conveyal.r5.multipoint.MultipointMetadata;
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TransportNetworkCache;
+import com.conveyal.r5.transitive.TransitiveNetwork;
+import com.conveyal.r5.util.ExceptionUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.common.io.LittleEndianDataOutputStream;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.config.SocketConfig;
-import org.apache.http.conn.HttpHostConnectException;
-import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
-import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.transit.TransportNetworkCache;
 import org.eclipse.jetty.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
-import java.net.SocketTimeoutException;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-import java.util.zip.GZIPOutputStream;
 
 /**
  * This is a main class run by worker machines in our Analysis computation cluster.
@@ -49,6 +59,8 @@ import java.util.zip.GZIPOutputStream;
  *
  * The worker can poll for work over two different channels. One is for large asynchronous batch jobs, the other is
  * intended for interactive single point requests that should return as fast as possible.
+ *
+ * TODO rename AnalysisWorker <---
  */
 public class AnalystWorker implements Runnable {
 
@@ -70,9 +82,29 @@ public class AnalystWorker implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(AnalystWorker.class);
 
-    public static final String WORKER_ID_HEADER = "X-Worker-Id";
+    private static final String DEFAULT_BROKER_ADDRESS = "localhost";
 
-    public static final int POLL_TIMEOUT = 10 * 1000; // TODO add units (milliseconds)
+    private static final String DEFAULT_BROKER_PORT = "7070";
+
+    public static final int POLL_WAIT_SECONDS = 15;
+
+    public static final int POLL_MAX_RANDOM_WAIT = 5;
+
+    /** The port on which the worker will listen for single point tasks forwarded from the backend. */
+    public static final int WORKER_LISTEN_PORT = 7080;
+
+    /**
+     * The number of threads the worker will use to receive HTTP connections. This crudely limits memory consumption
+     * from the worker handling single point requests.
+     * Unfortunately we can't set this very low. We get a message saying we need at least 10 threads:
+     * max=2 < needed(acceptors=1 + selectors=8 + request=1)
+     * TODO find a more effective way to limit simultaneous computations, e.g. feed them through the regional thread pool.
+     */
+    public static final int WORKER_SINGLE_POINT_THREADS = 10;
+
+    // TODO make non-static and make implementations swappable
+    // This is very ugly because it's static but initialized at class instantiation.
+    public static FilePersistence filePersistence;
 
     /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
     final TransportNetworkCache transportNetworkCache;
@@ -84,73 +116,104 @@ public class AnalystWorker implements Runnable {
      */
     public int dryRunFailureRate = -1;
 
-    /** How long (minimum, in milliseconds) should this worker stay alive after receiving a single point task? */
-    public static final int SINGLE_POINT_KEEPALIVE_MSEC = 15 * 60 * 1000;
+    /** How long (minimum, in milliseconds) should this worker stay alive after processing a single-point task. */
+    /** The minimum amount of time (in minutes) that this worker should stay alive after processing a single-point task. */
+    public static final int SINGLE_KEEPALIVE_MINUTES = 30;
 
-    /** should this worker shut down automatically */
+    /** The minimum amount of time (in minutes) that this worker should stay alive after processing a regional job task. */
+    public static final int REGIONAL_KEEPALIVE_MINUTES = 1;
+
+    /** Whether this worker should shut down automatically when idle. */
     public final boolean autoShutdown;
+
+    long startupTime, nextShutdownCheckTime;
 
     public static final Random random = new Random();
 
-    /** is there currently a channel open to the broker to receive single point jobs? */
-    private volatile boolean sideChannelOpen = false;
+    /** The common root of all API URLs contacted by this worker, e.g. http://localhost:7070/api/ */
+    protected String brokerBaseUrl;
 
-    String BROKER_BASE_URL = "http://localhost:9001";
+    /** The HTTP client the worker uses to contact the broker and fetch regional analysis tasks. */
+    static final HttpClient httpClient = makeHttpClient();
 
-    static final HttpClient httpClient;
+    /**
+     * This timeout should be longer than the longest expected worker calculation for a single-point request.
+     * Of course when linking a large grid, a worker could take much longer. We're just going to have to accept
+     * timeouts in those situations until we implement fail-fast 202 responses from workers for long lived operations.
+     */
+    private static final int HTTP_CLIENT_TIMEOUT_SEC = 30;
 
-    static {
+    /**
+     * The results of finished work accumulate here, and will be sent in batches back to the broker.
+     * All access to this field should be synchronized since it will is written to by multiple threads.
+     * We don't want to just wrap it in a SynchronizedList because we need an atomic copy-and-empty operation.
+     */
+    private List<RegionalWorkResult> workResults = new ArrayList<>();
+
+    /** The last time (in milliseconds since the epoch) that we polled for work. */
+    private long lastPollingTime;
+
+    /** Keep track of how many tasks per minute this worker is processing, broken down by scenario ID. */
+    ThroughputTracker throughputTracker = new ThroughputTracker();
+
+    /**
+     * This has been pulled out into a method so the broker can also make a similar http client.
+     */
+    public static HttpClient makeHttpClient () {
         PoolingHttpClientConnectionManager mgr = new PoolingHttpClientConnectionManager();
         mgr.setDefaultMaxPerRoute(20);
-
-        int timeout = 10 * 1000; // TODO should this be a symbolic constant such as POLL_TIMEOUT ?
+        int timeoutMilliseconds = HTTP_CLIENT_TIMEOUT_SEC * 1000;
         SocketConfig cfg = SocketConfig.custom()
-                .setSoTimeout(timeout)
+                .setSoTimeout(timeoutMilliseconds)
                 .build();
         mgr.setDefaultSocketConfig(cfg);
-
-        httpClient = HttpClients.custom()
+        return HttpClients.custom().disableAutomaticRetries()
                 .setConnectionManager(mgr)
                 .build();
     }
 
     GridCache gridCache;
 
-    // Clients for communicating with Amazon web services
-    AmazonS3 s3;
-
     /** The transport network this worker already has loaded, and therefore prefers to work on. */
     String networkId = null;
-
-    long startupTime, nextShutdownCheckTime;
 
     /** Information about the EC2 instance (if any) this worker is running on. */
     EC2Info ec2info;
 
     /**
-     * The time the last high priority task was processed, in milliseconds since the epoch, used to check if the
-     * machine should be shut down.
+     * The time the last single point task was processed, in milliseconds since the epoch.
+     * Used to check if the machine should be shut down.
      */
-    private long lastHighPriorityTaskProcessed = 0;
+    protected long lastSinglePointTime = 0;
+
+    /**
+     * The time the last regional task was processed, in milliseconds since the epoch.
+     * Used to check if the machine should be shut down.
+     */
+    protected long lastRegionalTaskTime = 0;
 
     /** If true Analyst is running locally, do not use internet connection and remote services such as S3. */
     private boolean workOffline;
 
     /**
-     * Queues for high-priority interactive tasks and low-priority batch tasks.
-     * Should be plenty long enough to hold all that have come in - we don't need to block on polling the manager.
+     * A queue to hold a backlog of regional analysis tasks.
+     * This avoids "slow joiner" syndrome where we wait to poll for more work until all N fetched tasks have finished,
+     * but one of the tasks takes much longer than all the rest.
+     * This should be long enough to hold all that have come in - we don't need to block on polling the manager.
      */
-    private ThreadPoolExecutor highPriorityExecutor, batchExecutor;
+    private ThreadPoolExecutor regionalTaskExecutor;
 
-    /** Thread pool executor for delivering priority tasks. */
-    private ThreadPoolExecutor taskDeliveryExecutor;
+    /** The HTTP server that receives single-point requests. */
+    private spark.Service sparkHttpService;
 
-    public AnalystWorker(Properties config) {
-        // grr this() must be first call in constructor, even if previous statements do not have side effects.
-        // Thanks, Java.
-        this(config, new TransportNetworkCache(Boolean.parseBoolean(
-            config.getProperty("work-offline", "false")) ? null : config.getProperty("graphs-bucket"),
-            new File(config.getProperty("cache-dir", "cache/graphs"))));
+    public static AnalystWorker forConfig (Properties config) {
+        // FIXME why is there a separate configuration parsing section here? Why not always make the cache based on the configuration?
+        // FIXME why is some configuration done here and some in the constructor?
+        boolean workOffline = Boolean.parseBoolean(config.getProperty("work-offline", "false"));
+        String graphsBucket = workOffline ? null : config.getProperty("graphs-bucket");
+        String graphDirectory = config.getProperty("cache-dir", "cache/graphs");
+        TransportNetworkCache cache = new TransportNetworkCache(graphsBucket, new File(graphDirectory));
+        return new AnalystWorker(config, cache);
     }
 
     public AnalystWorker(Properties config, TransportNetworkCache cache) {
@@ -158,7 +221,10 @@ public class AnalystWorker implements Runnable {
         LOG.info("Analyst worker {} starting at {}", machineId,
                 LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
 
-        // PARSE THE CONFIGURATION
+        // PARSE THE CONFIGURATION TODO move configuration parsing into a separate method.
+
+        // Region region = Region.getRegion(Regions.fromName(config.getProperty("aws-region")));
+        filePersistence = new S3FilePersistence(config.getProperty("aws-region"));
 
         // First, check whether we are running Analyst offline.
         workOffline = Boolean.parseBoolean(config.getProperty("work-offline", "false"));
@@ -166,15 +232,10 @@ public class AnalystWorker implements Runnable {
             LOG.info("Working offline. Avoiding internet connections and hosted services.");
         }
 
-        String addr = config.getProperty("broker-address");
-        String port = config.getProperty("broker-port");
-
-        if (addr != null) {
-            if (port != null) {
-                this.BROKER_BASE_URL = String.format("http://%s:%s", addr, port);
-            } else {
-                this.BROKER_BASE_URL = String.format("http://%s", addr);
-            }
+        {
+            String brokerAddress = config.getProperty("broker-address", DEFAULT_BROKER_ADDRESS);
+            String brokerPort = config.getProperty("broker-port", DEFAULT_BROKER_PORT);
+            this.brokerBaseUrl = String.format("http://%s:%s/internal", brokerAddress, brokerPort);
         }
 
         // set the initial graph affinity of this worker (if it is not in the config file it will be
@@ -185,8 +246,7 @@ public class AnalystWorker implements Runnable {
 
         this.gridCache = new GridCache(config.getProperty("pointsets-bucket"));
         this.transportNetworkCache = cache;
-        Boolean autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown"));
-        this.autoShutdown = autoShutdown == null ? false : autoShutdown;
+        this.autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown", "false"));
 
         // Consider shutting this worker down once per hour, starting 55 minutes after it started up.
         startupTime = System.currentTimeMillis();
@@ -203,34 +263,53 @@ public class AnalystWorker implements Runnable {
             // We're working offline and/or not running on EC2. Set a default region rather than detecting one.
             ec2info.region = Regions.EU_WEST_1.getName();
         }
+    }
 
-        // When creating the S3 and SQS clients use the default credentials chain.
-        // This will check environment variables and ~/.aws/credentials first, then fall back on
-        // the auto-assigned IAM role if this code is running on an EC2 instance.
-        // http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/java-dg-roles.html
-        s3 = new AmazonS3Client();
-        s3.setRegion(Region.getRegion(Regions.fromName(ec2info.region)));
+    /**
+     * Consider shutting down if enough time has passed.
+     * The strategy depends on the fact that we are billed by the hour for EC2 machines.
+     * We only need to consider shutting them down once an hour. Leaving them alive for the rest of the hour provides
+     * immediate compute capacity in case someone starts another job.
+     * So a few minutes before each hour of uptime has elapsed, we check how long the machine has been idle.
+     */
+    public void considerShuttingDown() {
+        long now = System.currentTimeMillis();
+        if (now > nextShutdownCheckTime && autoShutdown) {
+            // Check again exactly one hour later (assumes billing in one-hour increments)
+            nextShutdownCheckTime += 60 * 60 * 1000;
+            if (now > lastSinglePointTime + (SINGLE_KEEPALIVE_MINUTES * 60 * 1000) &&
+                now > lastRegionalTaskTime + (REGIONAL_KEEPALIVE_MINUTES * 60 * 1000)) {
+                LOG.info("Machine has been idle for at least {} minutes (single point) and {} minutes (regional), " +
+                        "shutting down.", SINGLE_KEEPALIVE_MINUTES, REGIONAL_KEEPALIVE_MINUTES);
+                // Stop accepting any new single-point requests while shutdown is happening.
+                // TODO maybe actively tell the broker this worker is shutting down.
+                sparkHttpService.stop();
+                try {
+                    Process process = new ProcessBuilder("sudo", "/sbin/shutdown", "-h", "now").start();
+                    process.waitFor();
+                } catch (Exception ex) {
+                    LOG.error("Unable to terminate worker", ex);
+                    // TODO email us or something
+                } finally {
+                    System.exit(0);
+                }
+            }
+        }
+
     }
 
     /**
      * This is the main worker event loop which fetches tasks from a broker and schedules them for execution.
-     * It maintains a small local queue so the worker doesn't idle while fetching new tasks.
      */
     @Override
     public void run() {
 
         // Create executors with up to one thread per processor.
-        // fix size of highPriorityExecutor to avoid broken pipes when threads are killed off before they are done sending data
-        // (not confirmed if this actually works)
-        int nP = Runtime.getRuntime().availableProcessors();
-        highPriorityExecutor = new ThreadPoolExecutor(nP, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
-        highPriorityExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
-        batchExecutor = new ThreadPoolExecutor(1, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(nP * 2));
-        batchExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
-
-        taskDeliveryExecutor = new ThreadPoolExecutor(1, nP, 60, TimeUnit.SECONDS, new ArrayBlockingQueue<>(255));
-        // can't use CallerRunsPolicy as that would cause deadlocks, calling thread is writing to inputstream
-        taskDeliveryExecutor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
+        // The default task rejection policy is "Abort".
+        // The executor's queue is rather long because some tasks complete very fast and we poll max once per second.
+        int availableProcessors = Runtime.getRuntime().availableProcessors();
+        BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>(availableProcessors * 6);
+        regionalTaskExecutor = new ThreadPoolExecutor(1, availableProcessors, 60, TimeUnit.SECONDS, taskQueue);
 
         // If an initial graph ID was provided in the config file, build or load that TransportNetwork on startup.
         // Pre-loading the graph is necessary because if the graph is not cached it can take several
@@ -247,93 +326,97 @@ public class AnalystWorker implements Runnable {
             }
         }
 
-        // Start filling the work queues.
-        boolean idle = false;
+        // Before we go into an endless loop polling for regional tasks that can be computed asynchronously, start a
+        // single-endpoint web server on this worker to receive single-point requests that must be handled immediately.
+        // This is listening on a different port than the backend API so that a worker can be running on the backend.
+        // Trying out the new Spark syntax for non-static configuration.
+        // TODO symbolic constants for the backend and worker ports
+        sparkHttpService = spark.Service.ignite()
+            .port(WORKER_LISTEN_PORT)
+            .threadPool(WORKER_SINGLE_POINT_THREADS);
+        sparkHttpService.post("/single", new AnalysisWorkerController(this)::handleSinglePoint);
+
+        // Main polling loop to fill the regional work queue.
+        // You'd think the ThreadPoolExecutor could just block when the blocking queue is full, but apparently
+        // people all over the world have been jumping through hoops to try to achieve this simple behavior
+        // with no real success, at least without writing bug and deadlock-prone custom executor services.
+        // Two alternative approaches are trying to keep the queue full and waiting for the queue to be almost empty.
+        // To keep the queue full, we repeatedly try to add each task to the queue, pausing and retrying when
+        // it's full. To wait until it's almost empty, we could use wait() in a loop and notify() as tasks are handled.
+        // see https://stackoverflow.com/a/15185004/778449
+        // A simpler approach might be to spin-wait checking whether the queue is low and sleeping briefly,
+        // then fetch more work only when the queue is getting empty.
         while (true) {
-            long now = System.currentTimeMillis();
-            // Consider shutting down if enough time has passed
-            if (now > nextShutdownCheckTime && autoShutdown) {
-                if (idle && now > lastHighPriorityTaskProcessed + SINGLE_POINT_KEEPALIVE_MSEC) {
-                    LOG.warn("Machine is idle, shutting down.");
-                    try {
-                        Process process = new ProcessBuilder("sudo", "/sbin/shutdown", "-h", "now").start();
-                        process.waitFor();
-                    } catch (Exception ex) {
-                        LOG.error("Unable to terminate worker", ex);
-                    } finally {
-                        System.exit(0);
-                    }
-                }
-                nextShutdownCheckTime += 60 * 60 * 1000;
-            }
-            LOG.debug("Long-polling for work ({} second timeout).", POLL_TIMEOUT / 1000.0);
-            // Long-poll (wait a few seconds for messages to become available)
-            List<AnalysisTask> tasks = getSomeWork(WorkType.REGIONAL);
-            if (tasks == null) {
-                LOG.debug("Didn't get any work. Retrying.");
-                idle = true;
+            List<AnalysisTask> tasks = getSomeWork();
+            if (tasks == null || tasks.isEmpty()) {
+                // Either there was no work, or some kind of error occurred.
+                // Sleep for a while before polling again, adding a random component to spread out the polling load.
+                considerShuttingDown();
+                int randomWait = random.nextInt(POLL_MAX_RANDOM_WAIT);
+                LOG.info("Polling the broker did not yield any regional tasks. Sleeping {} + {} sec.", POLL_WAIT_SECONDS, randomWait);
+                sleepSeconds(POLL_WAIT_SECONDS + randomWait);
                 continue;
             }
-
-            // Enqueue high-priority (interactive) tasks first to ensure they are enqueued
-            // even if the low-priority batch queue blocks.
-            tasks.stream().filter(AnalysisTask::isHighPriority)
-                    .forEach(t -> highPriorityExecutor.execute(() -> {
-                        LOG.warn("Handling single point task via normal channel, side channel should open shortly.");
-                        this.handleOneRequest(t);
-                    }));
-
-            // Enqueue low-priority (batch) tasks; note that this may block anywhere in the process
-            logQueueStatus();
-            tasks.stream().filter(t -> !t.isHighPriority())
-                .forEach(t -> {
-                    // attempt to enqueue, waiting if the queue is full
-                    while (true) {
-                        try {
-                            batchExecutor.execute(() -> this.handleOneRequest(t));
-                            break;
-                        } catch (RejectedExecutionException e) {
-                            // queue is full, wait 200ms and try again
-                            try {
-                                Thread.sleep(200);
-                            } catch (InterruptedException e1) { /* nothing */}
-                        }
+            for (AnalysisTask task : tasks) {
+                while (true) {
+                    try {
+                        // TODO define non-anonymous runnable class to instantiate here
+                        regionalTaskExecutor.execute(() -> this.handleOneRequest(task));
+                        break;
+                    } catch (RejectedExecutionException e) {
+                        // Queue is full, wait a bit and try to feed it more tasks.
+                        // FIXME if we burn through the internal queue in less than 1 second this is a speed bottleneck.
+                        // This happens with regions unconnected to transit and with very small travel time cutoffs.
+                        // FIXME this is really using the list of fetched tasks as a secondary queue, it's awkward.
+                        sleepSeconds(1);
                     }
-                });
+                }
+            }
+        }
+    }
 
-            // TODO log info about the high-priority queue as well.
-            logQueueStatus();
-            idle = false;
+    /**
+     * Bypass idiotic java checked exceptions.
+     */
+    public void sleepSeconds (int seconds) {
+        try {
+            Thread.sleep(seconds * 1000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 
     /**
      * This is the callback that processes a single task and returns the results upon completion.
      * It may be called several times simultaneously on different executor threads.
+     * This returns a byte array but only for single point requests at this point.
+     * It handles both regional and single point requests... and maybe that's a good thing, and we should make them
+     * ever more interchangeable.
+     *
+     * TODO split this out into one "handle immediately" method that returns a byte[] and a void method for async tasks
      */
-    private void handleOneRequest(AnalysisTask request) {
-        if (request.isHighPriority()) {
-            lastHighPriorityTaskProcessed = System.currentTimeMillis();
-            if (!sideChannelOpen) {
-                openSideChannel();
-            }
-        }
-
+    protected byte[] handleOneRequest(AnalysisTask request) {
+        // Record the fact that the worker is busy so it won't shut down.
+        lastRegionalTaskTime = System.currentTimeMillis(); // FIXME both regional and single-point are handled here
         if (dryRunFailureRate >= 0) {
             // This worker is running in test mode.
             // It should report all work as completed without actually doing anything,
             // but will fail a certain percentage of the time.
+            // TODO sleep and generate work result in another method
             try {
                 Thread.sleep(random.nextInt(5000) + 1000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
             if (random.nextInt(100) >= dryRunFailureRate) {
-                deleteRequest(request);
+                RegionalWorkResult workResult = new RegionalWorkResult(request.jobId, request.taskId, 1, 1, 1);
+                synchronized (workResults) {
+                    workResults.add(workResult);
+                }
             } else {
                 LOG.info("Intentionally failing to complete task for testing purposes {}", request.taskId);
             }
-            return;
+            return null;
         }
 
         try {
@@ -353,246 +436,219 @@ public class AnalystWorker implements Runnable {
                 transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, request);
             } catch (ScenarioApplicationException scenarioException) {
                 // Handle exceptions specifically representing a failure to apply the scenario.
-                // These exceptions can be turned into structured JSON.
-                // Report the error back to the broker, which can then pass it back out to the client.
                 // Any other kinds of exceptions will be caught by the outer catch clause
-                reportTaskErrors(request.taskId, HttpStatus.BAD_REQUEST_400, scenarioException.taskErrors);
-                return;
+                return reportTaskErrors(request, scenarioException.taskErrors);
             }
 
-            // replicate previous static site functionality; if this is the first of a batch of tasks, and if there is
-            // an output bucket specified, write the shared metadata for this batch of requests to the output bucket
-            if(request.taskId == 0 && request.outputBucket != null && !request.outputBucket.isEmpty()){
-                MultipointMetadata mm = new MultipointMetadata(request, transportNetwork);
-                LOG.info("This is the lead-off task for a static site request; writing shared metadata");
-                mm.write();
+            // If we are generating a static site, there must be a single metadata file for an entire batch of results.
+            // Arbitrarily we create this metadata as part of the first task in the job.
+            if (request instanceof RegionalTask && request.makeStaticSite && request.taskId == 0) {
+                LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
+                saveStaticSiteMetadata(request, transportNetwork);
             }
 
             TravelTimeComputer computer = new TravelTimeComputer(request, transportNetwork, gridCache);
+            OneOriginResult oneOriginResult = computer.computeTravelTimes();
+            // TODO switch mainly on what's present in the result, not on the request type
             if (request.isHighPriority()) {
-                PipedInputStream pis = new PipedInputStream();
-
-                // gzip the data before sending it to the broker. Compression ratios here are extreme (100x is not uncommon)
-                // so this will help avoid broken pipes, connection reset by peer, buffer overflows, etc. since these types
-                // of errors are more common on large files.
-                GZIPOutputStream pos = new GZIPOutputStream(new PipedOutputStream(pis));
-
-                finishPriorityTask(request, pis, "application/octet-stream", "gzip");
-
-                computer.computeTravelTimes(pos);
-                pos.close();
+                // This is a single point task. Return the travel time grid which will be written back to the client.
+                // We want to gzip the data before sending it back to the broker.
+                // Compression ratios here are extreme (100x is not uncommon).
+                // We had many connection reset by peer, buffer overflows on large files.
+                // Handle gzipping with HTTP headers (caller should already be doing this)
+                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                // This travel time surface is being produced by a single-origin task.
+                // We could be making a grid or a TIFF.
+                TravelTimeSurfaceTask timeSurfaceTask = (TravelTimeSurfaceTask) request;
+                if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GRID) {
+                    // Return raw byte array representing grid to caller, for return to client over HTTP.
+                    // TODO eventually reuse same code path as static site time grid saving
+                    oneOriginResult.timeGrid.writeGridToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
+                    addErrorJson(byteArrayOutputStream, transportNetwork.scenarioApplicationWarnings);
+                } else if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
+                    oneOriginResult.timeGrid.writeGeotiff(byteArrayOutputStream);
+                }
+                // FIXME strangeness, only travel time results are returned from method, accessibility results return null and are accumulated for async delivery.
+                // Return raw byte array containing grid or TIFF file to caller, for return to client over HTTP.
+                byteArrayOutputStream.close();
+                // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
+                throughputTracker.recordTaskCompletion("SINGLE-" + transportNetwork.scenarioId);
+                return byteArrayOutputStream.toByteArray();
             } else {
-                // not a high priority task, will not be returned via high-priority channel but rather via an SQS
-                // queue or using MultipointDataStore. Explicitly delete the task when done if there have been no exceptions thrown.
-                computer.computeTravelTimes(null);
-                deleteRequest(request);
+                // This is a single task within a regional analysis with many origins.
+                if (request.makeStaticSite) {
+                    // Despite this being a regional task, this is actually writing a time grid because we're
+                    // generating a bunch of those for a static site. Only save a file if it has non-default contents.
+                    if (oneOriginResult.timeGrid.anyCellReached()) {
+                        PersistenceBuffer persistenceBuffer = oneOriginResult.timeGrid.writeToPersistenceBuffer();
+                        String timesFileName = request.taskId + "_times.dat";
+                        filePersistence.saveStaticSiteData(request, timesFileName, persistenceBuffer);
+                    } else {
+                        LOG.info("No destination cells reached. Not saving static site file to reduce storage space.");
+                    }
+                }
+                // Accumulate accessibility results to return to the backend in batches.
+                // This is usually an accessibility indicator value for one of many origins, but in the case of a static
+                // site we still want to return dummy / zero accessibility results so the backend is aware of progress.
+                synchronized (workResults) {
+                    workResults.add(oneOriginResult.toRegionalWorkResult(request));
+                }
+                throughputTracker.recordTaskCompletion(request.jobId);
             }
         } catch (Exception ex) {
             // Catch any exceptions that were not handled by more specific catch clauses above.
             // This ensures that some form of error message is passed all the way back up to the web UI.
             TaskError taskError = new TaskError(ex);
-            LOG.error("An error occurred while routing", ex);
-            reportTaskErrors(request.taskId, HttpStatus.INTERNAL_SERVER_ERROR_500, Arrays.asList(taskError));
+            LOG.error("An error occurred while routing: {}", ExceptionUtils.asString(ex));
+            reportTaskErrors(request, Arrays.asList(taskError));
         }
+        return null;
     }
 
-    /** Open a single point channel to the broker to receive high-priority requests immediately */
-    private synchronized void openSideChannel () {
-        if (sideChannelOpen) {
-            return;
-        }
-        LOG.info("Opening side channel for single point requests.");
-        new Thread(() -> {
-            sideChannelOpen = true;
-            // don't keep single point connections alive forever
-            while (System.currentTimeMillis() < lastHighPriorityTaskProcessed + SINGLE_POINT_KEEPALIVE_MSEC) {
-                LOG.debug("Awaiting high-priority work");
-                try {
-                    List<AnalysisTask> tasks = getSomeWork(WorkType.SINGLE);
-
-                    if (tasks != null)
-                        tasks.stream().forEach(t -> highPriorityExecutor.execute(
-                                () -> this.handleOneRequest(t)));
-
-                    logQueueStatus();
-                } catch (Exception e) {
-                    LOG.error("Unexpected exception getting single point work", e);
-                }
-            }
-            sideChannelOpen = false;
-        }).start();
+    /**
+     * This is somewhat hackish - when we want to return errors to the UI, we just append them as JSON at the end of
+     * a binary result. We always append this JSON even when there are no errors so the UI has something to decode,
+     * even if it's an empty list.
+     */
+    public static void addErrorJson (OutputStream outputStream, List<TaskError> scenarioApplicationWarnings) throws IOException {
+        LOG.info("Travel time surface written, appending metadata with scenario application {} warnings", scenarioApplicationWarnings.size());
+        // We create a single-entry map because this converts easily to a JSON object.
+        Map<String, List<TaskError>> errorsToSerialize = new HashMap<>();
+        errorsToSerialize.put("scenarioApplicationWarnings", scenarioApplicationWarnings);
+        JsonUtilities.objectMapper.writeValue(outputStream, errorsToSerialize);
+        LOG.info("Done writing");
     }
 
-    public List<AnalysisTask> getSomeWork(WorkType type) {
-        // Run a POST task (long-polling for work)
-        // The graph and r5 commit of this worker are indicated in the task body.
-        String url = String.join("/", BROKER_BASE_URL, "dequeue", type == WorkType.SINGLE ? "single" : "regional");
+    /**
+     * Ask the backend if it has any work for this worker, considering its software version and loaded networks.
+     * Also report the worker status to the backend, serving as a heartbeat so the backend knows this worker is alive.
+     * Also returns any accumulated work results to the backend.
+     * @return a list of work tasks, or null if there was no work to do, or if no work could be fetched.
+     */
+    public List<AnalysisTask> getSomeWork () {
+        String url = brokerBaseUrl + "/poll";
         HttpPost httpPost = new HttpPost(url);
-        WorkerStatus workerStatus = new WorkerStatus();
-        workerStatus.loadStatus(this);
+        WorkerStatus workerStatus = new WorkerStatus(this);
+        // Include all completed work results when polling the backend.
+        // Atomically copy and clear the accumulated work results, while blocking writes from other threads.
+        synchronized (workResults) {
+            workerStatus.results = new ArrayList<>(workResults);
+            workResults.clear();
+        }
+
+        // Compute throughput in tasks per minute and include it in the worker status report.
+        // We poll too frequently to compute throughput just since the last poll operation.
+        // TODO reduce polling frequency (larger queue in worker), compute shorter-term throughput.
+        workerStatus.tasksPerMinuteByJobId = throughputTracker.getTasksPerMinuteByJobId();
+
+        // Report how often we're polling for work, just for monitoring.
+        long timeNow = System.currentTimeMillis();
+        workerStatus.secondsSinceLastPoll = (timeNow - lastPollingTime) / 1000D;
+        lastPollingTime = timeNow;
+
         httpPost.setEntity(JsonUtilities.objectToJsonHttpEntity(workerStatus));
         try {
             HttpResponse response = httpClient.execute(httpPost);
             HttpEntity entity = response.getEntity();
+            if (response.getStatusLine().getStatusCode() == 204) {
+                // No work to do.
+                return null;
+            }
             if (entity == null) {
                 return null;
             }
             if (response.getStatusLine().getStatusCode() != 200) {
+                // TODO log errors!
                 EntityUtils.consumeQuietly(entity);
                 return null;
             }
-            // Use the lenient object mapper here in case the broker belongs to a newer
+            // Use the lenient object mapper here in case the broker is a newer version so sending unrecognizable fields
             return JsonUtilities.lenientObjectMapper.readValue(entity.getContent(), new TypeReference<List<AnalysisTask>>() {});
-        } catch (JsonProcessingException e) {
-            LOG.error("JSON processing exception while getting work", e);
-        } catch (SocketTimeoutException stex) {
-            LOG.debug("Socket timeout while waiting to receive work.");
-        } catch (HttpHostConnectException ce) {
-            LOG.error("Broker refused connection. Sleeping before retry.");
-            try {
-                Thread.currentThread().sleep(5000);
-            } catch (InterruptedException e) {
-            }
-        } catch (IOException e) {
-            LOG.error("IO exception while getting work", e);
+        } catch (Exception e) {
+            LOG.error("Exception while polling backend for work: {}",ExceptionUtils.asString(e));
         }
         return null;
-
     }
 
     /**
-     * We have two kinds of output from a worker: we can either write to an object in a bucket on S3, or we can stream
-     * output over HTTP to a waiting web service caller. This function handles the latter case. It connects to the
-     * cluster broker, signals that the task with a certain ID is being completed, and posts the result back through the
-     * broker. The broker then passes the result on to the original requester (usually the analysis web UI).
-     *
-     * This function will run the HTTP Post operation in a new thread so that this function can return, allowing its
-     * caller to write data to the input stream it passed in. This arrangement avoids broken pipes that can happen
-     * when the calling thread dies. TODO clarify when and how which thread can die.
+     * Report that the task could not be processed due to errors.
+     * For the moment, we are sending back the list of TaskErrors appended as json to a default response.
      */
-    public void finishPriorityTask(AnalysisTask request, InputStream result, String contentType, String contentEncoding) {
-        //CountingInputStream is = new CountingInputStream(result);
-
-        LOG.info("Returning high-priority results for task {}", request.taskId);
-
-        String url = BROKER_BASE_URL + String.format("/complete/success/%s", request.taskId);
-        HttpPost httpPost = new HttpPost(url);
-
-        // TODO reveal any errors etc. that occurred on the worker.
-        httpPost.setEntity(new InputStreamEntity(result));
-        httpPost.setHeader("Content-Type", contentType);
-        if (contentEncoding != null) httpPost.setHeader("Content-Encoding", contentEncoding);
-        taskDeliveryExecutor.execute(() -> {
-            try {
-                HttpResponse response = httpClient.execute(httpPost);
-                // Signal the http client library that we're done with this response object, allowing connection reuse.
-                EntityUtils.consumeQuietly(response.getEntity());
-
-                //LOG.info("Returned {} bytes to the broker for task {}", is.getCount(), clusterRequest.taskId);
-
-                if (response.getStatusLine().getStatusCode() == 200) {
-                    LOG.info("Successfully marked task {} as completed.", request.taskId);
-                } else if (response.getStatusLine().getStatusCode() == 404) {
-                    LOG.info("Task {} was not marked as completed because it doesn't exist.", request.taskId);
-                } else {
-                    LOG.info("Failed to mark task {} as completed, ({}).", request.taskId,
-                            response.getStatusLine());
-                }
-            } catch (Exception e) {
-                LOG.warn("Failed to mark task {} as completed.", request.taskId, e);
-            }
-        });
-    }
-
-    /**
-     * Report to the broker that the task taskId could not be processed due to errors.
-     * The broker should then pass the errors back up to the client that enqueued that task.
-     * That objects are always the same type (TaskError) so the client knows what to expect.
-     */
-    public void reportTaskErrors(int taskId, int httpStatusCode, List<TaskError> taskErrors) {
-        String url = BROKER_BASE_URL + String.format("/complete/%d/%s", httpStatusCode, taskId);
+    public byte[] reportTaskErrors(AnalysisTask request, List<TaskError> taskErrors) {
         try {
-            HttpPost httpPost = new HttpPost(url);
-            httpPost.setHeader("Content-type", "application/json");
-            httpPost.setEntity(JsonUtilities.objectToJsonHttpEntity(taskErrors));
-            // Send the JSON serialized error object to the broker.
-            HttpResponse response = httpClient.execute(httpPost);
-            // Tell the http client library that we won't do anything with the broker's response, allowing connection reuse.
-            EntityUtils.consumeQuietly(response.getEntity());
-        } catch (Exception e) {
-            LOG.error("An exception occurred while attempting to report an error to the broker:\n" + e.getStackTrace());
-        }
-    }
-
-    /**
-     * Tell the broker that the given message has been successfully processed by a worker (HTTP DELETE).
-     */
-    public void deleteRequest(AnalysisTask request) {
-        String url = BROKER_BASE_URL + String.format("/tasks/%s", request.taskId);
-        HttpDelete httpDelete = new HttpDelete(url);
-        try {
-            HttpResponse response = httpClient.execute(httpDelete);
-            // Signal the http client library that we're done with this response object, allowing connection reuse.
-            EntityUtils.consumeQuietly(response.getEntity());
-            if (response.getStatusLine().getStatusCode() == 200) {
-                LOG.info("Successfully deleted task {}.", request.taskId);
+            if (request.isHighPriority()) {
+                // For single-point requests, return a TimeGrid filled with UNREACHABLE, with the errors appended
+                LOG.warn("Reporting errors in response to single-point request:\n" + taskErrors.toString());
+                TimeGrid emptyTimeGrid = new TimeGrid(request.zoom, request.west, request.north, request.width, request.height, request.percentiles.length);
+                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                emptyTimeGrid.writeGridToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
+                addErrorJson(byteArrayOutputStream, taskErrors);
+                byteArrayOutputStream.close();
+                return byteArrayOutputStream.toByteArray();
             } else {
-                LOG.info("Failed to delete task {} ({}).", request.taskId, response.getStatusLine());
+                // TODO handle regional result errors, or force users to "preflight" regional results by running single-point request in UI
+                LOG.warn("Errors while completing task:\n" + taskErrors.toString());
             }
         } catch (Exception e) {
-            LOG.warn("Failed to delete task {}", request.taskId, e);
+            LOG.error("An exception occurred while attempting to report an error:\n" + ExceptionUtils.asString(e));
         }
+        return null;
     }
 
-    /** log queue status */
-    private void logQueueStatus() {
-        LOG.debug("Waiting tasks: high priority: {}, batch: {}", highPriorityExecutor.getQueue().size(), batchExecutor.getQueue().size());
+    /**
+     * Generate and write out metadata describing what's in a directory of static site output.
+     */
+    public static void saveStaticSiteMetadata (AnalysisTask analysisTask, TransportNetwork network) {
+        try {
+            // Save the regional analysis request, giving the UI some context to display the results.
+            // This is the request object sent to the workers to generate these static site regional results.
+            PersistenceBuffer buffer = PersistenceBuffer.serializeAsJson(analysisTask);
+            AnalystWorker.filePersistence.saveStaticSiteData(analysisTask, "request.json", buffer);
+
+            // Save non-fatal warnings encountered applying the scenario to the network for this regional analysis.
+            buffer = PersistenceBuffer.serializeAsJson(network.scenarioApplicationWarnings);
+            AnalystWorker.filePersistence.saveStaticSiteData(analysisTask, "warnings.json", buffer);
+
+            // Save transit route data that allows rendering paths with the Transitive library in a separate file.
+            TransitiveNetwork transitiveNetwork = new TransitiveNetwork(network.transitLayer);
+            buffer = PersistenceBuffer.serializeAsJson(transitiveNetwork);
+            AnalystWorker.filePersistence.saveStaticSiteData(analysisTask, "transitive.json", buffer);
+        } catch (Exception e) {
+            LOG.error("Exception saving static metadata: {}", ExceptionUtils.asString(e));
+            throw new RuntimeException(e);
+        }
     }
 
     /**
      * Requires a worker configuration, which is a Java Properties file with the following
      * attributes.
      *
-     * broker-address               address of the broker, without protocol or port
-     * broker port                  port broker is running on, default 80.
-     * graphs-bucket                S3 bucket in which graphs are stored.
-     * pointsets-bucket             S3 bucket in which pointsets are stored
-     * auto-shutdown                Should this worker shut down its machine if it is idle (e.g. on throwaway cloud instances)
-     * statistics-queue             SQS queue to which to send statistics (optional)
-     * initial-graph-id             The graph ID for this worker to start on
+     * graphs-bucket      S3 bucket in which graphs are stored.
+     * pointsets-bucket   S3 bucket in which pointsets are stored
+     * auto-shutdown      Should this worker shut down its machine if it is idle (e.g. on throwaway cloud instances)
+     * initial-graph-id   The graph ID for this worker to load immediately upon startup
      */
-    public static void main(String[] args) {
+    public static void main (String[] args) {
         LOG.info("Starting R5 Analyst Worker version {}", R5Version.version);
         LOG.info("R5 commit is {}", R5Version.commit);
         LOG.info("R5 describe is {}", R5Version.describe);
 
+        String configFileName = "worker.conf";
+        if (args.length > 0) {
+            configFileName = args[0];
+        }
         Properties config = new Properties();
-
-        try {
-            File cfg;
-            if (args.length > 0)
-                cfg = new File(args[0]);
-            else
-                cfg = new File("worker.conf");
-
-            InputStream cfgis = new FileInputStream(cfg);
-            config.load(cfgis);
-            cfgis.close();
+        try (InputStream configInputStream = new FileInputStream(new File(configFileName))) {
+            config.load(configInputStream);
         } catch (Exception e) {
-            LOG.info("Error loading worker configuration", e);
+            LOG.error("Error loading worker configuration, shutting down. " + ExceptionUtils.asString(e));
             return;
         }
-
         try {
-            new AnalystWorker(config).run();
+            AnalystWorker.forConfig(config).run();
         } catch (Exception e) {
-            LOG.error("Error in analyst worker", e);
-            return;
+            LOG.error("Unhandled error in analyst worker, shutting down. " + ExceptionUtils.asString(e));
         }
-    }
-
-    public static enum WorkType {
-        SINGLE, REGIONAL;
     }
 
 }

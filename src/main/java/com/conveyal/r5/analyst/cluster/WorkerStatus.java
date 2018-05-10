@@ -1,6 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.analyst.broker.WorkerCategory;
+import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.common.R5Version;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
@@ -10,7 +10,11 @@ import org.slf4j.LoggerFactory;
 import java.lang.management.ManagementFactory;
 import java.lang.management.OperatingSystemMXBean;
 import java.lang.management.RuntimeMXBean;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -33,7 +37,8 @@ public class WorkerStatus {
     public String workerId;
     public Set<String> networks = new HashSet<>();
     public Set<String> scenarios = new HashSet<>();
-    public double tasksPerMinute;
+    public double secondsSinceLastPoll;
+    public Map<String, Integer> tasksPerMinuteByJobId;
     @JsonUnwrapped(prefix = "ec2")
     public EC2Info ec2;
     public long jvmStartTime;
@@ -41,20 +46,18 @@ public class WorkerStatus {
     public String jvmName;
     public String jvmVendor;
     public String jvmVersion;
+    public String ipAddress;
+    public List<RegionalWorkResult> results;
 
     /** No-arg constructor used when deserializing. */
     public WorkerStatus() { }
 
-    /**
-     * Call this method to fill in the fields of the WorkerStatus object.
-     * This is not done in the constructor because this class is intended to hold deserialized data, and therefore
-     * needs a minimalist no-arg constructor.
-     */
-    public void loadStatus(AnalystWorker worker) {
+    /** Constructor that fills in all the fields with information about the machine it's running on. */
+    public WorkerStatus (AnalystWorker worker) {
 
         workerName = "R5";
         workerVersion = R5Version.describe;
-        workerId = worker.machineId;
+        workerId = worker.machineId; // TODO overwrite with cloud provider (EC2) machine ID in a generic way
         networks = worker.transportNetworkCache.getLoadedNetworkIds();
         scenarios = worker.transportNetworkCache.getAppliedScenarios();
         ec2 = worker.ec2info;
@@ -78,6 +81,18 @@ public class WorkerStatus {
         memoryTotal = runtime.totalMemory();
         memoryFree = runtime.freeMemory();
 
+        if (ec2.privateIp != null) {
+            // Give priority to the private IP address if running on EC2
+            ipAddress = ec2.privateIp;
+        } else {
+            // Get whatever is the default IP address
+            // FIXME this appears to be favoring IPv6 on MacOS which makes for buggy URLs
+            try {
+                ipAddress = InetAddress.getLocalHost().getHostAddress();
+            } catch (UnknownHostException e) {
+                ipAddress = "127.0.0.1";
+            }
+        }
     }
 
     /**

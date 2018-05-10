@@ -1,4 +1,4 @@
-package com.conveyal.r5.analyst.broker;
+package com.conveyal.r5.analyst;
 
 import java.io.Serializable;
 import java.util.Objects;

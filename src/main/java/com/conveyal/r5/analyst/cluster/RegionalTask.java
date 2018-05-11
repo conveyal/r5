@@ -5,6 +5,7 @@ import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.TravelTimeSurfaceReducer;
+import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.transit.TransportNetwork;
 
@@ -61,17 +62,21 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
         List<Grid> gridList = new ArrayList<>();
         List<PointSet> pointSets = new ArrayList<>();
 
-        //TODO check that this actually works and clean it up
-        if (grid != null){ // single grid specified
-
+        // TODO check that this actually works and clean it up
+        if (grid != null) { // single grid specified
             gridData = gridCache.get(grid);
-            pointSets.add(gridPointSetCache.get(gridData, network.gridPointSet));
+            // NOTE: Only TravelTimeSurfaceTasks support one-to-many routing to an arbitrary
+            // list of destinations instead of a grid. If network.gridPointSet is not a
+            // WebMercatorGridPointSet, this will fail.
+            WebMercatorGridPointSet set = (WebMercatorGridPointSet) network.pointSet;
+            // Use the network point set as the base point set, so that the cached linkages are used
+            pointSets.add(pointSetCache.get(gridData.zoom, gridData.west, gridData.north, gridData.width, gridData.height, set));
 
         } else { // grids specified; add only the first one, and any with different extents, to pointSets
-
             gridData = gridCache.get(grids.get(0));
             gridList.add(gridData);
-            pointSets.add(gridPointSetCache.get(gridData, network.gridPointSet));
+            WebMercatorGridPointSet set = (WebMercatorGridPointSet) network.pointSet;
+            pointSets.add(pointSetCache.get(gridData.zoom, gridData.west, gridData.north, gridData.width, gridData.height, set));
 
             for (int i = 1; i < grids.size(); i++) { // the first grid is already in the list
                 gridData = gridCache.get(grids.get(i));
@@ -81,12 +86,12 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
 
                     if (j == i - 1) { // all previously added grids checked, none matches extents, so add it
                         gridList.add(gridData);
-                        pointSets.add(gridPointSetCache.get(gridData, network.gridPointSet));
+                        WebMercatorGridPointSet setX = (WebMercatorGridPointSet) network.pointSet;
+                        pointSets.add(pointSetCache.get(gridData.zoom, gridData.west, gridData.north, gridData.width, gridData.height, setX));
                     }
                 }
             }
         }
-        // Use the network point set as the base point set, so that the cached linkages are used
         return pointSets;
     }
 

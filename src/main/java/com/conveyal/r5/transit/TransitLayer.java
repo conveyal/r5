@@ -111,8 +111,10 @@ public class TransitLayer implements Serializable, Cloneable {
     /** Map from frequency entry ID to pattern index, trip index, frequency entry index */
     public Map<String, int[]> frequencyEntryIndexForId;
 
-    /** If true at index stop allows boarding with wheelchairs **/
-    public BitSet stopsWheelchair;
+    /** If true at index stop allows boarding with wheelchairs. The initial size is small
+     *  enough to not be a problem when not used, yet big enough to scale up quickly when
+     *  we do. **/
+    public BitSet stopsWheelchair = new BitSet(5000);
 
     // TODO there is probably a better way to do this, but for now we need to retain stop object for linking to streets
     public transient List<Stop> stopForIndex = new ArrayList<>();
@@ -177,7 +179,7 @@ public class TransitLayer implements Serializable, Cloneable {
         // Load stops.
         // ID is the GTFS string ID, stopIndex is the zero-based index, stopVertexIndex is the index in the street layer.
         TObjectIntMap<String> indexForUnscopedStopId = new TObjectIntHashMap<>();
-        stopsWheelchair = new BitSet(gtfs.stops.size());
+
         for (Stop stop : gtfs.stops.values()) {
             int stopIndex = stopIdForIndex.size();
             String scopedStopId = String.join(":", stop.feed_id, stop.stop_id);

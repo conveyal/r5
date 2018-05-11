@@ -118,9 +118,14 @@ public class TNBuilderConfig {
     public final boolean staticBikeParkAndRide;
 
     /**
-     * Path to bikeRental file currently only XML is support and file needs to be in same folder as OSM files
+     * Path to zip file object containing GBFS bikeshare files.
      */
     public String bikeRentalFile;
+
+    /**
+     * Path to text file containing custom destinations pointset for one-to-many routing.
+     */
+    public String destinations;
 
     /** The fare calculator for analysis */
     public GreedyFareCalculator analysisFareCalculator;

@@ -17,6 +17,8 @@ import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TObjectIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TObjectIntHashMap;
+
+import org.apache.commons.io.output.NullOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,9 +40,6 @@ public class TravelTimeComputer {
 
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeComputer.class);
 
-    // FIXME pointset cache is never used - why?
-    private static final WebMercatorGridPointSetCache pointSetCache = new WebMercatorGridPointSetCache();
-
     public final AnalysisTask request;
     public final TransportNetwork network;
     public final GridCache gridCache;
@@ -51,9 +50,21 @@ public class TravelTimeComputer {
         this.gridCache = gridCache;
     }
 
-    // Perhaps function should not be void return type. Why is this using a streaming or pipelining approach?
-    // We also want to decouple the internal representation of the results from how they're serialized to an API.
-    public void computeTravelTimes(OutputStream os) throws IOException {
+    public TravelTimeComputer(AnalysisTask request, TransportNetwork network) {
+        this.request = request;
+        this.network = network;
+        this.gridCache = null;
+    }
+
+    public int[] computeTravelTimes() throws IOException {
+        return this.computeTravelTimes(new NullOutputStream());
+    }
+
+    // We also want to decouple the internal representation of the results from how they're
+    // serialized to an API.
+    // Returns an array of travel times from a single origin to the list of destinations in the
+    // request in the original order.
+    public int[] computeTravelTimes (OutputStream os) throws IOException {
 
         // The mode of travel that will be used to reach transit stations from the origin point.
         StreetMode accessMode = LegMode.getDominantStreetMode(request.accessModes);
@@ -62,7 +73,7 @@ public class TravelTimeComputer {
         // The mode of travel that would be used to reach the destination directly without using transit.
         StreetMode directMode = LegMode.getDominantStreetMode(request.directModes);
 
-        // The set of destinations in the one-to-many travel time calculations, not yet linked to the street network.
+        // The set of destinations in the one-to-many travel time calculations, already linked to the street network.
         List<PointSet> destinationList = request.getDestinations(network, gridCache);
 
         //TODO wrap in loop to repeat for multiple destinations pointsets in a regional request;
@@ -85,42 +96,70 @@ public class TravelTimeComputer {
         sr.streetMode = accessMode;
         boolean foundOriginPoint = sr.setOrigin(request.fromLat, request.fromLon);
         if (!foundOriginPoint) {
-            // Short circuit around routing and propagation. Calling finish() before streaming in any travel times to
-            // destinations is designed to produce the right result here.
+            // Short circuit around routing and propagation.
+            // Calling finish() before streaming in any travel times to destinations is designed to produce the right result here.
             LOG.info("Origin point was outside the transport network. Skipping routing and propagation, and returning default result.");
             travelTimeReducer.finish();
-            return;
+            return null;
         }
 
         // First we will find travel times to all destinations reachable without using transit.
         // Simultaneously we will find stations that allow access to the transit network.
         if (request.transitModes.isEmpty()) {
             // This search will use no transit.
-            //
             // When doing a non-transit walk search, we're not trying to match the behavior of egress and transfer
             // searches which use distance as the quantity to minimize (because they are precalculated and stored as distance,
             // and then converted to times by dividing by speed without regard to weights/penalties for things like stairs).
             // This does mean that walk-only results will not match the walking portion of walk+transit results.
-            sr.timeLimitSeconds = request.maxTripDurationMinutes * 60;
-            sr.streetMode = directMode;
-            sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
-            sr.route();
+            if (request.directModes.contains(LegMode.BICYCLE_RENT)) {
+                if (!this.network.streetLayer.bikeSharing) {
+                    LOG.warn("Bike sharing trip requested but no bike sharing stations in the " +
+                        "streetlayer");
+                    travelTimeReducer.finish();
+                    return null;
+                }
+                PointToPointQuery bikeQuery = new PointToPointQuery(network);
+                sr = bikeQuery.findBikeRentalPath(
+                    request,
+                    sr,
+                    true,
+                    false);
+
+                if (sr == null) {
+                    // Origin not found. Return an empty access times map, as is done by the other
+                    // conditions for other modes.
+                    // FIXME this is ugly. we should have a way to break out of the search early
+                    // (here and in other methods).
+                    // It causes regional analyses to be very slow when there are a large number
+                    // of disconnected cells.
+                        LOG.warn("MODE:{}, Edge near the destination coordinate wasn't found. " +
+                            "Routing didn't start!",
+                                LegMode.BICYCLE_RENT);
+                        travelTimeReducer.finish();
+                        return null;
+                }
+            } else {
+                sr.timeLimitSeconds = request.maxTripDurationMinutes * 60;
+                sr.streetMode = directMode;
+                sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+                sr.route();
+            }
 
             int offstreetTravelSpeedMillimetersPerSecond = (int) (request.getSpeedForMode(directMode) * 1000);
 
+            // This should pull the cached version of the linkage if it's already been precomputed in the build step.
             LinkedPointSet directModeLinkedDestinations = destinations.link(network.streetLayer, directMode);
             int[] travelTimesToTargets = directModeLinkedDestinations
                     .eval(sr::getTravelTimeToVertex, offstreetTravelSpeedMillimetersPerSecond).travelTimes;
 
-            for (int x = 0; x < request.width; x++) {
-                for (int y = 0; y < request.height; y++) {
-                    int targetIndex = y * request.width + x;
-                    final int travelTimeSeconds = travelTimesToTargets[targetIndex];
-                    travelTimeReducer.recordTravelTimesForTarget(targetIndex, new int[] { travelTimeSeconds });
-                }
+            for (int i = 0; i < travelTimesToTargets.length; i++) {
+                final int travelTimeSeconds = travelTimesToTargets[i];
+                travelTimeReducer.recordTravelTimesForTarget(i, new int[] { travelTimeSeconds });
             }
-
             travelTimeReducer.finish();
+
+            return travelTimesToTargets;
+
         } else {
             // This search will include transit.
             //
@@ -218,7 +257,7 @@ public class TravelTimeComputer {
                     travelTimeReducer.recordTravelTimesForTarget(target, new int[] { travelTimeSeconds });
                 }
                 travelTimeReducer.finish();
-                return;
+                return nonTransitTravelTimesToDestinations;
             }
 
             // Create a new Raptor Worker.
@@ -302,15 +341,16 @@ public class TravelTimeComputer {
                 }
 
                 perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request, transitTravelTimesToStops, nonTransitTravelTimesToDestinations, inVehicleTimesToStops, waitTimesToStops, pathsToStops);
-                perTargetPropagater.reducer = travelTimeReducer;
                 perTargetPropagater.pathWriter = new PathWriter(request, network, pathList);
-
             } else {
-
                 perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request, transitTravelTimesToStops, nonTransitTravelTimesToDestinations, null, null, null);
-                perTargetPropagater.reducer = travelTimeReducer;
             }
-            perTargetPropagater.propagate();
+
+            perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request, transitTravelTimesToStops, nonTransitTravelTimesToDestinations, null, null, null);
+            perTargetPropagater.reducer = travelTimeReducer;
+
+            int[] firstTravelTimesToDestinations = perTargetPropagater.propagate();
+            return firstTravelTimesToDestinations;
         }
     }
 }

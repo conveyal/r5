@@ -46,8 +46,8 @@ public class IsochroneFeature implements Serializable {
      * https://en.wikipedia.org/wiki/Marching_squares
      */
     public IsochroneFeature (int cutoffSec, WebMercatorGridPointSet points, int[] times) {
-        // slightly hacky, but simple: set all of the times around the edges of the pointset to MAX_VALUE so that
-        // the isochrone never runs off the edge of the display.
+        // slightly hacky, but simple: set all of the times around the edges of the pointSet to
+        // MAX_VALUE so that the isochrone never runs off the edge of the display.
         // first, protective copy
         times = Arrays.copyOf(times, times.length);
 

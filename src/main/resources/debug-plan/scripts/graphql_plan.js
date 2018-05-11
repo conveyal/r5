@@ -1,6 +1,6 @@
-var hostname = "http://localhost:8080";
+var hostname = "http://" + window.location.hostname + ":8080";
 var my_map;
-var MARIBOR_COOR = [46.562483, 15.643975];
+var TORONTO_COOR = [43.661263, -79.388832];
 var layer = null;
 var graphqlResponse = null;
 var geojsonLayer = null;
@@ -97,7 +97,7 @@ my_map  = L.map('map', {
         text: "Zoom Out",
         callback: zoomOut
     }]
-}).setView(L.latLng(MARIBOR_COOR[0], MARIBOR_COOR[1]), 13);
+}).setView(L.latLng(TORONTO_COOR[0], TORONTO_COOR[1]), 13);
 
 function enable_button() {
     if (m1 != undefined && m2 != undefined) {
@@ -172,7 +172,7 @@ function getModeColor (mode) {
     if (mode === 'FERRY') return '#008'
     if (mode === 'CAR') return '#444'
     return '#aaa'
-}; 
+};
 
 function getDash (mode) {
     if (mode == 'WALK' || mode === 'BICYCLE' || mode === 'CAR') {
@@ -416,10 +416,10 @@ function showItinerary(optionIdx, itineraryIdx) {
                 var middleData = transitData["middle"]
                 features.features.push(getFeature(middleData));
             }
-            
+
         }
     }
-    if (connection.egress !== null) { 
+    if (connection.egress !== null) {
         var egressData = egress[connection.egress];
         /*var egressFeature = getFeature(egressData);*/
         /*features.features.push(egressFeature);*/
@@ -438,7 +438,7 @@ function showItinerary(optionIdx, itineraryIdx) {
     layer.addTo(window.my_map);
 }
 
-function secondsToTime(seconds) { 
+function secondsToTime(seconds) {
     return new Date(seconds * 1000).toISOString().substr(11, 8);
 }
 
@@ -522,7 +522,7 @@ function makeTextResponse(data) {
                 }
 
             }
-            if (connection.egress !== null) { 
+            if (connection.egress !== null) {
                 var egressData = egress[connection.egress];
                 item+="<li>Mode:"+egressData.mode+" Duration: " + secondsToTime(egressData.duration) + "Distance: "+egressData.distance/1000 + "m</li>";
             }
@@ -666,9 +666,9 @@ function requestPlan() {
         };
     var params = {
         'query': request,
-        'variables': JSON.stringify(variables)
+        'variables': variables
     };
-    
+
     //This is object with variables copied into URL hash so requests can be shared
     var filteredPlanConfig = {};
     //Copies only variables from planConfig
@@ -837,7 +837,7 @@ var sidebar = L.control.sidebar('sidebar').addTo(my_map);
     })
     //Sets GUI from hash values
     if (location.search != "") {
-        
+
         // init url params
         urlParams = { };
         var match,

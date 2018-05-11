@@ -37,37 +37,39 @@ public class ProfileRequest implements Serializable, Cloneable {
 
     /** The latitude of the origin. */
     public double fromLat;
-    
+
     /** The longitude of the origin. */
     public double fromLon;
-    
+
     /** The latitude of the destination. Must be set even in Analyst mode. */
     public double toLat;
-    
+
     /** The longitude of the destination. Must be set even in Analyst mode. */
     public double toLon;
-    
+
     /** The beginning of the departure window, in seconds since midnight. */
     public int    fromTime;
-    
+
     /** The end of the departure window, in seconds since midnight. */
     public int    toTime;
 
     /** The speed of walking, in meters per second */
     public float  walkSpeed = 1.3f;
-    
+
     /** The speed of cycling, in meters per second */
     public float  bikeSpeed = 4f;
 
     /** maximum level of traffic stress for cycling, 1 - 4 */
     public int bikeTrafficStress = 4;
-    
+
     /** The speed of driving, in meters per second. Roads from OSM use the speed limit, this is the speed used when propagating from the street network to a pointset. */
     public float carSpeed = 11; // ~40 km/h
 
     /** Maximum time to reach the destination without using transit in minutes */
     public int    streetTime = 60;
-    
+
+    public int transferPenaltySecs = 0;
+
     /**
      * Maximum walk time before and after using transit, in minutes
      *
@@ -86,44 +88,49 @@ public class ProfileRequest implements Serializable, Cloneable {
      * would slow the algorithm down) by retaining all Pareto-optimal combinations of (travel time, walk distance).
      */
     public int    maxWalkTime = 30;
-    
+
     /** Maximum bike time when using transit, in minutes */
     public int    maxBikeTime = 30;
-    
+
     /** Maximum car time before when using transit, in minutes */
     public int    maxCarTime = 30;
-    
+
     /** Minimum time to ride a bike (to prevent extremely short bike legs), in minutes */
     public int    minBikeTime = 5;
-    
+
     /** Minimum time to drive (to prevent extremely short driving legs), in minutes */
     public int    minCarTime = 5;
 
     /** The date of the search */
+    @JsonDeserialize(using = JavaLocalDateDeserializer.class)
+    @JsonSerialize(using = JavaLocalDateSerializer.class)
     public LocalDate date;
-    
+
     /** the maximum number of options presented PER ACCESS MODE */
     public int limit;
-    
+
     /** The modes used to access transit */
     @JsonSerialize(using = LegModeSetSerializer.class)
     @JsonDeserialize(using = LegModeSetDeserializer.class)
     public EnumSet<LegMode> accessModes;
-    
+
     /** The modes used to reach the destination after leaving transit */
     @JsonSerialize(using = LegModeSetSerializer.class)
     @JsonDeserialize(using = LegModeSetDeserializer.class)
     public EnumSet<LegMode> egressModes;
-    
+
     /** The modes used to reach the destination without transit */
     @JsonSerialize(using = LegModeSetSerializer.class)
     @JsonDeserialize(using = LegModeSetDeserializer.class)
     public EnumSet<LegMode> directModes;
-    
+
     /** The transit modes used */
     @JsonSerialize(using = TransitModeSetSerializer.class)
     @JsonDeserialize(using = TransitModeSetDeserializer.class)
     public EnumSet<TransitModes> transitModes;
+
+    public boolean verbose;
+    public boolean compactEdges = false;
 
     /**
      * This parameter compensates for the fact that GTFS does not contain information about schedule deviation (lateness).
@@ -207,6 +214,17 @@ public class ProfileRequest implements Serializable, Cloneable {
     }
 
     /**
+     * When running a request in reverse, for egress we need to also reverse the actual coordinates
+     */
+    public void swapFromTo() {
+        ProfileRequest result = clone();
+        toLat = result.fromLat;
+        toLon = result.fromLon;
+        fromLat = result.toLat;
+        fromLon = result.toLon;
+    }
+
+    /**
      * Returns number of milliseconds UNIX time made with date and fromTime
      * It reads date as date in transportNetwork timezone when it is converted to UNIX time it is in UTC
      * It needs to be decided how to do this correctly: #37
@@ -231,11 +249,11 @@ public class ProfileRequest implements Serializable, Cloneable {
         if (date == null) {
             currentDateTime = ZonedDateTime.now(zoneId).truncatedTo(ChronoUnit.DAYS);
         } else {
-            currentDateTime = ZonedDateTime.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth(), 0,0,0,0,zoneId);
+            currentDateTime = ZonedDateTime.of(date.getYear(), date.getMonthValue(), date.getDayOfMonth(), 0, 0, 0, 0, zoneId);
         }
 
         //fromTime is in seconds and there are 1000 ms in a second
-        return  currentDateTime.plusSeconds(fromTime);
+        return currentDateTime.plusSeconds(fromTime);
     }
 
     /**
@@ -295,6 +313,8 @@ public class ProfileRequest implements Serializable, Cloneable {
         profileRequest.setTime();
 
         profileRequest.wheelchair = environment.getArgument("wheelchair");
+        profileRequest.verbose = environment.getArgument("verbose");
+        profileRequest.compactEdges = environment.getArgument("compactEdges");
         if (operation.equals("plan")) {
             profileRequest.searchType = environment.getArgument("searchType");
         }
@@ -312,6 +332,7 @@ public class ProfileRequest implements Serializable, Cloneable {
         profileRequest.maxCarTime = environment.getArgument("maxCarTime");
         profileRequest.minBikeTime = environment.getArgument("minBikeTime");
         profileRequest.minCarTime = environment.getArgument("minCarTime");
+        profileRequest.transferPenaltySecs = environment.getArgument("transferPenaltySecs");
         profileRequest.limit = environment.getArgument("limit");
 
         profileRequest.suboptimalMinutes = environment.getArgument("suboptimalMinutes");
@@ -345,7 +366,7 @@ public class ProfileRequest implements Serializable, Cloneable {
             }
         }
         profileRequest.accessModes = EnumSet.copyOf((Collection<LegMode>) environment.getArgument("accessModes"));
-        profileRequest.egressModes = EnumSet.copyOf((Collection<LegMode>)environment.getArgument("egressModes"));
+        profileRequest.egressModes = EnumSet.copyOf((Collection<LegMode>) environment.getArgument("egressModes"));
 
         Collection<LegMode> directModes = environment.getArgument("directModes");
         //directModes can be empty if we only want transit searches

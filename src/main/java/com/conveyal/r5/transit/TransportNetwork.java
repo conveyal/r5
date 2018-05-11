@@ -5,6 +5,9 @@ import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.analyst.scenario.Scenario;
+import com.conveyal.r5.analyst.OneToMany;
+import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.analyst.PointSetWithIds;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.util.ExpandingMMFBytez;
@@ -16,6 +19,7 @@ import com.google.common.io.Files;
 import com.vividsolutions.jts.geom.Envelope;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
+
 import org.mapdb.Fun;
 import org.nustaq.serialization.FSTObjectInput;
 import org.nustaq.serialization.FSTObjectOutput;
@@ -54,13 +58,13 @@ public class TransportNetwork implements Serializable {
      * so you should usually only serialize a TransportNetwork right after it's built, when that cache contains only
      * the baseline linkage.
      */
-    public WebMercatorGridPointSet gridPointSet;
+    public PointSet pointSet;
 
     /**
      * Linkages are cached within GridPointSets. Guava caches serialize their configuration but not
      * their contents, which is actually pretty sane behavior for a cache. So if we want a particular linkage to be
      * available on reload, we have to store it in its own field.
-     * TODO it would be more "normalized" to keep only this field, and access the unlinked gridPointSet via linkedGridPointSet.pointset.
+     * TODO it would be more "normalized" to keep only this field, and access the unlinked gridPointSet via linkedGridPointSet.pointSet.
      */
     public LinkedPointSet linkedGridPointSet;
 
@@ -94,15 +98,15 @@ public class TransportNetwork implements Serializable {
             result.fareCalculator.transitLayer = result.transitLayer;
         }
 
-        // we need to put the linked grid pointset back in the linkage cache, as the contents of the linkage cache
+        // we need to put the linked grid pointSet back in the linkage cache, as the contents of the linkage cache
         // are not saved by Guava. This accelerates the time to first result after a prebuilt network has been loaded
         // to just a few seconds even in the largest regions. However, currently only the linkage for walking is saved,
         // so there will still be a long pause at the first request for driving or cycling.
-        // TODO just use a map for linkages? There should never be more than a handful per pointset, one for each mode.
-        // and the pointsets themselves are in a cache, although it does not currently have an eviction method.
-        if (result.gridPointSet != null && result.linkedGridPointSet != null) {
-            result.gridPointSet.linkageCache
-                    .put(new Fun.Tuple2<>(result.streetLayer, result.linkedGridPointSet.streetMode), result.linkedGridPointSet);
+        // TODO: just use a map for linkages? There should never be more than a handful per pointSet, one for each mode.
+        // and the pointSets themselves are in a cache, although it does not currently have an eviction method.
+        if (result.pointSet != null && result.linkedGridPointSet != null) {
+            result.pointSet.linkageCache
+                .put(new Fun.Tuple2<>(result.streetLayer, result.linkedGridPointSet.streetMode), result.linkedGridPointSet);
         }
 
         result.rebuildTransientIndexes();
@@ -147,12 +151,12 @@ public class TransportNetwork implements Serializable {
 
 
     /** Create a TransportNetwork from gtfs-lib feeds */
-    public static TransportNetwork fromFeeds (String osmSourceFile, List<GTFSFeed> feeds, TNBuilderConfig config) {
+    public static TransportNetwork fromFeeds (String osmSourceFile, List<GTFSFeed> feeds, TNBuilderConfig config) throws IOException {
         return fromFiles(osmSourceFile, null, feeds, config);
     }
 
     /** Legacy method to load from a single GTFS file */
-    public static TransportNetwork fromFiles (String osmSourceFile, String gtfsSourceFile, TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
+    public static TransportNetwork fromFiles (String osmSourceFile, String gtfsSourceFile, TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException, IOException {
         return fromFiles(osmSourceFile, Arrays.asList(gtfsSourceFile), tnBuilderConfig);
     }
 
@@ -163,7 +167,7 @@ public class TransportNetwork implements Serializable {
      * (due to caching etc.)
      */
     private static TransportNetwork fromFiles (String osmSourceFile, List<String> gtfsSourceFiles, List<GTFSFeed> feeds,
-                                               TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException {
+                                               TNBuilderConfig tnBuilderConfig) throws DuplicateFeedException, IOException {
 
         System.out.println("Summarizing builder config: " + BUILDER_CONFIG_FILENAME);
         System.out.println(tnBuilderConfig);
@@ -222,6 +226,15 @@ public class TransportNetwork implements Serializable {
         new TransferFinder(transportNetwork).findTransfers();
         new TransferFinder(transportNetwork).findParkRideTransfer();
 
+        // If a set of destinations is available at build time, link them to the street and transit networks.
+        if (tnBuilderConfig.destinations != null) {
+            PointSetWithIds destinations = OneToMany.readDestinations(new File(tnBuilderConfig.destinations));
+            transportNetwork.transitLayer.buildDistanceTables(null);
+            transportNetwork.rebuildLinkedGridPointSet(destinations);
+            transportNetwork.linkedGridPointSet = destinations.link(transportNetwork.streetLayer, StreetMode.BICYCLE);
+            transportNetwork.linkedGridPointSet = destinations.link(transportNetwork.streetLayer, StreetMode.WALK);
+        }
+
         transportNetwork.fareCalculator = tnBuilderConfig.analysisFareCalculator;
 
         if (transportNetwork.fareCalculator != null) transportNetwork.fareCalculator.transitLayer = transitLayer;
@@ -237,11 +250,11 @@ public class TransportNetwork implements Serializable {
      * distinction should be maintained for various reasons. However, we use the GTFS IDs only for reference, so it
      * doesn't really matter, particularly for analytics.
      */
-    public static TransportNetwork fromFiles (String osmFile, List<String> gtfsFiles, TNBuilderConfig config) {
+    public static TransportNetwork fromFiles (String osmFile, List<String> gtfsFiles, TNBuilderConfig config) throws IOException {
         return fromFiles(osmFile, gtfsFiles, null, config);
     }
 
-    public static TransportNetwork fromDirectory (File directory) throws DuplicateFeedException {
+    public static TransportNetwork fromDirectory (File directory) throws DuplicateFeedException, IOException {
         File osmFile = null;
         List<String> gtfsFiles = new ArrayList<>();
         TNBuilderConfig builderConfig = null;
@@ -252,6 +265,10 @@ public class TransportNetwork implements Serializable {
                 case GTFS:
                     LOG.info("Found GTFS file {}", file);
                     gtfsFiles.add(file.getAbsolutePath());
+                    break;
+                case GBFS:
+                    LOG.info("Found GBFS file {}", file);
+                    builderConfig.bikeRentalFile = file.getAbsolutePath();
                     break;
                 case OSM:
                     LOG.info("Found OSM file {}", file);
@@ -264,6 +281,11 @@ public class TransportNetwork implements Serializable {
                 case DEM:
                     LOG.warn("DEM file '{}' not yet supported.", file);
                     break;
+                case POINTS:
+                    LOG.info("Found destination pointSet file {}", file);
+                    builderConfig.destinations = file.getAbsolutePath();
+                    break;
+                default:
                 case OTHER:
                     LOG.warn("Skipping non-input file '{}'", file);
             }
@@ -323,36 +345,53 @@ public class TransportNetwork implements Serializable {
      * types are present. This helps point out when config files have been misnamed.
      */
     private static enum InputFileType {
-        GTFS, OSM, DEM, CONFIG, OUTPUT, OTHER;
+        GTFS, GBFS, OSM, DEM, CONFIG, OUTPUT, POINTS, OTHER;
         public static InputFileType forFile(File file) {
             String name = file.getName();
             if (name.endsWith(".zip")) {
                 try {
                     ZipFile zip = new ZipFile(file);
                     ZipEntry stopTimesEntry = zip.getEntry("stop_times.txt");
+                    ZipEntry stationInfoEntry = zip.getEntry("station_information.txt");
                     zip.close();
                     if (stopTimesEntry != null) return GTFS;
+                    if (stationInfoEntry != null) return GBFS;
                 } catch (Exception e) { /* fall through */ }
             }
             if (name.endsWith(".pbf") || name.endsWith(".vex")) return OSM;
             if (name.endsWith(".tif") || name.endsWith(".tiff")) return DEM; // Digital elevation model (elevation raster)
             if (name.endsWith("network.dat")) return OUTPUT;
+            if (name.endsWith("locations.txt")) return POINTS; // Destination pointSet file (for one to many routing)
             return OTHER;
         }
     }
 
     /**
-     * Build an efficient implicit grid PointSet for this TransportNetwork if it doesn't already exist. Then link that
-     * grid pointset to the street layer. This is called when a network is built for analysis purposes, and also after a
-     * scenario is applied to rebuild the grid pointset on the scenario copy of the network.
+     * Use the given PointSet for this TransportNetwork. Then link that
+     * pointSet to the street layer. This is called when a network is built for analysis purposes, and also after a
+     * scenario is applied to rebuild the pointSet on the scenario copy of the network.
      */
-    public void rebuildLinkedGridPointSet() {
-        if (gridPointSet == null) {
-            gridPointSet = new WebMercatorGridPointSet(this);
+    public void rebuildLinkedGridPointSet(PointSet ptSet) {
+        if (pointSet == null) {
+            pointSet = ptSet;
         }
         // Here we are bypassing the GridPointSet's internal cache of linkages because we want this particular
         // linkage to be serialized with the network. The internal cache does not serialize its contents.
-        linkedGridPointSet = new LinkedPointSet(gridPointSet, streetLayer, StreetMode.WALK, linkedGridPointSet);
+        linkedGridPointSet = new LinkedPointSet(pointSet, streetLayer, StreetMode.WALK, linkedGridPointSet);
+    }
+
+    /**
+     * Build an efficient implicit grid PointSet for this TransportNetwork if it doesn't already exist. Then link that
+     * grid pointSet to the street layer. This is called when a network is built for analysis purposes, and also after a
+     * scenario is applied to rebuild the grid pointSet on the scenario copy of the network.
+     */
+    public void rebuildLinkedGridPointSet() {
+        if (pointSet == null) {
+            pointSet = new WebMercatorGridPointSet(this);
+        }
+        // Here we are bypassing the GridPointSet's internal cache of linkages because we want this particular
+        // linkage to be serialized with the network. The internal cache does not serialize its contents.
+        linkedGridPointSet = new LinkedPointSet(pointSet, streetLayer, StreetMode.WALK, linkedGridPointSet);
     }
 
     //TODO: add transit stops to envelope
@@ -412,7 +451,7 @@ public class TransportNetwork implements Serializable {
         TransportNetwork copy = new TransportNetwork();
         // It is important to set this before making the clones of the street and transit layers below.
         copy.scenarioId = scenario.id;
-        copy.gridPointSet = this.gridPointSet;
+        copy.pointSet = this.pointSet;
         copy.linkedGridPointSet = this.linkedGridPointSet;
         copy.transitLayer = this.transitLayer.scenarioCopy(copy, scenario.affectsTransitLayer());
         copy.streetLayer = this.streetLayer.scenarioCopy(copy, scenario.affectsStreetLayer());

@@ -45,7 +45,7 @@ public class MultipointMetadata {
     /** Write metadata for this query */
     private void writeMetadata (OutputStream out) throws IOException {
         Metadata metadata = new Metadata();
-        WebMercatorGridPointSet ps = network.gridPointSet;
+        WebMercatorGridPointSet ps = (WebMercatorGridPointSet) network.pointSet;
         metadata.zoom = ps.zoom;
         metadata.west = ps.west;
         metadata.north = ps.north;

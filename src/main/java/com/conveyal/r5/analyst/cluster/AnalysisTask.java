@@ -2,7 +2,7 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.WebMercatorGridPointSetCache;
+import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.broker.WorkerCategory;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.profile.ProfileRequest;
@@ -15,10 +15,9 @@ import java.io.OutputStream;
 import java.util.List;
 
 /**
- * Describes an analysis task to be performed.
- *
- * By default, the task will be a travelTimeSurfaceTask for one origin.
- * This task is completed by returning a grid of total travel times from that origin to all destinations.
+ * Describe an analysis task to be performed, which could be a single point interactive task for
+ * a surface of travel times (default),
+ * or could be a regional task for bootstrapped accessibility values.
  */
 @JsonTypeInfo(use= JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property = "type")
 @JsonSubTypes({
@@ -84,13 +83,19 @@ public abstract class AnalysisTask extends ProfileRequest {
     public void setTypes (String type) {};
 
     /** Share this among both single and multipoint requests */
-    protected static WebMercatorGridPointSetCache gridPointSetCache = new WebMercatorGridPointSetCache();
+    protected static PointSetCache pointSetCache = new PointSetCache();
 
     /** Whether this task is high priority and should jump in front of other work. */
     @JsonIgnore
     public abstract boolean isHighPriority();
 
-    /** Get the destinations that should be used for this task */
+    /**
+     * Get the destinations that should be used for this task. These destinations are submitted
+     * and linked in the build step for lower latency.
+     * We could add the ability to set a different list of destinations on every request, but
+     * the required insertIfAbsent into cache on each request adds enough latency that we have
+     * chosen to leave it unimplemented until that functionality is needed.
+     */
     @JsonIgnore
     public abstract List<PointSet> getDestinations(TransportNetwork network, GridCache gridCache);
 
@@ -114,7 +119,7 @@ public abstract class AnalysisTask extends ProfileRequest {
            specified in the profile request.  If travel time results are requested, flags can specify whether components
            of travel time (e.g. waiting) and paths should also be returned.
          */
-        /** Binary grid of travel times from a single origin, for multiple percentiles, returned via broker by default */
+        /** Binary grid of travel times from a single origin. */
         TRAVEL_TIME_SURFACE,
         /** Bootstrapped accessibility results for multiple origins, returned over SQS by default. */
         REGIONAL_ANALYSIS

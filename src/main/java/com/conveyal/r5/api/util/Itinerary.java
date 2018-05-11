@@ -17,6 +17,9 @@ public class Itinerary {
     //Distance in mm of all non-transit parts of this itinerary @notnull
     public int distance;
 
+    // Distance in mm of all transit parts of this itinerary
+    public int transitDistance;
+
     //TODO: walking, cycling, driving distance/time?
 
     //Number of transfers between different transit vehicles
@@ -51,6 +54,7 @@ public class Itinerary {
         waitingTime = 0;
         walkTime = duration = streetSegment.duration;
         distance = streetSegment.distance;
+        transitDistance = 0;
         transitTime = 0;
         startTime = fromTimeDateZD;
         endTime = fromTimeDateZD.plusSeconds(streetSegment.duration);
@@ -73,5 +77,12 @@ public class Itinerary {
         walkTime+=durationSeconds;
         //Updates waiting time
         waitingTime=duration-(transitTime+walkTime);
+    }
+
+    /**
+     * Calculate a cost for the itinerary based on time and adding a cost per transfer.
+     */
+    public int getTransferWeightedTime(int transferPenaltySecs) {
+        return this.duration + (this.transfers * transferPenaltySecs);
     }
 }

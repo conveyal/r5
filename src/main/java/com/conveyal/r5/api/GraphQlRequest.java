@@ -2,6 +2,8 @@ package com.conveyal.r5.api;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+import java.util.Map;
+
 /**
  * Dummy request for GraphQL
  *
@@ -10,7 +12,5 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class GraphQlRequest {
     public String query;
-    //FIXME: This should be Map<String, Object> and be serialized automatically with Jackson but it
-    //doesn't seems to work.
-    public String variables;
+    public Map<String, Object> variables;
 }

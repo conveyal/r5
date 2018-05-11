@@ -95,17 +95,6 @@ public class LinkedPointSet implements Serializable {
         // Null means relink and rebuild everything, but this will be constrained below if a base linkage was supplied.
         Geometry treeRebuildZone = null;
 
-// This has been commented out because this was evaluating to true frequently on car searches
-// Perhaps the effect of identity equality comparisons and the fact that both base layer and new linkage are coming from a cache?
-//        if (baseLinkage != null && (
-//                baseLinkage.pointSet != pointSet ||
-//                baseLinkage.streetLayer != streetLayer.baseStreetLayer ||
-//                baseLinkage.streetMode != streetMode)) {
-//            LOG.error("Cannot reuse linkage with mismatched characteristics. THIS IS A BUG.");
-//            // Relink everything as if no base linkage was supplied.
-//            baseLinkage = null;
-//        }
-
         if (baseLinkage == null) {
             edges = new int[nPoints];
             distances0_mm = new int[nPoints];
@@ -114,8 +103,12 @@ public class LinkedPointSet implements Serializable {
         } else {
             // The caller has supplied an existing linkage for a scenario StreetLayer's base StreetLayer.
             // We want to re-use most of that that existing linkage to reduce linking time.
-            LOG.info("Linking a subset of points and copying other linkages from an existing base linkage.");
-            LOG.info("The base linkage is for street mode {}", baseLinkage.streetMode);
+            // TODO switch on assertions, they are off by default
+            assert baseLinkage.pointSet == pointSet;
+            assert baseLinkage.streetLayer == streetLayer.baseStreetLayer;
+            assert baseLinkage.streetMode == streetMode;
+
+            LOG.info("Linking a subset of points and copying other linkages from base layer");
 
             // Copy the supplied base linkage into this new LinkedPointSet.
             // The new linkage has the same PointSet as the base linkage, so the linkage arrays remain the same length
@@ -142,11 +135,10 @@ public class LinkedPointSet implements Serializable {
         // If dealing with a base network linkage, fill the stop trees list entirely with nulls.
         while (stopToPointDistanceTables.size() < nStops) stopToPointDistanceTables.add(null);
 
-        // First, link the points in this PointSet to specific street vertices.
-        // If there is no base linkage, link all streets.
+        /* First, link the points in this PointSet to specific street vertices. If there is no base linkage, link all streets. */
         this.linkPointsToStreets(baseLinkage == null);
 
-        // Second, make a table of distances from each transit stop to the points in this PointSet.
+        /* Second, make a table of distances from each transit stop to the points in this PointSet. */
         this.makeStopToPointDistanceTables(treeRebuildZone);
 
     }

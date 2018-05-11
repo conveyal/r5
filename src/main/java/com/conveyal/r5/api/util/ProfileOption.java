@@ -132,6 +132,11 @@ public class ProfileOption {
         transit.add(transitSegment);
     }
 
+    public void addTransit(TransitLayer transitLayer, PathWithTimes currentTransitPath, int pathIndex,
+    ZonedDateTime fromTimeDateZD, List<TransitJourneyID> transitJourneyIDs) {
+        addTransit(transitLayer, currentTransitPath, pathIndex, fromTimeDateZD, transitJourneyIDs, false);
+    }
+
     /**
      * Creates new transit path
      *
@@ -145,7 +150,7 @@ public class ProfileOption {
      * @param transitJourneyIDs list of patterns and times in those patterns in this path
      */
     public void addTransit(TransitLayer transitLayer, PathWithTimes currentTransitPath, int pathIndex,
-        ZonedDateTime fromTimeDateZD, List<TransitJourneyID> transitJourneyIDs) {
+            ZonedDateTime fromTimeDateZD, List<TransitJourneyID> transitJourneyIDs, boolean verbose) {
         //If this is first transit in this option or leg that doesn't exist yet we need to create new transitSegment
         if (transit == null || pathIndex >= transit.size()) {
             stats = new Stats();
@@ -153,7 +158,8 @@ public class ProfileOption {
             stats.min = currentTransitPath.stats.min;
             stats.avg = currentTransitPath.stats.avg;
             stats.num = currentTransitPath.length;
-            addTransit(new TransitSegment(transitLayer, currentTransitPath, pathIndex, fromTimeDateZD, transitJourneyIDs));
+            addTransit(new TransitSegment(transitLayer, currentTransitPath, pathIndex, fromTimeDateZD,
+                       transitJourneyIDs, verbose));
             LOG.debug("Making new transit segment:{}", currentTransitPath);
         } else {
             //Each transitSegment is for each part of transitPath. Since one path consist of multiple transfers.
@@ -226,8 +232,10 @@ public class ProfileOption {
         Itinerary itinerary = new Itinerary();
         itinerary.transfers = transitJourneyIDs.size() - 1;
 
-        itinerary.walkTime = access.get(accessIdx).duration+egress.get(egressIdx).duration;
-        itinerary.distance = access.get(accessIdx).distance+egress.get(egressIdx).distance;
+        itinerary.walkTime = access.get(accessIdx).duration + egress.get(egressIdx).duration;
+        // Middle/transfer distance is added in addMiddle()
+        itinerary.distance = access.get(accessIdx).distance + egress.get(egressIdx).distance;
+        itinerary.transitDistance = (int) transit.stream().mapToDouble(o -> o.getTransitDistanceM()).sum() * 1000;
         ZonedDateTime transitStart = transit.get(0).segmentPatterns.get(transitJourneyIDs.get(0).pattern).fromDepartureTime.get(transitJourneyIDs.get(0).time);
         itinerary.startTime = transitStart.minusSeconds(access.get(accessIdx).duration);
         int lastTransit = transitJourneyIDs.size()-1;

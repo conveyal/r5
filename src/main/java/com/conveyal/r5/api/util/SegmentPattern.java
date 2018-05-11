@@ -154,7 +154,7 @@ public  class SegmentPattern implements Comparable<SegmentPattern> {
      * @param fromTimeDateZD
      * @return
      */
-    private ZonedDateTime createTime(int time, ZonedDateTime fromTimeDateZD) {
+    static ZonedDateTime createTime(int time, ZonedDateTime fromTimeDateZD) {
         //TODO: check timezones correct time etc. this is untested
         LocalDateTime localDateTime = LocalDateTime.of(fromTimeDateZD.getYear(), fromTimeDateZD.getMonth(), fromTimeDateZD.getDayOfMonth(), 0,0);
         return localDateTime.plusSeconds(time).atZone(fromTimeDateZD.getZone());

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.vividsolutions.jts.geom.*;
 import com.vividsolutions.jts.geom.Coordinate;
 
+import java.time.ZonedDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -28,6 +29,10 @@ public class StreetEdgeInfo {
      * @notnull
      */
     public int distance;
+
+    public ZonedDateTime startTime;
+    public ZonedDateTime endTime;
+
     /** The geometry of this edge */
     public LineString geometry;
 

@@ -10,9 +10,6 @@ import gnu.trove.list.array.TByteArrayList;
 import gnu.trove.list.array.TIntArrayList;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.List;
 
 /**
  * Store a large number of vertices in parallel arrays, providing some abstraction to view them as Vertex objects.
@@ -116,6 +113,16 @@ public class VertexStore implements Serializable {
             return fixedLons.get(index);
         }
 
+        public String getFlagsAsString () {
+            StringBuilder sb = new StringBuilder();
+            for (VertexFlag flag : VertexFlag.values()) {
+                if (getFlag(flag)) {
+                    sb.append(" ");
+                    sb.append(flag.toString());
+                }
+            }
+            return sb.toString();
+        }
     }
 
     public Vertex getCursor() {

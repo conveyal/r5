@@ -1,8 +1,5 @@
 package com.conveyal.r5.util;
 
-import javafx.beans.NamedArg;
-import javafx.util.Pair;
-
 /**
  * Tuple of two elements with same type
  */

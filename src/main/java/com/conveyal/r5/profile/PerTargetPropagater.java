@@ -27,7 +27,7 @@ public class PerTargetPropagater {
     private static final Logger LOG = LoggerFactory.getLogger(PerTargetPropagater.class);
 
     /** The travel time cutoff in this regional analysis */
-    public int cutoffSeconds = 120 * 60;
+    public final int cutoffSeconds = 120 * 60;
 
     /** The linked targets */
     public LinkedPointSet targets;
@@ -57,7 +57,7 @@ public class PerTargetPropagater {
     int [][] pathsToStops;
 
 
-    public PerTargetPropagater(LinkedPointSet targets, AnalysisTask task, int[][] travelTimesToStopsEachIteration, int[] nonTransitTravelTimesToTargets, int[][] inVehicleTimesToStops, int[][] waitTimesToStops, int[][] paths) {
+    public PerTargetPropagater(LinkedPointSet targets, AnalysisTask task, int[][] travelTimesToStopsEachIteration, int[] nonTransitTravelTimesToTargets,  int[][] inVehicleTimesToStops, int[][] waitTimesToStops, int[][] paths) {
         this.targets = targets;
         this.request = task;
         this.travelTimesToStopsEachIteration = travelTimesToStopsEachIteration;
@@ -67,14 +67,13 @@ public class PerTargetPropagater {
         this.pathsToStops = paths;
     }
 
-
     /**
      * A reducer is only told whether the target was reached within the travel time threshold, which allows some
      * optimizations in certain cases. A travelTimeReducer receives a full list of travel times to the given
      * destination.
      * TODO change function signature so this returns the resulting grid object
      */
-    public void propagate () {
+    public int[] propagate() {
         targets.makePointToStopDistanceTablesIfNeeded();
 
         long startTimeMillis = System.currentTimeMillis();
@@ -126,6 +125,7 @@ public class PerTargetPropagater {
             }
         }
 
+        int[] timeToTarget = new int[targets.size()];
         for (int targetIdx = 0; targetIdx < targets.size(); targetIdx++) {
             // clear previous results, fill with whether target is reached within the cutoff without transit (which does
             // not vary with monte carlo draw)
@@ -171,6 +171,9 @@ public class PerTargetPropagater {
             if (pathWriter != null) {
                 pathWriter.recordPathsForTarget(perIterationPaths);
             }
+
+            Arrays.sort(perIterationTravelTimes);
+            timeToTarget[targetIdx] = perIterationTravelTimes[0];
         }
 
         long totalTimeMillis = System.currentTimeMillis() - startTimeMillis;
@@ -184,6 +187,7 @@ public class PerTargetPropagater {
         if (pathWriter != null) {
             pathWriter.finishPaths();
         }
+        return timeToTarget;
     }
 
     /**

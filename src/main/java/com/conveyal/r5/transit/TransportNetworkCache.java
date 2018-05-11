@@ -266,9 +266,9 @@ public class TransportNetworkCache {
         network.scenarioId = networkId;
 
         // Networks created in TransportNetworkCache are going to be used for analysis work.
-        // Pre-compute distance tables from stops to streets and pre-build a linked grid pointset for the whole region.
+        // Pre-compute distance tables from stops to streets and pre-build a linked grid pointSet for the whole region.
         // They should be serialized along with the network, which avoids building them when an analysis worker starts.
-        // The pointset linkage will never be used directly, but serves as a basis for scenario linkages, making
+        // The pointSet linkage will never be used directly, but serves as a basis for scenario linkages, making
         // analysis much faster to start up.
         network.transitLayer.buildDistanceTables(null);
         network.rebuildLinkedGridPointSet();
@@ -341,6 +341,9 @@ public class TransportNetworkCache {
             network = TransportNetwork.fromDirectory(new File(cacheDir, networkId));
         } catch (DuplicateFeedException e) {
             LOG.error("Duplicate feeds in transport network {}", networkId, e);
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            LOG.error("Could not read file {}", e);
             throw new RuntimeException(e);
         }
 

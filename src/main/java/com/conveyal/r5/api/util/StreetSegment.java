@@ -9,6 +9,7 @@ import com.conveyal.r5.streets.EdgeStore;
 import com.conveyal.r5.streets.StreetRouter;
 import com.vividsolutions.jts.geom.Coordinate;
 
+import java.time.ZonedDateTime;
 import java.util.*;
 
 /**
@@ -48,9 +49,10 @@ public class StreetSegment {
      * It fills geometry fields and duration for now.
      * @param path
      * @param mode requested mode for this path
+     * @param fromTimeDateZD
      * @param streetLayer
      */
-    public StreetSegment(StreetPath path, LegMode mode, StreetLayer streetLayer) {
+    public StreetSegment(StreetPath path, LegMode mode, ZonedDateTime fromTimeDateZD, StreetLayer streetLayer, boolean compactEdges) {
         duration = path.getDuration();
         distance = path.getDistance();
         streetEdges = new LinkedList<>();
@@ -87,6 +89,8 @@ public class StreetSegment {
                 //TODO: decide between NonTransitMode and mode
                 streetEdgeInfo.mode = NonTransitMode.valueOf(state.streetMode.toString());
                 streetEdgeInfo.distance = edge.getLengthMm();
+                streetEdgeInfo.startTime = fromTimeDateZD.plusSeconds(state.backState != null ? state.backState.getDurationSeconds() : 0);
+                streetEdgeInfo.endTime = fromTimeDateZD.plusSeconds(state.getDurationSeconds());
                 //Adds bikeRentalStation to streetEdgeInfo
                 if (state.isBikeShare && streetLayer != null && streetLayer.bikeRentalStationMap != null) {
                     BikeRentalStation bikeRentalStation = streetLayer.bikeRentalStationMap.get(state.vertex);
@@ -122,7 +126,9 @@ public class StreetSegment {
             }
         }
         //This joins consecutive streetEdgeInfos with CONTINUE Relative direction and same street name to one StreetEdgeInfo
-        compactEdges(); //TODO: this needs to be optional because of profile routing and edgeIDs
+        if (compactEdges) {
+            compactEdges();
+        }
         Coordinate[] coordinatesArray = new Coordinate[coordinates.size()];
         //FIXME: copy from list to array
         coordinatesArray = coordinates.toArray(coordinatesArray);

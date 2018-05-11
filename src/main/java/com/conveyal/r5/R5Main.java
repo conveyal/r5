@@ -3,6 +3,7 @@ package com.conveyal.r5;
 import com.conveyal.r5.analyst.broker.BrokerMain;
 import com.conveyal.r5.analyst.cluster.AnalystWorker;
 import com.conveyal.r5.point_to_point.PointToPointRouterServer;
+import com.conveyal.r5.edge_server.EdgeServiceServer;
 
 import java.util.Arrays;
 
@@ -30,6 +31,8 @@ public class R5Main {
             AnalystWorker.main(commandArguments);
         } else if ("point".equals(command)) {
             PointToPointRouterServer.main(commandArguments);
+        } else if ("edge".equals(command)) {
+            EdgeServiceServer.main(commandArguments);
         } else {
             System.err.println("Unknown command " + command);
         }

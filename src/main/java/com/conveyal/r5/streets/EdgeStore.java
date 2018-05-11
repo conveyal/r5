@@ -34,6 +34,7 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.concurrent.locks.Lock;
 import java.util.function.IntConsumer;
 
 /**
@@ -417,6 +418,28 @@ public class EdgeStore implements Serializable {
 
         public int getToVertex() {
             return isBackward ? fromVertices.get(pairIndex) : toVertices.get(pairIndex);
+        }
+
+        /**
+         * @return a Coordinate object describing the lat, long of the edge's starting vertex (origin)
+         */
+        public Coordinate getFromCoordinate() {
+            VertexStore.Vertex fromVertex = vertexStore.getCursor(getFromVertex());
+            double fromVertexLat = fromVertex.getLat();
+            double fromVertexLon = fromVertex.getLon();
+
+            return new Coordinate(fromVertexLat, fromVertexLon);
+        }
+
+        /**
+         * @return a Coordinate object describing the lat, long of the edge's ending vertex (destination)
+         */
+        public Coordinate getToCoordinate() {
+            VertexStore.Vertex toVertex = vertexStore.getCursor(getToVertex());
+            double toVertexLat = toVertex.getLat();
+            double toVertexLon = toVertex.getLon();
+
+            return new Coordinate(toVertexLat, toVertexLon);
         }
 
         /**
@@ -1141,6 +1164,10 @@ public class EdgeStore implements Serializable {
             float speedms = edge.calculateSpeed(req, streetMode);
             return (float) (edge.getLengthM() / speedms);
         }
+
+        public Lock startRequest() {return null;}
+
+        public void finishRequest(Lock l) {}
     }
 
 }

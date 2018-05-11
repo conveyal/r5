@@ -26,11 +26,11 @@ public class ProfileResponse {
     //This is used to find which transfers are used in which Profileoption when calculating street transfers
     private Multimap<Transfer, ProfileOption> transferToOption = HashMultimap.create();
 
-    @Override public String toString() {
-        return "ProfileResponse{" +
-            "options=" + options +
-            '}';
+    @Override
+    public String toString() {
+        return "ProfileResponse{" + "options=" + options + '}';
     }
+
     //This connect which transits are in which profileOption
     private Map<HashPath, ProfileOption> transitToOption = new HashMap<>();
 
@@ -71,6 +71,15 @@ public class ProfileResponse {
     public void addTransitPath(Map<LegMode, StreetRouter> accessRouter,
                                Map<LegMode, StreetRouter> egressRouter, PathWithTimes currentTransitPath,
                                TransportNetwork transportNetwork, ZonedDateTime fromTimeDateZD) {
+        addTransitPath(accessRouter, egressRouter, currentTransitPath, transportNetwork, fromTimeDateZD, false, false);
+    }
+
+    /**
+     * Version of addTransitPath with verbose parameter indicating whether to include transitEdges
+     */
+    public void addTransitPath(Map<LegMode, StreetRouter> accessRouter, Map<LegMode, StreetRouter> egressRouter,
+                               PathWithTimes currentTransitPath, TransportNetwork transportNetwork, ZonedDateTime fromTimeDateZD,
+                               boolean verbose, boolean compactEdges) {
 
         HashPath hashPath = new HashPath(currentTransitPath);
         ProfileOption profileOption = transitToOption.getOrDefault(hashPath, new ProfileOption());
@@ -104,7 +113,7 @@ public class ProfileResponse {
                     } else {
                         streetPath = new StreetPath(state, transportNetwork, false);
                     }
-                    StreetSegment streetSegment = new StreetSegment(streetPath, accessMode, transportNetwork.streetLayer);
+                    StreetSegment streetSegment = new StreetSegment(streetPath, accessMode, fromTimeDateZD, transportNetwork.streetLayer, compactEdges);
                     profileOption.addAccess(streetSegment, accessMode, startVertexStopIndex);
                     //This should never happen since stopModeAccessMap is filled from reached stops in accessRouter
                 } else {
@@ -127,7 +136,7 @@ public class ProfileResponse {
                 StreetRouter.State state = streetRouter.getStateAtVertex(endVertexStopIndex);
                 if (state != null) {
                     StreetPath streetPath = new StreetPath(state, transportNetwork, true);
-                    StreetSegment streetSegment = new StreetSegment(streetPath, egressMode, transportNetwork.streetLayer);
+                    StreetSegment streetSegment = new StreetSegment(streetPath, egressMode, fromTimeDateZD, transportNetwork.streetLayer, compactEdges);
                     profileOption.addEgress(streetSegment, egressMode, endVertexStopIndex);
                     //This should never happen since stopModeEgressMap is filled from reached stops in egressRouter
                 } else {
@@ -140,7 +149,7 @@ public class ProfileResponse {
         List<TransitJourneyID> transitJourneyIDs = new ArrayList<>(currentTransitPath.patterns.length);
         for (int i = 0; i < currentTransitPath.patterns.length; i++) {
                 profileOption.addTransit(transportNetwork.transitLayer,
-                    currentTransitPath, i, fromTimeDateZD, transitJourneyIDs);
+                    currentTransitPath, i, fromTimeDateZD, transitJourneyIDs, verbose);
             if (i>0) {
                 //If there is a transfer between same stops we don't need to walk since we are already there
                 if (currentTransitPath.boardStops[i] != currentTransitPath.alightStops[i-1]) {
@@ -198,7 +207,7 @@ public class ProfileResponse {
                 StreetRouter.State lastState = streetRouter.getStateAtVertex(endIndex);
                 if (lastState != null) {
                     StreetPath streetPath = new StreetPath(lastState, transportNetwork, false);
-                    StreetSegment streetSegment = new StreetSegment(streetPath, LegMode.WALK, transportNetwork.streetLayer);
+                    StreetSegment streetSegment = new StreetSegment(streetPath, LegMode.WALK, request.getFromTimeDateZD(), transportNetwork.streetLayer, request.compactEdges);
                     for (ProfileOption profileOption: transferToOption.get(transfer)) {
                         profileOption.addMiddle(streetSegment, transfer);
                     }

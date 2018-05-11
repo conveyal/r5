@@ -372,8 +372,13 @@ public class FastRaptorWorker {
             TripSchedule schedule = null;
 
             for (int stopPositionInPattern = 0; stopPositionInPattern < pattern.stops.length; stopPositionInPattern++) {
-                int stop = pattern.stops[stopPositionInPattern];
 
+                int stop = pattern.stops[stopPositionInPattern];
+                if (request.wheelchair) {
+                    if (!transit.stopsWheelchair.get(stop)) {
+                        continue;
+                    }
+                }
                 // attempt to alight if we're on board and if drop off is allowed, done above the board search so
                 // that we don't check for alighting when boarding
                 if (onTrip > -1 && pattern.dropoffs[stopPositionInPattern] != PickDropType.NONE) {
@@ -391,7 +396,7 @@ public class FastRaptorWorker {
                         inputState.previousPatterns[stop] :
                         inputState.previousPatterns[inputState.previousStop[stop]];
 
-                // Don't attempt to board if this stop was not reached in the last round or if pick up is not allowed,
+                // Don't attempt to board if this stop was not reached in the last round  or if pick up is not allowed,
                 // and don't attempt to reboard the same pattern
                 if (inputState.bestStopsTouched.get(stop) && sourcePatternIndex != originalPatternIndex && pattern.pickups[stopPositionInPattern] != PickDropType.NONE) {
                     int earliestBoardTime = inputState.bestTimes[stop] + MINIMUM_BOARD_WAIT_SEC;
@@ -477,8 +482,13 @@ public class FastRaptorWorker {
                     for (int stopPositionInPattern = 0; stopPositionInPattern < pattern.stops.length; stopPositionInPattern++) {
                         int stop = pattern.stops[stopPositionInPattern];
 
-                        // attempt to alight if boarded and if drop off is allowed
-                        if (boardTime > -1 && pattern.dropoffs[stopPositionInPattern] != PickDropType.NONE) {
+                        if (request.wheelchair) {
+                            if (!transit.stopsWheelchair.get(stop)) {
+                                continue;
+                            }
+                        }
+                        // attempt to alight if boarded and if drop off is allowe
+                        if (boardTime > -1  && pattern.dropoffs[stopPositionInPattern] != PickDropType.NONE) {
                             // attempt to alight
                             int travelTime = schedule.arrivals[stopPositionInPattern] - schedule.departures[boardStopPositionInPattern];
                             int alightTime = boardTime + travelTime;

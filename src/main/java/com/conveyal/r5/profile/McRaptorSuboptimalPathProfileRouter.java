@@ -31,7 +31,7 @@ import java.util.function.Supplier;
  * @author mattwigway
  */
 public class McRaptorSuboptimalPathProfileRouter {
-    
+
     private static final Logger LOG = LoggerFactory.getLogger(McRaptorSuboptimalPathProfileRouter.class);
 
     public static final int BOARD_SLACK = 60;
@@ -70,8 +70,6 @@ public class McRaptorSuboptimalPathProfileRouter {
     private FrequencyRandomOffsets offsets;
 
     private TIntObjectMap<McRaptorStateBag> bestStates = new TIntObjectHashMap<>();
-
-
 
     private int round = 0;
     // used in hashing

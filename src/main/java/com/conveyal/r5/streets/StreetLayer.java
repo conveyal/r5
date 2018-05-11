@@ -35,6 +35,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.Serializable;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -46,7 +47,6 @@ import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
 import static com.conveyal.r5.streets.VertexStore.fixedDegreeGeometryToFloating;
-import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
 /**
  * This class stores the street network. Information about public transit is in a separate layer.
@@ -1369,7 +1369,7 @@ public class StreetLayer implements Serializable, Cloneable {
         if (willBeModified) {
             // Wrap all the edge and vertex storage in classes that make them extensible.
             // Indicate that the content of the new StreetLayer will be changed by giving it the scenario's scenarioId.
-            // If the copy will not be modified, scenarioId remains unchanged to allow cached pointset linkage reuse.
+            // If the copy will not be modified, scenarioId remains unchanged to allow cached pointSet linkage reuse.
             copy.scenarioId = newScenarioNetwork.scenarioId;
             copy.edgeStore = edgeStore.extendOnlyCopy(copy);
             // The extend-only copy of the EdgeStore also contains a new extend-only copy of the VertexStore.
@@ -1385,9 +1385,9 @@ public class StreetLayer implements Serializable, Cloneable {
     /**
      * Creates vertices to represent each bike rental station.
      */
-    public void associateBikeSharing(TNBuilderConfig tnBuilderConfig) {
+    public void associateBikeSharing(TNBuilderConfig tnBuilderConfig) throws IOException {
         LOG.info("Builder file:{}", tnBuilderConfig.bikeRentalFile);
-        BikeRentalBuilder bikeRentalBuilder = new BikeRentalBuilder(new File(tnBuilderConfig.bikeRentalFile));
+        BikeRentalBuilder bikeRentalBuilder = new BikeRentalBuilder(tnBuilderConfig.bikeRentalFile);
         List<BikeRentalStation> bikeRentalStations = bikeRentalBuilder.getRentalStations();
         bikeRentalStationMap = new TIntObjectHashMap<>(bikeRentalStations.size());
         LOG.info("Bike rental stations:{}", bikeRentalStations.size());
@@ -1404,7 +1404,10 @@ public class StreetLayer implements Serializable, Cloneable {
         if (numAddedStations > 0) {
             this.bikeSharing = true;
         }
-        LOG.info("Added {} out of {} stations ratio:{}", numAddedStations, bikeRentalStations.size(), numAddedStations/bikeRentalStations.size());
+        LOG.info("Added {} out of {} stations ratio:{}",
+            numAddedStations,
+            bikeRentalStations.size(),
+            bikeRentalStations.size() > 0 ? numAddedStations/bikeRentalStations.size() : 0 );
 
     }
 

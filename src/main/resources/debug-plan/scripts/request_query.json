@@ -62,22 +62,28 @@ bikeTrafficStress: $bikeTrafficStress, minBikeTime: $minBikeTime) {
       mode,
       routes {id, routeIdx shortName, mode, agencyName},
       segmentPatterns {
-        patternId, patternIdx,
-	routeIdx
-        fromIndex
+        patternId,
+        patternIdx,
+        routeIdx,
+        fromIndex,
         toIndex,
         fromDepartureTime
         toArrivalTime,
         tripId
-        
-     
       },
-    middle {
-      mode,
-      duration,
-      distance,
-      geometryGeoJSON,
-    }
+      middle {
+        mode,
+        duration,
+        distance,
+        geometryGeoJSON,
+      },
+      transitEdges {
+        id,
+        fromStopID,
+        toStopID,
+        routeID,
+        geometry,
+      },
     },
     
     access {
@@ -98,7 +104,7 @@ bikeTrafficStress: $bikeTrafficStress, minBikeTime: $minBikeTime) {
         #effectiveEndDate
       #},
       streetEdges {
-        #edgeId
+        edgeId
         distance
         geometryGeoJSON
         mode
@@ -144,7 +150,7 @@ bikeTrafficStress: $bikeTrafficStress, minBikeTime: $minBikeTime) {
         #effectiveEndDate
       #},
       streetEdges {
-        #edgeId
+        edgeId
         #distance
         #geometryPolyline
         mode

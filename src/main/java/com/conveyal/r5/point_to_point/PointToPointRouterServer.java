@@ -1,24 +1,31 @@
 package com.conveyal.r5.point_to_point;
 
+import com.conveyal.r5.analyst.OneToMany;
+import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.api.GraphQlRequest;
+import com.conveyal.r5.api.ProfileResponse;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.ParkRideParking;
+import com.conveyal.r5.api.util.ProfileOption;
 import com.conveyal.r5.api.util.Stop;
 import com.conveyal.r5.common.GeoJsonFeature;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.point_to_point.builder.RouterInfo;
-import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.streets.*;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectReader;
-import com.vividsolutions.jts.geom.*;
+import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Envelope;
+import com.vividsolutions.jts.geom.LineString;
+import com.vividsolutions.jts.geom.PrecisionModel;
 import com.vividsolutions.jts.operation.buffer.BufferParameters;
 import com.vividsolutions.jts.operation.buffer.OffsetCurveBuilder;
 import gnu.trove.map.TIntIntMap;
@@ -29,9 +36,20 @@ import graphql.GraphQLException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
-
 import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.EnumMap;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
@@ -40,7 +58,11 @@ import static spark.Spark.*;
 /**
  * This will represent point to point search server.
  *
- * It can build point to point TransportNetwork and start a server with API for point to point searches
+ * It can build point to point TransportNetwork and start a server with API for point to point searches.
+ * Expected flags:
+ * --<function> <input file directory> <additional flags>
+ * e.g.
+ * --build|graphs|isochrones ./transit_data/toronto one-to-many toronto-das.locations.txt
  *
  */
 public class PointToPointRouterServer {
@@ -56,6 +78,8 @@ public class PointToPointRouterServer {
 
     public static final int RADIUS_METERS = 200;
 
+    public static final String gcsCongestion = System.getenv("GCS_CONGESTION");
+
     public static void main(String[] commandArguments) {
 
         LOG.info("Arguments: {}", Arrays.toString(commandArguments));
@@ -70,27 +94,46 @@ public class PointToPointRouterServer {
                 LOG.error("'{}' is not a readable directory.", dir);
             }
 
-            TransportNetwork transportNetwork = TransportNetwork.fromDirectory(dir);
-            //In memory doesn't save it to disk others do (build, preFlight)
-            if (!inMemory) {
-                try {
+            TransportNetwork transportNetwork;
+            try {
+                transportNetwork = TransportNetwork.fromDirectory(dir);
+                //In memory doesn't save it to disk others do (build, preFlight)
+                if (!inMemory) {
                     transportNetwork.write(new File(dir, "network.dat"));
-                } catch (Exception e) {
-                    LOG.error("An error occurred during saving transit networks. Exiting.", e);
-                    System.exit(-1);
                 }
+            } catch (IOException e) {
+                LOG.error("An error occurred during creation of transport network. Exiting.", e);
+                System.exit(-1);
+            } catch (Exception e) {
+                LOG.error("An error occurred during saving transit networks. Exiting.", e);
+                System.exit(-1);
             }
         } else if ("--graphs".equals(commandArguments[0])) {
+            if (commandArguments.length < 2) {
+                throw new RuntimeException(
+                        "To use the --graphs flag, specify the directory where the TransportNetwork can be found");
+            }
             File dir = new File(commandArguments[1]);
+
+            // See OneToMany.java for a description of what OneToMany mode expects as inputs.
+            Boolean oneToMany = commandArguments.length > 2
+                    && ("one-to-many".equals(commandArguments[2]) || "--one-to-many".equals(commandArguments[2]));
+            File destinationsFile = null;
+            if (oneToMany) {
+                if (commandArguments.length < 4) {
+                    throw new RuntimeException("To use OneToMany mode, specify the destinations file.");
+                }
+                destinationsFile = new File(dir, commandArguments[3]);
+            }
 
             if (!dir.isDirectory() && dir.canRead()) {
                 LOG.error("'{}' is not a readable directory.", dir);
             }
             try {
                 LOG.info("Loading transit networks from: {}", dir);
-                TransportNetwork transportNetwork = TransportNetwork.read(new File(dir, "network.dat"));
-                transportNetwork.readOSM(new File(dir, "osm.mapdb"));
-                run(transportNetwork);
+                TransportNetwork transportNetwork = setUpTransportNetwork(dir, oneToMany);
+                TravelTimeCalculator travelTimeCalculator = getTravelTimeCalculator(dir);
+                run(transportNetwork, travelTimeCalculator, dir, destinationsFile);
             } catch (Exception e) {
                 LOG.error("An error occurred during the reading or decoding of transit networks", e);
                 System.exit(-1);
@@ -103,20 +146,15 @@ public class PointToPointRouterServer {
             }
             try {
                 LOG.info("Loading transit networks from: {}", dir);
-                TransportNetwork transportNetwork = TransportNetwork.read(new File(dir, "network.dat"));
-                transportNetwork.readOSM(new File(dir, "osm.mapdb"));
-                transportNetwork.transitLayer.buildDistanceTables(null);
-                transportNetwork.rebuildLinkedGridPointSet();
-                transportNetwork.linkedGridPointSet.pointSet.link(transportNetwork.streetLayer, StreetMode.CAR);
-                run(transportNetwork);
+                TransportNetwork transportNetwork = setUpTransportNetwork(dir, true);
+                TravelTimeCalculator travelTimeCalculator = getTravelTimeCalculator(dir);
+                run(transportNetwork, travelTimeCalculator, null, null);
             } catch (Exception e) {
                 LOG.error("An error occurred during the reading or decoding of transit networks", e);
                 System.exit(-1);
             }
-        } else if ("--help".equals(commandArguments[0])
-                || "-h".equals(commandArguments[0])
-                || "--usage".equals(commandArguments[0])
-                || "-u".equals(commandArguments[0])) {
+        } else if ("--help".equals(commandArguments[0]) || "-h".equals(commandArguments[0])
+                || "--usage".equals(commandArguments[0]) || "-u".equals(commandArguments[0])) {
             System.out.println(USAGE);
         } else {
             LOG.info("Unknown argument: {}", commandArguments[0]);
@@ -125,14 +163,25 @@ public class PointToPointRouterServer {
 
     }
 
-    private static void run(TransportNetwork transportNetwork) {
+    private static TravelTimeCalculator getTravelTimeCalculator(File dir) {
+        String congestPath = gcsCongestion != null ? gcsCongestion : dir.toString() + "/r5_predicted_tt.csv";
+        if ((new File(congestPath)).exists()) {
+            return new FileTravelTimeCalculator(congestPath);
+        } else {
+            return new EdgeStore.DefaultTravelTimeCalculator();
+        }
+    }
+
+    private static void run(TransportNetwork transportNetwork, TravelTimeCalculator travelTimeCalculator, File dir,
+            File destinationsFile) {
         port(DEFAULT_PORT);
         ObjectMapper mapper = new ObjectMapper();
         //ObjectReader is a new lightweight mapper which can only deserialize specified class
         ObjectReader graphQlRequestReader = mapper.reader(GraphQlRequest.class);
-        ObjectReader mapReader = mapper.reader(HashMap.class);
         staticFileLocation("debug-plan");
-        PointToPointQuery pointToPointQuery = new PointToPointQuery(transportNetwork);
+        PointToPointQuery pointToPointQuery = new PointToPointQuery(transportNetwork, travelTimeCalculator);
+
+        System.out.println("Starting GraphQL server.");
 
         //TODO: executor strategies
         GraphQL graphQL = new GraphQL(new com.conveyal.r5.GraphQLSchema(pointToPointQuery).indexSchema);
@@ -141,14 +190,12 @@ public class PointToPointRouterServer {
 
         options("/*", (request, response) -> {
 
-            String accessControlRequestHeaders = request
-                .headers("Access-Control-Request-Headers");
+            String accessControlRequestHeaders = request.headers("Access-Control-Request-Headers");
             if (accessControlRequestHeaders != null) {
                 response.header("Access-Control-Allow-Headers", accessControlRequestHeaders);
             }
 
-            String accessControlRequestMethod = request
-                .headers("Access-Control-Request-Method");
+            String accessControlRequestMethod = request.headers("Access-Control-Request-Method");
             if (accessControlRequestMethod != null) {
                 response.header("Access-Control-Allow-Methods", accessControlRequestMethod);
             }
@@ -193,11 +240,11 @@ public class PointToPointRouterServer {
             streetRouter.timeLimitSeconds = profileRequest.getTimeLimit(LegMode.valueOf(streetMode.toString()));
             streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             streetRouter.transitStopSearch = true;
-            if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
+            if (streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
                 streetRouter.route();
                 streetRouter.getReachedStops().forEachEntry((stopIdx, weight) -> {
-                    VertexStore.Vertex stopVertex = transportNetwork.streetLayer.vertexStore.getCursor(
-                        transportNetwork.transitLayer.streetVertexForStop.get(stopIdx));
+                    VertexStore.Vertex stopVertex = transportNetwork.streetLayer.vertexStore
+                            .getCursor(transportNetwork.transitLayer.streetVertexForStop.get(stopIdx));
                     StreetRouter.State state = streetRouter.getStateAtVertex(stopVertex.index);
                     GeoJsonFeature feature = new GeoJsonFeature(stopVertex.getLon(), stopVertex.getLat());
                     feature.addProperty("weight", weight);
@@ -205,7 +252,7 @@ public class PointToPointRouterServer {
                     feature.addProperty("type", "stop");
                     feature.addProperty("mode", streetMode.toString());
                     if (state != null) {
-                        feature.addProperty("distance_m", state.distance/1000);
+                        feature.addProperty("distance_m", state.distance / 1000);
                         feature.addProperty("duration_s", state.getDurationSeconds());
                         LOG.info("Duration:{}s diff:{}", state.getDurationSeconds());
                     }
@@ -253,26 +300,30 @@ public class PointToPointRouterServer {
             streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             streetRouter.flagSearch = VertexStore.VertexFlag.BIKE_SHARING;
             streetRouter.flagSearchQuantity = 50;
-            if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
+            if (streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
                 streetRouter.route();
-                streetRouter.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING).forEachEntry((vertexIdx, state) -> {
-                    VertexStore.Vertex bikeShareVertex = transportNetwork.streetLayer.vertexStore.getCursor(vertexIdx);
-                    BikeRentalStation bikeRentalStation = transportNetwork.streetLayer.bikeRentalStationMap.get(vertexIdx);
-                    GeoJsonFeature feature = new GeoJsonFeature(bikeShareVertex.getLon(), bikeShareVertex.getLat());
-                    feature.addProperty("weight", state.weight);
-                    if (bikeRentalStation != null) {
-                        feature.addProperty("name", bikeRentalStation.name);
-                        feature.addProperty("id", bikeRentalStation.id);
-                        feature.addProperty("bikes", bikeRentalStation.bikesAvailable);
-                        feature.addProperty("places", bikeRentalStation.spacesAvailable);
-                    }
-                    feature.addProperty("type", "bike_share");
-                    if (state != null) {
-                        feature.addProperty("distance_m", state.distance/1000);
-                    }
-                    features.add(feature);
-                    return true;
-                });
+                streetRouter.getReachedVertices(VertexStore.VertexFlag.BIKE_SHARING)
+                        .forEachEntry((vertexIdx, state) -> {
+                            VertexStore.Vertex bikeShareVertex = transportNetwork.streetLayer.vertexStore
+                                    .getCursor(vertexIdx);
+                            BikeRentalStation bikeRentalStation = transportNetwork.streetLayer.bikeRentalStationMap
+                                    .get(vertexIdx);
+                            GeoJsonFeature feature = new GeoJsonFeature(bikeShareVertex.getLon(),
+                                    bikeShareVertex.getLat());
+                            feature.addProperty("weight", state.weight);
+                            if (bikeRentalStation != null) {
+                                feature.addProperty("name", bikeRentalStation.name);
+                                feature.addProperty("id", bikeRentalStation.id);
+                                feature.addProperty("bikes", bikeRentalStation.bikesAvailable);
+                                feature.addProperty("places", bikeRentalStation.spacesAvailable);
+                            }
+                            feature.addProperty("type", "bike_share");
+                            if (state != null) {
+                                feature.addProperty("distance_m", state.distance / 1000);
+                            }
+                            features.add(feature);
+                            return true;
+                        });
             } else {
                 content.put("errors", "Start point isn't found!");
             }
@@ -283,7 +334,6 @@ public class PointToPointRouterServer {
 
             return content;
         }, JsonUtilities.objectMapper::writeValueAsString);
-
 
         get("/reachedParkRide", (request, response) -> {
             response.header("Content-Type", "application/json");
@@ -309,20 +359,22 @@ public class PointToPointRouterServer {
             streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             streetRouter.flagSearch = VertexStore.VertexFlag.PARK_AND_RIDE;
             streetRouter.flagSearchQuantity = 50;
-            if(streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
+            if (streetRouter.setOrigin(profileRequest.fromLat, profileRequest.fromLon)) {
                 streetRouter.route();
-                streetRouter.getReachedVertices(VertexStore.VertexFlag.PARK_AND_RIDE).forEachEntry((vertexIdx, state) -> {
-                    VertexStore.Vertex stopVertex = transportNetwork.streetLayer.vertexStore.getCursor(vertexIdx);
-                    GeoJsonFeature feature = new GeoJsonFeature(stopVertex.getLon(), stopVertex.getLat());
-                    feature.addProperty("weight", state.weight);
-                    //feature.addProperty("name", transportNetwork.transitLayer.stopNames.get(stopIdx));
-                    feature.addProperty("type", "park_ride");
-                    feature.addProperty("mode", "CAR");
-                    feature.addProperty("distance_m", state.distance/1000);
-                    feature.addProperty("duration_s", state.getDurationSeconds());
-                    features.add(feature);
-                    return true;
-                });
+                streetRouter.getReachedVertices(VertexStore.VertexFlag.PARK_AND_RIDE)
+                        .forEachEntry((vertexIdx, state) -> {
+                            VertexStore.Vertex stopVertex = transportNetwork.streetLayer.vertexStore
+                                    .getCursor(vertexIdx);
+                            GeoJsonFeature feature = new GeoJsonFeature(stopVertex.getLon(), stopVertex.getLat());
+                            feature.addProperty("weight", state.weight);
+                            //feature.addProperty("name", transportNetwork.transitLayer.stopNames.get(stopIdx));
+                            feature.addProperty("type", "park_ride");
+                            feature.addProperty("mode", "CAR");
+                            feature.addProperty("distance_m", state.distance / 1000);
+                            feature.addProperty("duration_s", state.getDurationSeconds());
+                            features.add(feature);
+                            return true;
+                        });
             } else {
                 content.put("errors", "Start point isn't found!");
             }
@@ -334,6 +386,43 @@ public class PointToPointRouterServer {
             return content;
         }, JsonUtilities.objectMapper::writeValueAsString);
 
+        /**
+         * One to many routing. Works with all modes (transit, walking, biking, etc.)
+         */
+        post("/travelTimeMap", ((request, response) -> {
+            response.header("Content-Type", "application/json");
+            ObjectReader analysisTaskReader = mapper.reader(AnalysisTask.class);
+            AnalysisTask analysisTask = analysisTaskReader.readValue(request.body());
+            return OneToMany.makeRequest(analysisTask, transportNetwork);
+        }), JsonUtilities.objectMapper::writeValueAsString);
+
+        /**
+         * One-to-one routing. Works with all modes (transit, walking, biking, etc.)
+         */
+        post("/route", ((request, response) -> {
+            response.header("Content-Type", "application/json");
+            ObjectReader profileRequestReader = mapper.reader(ProfileRequest.class);
+            ProfileRequest profileRequest = profileRequestReader.readValue(request.body());
+            ProfileResponse pr = pointToPointQuery.getPlan(profileRequest);
+            // Return fastest route.
+            class TimeComparator implements Comparator<ProfileOption> {
+                @Override
+                public int compare(ProfileOption p1, ProfileOption p2) {
+                    return p1.itinerary.get(0).getTransferWeightedTime(profileRequest.transferPenaltySecs)
+                            - p2.itinerary.get(0).getTransferWeightedTime(profileRequest.transferPenaltySecs);
+                }
+            }
+            ProfileOption fastest = null;
+            if (pr.options.size() > 0) {
+                fastest = Collections.min(pr.options, new TimeComparator());
+            }
+            return fastest;
+        }), JsonUtilities.objectMapper::writeValueAsString);
+
+        /**
+         * Unlike route/, this endpoint only supports routing over the street network,
+         * not via transit.
+         */
         get("/plan", (request, response) -> {
             response.header("Content-Type", "application/json");
             Map<String, Object> content = new HashMap<>();
@@ -368,6 +457,7 @@ public class PointToPointRouterServer {
             profileRequest.fromLon = fromLon;
             profileRequest.toLat = toLat;
             profileRequest.toLon = toLon;
+            profileRequest.verbose = request.queryMap("verbose").booleanValue();
             StreetRouter streetRouter = new StreetRouter(transportNetwork.streetLayer);
 
             streetRouter.profileRequest = profileRequest;
@@ -404,7 +494,7 @@ public class PointToPointRouterServer {
 
             //Gets lowest weight state for end coordinate split
             StreetRouter.State lastState = streetRouter.getState(streetRouter.getDestinationSplit());
-//          StreetRouter.State lastState = streetRouter.getState(transportNetwork.transitLayer.streetVertexForStop.get(stops.keys()[0]));
+            //          StreetRouter.State lastState = streetRouter.getState(transportNetwork.transitLayer.streetVertexForStop.get(stops.keys()[0]));
             if (lastState != null) {
                 Map<String, Object> featureCollection = new HashMap<>(2);
                 featureCollection.put("type", "FeatureCollection");
@@ -428,45 +518,44 @@ public class PointToPointRouterServer {
                 Map<String, Object> featureCollection = new HashMap<>(2);
                 featureCollection.put("type", "FeatureCollection");
                 List<GeoJsonFeature> features = new ArrayList<>(10);
-                GeoJsonFeature feature = new GeoJsonFeature(
-                    fixedDegreesToFloating(destinationSplit.fixedLon), fixedDegreesToFloating(destinationSplit.fixedLat));
+                GeoJsonFeature feature = new GeoJsonFeature(fixedDegreesToFloating(destinationSplit.fixedLon),
+                        fixedDegreesToFloating(destinationSplit.fixedLat));
                 feature.addProperty("type", "Point on edge");
 
                 features.add(feature);
 
-                VertexStore.Vertex vertex = transportNetwork.streetLayer.vertexStore.getCursor(destinationSplit.vertex0);
+                VertexStore.Vertex vertex = transportNetwork.streetLayer.vertexStore
+                        .getCursor(destinationSplit.vertex0);
                 feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
                 feature.addProperty("type", "Edge start point");
                 feature.addProperty("vertex_idx", destinationSplit.vertex0);
-                feature.addProperty("distance_to_vertex", destinationSplit.distance0_mm/1000);
+                feature.addProperty("distance_to_vertex", destinationSplit.distance0_mm / 1000);
                 features.add(feature);
-                transportNetwork.streetLayer.incomingEdges.get(destinationSplit.vertex0)
-                    .forEach(edge_idx -> {
-                        EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edge_idx);
-                        GeoJsonFeature edge_feature = new GeoJsonFeature(edge.getGeometry());
-                        edge_feature.addProperty("idx", edge_idx);
-                        edge_feature.addProperty("permissions", edge.getPermissionsAsString());
-                        edge_feature.addProperty("to", "vertex0");
-                        features.add(edge_feature);
-                        return true;
-                    });
+                transportNetwork.streetLayer.incomingEdges.get(destinationSplit.vertex0).forEach(edge_idx -> {
+                    EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edge_idx);
+                    GeoJsonFeature edge_feature = new GeoJsonFeature(edge.getGeometry());
+                    edge_feature.addProperty("idx", edge_idx);
+                    edge_feature.addProperty("permissions", edge.getPermissionsAsString());
+                    edge_feature.addProperty("to", "vertex0");
+                    features.add(edge_feature);
+                    return true;
+                });
 
                 transportNetwork.streetLayer.vertexStore.getCursor(destinationSplit.vertex1);
                 feature = new GeoJsonFeature(vertex.getLon(), vertex.getLat());
                 feature.addProperty("type", "Edge end point");
                 feature.addProperty("vertex_idx", destinationSplit.vertex1);
-                feature.addProperty("distance_to_vertex", destinationSplit.distance1_mm/1000);
+                feature.addProperty("distance_to_vertex", destinationSplit.distance1_mm / 1000);
                 features.add(feature);
-                transportNetwork.streetLayer.incomingEdges.get(destinationSplit.vertex1)
-                    .forEach(edge_idx -> {
-                        EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edge_idx);
-                        GeoJsonFeature edge_feature = new GeoJsonFeature(edge.getGeometry());
-                        edge_feature.addProperty("idx", edge_idx);
-                        edge_feature.addProperty("permissions", edge.getPermissionsAsString());
-                        edge_feature.addProperty("to", "vertex1");
-                        features.add(edge_feature);
-                        return true;
-                    });
+                transportNetwork.streetLayer.incomingEdges.get(destinationSplit.vertex1).forEach(edge_idx -> {
+                    EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edge_idx);
+                    GeoJsonFeature edge_feature = new GeoJsonFeature(edge.getGeometry());
+                    edge_feature.addProperty("idx", edge_idx);
+                    edge_feature.addProperty("permissions", edge.getPermissionsAsString());
+                    edge_feature.addProperty("to", "vertex1");
+                    features.add(edge_feature);
+                    return true;
+                });
 
                 featureCollection.put("features", features);
                 content.put("data", featureCollection);
@@ -486,8 +575,7 @@ public class PointToPointRouterServer {
             float east = request.queryMap("e").floatValue();
             float west = request.queryMap("w").floatValue();
 
-            Envelope env = new Envelope(east, west,
-                south, north);
+            Envelope env = new Envelope(east, west, south, north);
 
             // write geojson to response
             Map<String, Object> featureCollection = new HashMap<>(2);
@@ -521,8 +609,7 @@ public class PointToPointRouterServer {
             float east = request.queryMap("e").floatValue();
             float west = request.queryMap("w").floatValue();
 
-            Envelope env = new Envelope(east, west,
-                south, north);
+            Envelope env = new Envelope(east, west, south, north);
 
             // write geojson to response
             Map<String, Object> featureCollection = new HashMap<>(2);
@@ -557,8 +644,7 @@ public class PointToPointRouterServer {
             float east = request.queryMap("e").floatValue();
             float west = request.queryMap("w").floatValue();
 
-            Envelope env = new Envelope(east, west,
-                south, north);
+            Envelope env = new Envelope(east, west, south, north);
 
             // write geojson to response
             Map<String, Object> featureCollection = new HashMap<>(2);
@@ -610,7 +696,7 @@ public class PointToPointRouterServer {
             String layer = "turns"; // request.params(":layer");
 
             Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
-                floatingDegreesToFixed(south), floatingDegreesToFixed(north));
+                    floatingDegreesToFixed(south), floatingDegreesToFixed(north));
             TIntSet streets = transportNetwork.streetLayer.findEdgesInEnvelope(env);
 
             if (streets.size() > 100_000) {
@@ -629,8 +715,7 @@ public class PointToPointRouterServer {
             BufferParameters bufParams = new BufferParameters();
             bufParams.setSingleSided(true);
             bufParams.setJoinStyle(BufferParameters.JOIN_BEVEL);
-            OffsetCurveBuilder offsetBuilder = new OffsetCurveBuilder(new PrecisionModel(),
-                bufParams);
+            OffsetCurveBuilder offsetBuilder = new OffsetCurveBuilder(new PrecisionModel(), bufParams);
             float distance = -0.00005f;
 
             Set<Integer> seenVertices = new HashSet<>(streets.size());
@@ -639,11 +724,9 @@ public class PointToPointRouterServer {
                 streets.forEach(s -> {
                     try {
                         int edgeIdx = s;
-                        makeTurnEdge(transportNetwork, both, features, cursor, offsetBuilder,
-                            distance, edgeIdx);
+                        makeTurnEdge(transportNetwork, both, features, cursor, offsetBuilder, distance, edgeIdx);
                         edgeIdx++;
-                        makeTurnEdge(transportNetwork, both, features, cursor, offsetBuilder,
-                            distance, edgeIdx);
+                        makeTurnEdge(transportNetwork, both, features, cursor, offsetBuilder, distance, edgeIdx);
 
                         return true;
                     } catch (Exception e) {
@@ -659,7 +742,6 @@ public class PointToPointRouterServer {
             return featureCollection;
         }, JsonUtilities.objectMapper::writeValueAsString);
 
-
         get("debug/streetEdges", (request, response) -> {
             response.header("Content-Type", "application/json");
             if (request.queryParams().size() < 4) {
@@ -673,7 +755,6 @@ public class PointToPointRouterServer {
             Boolean iboth = request.queryMap("both").booleanValue();
             Boolean idetail = request.queryMap("detail").booleanValue();
             boolean both, detail;
-
 
             if (iboth == null) {
                 both = false;
@@ -690,7 +771,7 @@ public class PointToPointRouterServer {
             String layer = "streetEdges"; // request.params(":layer");
 
             Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
-                floatingDegreesToFixed(south), floatingDegreesToFixed(north));
+                    floatingDegreesToFixed(south), floatingDegreesToFixed(north));
             TIntSet streets = transportNetwork.streetLayer.findEdgesInEnvelope(env);
 
             if (streets.size() > 100_000) {
@@ -710,8 +791,7 @@ public class PointToPointRouterServer {
             BufferParameters bufParams = new BufferParameters();
             bufParams.setSingleSided(true);
             bufParams.setJoinStyle(BufferParameters.JOIN_BEVEL);
-            OffsetCurveBuilder offsetBuilder = new OffsetCurveBuilder(new PrecisionModel(),
-                bufParams);
+            OffsetCurveBuilder offsetBuilder = new OffsetCurveBuilder(new PrecisionModel(), bufParams);
             float distance = -0.00005f;
 
             Set<Integer> seenVertices = new HashSet<>(streets.size());
@@ -721,13 +801,13 @@ public class PointToPointRouterServer {
                     try {
                         cursor.seek(s);
 
-                        GeoJsonFeature feature = getEdgeFeature(both, cursor, offsetBuilder,
-                            distance, transportNetwork);
+                        GeoJsonFeature feature = getEdgeFeature(both, cursor, offsetBuilder, distance,
+                                transportNetwork);
 
                         if (!both) {
                             //Adds fake flag oneway which is added to forward edge if permission flags on forward and backward edge differ.
                             EnumSet<EdgeStore.EdgeFlag> forwardPermissions = cursor.getPermissionFlags();
-                            EdgeStore.Edge backwardCursor = transportNetwork.streetLayer.edgeStore.getCursor(s+1);
+                            EdgeStore.Edge backwardCursor = transportNetwork.streetLayer.edgeStore.getCursor(s + 1);
 
                             EnumSet<EdgeStore.EdgeFlag> backwardPermissions = backwardCursor.getPermissionFlags();
 
@@ -740,9 +820,8 @@ public class PointToPointRouterServer {
                         getVertexFeatures(cursor, vcursor, seenVertices, features, transportNetwork);
                         if (both) {
                             //backward edge
-                            cursor.seek(s+1);
-                            feature = getEdgeFeature(both, cursor, offsetBuilder,
-                                distance, transportNetwork);
+                            cursor.seek(s + 1);
+                            feature = getEdgeFeature(both, cursor, offsetBuilder, distance, transportNetwork);
                             features.add(feature);
 
                         }
@@ -764,8 +843,7 @@ public class PointToPointRouterServer {
         get("debug/stats", (request, response) -> {
             response.header("Content-Type", "application/json");
             Map<String, Object> content = new HashMap<>(2);
-            EnumMap<EdgeStore.EdgeFlag, Integer> flagUsage = new EnumMap<>(
-                EdgeStore.EdgeFlag.class);
+            EnumMap<EdgeStore.EdgeFlag, Integer> flagUsage = new EnumMap<>(EdgeStore.EdgeFlag.class);
             if (request.queryParams().size() < 4) {
 
                 EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor();
@@ -797,7 +875,7 @@ public class PointToPointRouterServer {
             boolean detail = request.queryMap("detail").booleanValue();
 
             Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
-                floatingDegreesToFixed(south), floatingDegreesToFixed(north));
+                    floatingDegreesToFixed(south), floatingDegreesToFixed(north));
             TIntSet streets = transportNetwork.streetLayer.findEdgesInEnvelope(env);
             //transportNetwork.streetLayer.edgeStore.getCursor()
 
@@ -863,7 +941,7 @@ public class PointToPointRouterServer {
             float west = request.queryMap("w").floatValue();
 
             Envelope env = new Envelope(floatingDegreesToFixed(east), floatingDegreesToFixed(west),
-                floatingDegreesToFixed(south), floatingDegreesToFixed(north));
+                    floatingDegreesToFixed(south), floatingDegreesToFixed(north));
             TIntSet streets = transportNetwork.streetLayer.findEdgesInEnvelope(env);
 
             if (streets.size() > 100_000) {
@@ -892,40 +970,39 @@ public class PointToPointRouterServer {
             return content;
         }, JsonUtilities.objectMapper::writeValueAsString);
 
-
         //queries edge store for edgeID and returns envelope of this edge ID
         get("/query", (request, response) -> {
             response.header("Content-Type", "application/json");
             Map<String, Object> content = new HashMap<>(2);
             try {
 
-            Integer edgeID = request.queryMap("edgeID").integerValue();
+                Integer edgeID = request.queryMap("edgeID").integerValue();
 
-            //If true returns all the OSM tags of this edge
-            Boolean wantTags = request.queryMap("tags").booleanValue();
+                //If true returns all the OSM tags of this edge
+                Boolean wantTags = request.queryMap("tags").booleanValue();
 
-            if (edgeID == null) {
-                content.put("errors", "edgeID is empty!");
-            } else {
-                EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor();
-                try {
-                    edge.seek(edgeID);
-                    content.put("data", edge.getGeometry().getEnvelopeInternal());
+                if (edgeID == null) {
+                    content.put("errors", "edgeID is empty!");
+                } else {
+                    EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor();
+                    try {
+                        edge.seek(edgeID);
+                        content.put("data", edge.getGeometry().getEnvelopeInternal());
 
-                    if (wantTags != null && wantTags) {
-                        String osmTags = transportNetwork.streetLayer.getWayTags(edge);
-                        if (osmTags != null) {
-                            content.put("tags", osmTags);
+                        if (wantTags != null && wantTags) {
+                            String osmTags = transportNetwork.streetLayer.getWayTags(edge);
+                            if (osmTags != null) {
+                                content.put("tags", osmTags);
+                            }
                         }
+                    } catch (Exception ex) {
+                        content.put("errors", ex.getMessage());
+                        LOG.error("Error getting edge:{}", ex);
                     }
-                } catch (Exception ex) {
-                    content.put("errors", ex.getMessage());
-                    LOG.error("Error getting edge:{}", ex);
-                }
 
-            }
+                }
             } catch (Exception ex) {
-                content.put("errors", "Problem converting edgeID to integer:"+ ex.getMessage());
+                content.put("errors", "Problem converting edgeID to integer:" + ex.getMessage());
                 LOG.error("Error converting edgeID to integer:{}", ex.getMessage());
             }
 
@@ -938,13 +1015,9 @@ public class PointToPointRouterServer {
 
             HashMap<String, Object> content = new HashMap<>();
             try {
-                GraphQlRequest graphQlRequest = graphQlRequestReader
-                    .readValue(request.body());
-
-                //TODO: deserialize variables map automatically in GraphQLRequest object
-                //FIXME: here only flat variables are supported. For example directModes:[CAR, WALK] is unsupported for now since it can't be deserialized
-                Map<String, Object> variables = graphQlRequest.variables==null ? new HashMap<>() : mapReader.readValue(graphQlRequest.variables);
-                ExecutionResult executionResult = graphQL.execute(graphQlRequest.query, null, null, variables);
+                GraphQlRequest graphQlRequest = graphQlRequestReader.readValue(request.body());
+                ExecutionResult executionResult = graphQL.execute(graphQlRequest.query, null, null,
+                        graphQlRequest.variables);
                 response.status(200);
 
                 if (!executionResult.getErrors().isEmpty()) {
@@ -975,20 +1048,18 @@ public class PointToPointRouterServer {
     /**
      * Add a feature to the supplied List of GeoJSON features. Used in street layer debug visualizations.
      */
-    private static void makeTurnEdge(TransportNetwork transportNetwork, boolean both,
-        List<GeoJsonFeature> features, EdgeStore.Edge cursor, OffsetCurveBuilder offsetBuilder,
-        float distance, int edgeIdx) {
+    private static void makeTurnEdge(TransportNetwork transportNetwork, boolean both, List<GeoJsonFeature> features,
+            EdgeStore.Edge cursor, OffsetCurveBuilder offsetBuilder, float distance, int edgeIdx) {
         if (transportNetwork.streetLayer.edgeStore.turnRestrictions.containsKey(edgeIdx)) {
 
-            final int numberOfRestrictions =
-                    transportNetwork.streetLayer.edgeStore.turnRestrictions.get(edgeIdx).size();
+            final int numberOfRestrictions = transportNetwork.streetLayer.edgeStore.turnRestrictions.get(edgeIdx)
+                    .size();
             List<Integer> edge_restricion_idxs = new ArrayList<>(numberOfRestrictions);
-            transportNetwork.streetLayer.edgeStore.turnRestrictions.get(edgeIdx)
-                .forEach(turn_restriction_idx -> {
-                    edge_restricion_idxs.add(turn_restriction_idx);
-                    return true;
-                });
-            for (int i=0; i < edge_restricion_idxs.size(); i++) {
+            transportNetwork.streetLayer.edgeStore.turnRestrictions.get(edgeIdx).forEach(turn_restriction_idx -> {
+                edge_restricion_idxs.add(turn_restriction_idx);
+                return true;
+            });
+            for (int i = 0; i < edge_restricion_idxs.size(); i++) {
                 int turnRestrictionIdx = edge_restricion_idxs.get(i);
                 TurnRestriction turnRestriction = transportNetwork.streetLayer.turnRestrictions.get(turnRestrictionIdx);
 
@@ -996,8 +1067,7 @@ public class PointToPointRouterServer {
                 //If edge on which from is is splitted then fromEdge is different but isn't updated in TurnRestriction
                 cursor.seek(edgeIdx);
 
-                GeoJsonFeature feature = getEdgeFeature(both, cursor, offsetBuilder,
-                    distance, transportNetwork);
+                GeoJsonFeature feature = getEdgeFeature(both, cursor, offsetBuilder, distance, transportNetwork);
 
                 feature.addProperty("only", turnRestriction.only);
                 feature.addProperty("edge", "FROM");
@@ -1010,8 +1080,7 @@ public class PointToPointRouterServer {
                         int via_edge_index = turnRestriction.viaEdges[idx];
                         cursor.seek(via_edge_index);
 
-                        feature = getEdgeFeature(both, cursor, offsetBuilder,
-                            distance, transportNetwork);
+                        feature = getEdgeFeature(both, cursor, offsetBuilder, distance, transportNetwork);
 
                         feature.addProperty("only", turnRestriction.only);
                         feature.addProperty("edge", "VIA");
@@ -1024,8 +1093,7 @@ public class PointToPointRouterServer {
                 }
                 cursor.seek(turnRestriction.toEdge);
 
-                feature = getEdgeFeature(both, cursor, offsetBuilder, distance,
-                    transportNetwork);
+                feature = getEdgeFeature(both, cursor, offsetBuilder, distance, transportNetwork);
 
                 feature.addProperty("only", turnRestriction.only);
                 feature.addProperty("edge", "TO");
@@ -1038,11 +1106,27 @@ public class PointToPointRouterServer {
     }
 
     /**
+     * @param dir The file directory in which to find the OSM and network.dat files
+     * Expected inputs, in directory 'dir'
+     * * network.dat, created by the --build step of the PointToPointRouter server.
+     * * osm.mapdb, created by the --build step of the PointToPointRouter server from an OSM file
+     *   that needs to come from some external source.
+     * @param oneToMany Whether or not to link the street network and the transit network. This is
+     *   only necessary for one-to-many routing, which needs to precompute distances to street
+     *   corners and transit stops.
+     */
+    public static TransportNetwork setUpTransportNetwork(File dir, Boolean oneToMany) throws Exception {
+        TransportNetwork transportNetwork = TransportNetwork.read(new File(dir, "network.dat"));
+        transportNetwork.readOSM(new File(dir, "osm.mapdb"));
+        return transportNetwork;
+    }
+
+    /**
      * Creates features from from and to vertices of provided edge
      * if they weren't already created and they have TRAFFIC_SIGNAL flag
      */
-    private static void getVertexFeatures(EdgeStore.Edge cursor, VertexStore.Vertex vcursor,
-        Set<Integer> seenVertices, List<GeoJsonFeature> features, TransportNetwork network) {
+    private static void getVertexFeatures(EdgeStore.Edge cursor, VertexStore.Vertex vcursor, Set<Integer> seenVertices,
+            List<GeoJsonFeature> features, TransportNetwork network) {
 
         int fromVertex = cursor.getFromVertex();
         if (!seenVertices.contains(fromVertex)) {
@@ -1089,7 +1173,7 @@ public class PointToPointRouterServer {
 
         feature.addProperty("vertex_id", vertex.index);
         //Needed for filtering flags
-        for (VertexStore.VertexFlag flag: VertexStore.VertexFlag.values()) {
+        for (VertexStore.VertexFlag flag : VertexStore.VertexFlag.values()) {
             if (vertex.getFlag(flag)) {
                 feature.addProperty(flag.toString(), true);
             }
@@ -1104,7 +1188,7 @@ public class PointToPointRouterServer {
      * Used to displace transit stops from the vertices they are linked to, so we can see the linking structure of
      * complex stops.
      */
-    public static Coordinate jitter (VertexStore.Vertex v) {
+    public static Coordinate jitter(VertexStore.Vertex v) {
         double lat = v.getLat();
         lat += (v.index % 7 - 3.5) * 1e-5;
         double lon = v.getLon();
@@ -1112,9 +1196,8 @@ public class PointToPointRouterServer {
         return new Coordinate(lon, lat);
     }
 
-
     private static void fillFeature(TransportNetwork transportNetwork, StreetRouter.State lastState,
-        List<GeoJsonFeature> features, boolean reverse) {
+            List<GeoJsonFeature> features, boolean reverse) {
 
         StreetPath streetPath = new StreetPath(lastState, transportNetwork, reverse);
 
@@ -1124,12 +1207,11 @@ public class PointToPointRouterServer {
         for (StreetRouter.State state : streetPath.getStates()) {
             Integer edgeIdx = state.backEdge;
             if (!(edgeIdx == -1 || edgeIdx == null)) {
-                EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore
-                    .getCursor(edgeIdx);
+                EdgeStore.Edge edge = transportNetwork.streetLayer.edgeStore.getCursor(edgeIdx);
                 GeoJsonFeature feature = new GeoJsonFeature(edge.getGeometry());
                 feature.addProperty("weight", state.weight);
                 feature.addProperty("mode", state.streetMode);
-                feature.addProperty("distance", state.distance/1000);
+                feature.addProperty("distance", state.distance / 1000);
                 feature.addProperty("idx", stateIdx++);
                 feature.addProperty("stateIdx", state.idx);
                 features.add(feature);
@@ -1145,16 +1227,14 @@ public class PointToPointRouterServer {
      * @param offsetBuilder builder which creates edge offset if needed
      * @param distance for which edge is offset if both is true
      */
-    private static GeoJsonFeature getEdgeFeature(boolean both, EdgeStore.Edge cursor,
-        OffsetCurveBuilder offsetBuilder, float distance, TransportNetwork network) {
+    private static GeoJsonFeature getEdgeFeature(boolean both, EdgeStore.Edge cursor, OffsetCurveBuilder offsetBuilder,
+            float distance, TransportNetwork network) {
         LineString geometry = cursor.getGeometry();
         Coordinate[] coords = geometry.getCoordinates();
 
         if (both) {
-            coords = offsetBuilder.getOffsetCurve(coords,
-                distance);
+            coords = offsetBuilder.getOffsetCurve(coords, distance);
         }
-
 
         if (network.transitLayer.stopForStreetVertex.containsKey(cursor.getFromVertex())) {
             // from vertex is a transit stop, jitter it so that it doesn't sit exactly on top of the street vertex
@@ -1175,7 +1255,7 @@ public class PointToPointRouterServer {
         feature.addProperty("speed_ms", cursor.getSpeed());
         feature.addProperty("osmid", cursor.getOSMID());
         //Needed for filtering flags
-        for (EdgeStore.EdgeFlag flag: EdgeStore.EdgeFlag.values()) {
+        for (EdgeStore.EdgeFlag flag : EdgeStore.EdgeFlag.values()) {
             if (cursor.getFlag(flag)) {
                 feature.addProperty(flag.toString(), true);
             }
@@ -1184,11 +1264,10 @@ public class PointToPointRouterServer {
         return feature;
     }
 
-    private static void updateSpeed(EdgeStore.Edge edge, Map<Short, Integer> speedUsage,
-        MinMax minMax) {
+    private static void updateSpeed(EdgeStore.Edge edge, Map<Short, Integer> speedUsage, MinMax minMax) {
         Short currentEdgeSpeed = edge.getSpeed();
         Integer currentValue = speedUsage.getOrDefault(currentEdgeSpeed, 0);
-        speedUsage.put(currentEdgeSpeed, currentValue+1);
+        speedUsage.put(currentEdgeSpeed, currentValue + 1);
         minMax.updateMin(currentEdgeSpeed);
         minMax.updateMax(currentEdgeSpeed);
     }

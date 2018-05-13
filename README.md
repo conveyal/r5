@@ -4,6 +4,8 @@ R<sup>5</sup> is a routing engine for multimodal (transit/bike/walk/car) network
 
 We refer to the routing method as "realistic" because it works by planning many trips at different departure times in a time window, which better reflects how people use transportation system than planning a single trip at an exact departure time. There's more information on our thinking on this particular point [here](http://conveyal.com/blog/2015/05/04/variation-in-accessibility-measures) and [in this TRB article](http://trrjournalonline.trb.org/doi/abs/10.3141/2653-06).
 
+We say "Real-world and Reimagined" networks because R5's networks are built from widely available open GTFS data describing existing transit service, but R5 includes a system for applying light-weight patches to those networks for immediate, interactive scenario comparison.
+
 When contributing code, please follow the Conveyal Java style guide at https://github.com/conveyal/JavaStyle/
 
 Javadoc for the project is built automatically after every change and published at http://javadoc.conveyal.com/r5/master/

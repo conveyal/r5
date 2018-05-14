@@ -1,13 +1,12 @@
 # R<sup>5</sup>: Rapid Realistic Routing on Real-world and Reimagined networks
 
-R<sup>5</sup> is a fast routing engine for multimodal (transit/bike/walk/car) networks. It is currently designed
-for analytic applications but there are plans to eventually have it support point-to-point journey planning.
-The routing is "realistic" because it works by planning many trips over a time window, which is more reflective of how people
-use the transportation system than planning a single trip at an exact departure time---very few people leave for work at precisely
-7:53 AM every morning, and even fewer leave at a precise time when going to a non-work event. There's more information on our thinking
-on this particular point [here](http://conveyal.com/blog/2015/05/04/variation-in-accessibility-measures) and [here](http://trrjournalonline.trb.org/doi/abs/10.3141/2653-06).
+R<sup>5</sup> is a routing engine for multimodal (transit/bike/walk/car) networks, with attention given to speed and efficient use of resources. It is intended primarily for analysis applications (one-to-many trees, travel time matrices, and cumulative opporunitites accessibility indicators) but it also has basic support for point-to-point journey planning which may expand over time.
 
-Please follow the Conveyal Java style guide at https://github.com/conveyal/JavaStyle/
+We refer to the routing method as "realistic" because it works by planning many trips at different departure times in a time window, which better reflects how people use transportation system than planning a single trip at an exact departure time. There's more information on our thinking on this particular point [here](http://conveyal.com/blog/2015/05/04/variation-in-accessibility-measures) and [in this TRB article](http://trrjournalonline.trb.org/doi/abs/10.3141/2653-06).
+
+We say "Real-world and Reimagined" networks because R5's networks are built from widely available open GTFS data describing existing transit service, but R5 includes a system for applying light-weight patches to those networks for immediate, interactive scenario comparison.
+
+When contributing code, please follow the Conveyal Java style guide at https://github.com/conveyal/JavaStyle/
 
 Javadoc for the project is built automatically after every change and published at http://javadoc.conveyal.com/r5/master/
 

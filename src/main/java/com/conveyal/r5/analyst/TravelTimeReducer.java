@@ -41,6 +41,8 @@ public class TravelTimeReducer {
 
     private final boolean calculateAccessibility;
 
+    private final boolean isGridTask;
+
     private final int[] percentileIndexes;
 
     private final int nPercentiles;
@@ -64,10 +66,14 @@ public class TravelTimeReducer {
         }
 
         // Decide whether we want to retain travel times to all destinations for this origin.
+        isGridTask = task.width * task.height > 0;
         retainTravelTimes = task instanceof TravelTimeSurfaceTask || task.makeStaticSite;
         if (retainTravelTimes) {
-            pointToTime = new HashMap<Integer, Integer>();
-            timeGrid = new TimeGrid(task.zoom, task.west, task.north, task.width, task.height, task.percentiles.length);
+            if (isGridTask) {
+                timeGrid = new TimeGrid(task.zoom, task.west, task.north, task.width, task.height, task.percentiles.length);
+            } else {
+                pointToTime = new HashMap<Integer, Integer>();
+            }
         }
 
         // Decide whether we want to calculate cumulative opportunities accessibility indicators for this origin.
@@ -144,8 +150,11 @@ public class TravelTimeReducer {
             throw new ParameterException("You must supply the expected number of travel time values (or only one value).");
         }
         if (retainTravelTimes) {
-            timeGrid.setTarget(target, percentileTravelTimesMinutes);
-            pointToTime.put(target, timesSeconds[0]);
+            if (isGridTask) {
+                timeGrid.setTarget(target, percentileTravelTimesMinutes);
+            } else {
+                pointToTime.put(target, timesSeconds[0]);
+            }
         }
         if (calculateAccessibility) {
             // This x/y addressing can only work with one grid at a time,

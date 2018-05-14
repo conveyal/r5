@@ -161,7 +161,6 @@ public class PerTargetPropagater {
                 pathWriter.recordPathsForTarget(selectedPaths);
             }
 
-            Arrays.sort(perIterationTravelTimes);
         }
         LOG.info("Propagating {} iterations from {} stops to {} targets took {}s",
                 nIterations, nStops, targets.size(), (System.currentTimeMillis() - startTimeMillis) / 1000d

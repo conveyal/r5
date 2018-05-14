@@ -100,6 +100,8 @@ public abstract class AvgTimer {
     private void reset() {
         startTime = 0;
         lapTime = 0;
+        minTime = Long.MAX_VALUE;
+        maxTime = -1;
         totalTimeSuccess = 0;
         totalTimeFailed = 0;
         counterSuccess = 0;

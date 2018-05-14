@@ -233,6 +233,12 @@ public class McRaptorState {
         return optimal;
     }
 
+    public void setInitalTime(int stop, int time) {
+        stopTimesImproved.set(stop);
+        bestTimes[stop] = time;
+        bestStopsTouched.set(stop);
+    }
+
     /** Debug function: dump the path up to this state as a string */
     public String dump (int stop) {
         Path p = McPathBuilder.extractPathForStop(this, stop);

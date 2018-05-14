@@ -219,11 +219,10 @@ public class MultiCriteriaRangeRaptorWorker {
             // TODO prune trips that are now longer than max lengths to avoid biasing averages
         }
 
-
         // add initial stops
         McRaptorState initialState = scheduleState[0];
         accessStops.forEachEntry((stop, accessTime) -> {
-            initialState.setTimeAtStop(stop, accessTime + nextMinuteDepartureTime, -1, -1, 0, 0, true, -1, -1, -1);
+            initialState.setInitalTime(stop, accessTime + nextMinuteDepartureTime);
             return true; // continue iteration
         });
     }

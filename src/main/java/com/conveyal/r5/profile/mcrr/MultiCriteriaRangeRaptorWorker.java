@@ -7,6 +7,7 @@ import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
+import com.conveyal.r5.util.AvgTimer;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -67,13 +68,11 @@ public class MultiCriteriaRangeRaptorWorker {
     private static final int MINIMUM_BOARD_WAIT_SEC = 60;
     private final int nMinutes;
 
-    // Variables to track time spent, all in nanoseconds (some of the operations we're timing are significantly submillisecond)
-    // (although I suppose using ms would be fine because the number of times we cross a millisecond boundary would be proportional
-    //  to the portion of a millisecond that operation took).
-    private long startClockTime;
-    private long timeInScheduledSearch;
-    private long timeInScheduledSearchTransit;
-    private long timeInScheduledSearchTransfers;
+    // Variables to track time spent
+    private static AvgTimer timerSearch = AvgTimer.timerMilliSec("McRRaptor:route Search");
+    private static AvgTimer timerSearchTransit = AvgTimer.timerMicroSec("McRRaptor:route Transit Search");
+    private static AvgTimer timerSearchTransfers = AvgTimer.timerMicroSec("McRRaptor:route Transfers Search");
+    private static AvgTimer timerEgressPathBuilding = AvgTimer.timerMilliSec("McRRaptor:route Egress path building");
 
     /** the transit layer to route on */
     private final TransitLayer transit;
@@ -126,47 +125,39 @@ public class MultiCriteriaRangeRaptorWorker {
      * Return value dimension order is [searchIteration][transitStopIndex]
      */
     public int[][] route () {
-        LOG.info("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -");
-        LOG.info("Performing {} scheduled iterations",  nMinutes);
 
-        startClockTime = System.nanoTime();
-        prefilterPatterns();
+        //LOG.info("Performing {} rounds (minutes)",  nMinutes);
 
-        // Initialize result storage.
-        // Results are one arrival time at each stop, for every raptor iteration.
-        int[][] arrivalTimesAtStopsPerIteration = new int[nMinutes][];
-        if (retainPaths) pathsPerIteration = new ArrayList<>();
-        int currentIteration = 0;
+        return timerSearch.timeAndReturn(() -> {
+            prefilterPatterns();
 
-        // The main outer loop iterates backward over all minutes in the departure times window.
-        for (int departureTime = request.toTime - DEPARTURE_STEP_SEC, minute = nMinutes;
-             departureTime >= request.fromTime;
-             departureTime -= DEPARTURE_STEP_SEC, minute--) {
+            // Initialize result storage.
+            // Results are one arrival time at each stop, for every raptor iteration.
+            int[][] arrivalTimesAtStopsPerIteration = new int[nMinutes][];
+            if (retainPaths) pathsPerIteration = new ArrayList<>();
+            int currentIteration = 0;
 
-            //if (minute % 15 == 0) LOG.debug("  minute {}", minute);
+            // The main outer loop iterates backward over all minutes in the departure times window.
+            for (int departureTime = request.toTime - DEPARTURE_STEP_SEC, minute = nMinutes;
+                 departureTime >= request.fromTime;
+                 departureTime -= DEPARTURE_STEP_SEC, minute--) {
 
-            // Run the raptor search. For this particular departure time, we receive N arrays of arrival times at all
-            // stops, one for each randomized schedule: resultsForMinute[randScheduleNumber][transitStop]
-            int[] resultsForMinute = runRaptorForMinute(departureTime);
+                //if (minute % 15 == 0) LOG.debug("  minute {}", minute);
 
-            // Bypass Java's "effectively final" nonsense.
-            // FIXME we could avoid this "final" weirdness by just using non-stream explicit loop syntax over the stops.
-            // TODO clarify identifiers and explain how results are being unrolled from minutes into 'iterations'.
-            final int finalDepartureTime = departureTime;
+                // Run the raptor search. For this particular departure time, we receive N arrays of arrival times at all
+                // stops, one for each randomized schedule: resultsForMinute[randScheduleNumber][transitStop]
+                int[] resultsForMinute = runRaptorForMinute(departureTime);
 
-            // NB this copies the array, so we don't have issues with it being updated later
-            arrivalTimesAtStopsPerIteration[currentIteration++] = IntStream.of(resultsForMinute)
-                    .map(r -> r != UNREACHED ? r - finalDepartureTime : r)
-                    .toArray();
-        }
-        double time =  (System.nanoTime() - startClockTime) / 1e9d;
+                // Bypass Java's "effectively final" nonsense.
+                final int finalDepartureTime = departureTime;
 
-        LOG.info("Search completed in {}s", time);
-        LOG.info("Scheduled/bounds search: {}s", timeInScheduledSearch / 1e9d);
-        LOG.info("  - Scheduled search: {}s", timeInScheduledSearchTransit / 1e9d);
-        LOG.info("  - Transfers: {}s", timeInScheduledSearchTransfers / 1e9d);
-
-        return arrivalTimesAtStopsPerIteration;
+                // NB this copies the array, so we don't have issues with it being updated later
+                arrivalTimesAtStopsPerIteration[currentIteration++] = IntStream.of(resultsForMinute)
+                        .map(r -> r != UNREACHED ? r - finalDepartureTime : r)
+                        .toArray();
+            }
+            return arrivalTimesAtStopsPerIteration;
+        });
     }
 
     /** Prefilter the patterns to only ones that are running */
@@ -239,7 +230,6 @@ public class MultiCriteriaRangeRaptorWorker {
         // ergo, we re-use the arrival times found in searches that have already occurred that depart later, because
         // the arrival time given departure at time t is upper-bounded by the arrival time given departure at minute t + 1.
         if (transit.hasSchedules) {
-            long startTime = System.nanoTime();
             for (int round = 1; round <= request.maxRides; round++) {
                 // NB since we have transfer limiting not bothering to cut off search when there are no more transfers
                 // as that will be rare and complicates the code grabbing the results
@@ -248,15 +238,14 @@ public class MultiCriteriaRangeRaptorWorker {
                 // transfers
                 scheduleState[round].min(scheduleState[round - 1]);
 
-                long scheduledStartTime = System.nanoTime();
+                timerSearchTransit.start();
                 doScheduledSearchForRound(scheduleState[round - 1], scheduleState[round]);
-                timeInScheduledSearchTransit += System.nanoTime() - scheduledStartTime;
+                timerSearchTransit.stop();
 
-                long transferStartTime = System.nanoTime();
+                timerSearchTransfers.start();
                 doTransfers(scheduleState[round]);
-                timeInScheduledSearchTransfers += System.nanoTime() - transferStartTime;
+                timerSearchTransfers.stop();
             }
-            timeInScheduledSearch += System.nanoTime() - startTime;
         }
 
         // If there are no frequency trips, return the result of the scheduled search, but repeated as many times
@@ -268,10 +257,13 @@ public class MultiCriteriaRangeRaptorWorker {
         // TODO check whether we're actually hitting this code with iterationsPerMinute > 1 on scheduled networks.
 
         McRaptorState finalRoundState = scheduleState[request.maxRides];
+
         // This scheduleState is repeatedly modified as the outer loop progresses over departure minutes.
         // We have to be careful here that creating these paths does not modify the state, and makes
         // protective copies of any information we want to retain.
+        timerEgressPathBuilding.start();
         Path[] paths = retainPaths ? pathToEachStop(finalRoundState) : null;
+        timerEgressPathBuilding.stop();
 
         int[] result = finalRoundState.bestNonTransferTimes;
 

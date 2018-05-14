@@ -220,6 +220,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     /** #Entur */
     public SearchAlgorithm algorithm;
 
+    public String description;
 
 
     public ProfileRequest clone () {

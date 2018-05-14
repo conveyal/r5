@@ -80,6 +80,9 @@ public class MultiCriteriaRangeRaptorWorker {
     /** Times to access each transit stop using the street network (seconds) */
     private final TIntIntMap accessStops;
 
+    /** List of all possible egress stops. */
+    private final int[] egressStops;
+
     /** The profilerequest describing routing parameters */
     private final ProfileRequest request;
 
@@ -104,10 +107,11 @@ public class MultiCriteriaRangeRaptorWorker {
     /** If we're going to store paths to every destination (e.g. for static sites) then they'll be retained here. */
     public List<Path[]> pathsPerIteration;
 
-    public MultiCriteriaRangeRaptorWorker(TransitLayer transitLayer, ProfileRequest request, TIntIntMap accessStops) {
+    public MultiCriteriaRangeRaptorWorker(TransitLayer transitLayer, ProfileRequest request, TIntIntMap accessStops, int[] egressStops) {
         this.transit = transitLayer;
         this.request = request;
         this.accessStops = accessStops;
+        this.egressStops = egressStops;
         this.servicesActive  = transit.getActiveServicesForDate(request.date);
         // we add one to request.maxRides, first state is result of initial walk
         this.scheduleState = IntStream.range(0, request.maxRides + 1)
@@ -276,14 +280,15 @@ public class MultiCriteriaRangeRaptorWorker {
     /**
      * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
      */
-    private static Path[] pathToEachStop (McRaptorState state) {
-        int nStops = state.bestNonTransferTimes.length;
+    private Path[] pathToEachStop (McRaptorState state) {
+        int nStops = egressStops.length;
         Path[] paths = new Path[nStops];
         for (int s = 0; s < nStops; s++) {
-            if (state.bestNonTransferTimes[s] == UNREACHED) {
+            int stopIndex = egressStops[s];
+            if (state.bestNonTransferTimes[stopIndex] == UNREACHED) {
                 paths[s] = null;
             } else {
-                paths[s] = McPathBuilder.mcPath(state, s);
+                paths[s] = McPathBuilder.extractPathForStop(state, stopIndex);
             }
         }
         return paths;

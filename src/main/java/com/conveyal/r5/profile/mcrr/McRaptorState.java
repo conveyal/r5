@@ -227,7 +227,7 @@ public class McRaptorState {
 
     /** Debug function: dump the path up to this state as a string */
     public String dump (int stop) {
-        Path p = McPathBuilder.mcPath(this, stop);
+        Path p = McPathBuilder.extractPathForStop(this, stop);
 
         StringBuilder sb = new StringBuilder();
 

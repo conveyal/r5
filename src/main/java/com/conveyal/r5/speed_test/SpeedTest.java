@@ -206,7 +206,8 @@ public class SpeedTest {
             MultiCriteriaRangeRaptorWorker worker = new MultiCriteriaRangeRaptorWorker(
                     transportNetwork.transitLayer,
                     request,
-                    streetRouter.accessTimesToStopsInSeconds
+                    streetRouter.accessTimesToStopsInSeconds,
+                    streetRouter.egressTimesToStopsInSeconds.keys()
             );
 
             // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
@@ -237,7 +238,7 @@ public class SpeedTest {
 
                     if (travelTimeToStop != MultiCriteriaRangeRaptorWorker.UNREACHED) {
                         int totalTime = travelTimeToStop + egressTime;
-                        results.addResult(totalTime, range, stopIndex);
+                        results.addResult(totalTime, range, stopIndex, worker.pathsPerIteration.get(range)[i]);
                         //accessTime = accessTimesToStopsInSeconds.get(worker.pathsPerIteration.get(range)[stopIndex].boardStops[0]);
                     }
                 }
@@ -251,8 +252,7 @@ public class SpeedTest {
             TripPlan tripPlan = createTripPlanForRequest(request);
 
             for (BestResult result : results.results) {
-                Path transitPath = result.path(worker.pathsPerIteration);
-                Itinerary itinerary = createItinerary(request, streetRouter, transitPath);
+                Itinerary itinerary = createItinerary(request, streetRouter, result.transitPath);
                 tripPlan.addItinerary(itinerary);
                 tripPlan.sort();
             }

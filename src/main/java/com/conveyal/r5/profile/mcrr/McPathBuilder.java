@@ -16,7 +16,7 @@ public class McPathBuilder {
     /**
      * Scan over a raptor state and extract the path leading up to that state.
      */
-    public static Path mcPath(McRaptorState state, int stop) {
+    public static Path extractPathForStop(McRaptorState state, int stop) {
         // trace the path back from this RaptorState
         int previousPattern;
         int previousTrip;

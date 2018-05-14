@@ -8,11 +8,13 @@ class BestResult {
     final int totalTime;
     final int rangeIndex;
     final int stopIndex;
+    final Path transitPath;
 
-    BestResult(int totalTime, int rangeIndex, int stopIndex) {
+    BestResult(int totalTime, int rangeIndex, int stopIndex, Path transitPath) {
         this.totalTime = totalTime;
         this.rangeIndex = rangeIndex;
         this.stopIndex = stopIndex;
+        this.transitPath = transitPath;
     }
 
     boolean fasterThen(int totalTime) {

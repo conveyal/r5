@@ -1,6 +1,8 @@
 package com.conveyal.r5.speed_test;
 
 
+import com.conveyal.r5.profile.Path;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,13 +17,13 @@ public class BestKnownResults {
     }
 
 
-    public void addResult(int totalTime, int rangeIndex, int stopIndex) {
+    public void addResult(int totalTime, int rangeIndex, int stopIndex, Path transitPath) {
         if(results.size() < limit) {
-            results.add(new BestResult(totalTime, rangeIndex, stopIndex));
+            results.add(new BestResult(totalTime, rangeIndex, stopIndex, transitPath));
             sort();
         }
         else if(results.get(0).fasterThen(totalTime)) {
-            results.set(0, new BestResult(totalTime, rangeIndex, stopIndex));
+            results.set(0, new BestResult(totalTime, rangeIndex, stopIndex, transitPath));
             sort();
         }
     }

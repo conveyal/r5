@@ -13,7 +13,6 @@ import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import com.conveyal.r5.streets.EdgeStore.Edge;
 import gnu.trove.set.TIntSet;
-import org.apache.commons.math3.util.FastMath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

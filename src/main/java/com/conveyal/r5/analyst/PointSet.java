@@ -62,7 +62,8 @@ public abstract class PointSet implements Serializable {
     /**
      * Makes it fast to get a set of all points within a given rectangle.
      * This is useful when finding distances from transit stops to points.
-     * FIXME we don't need a spatial index to do this on a gridded pointset. Make a specialized method on pointset subclasses.
+     * FIXME we don't need a spatial index to do this on a gridded pointset. Make an method abstract and implement on subclasses.
+     * The spatial index is a hashgrid anyway though, not an STRtree.
      */
     public transient IntHashGrid spatialIndex;
 
@@ -85,12 +86,18 @@ public abstract class PointSet implements Serializable {
 
     public abstract int featureCount();
 
-    /** Returns a new coordinate object for the feature at the given index in this set, or its centroid, in FIXED POINT DEGREES. */
+    /**
+     * Returns a new coordinate object for the feature at the given index in this set, or its centroid,
+     * in FIXED POINT DEGREES.
+     */
     public Coordinate getCoordinateFixed(int index) {
         return new Coordinate(floatingDegreesToFixed(getLon(index)), floatingDegreesToFixed(getLat(index)));
     }
 
-    /** Returns a new coordinate object for the feature at the given index in this set, or its centroid, in FIXED POINT DEGREES. */
+    /**
+     * Returns a new coordinate object for the feature at the given index in this set, or its centroid,
+     * in FIXED POINT DEGREES.
+     */
     public Point getJTSPointFixed(int index) {
         return GeometryUtils.geometryFactory.createPoint(getCoordinateFixed(index));
     }

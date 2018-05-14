@@ -92,7 +92,7 @@ public class TransportNetwork implements Serializable {
 
     public static TransportNetwork read (File file) throws Exception {
         LOG.info("Reading transport network...");
-        TransportNetwork result = ExpandingMMFBytez.readObjectFromFile(file);
+        TransportNetwork result = ExpandingMMFBytez.readObjectFromFile(file, TransportNetwork.class);
         LOG.info("Done reading.");
         if (result.fareCalculator != null) {
             result.fareCalculator.transitLayer = result.transitLayer;
@@ -382,15 +382,19 @@ public class TransportNetwork implements Serializable {
 
     /**
      * Build an efficient implicit grid PointSet for this TransportNetwork if it doesn't already exist. Then link that
-     * grid pointSet to the street layer. This is called when a network is built for analysis purposes, and also after a
-     * scenario is applied to rebuild the grid pointSet on the scenario copy of the network.
+     * grid pointset to the street layer. This is called when a network is built for analysis purposes, and also after a
+     * scenario is applied to rebuild the grid pointset on the scenario copy of the network.
+     *
+     * This grid PointSet will cover the entire street network layer of this TransportNetwork, which should include
+     * every point we can route from or to. Any other destination grid (for the same mode, walking) can be made as a
+     * subset of this one since it includes every potentially accessible point.
      */
     public void rebuildLinkedGridPointSet() {
         if (pointSet == null) {
             pointSet = new WebMercatorGridPointSet(this);
         }
         // Here we are bypassing the GridPointSet's internal cache of linkages because we want this particular
-        // linkage to be serialized with the network. The internal cache does not serialize its contents.
+        // linkage to be serialized with the network. The internal Guava cache does not serialize its contents (by design).
         linkedGridPointSet = new LinkedPointSet(pointSet, streetLayer, StreetMode.WALK, linkedGridPointSet);
     }
 

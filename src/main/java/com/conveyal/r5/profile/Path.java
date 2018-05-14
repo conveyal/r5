@@ -16,6 +16,8 @@ public class Path {
 
     private static final Logger LOG = LoggerFactory.getLogger(Path.class);
 
+    // FIXME assuming < 4 legs on each path, this parallel array implementation probably doesn't use less memory than a List<Leg>.
+    // It does effectively allow you to leave out the boardStopPositions and alightStopPositions, but a subclass could do that too.
     public int[] patterns;
     public int[] boardStops;
     public int[] alightStops;
@@ -37,8 +39,6 @@ public class Path {
         TIntList times = new TIntArrayList();
         TIntList alightTimes = new TIntArrayList();
 
-        boolean first = true;
-
         while (state.previous != null) {
             // find the fewest-transfers trip that is still optimal in terms of travel time
             if (state.previous.bestNonTransferTimes[stop] == state.bestNonTransferTimes[stop]) {
@@ -59,14 +59,13 @@ public class Path {
             stop = state.previousStop[stop];
             boardStops.add(stop);
 
-            first = false;
-
             // go to previous state before handling transfers as transfers are done at the end of a round
             state = state.previous;
 
             // handle transfers
-            if (state.transferStop[stop] != -1)
+            if (state.transferStop[stop] != -1) {
                 stop = state.transferStop[stop];
+            }
         }
 
         // we traversed up the tree but the user wants to see paths down the tree

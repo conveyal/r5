@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -41,7 +42,7 @@ public class OneToMany {
      * @param outputDir the directory where the list of destination lives and where output will be
      * written to.
      */
-    public static HashMap<String, Object> makeRequest(AnalysisTask request, TransportNetwork transportNetwork)
+    public static Map<String, Object> makeRequest(AnalysisTask request, TransportNetwork transportNetwork)
             throws IOException {
         // Fetch the prelinked set of one-to-many destinations that was read into the network in the build step.
         PointSetWithIds destinations = (PointSetWithIds) request.getDestinations(transportNetwork, null).get(0);
@@ -50,12 +51,12 @@ public class OneToMany {
         TravelTimeComputer computer = new TravelTimeComputer(request, transportNetwork);
         HashMap<String, Object> idToTravelTime = new HashMap<>();
         long startTime = System.nanoTime();
-        int[] travelTimes = computer.computeTravelTimes();
+        Map<Integer, Integer> indexToTravelTime = computer.computeTravelTimes().pointIndexToTravelTime;
         long endTime = System.nanoTime();
         long duration = (endTime - startTime);
         LOG.info("Took {} ms to run the routing task.", TimeUnit.MILLISECONDS.toSeconds(duration));
-        for (int i = 0; i < travelTimes.length; i++) {
-            idToTravelTime.put(destinations.points.get(i).getId(), Integer.valueOf(travelTimes[i]));
+        for (int i = 0; i < indexToTravelTime.size(); i++) {
+            idToTravelTime.put(destinations.points.get(i).getId(), Integer.valueOf(indexToTravelTime.get(i)));
         }
         return idToTravelTime;
     }

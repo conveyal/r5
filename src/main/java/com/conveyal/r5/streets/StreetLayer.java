@@ -127,7 +127,7 @@ public class StreetLayer implements Serializable, Cloneable {
     private transient TypeOfEdgeLabeler typeOfEdgeLabeler = new TypeOfEdgeLabeler();
     private transient SpeedLabeler speedLabeler;
     // This is only used when loading from OSM, and is then nulled to save memory.
-    transient OSM osm;
+    public transient OSM osm;
 
     /** Envelope of this street layer, in decimal degrees (floating, not fixed-point) */
     public Envelope envelope = new Envelope();
@@ -720,7 +720,7 @@ public class StreetLayer implements Serializable, Cloneable {
             if (bad[0]) return; // log message already printed
 
             if (fromEdge[0] == -1 || toEdge[0] == -1) {
-                LOG.error("Did not find from/to edges for restriction {}, skipping", osmRelationId);
+                LOG.warn("Did not find from/to edges for restriction {}, skipping", osmRelationId);
                 return;
             }
 

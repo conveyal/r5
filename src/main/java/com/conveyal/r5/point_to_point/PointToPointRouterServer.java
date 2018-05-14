@@ -163,13 +163,11 @@ public class PointToPointRouterServer {
 
     }
 
+    /**
+     * This method is separate to allow alternate travelTimeCalculators to be slotted in.
+     */
     private static TravelTimeCalculator getTravelTimeCalculator(File dir) {
-        String congestPath = gcsCongestion != null ? gcsCongestion : dir.toString() + "/r5_predicted_tt.csv";
-        if ((new File(congestPath)).exists()) {
-            return new FileTravelTimeCalculator(congestPath);
-        } else {
-            return new EdgeStore.DefaultTravelTimeCalculator();
-        }
+        return new EdgeStore.DefaultTravelTimeCalculator();
     }
 
     private static void run(TransportNetwork transportNetwork, TravelTimeCalculator travelTimeCalculator, File dir,
@@ -184,6 +182,8 @@ public class PointToPointRouterServer {
         System.out.println("Starting GraphQL server.");
 
         //TODO: executor strategies
+        // TODO Clarify why this is generating the GraphQL schema as a function of a point to point query, this is bizarre.
+        // And why is that parameter called "profileResponse" in the GraphQLSchema constructor?
         GraphQL graphQL = new GraphQL(new com.conveyal.r5.GraphQLSchema(pointToPointQuery).indexSchema);
         // add cors header
         before((req, res) -> res.header("Access-Control-Allow-Origin", "*"));

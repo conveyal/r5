@@ -3,15 +3,13 @@ package com.conveyal.r5.analyst.cluster;
 import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.PointSetCache;
-import com.conveyal.r5.analyst.broker.WorkerCategory;
-import com.conveyal.r5.profile.PerTargetPropagater;
+import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
-import java.io.OutputStream;
 import java.util.List;
 
 /**
@@ -26,6 +24,7 @@ import java.util.List;
     @JsonSubTypes.Type(name = "REGIONAL_ANALYSIS", value = RegionalTask.class)
 })
 public abstract class AnalysisTask extends ProfileRequest {
+
     public int zoom;
     public int west;
     public int north;
@@ -47,30 +46,33 @@ public abstract class AnalysisTask extends ProfileRequest {
     /** A unique identifier for this task assigned by the queue/broker system. */
     public int taskId;
 
-    /** Save results to a bucket.  If blank, the response to this task will be via the default channel (broker for
-     *  single-point requests, queue for regional requests).  Not yet compatible with UI.
+    /**
+     * Whether to save results on S3.
+     * If false, the results will only be sent back to the broker or UI.
+     * If true, travel time surfaces will be saved to S3
+     * Currently this only works on regional requests, and causes them to produce travel time surfaces instead of
+     * accessibility indicator values.
+     * FIXME in practice this always implies travelTimeBreakdown and returnPaths, so we've got redundant and potentially incoherent information in the request.
+     * The intent is in the future to make all these options separate - we can make either travel time surfaces or
+     * accessibility indicators or both, and they may or may not be saved to S3.
      */
-    @JsonIgnore
-    public String outputBucket = "";
+    public boolean makeStaticSite = false;
 
-    /* Directory in the bucket in which to save results; not yet compatible with UI */
-    @JsonIgnore
-    public String outputDirectory = "";
+    /** Whether to break travel time down into in-vehicle, wait, and access/egress time. */
+    public boolean travelTimeBreakdown = false;
 
-    /** Whether to include the in-vehicle component of overall travel time in results */
-    @JsonIgnore
-    public boolean returnInVehicleTimes = false;
-
-    /** Whether to include the waiting time component of overall travel time in results */
-    @JsonIgnore
-    public boolean returnWaitTimes = false;
-
-    /** Whether to include paths, used to for transitive-style maps, in results */
-    @JsonIgnore
+    /** Whether to include paths in results. This allows rendering transitive-style schematic maps. */
     public boolean returnPaths = false;
 
     /** Which percentiles of travel time to calculate. */
     public double[] percentiles = new double[] { 50 };
+
+    /**
+     * When recording paths as in a static site, how many distinct paths should be saved to each destination?
+     * Currently this only makes sense in regional tasks, but it could also become relevant for travel time surfaces
+     * so it's in this superclass.
+     */
+    public int nPathsPerTarget = 3;
 
     /**
      * Is this a task that should return a binary travel time surface or compute accessibility and return it via SQS
@@ -99,15 +101,6 @@ public abstract class AnalysisTask extends ProfileRequest {
     @JsonIgnore
     public abstract List<PointSet> getDestinations(TransportNetwork network, GridCache gridCache);
 
-    /**
-     * Get a TravelTimeReducer that will finish this task.
-     *
-     * The computation of travel times is the same for all task types, but how they are summarized (a surface of travel
-     * times, bootstrapped accessibility, etc) is not.
-     */
-    @JsonIgnore
-    public abstract PerTargetPropagater.TravelTimeReducer getTravelTimeReducer(TransportNetwork network, OutputStream os);
-
     @JsonIgnore
     public WorkerCategory getWorkerCategory () {
         return new WorkerCategory(graphId, workerVersion);
@@ -129,4 +122,5 @@ public abstract class AnalysisTask extends ProfileRequest {
         // no need to catch CloneNotSupportedException, it's caught in ProfileRequest::clone
         return (AnalysisTask) super.clone();
     }
+
 }

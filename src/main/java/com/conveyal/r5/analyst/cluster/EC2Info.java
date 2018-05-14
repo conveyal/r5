@@ -23,6 +23,7 @@ public class EC2Info {
     public String instanceId;
     public String instanceType;
     public String machineImage;
+    public String privateIp;
 
     /** Empty constructor, which will be called during deserialization from JSON. */
     public EC2Info() { }
@@ -40,6 +41,8 @@ public class EC2Info {
             instanceId = EC2MetadataUtils.getInstanceId();
             // There is a method to get a Region object, but stick to strings for deserialization simplicity.
             region = EC2MetadataUtils.getEC2InstanceRegion();
+            // IP address fetching should really not be tied to EC2 but for now this lets us get a useable IP.
+            privateIp = EC2MetadataUtils.getPrivateIpAddress();
             //EC2MetadataUtils.getInstanceInfo();
         } catch (IOException ex) {
             LOG.warn("Connection to metadata URL failed, probably not running on EC2.");

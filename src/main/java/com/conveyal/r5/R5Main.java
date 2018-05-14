@@ -1,6 +1,5 @@
 package com.conveyal.r5;
 
-import com.conveyal.r5.analyst.broker.BrokerMain;
 import com.conveyal.r5.analyst.cluster.AnalystWorker;
 import com.conveyal.r5.point_to_point.PointToPointRouterServer;
 import com.conveyal.r5.edge_server.EdgeServiceServer;
@@ -25,9 +24,7 @@ public class R5Main {
         // then pass the remaining args (1..n) on to that subcommand.
         String command = args[0];
         String[] commandArguments = Arrays.copyOfRange(args, 1, args.length);
-        if ("broker".equals(command)) {
-            BrokerMain.main(commandArguments);
-        } else if ("worker".equals(command)) {
+        if ("worker".equals(command)) {
             AnalystWorker.main(commandArguments);
         } else if ("point".equals(command)) {
             PointToPointRouterServer.main(commandArguments);

@@ -169,13 +169,13 @@ public class ExpandingMMFBytez extends MallocBytez {
      * Encapsulates all the logic needed to deserialize a single object from a file.
      * The type of the resulting object is inferred from the caller.
      */
-    public static <T> T readObjectFromFile (File file) throws Exception {
+    public static <T> T readObjectFromFile (File file, Class<T> theClass) throws Exception {
         FSTConfiguration fstConfiguration = FSTConfiguration.createDefaultConfiguration();
         ExpandingMMFBytez.StreamCoderFactory coderFactory =
                 new ExpandingMMFBytez.StreamCoderFactory(fstConfiguration, file);
         fstConfiguration.setStreamCoderFactory(coderFactory);
         FSTObjectInput in = new FSTObjectInput(fstConfiguration);
-        T result = (T) in.readObject(TransportNetwork.class);
+        T result = (T) in.readObject(theClass);
         in.close();
         coderFactory.free();
         return result;

@@ -2,9 +2,6 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.analyst.TravelTimeSurfaceReducer;
-import com.conveyal.r5.analyst.WebMercatorGridPointSet;
-import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
@@ -53,31 +50,19 @@ public class TravelTimeSurfaceTask extends AnalysisTask {
      * Get the list of point destinations to route to.
      * This may be an arbitrary list of points or the bounds of a grid we'll
      * generate points within.
-     * Since this may be applied to many different grids, we use the extents defined in the request.
+     * Travel time results may be combined with many different grids, so we don't want to limit their geographic extent
+     * to that of any one grid. Instead we use the extents supplied in the request.
+     * The UI only sends these if the user has changed them to something other than "full region".
+     * If "full region" is selected, the UI sends nothing and the backend fills in the bounds of the region.
+     *
+     * FIXME: the request bounds indicate either origin bounds or destination bounds depending on the request type.
+     * We need to specify these separately as we merge all the request types.
      */
     @Override
     public List<PointSet> getDestinations(TransportNetwork network, GridCache gridCache) {
         List<PointSet> pointSets = new ArrayList<>();
-        // Use TransportNetwork gridPointSet as base to avoid relinking
+        // Use TransportNetwork pointSet as base to avoid relinking
         pointSets.add(pointSetCache.get(this.zoom, this.west, this.north, this.width, this.height, network.pointSet));
         return pointSets;
-    }
-
-    @Override
-    public PerTargetPropagater.TravelTimeReducer getTravelTimeReducer(TransportNetwork network, OutputStream os) {
-        if (network.pointSet.getClass() == WebMercatorGridPointSet.class) {
-            WebMercatorGridPointSet gridPointSet = (WebMercatorGridPointSet) network.pointSet;
-            this.width = gridPointSet.width;
-            this.height = gridPointSet.height;
-            this.west = gridPointSet.west;
-            this.north = gridPointSet.north;
-            return new TravelTimeSurfaceReducer(this, network, os);
-        } else {
-            return new PerTargetPropagater.TravelTimeReducer() {
-                @Override
-                public void recordTravelTimesForTarget(int targetIndex, int[] travelTimesForTarget) {
-                }
-            };
-        }
     }
 }

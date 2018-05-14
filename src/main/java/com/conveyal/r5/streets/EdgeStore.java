@@ -587,7 +587,7 @@ public class EdgeStore implements Serializable {
             }
 
             StreetRouter.State s1 = new StreetRouter.State(vertex, edgeIndex, s0);
-            float time = travelTimeCalculator.getTravelTimeMilliseconds(this, s0.durationSeconds, streetMode, req);
+            float time = travelTimeCalculator.getTravelTimeSeconds(this, s0.durationSeconds, streetMode, req);
             float weight = 0;
 
             if (!canTurnFrom(s0, s1, req.reverseSearch)) return null;
@@ -1160,7 +1160,7 @@ public class EdgeStore implements Serializable {
     public static class DefaultTravelTimeCalculator implements TravelTimeCalculator {
 
         @Override
-        public float getTravelTimeMilliseconds(Edge edge, int durationSeconds, StreetMode streetMode, ProfileRequest req) {
+        public float getTravelTimeSeconds(Edge edge, int durationSeconds, StreetMode streetMode, ProfileRequest req) {
             float speedms = edge.calculateSpeed(req, streetMode);
             return (float) (edge.getLengthM() / speedms);
         }

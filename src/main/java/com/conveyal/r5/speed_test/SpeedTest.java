@@ -36,6 +36,7 @@ import static com.conveyal.r5.profile.SearchAlgorithm.RangeRaptor;
  */
 public class SpeedTest {
 
+
     private static final Logger LOG = LoggerFactory.getLogger(SpeedTest.class);
 
 
@@ -46,7 +47,10 @@ public class SpeedTest {
     private static ItineraryMapper itineraryMapper;
 
     private CommandLineOpts opts;
-    private AvgTimer timer = AvgTimer.timerMilliSec("SpeedTest:route");
+    private static final AvgTimer TIMER = AvgTimer.timerMilliSec("SpeedTest:route");
+    private static final AvgTimer TIMER_WORKER = AvgTimer.timerMilliSec("SpeedTest:route Worker");
+    private static final AvgTimer TIMER_COLLECT_RESULTS = AvgTimer.timerMilliSec("SpeedTest:route Collect Results");
+
 
     SpeedTest(CommandLineOpts opts) throws Exception {
         this.opts = opts;
@@ -95,25 +99,23 @@ public class SpeedTest {
         );
 
         LOG.info("Successful searches: " + nRoutesComputed + " / " + testCases.size());
-        LOG.info("Total time: " + timer.totalTimeInSeconds() + " seconds");
+        LOG.info("Total time: " + TIMER.totalTimeInSeconds() + " seconds");
     }
 
     private boolean runSingleTestCase(List<TripPlan> tripPlans, CsvTestCase testCase, SpeedTestCmdLineOpts opts) {
         try {
             final ProfileRequest request = buildDefaultRequest(testCase, opts);
-            timer.start();
-            TripPlan route = route(request);
-            timer.stop();
+            TripPlan route =  TIMER.timeAndReturn(() ->
+                    route(request)
+            );
             tripPlans.add(route);
-            printResult(route.getItineraries().size(), testCase, timer.lapTime(), "");
+            printResult(route.getItineraries().size(), testCase, TIMER.lapTime(), "");
             return true;
         } catch (ConcurrentModificationException | NullPointerException e) {
-            timer.fail();
-            printError(testCase, timer.lapTime(), e);
+            printError(testCase, TIMER.lapTime(), e);
             e.printStackTrace();
         } catch (Exception e) {
-            timer.fail();
-            printError(testCase, timer.lapTime(), e);
+            printError(testCase, TIMER.lapTime(), e);
         }
         return false;
     }
@@ -192,16 +194,13 @@ public class SpeedTest {
     }
 
     private TripPlan routeMcrr(ProfileRequest request) {
-        AvgTimer timerWorker = AvgTimer.timerMilliSec("SpeedTest:route  workerRoute");
-        AvgTimer timerCollectResults = AvgTimer.timerMilliSec("SpeedTest:route  collect results");
-
         try {
             EgressAccessRouter streetRouter = new EgressAccessRouter(transportNetwork, request);
             streetRouter.route();
 
             // -------------------------------------------------------- [ WORKER ROUTE ]
 
-            timerWorker.start();
+            TIMER_WORKER.start();
 
             MultiCriteriaRangeRaptorWorker worker = new MultiCriteriaRangeRaptorWorker(
                     transportNetwork.transitLayer,
@@ -217,11 +216,11 @@ public class SpeedTest {
 
             int[][] transitTravelTimesToStops = worker.route();
 
-            timerWorker.stop();
+            TIMER_WORKER.stop();
 
             // -------------------------------------------------------- [ COLLECT RESULTS ]
 
-            timerCollectResults.start();
+            TIMER_COLLECT_RESULTS.start();
 
             BestKnownResults results = new BestKnownResults(request.numberOfItineraries);
 
@@ -256,11 +255,11 @@ public class SpeedTest {
                 tripPlan.addItinerary(itinerary);
                 tripPlan.sort();
             }
-            timerCollectResults.stop();
+            TIMER_COLLECT_RESULTS.stop();
             return tripPlan;
         } finally {
-            timerWorker.fail();
-            timerCollectResults.fail();
+            TIMER_WORKER.fail();
+            TIMER_COLLECT_RESULTS.fail();
         }
     }
 

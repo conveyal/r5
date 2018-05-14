@@ -69,10 +69,14 @@ public class MultiCriteriaRangeRaptorWorker {
     private final int nMinutes;
 
     // Variables to track time spent
-    private static AvgTimer timerSearch = AvgTimer.timerMilliSec("McRRaptor:route Search");
-    private static AvgTimer timerSearchTransit = AvgTimer.timerMicroSec("McRRaptor:route Transit Search");
-    private static AvgTimer timerSearchTransfers = AvgTimer.timerMicroSec("McRRaptor:route Transfers Search");
-    private static AvgTimer timerEgressPathBuilding = AvgTimer.timerMilliSec("McRRaptor:route Egress path building");
+    private static final AvgTimer TIMER_ROUTE = AvgTimer.timerMilliSec("McRRaptor:route");
+    private static final AvgTimer TIMER_ROUTE_SETUP = AvgTimer.timerMilliSec("McRRaptor:route Init");
+    private static final AvgTimer TIMER_ROUTE_BY_MINUTE = AvgTimer.timerMilliSec("McRRaptor:route Run Raptor For Minute");
+    private static final AvgTimer TIMER_ROUTE_RESULT = AvgTimer.timerMilliSec("McRRaptor:route Result");
+    private static final AvgTimer TIMER_BY_MINUTE_INIT = AvgTimer.timerMilliSec("McRRaptor:runRaptorForMinute Init");
+    private static final AvgTimer TIMER_BY_MINUTE_MIN = AvgTimer.timerMicroSec("McRRaptor:runRaptorForMinute Min");
+    private static final AvgTimer TIMER_BY_MINUTE_SCHEDULE_SEARCH = AvgTimer.timerMicroSec("McRRaptor:runRaptorForMinute Schedule Search");
+    private static final AvgTimer TIMER_BY_MINUTE_TRANSFERS = AvgTimer.timerMicroSec("McRRaptor:runRaptorForMinute Transfers");
 
     /** the transit layer to route on */
     private final TransitLayer transit;
@@ -132,8 +136,8 @@ public class MultiCriteriaRangeRaptorWorker {
 
         //LOG.info("Performing {} rounds (minutes)",  nMinutes);
 
-        return timerSearch.timeAndReturn(() -> {
-            prefilterPatterns();
+        return TIMER_ROUTE.timeAndReturn(() -> {
+            TIMER_ROUTE_SETUP.time(this::prefilterPatterns);
 
             // Initialize result storage.
             // Results are one arrival time at each stop, for every raptor iteration.
@@ -150,15 +154,21 @@ public class MultiCriteriaRangeRaptorWorker {
 
                 // Run the raptor search. For this particular departure time, we receive N arrays of arrival times at all
                 // stops, one for each randomized schedule: resultsForMinute[randScheduleNumber][transitStop]
+                TIMER_ROUTE_BY_MINUTE.start();
                 int[] resultsForMinute = runRaptorForMinute(departureTime);
+                TIMER_ROUTE_BY_MINUTE.stop();
 
                 // Bypass Java's "effectively final" nonsense.
                 final int finalDepartureTime = departureTime;
+                final int _currentIteration = currentIteration;
 
                 // NB this copies the array, so we don't have issues with it being updated later
-                arrivalTimesAtStopsPerIteration[currentIteration++] = IntStream.of(resultsForMinute)
-                        .map(r -> r != UNREACHED ? r - finalDepartureTime : r)
-                        .toArray();
+                TIMER_ROUTE_RESULT.time(() ->
+                    arrivalTimesAtStopsPerIteration[_currentIteration] = IntStream.of(resultsForMinute)
+                            .map(r -> r != UNREACHED ? r - finalDepartureTime : r)
+                            .toArray()
+                );
+                ++currentIteration;
             }
             return arrivalTimesAtStopsPerIteration;
         });
@@ -225,7 +235,9 @@ public class MultiCriteriaRangeRaptorWorker {
      * @return an array of length iterationsPerMinute, containing the arrival (clock) times at each stop for each iteration.
      */
     private int[] runRaptorForMinute (int departureTime) {
-        advanceScheduledSearchToPreviousMinute(departureTime);
+        TIMER_BY_MINUTE_INIT.time(() ->
+                advanceScheduledSearchToPreviousMinute(departureTime)
+        );
 
         // Run the scheduled search
         // round 0 is the street search
@@ -235,20 +247,23 @@ public class MultiCriteriaRangeRaptorWorker {
         // the arrival time given departure at time t is upper-bounded by the arrival time given departure at minute t + 1.
         if (transit.hasSchedules) {
             for (int round = 1; round <= request.maxRides; round++) {
+                final int _round = round;
                 // NB since we have transfer limiting not bothering to cut off search when there are no more transfers
                 // as that will be rare and complicates the code grabbing the results
 
                 // prevent finding crazy multi-transfer ways to get somewhere when there is a quicker way with fewer
                 // transfers
-                scheduleState[round].min(scheduleState[round - 1]);
+                TIMER_BY_MINUTE_MIN.time(() ->
+                        scheduleState[_round].min(scheduleState[_round - 1])
+                );
 
-                timerSearchTransit.start();
-                doScheduledSearchForRound(scheduleState[round - 1], scheduleState[round]);
-                timerSearchTransit.stop();
+                TIMER_BY_MINUTE_SCHEDULE_SEARCH.time(() ->
+                        doScheduledSearchForRound(scheduleState[_round - 1], scheduleState[_round])
+                );
 
-                timerSearchTransfers.start();
-                doTransfers(scheduleState[round]);
-                timerSearchTransfers.stop();
+                TIMER_BY_MINUTE_TRANSFERS.time(() ->
+                        doTransfers(scheduleState[_round])
+                );
             }
         }
 
@@ -265,9 +280,7 @@ public class MultiCriteriaRangeRaptorWorker {
         // This scheduleState is repeatedly modified as the outer loop progresses over departure minutes.
         // We have to be careful here that creating these paths does not modify the state, and makes
         // protective copies of any information we want to retain.
-        timerEgressPathBuilding.start();
         Path[] paths = retainPaths ? pathToEachStop(finalRoundState) : null;
-        timerEgressPathBuilding.stop();
 
         int[] result = finalRoundState.bestNonTransferTimes;
 

@@ -244,6 +244,8 @@ public class MultiCriteriaRangeRaptorWorker {
         // “Round-Based Public Transit Routing,” January 1, 2012. http://research.microsoft.com/pubs/156567/raptor_alenex.pdf.
         // ergo, we re-use the arrival times found in searches that have already occurred that depart later, because
         // the arrival time given departure at time t is upper-bounded by the arrival time given departure at minute t + 1.
+        int roundsUsed = request.maxRides;
+
         if (transit.hasSchedules) {
             for (int round = 1; round <= request.maxRides; round++) {
                 final int _round = round;
@@ -263,6 +265,11 @@ public class MultiCriteriaRangeRaptorWorker {
                 TIMER_BY_MINUTE_TRANSFERS.time(() ->
                         doTransfers(scheduleState[_round])
                 );
+
+                if (scheduleState[round].bestStopsTouched.isEmpty() && scheduleState[round].nonTransferStopsTouched.isEmpty()) {
+                    roundsUsed = round;
+                    break;
+                }
             }
         }
 
@@ -274,7 +281,7 @@ public class MultiCriteriaRangeRaptorWorker {
         // It may be somewhat less inefficient than it seems if we make arrays of references all to the same object.
         // TODO check whether we're actually hitting this code with iterationsPerMinute > 1 on scheduled networks.
 
-        McRaptorState finalRoundState = scheduleState[request.maxRides];
+        McRaptorState finalRoundState = scheduleState[roundsUsed];
 
         // This scheduleState is repeatedly modified as the outer loop progresses over departure minutes.
         // We have to be careful here that creating these paths does not modify the state, and makes

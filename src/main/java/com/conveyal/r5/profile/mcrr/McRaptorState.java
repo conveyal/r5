@@ -272,13 +272,6 @@ public class McRaptorState {
         int previousDepartureTime = this.departureTime;
         this.departureTime = departureTime;
 
-        // remove trips that are now too long
-        int maxClockTime = departureTime + maxDurationSeconds;
-        for (int i = 0; i < bestTimes.length; i++) {
-            if (bestTimes[i] > maxClockTime) bestTimes[i] = FastRaptorWorker.UNREACHED;
-            if (bestNonTransferTimes[i] > maxClockTime) bestNonTransferTimes[i] = FastRaptorWorker.UNREACHED;
-        }
-
         // handle updating wait
         for (int stop = 0; stop < this.bestTimes.length; stop++) {
             if (this.previousPatterns[stop] > -1) {

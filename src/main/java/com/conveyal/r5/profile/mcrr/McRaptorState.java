@@ -40,7 +40,9 @@ public class McRaptorState {
     public int[] bestNonTransferTimes;
 
     /** Cumulative transit wait time for the best path to each stop, parallel to bestNonTransferTimes. */
-    public int[] nonTransferWaitTime;
+    private int[] nonTransferWaitTime;
+
+    public int nonTransitWaitTimeAjustment;
 
     /** Cumulative in-vehicle travel time for the best path to each stop, parallel to bestNonTransferTimes. */
     public int[] nonTransferInVehicleTravelTime;
@@ -102,6 +104,7 @@ public class McRaptorState {
         Arrays.fill(transferTimes, -1);
 
         this.nonTransferWaitTime = new int[nStops];
+        this.nonTransitWaitTimeAjustment = 0;
         this.nonTransferInVehicleTravelTime = new int[nStops];
         this.nonTransferStopsTouched = new BitSet(nStops);
         this.bestStopsTouched = new BitSet(nStops);
@@ -272,11 +275,10 @@ public class McRaptorState {
         int previousDepartureTime = this.departureTime;
         this.departureTime = departureTime;
 
-        // handle updating wait
-        for (int stop = 0; stop < this.bestTimes.length; stop++) {
-            if (this.previousPatterns[stop] > -1) {
-                this.nonTransferWaitTime[stop] += previousDepartureTime - departureTime;
-            }
-        }
+        this.nonTransitWaitTimeAjustment = previousDepartureTime - departureTime;
+    }
+
+    public int getNonTransferWaitTimeByIndex(int index) {
+        return this.nonTransferWaitTime[index] + this.nonTransitWaitTimeAjustment;
     }
 }

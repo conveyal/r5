@@ -106,7 +106,7 @@ public class Grid {
     private static final double MAX_BOUNDING_BOX_AREA_SQ_KM = 250_000;
 
     /** Maximum area allowed for features in a shapefile upload */
-    double MAX_FEATURE_AREA_SQ_DEG = 0.01;
+    double MAX_FEATURE_AREA_SQ_DEG = 2;
 
     /**
      * @param zoom web mercator zoom level for the grid.

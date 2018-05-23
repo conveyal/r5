@@ -20,8 +20,8 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 /**
- * RaptorWorker is fast, but FastRaptorWorker is knock-your-socks-off fast, and also more maintainable.
- * It is also simpler, as it only focuses on the transit network; see the Propagater class for the methods that extend
+ * FastRaptorWorker is faster than the old RaptorWorker and made to be more maintainable.
+ * It is simpler, as it only focuses on the transit network; see the Propagater class for the methods that extend
  * the travel times from the final transit stop of a trip out to the individual targets.
  *
  * The algorithm used herein is described in
@@ -33,7 +33,7 @@ import java.util.stream.Stream;
  * Delling, Daniel, Thomas Pajor, and Renato Werneck. “Round-Based Public Transit Routing,” January 1, 2012.
  *   http://research.microsoft.com/pubs/156567/raptor_alenex.pdf.
  *
- * There is currently no support for saving paths.
+ * There is basic support for saving paths, so we can report how to reach a destination rather than just how long it takes.
  *
  * This class originated as a rewrite of our RAPTOR code that would use "thin workers", allowing computation by a
  * generic function-execution service like AWS Lambda. The gains in efficiency were significant enough that this is now
@@ -42,34 +42,39 @@ import java.util.stream.Stream;
  */
 public class FastRaptorWorker {
 
-    /**
-     * This value essentially serves as Infinity for ints - it's bigger than every other number.
-     * It is the travel time to a transit stop or a target before that stop or target is ever reached.
-     * Be careful when propagating travel times from stops to targets, adding something to UNREACHED will cause overflow.
-     */
-    public static final int UNREACHED = Integer.MAX_VALUE;
-
-    /** Minimum slack time to board transit in seconds. */
-    public static final int BOARD_SLACK_SECONDS = 60;
-
     private static final Logger LOG = LoggerFactory.getLogger(FastRaptorWorker.class);
 
     /**
+     * This value essentially serves as Infinity for ints - it's bigger than every other number.
+     * It is the travel time to a transit stop or a target before that stop or target is ever reached.
+     * Be careful when propagating travel times from stops to targets, adding anything to UNREACHED will cause overflow.
+     */
+    public static final int UNREACHED = Integer.MAX_VALUE;
+
+    /**
+     * Minimum time between alighting from one vehicle and boarding another, in seconds.
+     * TODO make this configurable, and use loop-transfers from transfers.txt.
+     */
+    public static final int BOARD_SLACK_SECONDS = 60;
+
+    /**
      * Step for departure times. Use caution when changing this as we use the functions
-     * request.getTimeWindowLengthMinutes and request.getMonteCarloDrawsPerMinute below which assume this value is 1 minute.
-     * The same functions are also used in BootstrappingTravelTimeReducer where we assume that their product is the number
-     * of iterations performed.
+     * request.getTimeWindowLengthMinutes and request.getMonteCarloDrawsPerMinute below which assume this value is 1
+     * minute. The same functions are also used in BootstrappingTravelTimeReducer where we assume that their product is
+     * the number of iterations performed.
      */
     private static final int DEPARTURE_STEP_SEC = 60;
 
-    /** Minimum wait for boarding to account for schedule variation */
+    /** Minimum wait for boarding to account for schedule variation. FIXME clarify how this is different than BOARD_SLACK. */
     private static final int MINIMUM_BOARD_WAIT_SEC = 60;
+
     public final int nMinutes;
     public final int monteCarloDrawsPerMinute;
 
-    // Variables to track time spent, all in nanoseconds (some of the operations we're timing are significantly submillisecond)
-    // (although I suppose using ms would be fine because the number of times we cross a millisecond boundary would be proportional
-    //  to the portion of a millisecond that operation took).
+    // Variables to track calculation time spent, all in nanoseconds (some of the operations we're timing are
+    // significantly submillisecond) although using ms would be fine because the number of times we cross
+    // a millisecond boundary would be proportional to the portion of a millisecond that operation took.
+
     public long startClockTime;
     public long timeInScheduledSearch;
     public long timeInScheduledSearchTransit;
@@ -81,13 +86,13 @@ public class FastRaptorWorker {
     public long timeInFrequencySearchScheduled;
     public long timeInFrequencySearchTransfers;
 
-    /** the transit layer to route on */
+    /** The transit layer to route on. */
     private final TransitLayer transit;
 
-    /** Times to access each transit stop using the street network (seconds) */
+    /** Times to access each transit stop using the street network (seconds). */
     private final TIntIntMap accessStops;
 
-    /** The profilerequest describing routing parameters */
+    /** The routing parameters. */
     private final ProfileRequest request;
 
     /** Frequency-based trip patterns running on a given day */

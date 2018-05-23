@@ -547,25 +547,33 @@ public class AnalystWorker implements Runnable {
         lastPollingTime = timeNow;
 
         httpPost.setEntity(JsonUtilities.objectToJsonHttpEntity(workerStatus));
+        HttpEntity responseEntity = null;
         try {
             HttpResponse response = httpClient.execute(httpPost);
-            HttpEntity entity = response.getEntity();
+            responseEntity = response.getEntity();
             if (response.getStatusLine().getStatusCode() == 204) {
-                // No work to do.
+                // Broker said there's no work to do.
                 return null;
             }
-            if (entity == null) {
-                return null;
+            if (response.getStatusLine().getStatusCode() == 200 && responseEntity != null) {
+                // Broker returned some work. Use the lenient object mapper to decode it in case the broker is a
+                // newer version so sending unrecognizable fields.
+                // ReadValue closes the stream, releasing the HTTP connection.
+                return JsonUtilities.lenientObjectMapper.readValue(responseEntity.getContent(),
+                        new TypeReference<List<AnalysisTask>>() {});
             }
-            if (response.getStatusLine().getStatusCode() != 200) {
-                // TODO log errors!
-                EntityUtils.consumeQuietly(entity);
-                return null;
-            }
-            // Use the lenient object mapper here in case the broker is a newer version so sending unrecognizable fields
-            return JsonUtilities.lenientObjectMapper.readValue(entity.getContent(), new TypeReference<List<AnalysisTask>>() {});
+            // Non-200 response code or a null entity. Something is weird.
+            LOG.error("Unsuccessful polling. HTTP response code: " + response.getStatusLine().getStatusCode());
         } catch (Exception e) {
             LOG.error("Exception while polling backend for work: {}",ExceptionUtils.asString(e));
+        } finally {
+            // We have to properly close any streams so the HTTP connection is released back to the (finite) pool.
+            EntityUtils.consumeQuietly(responseEntity);
+        }
+        // If we did not return yet, something went wrong and the results were not delivered. Put them back on the list
+        // for later re-delivery, safely interleaving with new results that may be coming from other worker threads.
+        synchronized (workResults) {
+            workResults.addAll(workerStatus.results);
         }
         return null;
     }

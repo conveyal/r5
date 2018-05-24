@@ -25,7 +25,6 @@ import org.apache.http.config.SocketConfig;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.impl.conn.PoolingHttpClientConnectionManager;
 import org.apache.http.util.EntityUtils;
-import org.eclipse.jetty.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -110,11 +109,14 @@ public class AnalystWorker implements Runnable {
     final TransportNetworkCache transportNetworkCache;
 
     /**
-     * If this value is non-negative, the worker will not actually do any work. It will just report all tasks
-     * as completed immediately, but will fail to do so on the given percentage of tasks. This is used in testing task
-     * re-delivery and overall broker sanity.
+     * If this is true, the worker will not actually do any work. It will just report all tasks as completed
+     * after a small delay, but will fail to do so on the given percentage of tasks. This is used in testing task
+     * re-delivery and overall broker sanity with multiple jobs and multiple failing workers.
      */
-    public int dryRunFailureRate = -1;
+    private final boolean testTaskRedelivery;
+
+    /** In the type of tests described above, this is how often the worker will fail to return a result for a task. */
+    public static final int TESTING_FAILURE_RATE_PERCENT = 20;
 
     /** How long (minimum, in milliseconds) should this worker stay alive after processing a single-point task. */
     /** The minimum amount of time (in minutes) that this worker should stay alive after processing a single-point task. */
@@ -222,6 +224,8 @@ public class AnalystWorker implements Runnable {
                 LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
 
         // PARSE THE CONFIGURATION TODO move configuration parsing into a separate method.
+
+        testTaskRedelivery = Boolean.parseBoolean(config.getProperty("test-task-redelivery", "false"));
 
         // Region region = Region.getRegion(Regions.fromName(config.getProperty("aws-region")));
         filePersistence = new S3FilePersistence(config.getProperty("aws-region"));
@@ -331,10 +335,14 @@ public class AnalystWorker implements Runnable {
         // This is listening on a different port than the backend API so that a worker can be running on the backend.
         // Trying out the new Spark syntax for non-static configuration.
         // TODO symbolic constants for the backend and worker ports
-        sparkHttpService = spark.Service.ignite()
-            .port(WORKER_LISTEN_PORT)
-            .threadPool(WORKER_SINGLE_POINT_THREADS);
-        sparkHttpService.post("/single", new AnalysisWorkerController(this)::handleSinglePoint);
+        // To avoid port conflicts, do not start HTTP server when testing task redelivery, in which case many workers
+        // run on the same machine.
+        if (!testTaskRedelivery) {
+            sparkHttpService = spark.Service.ignite()
+                .port(WORKER_LISTEN_PORT)
+                .threadPool(WORKER_SINGLE_POINT_THREADS);
+            sparkHttpService.post("/single", new AnalysisWorkerController(this)::handleSinglePoint);
+        }
 
         // Main polling loop to fill the regional work queue.
         // You'd think the ThreadPoolExecutor could just block when the blocking queue is full, but apparently
@@ -398,23 +406,23 @@ public class AnalystWorker implements Runnable {
     protected byte[] handleOneRequest(AnalysisTask request) {
         // Record the fact that the worker is busy so it won't shut down.
         lastRegionalTaskTime = System.currentTimeMillis(); // FIXME both regional and single-point are handled here
-        if (dryRunFailureRate >= 0) {
-            // This worker is running in test mode.
-            // It should report all work as completed without actually doing anything,
-            // but will fail a certain percentage of the time.
+        if (testTaskRedelivery) {
+            // This worker is being used in a test of task redelivery. It should report all work as completed without
+            // actually doing anything, but fail to report results a certain percentage of the time.
             // TODO sleep and generate work result in another method
             try {
-                Thread.sleep(random.nextInt(5000) + 1000);
+                // Pretend the task takes 5-6 seconds to complete.
+                Thread.sleep(random.nextInt(1000) + 1000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            if (random.nextInt(100) >= dryRunFailureRate) {
+            if (random.nextInt(100) >= TESTING_FAILURE_RATE_PERCENT) {
                 RegionalWorkResult workResult = new RegionalWorkResult(request.jobId, request.taskId, 1, 1, 1);
                 synchronized (workResults) {
                     workResults.add(workResult);
                 }
             } else {
-                LOG.info("Intentionally failing to complete task for testing purposes {}", request.taskId);
+                LOG.info("Intentionally failing to complete task {} for testing purposes.", request.taskId);
             }
             return null;
         }
@@ -573,6 +581,7 @@ public class AnalystWorker implements Runnable {
         // If we did not return yet, something went wrong and the results were not delivered. Put them back on the list
         // for later re-delivery, safely interleaving with new results that may be coming from other worker threads.
         synchronized (workResults) {
+            // TODO check here that results are not piling up too much?
             workResults.addAll(workerStatus.results);
         }
         return null;

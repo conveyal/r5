@@ -411,7 +411,7 @@ public class AnalystWorker implements Runnable {
             // actually doing anything, but fail to report results a certain percentage of the time.
             // TODO sleep and generate work result in another method
             try {
-                // Pretend the task takes 5-6 seconds to complete.
+                // Pretend the task takes 1-2 seconds to complete.
                 Thread.sleep(random.nextInt(1000) + 1000);
             } catch (InterruptedException e) {
                 e.printStackTrace();

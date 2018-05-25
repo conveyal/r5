@@ -44,6 +44,9 @@ import java.util.stream.IntStream;
 @SuppressWarnings("Duplicates")
 public class MultiCriteriaRangeRaptorWorker {
 
+    private static final Logger LOG = LoggerFactory.getLogger(MultiCriteriaRangeRaptorWorker.class);
+    private static boolean PRINT_REFILTERING_PATTERNS_INFO = true;
+
     /**
      * This value essentially serves as Infinity for ints - it's bigger than every other number.
      * It is the travel time to a transit stop or a target before that stop or target is ever reached.
@@ -54,7 +57,6 @@ public class MultiCriteriaRangeRaptorWorker {
     /** Minimum slack time to board transit in seconds. */
     public static final int BOARD_SLACK_SECONDS = 60;
 
-    private static final Logger LOG = LoggerFactory.getLogger(MultiCriteriaRangeRaptorWorker.class);
 
     /**
      * Step for departure times. Use caution when changing this as we use the functions
@@ -150,8 +152,6 @@ public class MultiCriteriaRangeRaptorWorker {
                  departureTime >= request.fromTime;
                  departureTime -= DEPARTURE_STEP_SEC, minute--) {
 
-                //if (minute % 15 == 0) LOG.debug("  minute {}", minute);
-
                 // Run the raptor search. For this particular departure time, we receive N arrays of arrival times at all
                 // stops, one for each randomized schedule: resultsForMinute[randScheduleNumber][transitStop]
                 TIMER_ROUTE_BY_MINUTE.start();
@@ -201,8 +201,11 @@ public class MultiCriteriaRangeRaptorWorker {
         runningScheduledPatterns = IntStream.of(originalPatternIndexForScheduledIndex)
                 .mapToObj(transit.tripPatterns::get).toArray(TripPattern[]::new);
 
-        LOG.info("Prefiltering patterns based on date active reduced {} patterns to {} scheduled patterns",
-                transit.tripPatterns.size(), scheduledPatterns.size());
+        if (PRINT_REFILTERING_PATTERNS_INFO) {
+            LOG.info("Prefiltering patterns based on date active reduced {} patterns to {} scheduled patterns",
+                    transit.tripPatterns.size(), scheduledPatterns.size());
+            PRINT_REFILTERING_PATTERNS_INFO = false;
+        }
     }
 
     /**
@@ -248,25 +251,27 @@ public class MultiCriteriaRangeRaptorWorker {
 
         if (transit.hasSchedules) {
             for (int round = 1; round <= request.maxRides; round++) {
-                final int _round = round;
+                final McRaptorState currState = scheduleState[round];
+                final McRaptorState prevState = currState.previous;
+
                 // NB since we have transfer limiting not bothering to cut off search when there are no more transfers
                 // as that will be rare and complicates the code grabbing the results
 
                 // prevent finding crazy multi-transfer ways to get somewhere when there is a quicker way with fewer
                 // transfers
                 TIMER_BY_MINUTE_MIN.time(() ->
-                        scheduleState[_round].min(scheduleState[_round - 1])
+                        currState.min(prevState)
                 );
 
                 TIMER_BY_MINUTE_SCHEDULE_SEARCH.time(() ->
-                        doScheduledSearchForRound(scheduleState[_round - 1], scheduleState[_round])
+                        doScheduledSearchForRound(prevState, currState)
                 );
 
                 TIMER_BY_MINUTE_TRANSFERS.time(() ->
-                        doTransfers(scheduleState[_round])
+                        doTransfers(currState)
                 );
 
-                if (scheduleState[round].bestStopsTouched.isEmpty() && scheduleState[round].nonTransferStopsTouched.isEmpty()) {
+                if (currState.bestStopsTouched.isEmpty() && currState.nonTransferStopsTouched.isEmpty()) {
                     roundsUsed = round;
                     break;
                 }
@@ -296,6 +301,7 @@ public class MultiCriteriaRangeRaptorWorker {
         return result;
     }
 
+    private final McPathBuilder pathBuilder = new McPathBuilder();
     /**
      * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
      */
@@ -307,7 +313,7 @@ public class MultiCriteriaRangeRaptorWorker {
             if (state.bestNonTransferTimes[stopIndex] == UNREACHED) {
                 paths[s] = null;
             } else {
-                paths[s] = McPathBuilder.extractPathForStop(state, stopIndex);
+                paths[s] = pathBuilder.extractPathForStop(state, stopIndex);
             }
         }
         return paths;
@@ -336,7 +342,7 @@ public class MultiCriteriaRangeRaptorWorker {
                     int onVehicleTime = alightTime - boardTime;
 
                     if (waitTime + onVehicleTime + inputState.bestTimes[boardStop] > alightTime) {
-                        LOG.error("Components of travel time are larger than travel time!");
+                        throw new IllegalStateException("Components of travel time are larger than travel time!");
                     }
 
                     outputState.setTimeAtStop(stop, alightTime, originalPatternIndex, boardStop, waitTime, onVehicleTime, false, pattern.tripSchedules.indexOf(schedule), boardTime, -1);

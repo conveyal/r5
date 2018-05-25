@@ -33,6 +33,8 @@ public class StreetRouter {
 
     private static final Logger LOG = LoggerFactory.getLogger(StreetRouter.class);
 
+    private static boolean SHOW_DISTANCE_LIMIT_WARNING_ONCE = true;
+
     private static final boolean DEBUG_OUTPUT = false;
 
     /** A special value for the search target vertex: do not stop the search at any particular vertex. */
@@ -457,7 +459,10 @@ public class StreetRouter {
             // Distance in State is in millimeters. Distance limit is in meters, requiring a conversion.
             distanceLimitMm = distanceLimitMeters * 1000;
             if (quantityToMinimize != State.RoutingVariable.DISTANCE_MILLIMETERS) {
-                LOG.warn("Setting a distance limit when distance is not the dominance function, this is a resource limiting issue and paths may be incorrect.");
+                if(SHOW_DISTANCE_LIMIT_WARNING_ONCE) {
+                    LOG.warn("Setting a distance limit when distance is not the dominance function, this is a resource limiting issue and paths may be incorrect.");
+                    SHOW_DISTANCE_LIMIT_WARNING_ONCE = false;
+                }
             }
         } else {
             // There is no distance limit. Set it to the largest possible value to allow routing to progress.

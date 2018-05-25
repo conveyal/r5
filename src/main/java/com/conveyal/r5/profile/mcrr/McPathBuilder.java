@@ -3,31 +3,36 @@ package com.conveyal.r5.profile.mcrr;
 import com.conveyal.r5.profile.Path;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 
 /**
  * Class used to represent transit paths in Browsochrones and Modeify.
  */
 public class McPathBuilder {
-    private static final Logger LOG = LoggerFactory.getLogger(McPathBuilder.class);
+    private TIntList patterns = new TIntArrayList();
+    private TIntList boardStops = new TIntArrayList();
+    private TIntList alightStops = new TIntArrayList();
+    private TIntList times = new TIntArrayList();
+    private TIntList alightTimes = new TIntArrayList();
+    private TIntList boardTimes = new TIntArrayList();
+    private TIntList transferTimes = new TIntArrayList();
+    private TIntList trips = new TIntArrayList();
 
     /**
      * Scan over a raptor state and extract the path leading up to that state.
      */
-    public static Path extractPathForStop(McRaptorState state, int stop) {
+    public  Path extractPathForStop(McRaptorState state, int stop) {
         // trace the path back from this RaptorState
         int previousPattern;
         int previousTrip;
-        TIntList patterns = new TIntArrayList();
-        TIntList boardStops = new TIntArrayList();
-        TIntList alightStops = new TIntArrayList();
-        TIntList times = new TIntArrayList();
-        TIntList alightTimes = new TIntArrayList();
-        TIntList boardTimes = new TIntArrayList();
-        TIntList transferTimes = new TIntArrayList();
-        TIntList trips = new TIntArrayList();
+        patterns.clear();
+        boardStops.clear();
+        alightStops.clear();
+        times.clear();
+        alightTimes.clear();
+        boardTimes.clear();
+        transferTimes.clear();
+        trips.clear();
 
         while (state.previous != null) {
             // find the fewest-transfers trip that is still optimal in terms of travel time
@@ -37,7 +42,7 @@ public class McPathBuilder {
             }
 
             if (state.previous.bestNonTransferTimes[stop] < state.bestNonTransferTimes[stop]) {
-                LOG.error("Previous round has lower weight at stop {}, this implies a bug!", stop);
+                throw new IllegalStateException("Previous round has lower weight at stop " + stop + ", this implies a bug!");
             }
 
             previousPattern = state.previousPatterns[stop];

@@ -2,12 +2,14 @@ package com.conveyal.r5.profile;
 
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
+import com.google.common.primitives.Ints;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * Class used to represent transit paths in Browsochrones and Modeify.
@@ -134,18 +136,35 @@ public class Path {
             LOG.error("Transit path computed without a transit segment!");
     }
 
-    // FIXME we are using a map with unorthodox definitions of hashcode and equals to make them serve as map keys.
-    // We should instead wrap Path or copy the relevant fields into a PatternSequenceKey class.
+    // The semantic HashCode and Equals are used in deduplicating the paths for static site output.
+    // They will be calculated millions of times so might be slow with all these multiplications.
 
-    public int hashCode() {
-        return Arrays.hashCode(patterns);
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Path path = (Path) o;
+        return length == path.length &&
+                Arrays.equals(patterns, path.patterns) &&
+                Arrays.equals(boardStops, path.boardStops) &&
+                Arrays.equals(alightStops, path.alightStops) &&
+                Arrays.equals(alightTimes, path.alightTimes) &&
+                Arrays.equals(trips, path.trips) &&
+                Arrays.equals(boardStopPositions, path.boardStopPositions) &&
+                Arrays.equals(alightStopPositions, path.alightStopPositions);
     }
 
-    public boolean equals(Object o) {
-        if (o instanceof Path) {
-            Path p = (Path) o;
-            return this == p || Arrays.equals(patterns, p.patterns);
-        } else return false;
+    @Override
+    public int hashCode() {
+        int result = Ints.hashCode(length);
+        result = 31 * result + Arrays.hashCode(patterns);
+        result = 31 * result + Arrays.hashCode(boardStops);
+        result = 31 * result + Arrays.hashCode(alightStops);
+        result = 31 * result + Arrays.hashCode(alightTimes);
+        result = 31 * result + Arrays.hashCode(trips);
+        result = 31 * result + Arrays.hashCode(boardStopPositions);
+        result = 31 * result + Arrays.hashCode(alightStopPositions);
+        return result;
     }
 
     /**

@@ -4,6 +4,7 @@ import org.apache.commons.cli.Options;
 
 public class SpeedTestCmdLineOpts extends CommandLineOpts {
 
+    private static final String PRINT_ITINERARIES_OPT = "p";
     private static final String NUM_OF_ITINERARIES_OPT = "i";
     private static final String SEARCH_WINDOW_IN_MINUTES_OPT = "t";
 
@@ -15,8 +16,13 @@ public class SpeedTestCmdLineOpts extends CommandLineOpts {
     Options speedTestOptions() {
         Options options = super.speedTestOptions();
         options.addOption(NUM_OF_ITINERARIES_OPT, "numOfItineraries", true, "Number of itineraries to return");
+        options.addOption(PRINT_ITINERARIES_OPT, "printItineraries", false, "Print itineraries found");
         options.addOption(SEARCH_WINDOW_IN_MINUTES_OPT, "searchTimeWindowInMinutes", true, "The time in minutes to add to from to time");
         return options;
+    }
+
+    boolean printItineraries() {
+        return cmd.hasOption(PRINT_ITINERARIES_OPT);
     }
 
     int numOfItineraries() {

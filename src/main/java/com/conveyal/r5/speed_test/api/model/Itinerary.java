@@ -110,8 +110,12 @@ public class Itinerary {
      * @param leg
      */
     public void addLeg(Leg leg) {
-        if(leg != null)
+        if(leg != null) {
+            if(leg.isWalkLeg()) {
+                walkDistance += leg.distance;
+            }
             legs.add(leg);
+        }
     }
 
     /** 

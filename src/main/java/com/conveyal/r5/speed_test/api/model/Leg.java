@@ -272,6 +272,13 @@ public class Leg {
    }
 
    /**
+    * Whether this leg is a transit leg or not.
+    * @return Boolean true if the leg is a transit leg
+    */
+   public boolean isWalkLeg() {
+      return mode != null && TraverseMode.WALK.name().equals(mode);
+   }
+   /**
     * The leg's duration in seconds
     */
    @XmlElement

@@ -5,7 +5,6 @@ import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.speed_test.api.model.AgencyAndId;
-import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.Leg;
 import com.conveyal.r5.speed_test.api.model.Place;
 import com.conveyal.r5.speed_test.api.model.PolylineEncoder;
@@ -32,8 +31,8 @@ public class ItineraryMapper {
         this.transportNetwork = transportNetwork;
     }
 
-    Itinerary createItinerary(ProfileRequest request, Path path, StreetPath accessPath, StreetPath egressPath) {
-        Itinerary itinerary = new Itinerary();
+    SpeedTestItinerary createItinerary(ProfileRequest request, Path path, StreetPath accessPath, StreetPath egressPath) {
+        SpeedTestItinerary itinerary = new SpeedTestItinerary();
         if (path == null) {
             return null;
         }
@@ -65,9 +64,7 @@ public class ItineraryMapper {
         accessLeg.mode = "WALK";
         accessLeg.legGeometry = PolylineEncoder.createEncodings(acessCoords);
 
-        accessLeg.distance = (double)accessPath.getDistance();
-
-        itinerary.walkDistance += accessLeg.distance;
+        accessLeg.distance = distanceMMToMeters(accessPath.getDistance());
 
         itinerary.addLeg(accessLeg);
 
@@ -91,9 +88,7 @@ public class ItineraryMapper {
                 transferLeg.to = new Place(boardStop.stop_lat, boardStop.stop_lon, boardStop.stop_name);
                 transferLeg.legGeometry = PolylineEncoder.createEncodings(transferCoords);
 
-                transferLeg.distance = (double)transferPath.getDistance();
-
-                itinerary.walkDistance += transferLeg.distance;
+                transferLeg.distance = distanceMMToMeters (transferPath.getDistance());
 
                 itinerary.addLeg(transferLeg);
             }
@@ -159,9 +154,7 @@ public class ItineraryMapper {
         egressLeg.mode = "WALK";
         egressLeg.legGeometry = PolylineEncoder.createEncodings(egressCoords);
 
-        egressLeg.distance = (double)egressPath.getDistance();
-
-        itinerary.walkDistance += egressLeg.distance;
+        egressLeg.distance = distanceMMToMeters (egressPath.getDistance());
 
         itinerary.addLeg(egressLeg);
 
@@ -170,6 +163,8 @@ public class ItineraryMapper {
         itinerary.endTime = egressLeg.endTime;
 
         itinerary.transfers = path.patterns.length - 1;
+
+        itinerary.initParetoVector();
 
         return itinerary;
     }
@@ -196,4 +191,7 @@ public class ItineraryMapper {
         return calendar;
     }
 
+    private double distanceMMToMeters(int distanceMm) {
+        return (double) (distanceMm / 1000);
+    }
 }

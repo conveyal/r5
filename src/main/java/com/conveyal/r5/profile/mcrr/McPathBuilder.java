@@ -36,12 +36,12 @@ public class McPathBuilder {
 
         while (state.previous != null) {
             // find the fewest-transfers trip that is still optimal in terms of travel time
-            if (state.previous.bestNonTransferTimes[stop] == state.bestNonTransferTimes[stop]) {
+            if (state.previous.bestTransitTimes[stop] == state.bestTransitTimes[stop]) {
                 state = state.previous;
                 continue;
             }
 
-            if (state.previous.bestNonTransferTimes[stop] < state.bestNonTransferTimes[stop]) {
+            if (state.previous.bestTransitTimes[stop] < state.bestTransitTimes[stop]) {
                 throw new IllegalStateException("Previous round has lower weight at stop " + stop + ", this implies a bug!");
             }
 
@@ -52,7 +52,7 @@ public class McPathBuilder {
             trips.add(previousTrip);
             alightStops.add(stop);
             times.add(state.bestTimes[stop]);
-            alightTimes.add(state.bestNonTransferTimes[stop]);
+            alightTimes.add(state.bestTransitTimes[stop]);
             boardTimes.add(state.boardTimes[stop]);
             stop = state.previousStop[stop];
             boardStops.add(stop);

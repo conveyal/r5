@@ -107,11 +107,11 @@ public class MultiCriteriaRangeRaptorWorker {
     // TODO add javadoc to field
     private final McRaptorState[] scheduleState;
 
-    /** Set to true to save path details for all optimal paths. */
-    public boolean retainPaths = false;
-
     /** If we're going to store paths to every destination (e.g. for static sites) then they'll be retained here. */
     public List<Path[]> pathsPerIteration;
+
+    private final McPathBuilder pathBuilder = new McPathBuilder();
+
 
     public MultiCriteriaRangeRaptorWorker(TransitLayer transitLayer, ProfileRequest request, TIntIntMap accessStops, int[] egressStops) {
         this.transit = transitLayer;
@@ -119,15 +119,28 @@ public class MultiCriteriaRangeRaptorWorker {
         this.accessStops = accessStops;
         this.egressStops = egressStops;
         this.servicesActive  = transit.getActiveServicesForDate(request.date);
-        // we add one to request.maxRides, first state is result of initial walk
-        this.scheduleState = IntStream.range(0, request.maxRides + 1)
-                .mapToObj((i) -> new McRaptorState(transit.getStopCount(), request.maxTripDurationMinutes * 60))
-                .toArray(McRaptorState[]::new);
 
-        for (int i = 1; i < this.scheduleState.length; i++) this.scheduleState[i].previous = this.scheduleState[i - 1];
+        this.scheduleState = createStateArray(
+                request.maxRides,
+                transit.getStopCount(),
+                request.maxTripDurationMinutes * 60
+        );
 
         // compute number of minutes for scheduled search
         nMinutes = request.getTimeWindowLengthMinutes();
+    }
+
+    private static McRaptorState[] createStateArray(final int maxRides, final int stopCount, final int maxDurationSeconds) {
+        // we add one to request.maxRides, first state is result of initial walk
+        McRaptorState[] array = new McRaptorState[maxRides + 1];
+        McRaptorState newState, prev = null;
+
+        for(int i=0; i<array.length; ++i) {
+            array[i] = new McRaptorState(stopCount, maxDurationSeconds);
+            array[i].previous = prev;
+            prev = array[i];
+        }
+        return array;
     }
 
     /**
@@ -144,7 +157,9 @@ public class MultiCriteriaRangeRaptorWorker {
             // Initialize result storage.
             // Results are one arrival time at each stop, for every raptor iteration.
             int[][] arrivalTimesAtStopsPerIteration = new int[nMinutes][];
-            if (retainPaths) pathsPerIteration = new ArrayList<>();
+
+            pathsPerIteration = new ArrayList<>();
+
             int currentIteration = 0;
 
             // The main outer loop iterates backward over all minutes in the departure times window.
@@ -165,7 +180,7 @@ public class MultiCriteriaRangeRaptorWorker {
                 // NB this copies the array, so we don't have issues with it being updated later
                 TIMER_ROUTE_RESULT.time(() ->
                     arrivalTimesAtStopsPerIteration[_currentIteration] = IntStream.of(resultsForMinute)
-                            .map(r -> r != UNREACHED ? r - finalDepartureTime : r)
+                            .map(r -> r != McRaptorState.UNREACHED ? r - finalDepartureTime : r)
                             .toArray()
                 );
                 ++currentIteration;
@@ -218,7 +233,7 @@ public class MultiCriteriaRangeRaptorWorker {
 
             // clear all touched stops to avoid constant reëxploration
             state.bestStopsTouched.clear();
-            state.nonTransferStopsTouched.clear();
+            state.transitStopsTouched.clear();
             // TODO prune trips that are now longer than max lengths to avoid biasing averages
         }
 
@@ -271,7 +286,7 @@ public class MultiCriteriaRangeRaptorWorker {
                         doTransfers(currState)
                 );
 
-                if (currState.bestStopsTouched.isEmpty() && currState.nonTransferStopsTouched.isEmpty()) {
+                if (currState.bestStopsTouched.isEmpty() && currState.transitStopsTouched.isEmpty()) {
                     roundsUsed = round;
                     break;
                 }
@@ -291,17 +306,13 @@ public class MultiCriteriaRangeRaptorWorker {
         // This scheduleState is repeatedly modified as the outer loop progresses over departure minutes.
         // We have to be careful here that creating these paths does not modify the state, and makes
         // protective copies of any information we want to retain.
-        Path[] paths = retainPaths ? pathToEachStop(finalRoundState) : null;
+        Path[] paths = pathToEachStop(finalRoundState);
+        pathsPerIteration.add(paths);
 
-        int[] result = finalRoundState.bestNonTransferTimes;
-
-        if (retainPaths) {
-            pathsPerIteration.add(paths);
-        }
-        return result;
+        return finalRoundState.bestTransitTimes;
     }
 
-    private final McPathBuilder pathBuilder = new McPathBuilder();
+
     /**
      * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
      */
@@ -310,7 +321,7 @@ public class MultiCriteriaRangeRaptorWorker {
         Path[] paths = new Path[nStops];
         for (int s = 0; s < nStops; s++) {
             int stopIndex = egressStops[s];
-            if (state.bestNonTransferTimes[stopIndex] == UNREACHED) {
+            if (state.bestTransitTimes[stopIndex] == McRaptorState.UNREACHED) {
                 paths[s] = null;
             } else {
                 paths[s] = pathBuilder.extractPathForStop(state, stopIndex);
@@ -345,7 +356,7 @@ public class MultiCriteriaRangeRaptorWorker {
                         throw new IllegalStateException("Components of travel time are larger than travel time!");
                     }
 
-                    outputState.setTimeAtStop(stop, alightTime, originalPatternIndex, boardStop, waitTime, onVehicleTime, false, pattern.tripSchedules.indexOf(schedule), boardTime, -1);
+                    outputState.transitToStop(stop, alightTime, originalPatternIndex, boardStop, pattern.tripSchedules.indexOf(schedule), boardTime);
                 }
 
                 int sourcePatternIndex = inputState.previousStop[stop] == -1 ?
@@ -412,10 +423,11 @@ public class MultiCriteriaRangeRaptorWorker {
         int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
         int maxWalkMillimeters = (int) (request.walkSpeed * request.maxWalkTime * 60 * 1000);
 
-        for (int stop = state.nonTransferStopsTouched.nextSetBit(0); stop > -1; stop = state.nonTransferStopsTouched.nextSetBit(stop + 1)) {
+        for (int stop = state.transitStopsTouched.nextSetBit(0); stop > -1; stop = state.transitStopsTouched.nextSetBit(stop + 1)) {
             // no need to consider loop transfers, since we don't mark patterns here any more
             // loop transfers are already included by virtue of those stops having been reached
             TIntList transfersFromStop = transit.transfersForStop.get(stop);
+
             if (transfersFromStop != null) {
                 for (int stopIdx = 0; stopIdx < transfersFromStop.size(); stopIdx += 2) {
                     int targetStop = transfersFromStop.get(stopIdx);
@@ -424,13 +436,13 @@ public class MultiCriteriaRangeRaptorWorker {
                     if (distanceToTargetStopMillimeters < maxWalkMillimeters) {
                         // transfer length to stop is acceptable
                         int walkTimeToTargetStopSeconds = distanceToTargetStopMillimeters / walkSpeedMillimetersPerSecond;
-                        int timeAtTargetStop = state.bestNonTransferTimes[stop] + walkTimeToTargetStopSeconds;
+                        int timeAtTargetStop = state.bestTransitTimes[stop] + walkTimeToTargetStopSeconds;
 
                         if (walkTimeToTargetStopSeconds < 0) {
                             LOG.error("Negative transfer time!!");
                         }
 
-                        state.setTimeAtStop(targetStop, timeAtTargetStop, -1, stop, 0, 0, true, -1, -1, walkTimeToTargetStopSeconds);
+                        state.transferToStop(targetStop, timeAtTargetStop, stop, walkTimeToTargetStopSeconds);
                     }
                 }
             }

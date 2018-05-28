@@ -1,10 +1,8 @@
 package com.conveyal.r5.profile.mcrr;
 
-import com.conveyal.r5.profile.FastRaptorWorker;
-import com.conveyal.r5.profile.Path;
-
-import java.util.Arrays;
 import java.util.BitSet;
+
+import static com.conveyal.r5.profile.mcrr.IntUtils.newIntArray;
 
 /**
  * Tracks the state of a RAPTOR search, specifically the best arrival times at each transit stop at the end of a
@@ -23,6 +21,12 @@ import java.util.BitSet;
  * @author mattwigway
  */
 public class McRaptorState {
+    /**
+     * This value essentially serves as Infinity for ints - it's bigger than every other number.
+     * It is the travel time to a transit stop or a target before that stop or target is ever reached.
+     * Be careful when propagating travel times from stops to targets, adding something to UNREACHED will cause overflow.
+     */
+    public static final int UNREACHED = Integer.MAX_VALUE;
 
     /** State for the previous round (one less transfer). */
     public McRaptorState previous;
@@ -30,15 +34,21 @@ public class McRaptorState {
     /** Departure time for the search producing this state. */
     private int departureTime;
 
+    /** Maximum duration of trips stored by this RaptorState */
+    private final int maxDurationSeconds;
+
+    /** Stop the search when the time excids the max time limit. */
+    private int maxTimeLimit;
+
     /** Best times to reach each stop, whether via a transfer or via transit directly. */
-    public int[] bestTimes;
+    public final int[] bestTimes;
 
     /** The best times for reaching stops via transit rather than via a transfer from another stop */
-    public int[] bestNonTransferTimes;
+    public final int[] bestTransitTimes;
 
     /**
-     * The previous pattern used to get to this stop, parallel to bestNonTransferTimes.
-     * When there is a transfer, bestNonTransferTimes will contain the time that the pattern in
+     * The previous pattern used to get to this stop, parallel to bestTransitTimes.
+     * When there is a transfer, bestTransitTimes will contain the time that the pattern in
      * previousPatterns arrived, whereas bestTimes will contain the time the transfer arrived (these are kept separate
      * to keep the router from blowing past the walk limit by stringing multiple transfers together). The previous pattern
      * for the transfer can be found by looking up the stop at which the transfer originated in transferStop, and looking
@@ -46,53 +56,41 @@ public class McRaptorState {
      * so a single RaptorState represents everything that happened in a round, including riding transit vehicles and any
      * possible transfers from those transit vehicles to other stops.
      */
-    public int[] previousPatterns;
+    public final int[] previousPatterns;
 
-    public int[] previousTrips;
+    public final int[] previousTrips;
 
-    public int[] boardTimes;
+    public final int[] boardTimes;
 
-    public int[] transferTimes;
+    public final int[] transferTimes;
 
     /** The stop the previous pattern was boarded at */
-    public int[] previousStop;
+    public final int[] previousStop;
 
     /** If this stop is optimally reached via a transfer, the stop we transferred from */
-    public int[] transferStop;
+    public final int[] transferStop;
 
     /** Stops touched by transit search */
-    public BitSet nonTransferStopsTouched;
+    public final BitSet transitStopsTouched;
 
     /** Stops touched by transit or transfers */
-    public BitSet bestStopsTouched;
+    public final BitSet bestStopsTouched;
 
-    /** Maximum duration of trips stored by this RaptorState */
-    private int maxDurationSeconds;
-
-    private BitSet stopTimesImproved;
+    private final BitSet stopTimesImproved;
 
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
     public McRaptorState(int nStops, int maxDurationSeconds) {
-        this.bestTimes = new int[nStops];
-        this.bestNonTransferTimes = new int[nStops];
+        this.bestTimes = newIntArray(nStops, UNREACHED);
+        this.bestTransitTimes = newIntArray(nStops, UNREACHED);
 
-        Arrays.fill(bestTimes, FastRaptorWorker.UNREACHED);
-        Arrays.fill(bestNonTransferTimes, FastRaptorWorker.UNREACHED);
+        this.previousPatterns = newIntArray(nStops, -1);
+        this.previousStop = newIntArray(nStops, -1);
+        this.transferStop = newIntArray(nStops, -1);
+        this.previousTrips = newIntArray(nStops, -1);
+        this.boardTimes = newIntArray(nStops, -1);
+        this.transferTimes = newIntArray(nStops, -1);
 
-        this.previousPatterns = new int[nStops];
-        this.previousStop = new int[nStops];
-        this.transferStop = new int[nStops];
-        this.previousTrips = new int[nStops];
-        this.boardTimes = new int[nStops];
-        this.transferTimes = new int[nStops];
-        Arrays.fill(previousPatterns, -1);
-        Arrays.fill(previousStop, -1);
-        Arrays.fill(transferStop, -1);
-        Arrays.fill(previousTrips, -1);
-        Arrays.fill(boardTimes, -1);
-        Arrays.fill(transferTimes, -1);
-
-        this.nonTransferStopsTouched = new BitSet(nStops);
+        this.transitStopsTouched = new BitSet(nStops);
         this.bestStopsTouched = new BitSet(nStops);
         this.maxDurationSeconds = maxDurationSeconds;
         this.stopTimesImproved = new BitSet(nStops);
@@ -104,7 +102,6 @@ public class McRaptorState {
      * Since this is used to progress between rounds, does not copy stopsTouched data.
      */
     public void min(McRaptorState other) {
-        int nStops = this.bestTimes.length;
         for (int stop = other.stopTimesImproved.nextSetBit(0); stop >= 0; stop = other.stopTimesImproved.nextSetBit(stop + 1)) {
             //for (int stop = 0; stop < nStops; stop++) {
             // prefer times from other when breaking tie as other is earlier in RAPTOR search and thus has fewer transfers
@@ -113,9 +110,9 @@ public class McRaptorState {
                 this.bestTimes[stop] = other.bestTimes[stop];
                 this.transferStop[stop] = other.transferStop[stop];
             }
-            if (other.bestNonTransferTimes[stop] <= this.bestNonTransferTimes[stop]) {
+            if (other.bestTransitTimes[stop] <= this.bestTransitTimes[stop]) {
                 this.stopTimesImproved.set(stop);
-                this.bestNonTransferTimes[stop] = other.bestNonTransferTimes[stop];
+                this.bestTransitTimes[stop] = other.bestTransitTimes[stop];
                 this.previousPatterns[stop] = other.previousPatterns[stop];
                 this.previousStop[stop] = other.previousStop[stop];
             }
@@ -125,41 +122,51 @@ public class McRaptorState {
     /**
      * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the nonTransferTime
      *
-     * @param transfer if true, this was reached via transfer/initial walk
      * @return if the time was optimal
      */
-    public boolean setTimeAtStop(int stop, int time, int fromPattern, int fromStop, int waitTime, int inVehicleTime, boolean transfer, int tripIndex, int boardTime, int transferTime) {
-        if (time > departureTime + maxDurationSeconds) return false;
+    public void transitToStop(int stop, int time, int fromPattern, int fromStop, int tripIndex, int boardTime) {
+        if (time > maxTimeLimit) {
+            return;
+        }
 
-        boolean optimal = false;
-        if (!transfer && time < bestNonTransferTimes[stop]) {
+        if (time < bestTransitTimes[stop]) {
             stopTimesImproved.set(stop);
-            bestNonTransferTimes[stop] = time;
-            nonTransferStopsTouched.set(stop);
+            bestTransitTimes[stop] = time;
+            transitStopsTouched.set(stop);
             previousPatterns[stop] = fromPattern;
             previousTrips[stop] = tripIndex;
             boardTimes[stop] = boardTime;
             previousStop[stop] = fromStop;
 
-            optimal = true;
-        }
 
+            // nonTransferTimes upper bounds bestTimes so we don't need to update wait time and in-vehicle time here, if we
+            // enter this conditional it has already been updated.
+            if (time < bestTimes[stop]) {
+                bestTimes[stop] = time;
+                bestStopsTouched.set(stop);
+                transferStop[stop] = -1;
+            }
+        }
+    }
+
+    /**
+     * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the nonTransferTime
+     *
+     */
+    public void transferToStop(int stop, int time, int fromStop, int transferTime) {
+
+        if (time > maxTimeLimit) {
+            return;
+        }
         // nonTransferTimes upper bounds bestTimes so we don't need to update wait time and in-vehicle time here, if we
         // enter this conditional it has already been updated.
         if (time < bestTimes[stop]) {
             stopTimesImproved.set(stop);
             bestTimes[stop] = time;
             bestStopsTouched.set(stop);
-            if (transfer) {
-                transferStop[stop] = fromStop;
-                transferTimes[stop] = transferTime;
-            } else {
-                transferStop[stop] = -1;
-            }
-            optimal = true;
+            transferStop[stop] = fromStop;
+            transferTimes[stop] = transferTime;
         }
-
-        return optimal;
     }
 
     public void setInitalTime(int stop, int time) {
@@ -168,20 +175,8 @@ public class McRaptorState {
         bestStopsTouched.set(stop);
     }
 
-    /** Debug function: dump the path up to this state as a string */
-    public String dump (int stop) {
-        Path p = new McPathBuilder().extractPathForStop(this, stop);
-
-        StringBuilder sb = new StringBuilder();
-
-        for (int i = 0; i < p.length; i++) {
-            sb.append(String.format("Stop %5d at %5d, reached by pattern %5d from stop %5d\n", p.alightStops[i], p.alightTimes[i], p.patterns[i], p.boardStops[i]));
-        }
-
-        return sb.toString();
-    }
-
     public void setDepartureTime(int departureTime) {
         this.departureTime = departureTime;
+        this.maxTimeLimit = departureTime + maxDurationSeconds;
     }
 }

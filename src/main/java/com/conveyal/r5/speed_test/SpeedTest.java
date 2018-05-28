@@ -7,6 +7,7 @@ import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.SearchAlgorithm;
 import com.conveyal.r5.profile.StreetPath;
+import com.conveyal.r5.profile.mcrr.McRaptorState;
 import com.conveyal.r5.profile.mcrr.MultiCriteriaRangeRaptorWorker;
 import com.conveyal.r5.profile.mcrr.PathParetoSortableWrapper;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
@@ -218,11 +219,6 @@ public class SpeedTest {
                     streetRouter.egressTimesToStopsInSeconds.keys()
             );
 
-            // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
-            // Returns the total travel times as a 2D array of [searchIteration][destinationStopIndex].
-            // Additional detailed path information is retained in the FastRaptorWorker after routing.
-            worker.retainPaths = true;
-
             int[][] transitTravelTimesToStops = worker.route();
 
             TIMER_WORKER.stop();
@@ -252,7 +248,7 @@ public class SpeedTest {
                 for (int minute = 0; minute < transitTravelTimesToStops.length; minute++) {
                     int travelTimeToStop = transitTravelTimesToStops[minute][stopIndex];
 
-                    if (travelTimeToStop != MultiCriteriaRangeRaptorWorker.UNREACHED) {
+                    if (travelTimeToStop != McRaptorState.UNREACHED) {
                         int totalTime = travelTimeToStop + egressTime;
                         Path path = worker.pathsPerIteration.get(minute)[i];
                         paths.add(new PathParetoSortableWrapper(path, totalTime));

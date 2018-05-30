@@ -61,9 +61,9 @@ public class McPathBuilder {
             state = state.previous;
 
             // handle transfers
-            if (state.transferStop[stop] != -1) {
+            if (state.transferFromStop[stop] != -1) {
                 transferTimes.add(state.transferTimes[stop]);
-                stop = state.transferStop[stop];
+                stop = state.transferFromStop[stop];
             }
             else {
                 transferTimes.add(-1);
@@ -92,4 +92,5 @@ public class McPathBuilder {
                 transferTimes.toArray()
         );
     }
+
 }

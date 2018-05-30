@@ -123,6 +123,7 @@ public class MultiCriteriaRangeRaptorWorker {
         this.scheduleState = createStateArray(
                 request.maxRides,
                 transit.getStopCount(),
+                request.fromTime,
                 request.maxTripDurationMinutes * 60
         );
 
@@ -130,15 +131,13 @@ public class MultiCriteriaRangeRaptorWorker {
         nMinutes = request.getTimeWindowLengthMinutes();
     }
 
-    private static McRaptorState[] createStateArray(final int maxRides, final int stopCount, final int maxDurationSeconds) {
+    private static McRaptorState[] createStateArray(final int maxRides, final int stopCount, final int fromTime, final int maxDurationSeconds) {
         // we add one to request.maxRides, first state is result of initial walk
         McRaptorState[] array = new McRaptorState[maxRides + 1];
-        McRaptorState newState, prev = null;
+        McRaptorState prev = null;
 
         for(int i=0; i<array.length; ++i) {
-            array[i] = new McRaptorState(stopCount, maxDurationSeconds);
-            array[i].previous = prev;
-            prev = array[i];
+            prev = array[i] = new McRaptorState(stopCount, maxDurationSeconds, fromTime, prev);
         }
         return array;
     }
@@ -255,6 +254,8 @@ public class MultiCriteriaRangeRaptorWorker {
         TIMER_BY_MINUTE_INIT.time(() ->
                 advanceScheduledSearchToPreviousMinute(departureTime)
         );
+
+        McRaptorState.debugStopHeader("runRaptorForMinute()");
 
         // Run the scheduled search
         // round 0 is the street search

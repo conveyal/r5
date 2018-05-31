@@ -59,8 +59,10 @@ public class ItineraryMapper {
         accessLeg.startTime = createCalendar(request.date, (path.boardTimes[0] - accessTime));
         accessLeg.endTime = createCalendar(request.date, path.boardTimes[0]);
         accessLeg.from = new Place(request.fromLon, request.fromLat, "Origin");
+        accessLeg.from.stopIndex = -1;
         accessLeg.to = new Place(firstStop.stop_lat, firstStop.stop_lon, firstStop.stop_name);
         accessLeg.to.stopId = new AgencyAndId("RB", firstStop.stop_id);
+        accessLeg.to.stopIndex = path.boardStops[0];
         accessLeg.mode = "WALK";
         accessLeg.legGeometry = PolylineEncoder.createEncodings(acessCoords);
 
@@ -109,8 +111,11 @@ public class ItineraryMapper {
 
             transitLeg.from = new Place(boardStop.stop_lat, boardStop.stop_lon, boardStop.stop_name);
             transitLeg.from.stopId = new AgencyAndId("RB", boardStop.stop_id);
+            transitLeg.from.stopIndex = path.boardStops[i];
+
             transitLeg.to = new Place(alightStop.stop_lat, alightStop.stop_lon, alightStop.stop_name);
             transitLeg.to.stopId = new AgencyAndId("RB", alightStop.stop_id);
+            transitLeg.to.stopIndex = path.alightStops[i];
 
             transitLeg.route = routeInfo.route_short_name;
             transitLeg.agencyName = routeInfo.agency_name;
@@ -149,6 +154,7 @@ public class ItineraryMapper {
         egressLeg.startTime = createCalendar(request.date, path.alightTimes[path.alightTimes.length - 1]);
         egressLeg.endTime = createCalendar(request.date, path.alightTimes[path.alightTimes.length - 1] + egressTime);
         egressLeg.from = new Place(lastStop.stop_lat, lastStop.stop_lon, lastStop.stop_name);
+        egressLeg.from.stopIndex = path.alightStops[path.length - 1];
         egressLeg.from.stopId = new AgencyAndId("RB", lastStop.stop_id);
         egressLeg.to = new Place(request.toLon, request.toLat, "Destination");
         egressLeg.mode = "WALK";

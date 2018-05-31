@@ -87,7 +87,8 @@ public class SpeedTest {
         int nRoutesComputed = 0;
 
         // Warm up JIT compiler
-        runSingleTestCase(tripPlans, testCases.get(10), opts);
+        runSingleTestCase(tripPlans, testCases.get(9), opts);
+        //if(true) return;
         runSingleTestCase(tripPlans, testCases.get(15), opts);
 
 
@@ -111,6 +112,7 @@ public class SpeedTest {
 
     private boolean runSingleTestCase(List<TripPlan> tripPlans, CsvTestCase testCase, SpeedTestCmdLineOpts opts) {
         try {
+
             final ProfileRequest request = buildDefaultRequest(testCase, opts);
             TripPlan route =  TIMER.timeAndReturn(() ->
                     route(request)
@@ -126,6 +128,7 @@ public class SpeedTest {
             e.printStackTrace();
         } catch (Exception e) {
             printError(testCase, TIMER.lapTime(), e);
+            e.printStackTrace();
         }
         return false;
     }
@@ -251,7 +254,9 @@ public class SpeedTest {
                     if (travelTimeToStop != McRaptorState.UNREACHED) {
                         int totalTime = travelTimeToStop + egressTime;
                         Path path = worker.pathsPerIteration.get(minute)[i];
-                        paths.add(new PathParetoSortableWrapper(path, totalTime));
+                        if (path != null) {
+                            paths.add(new PathParetoSortableWrapper(path, totalTime));
+                        }
                         //accessTime = accessTimesToStopsInSeconds.get(worker.pathsPerIteration.get(range)[stopIndex].boardStops[0]);
                     }
                 }

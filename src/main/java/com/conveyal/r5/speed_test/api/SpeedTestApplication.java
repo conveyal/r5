@@ -9,9 +9,11 @@ import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.ws.rs.WebApplicationException;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.ext.ExceptionMapper;
+import javax.ws.rs.ext.Provider;
 import java.util.Set;
 
 import static com.google.common.collect.Sets.newHashSet;
@@ -33,7 +35,7 @@ public class SpeedTestApplication extends Application {
     @Override
     public Set<Object> getSingletons() {
         return Sets.newHashSet (
-                // errorHandler()
+                new OTPExceptionMapper(),
                 // Enable Jackson JSON response serialization
                 new JacksonJsonProvider(),
                 // Enable Jackson XML response serialization
@@ -62,5 +64,24 @@ public class SpeedTestApplication extends Application {
                     .entity(e.toString() + " " + e.getMessage())
                     .type("text/plain").build();
         };
+    }
+
+    @Provider
+    public static class OTPExceptionMapper implements ExceptionMapper<Exception> {
+        private static final Logger LOG = LoggerFactory.getLogger(OTPExceptionMapper.class);
+
+        public Response toResponse(Exception ex) {
+            // Show the exception in the server log
+            LOG.error("Unhandled exception", ex);
+
+            int statusCode = Response.Status.INTERNAL_SERVER_ERROR.getStatusCode();
+            if (ex instanceof WebApplicationException)
+                statusCode = ((WebApplicationException)ex).getResponse().getStatus();
+
+            // Return the short form message to the client
+            return Response.status(statusCode)
+                    .entity(ex.toString() + " " + ex.getMessage())
+                    .type("text/plain").build();
+        }
     }
 }

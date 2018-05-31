@@ -12,58 +12,68 @@ public class McPathBuilder {
     private TIntList patterns = new TIntArrayList();
     private TIntList boardStops = new TIntArrayList();
     private TIntList alightStops = new TIntArrayList();
-    private TIntList times = new TIntArrayList();
+//    private TIntList times = new TIntArrayList();
     private TIntList alightTimes = new TIntArrayList();
     private TIntList boardTimes = new TIntArrayList();
     private TIntList transferTimes = new TIntArrayList();
     private TIntList trips = new TIntArrayList();
 
+
     /**
      * Scan over a raptor state and extract the path leading up to that state.
      */
     public  Path extractPathForStop(McRaptorState state, int stop) {
+        if(!state.isStopReachedByTransit(stop)) {
+            return null;
+        }
         // trace the path back from this RaptorState
-        int previousPattern;
-        int previousTrip;
         patterns.clear();
         boardStops.clear();
         alightStops.clear();
-        times.clear();
+//        times.clear();
         alightTimes.clear();
         boardTimes.clear();
         transferTimes.clear();
         trips.clear();
 
-        while (state.previous != null) {
-            // find the fewest-transfers trip that is still optimal in terms of travel time
-            if (state.previous.bestTransitTimes[stop] == state.bestTransitTimes[stop]) {
-                state = state.previous;
-                continue;
-            }
+        McRaptorState.debugStopHeader("FIND PATH");
 
-            if (state.previous.bestTransitTimes[stop] < state.bestTransitTimes[stop]) {
-                throw new IllegalStateException("Previous round has lower weight at stop " + stop + ", this implies a bug!");
-            }
+        // find the fewest-transfers trip that is still optimal in terms of travel time
+        state.findLastRoundWithTransitTimeSet(stop);
 
-            previousPattern = state.previousPatterns[stop];
-            previousTrip = state.previousTrips[stop];
+        if(state.round() == 0) {
+            return null;
+        }
 
-            patterns.add(previousPattern);
-            trips.add(previousTrip);
+
+        state.debugStop("egress stop", state.round(), stop);
+
+        while (state.round() > 0) {
+            StopState it = state.stop(stop);
+
+            patterns.add(it.previousPattern());
+            trips.add(it.previousTrip());
             alightStops.add(stop);
-            times.add(state.bestTimes[stop]);
-            alightTimes.add(state.bestTransitTimes[stop]);
-            boardTimes.add(state.boardTimes[stop]);
-            stop = state.previousStop[stop];
+//            times.add(it.time());
+            boardTimes.add(it.boardTime());
+            alightTimes.add(it.transitTime());
+
+            // TODO
+            stop = it.boardStop();
+
             boardStops.add(stop);
 
             // go to previous state before handling transfers as transfers are done at the end of a round
-            state = state.previous;
+            state.gotoPreviousRound();
+            it = state.stop(stop);
+            state.debugStop("by", state.round(), stop);
+
 
             // handle transfers
-            if (state.transferFromStop[stop] != -1) {
-                transferTimes.add(state.transferTimes[stop]);
-                stop = state.transferFromStop[stop];
+            if (it.arrivedByTransfer()) {
+                transferTimes.add(it.time());
+                stop = it.transferFromStop();
+                state.debugStop("transfer", state.round(), stop);
             }
             else {
                 transferTimes.add(-1);
@@ -92,5 +102,4 @@ public class McPathBuilder {
                 transferTimes.toArray()
         );
     }
-
 }

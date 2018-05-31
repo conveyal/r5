@@ -76,7 +76,6 @@ public class MultiCriteriaRangeRaptorWorker {
     private static final AvgTimer TIMER_ROUTE_BY_MINUTE = AvgTimer.timerMilliSec("McRRaptor:route Run Raptor For Minute");
     private static final AvgTimer TIMER_ROUTE_RESULT = AvgTimer.timerMilliSec("McRRaptor:route Result");
     private static final AvgTimer TIMER_BY_MINUTE_INIT = AvgTimer.timerMilliSec("McRRaptor:runRaptorForMinute Init");
-    private static final AvgTimer TIMER_BY_MINUTE_MIN = AvgTimer.timerMicroSec("McRRaptor:runRaptorForMinute Min");
     private static final AvgTimer TIMER_BY_MINUTE_SCHEDULE_SEARCH = AvgTimer.timerMicroSec("McRRaptor:runRaptorForMinute Schedule Search");
     private static final AvgTimer TIMER_BY_MINUTE_TRANSFERS = AvgTimer.timerMicroSec("McRRaptor:runRaptorForMinute Transfers");
 
@@ -105,7 +104,7 @@ public class MultiCriteriaRangeRaptorWorker {
     private final BitSet servicesActive;
 
     // TODO add javadoc to field
-    private final McRaptorState[] scheduleState;
+    private final McRaptorState state;
 
     /** If we're going to store paths to every destination (e.g. for static sites) then they'll be retained here. */
     public List<Path[]> pathsPerIteration;
@@ -120,26 +119,10 @@ public class MultiCriteriaRangeRaptorWorker {
         this.egressStops = egressStops;
         this.servicesActive  = transit.getActiveServicesForDate(request.date);
 
-        this.scheduleState = createStateArray(
-                request.maxRides,
-                transit.getStopCount(),
-                request.fromTime,
-                request.maxTripDurationMinutes * 60
-        );
+        this.state = new McRaptorState(transit.getStopCount(), request.maxRides + 1, request.maxTripDurationMinutes * 60, request.fromTime);
 
         // compute number of minutes for scheduled search
         nMinutes = request.getTimeWindowLengthMinutes();
-    }
-
-    private static McRaptorState[] createStateArray(final int maxRides, final int stopCount, final int fromTime, final int maxDurationSeconds) {
-        // we add one to request.maxRides, first state is result of initial walk
-        McRaptorState[] array = new McRaptorState[maxRides + 1];
-        McRaptorState prev = null;
-
-        for(int i=0; i<array.length; ++i) {
-            prev = array[i] = new McRaptorState(stopCount, maxDurationSeconds, fromTime, prev);
-        }
-        return array;
     }
 
     /**
@@ -227,19 +210,11 @@ public class MultiCriteriaRangeRaptorWorker {
      * and prepare for the scheduled search at the next-earlier minute
      */
     private void advanceScheduledSearchToPreviousMinute (int nextMinuteDepartureTime) {
-        for (McRaptorState state : this.scheduleState) {
-            state.setDepartureTime(nextMinuteDepartureTime);
-
-            // clear all touched stops to avoid constant reëxploration
-            state.bestStopsTouched.clear();
-            state.transitStopsTouched.clear();
-            // TODO prune trips that are now longer than max lengths to avoid biasing averages
-        }
+        state.initNewDepatureForMinute(nextMinuteDepartureTime);
 
         // add initial stops
-        McRaptorState initialState = scheduleState[0];
         accessStops.forEachEntry((stop, accessTime) -> {
-            initialState.setInitalTime(stop, accessTime + nextMinuteDepartureTime);
+            state.setInitialTime(stop, accessTime + nextMinuteDepartureTime);
             return true; // continue iteration
         });
     }
@@ -251,11 +226,11 @@ public class MultiCriteriaRangeRaptorWorker {
      * @return an array of length iterationsPerMinute, containing the arrival (clock) times at each stop for each iteration.
      */
     private int[] runRaptorForMinute (int departureTime) {
+        McRaptorState.debugStopHeader("runRaptorForMin "+departureTime);
+
         TIMER_BY_MINUTE_INIT.time(() ->
                 advanceScheduledSearchToPreviousMinute(departureTime)
         );
-
-        McRaptorState.debugStopHeader("runRaptorForMinute()");
 
         // Run the scheduled search
         // round 0 is the street search
@@ -263,77 +238,43 @@ public class MultiCriteriaRangeRaptorWorker {
         // “Round-Based Public Transit Routing,” January 1, 2012. http://research.microsoft.com/pubs/156567/raptor_alenex.pdf.
         // ergo, we re-use the arrival times found in searches that have already occurred that depart later, because
         // the arrival time given departure at time t is upper-bounded by the arrival time given departure at minute t + 1.
-        int roundsUsed = request.maxRides;
 
-        if (transit.hasSchedules) {
-            for (int round = 1; round <= request.maxRides; round++) {
-                final McRaptorState currState = scheduleState[round];
-                final McRaptorState prevState = currState.previous;
+        while (state.isNewRoundAvailable()) {
+            state.gotoNextRound();
 
-                // NB since we have transfer limiting not bothering to cut off search when there are no more transfers
-                // as that will be rare and complicates the code grabbing the results
+            // NB since we have transfer limiting not bothering to cut off search when there are no more transfers
+            // as that will be rare and complicates the code grabbing the results
 
-                // prevent finding crazy multi-transfer ways to get somewhere when there is a quicker way with fewer
-                // transfers
-                TIMER_BY_MINUTE_MIN.time(() ->
-                        currState.min(prevState)
-                );
+            TIMER_BY_MINUTE_SCHEDULE_SEARCH.time(this::doScheduledSearchForRound);
 
-                TIMER_BY_MINUTE_SCHEDULE_SEARCH.time(() ->
-                        doScheduledSearchForRound(prevState, currState)
-                );
-
-                TIMER_BY_MINUTE_TRANSFERS.time(() ->
-                        doTransfers(currState)
-                );
-
-                if (currState.bestStopsTouched.isEmpty() && currState.transitStopsTouched.isEmpty()) {
-                    roundsUsed = round;
-                    break;
-                }
-            }
+            TIMER_BY_MINUTE_TRANSFERS.time(this::doTransfers);
         }
 
-        // If there are no frequency trips, return the result of the scheduled search, but repeated as many times
-        // as there are requested MC draws, so that the scheduled search accessibility avoids potential bugs
-        // where assumptions are made about how many results will be returned from a search, e.g., in
-        // https://github.com/conveyal/r5/issues/306
-        // FIXME on large networks with no frequency routes this seems extremely inefficient.
-        // It may be somewhat less inefficient than it seems if we make arrays of references all to the same object.
-        // TODO check whether we're actually hitting this code with iterationsPerMinute > 1 on scheduled networks.
-
-        McRaptorState finalRoundState = scheduleState[roundsUsed];
-
-        // This scheduleState is repeatedly modified as the outer loop progresses over departure minutes.
+        // This state is repeatedly modified as the outer loop progresses over departure minutes.
         // We have to be careful here that creating these paths does not modify the state, and makes
         // protective copies of any information we want to retain.
-        Path[] paths = pathToEachStop(finalRoundState);
-        pathsPerIteration.add(paths);
+        pathsPerIteration.add(pathToEachStop());
 
-        return finalRoundState.bestTransitTimes;
+        return state.bestTransitTimes();
     }
 
 
     /**
      * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
      */
-    private Path[] pathToEachStop (McRaptorState state) {
+    private Path[] pathToEachStop () {
         int nStops = egressStops.length;
         Path[] paths = new Path[nStops];
         for (int s = 0; s < nStops; s++) {
             int stopIndex = egressStops[s];
-            if (state.bestTransitTimes[stopIndex] == McRaptorState.UNREACHED) {
-                paths[s] = null;
-            } else {
-                paths[s] = pathBuilder.extractPathForStop(state, stopIndex);
-            }
+            paths[s] = pathBuilder.extractPathForStop(state, stopIndex);
         }
         return paths;
     }
 
     /** Perform a scheduled search */
-    private void doScheduledSearchForRound(McRaptorState inputState, McRaptorState outputState) {
-        BitSet patternsTouched = getPatternsTouchedForStops(inputState, scheduledIndexForOriginalPatternIndex);
+    private void doScheduledSearchForRound() {
+        BitSet patternsTouched = getPatternsTouchedForStops(scheduledIndexForOriginalPatternIndex);
 
         for (int patternIndex = patternsTouched.nextSetBit(0); patternIndex >= 0; patternIndex = patternsTouched.nextSetBit(patternIndex + 1)) {
             int originalPatternIndex = originalPatternIndexForScheduledIndex[patternIndex];
@@ -353,44 +294,47 @@ public class MultiCriteriaRangeRaptorWorker {
                     int alightTime = schedule.arrivals[stopPositionInPattern];
                     int onVehicleTime = alightTime - boardTime;
 
-                    if (waitTime + onVehicleTime + inputState.bestTimes[boardStop] > alightTime) {
+                    if (waitTime + onVehicleTime + state.bestTimePreviousRound(boardStop) > alightTime) {
                         throw new IllegalStateException("Components of travel time are larger than travel time!");
                     }
 
-                    outputState.transitToStop(stop, alightTime, originalPatternIndex, boardStop, pattern.tripSchedules.indexOf(schedule), boardTime);
+                    state.transitToStop(
+                            stop,
+                            alightTime,
+                            originalPatternIndex,
+                            boardStop,
+                            pattern.tripSchedules.indexOf(schedule),
+                            boardTime
+                    );
                 }
 
-                int sourcePatternIndex = inputState.previousStop[stop] == -1 ?
-                        inputState.previousPatterns[stop] :
-                        inputState.previousPatterns[inputState.previousStop[stop]];
+                int sourcePatternIndex = state.getPatternIndexForPreviousRound(stop);
 
                 // Don't attempt to board if this stop was not reached in the last round, and don't attempt to
                 // reboard the same pattern
-                if (inputState.bestStopsTouched.get(stop) && sourcePatternIndex != originalPatternIndex) {
-                    int earliestBoardTime = inputState.bestTimes[stop] + MINIMUM_BOARD_WAIT_SEC;
+                if (state.isStopReachedInLastRound(stop) && sourcePatternIndex != originalPatternIndex) {
+                    int earliestBoardTime = state.bestTimePreviousRound(stop) + MINIMUM_BOARD_WAIT_SEC;
 
                     // only attempt to board if the stop was touched
                     if (onTrip == -1) {
-                        if (inputState.bestStopsTouched.get(stop)) {
-                            int candidateTripIndex = -1;
-                            EARLIEST_TRIP:
-                            for (TripSchedule candidateSchedule : pattern.tripSchedules) {
-                                candidateTripIndex++;
+                        int candidateTripIndex = -1;
+                        EARLIEST_TRIP:
+                        for (TripSchedule candidateSchedule : pattern.tripSchedules) {
+                            candidateTripIndex++;
 
-                                if (!servicesActive.get(candidateSchedule.serviceCode) || candidateSchedule.headwaySeconds != null) {
-                                    // frequency trip or not running
-                                    continue;
-                                }
+                            if (!servicesActive.get(candidateSchedule.serviceCode) || candidateSchedule.headwaySeconds != null) {
+                                // frequency trip or not running
+                                continue;
+                            }
 
-                                if (earliestBoardTime < candidateSchedule.departures[stopPositionInPattern]) {
-                                    // board this vehicle
-                                    onTrip = candidateTripIndex;
-                                    schedule = candidateSchedule;
-                                    boardTime = candidateSchedule.departures[stopPositionInPattern];
-                                    waitTime = boardTime - inputState.bestTimes[stop];
-                                    boardStop = stop;
-                                    break EARLIEST_TRIP;
-                                }
+                            if (earliestBoardTime < candidateSchedule.departures[stopPositionInPattern]) {
+                                // board this vehicle
+                                onTrip = candidateTripIndex;
+                                schedule = candidateSchedule;
+                                boardTime = candidateSchedule.departures[stopPositionInPattern];
+                                waitTime = boardTime - state.bestTimePreviousRound(stop);
+                                boardStop = stop;
+                                break EARLIEST_TRIP;
                             }
                         }
                     } else {
@@ -406,7 +350,7 @@ public class MultiCriteriaRangeRaptorWorker {
                                 onTrip = bestTripIdx;
                                 schedule = trip;
                                 boardTime = trip.departures[stopPositionInPattern];
-                                waitTime = boardTime - inputState.bestTimes[stop];
+                                waitTime = boardTime - state.bestTimePreviousRound(stop);
                                 boardStop = stop;
                             } else {
                                 // this trip arrives too early, break loop since they are sorted by departure time
@@ -419,12 +363,14 @@ public class MultiCriteriaRangeRaptorWorker {
         }
     }
 
-    private void doTransfers (McRaptorState state) {
+    private void doTransfers () {
         // avoid integer casts in tight loop below
         int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
         int maxWalkMillimeters = (int) (request.walkSpeed * request.maxWalkTime * 60 * 1000);
 
-        for (int stop = state.transitStopsTouched.nextSetBit(0); stop > -1; stop = state.transitStopsTouched.nextSetBit(stop + 1)) {
+        BitSetIterator it = state.stopsTouchedByTransitCurrentRoundIterator();
+
+        for (int stop = it.next(); stop > -1; stop = it.next()) {
             // no need to consider loop transfers, since we don't mark patterns here any more
             // loop transfers are already included by virtue of those stops having been reached
             TIntList transfersFromStop = transit.transfersForStop.get(stop);
@@ -437,7 +383,7 @@ public class MultiCriteriaRangeRaptorWorker {
                     if (distanceToTargetStopMillimeters < maxWalkMillimeters) {
                         // transfer length to stop is acceptable
                         int walkTimeToTargetStopSeconds = distanceToTargetStopMillimeters / walkSpeedMillimetersPerSecond;
-                        int timeAtTargetStop = state.bestTransitTimes[stop] + walkTimeToTargetStopSeconds;
+                        int timeAtTargetStop = state.bestTransitTime(stop) + walkTimeToTargetStopSeconds;
 
                         if (walkTimeToTargetStopSeconds < 0) {
                             LOG.error("Negative transfer time!!");
@@ -455,10 +401,12 @@ public class MultiCriteriaRangeRaptorWorker {
      * "touched" means they were reached in the last round, and the index maps from the original pattern index to the
      * local index of the filtered patterns.
      */
-    private BitSet getPatternsTouchedForStops(McRaptorState state, int[] index) {
-        BitSet patternsTouched = new BitSet();
+    private BitSet getPatternsTouchedForStops(int[] index) {
 
-        for (int stop = state.bestStopsTouched.nextSetBit(0); stop >= 0; stop = state.bestStopsTouched.nextSetBit(stop + 1)) {
+        BitSet patternsTouched = new BitSet();
+        BitSetIterator it = state.bestStopsTouchedLastRoundIterator();
+
+        for (int stop = it.next(); stop >= 0; stop = it.next()) {
             // copy stop to a new final variable to get around Java 8 "effectively final" nonsense
             final int finalStop = stop;
             transit.patternsForStop.get(stop).forEach(originalPattern -> {
@@ -468,9 +416,7 @@ public class MultiCriteriaRangeRaptorWorker {
                     return true; // this pattern does not exist in the local subset of patterns, continue iteration
                 }
 
-                int sourcePatternIndex = state.previousStop[finalStop] == -1 ?
-                        state.previousPatterns[finalStop] :
-                        state.previousPatterns[state.previousStop[finalStop]];
+                int sourcePatternIndex = state.getPatternIndexForPreviousRound(finalStop);
 
                 if (sourcePatternIndex != originalPattern) {
                     // don't re-explore the same pattern we used to reach this stop

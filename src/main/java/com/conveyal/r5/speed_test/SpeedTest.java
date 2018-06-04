@@ -222,7 +222,7 @@ public class SpeedTest {
                     streetRouter.egressTimesToStopsInSeconds.keys()
             );
 
-            int[][] transitTravelTimesToStops = worker.route();
+            worker.route();
 
             TIMER_WORKER.stop();
 
@@ -242,25 +242,25 @@ public class SpeedTest {
 
             TIntIntIterator egressTimeIterator = streetRouter.egressTimesToStopsInSeconds.iterator();
 
-            int i = 0;
+            int egressIndex = 0;
             while (egressTimeIterator.hasNext()) {
                 egressTimeIterator.advance();
-                int stopIndex = egressTimeIterator.key();
                 int egressTime = egressTimeIterator.value();
 
-                for (int minute = 0; minute < transitTravelTimesToStops.length; minute++) {
-                    int travelTimeToStop = transitTravelTimesToStops[minute][stopIndex];
-
-                    if (travelTimeToStop != McRaptorState.UNREACHED) {
-                        int totalTime = travelTimeToStop + egressTime;
-                        Path path = worker.pathsPerIteration.get(minute)[i];
+                for (int minute = 0; minute < worker.pathsPerIteration.stream().count(); minute++) {
+                    Path[] pathsPerIteration = worker.pathsPerIteration.get(minute);
+                    if (pathsPerIteration != null) {
+                        Path path = pathsPerIteration[egressIndex];
                         if (path != null) {
-                            paths.add(new PathParetoSortableWrapper(path, totalTime));
+                            int travelTimeToStop = path.alightTimes[path.alightTimes.length - 1];
+                            if (travelTimeToStop != McRaptorState.UNREACHED) {
+                                int totalTime = travelTimeToStop + egressTime;
+                                paths.add(new PathParetoSortableWrapper(path, totalTime));
+                            }
                         }
-                        //accessTime = accessTimesToStopsInSeconds.get(worker.pathsPerIteration.get(range)[stopIndex].boardStops[0]);
                     }
                 }
-                ++i;
+                egressIndex++;
             }
             TIMER_COLLECT_RESULTS_PATHS.stop();
             TIMER_COLLECT_RESULTS_ITINERARIES.start();

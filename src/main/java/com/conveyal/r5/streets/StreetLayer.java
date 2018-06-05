@@ -524,12 +524,12 @@ public class StreetLayer implements Serializable, Cloneable {
             int vidx = getVertexIndexForOsmNode(nodeId);
             VertexStore.Vertex v = vertexStore.getCursor();
             v.seek(vidx);
-            int targetWalking = getOrCreateVertexNear(v.getLat(), v.getLon(), StreetMode.WALK, 5);
+            int targetWalking = getOrCreateVertexNear(v.getLat(), v.getLon(), StreetMode.WALK, 15);
             if (targetWalking == -1) {
                 unconnectedCount ++;
                 continue;
             }
-            EdgeStore.Edge created = edgeStore.addStreetPair(vidx, targetWalking, 1, -1);
+            EdgeStore.Edge created = edgeStore.addStreetPair(vidx, targetWalking, 15000, -1);
             // allow link edges to be traversed by all, access is controlled by connected edges
             created.allowAllModes();
             created.setFlag(EdgeStore.EdgeFlag.LINK);

@@ -78,14 +78,14 @@ public class StreetLayer implements Serializable, Cloneable {
      * to mind), or islands that are isolated by infrastructure (for example, airport terminals reachable
      * only by transit or driving, for instance BWI or SFO).
      */
-    public static final int MIN_SUBGRAPH_SIZE = 40;
+    public static final int MIN_SUBGRAPH_SIZE = 2;
 
     /**
      * The radius below which we will not split a street, and will instead connect to an existing intersection.
      * i.e. if the requested split point is less than this distance from an existing vertex (edge endpoint) we'll just
      * return that existing endpoint.
      */
-    private static final int SNAP_RADIUS_MM = 5 * 1000;
+    private static final int SNAP_RADIUS_MM = 20 * 1000;
 
     /**
      * The radius of a circle in meters within which to search for nearby streets.
@@ -265,6 +265,9 @@ public class StreetLayer implements Serializable, Cloneable {
         // keep track of ways that need to later become park and rides
         List<Way> parkAndRideWays = new ArrayList<>();
 
+        // keep track of node ids for a supplemental network that will be stitched together with the main OSM.
+        List<Long> supplementalNodeIds = new ArrayList<>();
+
         for (Map.Entry<Long, Way> entry : osm.ways.entrySet()) {
             Way way = entry.getValue();
 
@@ -329,6 +332,7 @@ public class StreetLayer implements Serializable, Cloneable {
 
         buildParkAndRideAreas(parkAndRideWays);
         buildParkAndRideNodes(parkAndRideNodes);
+        connectSupplementalNodes(supplementalNodeIds);
 
         VertexStore.Vertex vertex = vertexStore.getCursor();
         long numOfParkAndRides = 0;
@@ -510,6 +514,31 @@ public class StreetLayer implements Serializable, Cloneable {
             // TODO check if we didn't connect anything and fall back to proximity based connection
         }
     }
+
+    private void connectSupplementalNodes (List<Long> nodeIds) {
+        int unconnectedCount = 0;
+        for (Long nodeId : nodeIds) {
+            int vidx = getVertexIndexForOsmNode(nodeId);
+            VertexStore.Vertex v = vertexStore.getCursor();
+            v.seek(vidx);
+            int targetWalking = getOrCreateVertexNear(v.getLat(), v.getLon(), StreetMode.WALK, 5);
+            if (targetWalking == -1) {
+                unconnectedCount ++;
+                continue;
+            }
+            EdgeStore.Edge created = edgeStore.addStreetPair(vidx, targetWalking, 1, -1);
+            // allow link edges to be traversed by all, access is controlled by connected edges
+            created.allowAllModes();
+            created.setFlag(EdgeStore.EdgeFlag.LINK);
+
+            // and the back edge
+            created.advance();
+            created.allowAllModes();
+            created.setFlag(EdgeStore.EdgeFlag.LINK);
+        }
+        LOG.warn("Left {} nodes unconnected", unconnectedCount);
+    }
+
 
     private void buildParkAndRideNodes (List<Node> nodes) {
         VertexStore.Vertex v = vertexStore.getCursor();
@@ -1142,8 +1171,12 @@ public class StreetLayer implements Serializable, Cloneable {
      *         or -1 if no such vertex could be found or created.
      */
     public int getOrCreateVertexNear(double lat, double lon, StreetMode streetMode) {
+        return getOrCreateVertexNear(lat, lon, streetMode, LINK_RADIUS_METERS);
+    }
 
-        Split split = findSplit(lat, lon, LINK_RADIUS_METERS, streetMode);
+    public int getOrCreateVertexNear(double lat, double lon, StreetMode streetMode, double radius) {
+
+        Split split = findSplit(lat, lon, radius, streetMode);
         if (split == null) {
             // No linking site was found within range.
             return -1;

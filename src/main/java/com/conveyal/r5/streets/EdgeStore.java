@@ -199,7 +199,7 @@ public class EdgeStore implements Serializable {
         // Street categories.
         // FIXME some street categories are mutually exclusive and should not be flags, just narrow numbers.
         // Maybe reserve the first 4-5 bits (or a whole byte, and 16 bits for flags) for mutually exclusive edge types.
-        UNUSED (0), // This flag is deprecated and currently unused. Use it for something new and interesting!
+        SUPPLEMENTAL (0), // This flag is deprecated and currently unused. Use it for something new and interesting!
         BIKE_PATH (1),
         SIDEWALK (2),
         CROSSING (3),

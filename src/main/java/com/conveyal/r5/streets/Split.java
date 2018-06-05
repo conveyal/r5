@@ -101,7 +101,7 @@ public class Split {
             // Do not consider linking to edges that are links to streets from transit stops, P+Rs, and bike shares.
             // These edges allow all modes to traverse, but may be connected to roads with more restrictive permissions.
             // On a given edge pair both directions will have the same flag.
-            if (edge.getFlag(EdgeStore.EdgeFlag.LINK)) return true;
+            if (edge.getFlag(EdgeStore.EdgeFlag.LINK) || edge.getFlag(EdgeStore.EdgeFlag.SUPPLEMENTAL)) return true;
 
             // If either direction of the current edge doesn't allow the specified mode of travel, skip it.
             // It is arguably better to skip it only if BOTH directions forbid the specified mode (see commented block

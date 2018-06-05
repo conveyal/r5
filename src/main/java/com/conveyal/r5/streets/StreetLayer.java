@@ -281,9 +281,12 @@ public class StreetLayer implements Serializable, Cloneable {
             int beginIdx = 0;
             // Break each OSM way into topological segments between intersections, and make one edge per segment.
             for (int n = 1; n < way.nodes.length; n++) {
-                if (osm.intersectionNodes.contains(way.nodes[n]) || n == (way.nodes.length - 1)) {
+                if (osm.intersectionNodes.contains(way.nodes[n]) || n == (way.nodes.length - 1) || way.hasTag("expl-lts")) {
                     makeEdge(way, beginIdx, n, entry.getKey());
                     nEdgesCreated += 1;
+                    if (way.hasTag("expl-lts")){
+                        supplementalNodeIds.add(way.nodes[beginIdx]);
+                    }
                     beginIdx = n;
                 }
             }

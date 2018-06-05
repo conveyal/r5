@@ -42,33 +42,26 @@ public class LevelOfTrafficStressLabeler {
     public void label (Way way, EnumSet<EdgeStore.EdgeFlag> forwardFlags, EnumSet<EdgeStore.EdgeFlag> backFlags) {
         // the general idea behind this function is that we progress from low-stress to higher-stress, bailing out as we go.
 
-        if (!forwardFlags.contains(EdgeStore.EdgeFlag.ALLOWS_CAR) && !backFlags.contains(EdgeStore.EdgeFlag.ALLOWS_CAR)) {
-            // no cars permitted on this way, it is LTS 1
-            // TODO on street bike lanes/cycletracks digitized as separate infrastructure?
-            forwardFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_1);
-            backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_1);
-            return;
-        }
-
         // leave some unlabeled because we don't really know. Also alleys and parking aisles shouldn't "bleed" high LTS
         // into the streets that connect to them
-        if (way.hasTag("highway", "service"))
-            return;
-
-        // is this a small, low-stress road?
-        if (way.hasTag("highway", "residential") || way.hasTag("highway", "living_street")) {
-            forwardFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_1);
-            backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_1);
-            return;
-        }
+        if (way.hasTag("highway", "service")) return;
 
         // is there a bike lane?
         // we don't have lane widths, so guess from the roadway classification
         boolean hasForwardLane = false;
         boolean hasBackwardLane = false;
-        if (way.hasTag("cycleway", "lane")) {
-            // there is a bike lane in all directions that cycles are allowed to traverse.
-            hasForwardLane = hasBackwardLane = true;
+        if (way.hasTag("expl-lts", "LTS_1")) {
+            forwardFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_1);
+            backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_1);
+            forwardFlags.add(EdgeStore.EdgeFlag.SUPPLEMENTAL);
+            backFlags.add(EdgeStore.EdgeFlag.SUPPLEMENTAL);
+        }
+
+        if (way.hasTag("expl-lts", "LTS_2")) {
+            forwardFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_2);
+            backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_2);
+            forwardFlags.add(EdgeStore.EdgeFlag.SUPPLEMENTAL);
+            backFlags.add(EdgeStore.EdgeFlag.SUPPLEMENTAL);
         }
 
         // TODO handle left-hand-drive countries
@@ -82,69 +75,13 @@ public class LevelOfTrafficStressLabeler {
             hasForwardLane = true;
         }
 
-        // extract max speed and lane info
-        double maxSpeed = Double.NaN;
-        if (way.hasTag("maxspeed")) {
-            // parse the max speed tag
-            String tagValue = way.getTag("maxspeed");
-            maxSpeed = getSpeedKmh(tagValue);
-            if (Double.isNaN(maxSpeed)) {
-                LOG.debug("Unable to parse maxspeed tag {}", tagValue);
-                badMaxspeedValues.add(tagValue);
-            }
+        // Bike lanes not explicitly tagged with LTS get assigned LTS_3
+        if (hasForwardLane) {
+            forwardFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_3);
         }
 
-        int lanes = Integer.MAX_VALUE;
-        if (way.hasTag("lanes")) {
-            String tagValue = null;
-            try {
-                tagValue = way.getTag("lanes");
-                lanes = Integer.parseInt(tagValue);
-            } catch (NumberFormatException e) {
-                LOG.debug("Unable to parse lane specification {}", tagValue);
-                badLaneValues.add(tagValue);
-            }
-        }
-
-        EdgeStore.EdgeFlag defaultLts = EdgeStore.EdgeFlag.BIKE_LTS_3;
-
-        // if it's small and slow, LTS 2
-        if (lanes <= 3 && maxSpeed <= 25 * 1.61) defaultLts = EdgeStore.EdgeFlag.BIKE_LTS_2;
-
-        // assume that there aren't too many lanes if it's not specified
-        if (lanes == Integer.MAX_VALUE && maxSpeed <= 25 * 1.61) defaultLts = EdgeStore.EdgeFlag.BIKE_LTS_2;
-
-        // TODO arbitrary. Roads up to tertiary with bike lanes are considered LTS 2, roads above tertiary, LTS 3.
-        // LTS 3 has defined space, but on fast roads
-        if (way.hasTag("highway", "unclassified") || way.hasTag("highway", "tertiary") || way.hasTag("highway", "tertiary_link")) {
-            // assume that it's not too fast if it's not specified, but only for these smaller roads
-            // TODO questionable. Tertiary roads probably tend to be faster than 25 MPH.
-            if (lanes <= 3 && Double.isNaN(maxSpeed)) defaultLts = EdgeStore.EdgeFlag.BIKE_LTS_2;
-
-            if (hasForwardLane) {
-                forwardFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_2);
-            }
-            else {
-                forwardFlags.add(defaultLts); // moderate speed single lane street
-            }
-
-            if (hasBackwardLane) {
-                backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_2);
-            }
-            else {
-                backFlags.add(defaultLts);
-            }
-        }
-        else { // NB includes trunk
-            // NB this will be LTS 3 unless this street has a low number of lanes and speed limit, or a low speed limit
-            // and unknown number of lanes
-            if (hasForwardLane) {
-                forwardFlags.add(defaultLts);
-            }
-
-            if (hasBackwardLane) {
-                backFlags.add(defaultLts);
-            }
+        if (hasBackwardLane) {
+            backFlags.add(EdgeStore.EdgeFlag.BIKE_LTS_3);
         }
 
         // if we've assigned nothing, assign LTS 4

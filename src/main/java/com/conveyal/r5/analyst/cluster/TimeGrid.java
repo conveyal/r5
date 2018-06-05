@@ -163,7 +163,11 @@ public class TimeGrid {
                 for (int x = 0; x < width; x ++) {
                     for (int n = 0; n < nValuesPerPixel; n ++) {
                         val = values[(y * width + x) * nValuesPerPixel + n];
-                        if (val < FastRaptorWorker.UNREACHED) raster.setSample(x, y, n, val);
+                        if (val < FastRaptorWorker.UNREACHED) {
+                            raster.setSample(x, y, n, val);
+                        } else {
+                            raster.setSample(x, y, n, 999);
+                        }
                     }
                 }
             }

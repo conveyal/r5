@@ -605,7 +605,7 @@ public class EdgeStore implements Serializable {
 
                 if (walking) {
                     //Recalculation of time and speed is needed if we are walking with bike
-                    float speedms = calculateSpeed(req, StreetMode.WALK)*0.9f;
+                    float speedms = calculateSpeed(req, StreetMode.WALK);
                     time = (float) (getLengthM() / speedms);
                 }
 

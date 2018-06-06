@@ -24,7 +24,8 @@ import java.util.stream.Stream;
  * See the {@link #main(String[])} for usage and example code.
  */
 public abstract class AvgTimer {
-    public static final String RESULT_TABLE_TITLE = "METHOD CALLS DURATION";
+    private static final boolean NOOP = true;
+    private static final String RESULT_TABLE_TITLE = "METHOD CALLS DURATION";
     //    private static final Logger LOG = LoggerFactory.getLogger(AvgTimer.class);
 
     /**
@@ -57,14 +58,14 @@ public abstract class AvgTimer {
      * @param method Use: <SimpleClassName>::<methodName>
      */
     public static AvgTimer timerMilliSec(final String method) {
-        return timer(method, AvgTimerMilliSec::new);
+        return timer(method, NOOP ? AvgTimerNoop::new : AvgTimerMilliSec::new);
     }
 
     /**
      * @param method Use: <SimpleClassName>::<methodName>
      */
     public static AvgTimer timerMicroSec(final String method) {
-        return timer(method, AvgTimerMicroSec::new);
+        return timer(method, NOOP ? AvgTimerNoop::new : AvgTimerMicroSec::new);
     }
 
     private static AvgTimer timer(final String method, final Function<String, ? extends AvgTimer> factory) {
@@ -302,6 +303,27 @@ public abstract class AvgTimer {
         @Override
         String toSec(long time) {
             return String.format("%6.2f", time / 1000d);
+        }
+    }
+
+    private static final class AvgTimerNoop extends AvgTimer {
+        private AvgTimerNoop(String method) {
+            super(method);
+        }
+        @Override public void start() { }
+        @Override public void stop() { }
+        @Override public void fail() { }
+        @Override  public void time(Runnable body) { body.run(); }
+        @Override public <T> T timeAndReturn(Supplier<T> body) { return body.get();  }
+        @Override public long lapTime() {
+            return 0;
+        }
+        @Override long currentTime() { return 0; }
+        @Override String unit() {
+            return "ms";
+        }
+        @Override String toSec(long time) {
+            return "0";
         }
     }
 

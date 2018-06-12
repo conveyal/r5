@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst;
 
 import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.amazonaws.services.s3.model.S3Object;
 import com.google.common.io.LittleEndianDataInputStream;
 
@@ -26,7 +26,7 @@ import java.util.zip.GZIPInputStream;
  */
 public class SelectingGridReducer {
 
-    private static final AmazonS3 s3 = new AmazonS3Client();
+    private static final AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
 
     /** Version of the access grid format we read */
     private static final int ACCESS_GRID_VERSION = 0;

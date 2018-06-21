@@ -1,0 +1,64 @@
+package com.conveyal.r5.analyst.fare;
+
+import com.conveyal.r5.profile.FastRaptorWorker;
+import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter.McRaptorState;
+import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.transit.TransitLayer;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+
+import java.io.Serializable;
+import java.util.Collection;
+import java.util.function.ToIntFunction;
+
+/**
+ * A fare calculator used in Analyst searches. It must be "greedy," i.e. boarding another vehicle should always cost a
+ * nonnegative amount (0 is OK). The currency is not important as long as it is constant (i.e. the whole thing is in
+ * dollars, yen, bitcoin or kina.
+ *
+ * Note that this fare calculator will be called on partial trips, both in the forward and (eventually) reverse directions.
+ * Adding another ride should be monotonic - the fare should either increase or stay the same.
+ */
+@JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property="type")
+@JsonSubTypes({
+        @JsonSubTypes.Type(name = "bogota", value = BogotaInRoutingFareCalculator.class),
+        @JsonSubTypes.Type(name = "chicago", value = ChicagoInRoutingFareCalculator.class),
+        @JsonSubTypes.Type(name = "simple", value = SimpleInRoutingFareCalculator.class)
+})
+public abstract class InRoutingFareCalculator implements Serializable {
+    public static final long serialVersionUID = 0L;
+
+    public abstract int calculateFare (McRaptorState state);
+
+    public abstract String getType ();
+
+    public void setType (String type) {
+        /* do nothing */
+    }
+
+    // injected on load
+    public transient TransitLayer transitLayer;
+
+    public static ToIntFunction<Collection<McRaptorState>> getCollator (ProfileRequest request){
+        return (states) -> {
+            McRaptorState best = null;
+            for (McRaptorState state : states) {
+                // check if this state falls below the fare cutoff.
+                // We generally try not to impose cutoffs at calculation time, but leaving two free cutoffs creates a grid
+                // of possibilities that is too large to be stored.
+                int fareAtState = request.inRoutingFareCalculator.calculateFare(state);
+
+                if (fareAtState > request.maxFare) {
+                    continue;
+                }
+
+                if (best == null || state.time < best.time) best = state;
+            }
+            if (best != null){
+                return best.time;
+            } else {
+                return FastRaptorWorker.UNREACHED;
+            }
+        };
+    }
+}

@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
 
 import java.time.*;
@@ -170,7 +171,8 @@ public class ProfileRequest implements Serializable, Cloneable {
 
     /**
      * If true current search is reverse search AKA we are looking for a path from destination to origin in reverse
-     * It differs from searchType because it is used as egress search
+     * It differs from searchType because it is used as egress search.  Note that NON_DEFAULT allows the broker to
+     * talk to older workers.
      */
     @JsonInclude(JsonInclude.Include.NON_DEFAULT)
     public boolean reverseSearch = false;
@@ -180,6 +182,12 @@ public class ProfileRequest implements Serializable, Cloneable {
      * If nonnegative, fares will be used in routing.
      */
     public int maxFare = -1;
+
+    /**
+     * An object that should have at a minimum a "type" set according to the list in InRoutingFareCalculator.
+     */
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+    public InRoutingFareCalculator inRoutingFareCalculator = null;
 
     /**
      * Number of Monte Carlo draws to take for frequency searches.

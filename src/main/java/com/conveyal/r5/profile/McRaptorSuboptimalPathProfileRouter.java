@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.function.Supplier;
+import java.util.function.ToIntFunction;
 
 /**
  * A profile routing implementation which uses McRAPTOR to store bags of arrival times and paths per
@@ -61,12 +62,13 @@ public class McRaptorSuboptimalPathProfileRouter {
     private LinkedPointSet pointSet = null;
 
     /** Use a list for the iterations since we aren't sure how many there will be (we're using random sampling over the departure minutes) */
-    public List<int[]> timesAtTargetsEachIteration = null;
+    public List<int[]> timesAtStopsEachIteration = new ArrayList<>();
 
     private TransportNetwork network;
     private ProfileRequest request;
     private Map<LegMode, TIntIntMap> accessTimes;
     private Map<LegMode, TIntIntMap> egressTimes = null;
+    private ToIntFunction<Collection<McRaptorState>> collapseParetoSurfaceToTime;
 
     private FrequencyRandomOffsets offsets;
 
@@ -80,15 +82,22 @@ public class McRaptorSuboptimalPathProfileRouter {
     private BitSet touchedPatterns;
     private BitSet patternsNearDestination;
     private BitSet servicesActive;
+    // Used in creating the McRaptorStateBag; the type of list supplied determines the domination rules
+    private Supplier<DominatingList> listSupplier;
 
     /** In order to properly do target pruning we store the best times at each target _by access mode_, so car trips don't quash walk trips */
     private TObjectIntMap<LegMode> bestTimesAtTargetByAccessMode = new TObjectIntHashMap<>(4, 0.95f, Integer.MAX_VALUE);
 
-    public McRaptorSuboptimalPathProfileRouter (TransportNetwork network, ProfileRequest req, Map<LegMode, TIntIntMap> accessTimes, Map<LegMode, TIntIntMap> egressTimes) {
+    public McRaptorSuboptimalPathProfileRouter (TransportNetwork network, ProfileRequest req, Map<LegMode,
+            TIntIntMap> accessTimes, Map<LegMode, TIntIntMap> egressTimes, Supplier<DominatingList> listSupplier,
+                                                ToIntFunction<Collection<McRaptorState>>
+                                                        collapseParetoSurfaceToTime) {
         this.network = network;
         this.request = req;
         this.accessTimes = accessTimes;
         this.egressTimes = egressTimes;
+        this.listSupplier = listSupplier;
+        this.collapseParetoSurfaceToTime = collapseParetoSurfaceToTime;
         this.touchedStops = new BitSet(network.transitLayer.getStopCount());
         this.touchedPatterns = new BitSet(network.transitLayer.tripPatterns.size());
         this.patternsNearDestination = new BitSet(network.transitLayer.tripPatterns.size());
@@ -167,8 +176,8 @@ public class McRaptorSuboptimalPathProfileRouter {
                 // In a PointToPointQuery (for Modeify), egressTimes will already be computed
                 codominatingStatesToBeReturned.addAll(doPropagationToDestination());
             }
-            else {
-                doPropagationToPointSet(departureTime);
+            if (collapseParetoSurfaceToTime != null) {
+                collateTravelTimes(departureTime);
             }
 
             if (n % 15 == 0)
@@ -177,11 +186,6 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         // DEBUG: print hash table performance
 //        LOG.info("Hash performance: {} hashes, {} states", hashes.size(), keys.size());
-
-        // analyst request, create a propagated times store
-        if (egressTimes == null) {
-            throw new UnsupportedOperationException("We have removed support for fare analysis during refactoring, because there is no more PropagatedTimesStore");
-        }
 
         LOG.info("McRAPTOR took {}ms", System.currentTimeMillis() - startTime);
 
@@ -485,53 +489,30 @@ public class McRaptorSuboptimalPathProfileRouter {
         return bag.getBestStates();
     }
 
-    private void doPropagationToPointSet (int departureTime) {
-        int[] timesAtTargetsThisIteration = new int[pointSet.size()];
-        Arrays.fill(timesAtTargetsThisIteration, FastRaptorWorker.UNREACHED);
+    private void collateTravelTimes(int departureTime) {
+        int[] timesAtStopsThisIteration = new int[network.transitLayer.getStopCount()];
+        Arrays.fill(timesAtStopsThisIteration, FastRaptorWorker.UNREACHED);
 
         for (int stop = 0; stop < network.transitLayer.getStopCount(); stop++) {
-            int[] distanceTable = pointSet.stopToPointDistanceTables.get(stop);
-
-            if (distanceTable == null) continue;
-
             // find the best state at the stop
             McRaptorStateBag bag = bestStates.get(stop);
 
             if (bag == null) continue;
-
-            // assume we're using fares as it doesn't make sense to do modeify-style suboptimal paths in Analyst
-            McRaptorState best = null;
-            for (McRaptorState state : bag.getNonTransferStates()) {
-                // check if this state falls below the fare cutoff.
-                // We generally try not to impose cutoffs at calculation time, but leaving two free cutoffs creates a grid
-                // of possibilities that is too large to be stored.
-                int fareAtState = network.fareCalculator.calculateFare(state);
-
-                if (fareAtState > request.maxFare) {
-                    continue;
-                }
-
-                if (best == null || state.time < best.time) best = state;
-            }
-
-            if (best == null) continue; // stop is unreachable
-
-            // jagged array
-            for (int i = 0; i < distanceTable.length; i += 2) {
-                int target = distanceTable[i];
-                int distance = distanceTable[i + 1];
-
-                int timeAtTarget = (int) (best.time + distance / request.walkSpeed / 1000);
-
-                if (timesAtTargetsThisIteration[target] > timeAtTarget) timesAtTargetsThisIteration[target] = timeAtTarget;
+            int bestClockTimeGivenConstraint = collapseParetoSurfaceToTime.applyAsInt(bag.getNonTransferStates());
+            if (bestClockTimeGivenConstraint < timesAtStopsThisIteration[stop]){
+                timesAtStopsThisIteration[stop] = bestClockTimeGivenConstraint;
             }
         }
 
-        for (int i = 0; i < timesAtTargetsThisIteration.length; i++) {
-            if (timesAtTargetsThisIteration[i] != FastRaptorWorker.UNREACHED) timesAtTargetsThisIteration[i] -= departureTime;
+        for (int i = 0; i < timesAtStopsThisIteration.length; i++) {
+            if (timesAtStopsThisIteration[i] != FastRaptorWorker.UNREACHED) timesAtStopsThisIteration[i] -= departureTime;
         }
 
-        timesAtTargetsEachIteration.add(timesAtTargetsThisIteration);
+        timesAtStopsEachIteration.add(timesAtStopsThisIteration);
+    }
+
+    public int[][] getBestTimes() {
+        return timesAtStopsEachIteration.toArray(new int[timesAtStopsEachIteration.size()][]);
     }
 
     /** Mark patterns at touched stops, to be explored in a subsequent round */
@@ -652,21 +633,8 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     /** Create a new McRaptorStateBag with properly-configured dominance */
     public McRaptorStateBag createStateBag () {
-        if (request.maxFare >= 0) {
-            if (network.fareCalculator == null) throw new IllegalArgumentException("Fares requested in ProfileRequest but no fare data loaded");
-
-            return new McRaptorStateBag(() -> new FareDominatingList(network.fareCalculator));
-        } else {
-            return new McRaptorStateBag(() -> new SuboptimalDominatingList(request.suboptimalMinutes));
-        }
+        return new McRaptorStateBag(listSupplier);
     }
-
-//    /** run routing and return a result envelope */
-//    public ResultEnvelope routeEnvelope() {
-//        boolean isochrone = pointSet.pointSet instanceof WebMercatorGridPointSet;
-//        route();
-//        return propagatedTimesStore.makeResults(pointSet.pointSet, clusterRequest.includeTimes, !isochrone, isochrone);
-//    }
 
     /**
      * This is the McRAPTOR state, which stores a way to get to a stop in a round. It is an object,

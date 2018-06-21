@@ -40,14 +40,18 @@ public class TravelTimeReducer {
 
     private final int timesPerDestination;
 
+    public TravelTimeReducer (AnalysisTask task) {
+        this(task, task.getMonteCarloDrawsPerMinute() * task.getTimeWindowLengthMinutes());
+    }
+
     /**
      * Knowing the number of times that will be provided per destination and holding that constant allows us to
      * pre-compute and cache the positions within the sorted array at which percentiles will be found.
      */
-    public TravelTimeReducer (AnalysisTask task) {
+    public TravelTimeReducer (AnalysisTask task, int timesPerDestination) {
 
         this.maxTripDurationMinutes = task.maxTripDurationMinutes;
-        this.timesPerDestination = task.getMonteCarloDrawsPerMinute() * task.getTimeWindowLengthMinutes();
+        this.timesPerDestination = timesPerDestination;
         this.nPercentiles = task.percentiles.length;
 
         // We pre-compute the indexes at which we'll find each percentile in a sorted list of the given length.

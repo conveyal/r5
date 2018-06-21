@@ -5,7 +5,7 @@ import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
 /**
  * A simple greedy fare calculator that simply applies a single fare at each boarding.
  */
-public class SimpleGreedyFareCalculator extends GreedyFareCalculator {
+public class SimpleInRoutingFareCalculator extends InRoutingFareCalculator {
     public int fare;
 
     @Override

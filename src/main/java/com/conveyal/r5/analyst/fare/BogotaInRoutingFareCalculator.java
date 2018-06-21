@@ -9,7 +9,7 @@ import gnu.trove.list.array.TIntArrayList;
 /**
  * Calculate fares in Bogotá, Colombia.
  */
-public class BogotaGreedyFareCalculator extends GreedyFareCalculator {
+public class BogotaInRoutingFareCalculator extends InRoutingFareCalculator {
     // base fares, all in Colombian pesos
     /** Fare to ride TPC (local service) */
     public int tpcBaseFare = 0;
@@ -90,7 +90,7 @@ public class BogotaGreedyFareCalculator extends GreedyFareCalculator {
     private enum RouteType {
         TPC, TRANSMILENIO;
 
-        public static RouteType fromAgencyName (String agencyName, BogotaGreedyFareCalculator calculator) {
+        public static RouteType fromAgencyName (String agencyName, BogotaInRoutingFareCalculator calculator) {
             if (calculator.tmAgencyName.equals(agencyName)) {
                 return TRANSMILENIO;
             } else {

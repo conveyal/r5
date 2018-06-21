@@ -8,7 +8,7 @@ import java.util.Collection;
  * One state is said to dominate another when it is better than that other state in all ways, i.e. it provides a path
  * that is so much better that the other path can be pruned or abandoned.
  *
- * When you add states to this type of list, the state might not actuallty be added if another state in the list
+ * When you add states to this type of list, the state might not actually be added if another state in the list
  * dominates it. If the state is optimal and is added to the list, other states are automatically dropped if they
  * are no longer co-optimal given the existence of the new state.
  *
@@ -18,7 +18,8 @@ import java.util.Collection;
  * We only do multi-criteria transit searches, we haven't implemented multi-criteria street searches.
  */
 public interface DominatingList {
-    /** Attempt to add a state to this dominating list, returning true if the state is undominated */
+    /** Attempt to add a state to this dominating list, and evict dominated states, returning true if this state is
+     * undominated */
     boolean add (McRaptorSuboptimalPathProfileRouter.McRaptorState state);
 
     /** get non-dominated states at this location */

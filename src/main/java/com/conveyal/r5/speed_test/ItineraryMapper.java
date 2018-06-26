@@ -84,7 +84,7 @@ public class ItineraryMapper {
 
                 Leg transferLeg = new Leg();
                 transferLeg.startTime = createCalendar(request.date, path.alightTimes[i - 1]);
-                transferLeg.endTime = createCalendar(request.date, path.alightTimes[i - 1] + path.transferTimes[i]);
+                transferLeg.endTime = createCalendar(request.date, path.transferTimes[i]);
                 transferLeg.mode = "WALK";
                 transferLeg.from = new Place(previousAlightStop.stop_lat, previousAlightStop.stop_lon, previousAlightStop.stop_name);
                 transferLeg.to = new Place(boardStop.stop_lat, boardStop.stop_lon, boardStop.stop_name);

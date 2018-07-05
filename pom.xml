@@ -259,6 +259,11 @@
             <url>https://maven.conveyal.com</url>
         </repository>
         <repository>
+            <id>conveyal-ossrh</id>
+            <name>releases on sonatype, which may not yet have been synced with central</name>
+            <url>https://oss.sonatype.org/content/repositories/releases/</url>
+        </repository>
+        <repository>
             <id>osgeo</id>
             <name>Open Source Geospatial Foundation Repository</name>
             <url>http://download.osgeo.org/webdav/geotools/</url>
@@ -361,13 +366,13 @@
         <dependency>
             <groupId>com.conveyal</groupId>
             <artifactId>gtfs-lib</artifactId>
-            <version>3.0.3</version>
+            <version>3.0.4</version>
         </dependency>
         <!-- Conveyal library for loading and storing OSM road data. -->
         <dependency>
             <groupId>com.conveyal</groupId>
             <artifactId>osm-lib</artifactId>
-            <version>1.3.0</version>
+            <version>1.4.0</version>
         </dependency>
         <!-- Fast serialization, used to save transport networks to disk (with some mmap hacks). -->
         <dependency>

@@ -248,7 +248,7 @@ public class AnalystWorker implements Runnable {
         // graph this machine was intended to analyze.
         this.networkId = config.getProperty("initial-graph-id");
 
-        this.gridCache = new GridCache(config.getProperty("pointsets-bucket"));
+        this.gridCache = new GridCache(config.getProperty("aws-region"), config.getProperty("pointsets-bucket"));
         this.transportNetworkCache = cache;
         this.autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown", "false"));
 

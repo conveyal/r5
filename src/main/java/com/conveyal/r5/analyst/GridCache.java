@@ -22,7 +22,7 @@ import java.util.zip.GZIPInputStream;
 public class GridCache {
     private static final Logger LOG = LoggerFactory.getLogger(GridCache.class);
 
-    private AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
+    private AmazonS3 s3 = null;
 
     /** How large the cache should be. Should be large enough to fit all field of a project */
     private static final int CACHE_SIZE = 200;
@@ -37,10 +37,13 @@ public class GridCache {
                     }
                 });
 
+    private final String region;
     private final String bucket;
 
-    public GridCache (String bucket) {
+    public GridCache (String region, String bucket) {
         this.bucket = bucket;
+        this.region = region;
+        s3 = AmazonS3ClientBuilder.standard().withRegion(region).build();
     }
 
     private Grid loadGrid (String key) throws IOException {

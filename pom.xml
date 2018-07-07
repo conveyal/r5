@@ -366,7 +366,7 @@
         <dependency>
             <groupId>com.conveyal</groupId>
             <artifactId>gtfs-lib</artifactId>
-            <version>3.0.4</version>
+            <version>3.0.5</version>
         </dependency>
         <!-- Conveyal library for loading and storing OSM road data. -->
         <dependency>

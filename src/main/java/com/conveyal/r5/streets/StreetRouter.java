@@ -942,21 +942,14 @@ public class StreetRouter {
                 //defectiveTraversal = true;
                 return;
             }
-/*
-            durationSeconds += seconds;
-            time += seconds;
-*/
             //TODO: decrease time
             if (false) {
-
                 durationSeconds-=seconds;
                 durationFromOriginSeconds -= seconds;
             } else {
-
                 durationSeconds+=seconds;
                 durationFromOriginSeconds += seconds;
             }
-
 
         }
 

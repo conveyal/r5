@@ -317,11 +317,14 @@ public class StreetRouter {
         // Uses weight based on distance from end vertices, and speed on edge which depends on transport mode
         float speedMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
         startState1.weight = (int) ((split.distance1_mm / 1000) / speedMetersPerSecond);
+        startState1.durationSeconds = startState1.weight;
+        startState1.distance = split.distance1_mm;
         edge.advance();
         // Speed can be different on opposite sides of the same street
         speedMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
         startState0.weight = (int) ((split.distance0_mm / 1000) / speedMetersPerSecond);
-        // FIXME we're setting weight but not time and distance on these states above!
+        startState0.durationSeconds = startState0.weight;
+        startState0.distance = split.distance0_mm;
 
         // FIXME Below is reversing the vertices, but then aren't the weights, times, distances wrong? Why are we even doing this?
         if (profileRequest.reverseSearch) {

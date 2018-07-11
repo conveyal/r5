@@ -212,9 +212,10 @@ public class AnalystWorker implements Runnable {
         // FIXME why is there a separate configuration parsing section here? Why not always make the cache based on the configuration?
         // FIXME why is some configuration done here and some in the constructor?
         boolean workOffline = Boolean.parseBoolean(config.getProperty("work-offline", "false"));
+        String awsRegion = workOffline ? null : config.getProperty("aws-region");
         String graphsBucket = workOffline ? null : config.getProperty("graphs-bucket");
         String graphDirectory = config.getProperty("cache-dir", "cache/graphs");
-        TransportNetworkCache cache = new TransportNetworkCache(graphsBucket, new File(graphDirectory));
+        TransportNetworkCache cache = new TransportNetworkCache(awsRegion, graphsBucket, new File(graphDirectory));
         return new AnalystWorker(config, cache);
     }
 

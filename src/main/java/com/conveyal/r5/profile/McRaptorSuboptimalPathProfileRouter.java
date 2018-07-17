@@ -142,6 +142,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         // seed with some characteristic of the request itself, e.g. (int) (request.fromLat * 1e9)
         MersenneTwister mersenneTwister = new MersenneTwister();
 
+        // TODO align with Owen and Jiang paper, remove range raptor since its assumptions aren't valid for non-travel-time optimization criteria
         for (int departureTime = request.toTime - 60, n = 0; departureTime > request.fromTime; departureTime -= mersenneTwister.nextInt(maxRandomWalkStep), n++) {
 
             // we're not using range-raptor so it's safe to change the schedule on each search
@@ -272,19 +273,17 @@ public class McRaptorSuboptimalPathProfileRouter {
             touchedPatterns.and(patternsNearDestination);
 
         for (int patIdx = touchedPatterns.nextSetBit(0); patIdx >= 0; patIdx = touchedPatterns.nextSetBit(patIdx + 1)) {
-            // We never propagate more than one state from the same previous pattern _sequence_
-            // e.g. don't have two different ways to do L2 -> Red -> Green, one with a transfer at Van Ness
-            // and one with a transfer at Cleveland Park.
-            // However, do allow L1 -> Red -> Green and L2 -> Red -> Green to exist simultaneously. (if we were only
-            // looking at the previous pattern, these would be identical when we board the green line because they both
-            // came from the red line).
-            Map<StatePatternKey, McRaptorState> statesPerPatternSequence = new HashMap<>();
-            TObjectIntMap<StatePatternKey> tripsPerPatternSequence = new TObjectIntHashMap<>();
+            // All states that have been propagated
+            List<McRaptorState> states = new ArrayList<>();
 
-            // used for frequency trips
-            TObjectIntMap<StatePatternKey> boardTimesPerPatternSequence = new TObjectIntHashMap<>();
+            // The board stop position in the pattern for each state (not the R5 or GTFS stop ID)
+            TObjectIntMap<McRaptorState> boardStopPositionInPattern = new TObjectIntHashMap<>();
 
-            TObjectIntMap<StatePatternKey> boardStopsPositionsPerPatternSequence = new TObjectIntHashMap<>();
+            // The board time, for frequency trips
+            TObjectIntMap<McRaptorState> boardTimeForFrequencyTrips = new TObjectIntHashMap<>();
+
+            // The trip index in the pattern (not GTFS Trip ID) that produced each state
+            TObjectIntMap<McRaptorState> tripIndicesInPattern = new TObjectIntHashMap<>();
 
             TripPattern pattern = network.transitLayer.tripPatterns.get(patIdx);
             RouteInfo routeInfo = network.transitLayer.routes.get(pattern.routeIndex);
@@ -312,23 +311,22 @@ public class McRaptorSuboptimalPathProfileRouter {
                 boolean stopReachedViaDifferentPattern = bestStates.containsKey(stop);
 
                 // get off the bus, if we can
-                for (Map.Entry<StatePatternKey, McRaptorState> e : statesPerPatternSequence.entrySet()) {
-                    int trip = tripsPerPatternSequence.get(e.getKey());
-                    TripSchedule sched = pattern.tripSchedules.get(trip);
-
-                    int boardStopPositionInPattern = boardStopsPositionsPerPatternSequence.get(e.getKey());
+                for (McRaptorState state : states) {
+                    int tripIndexInPattern = tripIndicesInPattern.get(state);
+                    TripSchedule sched = pattern.tripSchedules.get(tripIndexInPattern);
+                    int boardStopPosition = boardStopPositionInPattern.get(state);
 
                     int arrival;
 
                     // we know we have no mixed schedule/frequency patterns, see check on boarding
                     if (sched.headwaySeconds != null) {
-                        int travelTimeToStop = sched.arrivals[stopPositionInPattern] - sched.departures[boardStopPositionInPattern];
-                        arrival = boardTimesPerPatternSequence.get(e.getKey()) + travelTimeToStop;
+                        int travelTimeToStop = sched.arrivals[stopPositionInPattern] - sched.departures[boardStopPosition];
+                        arrival = boardTimeForFrequencyTrips.get(state) + travelTimeToStop;
                     } else {
                         arrival = sched.arrivals[stopPositionInPattern];
                     }
 
-                    if (addState(stop, boardStopPositionInPattern, stopPositionInPattern, arrival, patIdx, trip, e.getValue()))
+                    if (addState(stop, boardStopPosition, stopPositionInPattern, arrival, patIdx, tripIndexInPattern, state))
                         touchedStops.set(stop);
                 }
 
@@ -345,7 +343,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
                         // don't reexplore patterns.
                         // NB checking and preventing reboarding any pattern that's been boarded in a previous
-                        // round doesn't save a signifiant amount of search time (anecdotally), and forbids some rare
+                        // round doesn't save a significant amount of search time (anecdotally), and forbids some rare
                         // but possible optimal routes that use the same pattern twice (e.g. transfering in Singapore
                         // from Downtown Line westbound at Jalan Besar to Rochor; see also Line 1 in Naples, or LU
                         // Circle Line in the vicinity of Paddington).
@@ -358,7 +356,6 @@ public class McRaptorSuboptimalPathProfileRouter {
                         // find a trip, if we can
                         int currentTrip = -1; // first increment lands at zero
 
-                        StatePatternKey spk = new StatePatternKey(state);
 
                         if (pattern.hasSchedules) {
                             for (TripSchedule tripSchedule : pattern.tripSchedules) {
@@ -372,16 +369,29 @@ public class McRaptorSuboptimalPathProfileRouter {
                                 // clock time for trip departing a stop
                                 int departure = tripSchedule.departures[stopPositionInPattern];
                                 if (departure > state.time + BOARD_SLACK) {
-                                    if (!statesPerPatternSequence.containsKey(spk) || tripsPerPatternSequence.get(spk) > currentTrip) {
-                                        statesPerPatternSequence.put(spk, state);
-                                        tripsPerPatternSequence.put(spk, currentTrip);
-                                        boardTimesPerPatternSequence.put(spk, departure);
-                                        boardStopsPositionsPerPatternSequence.put(spk, stopPositionInPattern);
-                                    }
+                                    // boarding is possible here
+                                    states.add(state);
+                                    tripIndicesInPattern.put(state, currentTrip);
+                                    boardStopPositionInPattern.put(state, stopPositionInPattern);
 
-                                    // we found the best trip we can board at this stop (we know this because trips
+                                    // we found the best trip we can board at this stop based on travel time (we know this because trips
                                     // are sorted by departure time from first stop), break loop regardless of whether
                                     // we decided to board it or continue on a trip coming from a previous stop.
+
+                                    // NB there is an assumption here that a user will take the first vehicle that comes
+                                    // on the desired pattern. It is possible to imagine a situation in which this is not
+                                    // completely correct. If there are peak and off-peak fares, it may make sense to arrive
+                                    // at a transfer point and allow a on-peak vehicle to pass in order to get on the next vehicle
+                                    // which just so happens to arrive after peak. I do not doubt that someone, somewhere, does this.
+                                    // There are reasons to do this at a transfer point. Suppose that there are peak and off-peak
+                                    // fares for a rail system but not a connecting bus system (e.g., WMATA in DC). Suppose that the bus only
+                                    // comes every hour. If you take the 8:30 AM (hourly) bus, you arrive at the rail station at 8:50 - still in peak time.
+                                    // However, if you allow the 8:55 on-peak train to pass and take the off-peak 9:01, you stand to save some money.
+                                    // You can't leave your house later, because the feeder bus isn't coming again until 9:30.
+                                    // This isn't a problem for the almost certainly more common situation of people delaying
+                                    // their trips to save money, as that should be accounted for by the time window (and if you
+                                    // wanted to consider a trip that nominally departed at 8:30 but involved waiting to depart until 9:00
+                                    // to get the best fare, you could achieve that through post-processing.
                                     break;
                                 }
                             }
@@ -415,12 +425,10 @@ public class McRaptorSuboptimalPathProfileRouter {
                                     // on end time may not actually occur
                                     if (departure > latestDeparture) continue;
 
-                                    if (!statesPerPatternSequence.containsKey(spk) || boardTimesPerPatternSequence.get(spk) > departure) {
-                                        statesPerPatternSequence.put(spk, state);
-                                        tripsPerPatternSequence.put(spk, currentTrip);
-                                        boardTimesPerPatternSequence.put(spk, departure);
-                                        boardStopsPositionsPerPatternSequence.put(spk, stopPositionInPattern);
-                                    }
+                                    states.add(state);
+                                    tripIndicesInPattern.put(state, currentTrip);
+                                    boardTimeForFrequencyTrips.put(state, departure);
+                                    boardStopPositionInPattern.put(state, stopPositionInPattern);
                                 }
                             }
                         }

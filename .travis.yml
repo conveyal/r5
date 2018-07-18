@@ -57,6 +57,7 @@ after_success:
   # builds: one for the tag and one for the commit to the branch.
   - JAVADOC_TARGET=${TRAVIS_TAG:-$TRAVIS_BRANCH}
   - if [[ "$TRAVIS_PULL_REQUEST" = false ]]; then mvn javadoc:javadoc; aws s3 cp --cache-control max-age=300 --recursive /home/travis/build/conveyal/r5/target/site/apidocs s3://javadoc.conveyal.com/r5/${TRAVIS_BRANCH}/; fi
+  - yarn global add @conveyal/maven-semantic-release && maven-semantic-release
 
 sudo: true # sudo: true gets us more memory, which we need, at the expense of slower builds
 
@@ -68,6 +69,7 @@ git:
 cache:
   directories:
   - $HOME/.m2/repository
+  - $HOME/.yarn-cache
 
 notifications:
   slack: conveyal:vqrkN7708qU1OTL9XkbMqQFV

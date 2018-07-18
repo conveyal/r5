@@ -36,14 +36,14 @@ public class Split {
     // The following fields require more calculations and are only set once a best edge is found.
 
     /**
-     * Accumulated distance from the beginning vertex of the edge geometry up to the split point for a link point,
-     * plus the distance from the link point to the split point
+     * Accumulated distance from the beginning vertex of the edge geometry up to the split point (point on the edge
+     * closest to the point to be linked), plus the distance from the linked point to the split point
      */
     public int distance0_mm = 0;
 
     /**
-     * Accumulated distance from the end vertex of the edge geometry up to the split point for a link point,
-     * plus the distance from the link point to the split point
+     * Accumulated distance from the end vertex of the edge geometry up to the split point (point on the edge
+     * closest to the point to be linked), plus the distance from the linked point to the split point
      */
     public int distance1_mm = 0;
 

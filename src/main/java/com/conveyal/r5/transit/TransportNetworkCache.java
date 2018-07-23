@@ -59,11 +59,11 @@ public class TransportNetworkCache {
     private final OSMCache osmCache;
 
     /** Create a transport network cache. If source bucket is null, will work offline. */
-    public TransportNetworkCache(String bucket, File cacheDir) {
+    public TransportNetworkCache(String region, String bucket, File cacheDir) {
         this.cacheDir = cacheDir;
         this.bucket = bucket;
         this.cache = createCache(DEFAULT_CACHE_SIZE);
-        this.gtfsCache = new GTFSCache(bucket, cacheDir);
+        this.gtfsCache = new GTFSCache(region, bucket, null, cacheDir);
         this.osmCache = new OSMCache(bucket, cacheDir);
         this.s3 = (bucket == null) ? null : AmazonS3ClientBuilder.defaultClient();
     }

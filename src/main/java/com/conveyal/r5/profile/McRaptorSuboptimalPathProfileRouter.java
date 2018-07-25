@@ -268,6 +268,17 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     /** perform one round of the McRAPTOR search. Returns true if anything changed */
     private boolean doOneRound () {
+        // make a protective copy of bestStates so we're not reading from the same structure we're writing to
+        // Otherwise the router can ride multiple transit vehicles in a single round, if it explores the pattern of the first
+        // before the pattern of the second
+        TIntObjectMap<Collection<McRaptorState>> bestStatesBeforeRound = new TIntObjectHashMap<>();
+        TIntObjectMap<Collection<McRaptorState>> bestNonTransferStatesBeforeRound = new TIntObjectHashMap<>();
+        bestStates.forEachEntry((stop, bag) -> {
+            bestStatesBeforeRound.put(stop, new ArrayList<>(bag.getBestStates()));
+            bestNonTransferStatesBeforeRound.put(stop, new ArrayList<>(bag.getNonTransferStates()));
+            return true; // continue iteration
+        });
+
         // optimization: on the last round, only explore patterns near the destination in a point to point search
         if (round == MAX_ROUNDS && egressTimes != null)
             touchedPatterns.and(patternsNearDestination);
@@ -288,9 +299,9 @@ public class McRaptorSuboptimalPathProfileRouter {
             TripPattern pattern = network.transitLayer.tripPatterns.get(patIdx);
             RouteInfo routeInfo = network.transitLayer.routes.get(pattern.routeIndex);
             TransitModes mode = TransitLayer.getTransitModes(routeInfo.route_type);
-            //skips trip patterns with trips which don't run on wanted date
+            // skips trip patterns with trips which don't run on wanted date
             if (!pattern.servicesActive.intersects(servicesActive) ||
-                //skips pattern with Transit mode which isn't wanted by profileRequest
+                // skips pattern with Transit mode which isn't wanted by profileRequest
                 !request.transitModes.contains(mode)) {
                 continue;
             }
@@ -298,7 +309,7 @@ public class McRaptorSuboptimalPathProfileRouter {
             // ride along the entire pattern, picking up states as we go
             for (int stopPositionInPattern = 0; stopPositionInPattern < pattern.stops.length; stopPositionInPattern++) {
                 int stop = pattern.stops[stopPositionInPattern];
-                //Skips stops that don't allow wheelchair users if this is wanted in request
+                // Skips stops that don't allow wheelchair users if this is wanted in request
                 if (request.wheelchair) {
                     if (!network.transitLayer.stopsWheelchair.get(stop)) {
                         continue;
@@ -308,7 +319,7 @@ public class McRaptorSuboptimalPathProfileRouter {
                 // Perform this check here so we don't needlessly loop over states at a stop that are only created by
                 // getting off this pattern. This optimization may limit the usefulness of  R5 for a strict Class B
                 // (touch all stations) Subway Challenge attempt (http://www.gricer.com/anysrc/anysrc.html).
-                boolean stopReachedViaDifferentPattern = bestStates.containsKey(stop);
+                boolean stopReachedViaDifferentPattern = bestStatesBeforeRound.containsKey(stop);
 
                 // get off the bus, if we can
                 for (McRaptorState state : states) {
@@ -332,7 +343,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
                 // get on the bus, if we can
                 if (stopReachedViaDifferentPattern) {
-                    STATES: for (McRaptorState state : bestStates.get(stop).getBestStates()) {
+                    STATES: for (McRaptorState state : bestStatesBeforeRound.get(stop)) {
                         if (state.round != round - 1) continue; // don't continually reexplore states
 
                         int prevPattern = state.pattern;
@@ -451,6 +462,8 @@ public class McRaptorSuboptimalPathProfileRouter {
         for (int stop = touchedStops.nextSetBit(0); stop >= 0; stop = touchedStops.nextSetBit(stop + 1)) {
             TIntList transfers = network.transitLayer.transfersForStop.get(stop);
 
+            // okay to use bestStates directly here, it doesn't allow the router to ride two transit vehicles in one round.
+            // because doTransfers only creates transfer states, it does not affect nonTransfer states.
             for (McRaptorState state : bestStates.get(stop).getNonTransferStates()) {
                 for (int transfer = 0; transfer < transfers.size(); transfer += 2) {
                     int toStop = transfers.get(transfer);

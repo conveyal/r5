@@ -25,13 +25,13 @@ public class FareDominatingList implements DominatingList {
         FareBounds dominatorFare = fareCalculator.calculateFare(dominator);
         FareBounds dominateeFare = fareCalculator.calculateFare(dominatee);
         if (dominatorFare.cumulativeFarePaid == dominateeFare.cumulativeFarePaid &&
-                dominatorFare.transferPrivilege.maxValue == dominateeFare.transferPrivilege.maxValue &&
-                dominatorFare.expirationTime >= dominateeFare.expirationTime &&
-                dominatorFare.numberLimit >= dominateeFare.numberLimit) {
+                dominatorFare.transferPrivilege.valueLimit == dominateeFare.transferPrivilege.valueLimit &&
+                dominatorFare.transferPrivilege.expirationTime >= dominateeFare.transferPrivilege.expirationTime &&
+                dominatorFare.transferPrivilege.numberLimit >= dominateeFare.transferPrivilege.numberLimit) {
             return dominator.time < dominatee.time;
         } else {
             // non-strict dominance
-            int dominateeConsumedValue = dominateeFare.cumulativeFarePaid - dominateeFare.transferPrivilege.maxValue;
+            int dominateeConsumedValue = dominateeFare.cumulativeFarePaid - dominateeFare.transferPrivilege.valueLimit;
             // if you can get to this location using the dominator for less than the "consumed cost" -- i.e. the fare
             // minus any potential discounts -- of the dominatee, the dominatee is dominated.
             return dominator.time < dominatee.time && dominatorFare.cumulativeFarePaid < dominateeConsumedValue;

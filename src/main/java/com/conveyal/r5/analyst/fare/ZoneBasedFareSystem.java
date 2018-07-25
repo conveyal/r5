@@ -6,7 +6,7 @@ import java.util.Map;
 Fares specified only by origin_id and destination_id.
  */
 
-public class ZonalFareSystem {
+public class ZoneBasedFareSystem {
     public Map<Pair, Integer> fareByZonePair;
 
     public class Pair {

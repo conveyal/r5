@@ -41,10 +41,6 @@ public abstract class InRoutingFareCalculator implements Serializable {
 
     public Map<String, Fare> gtfsFares;
 
-    public void loadFaresFromGTFS(){
-        /* do nothing */
-    }
-
     // injected on load
     public transient TransitLayer transitLayer;
 
@@ -57,7 +53,7 @@ public abstract class InRoutingFareCalculator implements Serializable {
                 // of possibilities that is too large to be stored.
                 FareBounds fareAtState = request.inRoutingFareCalculator.calculateFare(state);
 
-                if (fareAtState.getFarePaid() > request.maxFare) {
+                if (fareAtState.cumulativeFarePaid > request.maxFare) {
                     continue;
                 }
 
@@ -71,7 +67,7 @@ public abstract class InRoutingFareCalculator implements Serializable {
         };
     }
 
-    public class StandardFareBounds implements FareBounds {
+    public class StandardFareBounds extends FareBounds {
         int farePaid;
         int maxFarePrivilege;
 

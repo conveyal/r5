@@ -2,6 +2,7 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.model.Fare;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.Trip;
@@ -144,6 +145,8 @@ public class TransitLayer implements Serializable, Cloneable {
      * references between the two layers.
      */
     public TransportNetwork parentNetwork = null;
+
+    public Map<String, Fare> fares;
 
     /** Map from feed ID to feed CRC32 to ensure that we can't apply scenarios to the wrong feeds */
     public Map<String, Long> feedChecksums = new HashMap<>();
@@ -431,6 +434,10 @@ public class TransitLayer implements Serializable, Cloneable {
                 LOG.warn(
                     "No agency in graph had valid timezone; API request times will be interpreted as GMT.");
             }
+        }
+
+        if (level == LoadLevel.FULL) {
+            this.fares = gtfs.fares; //TODO lazy load
         }
 
         // Will be useful in naming patterns.

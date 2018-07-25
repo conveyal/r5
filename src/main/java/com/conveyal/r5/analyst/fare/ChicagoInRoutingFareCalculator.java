@@ -22,7 +22,7 @@ public class ChicagoInRoutingFareCalculator extends InRoutingFareCalculator {
     private static final Logger LOG = LoggerFactory.getLogger(ChicagoInRoutingFareCalculator.class);
 
     @Override
-    public int calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state) {
+    public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state) {
         int fare = 0;
 
         // extract the relevant rides
@@ -69,7 +69,7 @@ public class ChicagoInRoutingFareCalculator extends InRoutingFareCalculator {
         // warning: reams of log output
         //  LOG.info("Fare for {}: ${}", String.join(" -> ", routeNames), String.format("%.2f", fare / 100D));
 
-        return fare;
+        return new StandardFareBounds(fare);
     }
 
     @Override

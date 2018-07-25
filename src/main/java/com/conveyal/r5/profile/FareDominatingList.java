@@ -20,12 +20,12 @@ public class FareDominatingList implements DominatingList {
 
     @Override
     public boolean add(McRaptorSuboptimalPathProfileRouter.McRaptorState state) {
-        int thisFare = fareCalculator.calculateFare(state);
+        int thisFare = fareCalculator.calculateFare(state).getFarePaid();
 
         for (Iterator<McRaptorSuboptimalPathProfileRouter.McRaptorState> it = states.iterator(); it.hasNext();) {
             McRaptorSuboptimalPathProfileRouter.McRaptorState other = it.next();
 
-            int otherFare = fareCalculator.calculateFare(other);
+            int otherFare = fareCalculator.calculateFare(other).getFarePaid();
 
             // using geq/leq below to avoid codominant states in the same place on the pareto curve
             if (other.time <= state.time && otherFare <= thisFare) {

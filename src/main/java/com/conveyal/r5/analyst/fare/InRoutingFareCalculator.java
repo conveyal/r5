@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.fare;
 
+import com.conveyal.gtfs.model.Fare;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter.McRaptorState;
 import com.conveyal.r5.profile.ProfileRequest;
@@ -9,6 +10,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.Map;
 import java.util.function.ToIntFunction;
 
 /**
@@ -21,6 +23,7 @@ import java.util.function.ToIntFunction;
  */
 @JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property="type")
 @JsonSubTypes({
+        @JsonSubTypes.Type(name = "boston", value = BostonInRoutingFareCalculator.class),
         @JsonSubTypes.Type(name = "bogota", value = BogotaInRoutingFareCalculator.class),
         @JsonSubTypes.Type(name = "chicago", value = ChicagoInRoutingFareCalculator.class),
         @JsonSubTypes.Type(name = "simple", value = SimpleInRoutingFareCalculator.class)
@@ -28,11 +31,17 @@ import java.util.function.ToIntFunction;
 public abstract class InRoutingFareCalculator implements Serializable {
     public static final long serialVersionUID = 0L;
 
-    public abstract int calculateFare (McRaptorState state);
+    public abstract FareBounds calculateFare (McRaptorState state);
 
     public abstract String getType ();
 
     public void setType (String type) {
+        /* do nothing */
+    }
+
+    public Map<String, Fare> gtfsFares;
+
+    public void loadFaresFromGTFS(){
         /* do nothing */
     }
 
@@ -46,9 +55,9 @@ public abstract class InRoutingFareCalculator implements Serializable {
                 // check if this state falls below the fare cutoff.
                 // We generally try not to impose cutoffs at calculation time, but leaving two free cutoffs creates a grid
                 // of possibilities that is too large to be stored.
-                int fareAtState = request.inRoutingFareCalculator.calculateFare(state);
+                FareBounds fareAtState = request.inRoutingFareCalculator.calculateFare(state);
 
-                if (fareAtState > request.maxFare) {
+                if (fareAtState.getFarePaid() > request.maxFare) {
                     continue;
                 }
 
@@ -60,5 +69,27 @@ public abstract class InRoutingFareCalculator implements Serializable {
                 return FastRaptorWorker.UNREACHED;
             }
         };
+    }
+
+    public class StandardFareBounds implements FareBounds {
+        int farePaid;
+        int maxFarePrivilege;
+
+        public int getFarePaid(){
+            return this.farePaid;
+        }
+
+        public int getAvailableTransferValue(){
+            return this.maxFarePrivilege;
+        }
+
+        public boolean isFarePrivilegeComparableTo(FareBounds other) {
+            return true;
+        }
+
+        public StandardFareBounds(int farePaid){
+            this.farePaid = farePaid;
+        }
+
     }
 }

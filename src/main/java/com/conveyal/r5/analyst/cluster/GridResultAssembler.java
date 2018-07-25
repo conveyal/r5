@@ -1,7 +1,7 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.AmazonS3Client;
+import com.amazonaws.services.s3.AmazonS3ClientBuilder;
 import com.conveyal.r5.analyst.LittleEndianIntOutputStream;
 import com.google.common.io.ByteStreams;
 import org.slf4j.Logger;
@@ -53,7 +53,7 @@ public class GridResultAssembler {
     /** The offset to get to the data section of the access grid file. */
     public static final long HEADER_LENGTH_BYTES = 9 * Integer.BYTES;
 
-    private static final AmazonS3 s3 = new AmazonS3Client();
+    private static final AmazonS3 s3 = AmazonS3ClientBuilder.defaultClient();
 
     public final AnalysisTask request;
 

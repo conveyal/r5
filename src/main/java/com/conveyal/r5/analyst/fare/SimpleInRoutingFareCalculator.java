@@ -9,7 +9,7 @@ public class SimpleInRoutingFareCalculator extends InRoutingFareCalculator {
     public int fare;
 
     @Override
-    public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state) {
+    public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state, int maxClockTime) {
         int fareForState = 0;
 
         while (state != null) {

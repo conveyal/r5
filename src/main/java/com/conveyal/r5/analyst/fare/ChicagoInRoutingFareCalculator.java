@@ -22,7 +22,7 @@ public class ChicagoInRoutingFareCalculator extends InRoutingFareCalculator {
     private static final Logger LOG = LoggerFactory.getLogger(ChicagoInRoutingFareCalculator.class);
 
     @Override
-    public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state) {
+    public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state, int maxClockTime) {
         int fare = 0;
 
         // extract the relevant rides

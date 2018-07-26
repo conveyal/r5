@@ -31,7 +31,7 @@ import java.util.function.ToIntFunction;
 public abstract class InRoutingFareCalculator implements Serializable {
     public static final long serialVersionUID = 0L;
 
-    public abstract FareBounds calculateFare (McRaptorState state);
+    public abstract FareBounds calculateFare (McRaptorState state, int maxClockTime);
 
     public abstract String getType ();
 
@@ -44,14 +44,14 @@ public abstract class InRoutingFareCalculator implements Serializable {
     // injected on load
     public transient TransitLayer transitLayer;
 
-    public static ToIntFunction<Collection<McRaptorState>> getCollator (ProfileRequest request){
-        return (states) -> {
+    public static Collater getCollator (ProfileRequest request){
+        return (states, maxClockTime) -> {
             McRaptorState best = null;
             for (McRaptorState state : states) {
                 // check if this state falls below the fare cutoff.
                 // We generally try not to impose cutoffs at calculation time, but leaving two free cutoffs creates a grid
                 // of possibilities that is too large to be stored.
-                FareBounds fareAtState = request.inRoutingFareCalculator.calculateFare(state);
+                FareBounds fareAtState = request.inRoutingFareCalculator.calculateFare(state, maxClockTime);
 
                 if (fareAtState.cumulativeFarePaid > request.maxFare) {
                     continue;
@@ -87,5 +87,9 @@ public abstract class InRoutingFareCalculator implements Serializable {
             super(farePaid, new TransferAllowance());
         }
 
+    }
+
+    public interface Collater {
+        int collate (Collection<McRaptorState> states, int maxClockTime);
     }
 }

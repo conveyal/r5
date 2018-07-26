@@ -59,7 +59,7 @@ public class FareDominatingList implements DominatingList {
         // calculate fare if it has not been calculated before
         // this is not the best place to do this, as there are two FareDominatingLists per stop (for best and nontransfer
         // states), but it works.
-        if (newState.fare == null) newState.fare = fareCalculator.calculateFare(newState);
+        if (newState.fare == null) newState.fare = fareCalculator.calculateFare(newState, maxClockTime);
 
         // Prune if the fare paid _minus the transfer privilege_ exceeds the max fare, for efficient calculation.
         // This is in order to support subway systems where the cumulative fare paid may actually go _down_ after an

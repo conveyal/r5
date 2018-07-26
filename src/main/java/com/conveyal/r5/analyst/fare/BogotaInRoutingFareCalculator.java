@@ -40,7 +40,7 @@ public class BogotaInRoutingFareCalculator extends InRoutingFareCalculator {
     // There is also a maximum transfer window of 75 minutes but our analysis window is 60 minutes so it's non-binding
 
     @Override
-    public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state) {
+    public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state, int maxClockTime) {
         int fare = 0;
 
         // extract the relevant rides

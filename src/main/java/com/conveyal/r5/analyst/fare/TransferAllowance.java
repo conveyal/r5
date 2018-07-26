@@ -44,10 +44,12 @@ public class TransferAllowance {
         return Math.max(0, grossFare - value);
     }
 
-    public TransferAllowance clean(){
+    public TransferAllowance clean(int maxClockTime){
         int valueLimit = Math.max(0, this.value);
         int numberLimit = Math.max(0, this.number);
-        return new TransferAllowance(this.fareId, valueLimit, numberLimit, this.expirationTime);
+        // cap expiration time of transfer at max clock time of search, so that transfer slips that technically have more time
+        // remaining, but that time cannot be used within the constraints of this search, can be pruned.
+        return new TransferAllowance(this.fareId, valueLimit, numberLimit, Math.min(this.expirationTime, maxClockTime));
 
     }
 

@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.fare.FareBounds;
+import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -53,7 +54,7 @@ public class McRaptorSuboptimalPathProfileRouter {
     private ProfileRequest request;
     private Map<LegMode, TIntIntMap> accessTimes;
     private Map<LegMode, TIntIntMap> egressTimes = null;
-    private ToIntFunction<Collection<McRaptorState>> collapseParetoSurfaceToTime;
+    private InRoutingFareCalculator.Collater collapseParetoSurfaceToTime;
 
     private FrequencyRandomOffsets offsets;
 
@@ -74,8 +75,7 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     public McRaptorSuboptimalPathProfileRouter (TransportNetwork network, ProfileRequest req, Map<LegMode,
             TIntIntMap> accessTimes, Map<LegMode, TIntIntMap> egressTimes, IntFunction<DominatingList> listSupplier,
-                                                ToIntFunction<Collection<McRaptorState>>
-                                                        collapseParetoSurfaceToTime) {
+                                                InRoutingFareCalculator.Collater collapseParetoSurfaceToTime) {
         this.network = network;
         this.request = req;
         this.accessTimes = accessTimes;
@@ -508,7 +508,8 @@ public class McRaptorSuboptimalPathProfileRouter {
             McRaptorStateBag bag = bestStates.get(stop);
 
             if (bag == null) continue;
-            int bestClockTimeGivenConstraint = collapseParetoSurfaceToTime.applyAsInt(bag.getNonTransferStates());
+            int bestClockTimeGivenConstraint = collapseParetoSurfaceToTime.collate(bag.getNonTransferStates(),
+                            departureTime + request.maxTripDurationMinutes * 60);
             if (bestClockTimeGivenConstraint < timesAtStopsThisIteration[stop]){
                 timesAtStopsThisIteration[stop] = bestClockTimeGivenConstraint;
             }

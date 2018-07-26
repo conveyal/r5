@@ -151,7 +151,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     }
 
     @Override
-    public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state) {
+    public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state, int maxClockTime) {
 
         // First, load fare data from GTFS
         if (fares == null){
@@ -285,7 +285,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
           //  LOG.info("Fare for {}: ${}", String.join(" -> ", routeNames), String.format("%.2f", cumulativeFarePaid / 100D));
         //}
 
-        return new FareBounds(cumulativeFarePaid, transferAllowance.clean());
+        return new FareBounds(cumulativeFarePaid, transferAllowance.clean(maxClockTime));
     }
 
     @Override

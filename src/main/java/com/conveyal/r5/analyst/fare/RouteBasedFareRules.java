@@ -52,8 +52,9 @@ public class RouteBasedFareRules {
             String destination = fareRule.destination_id;
             FareKey fareKey = new FareKey(route, origin, destination);
             byRouteKey.put(fareKey, fare);
-            byId.put(fare.fare_id, fare);
         }
+
+        byId.put(fare.fare_id, fare);
     }
 
     /**

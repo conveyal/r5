@@ -21,6 +21,8 @@ public class FareDominatingList implements DominatingList {
 
     /** Is dominator strictly better than dominatee? */
     private boolean dominates (McRaptorSuboptimalPathProfileRouter.McRaptorState dominator, McRaptorSuboptimalPathProfileRouter.McRaptorState dominatee) {
+        // FIXME add check for nonnegative
+
         // apply strict dominance if fares and transfer privileges are same
         FareBounds dominatorFare = fareCalculator.calculateFare(dominator);
         FareBounds dominateeFare = fareCalculator.calculateFare(dominatee);

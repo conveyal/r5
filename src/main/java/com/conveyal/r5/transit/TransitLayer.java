@@ -81,6 +81,11 @@ public class TransitLayer implements Serializable, Cloneable {
     // It contains information that is temporarily also held in stopForIndex.
     public List<String> stopIdForIndex = new ArrayList<>();
 
+    /** Fare zones for stops */
+    public List<String> fareZoneForStop = new ArrayList<>();
+
+    public List<String> parentStationIdForStop = new ArrayList<>();
+
     // Inverse map of stopIdForIndex, reconstructed from that list (not serialized). No-entry value is -1.
     public transient TObjectIntMap<String> indexForStopId;
 
@@ -187,6 +192,9 @@ public class TransitLayer implements Serializable, Cloneable {
             // This is only used while building the TransitNetwork to look up StopTimes from the same feed.
             indexForUnscopedStopId.put(stop.stop_id, stopIndex);
             stopIdForIndex.add(scopedStopId);
+            // intern zone IDs to save memory
+            fareZoneForStop.add(stop.zone_id != null ? stop.zone_id.intern() : null);
+            parentStationIdForStop.add(stop.parent_station != null ? stop.parent_station.intern() : null);
             stopForIndex.add(stop);
             if (stop.wheelchair_boarding != null && stop.wheelchair_boarding.trim().equals("1")) {
                 stopsWheelchair.set(stopIndex);

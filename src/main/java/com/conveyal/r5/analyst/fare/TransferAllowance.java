@@ -22,7 +22,7 @@ public class TransferAllowance {
         this.expirationTime = 0;
     }
 
-    public TransferAllowance(Fare fare, int value, int startTime){
+    public TransferAllowance(Fare fare, int value, int startTime) {
         this.fareId = fare.fare_id;
         this.value = value;
         this.number = fare.fare_attribute.transfers;

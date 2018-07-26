@@ -449,6 +449,11 @@ public class AnalystWorker implements Runnable {
                 return reportTaskErrors(request, scenarioException.taskErrors);
             }
 
+            if (request.inRoutingFareCalculator != null) {
+                // inject transit layer to inroutingfarecalculator
+                request.inRoutingFareCalculator.transitLayer = transportNetwork.transitLayer;
+            }
+
             // If we are generating a static site, there must be a single metadata file for an entire batch of results.
             // Arbitrarily we create this metadata as part of the first task in the job.
             if (request instanceof RegionalTask && request.makeStaticSite && request.taskId == 0) {

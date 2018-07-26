@@ -60,6 +60,9 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
      * rules about Express Buses.
      */
     public class BostonTransferAllowance extends TransferAllowance {
+        public BostonTransferAllowance () {
+            /* restore default constructor */
+        }
 
         public BostonTransferAllowance(Fare fare, int startTime){
             super(fare, priceToInt(Math.min(fares.byId.get(SUBWAY).fare_attribute.price, fare.fare_attribute
@@ -96,7 +99,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         }
     }
 
-    private static final BostonTransferAllowance noTransferAllowance = (BostonTransferAllowance) new TransferAllowance();
+    private final BostonTransferAllowance noTransferAllowance = new BostonTransferAllowance();
 
     private static int priceToInt(double price) {return (int) (price * 100);} // usd to cents
 
@@ -141,7 +144,10 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         List<String> routeNames = new ArrayList();
 
         while (state != null) {
-            if (state.pattern == -1) continue; // on the street, not on transit
+            if (state.pattern == -1) {
+                state = state.back;
+                continue; // on the street, not on transit
+            }
             patterns.add(state.pattern);
             alightStops.add(state.stop);
             boardStops.add(transitLayer.tripPatterns.get(state.pattern).stops[state.boardStopPosition]);
@@ -158,8 +164,16 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         for (int journeyStage = 0; journeyStage < patterns.size(); journeyStage ++) {
             int pattern = patterns.get(journeyStage);
             RouteInfo route = transitLayer.routes.get(transitLayer.tripPatterns.get(pattern).routeIndex);
-            Stop boardStop = transitLayer.stopForIndex.get(boardStops.get(journeyStage));
-            Stop alightStop = transitLayer.stopForIndex.get(alightStops.get(journeyStage));
+            int boardStopIndex = boardStops.get(journeyStage);
+            String boardStopId = transitLayer.stopIdForIndex.get(boardStopIndex);
+            String boardStopParentId = transitLayer.parentStationIdForStop.get(boardStopIndex);
+            String boardStopZoneId = transitLayer.fareZoneForStop.get(boardStopIndex);
+
+            int alightStopIndex = alightStops.get(journeyStage);
+            String alightStopId = transitLayer.stopIdForIndex.get(alightStopIndex);
+            String alightStopParentId = transitLayer.parentStationIdForStop.get(alightStopIndex);
+            String alightStopZoneId = transitLayer.fareZoneForStop.get(alightStopIndex);
+
             int clockTime = times.get(journeyStage);
 
             routeNames.add(route.route_short_name != null && !route.route_short_name.isEmpty() ?
@@ -167,24 +181,27 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
 
             String routeId = getRouteId(route);
 
-            Fare fare = fares.getFareOrDefault(routeId, boardStop.zone_id, alightStop.zone_id);
+            Fare fare = fares.getFareOrDefault(routeId, boardStopZoneId, alightStopZoneId);
 
             // Check for transferValue expiration
             if (transferAllowance.hasExpiredAt(times.get(journeyStage))) transferAllowance = noTransferAllowance;
 
+            if (fare == null) {
+                throw new IllegalArgumentException("FARE IS NULL");
+            }
+
             if (isFreeTransferCandidate(transferAllowance.fareId, fare.fare_id)) {
-                    Stop previousAlightStop = transitLayer.stopForIndex.get(alightStops.get(journeyStage - 1));
+                    int previousAlightStopIndex = alightStops.get(journeyStage - 1);
                     // and if the previous alighting stop and this boarding stop are connected behind fare
                     // gates, continue to the next journeyStage.
-                    if (previousAlightStop == boardStop) continue;
+                    if (previousAlightStopIndex == boardStopIndex) continue;
 
-                    String stn = boardStop.parent_station;
-                    String previousStn = previousAlightStop.parent_station;
+                    String stn = boardStopParentId;
+                    String previousStn = transitLayer.parentStationIdForStop.get(previousAlightStopIndex);
 
                     if (stn.equals(previousStn) && !stationsWithoutBehindGateTransfers.contains(stn)) continue;
 
                     if (stationsConnected.contains(new HashSet<>(Arrays.asList(stn, previousStn)))) continue;
-
             }
 
             boolean tryToRedeemTransfer = transferEligibleSequences.contains(

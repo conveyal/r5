@@ -26,17 +26,18 @@ public class FareDominatingList implements DominatingList {
         // apply strict dominance if fares and transfer privileges are same
         FareBounds dominatorFare = fareCalculator.calculateFare(dominator);
         FareBounds dominateeFare = fareCalculator.calculateFare(dominatee);
-        if (dominatorFare.cumulativeFarePaid == dominateeFare.cumulativeFarePaid &&
-                dominatorFare.transferAllowance.value == dominateeFare.transferAllowance.value &&
-                dominatorFare.transferAllowance.expirationTime >= dominateeFare.transferAllowance.expirationTime &&
+        if (dominatorFare.cumulativeFarePaid <= dominateeFare.cumulativeFarePaid &&
+                dominatorFare.transferAllowance.canTransferPrivilegeDominate(dominateeFare.transferAllowance) &&
+                //dominatorFare.transferAllowance.expirationTime >= dominateeFare.transferAllowance.expirationTime &&
                 dominatorFare.transferAllowance.number >= dominateeFare.transferAllowance.number) {
-            return dominator.time < dominatee.time;
+            return dominator.time <= dominatee.time;
         } else {
             // non-strict dominance
             int dominateeConsumedValue = dominateeFare.cumulativeFarePaid - dominateeFare.transferAllowance.value;
             // if you can get to this location using the dominator for less than the "consumed cost" -- i.e. the fare
             // minus any potential discounts -- of the dominatee, the dominatee is dominated.
-            return dominator.time < dominatee.time && dominatorFare.cumulativeFarePaid < dominateeConsumedValue;
+            // TODO can I use geq here?
+            return dominator.time <= dominatee.time && dominatorFare.cumulativeFarePaid <= dominateeConsumedValue;
         }
     }
 

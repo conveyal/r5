@@ -52,7 +52,7 @@ public class TransferAllowance {
     }
 
     public boolean canTransferPrivilegeDominate(TransferAllowance other){
-        return value == other.value && expirationTime >= other.expirationTime;
+        return value >= other.value;// && expirationTime >= other.expirationTime;
     }
 
 }

@@ -8,6 +8,7 @@ import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
+import org.apache.commons.math3.random.MersenneTwister;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -53,6 +54,8 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             new HashSet<>(Arrays.asList("place-dwnxg", "park"))));
     private static final Logger LOG = LoggerFactory.getLogger(BostonInRoutingFareCalculator.class);
 
+    private MersenneTwister logRandomizer = new MersenneTwister();
+
     /**
      * For the MBTA, the value of a TransferAllowance is never greater than the subway fare.  We need to handle
      * the special case of local bus -> subway -> local bus being covered by one subway fare, while all other fares
@@ -67,6 +70,10 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         public BostonTransferAllowance(Fare fare, int startTime){
             super(fare, priceToInt(Math.min(fares.byId.get(SUBWAY).fare_attribute.price, fare.fare_attribute
                     .price)), startTime);
+        }
+
+        public BostonTransferAllowance(String fareId, int value, int number, int expirationTime) {
+            super(fareId, value, number, expirationTime);
         }
 
         public BostonTransferAllowance updateTransferAllowance(Fare fare, int clockTime){
@@ -86,7 +93,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             int value = priceToInt(Math.min(fares.byId.get(SUBWAY).fare_attribute.price, fareAttribute.price));
             int expirationTime = clockTime + fareAttribute.transfer_duration;
             // transferAllowance.number set to -1 as a signal to check for local bus -> subway -> bus special case;
-            return (BostonTransferAllowance) new TransferAllowance(fareId, value, -1, expirationTime);
+            return new BostonTransferAllowance(fareId, value, -1, expirationTime);
         }
 
         @Override
@@ -193,8 +200,10 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                 // and if the previous alighting stop and this boarding stop are connected behind fare
                 // gates, continue to the next journeyStage.
                 if (previousAlightStopIndex == boardStopIndex ||
-                        (previousAlightStation.equals(boardStation) && !stationsWithoutBehindGateTransfers.contains
-                        (boardStation)) ||
+                        (previousAlightStation != null && previousAlightStation.equals(boardStation) &&
+                                // e.g. Copley has same parent station, but no behind-the-gate transfers between platforms
+                                !stationsWithoutBehindGateTransfers.contains(boardStation)) ||
+                        // e.g. Park Street and Downtown Crossing are connected by the Winter Street Concourse
                         stationsConnected.contains(new HashSet<>(Arrays.asList(previousAlightStation, boardStation))))
                 continue;
             }
@@ -242,7 +251,10 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         }
 
         // warning: reams of log output
-        LOG.info("Fare for {}: ${}", String.join(" -> ", routeNames), String.format("%.2f", cumulativeFarePaid / 100D));
+        // only log 1/10000 of the fares
+        //if (logRandomizer.nextInt(1000000) == 42) {
+          //  LOG.info("Fare for {}: ${}", String.join(" -> ", routeNames), String.format("%.2f", cumulativeFarePaid / 100D));
+        //}
 
         return new FareBounds(cumulativeFarePaid, transferAllowance.clean());
     }

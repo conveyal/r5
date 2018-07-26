@@ -23,6 +23,9 @@ public class RouteBasedFareRules {
         String origin_zone_id;
         String destination_zone_id;
 
+        // cache hash code for performance
+        private int hashCode;
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
@@ -35,13 +38,23 @@ public class RouteBasedFareRules {
 
         @Override
         public int hashCode() {
-            return Objects.hash(routeId, origin_zone_id, destination_zone_id);
+            return hashCode;
+        }
+
+        public void computeHashCode () {
+            hashCode = 0;
+            if (routeId != null) hashCode += routeId.hashCode();
+            else {
+                if (origin_zone_id != null) hashCode += origin_zone_id.hashCode() * 31;
+                if (destination_zone_id != null) hashCode += destination_zone_id.hashCode() * 131;
+            }
         }
 
         public FareKey(String route, String origin, String destination){
             this.routeId = route;
             this.origin_zone_id = origin;
             this.destination_zone_id = destination;
+            this.computeHashCode();
         }
     }
 

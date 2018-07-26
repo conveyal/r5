@@ -29,6 +29,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     private static final String INNER_EXPRESS_BUS = "innerExpressBus";
     private static final String OUTER_EXPRESS_BUS = "outerExpressBus";
     private static final String SUBWAY = "subway";
+    private static final String SL_AIRPORT = "slairport";
     private static final Set<List<String>> transferEligibleSequences = new HashSet<>(
             Arrays.asList(
                     Arrays.asList(LOCAL_BUS, LOCAL_BUS),
@@ -105,6 +106,11 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     // All routes with route_type 2 use the same Commuter Rail system of zones except FIXME CapeFlyer and Foxboro
     private static String getRouteId(RouteInfo route) {return route.route_type == 2 ? "" : route.route_id;}
 
+    private static boolean isFreeTransferCandidate(String previousFareId, String fareId){
+        return (SUBWAY.equals(previousFareId) || SL_AIRPORT.equals(previousFareId)) &&
+                (SUBWAY.equals(fareId) || SL_AIRPORT.equals(fareId));
+    }
+
     @Override
     public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state) {
 
@@ -166,21 +172,19 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             // Check for transferValue expiration
             if (transferAllowance.hasExpiredAt(times.get(journeyStage))) transferAllowance = noTransferAllowance;
 
-            if (SUBWAY.equals(fare.fare_id)) { // If this transfer is to a subway route...
-                if (SUBWAY.equals(transferAllowance.fareId)) { // and if this transfer is from a subway route...
+            if (isFreeTransferCandidate(transferAllowance.fareId, fare.fare_id)) {
                     Stop previousAlightStop = transitLayer.stopForIndex.get(alightStops.get(journeyStage - 1));
                     // and if the previous alighting stop and this boarding stop are connected behind fare
                     // gates, continue to the next journeyStage.
                     if (previousAlightStop == boardStop) continue;
 
                     String stn = boardStop.parent_station;
-                    String previousStation = previousAlightStop.parent_station;
+                    String previousStn = previousAlightStop.parent_station;
 
-                    if (stn.equals(previousStation) && !stationsWithoutBehindGateTransfers.contains(stn)) continue;
+                    if (stn.equals(previousStn) && !stationsWithoutBehindGateTransfers.contains(stn)) continue;
 
-                    if (stationsConnected.contains(new HashSet<>(Arrays.asList(stn, previousStation)))) continue;
+                    if (stationsConnected.contains(new HashSet<>(Arrays.asList(stn, previousStn)))) continue;
 
-                }
             }
 
             boolean tryToRedeemTransfer = transferEligibleSequences.contains(

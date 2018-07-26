@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.analyst.fare.FareBounds;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -143,8 +144,8 @@ public class McRaptorSuboptimalPathProfileRouter {
         MersenneTwister mersenneTwister = new MersenneTwister();
 
         // TODO align with Owen and Jiang paper, remove range raptor since its assumptions aren't valid for non-travel-time optimization criteria
-        //for (int departureTime = request.toTime - 60, n = 0; departureTime > request.fromTime; departureTime -= mersenneTwister.nextInt(maxRandomWalkStep), n++) {
-        int departureTime = request.fromTime;
+        for (int departureTime = request.toTime - 60, n = 0; departureTime > request.fromTime; departureTime -= mersenneTwister.nextInt(maxRandomWalkStep), n++) {
+        //int departureTime = request.fromTime;
 
             // we're not using range-raptor so it's safe to change the schedule on each search
             offsets.randomize();
@@ -182,9 +183,9 @@ public class McRaptorSuboptimalPathProfileRouter {
                 collateTravelTimes(departureTime);
             }
 
-            //if (n % 15 == 0)
-                //LOG.info("minute {}, {} rounds", n, round);
-        //}
+            if (n % 15 == 0)
+                LOG.info("minute {}, {} rounds", n, round);
+        }
 
         // DEBUG: print hash table performance
 //        LOG.info("Hash performance: {} hashes, {} states", hashes.size(), keys.size());
@@ -711,6 +712,13 @@ public class McRaptorSuboptimalPathProfileRouter {
         /** The mode used to access transit at the start of the trip implied by this state */
         public LegMode accessMode;
         public LegMode egressMode;
+
+        /**
+         * The fare to get to this state. Ideally, this wouldn't be here, as it only applies to fare-based routing, not
+         * other McRaptor DominatingLists, but this is the easiest place to put it so that it isn't being recalculated
+         * all the time (which can be slow if there are table lookups involved).
+         */
+        public FareBounds fare;
 
         public String dump(TransportNetwork network) {
             StringBuilder sb = new StringBuilder();

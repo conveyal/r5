@@ -111,7 +111,7 @@ public class PointToPointQuery {
                     .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getReachedStops()));
 
             McRaptorSuboptimalPathProfileRouter router = new McRaptorSuboptimalPathProfileRouter(transportNetwork,
-                    request, accessTimes, egressTimes, ()->new SuboptimalDominatingList(request.suboptimalMinutes),
+                    request, accessTimes, egressTimes, (t)->new SuboptimalDominatingList(request.suboptimalMinutes),
                     null);
             List<PathWithTimes> usefullpathList = new ArrayList<>();
 

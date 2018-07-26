@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import java.util.function.ToIntFunction;
 
@@ -64,21 +65,20 @@ public class McRaptorSuboptimalPathProfileRouter {
     private TIntObjectMap<McRaptorStateBag> bestStates = new TIntObjectHashMap<>();
 
     private int round = 0;
-    // used in hashing
-    //private int roundSquared = 0;
+    private int departureTime;
 
     private BitSet touchedStops;
     private BitSet touchedPatterns;
     private BitSet patternsNearDestination;
     private BitSet servicesActive;
-    // Used in creating the McRaptorStateBag; the type of list supplied determines the domination rules
-    private Supplier<DominatingList> listSupplier;
+    // Used in creating the McRaptorStateBag; the type of list supplied determines the domination rules. Receives the departure time as an argument.
+    private IntFunction<DominatingList> listSupplier;
 
     /** In order to properly do target pruning we store the best times at each target _by access mode_, so car trips don't quash walk trips */
     private TObjectIntMap<LegMode> bestTimesAtTargetByAccessMode = new TObjectIntHashMap<>(4, 0.95f, Integer.MAX_VALUE);
 
     public McRaptorSuboptimalPathProfileRouter (TransportNetwork network, ProfileRequest req, Map<LegMode,
-            TIntIntMap> accessTimes, Map<LegMode, TIntIntMap> egressTimes, Supplier<DominatingList> listSupplier,
+            TIntIntMap> accessTimes, Map<LegMode, TIntIntMap> egressTimes, IntFunction<DominatingList> listSupplier,
                                                 ToIntFunction<Collection<McRaptorState>>
                                                         collapseParetoSurfaceToTime) {
         this.network = network;
@@ -132,13 +132,12 @@ public class McRaptorSuboptimalPathProfileRouter {
         MersenneTwister mersenneTwister = new MersenneTwister();
 
         // TODO align with Owen and Jiang paper, remove range raptor since its assumptions aren't valid for non-travel-time optimization criteria
-        for (int departureTime = request.toTime - 60, n = 0; departureTime > request.fromTime; departureTime -= mersenneTwister.nextInt(maxRandomWalkStep), n++) {
-        //int departureTime = request.fromTime;
-
+        int n;
+        for (departureTime = request.toTime - 60, n = 0; departureTime > request.fromTime; departureTime -= mersenneTwister.nextInt(maxRandomWalkStep), n++) {
             // we're not using range-raptor so it's safe to change the schedule on each search
             offsets.randomize();
 
-            bestStates.clear(); // if we ever use range-raptor, for it to be valid in a search with a limited number of transfers we need a separate state after each round
+            bestStates.clear();
             touchedPatterns.clear();
             touchedStops.clear();
             // Round 0 is in essence non-transit access.
@@ -165,7 +164,7 @@ public class McRaptorSuboptimalPathProfileRouter {
             // TODO this means we wind up with some duplicated states.
             if (egressTimes != null) {
                 // In a PointToPointQuery (for Modeify), egressTimes will already be computed
-                codominatingStatesToBeReturned.addAll(doPropagationToDestination());
+                codominatingStatesToBeReturned.addAll(doPropagationToDestination(finalDepartureTime));
             }
             if (collapseParetoSurfaceToTime != null) {
                 collateTravelTimes(departureTime);
@@ -465,8 +464,8 @@ public class McRaptorSuboptimalPathProfileRouter {
     }
 
     /** propagate states to the destination in a point-to-point search */
-    private Collection<McRaptorState> doPropagationToDestination() {
-        McRaptorStateBag bag = createStateBag();
+    private Collection<McRaptorState> doPropagationToDestination(int departureTime) {
+        McRaptorStateBag bag = createStateBag(departureTime);
 
         egressTimes.forEach((mode, times) -> times.forEachEntry((stop, egressTime) -> {
             McRaptorStateBag bagAtStop = bestStates.get(stop);
@@ -579,12 +578,7 @@ public class McRaptorSuboptimalPathProfileRouter {
             }
         }
 
-        // BELOW CODE IS USED TO EVALUATE HASH PERFORMANCE
-        // uncomment it, the variables it uses, and the log statement in route to print a hash collision report
-//        keys.add(new StatePatternKey(state));
-//        hashes.add(state.patternHash);
-
-        if (!bestStates.containsKey(stop)) bestStates.put(stop, createStateBag());
+        if (!bestStates.containsKey(stop)) bestStates.put(stop, createStateBag(departureTime));
 
         McRaptorStateBag bag = bestStates.get(stop);
         boolean optimal = bag.add(state);
@@ -611,8 +605,8 @@ public class McRaptorSuboptimalPathProfileRouter {
     }
 
     /** Create a new McRaptorStateBag with properly-configured dominance */
-    public McRaptorStateBag createStateBag () {
-        return new McRaptorStateBag(listSupplier);
+    public McRaptorStateBag createStateBag (int departureTime) {
+        return new McRaptorStateBag(() -> listSupplier.apply(departureTime));
     }
 
     /**

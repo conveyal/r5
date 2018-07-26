@@ -24,6 +24,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.IntFunction;
 import java.util.function.Supplier;
 
 /**
@@ -223,7 +224,11 @@ public class TravelTimeComputer {
                 transitTravelTimesToStops = worker.route();
             } else {
                 // TODO maxClockTime could provide a tighter bound, as it could be based on the actual departure time, not the last possible
-                Supplier<DominatingList> listSupplier = () -> new FareDominatingList(request.inRoutingFareCalculator, request.maxFare, request.toTime + 120 * 60);
+                IntFunction<DominatingList> listSupplier =
+                        (departureTime) -> new FareDominatingList(
+                                request.inRoutingFareCalculator,
+                                request.maxFare,
+                                departureTime + request.maxTripDurationMinutes * 60);
                 McRaptorSuboptimalPathProfileRouter mcRaptorWorker = new McRaptorSuboptimalPathProfileRouter(network,
                         request, null, null, listSupplier, InRoutingFareCalculator.getCollator(request));
                 mcRaptorWorker.route();

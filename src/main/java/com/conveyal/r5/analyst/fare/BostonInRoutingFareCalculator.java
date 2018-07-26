@@ -48,7 +48,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     private static final String DEFAULT_FARE_ID = LOCAL_BUS;
     private static final Set<String> stationsWithoutBehindGateTransfers = new HashSet<>(Arrays.asList(
             "place-coecl", "place-aport"));
-    private static final Set<Set<String>> stationsConnectedBehindGates = new HashSet<>(Arrays.asList(
+    private static final Set<Set<String>> stationsConnected = new HashSet<>(Arrays.asList(
             new HashSet<>(Arrays.asList("place-dwnxg", "park"))));
     private static final Logger LOG = LoggerFactory.getLogger(BostonInRoutingFareCalculator.class);
 
@@ -76,7 +76,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             }
         }
 
-        public BostonTransferAllowance localBusTransferAllowance(int clockTime){
+        public BostonTransferAllowance localBusToSubwayTransferAllowance(int clockTime){
             String fareId = LOCAL_BUS;
             FareAttribute fareAttribute = fares.byId.get(LOCAL_BUS).fare_attribute;
             int value = priceToInt(Math.min(fares.byId.get(SUBWAY).fare_attribute.price, fareAttribute.price));
@@ -166,6 +166,23 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             // Check for transferValue expiration
             if (transferAllowance.hasExpiredAt(times.get(journeyStage))) transferAllowance = noTransferAllowance;
 
+            if (SUBWAY.equals(fare.fare_id)) { // If this transfer is to a subway route...
+                if (SUBWAY.equals(transferAllowance.fareId)) { // and if this transfer is from a subway route...
+                    Stop previousAlightStop = transitLayer.stopForIndex.get(alightStops.get(journeyStage - 1));
+                    // and if the previous alighting stop and this boarding stop are connected behind fare
+                    // gates, continue to the next journeyStage.
+                    if (previousAlightStop == boardStop) continue;
+
+                    String stn = boardStop.parent_station;
+                    String previousStation = previousAlightStop.parent_station;
+
+                    if (stn.equals(previousStation) && !stationsWithoutBehindGateTransfers.contains(stn)) continue;
+
+                    if (stationsConnected.contains(new HashSet<>(Arrays.asList(stn, previousStation)))) continue;
+
+                }
+            }
+
             boolean tryToRedeemTransfer = transferEligibleSequences.contains(
                     Arrays.asList(transferAllowance.fareId, fare.fare_id))
                     && transferAllowance.value > 0
@@ -173,6 +190,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
 
             // If the fare for this boarding accepts transfers and transferValue is available, attempt to use it.
             if (tryToRedeemTransfer) {
+
                 // Handle special cases first
                 if (transferAllowance.number < 0){
                     if (transferAllowance.number == -1) { // route prefix is (local bus -> subway)
@@ -191,33 +209,17 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                     }
                 }
 
-                if (SUBWAY.equals(fare.fare_id)) { // If this transfer is to a subway route...
-                    if (SUBWAY.equals(transferAllowance.fareId)) { // and if this transfer is from a subway route...
-                        Stop previousAlightStop = transitLayer.stopForIndex.get(alightStops.get(journeyStage - 1));
-                        // and if the previous alighting stop and this boarding stop are connected behind fare
-                        // gates, continue to the next journeyStage.
-                        if (previousAlightStop == boardStop) continue;
-
-                        String station = boardStop.parent_station;
-                        String previousStation = previousAlightStop.parent_station;
-
-                        if (station.equals(previousStation) && !stationsWithoutBehindGateTransfers.contains
-                                (station)) continue;
-
-                        if (stationsConnectedBehindGates.contains(new HashSet<>(Arrays.asList(station,
-                                previousStation)))) continue;
-
-                    } else if (LOCAL_BUS.equals(transferAllowance.fareId)) { // else if from a local bus...
+                 if (LOCAL_BUS.equals(transferAllowance.fareId) && SUBWAY.equals(fare.fare_id)) { // local bus -> subway
                         cumulativeFarePaid += transferAllowance.payDifference(priceToInt(fare.fare_attribute
                                 .price));
-                        transferAllowance = transferAllowance.localBusTransferAllowance(clockTime);
+                        transferAllowance = transferAllowance.localBusToSubwayTransferAllowance(clockTime);
                         continue;
                     }
-                }
+
                 // If we are not facing one of the special cases above, redeem the transfer.
                 cumulativeFarePaid += transferAllowance.payDifference(priceToInt(fare.fare_attribute.price));
                 transferAllowance = noTransferAllowance;
-            } else { // don't try to use transferValue, just pay the full fare for this journeyStage
+            } else { // don't try to use transferValue; pay the full fare for this journeyStage
                 cumulativeFarePaid += payFullFare(fare);
                 transferAllowance = transferAllowance.updateTransferAllowance(fare, clockTime);
             }

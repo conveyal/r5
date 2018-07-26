@@ -222,7 +222,8 @@ public class TravelTimeComputer {
                 // Additional detailed path information is retained in the FastRaptorWorker after routing.
                 transitTravelTimesToStops = worker.route();
             } else {
-                Supplier<DominatingList> listSupplier = () -> new FareDominatingList(request.inRoutingFareCalculator);
+                // TODO maxClockTime could provide a tighter bound, as it could be based on the actual departure time, not the last possible
+                Supplier<DominatingList> listSupplier = () -> new FareDominatingList(request.inRoutingFareCalculator, request.maxFare, request.toTime + 120 * 60);
                 McRaptorSuboptimalPathProfileRouter mcRaptorWorker = new McRaptorSuboptimalPathProfileRouter(network,
                         request, null, null, listSupplier, InRoutingFareCalculator.getCollator(request));
                 mcRaptorWorker.route();

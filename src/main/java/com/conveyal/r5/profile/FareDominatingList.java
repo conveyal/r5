@@ -11,12 +11,16 @@ import java.util.LinkedList;
  * An implementation of DominatingList, retaining pareto-optimal paths on time and fare.
  */
 public class FareDominatingList implements DominatingList {
+    private final int maxFare;
+    private final int maxClockTime;
     private InRoutingFareCalculator fareCalculator;
 
     private LinkedList<McRaptorSuboptimalPathProfileRouter.McRaptorState> states = new LinkedList<>();
 
-    public FareDominatingList(InRoutingFareCalculator fareCalculator) {
+    public FareDominatingList(InRoutingFareCalculator fareCalculator, int maxFare, int maxClockTime) {
         this.fareCalculator = fareCalculator;
+        this.maxFare = maxFare;
+        this.maxClockTime = maxClockTime;
     }
 
     /** Is dominator strictly better than dominatee? */
@@ -41,10 +45,26 @@ public class FareDominatingList implements DominatingList {
 
     @Override
     public boolean add(McRaptorSuboptimalPathProfileRouter.McRaptorState newState) {
+        // if it is past the time limit, drop it
+        if (newState.time > maxClockTime) return false;
+
         // calculate fare if it has not been calculated before
         // this is not the best place to do this, as there are two FareDominatingLists per stop (for best and nontransfer
         // states), but it works.
         if (newState.fare == null) newState.fare = fareCalculator.calculateFare(newState);
+
+        // Prune if the fare paid _minus the transfer privilege_ exceeds the max fare, for efficient calculation.
+        // This is in order to support subway systems where the cumulative fare paid may actually go _down_ after an
+        // additional ride.
+
+        // For instance, in the San Francisco Bay Area Rapid Transit (BART) system, the fare to travel from the San
+        // Francisco International Airport (SFO) to San Bruno is $7.85 (using a Clipper contactless smartcard). But if the
+        // user then crosses the platform and boards a Millbrae-bound train and exits at Millbrae, their total fare will
+        // be only $4.55 (i.e. riding another transit vehicle will actually reduce the fare). This is an optimal trip
+        // at some times of day when direct SFO-Millbrae service is not running. If we cut off the search when cumulativeFarePaid
+        // exceeded, say, $5, we'd prevent this trip. But if cumulativeFarePaid is set to $7.85 when exiting at San Bruno,
+        // and maxTransferBenefit is set to $7.85 - $4.55 = $3.30, we will retain it properly.
+        if (newState.fare.cumulativeFarePaid - newState.fare.transferAllowance.value > maxFare) return false;
 
         for (Iterator<McRaptorSuboptimalPathProfileRouter.McRaptorState> it = states.iterator(); it.hasNext();) {
             McRaptorSuboptimalPathProfileRouter.McRaptorState existing = it.next();

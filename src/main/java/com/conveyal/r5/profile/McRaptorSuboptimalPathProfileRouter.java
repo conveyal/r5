@@ -171,12 +171,8 @@ public class McRaptorSuboptimalPathProfileRouter {
                 collateTravelTimes(departureTime);
             }
 
-            if (n % 15 == 0)
-                LOG.info("minute {}, {} rounds", n, round);
+            LOG.info("minute {} / ~{}", n, NUMBER_OF_SEARCHES);
         }
-
-        // DEBUG: print hash table performance
-//        LOG.info("Hash performance: {} hashes, {} states", hashes.size(), keys.size());
 
         LOG.info("McRAPTOR took {}ms", System.currentTimeMillis() - startTime);
 

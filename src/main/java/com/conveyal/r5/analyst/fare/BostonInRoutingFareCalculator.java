@@ -165,13 +165,10 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             int pattern = patterns.get(journeyStage);
             RouteInfo route = transitLayer.routes.get(transitLayer.tripPatterns.get(pattern).routeIndex);
             int boardStopIndex = boardStops.get(journeyStage);
-            String boardStopId = transitLayer.stopIdForIndex.get(boardStopIndex);
-            String boardStopParentId = transitLayer.parentStationIdForStop.get(boardStopIndex);
+            String boardStation = transitLayer.parentStationIdForStop.get(boardStopIndex);
             String boardStopZoneId = transitLayer.fareZoneForStop.get(boardStopIndex);
 
             int alightStopIndex = alightStops.get(journeyStage);
-            String alightStopId = transitLayer.stopIdForIndex.get(alightStopIndex);
-            String alightStopParentId = transitLayer.parentStationIdForStop.get(alightStopIndex);
             String alightStopZoneId = transitLayer.fareZoneForStop.get(alightStopIndex);
 
             int clockTime = times.get(journeyStage);
@@ -191,17 +188,15 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             }
 
             if (isFreeTransferCandidate(transferAllowance.fareId, fare.fare_id)) {
-                    int previousAlightStopIndex = alightStops.get(journeyStage - 1);
-                    // and if the previous alighting stop and this boarding stop are connected behind fare
-                    // gates, continue to the next journeyStage.
-                    if (previousAlightStopIndex == boardStopIndex) continue;
-
-                    String stn = boardStopParentId;
-                    String previousStn = transitLayer.parentStationIdForStop.get(previousAlightStopIndex);
-
-                    if (stn.equals(previousStn) && !stationsWithoutBehindGateTransfers.contains(stn)) continue;
-
-                    if (stationsConnected.contains(new HashSet<>(Arrays.asList(stn, previousStn)))) continue;
+                int previousAlightStopIndex = alightStops.get(journeyStage - 1);
+                String previousAlightStation = transitLayer.fareZoneForStop.get(previousAlightStopIndex);
+                // and if the previous alighting stop and this boarding stop are connected behind fare
+                // gates, continue to the next journeyStage.
+                if (previousAlightStopIndex == boardStopIndex ||
+                        (previousAlightStation.equals(boardStation) && !stationsWithoutBehindGateTransfers.contains
+                        (boardStation)) ||
+                        stationsConnected.contains(new HashSet<>(Arrays.asList(previousAlightStation, boardStation))))
+                continue;
             }
 
             boolean tryToRedeemTransfer = transferEligibleSequences.contains(

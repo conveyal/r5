@@ -97,14 +97,43 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         }
 
         @Override
-        public boolean canTransferPrivilegeDominate(TransferAllowance other) {
-            return super.canTransferPrivilegeDominate(other) && (
-                // neither or both TransferPrivileges are coming from Express bus
-                (INNER_EXPRESS_BUS.equals(this.fareId) || OUTER_EXPRESS_BUS.equals(this.fareId)) ==
-                (INNER_EXPRESS_BUS.equals(other.fareId) || OUTER_EXPRESS_BUS.equals(other.fareId))
-            );
+        public boolean isAsGoodAsOrBetterThanForAllPossibleFutureTrips (TransferAllowance other) {
+            return super.isAsGoodAsOrBetterThanForAllPossibleFutureTrips(other) &&
+                    this.getTransferPrivilegeSource().equals(((BostonTransferAllowance) other).getTransferPrivilegeSource());
         }
+
+        /**
+         * Where did this transfer allowance come from?
+         *
+         * Transfer allowances from subway, local bus and express bus are all non-comparable, because
+         * 1. Subway allows boarding local and express buses, and other subways that are behind the same fare gates
+         * 2. Local bus allows boarding local and express buses and any subway
+         * 3. Express bus allows boading local buses or subway but not express buses
+         *
+         * Consider a counter example. If you are going from Coolidge Corner to Newton Center in Boston, you can take the C
+         * line to Cleveland Circle, walk the block to Reservoir, and take the D line to Newton Center. This costs
+         * $4.50 - two subway fares - because there is no behind-the-gates transfer between Riverside and Newton Center.
+         * Suppose there were a bus that ran along Beacon Street from Coolidge Corner to Cleveland Circle, and then you could
+         * again walk to Reservoir and take the D line. This costs $2.25 (a bus ride and then a transfer to the subway).
+         * At Cleveland Circle, the transfer allowances from the two services are equal* so the train route could dominate the
+         * bus route, even though the bus route yields a cheaper overall route. To prevent this, we consider the train
+         * transfer allowance to be incomparable to the bus transfer allowance.
+         *
+         * * actually, due to implementation, the transfer allowance from the train is 2.25, vs. 1.70 for the bus, because the algorithm doesn't
+         *   know there is no behind the gates transfer to any other train at Cleveland Circle.
+         * @return
+         */
+        private TransferPrivilegeSource getTransferPrivilegeSource() {
+            if (INNER_EXPRESS_BUS.equals(this.fareId) || OUTER_EXPRESS_BUS.equals(this.fareId))
+                return TransferPrivilegeSource.EXPRESS_BUS;
+            else if (SUBWAY.equals(this.fareId)) return TransferPrivilegeSource.SUBWAY;
+            else if (LOCAL_BUS.equals(this.fareId)) return TransferPrivilegeSource.LOCAL_BUS;
+            else return TransferPrivilegeSource.OTHER;
+        }
+
     }
+
+    private static enum TransferPrivilegeSource { LOCAL_BUS, SUBWAY, EXPRESS_BUS, OTHER };
 
     private final BostonTransferAllowance noTransferAllowance = new BostonTransferAllowance();
 

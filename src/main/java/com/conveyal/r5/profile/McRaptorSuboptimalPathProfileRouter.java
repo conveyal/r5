@@ -44,11 +44,6 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     public static final int[] EMPTY_INT_ARRAY = new int[0];
 
-    /**
-     * the number of searches to run (approximately). We use a constrained random walk to get about this many searches.
-     */
-    public int NUMBER_OF_SEARCHES = 20;
-
     private final boolean DUMP_STOPS = false;
 
     /** Use a list for the iterations since we aren't sure how many there will be (we're using random sampling over the departure minutes) */
@@ -124,7 +119,15 @@ public class McRaptorSuboptimalPathProfileRouter {
         // the number of samples without causing an issue with variance in results.  This value is the constraint
         // (upper limit) on the walk.
         // multiply by two because E[random] = 1/2 * max.
-        int maxRandomWalkStep = 2 * (request.toTime - request.fromTime) / NUMBER_OF_SEARCHES;
+        if (request.monteCarloDraws == 200) {
+            // 200 draws will take a really long time and is probably not what is desired. It is more likely the user simply
+            // forgot to change the number of draws in the
+            throw new IllegalArgumentException("Monte Carlo draws set to UI default, this is probably not what you want, exiting. " +
+                    "Each draw in the fare-based router can be quite slow, so you probably want a smaller number. " +
+                    "If you _really_ want 200 draws, maybe you'd be happy with 199 xor 201, which will prevent" +
+                    "this error?");
+        }
+        int maxRandomWalkStep = 2 * (request.toTime - request.fromTime) / request.monteCarloDraws;
 
         // This random number generator will be seeded with a combination of time and the instance's identity hash code.
         // This makes it truly random for all practical purposes. To make results repeatable from one run to the next,
@@ -170,7 +173,7 @@ public class McRaptorSuboptimalPathProfileRouter {
                 collateTravelTimes(departureTime);
             }
 
-            LOG.info("minute {} / ~{}", n, NUMBER_OF_SEARCHES);
+            LOG.info("minute {} / ~{}", n, request.monteCarloDraws);
         }
 
         LOG.info("McRAPTOR took {}ms", System.currentTimeMillis() - startTime);

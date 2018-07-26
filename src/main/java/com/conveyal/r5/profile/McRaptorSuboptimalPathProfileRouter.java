@@ -43,24 +43,12 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     public static final int[] EMPTY_INT_ARRAY = new int[0];
 
-    /** large primes for use in hashing lists of patterns (blockchain for transit routing!), computed using R numbers
-     * package */
-    public static final int[] PRIMES = new int[] { 400000009, 200000033, 2, 1100000009, 1900000043, 800000011, 1300000003,
-            1000000007, 500000003, 300000007, 1700000009, 100000007, 700000031, 900000011, 1800000011, 1400000023,
-            600000007, 1600000009, 1200000041, 1500000041 };
-
-    // DEBUG: USED TO EVALUATE HASH PERFORMANCE
-//    Set<StatePatternKey> keys = new HashSet<>(); // all unique keys
-//    TIntSet hashes = new TIntHashSet(); // all unique hashes
-
     /**
      * the number of searches to run (approximately). We use a constrained random walk to get about this many searches.
      */
     public int NUMBER_OF_SEARCHES = 20;
 
     private final boolean DUMP_STOPS = false;
-
-    private LinkedPointSet pointSet = null;
 
     /** Use a list for the iterations since we aren't sure how many there will be (we're using random sampling over the departure minutes) */
     public List<int[]> timesAtStopsEachIteration = new ArrayList<>();
@@ -348,12 +336,6 @@ public class McRaptorSuboptimalPathProfileRouter {
                     STATES: for (McRaptorState state : bestStatesBeforeRound.get(stop)) {
                         if (state.round != round - 1) continue; // don't continually reexplore states
 
-                        int prevPattern = state.pattern;
-
-                        // this state is a transfer, get the pattern used to reach the transfer
-                        // if pattern is -1 and state.back is null, then this is the initial walk to reach transit
-                        if (prevPattern == -1 && state.back != null) prevPattern = state.back.pattern;
-
                         // don't reexplore patterns.
                         // NB checking and preventing reboarding any pattern that's been boarded in a previous
                         // round doesn't save a significant amount of search time (anecdotally), and forbids some rare
@@ -454,14 +436,6 @@ public class McRaptorSuboptimalPathProfileRouter {
         markPatterns();
 
         round++;
-
-        double statesPerStop = 0;
-        for (McRaptorStateBag bag : bestStates.valueCollection()) {
-            statesPerStop += bag.getBestStates().size();
-        }
-        int reachedStops = bestStates.size();
-        statesPerStop /= reachedStops;
-        LOG.info("Starting round {} with {} reached stops, average {} states per reached stop", round, reachedStops, statesPerStop);
 
         return !touchedPatterns.isEmpty();
     }
@@ -609,29 +583,6 @@ public class McRaptorSuboptimalPathProfileRouter {
             }
         }
 
-        if (pattern != -1) {
-            if (state.back != null) {
-                state.patterns = Arrays.copyOf(state.back.patterns, round);
-                state.patternHash = state.back.patternHash;
-            }
-            else {
-                state.patterns = new int[1];
-            }
-
-            state.patterns[round - 1] = pattern;
-
-            // NB using the below implementation from Arrays.hashCode makes the algorithm 2x slower
-            // (not using Arrays.hashCode, obviously that would be slow due to retraversal, but just using the same algorithm is slow)
-            //state.patternHash = state.patternHash * 31 + pattern;
-            // Take advantage of the fact that we only ever compare states from the same round, and maximize entropy at each round
-            // also keep in mind that
-            state.patternHash += pattern * PRIMES[round];
-        }
-        else if (state.back != null) {
-            state.patterns = state.back.patterns;
-            state.patternHash = state.back.patternHash;
-        }
-
         // BELOW CODE IS USED TO EVALUATE HASH PERFORMANCE
         // uncomment it, the variables it uses, and the log statement in route to print a hash collision report
 //        keys.add(new StatePatternKey(state));
@@ -704,11 +655,6 @@ public class McRaptorSuboptimalPathProfileRouter {
          */
         public int alightStopPosition;
 
-        /** the patterns used in this state */
-        public int[] patterns = EMPTY_INT_ARRAY;
-
-        public int patternHash;
-
         /** The mode used to access transit at the start of the trip implied by this state */
         public LegMode accessMode;
         public LegMode egressMode;
@@ -780,27 +726,6 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         public Collection<McRaptorState> getNonTransferStates () {
             return nonTransfer.getNonDominatedStates();
-        }
-    }
-
-    private static class StatePatternKey {
-        McRaptorState state;
-
-        public StatePatternKey (McRaptorState state) {
-            this.state = state;
-        }
-
-        public int hashCode () {
-            return state.patternHash;
-        }
-
-        public boolean equals (Object o) {
-            if (o instanceof StatePatternKey) {
-                return Arrays.equals(state.patterns, ((StatePatternKey) o).state.patterns) &&
-                        state.accessMode == ((StatePatternKey) o).state.accessMode;
-            }
-
-            return false;
         }
     }
 }

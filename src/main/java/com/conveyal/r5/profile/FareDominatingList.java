@@ -1,6 +1,5 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.analyst.fare.FareBounds;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 
 import java.util.Collection;
@@ -23,24 +22,33 @@ public class FareDominatingList implements DominatingList {
         this.maxClockTime = maxClockTime;
     }
 
-    /** Is dominator strictly better than dominatee? */
+    /**
+     * Return true if there is no way that a route with dominator as a prefix can yield a route that is slower or more
+     * expensive than the same route with dominatee as a prefix.
+     */
     private boolean betterOrEqual(McRaptorSuboptimalPathProfileRouter.McRaptorState dominator, McRaptorSuboptimalPathProfileRouter.McRaptorState dominatee) {
         // FIXME add check for nonnegative
 
-        // apply strict dominance if fares and transfer privileges are same
-        if (dominator.fare.cumulativeFarePaid <= dominatee.fare.cumulativeFarePaid &&
-                dominator.fare.transferAllowance.canTransferPrivilegeDominate(dominatee.fare.transferAllowance) &&
-                //dominatorFare.transferAllowance.expirationTime >= dominateeFare.transferAllowance.expirationTime &&
-                dominator.fare.transferAllowance.number >= dominatee.fare.transferAllowance.number) {
-            return dominator.time <= dominatee.time;
-        } else {
-            // non-strict dominance
-            int dominateeConsumedValue = dominatee.fare.cumulativeFarePaid - dominatee.fare.transferAllowance.value;
-            // if you can get to this location using the dominator for less than the "consumed cost" -- i.e. the fare
-            // minus any potential discounts -- of the dominatee, the dominatee is dominated.
-            // TODO can I use geq here?
-            return dominator.time <= dominatee.time && dominator.fare.cumulativeFarePaid <= dominateeConsumedValue;
+        int dominateeConsumedValue = dominatee.fare.cumulativeFarePaid - dominatee.fare.transferAllowance.value;
+        if (dominator.time <= dominatee.time) {
+            // this route is as good or better on time
+            if (dominator.fare.cumulativeFarePaid <= dominateeConsumedValue) {
+                // This route is as fast as the alternate route, and it costs no more than the fare paid for the other route
+                // minus any transfer priviliges that the user gets from the other route that could be realized in the future.
+                return true;
+            }
+
+            // if the out of pocket cost is the same or less and the transfer privilege is as good as or better than the
+            // other transfer allowance (exact definition depends on the system, see javadoc), then there is no way that
+            // dominatee could yield a better fare than dominator.
+            if (dominator.fare.cumulativeFarePaid <= dominatee.fare.cumulativeFarePaid &&
+                    dominator.fare.transferAllowance.isAsGoodAsOrBetterThanForAllPossibleFutureTrips(dominatee.fare.transferAllowance)) {
+                return true;
+            }
         }
+
+        // if we have not returned true by now, there may be a way that the dominatee can yield a faster or cheaper route
+        return false;
     }
 
     @Override

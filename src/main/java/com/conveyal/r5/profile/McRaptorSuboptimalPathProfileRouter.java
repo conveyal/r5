@@ -124,10 +124,14 @@ public class McRaptorSuboptimalPathProfileRouter {
             // forgot to change the number of draws in the
             throw new IllegalArgumentException("Monte Carlo draws set to UI default, this is probably not what you want, exiting. " +
                     "Each draw in the fare-based router can be quite slow, so you probably want a smaller number. " +
-                    "If you _really_ want 200 draws, maybe you'd be happy with 199 xor 201, which will prevent" +
+                    "If you _really_ want 200 draws, maybe you'd be happy with 199 or 201, which will prevent " +
                     "this error?");
         }
-        int maxRandomWalkStep = 2 * (request.toTime - request.fromTime) / request.monteCarloDraws;
+
+        // See Owen and Jiang 2016 (unfortunately no longer available online), add between f / 2 and
+        // f + f / 2, where f is the mean step.
+        int randomWalkStepMean = (request.toTime - request.fromTime) / request.monteCarloDraws;
+        int randomWalkStepWidthOneSided = randomWalkStepMean / 2;
 
         // This random number generator will be seeded with a combination of time and the instance's identity hash code.
         // This makes it truly random for all practical purposes. To make results repeatable from one run to the next,
@@ -136,7 +140,9 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         // TODO align with Owen and Jiang paper, remove range raptor since its assumptions aren't valid for non-travel-time optimization criteria
         int n;
-        for (departureTime = request.toTime - 60, n = 0; departureTime > request.fromTime; departureTime -= mersenneTwister.nextInt(maxRandomWalkStep), n++) {
+        for (departureTime = request.fromTime, n = 0;
+             departureTime < request.toTime;
+             departureTime += mersenneTwister.nextInt(randomWalkStepMean) + randomWalkStepWidthOneSided, n++) {
             // we're not using range-raptor so it's safe to change the schedule on each search
             offsets.randomize();
 

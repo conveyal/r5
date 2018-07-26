@@ -24,16 +24,7 @@ import java.util.WeakHashMap;
 public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
 
     private static final WeakHashMap<TransitLayer, FareSystemWrapper> fareSystemCache = new WeakHashMap<>();
-
-    // Bus, rapid transit, and ferry fares
-    private RouteBasedFareSystem fares;
-
-    // All routes with route_type 2 use the same Commuter Rail system of zones except FIXME CapeFlyer and Foxboro
-    // We implement this as a separate fare system to avoid having to enumerate all origin-destination-route
-    // combinations for commuter rail in our input data.  These fares are not paid with CharlieCards and do not allow
-    // transfers.
-    private ZoneBasedFareSystem commuterRailFares;
-
+    private RouteBasedFareRules fares;
     private static final String LOCAL_BUS = "localBus";
     private static final String INNER_EXPRESS_BUS = "innerExpressBus";
     private static final String OUTER_EXPRESS_BUS = "outerExpressBus";
@@ -68,6 +59,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
      * rules about Express Buses.
      */
     public class BostonTransferAllowance extends TransferAllowance {
+
         public BostonTransferAllowance(Fare fare, int startTime){
             super(fare, priceToInt(Math.min(fares.byId.get(SUBWAY).fare_attribute.price, fare.fare_attribute
                     .price)), startTime);
@@ -105,24 +97,24 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
 
     private static final BostonTransferAllowance noTransferAllowance = (BostonTransferAllowance) new TransferAllowance();
 
-    private static int priceToInt (double price){
-        return (int) (price * 100); // usd to cents
-    }
+    private static int priceToInt(double price) {return (int) (price * 100);} // usd to cents
 
-    private static int payFullFare(Fare fare){
-        return priceToInt(fare.fare_attribute.price);
-    }
+    private static int payFullFare(Fare fare) {return priceToInt(fare.fare_attribute.price);}
+
+    // Assume commuter rail routes are not enumerated in fare_rules
+    // All routes with route_type 2 use the same Commuter Rail system of zones except FIXME CapeFlyer and Foxboro
+    private static String getRouteId(RouteInfo route) {return route.route_type == 2 ? "" : route.route_id;}
 
     @Override
     public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state) {
 
-        if (commuterRailFares == null){
+        // First, load fare data from GTFS
+        if (fares == null){
             synchronized (this) {
-                if (commuterRailFares == null){
+                if (fares == null){
                     synchronized (fareSystemCache) {
                         FareSystemWrapper fareSystem = fareSystemCache.computeIfAbsent(this.transitLayer,
                                 BostonInRoutingFareCalculator::loadFaresFromGTFS);
-                        this.commuterRailFares = fareSystem.commuterRailFares;
                         this.fares = fareSystem.fares;
                         this.fares.defaultFare = DEFAULT_FARE_ID;
                     }
@@ -130,10 +122,11 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             }
         }
 
+        // Initialize: haven't boarded, paid a fare, or received a transfer allowance
         int cumulativeFarePaid = 0;
         BostonTransferAllowance transferAllowance = noTransferAllowance;
 
-        // extract relevant data about journey stages
+        // Extract relevant data about journey stages
         TIntList patterns = new TIntArrayList();
         TIntList boardStops = new TIntArrayList();
         TIntList alightStops = new TIntArrayList();
@@ -166,69 +159,67 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             routeNames.add(route.route_short_name != null && !route.route_short_name.isEmpty() ?
                     route.route_short_name : route.route_long_name);
 
-            if (route.route_type == 2) {
-                cumulativeFarePaid += commuterRailFares.getFare(boardStop.zone_id, alightStop.zone_id);
-            } else {
-                Fare fare = fares.getFareOrDefault(route.route_id, boardStop.zone_id, alightStop.zone_id);
+            String routeId = getRouteId(route);
 
-                // Check for transferValue expiration
-                if (transferAllowance.hasExpiredAt(times.get(journeyStage))) transferAllowance = noTransferAllowance;
+            Fare fare = fares.getFareOrDefault(routeId, boardStop.zone_id, alightStop.zone_id);
 
-                boolean tryToRedeemTransfer = transferEligibleSequences.contains(
-                        Arrays.asList(transferAllowance.fareId, fare.fare_id))
-                        && transferAllowance.value > 0
-                        && transferAllowance.number != 0; // Negative values signal special cases
+            // Check for transferValue expiration
+            if (transferAllowance.hasExpiredAt(times.get(journeyStage))) transferAllowance = noTransferAllowance;
 
-                // If the fare for this boarding accepts transfers and transferValue is available, attempt to use it.
-                if (tryToRedeemTransfer) {
-                    // Handle special cases first
-                    if (transferAllowance.number < 0){
-                        if (transferAllowance.number == -1) { // route prefix is (local bus -> subway)
-                            if (LOCAL_BUS.equals(fare.fare_id)){ // local bus -> subway -> bus special case
-                                //Don't increment cumulativeFarePaid, just clear transferAllowance.
-                                transferAllowance = noTransferAllowance;
-                                continue;
-                            } else { // (local bus -> subway -> anything other than local bus) requires full fare on
-                                // third boarding
-                                cumulativeFarePaid += payFullFare(fare);
-                                transferAllowance = transferAllowance.updateTransferAllowance(fare, clockTime);
-                                continue;
-                            }
-                        } else {
-                            throw new UnsupportedOperationException("Negative transfer allowance!");
-                        }
-                    }
+            boolean tryToRedeemTransfer = transferEligibleSequences.contains(
+                    Arrays.asList(transferAllowance.fareId, fare.fare_id))
+                    && transferAllowance.value > 0
+                    && transferAllowance.number != 0; // Negative values signal special cases
 
-                    if (SUBWAY.equals(fare.fare_id)) { // If this transfer is to a subway route...
-                        if (SUBWAY.equals(transferAllowance.fareId)) { // and if this transfer is from a subway route...
-                            Stop previousAlightStop = transitLayer.stopForIndex.get(alightStops.get(journeyStage - 1));
-                            // and if the previous alighting stop and this boarding stop are connected behind fare
-                            // gates, continue to the next journeyStage.
-                            if (previousAlightStop == boardStop) continue;
-
-                            String station = boardStop.parent_station;
-                            String previousStation = previousAlightStop.parent_station;
-
-                            if (station.equals(previousStation) && !stationsWithoutBehindGateTransfers.contains
-                                    (station)) continue;
-
-                            if (stationsConnectedBehindGates.contains(new HashSet<>(Arrays.asList(station,
-                                    previousStation)))) continue;
-
-                        } else if (LOCAL_BUS.equals(transferAllowance.fareId)) { // else if from a local bus...
-                            cumulativeFarePaid += transferAllowance.payDifference(priceToInt(fare.fare_attribute
-                                    .price));
-                            transferAllowance = transferAllowance.localBusTransferAllowance(clockTime);
+            // If the fare for this boarding accepts transfers and transferValue is available, attempt to use it.
+            if (tryToRedeemTransfer) {
+                // Handle special cases first
+                if (transferAllowance.number < 0){
+                    if (transferAllowance.number == -1) { // route prefix is (local bus -> subway)
+                        if (LOCAL_BUS.equals(fare.fare_id)){ // local bus -> subway -> bus special case
+                            //Don't increment cumulativeFarePaid, just clear transferAllowance.
+                            transferAllowance = noTransferAllowance;
+                            continue;
+                        } else { // (local bus -> subway -> anything other than local bus) requires full fare on
+                            // third boarding
+                            cumulativeFarePaid += payFullFare(fare);
+                            transferAllowance = transferAllowance.updateTransferAllowance(fare, clockTime);
                             continue;
                         }
+                    } else {
+                        throw new UnsupportedOperationException("Negative transfer allowance!");
                     }
-                    // If we are not facing one of the special cases above, redeem the transfer.
-                    cumulativeFarePaid += transferAllowance.payDifference(priceToInt(fare.fare_attribute.price));
-                    transferAllowance = noTransferAllowance;
-                } else { // don't try to use transferValue, just pay the full fare for this journeyStage
-                    cumulativeFarePaid += payFullFare(fare);
-                    transferAllowance = transferAllowance.updateTransferAllowance(fare, clockTime);
                 }
+
+                if (SUBWAY.equals(fare.fare_id)) { // If this transfer is to a subway route...
+                    if (SUBWAY.equals(transferAllowance.fareId)) { // and if this transfer is from a subway route...
+                        Stop previousAlightStop = transitLayer.stopForIndex.get(alightStops.get(journeyStage - 1));
+                        // and if the previous alighting stop and this boarding stop are connected behind fare
+                        // gates, continue to the next journeyStage.
+                        if (previousAlightStop == boardStop) continue;
+
+                        String station = boardStop.parent_station;
+                        String previousStation = previousAlightStop.parent_station;
+
+                        if (station.equals(previousStation) && !stationsWithoutBehindGateTransfers.contains
+                                (station)) continue;
+
+                        if (stationsConnectedBehindGates.contains(new HashSet<>(Arrays.asList(station,
+                                previousStation)))) continue;
+
+                    } else if (LOCAL_BUS.equals(transferAllowance.fareId)) { // else if from a local bus...
+                        cumulativeFarePaid += transferAllowance.payDifference(priceToInt(fare.fare_attribute
+                                .price));
+                        transferAllowance = transferAllowance.localBusTransferAllowance(clockTime);
+                        continue;
+                    }
+                }
+                // If we are not facing one of the special cases above, redeem the transfer.
+                cumulativeFarePaid += transferAllowance.payDifference(priceToInt(fare.fare_attribute.price));
+                transferAllowance = noTransferAllowance;
+            } else { // don't try to use transferValue, just pay the full fare for this journeyStage
+                cumulativeFarePaid += payFullFare(fare);
+                transferAllowance = transferAllowance.updateTransferAllowance(fare, clockTime);
             }
         }
 
@@ -244,34 +235,19 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     }
 
     private static class FareSystemWrapper{
-        public RouteBasedFareSystem fares;
-        public ZoneBasedFareSystem commuterRailFares;
+        public RouteBasedFareRules fares;
 
-        public FareSystemWrapper(RouteBasedFareSystem fares, ZoneBasedFareSystem commuterRailFares) {
+        public FareSystemWrapper(RouteBasedFareRules fares) {
             this.fares = fares;
-            this.commuterRailFares = commuterRailFares;
         }
     }
 
     public static FareSystemWrapper loadFaresFromGTFS(TransitLayer transitLayer){
-        RouteBasedFareSystem fares = new RouteBasedFareSystem();
-        ZoneBasedFareSystem commuterRailFares = new ZoneBasedFareSystem();
-        // iterate through fares and record rules
-        transitLayer.fares.values().forEach(fare -> {
-            fare.fare_rules.forEach(fareRule -> {
-                String route_id = fareRule.route_id;
-                String start_zone_id = fareRule.origin_id;
-                String end_zone_id = fareRule.destination_id;
-                if (!route_id.isEmpty()){
-                    // route-based fares, the default for bus and rapid transit
-                    fares.addFare(route_id, start_zone_id, end_zone_id, fare);
-                } else {
-                    // zone-based fares for commuter rail
-                    commuterRailFares.addZonePair(start_zone_id, end_zone_id, priceToInt(fare.fare_attribute.price));
-                }
-            });
-        });
-        return new FareSystemWrapper(fares, commuterRailFares);
+        RouteBasedFareRules fares = new RouteBasedFareRules();
+        // iterate through fares to record rules
+        for (Fare fare : transitLayer.fares.values()){
+            fares.addFareRules(fare);
+        }
+        return new FareSystemWrapper(fares);
     }
-
 }

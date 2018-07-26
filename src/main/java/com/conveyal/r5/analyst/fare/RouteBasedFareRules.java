@@ -1,16 +1,16 @@
 package com.conveyal.r5.analyst.fare;
 
 import com.conveyal.gtfs.model.Fare;
+import com.conveyal.gtfs.model.FareRule;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
 /**
- Fare objects (joins of GTFS fare_rules and fare_attributes) specified by route_id (and optionally
- origin_id/destination_id).
+ Multiple Fare Rules, with convenience methods for looking up by fare_id, route_id, origin zone, and destination zone
  **/
-public class RouteBasedFareSystem {
+public class RouteBasedFareRules {
     // Map from route_id values to Fare objects from gtfs-lib.  Per GTFS spec, fare_rules.txt can have multiple rows
     // with the same route (e.g. in a mixed route/zone fare system).
 
@@ -35,7 +35,6 @@ public class RouteBasedFareSystem {
 
         @Override
         public int hashCode() {
-
             return Objects.hash(routeId, origin_zone_id, destination_zone_id);
         }
 
@@ -46,10 +45,15 @@ public class RouteBasedFareSystem {
         }
     }
 
-    public void addFare(String route, String origin, String destination, Fare fare){
-        FareKey fareKey = new FareKey(route, origin, destination);
-        byRouteKey.put(fareKey, fare);
-        byId.put(fare.fare_id, fare);
+    public void addFareRules(Fare fare){
+        for (FareRule fareRule : fare.fare_rules){
+            String route = fareRule.route_id;
+            String origin = fareRule.origin_id;
+            String destination = fareRule.destination_id;
+            FareKey fareKey = new FareKey(route, origin, destination);
+            byRouteKey.put(fareKey, fare);
+            byId.put(fare.fare_id, fare);
+        }
     }
 
     /**

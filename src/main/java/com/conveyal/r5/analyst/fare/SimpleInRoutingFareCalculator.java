@@ -17,7 +17,7 @@ public class SimpleInRoutingFareCalculator extends InRoutingFareCalculator {
             state = state.back;
         }
 
-        return new FareBounds(fareForState, new TransferPrivilege());
+        return new FareBounds(fareForState, new TransferAllowance());
     }
 
     @Override

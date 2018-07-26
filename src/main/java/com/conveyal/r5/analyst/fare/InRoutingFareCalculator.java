@@ -84,7 +84,7 @@ public abstract class InRoutingFareCalculator implements Serializable {
         }
 
         public StandardFareBounds(int farePaid){
-            super(farePaid, new TransferPrivilege());
+            super(farePaid, new TransferAllowance());
         }
 
     }

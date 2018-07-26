@@ -107,7 +107,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
 
     // Assume commuter rail routes are not enumerated in fare_rules
     // All routes with route_type 2 use the same Commuter Rail system of zones except FIXME CapeFlyer and Foxboro
-    private static String getRouteId(RouteInfo route) {return route.route_type == 2 ? "" : route.route_id;}
+    private static String getRouteId(RouteInfo route) {return route.route_type == 2 ? null : route.route_id;}
 
     private static boolean isFreeTransferCandidate(String previousFareId, String fareId){
         return (SUBWAY.equals(previousFareId) || SL_AIRPORT.equals(previousFareId)) &&

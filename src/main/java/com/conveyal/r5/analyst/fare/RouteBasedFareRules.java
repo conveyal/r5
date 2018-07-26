@@ -71,10 +71,10 @@ public class RouteBasedFareRules {
     public Fare getFareOrDefault(String route, String start, String end){
         // Order is important here.  We want to return the most explicit match.  For example, fare_rules.txt might
         // have one row for Route 1, and another row for Route 1 at Stop A.  We'd want to return the latter.
-        String[] originOrWildcard = {start, ""};
-        String[] destinationOrWildcard = {end, ""};
+        String[] originOrWildcard = {start, null};
+        String[] destinationOrWildcard = {end, null};
         for (String origin : originOrWildcard){
-            for (String destination :destinationOrWildcard){
+            for (String destination : destinationOrWildcard){
                 FareKey fareKey = new FareKey(route, origin, destination);
                 if (byRouteKey.containsKey(fareKey)) {
                     return byRouteKey.get(fareKey);

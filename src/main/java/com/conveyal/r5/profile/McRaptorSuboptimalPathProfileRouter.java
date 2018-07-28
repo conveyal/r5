@@ -4,7 +4,6 @@ import com.conveyal.r5.analyst.fare.FareBounds;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
-import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
@@ -25,7 +24,6 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
-import java.util.function.ToIntFunction;
 
 /**
  * A profile routing implementation which uses McRAPTOR to store bags of arrival times and paths per
@@ -128,21 +126,13 @@ public class McRaptorSuboptimalPathProfileRouter {
                     "this error?");
         }
 
-        // See Owen and Jiang 2016 (unfortunately no longer available online), add between f / 2 and
-        // f + f / 2, where f is the mean step.
-        int randomWalkStepMean = (request.toTime - request.fromTime) / request.monteCarloDraws;
-        int randomWalkStepWidthOneSided = randomWalkStepMean / 2;
 
-        // This random number generator will be seeded with a combination of time and the instance's identity hash code.
-        // This makes it truly random for all practical purposes. To make results repeatable from one run to the next,
-        // seed with some characteristic of the request itself, e.g. (int) (request.fromLat * 1e9)
-        MersenneTwister mersenneTwister = new MersenneTwister();
+        // TODO repeat until exact number of samples requested is generated.
+        ArrayList<Integer> departureTimes = generateDepartureTimesToSample(request);
 
-        // TODO align with Owen and Jiang paper, remove range raptor since its assumptions aren't valid for non-travel-time optimization criteria
-        int n;
-        for (departureTime = request.fromTime, n = 0;
-             departureTime < request.toTime;
-             departureTime += mersenneTwister.nextInt(randomWalkStepMean) + randomWalkStepWidthOneSided, n++) {
+        for (int n = 0; n < departureTimes.size(); n++) {
+            departureTime = departureTimes.get(n);
+
             // we're not using range-raptor so it's safe to change the schedule on each search
             offsets.randomize();
 
@@ -179,7 +169,7 @@ public class McRaptorSuboptimalPathProfileRouter {
                 collateTravelTimes(departureTime);
             }
 
-            LOG.info("minute {} / ~{}", n, request.monteCarloDraws);
+            LOG.info("minute {} / ~{}", n + 1, request.monteCarloDraws);
         }
 
         LOG.info("McRAPTOR took {}ms", System.currentTimeMillis() - startTime);
@@ -497,6 +487,29 @@ public class McRaptorSuboptimalPathProfileRouter {
         }));
 
         return bag.getBestStates();
+    }
+
+    private ArrayList<Integer> generateDepartureTimesToSample (ProfileRequest request) {
+        //TODO take step first, so first time sampled isn't always the start of the time window.
+        // See Owen and Jiang 2016 (unfortunately no longer available online), add between f / 2 and
+        // f + f / 2, where f is the mean step.
+        int randomWalkStepMean = (request.toTime - request.fromTime) / request.monteCarloDraws;
+        int randomWalkStepWidthOneSided = randomWalkStepMean / 2;
+
+        // This random number generator will be seeded with a combination of time and the instance's identity hash code.
+        // This makes it truly random for all practical purposes. To make results repeatable from one run to the next,
+        // seed with some characteristic of the request itself, e.g. (int) (request.fromLat * 1e9)
+        MersenneTwister mersenneTwister = new MersenneTwister((int) (request.fromLat * 1e9));
+
+        ArrayList<Integer> departureTimes = new ArrayList<>();
+
+        for (int departureTime = request.fromTime;
+             departureTime < request.toTime;
+             departureTime += mersenneTwister.nextInt(randomWalkStepMean) + randomWalkStepWidthOneSided) {
+             departureTimes.add(departureTime);
+        }
+
+        return departureTimes;
     }
 
     private void collateTravelTimes(int departureTime) {

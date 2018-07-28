@@ -90,7 +90,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         public BostonTransferAllowance localBusToSubwayTransferAllowance(int clockTime){
             String fareId = LOCAL_BUS;
             FareAttribute fareAttribute = fares.byId.get(LOCAL_BUS).fare_attribute;
-            int value = priceToInt(Math.min(fares.byId.get(SUBWAY).fare_attribute.price, fareAttribute.price));
+            int value = priceToInt(fares.byId.get(SUBWAY).fare_attribute.price);
             int expirationTime = clockTime + fareAttribute.transfer_duration;
             // transferAllowance.number set to -1 as a signal to check for local bus -> subway -> bus special case;
             return new BostonTransferAllowance(fareId, value, -1, expirationTime);

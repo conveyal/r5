@@ -70,8 +70,8 @@ public class FareDominatingList implements DominatingList {
         // user then crosses the platform and boards a Millbrae-bound train and exits at Millbrae, their total fare will
         // be only $4.55 (i.e. riding another transit vehicle will actually reduce the fare). This is an optimal trip
         // at some times of day when direct SFO-Millbrae service is not running. If we cut off the search when cumulativeFarePaid
-        // exceeded, say, $5, we'd prevent this trip. But if cumulativeFarePaid is set to $7.85 when exiting at San Bruno,
-        // and maxTransferBenefit is set to $7.85 - $4.55 = $3.30, we will retain it properly.
+        // exceeded, say, $5, we'd prevent this trip. But if cumulativeFarePaid is set to $7.85 when alighting at San
+        // Bruno, and transferAllowance.value is set to $7.85 - $4.55 = $3.30, we will retain it properly.
         if (newState.fare.cumulativeFarePaid - newState.fare.transferAllowance.value > maxFare) return false;
 
         for (Iterator<McRaptorSuboptimalPathProfileRouter.McRaptorState> it = states.iterator(); it.hasNext();) {

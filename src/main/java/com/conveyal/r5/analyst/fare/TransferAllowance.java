@@ -14,12 +14,14 @@ public class TransferAllowance {
     public final int value;
     public final int number;
     public final int expirationTime;
+    public final Set<String> redemptionRestrictedTo; // null --> all eligible transfer sequences
 
     public TransferAllowance(){
         this.fareId = null;
         this.value = 0;
         this.number = 0;
         this.expirationTime = 0;
+        this.redemptionRestrictedTo = null;
     }
 
     public TransferAllowance(Fare fare, int value, int startTime) {
@@ -27,6 +29,7 @@ public class TransferAllowance {
         this.value = value;
         this.number = fare.fare_attribute.transfers;
         this.expirationTime = startTime + fare.fare_attribute.transfer_duration;
+        this.redemptionRestrictedTo = null;
     }
 
     public TransferAllowance(String fareId, int value, int number, int expirationTime){
@@ -34,6 +37,15 @@ public class TransferAllowance {
         this.value = value;
         this.number = number;
         this.expirationTime = expirationTime;
+        this.redemptionRestrictedTo = null;
+    }
+    public TransferAllowance(String fareId, int value, int number, int expirationTime, Set<String>
+            redemptionRestrictedTo){
+        this.fareId = fareId;
+        this.value = value;
+        this.number = number;
+        this.expirationTime = expirationTime;
+        this.redemptionRestrictedTo = redemptionRestrictedTo;
     }
 
     public boolean hasExpiredAt(int otherTime){

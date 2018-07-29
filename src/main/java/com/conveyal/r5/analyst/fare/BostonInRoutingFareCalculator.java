@@ -90,10 +90,12 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         public BostonTransferAllowance localBusToSubwayTransferAllowance(int clockTime){
             String fareId = LOCAL_BUS;
             FareAttribute fareAttribute = fares.byId.get(LOCAL_BUS).fare_attribute;
+            //TODO refactor to populate by iterating over fare groups
+            Set<String> redeemableOnModes = new HashSet<>(Arrays.asList(LOCAL_BUS, SUBWAY, SL_AIRPORT));
             int value = priceToInt(fares.byId.get(SUBWAY).fare_attribute.price);
             int expirationTime = clockTime + fareAttribute.transfer_duration;
             // transferAllowance.number set to -1 as a signal to check for local bus -> subway -> bus special case;
-            return new BostonTransferAllowance(fareId, value, -1, expirationTime);
+            return new BostonTransferAllowance(fareId, value, -1, expirationTime, redeemableOnModes);
         }
 
         @Override

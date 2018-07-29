@@ -1,14 +1,20 @@
 package com.conveyal.r5.analyst.fare;
 
-/*
-Standard GTFS Fare has a number of transfers allowed, but doesn't permit the value of those transfers to be
-limited.  This class allows subsequent transfers to be limited both by number and value.  There has been discussion
-in the GTFS Fares Working Group about a pay_difference_duration column for fare_attributes.  For now, this assumes
-values specified in transfer_duration should also be considered pay_difference_duration.
- */
 
 import com.conveyal.gtfs.model.Fare;
 
+import java.util.Set;
+
+/**
+For Pareto searches that include as an optimization criterion monetary cost based on fares, we need to label states
+with information about the potential value of future transfer allowances.  A standard GTFS fare_attribute can include
+ a numeric limit on number of subsequent transfers, as well as a time_duration, but it doesn't have a good way of
+ representing the potential value of a transfer allowance that a passenger may obtain upon paying a fare.  This class
+ is meant to represent that value and restrictions on how it can be redeemed in subsequent rides. These restrictions
+ are specific to fare systems and may include limitations on the number of subsequent transfers, which routes accept
+ the transfer (e.g. only routes from a certain agency), and the duration of the value's validity.
+ //TODO explain why fields are final.
+ */
 public class TransferAllowance {
     public final String fareId;
     public final int value;
@@ -16,6 +22,9 @@ public class TransferAllowance {
     public final int expirationTime;
     public final Set<String> redemptionRestrictedTo; // null --> all eligible transfer sequences
 
+    /**
+     * Constructor used for no transfer allowance
+      */
     public TransferAllowance(){
         this.fareId = null;
         this.value = 0;
@@ -24,6 +33,12 @@ public class TransferAllowance {
         this.redemptionRestrictedTo = null;
     }
 
+    /**
+     * @param fare GTFS fare used to describe where this allowance was obtained and set a limit on the number of
+     *             subsequent transfers and duration of validity
+     * @param value Value (e.g. USD converted to cents)
+     * @param startTime clock time at which the allowance was obtained
+     */
     public TransferAllowance(Fare fare, int value, int startTime) {
         this.fareId = fare.fare_id;
         this.value = value;
@@ -31,7 +46,12 @@ public class TransferAllowance {
         this.expirationTime = startTime + fare.fare_attribute.transfer_duration;
         this.redemptionRestrictedTo = null;
     }
-
+    /**
+     * @param fareId The fare by which this allowance was obtained
+     * @param value Value (e.g. USD converted to cents)
+     * @param number Number of transfers for which this value can be redeemed
+     * @param expirationTime Clock time at which the value expires
+     */
     public TransferAllowance(String fareId, int value, int number, int expirationTime){
         this.fareId = fareId;
         this.value = value;
@@ -39,6 +59,15 @@ public class TransferAllowance {
         this.expirationTime = expirationTime;
         this.redemptionRestrictedTo = null;
     }
+
+    /**
+     * @param fareId The fare by which this allowance was obtained
+     * @param value Value (e.g. USD converted to cents)
+     * @param number Number of transfers for which this value can be redeemed
+     * @param expirationTime Clock time at which the value expires
+     * @param redemptionRestrictedTo Set of services (e.g. route_id, route_type, agency_id, etc.) that will accept
+     *                               this transfer allowance.
+     */
     public TransferAllowance(String fareId, int value, int number, int expirationTime, Set<String>
             redemptionRestrictedTo){
         this.fareId = fareId;

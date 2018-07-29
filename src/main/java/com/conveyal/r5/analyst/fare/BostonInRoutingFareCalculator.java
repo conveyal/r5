@@ -2,7 +2,6 @@ package com.conveyal.r5.analyst.fare;
 
 import com.conveyal.gtfs.model.Fare;
 import com.conveyal.gtfs.model.FareAttribute;
-import com.conveyal.gtfs.model.Stop;
 import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
@@ -14,8 +13,10 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.WeakHashMap;
 
@@ -26,32 +27,36 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
 
     private static final WeakHashMap<TransitLayer, FareSystemWrapper> fareSystemCache = new WeakHashMap<>();
     private RouteBasedFareRules fares;
+    private enum FareGroup { LOCAL_BUS, SUBWAY, EXPRESS_BUS, OTHER }
     private static final String LOCAL_BUS = "localBus";
     private static final String INNER_EXPRESS_BUS = "innerExpressBus";
     private static final String OUTER_EXPRESS_BUS = "outerExpressBus";
     private static final String SUBWAY = "subway";
     private static final String SL_AIRPORT = "slairport";
-    private static final Set<List<String>> transferEligibleSequences = new HashSet<>(
+    private Map<String, FareGroup> fareGroups = new HashMap<String, FareGroup>() {
+        {put(LOCAL_BUS, FareGroup.LOCAL_BUS); }
+        {put(INNER_EXPRESS_BUS, FareGroup.EXPRESS_BUS); }
+        {put(INNER_EXPRESS_BUS, FareGroup.EXPRESS_BUS); }
+        {put(OUTER_EXPRESS_BUS, FareGroup.EXPRESS_BUS); }
+        {put(SUBWAY, FareGroup.SUBWAY); }
+        {put(SL_AIRPORT, FareGroup.SUBWAY); }
+    };
+    private static final Set<List<FareGroup>> transferEligibleSequences = new HashSet<>(
             Arrays.asList(
-                    Arrays.asList(LOCAL_BUS, LOCAL_BUS),
-                    Arrays.asList(SUBWAY, SUBWAY),
-                    Arrays.asList(LOCAL_BUS, SUBWAY),
-                    Arrays.asList(SUBWAY, LOCAL_BUS),
-                    Arrays.asList(INNER_EXPRESS_BUS, SUBWAY),
-                    Arrays.asList(SUBWAY, INNER_EXPRESS_BUS),
-                    Arrays.asList(OUTER_EXPRESS_BUS, SUBWAY),
-                    Arrays.asList(SUBWAY, OUTER_EXPRESS_BUS),
-                    Arrays.asList(INNER_EXPRESS_BUS, LOCAL_BUS),
-                    Arrays.asList(LOCAL_BUS, INNER_EXPRESS_BUS),
-                    Arrays.asList(OUTER_EXPRESS_BUS, LOCAL_BUS),
-                    Arrays.asList(LOCAL_BUS, OUTER_EXPRESS_BUS)
-            )
+                    Arrays.asList(FareGroup.LOCAL_BUS, FareGroup.LOCAL_BUS),
+                    Arrays.asList(FareGroup.SUBWAY, FareGroup.SUBWAY),
+                    Arrays.asList(FareGroup.LOCAL_BUS, FareGroup.SUBWAY),
+                    Arrays.asList(FareGroup.SUBWAY, FareGroup.LOCAL_BUS),
+                    Arrays.asList(FareGroup.EXPRESS_BUS, FareGroup.SUBWAY),
+                    Arrays.asList(FareGroup.SUBWAY, FareGroup.EXPRESS_BUS),
+                    Arrays.asList(FareGroup.EXPRESS_BUS, FareGroup.LOCAL_BUS),
+                    Arrays.asList(FareGroup.LOCAL_BUS, FareGroup.EXPRESS_BUS))
     );
     private static final String DEFAULT_FARE_ID = LOCAL_BUS;
     private static final Set<String> stationsWithoutBehindGateTransfers = new HashSet<>(Arrays.asList(
             "place-coecl", "place-aport"));
-    private static final Set<Set<String>> stationsConnected = new HashSet<>(Arrays.asList(
-            new HashSet<>(Arrays.asList("place-dwnxg", "park"))));
+    private static final Set<Set<String>> stationsConnected = new HashSet<>(Arrays.asList(new HashSet<>(Arrays.asList(
+            "place-dwnxg", "place-pktrm"))));
     private static final Logger LOG = LoggerFactory.getLogger(BostonInRoutingFareCalculator.class);
 
     private MersenneTwister logRandomizer = new MersenneTwister();
@@ -72,8 +77,9 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                     .price)), startTime);
         }
 
-        public BostonTransferAllowance(String fareId, int value, int number, int expirationTime) {
-            super(fareId, value, number, expirationTime);
+        public BostonTransferAllowance(String fareId, int value, int number, int expirationTime, Set<String>
+                redeemableOnModes) {
+            super(fareId, value, number, expirationTime, redeemableOnModes);
         }
 
         public BostonTransferAllowance updateTransferAllowance(Fare fare, int clockTime){
@@ -82,6 +88,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                 // journeyStages
                 return new BostonTransferAllowance(fare, clockTime);
             } else {
+                //TODO SL Airport
                 //otherwise return the previous transfer privilege.
                 return this;
             }
@@ -102,6 +109,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         public boolean isAsGoodAsOrBetterThanForAllPossibleFutureTrips (TransferAllowance other) {
             return super.isAsGoodAsOrBetterThanForAllPossibleFutureTrips(other) &&
                     this.getTransferPrivilegeSource().equals(((BostonTransferAllowance) other).getTransferPrivilegeSource());
+
         }
 
         /**
@@ -125,17 +133,15 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
          *   know there is no behind the gates transfer to any other train at Cleveland Circle.
          * @return
          */
-        private TransferPrivilegeSource getTransferPrivilegeSource() {
+        private FareGroup getTransferPrivilegeSource() {
             if (INNER_EXPRESS_BUS.equals(this.fareId) || OUTER_EXPRESS_BUS.equals(this.fareId))
-                return TransferPrivilegeSource.EXPRESS_BUS;
-            else if (SUBWAY.equals(this.fareId)) return TransferPrivilegeSource.SUBWAY;
-            else if (LOCAL_BUS.equals(this.fareId)) return TransferPrivilegeSource.LOCAL_BUS;
-            else return TransferPrivilegeSource.OTHER;
+                return FareGroup.EXPRESS_BUS;
+            else if (SUBWAY.equals(this.fareId)) return FareGroup.SUBWAY;
+            else if (LOCAL_BUS.equals(this.fareId)) return FareGroup.LOCAL_BUS;
+            else return FareGroup.OTHER;
         }
 
     }
-
-    private static enum TransferPrivilegeSource { LOCAL_BUS, SUBWAY, EXPRESS_BUS, OTHER };
 
     private final BostonTransferAllowance noTransferAllowance = new BostonTransferAllowance();
 
@@ -240,7 +246,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             }
 
             boolean tryToRedeemTransfer = transferEligibleSequences.contains(
-                    Arrays.asList(transferAllowance.fareId, fare.fare_id))
+                    Arrays.asList(fareGroups.get(transferAllowance.fareId), fareGroups.get(fare.fare_id)))
                     && transferAllowance.value > 0
                     && transferAllowance.number != 0; // Negative values signal special cases
 
@@ -265,7 +271,8 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                     }
                 }
 
-                 if (LOCAL_BUS.equals(transferAllowance.fareId) && SUBWAY.equals(fare.fare_id)) { // local bus -> subway
+                 if (LOCAL_BUS.equals(fareGroups.get(transferAllowance.fareId)) && SUBWAY.equals(fareGroups.get(fare
+                         .fare_id))) { // local bus -> subway
                         cumulativeFarePaid += transferAllowance.payDifference(priceToInt(fare.fare_attribute
                                 .price));
                         transferAllowance = transferAllowance.localBusToSubwayTransferAllowance(clockTime);

@@ -1,7 +1,6 @@
 package com.conveyal.r5.analyst.fare;
 
 import com.conveyal.gtfs.model.Fare;
-import com.conveyal.gtfs.model.FareAttribute;
 import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
@@ -27,88 +26,62 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
 
     private static final WeakHashMap<TransitLayer, FareSystemWrapper> fareSystemCache = new WeakHashMap<>();
     private RouteBasedFareRules fares;
-    private enum FareGroup { LOCAL_BUS, SUBWAY, EXPRESS_BUS, OTHER }
-    private static final String LOCAL_BUS = "localBus";
-    private static final String INNER_EXPRESS_BUS = "innerExpressBus";
-    private static final String OUTER_EXPRESS_BUS = "outerExpressBus";
-    private static final String SUBWAY = "subway";
-    private static final String SL_AIRPORT = "slairport";
-    private Map<String, FareGroup> fareGroups = new HashMap<String, FareGroup>() {
-        {put(LOCAL_BUS, FareGroup.LOCAL_BUS); }
-        {put(INNER_EXPRESS_BUS, FareGroup.EXPRESS_BUS); }
-        {put(INNER_EXPRESS_BUS, FareGroup.EXPRESS_BUS); }
-        {put(OUTER_EXPRESS_BUS, FareGroup.EXPRESS_BUS); }
-        {put(SUBWAY, FareGroup.SUBWAY); }
-        {put(SL_AIRPORT, FareGroup.SUBWAY); }
+
+    // Some fares may confer different transfer allowance values, but have the same issuing and acceptance rules.
+    // For example, in Boston, the transfer allowances from inner and outer express bus fares have different values,
+    // but they are issued and accepted under the same circumstances.
+    private enum TransferRuleGroup { LOCAL_BUS, SUBWAY, EXPRESS_BUS, SL_AIRPORT, LOCAL_BUS_TO_SUBWAY, OUT_OF_SUBWAY,
+        OTHER, NONE}
+
+    // Map fare_id values from GTFS fare_attributes.txt to these transfer rule groups
+    private static final String LOCAL_BUS_FARE_ID = "localBus";
+    private static final String SUBWAY_FARE_ID = "subway";
+    private static final Map<String, TransferRuleGroup> fareGroups = new HashMap<String, TransferRuleGroup>() {
+        {put(LOCAL_BUS_FARE_ID, TransferRuleGroup.LOCAL_BUS); }
+        {put(SUBWAY_FARE_ID, TransferRuleGroup.SUBWAY); }
+        {put("innerExpressBus", TransferRuleGroup.EXPRESS_BUS); }
+        {put("outerExpressBus", TransferRuleGroup.EXPRESS_BUS); }
+        {put("slairport", TransferRuleGroup.SL_AIRPORT); }
     };
-    private static final Set<List<FareGroup>> transferEligibleSequences = new HashSet<>(
+
+    private static final Set<List<TransferRuleGroup>> transferEligibleSequencePairs = new HashSet<>(
             Arrays.asList(
-                    Arrays.asList(FareGroup.LOCAL_BUS, FareGroup.LOCAL_BUS),
-                    Arrays.asList(FareGroup.SUBWAY, FareGroup.SUBWAY),
-                    Arrays.asList(FareGroup.LOCAL_BUS, FareGroup.SUBWAY),
-                    Arrays.asList(FareGroup.SUBWAY, FareGroup.LOCAL_BUS),
-                    Arrays.asList(FareGroup.EXPRESS_BUS, FareGroup.SUBWAY),
-                    Arrays.asList(FareGroup.SUBWAY, FareGroup.EXPRESS_BUS),
-                    Arrays.asList(FareGroup.EXPRESS_BUS, FareGroup.LOCAL_BUS),
-                    Arrays.asList(FareGroup.LOCAL_BUS, FareGroup.EXPRESS_BUS))
+                    Arrays.asList(TransferRuleGroup.LOCAL_BUS, TransferRuleGroup.LOCAL_BUS),
+                    Arrays.asList(TransferRuleGroup.SUBWAY, TransferRuleGroup.SUBWAY),
+                    Arrays.asList(TransferRuleGroup.LOCAL_BUS, TransferRuleGroup.SUBWAY),
+                    Arrays.asList(TransferRuleGroup.SUBWAY, TransferRuleGroup.LOCAL_BUS),
+                    Arrays.asList(TransferRuleGroup.EXPRESS_BUS, TransferRuleGroup.SUBWAY),
+                    Arrays.asList(TransferRuleGroup.SUBWAY, TransferRuleGroup.EXPRESS_BUS),
+                    Arrays.asList(TransferRuleGroup.EXPRESS_BUS, TransferRuleGroup.LOCAL_BUS),
+                    Arrays.asList(TransferRuleGroup.LOCAL_BUS, TransferRuleGroup.EXPRESS_BUS),
+                    Arrays.asList(TransferRuleGroup.LOCAL_BUS_TO_SUBWAY, TransferRuleGroup.SUBWAY),
+                    Arrays.asList(TransferRuleGroup.LOCAL_BUS_TO_SUBWAY, TransferRuleGroup.LOCAL_BUS)
+            )
     );
-    private static final String DEFAULT_FARE_ID = LOCAL_BUS;
+
+    private static final String DEFAULT_FARE_ID = LOCAL_BUS_FARE_ID;
     private static final Set<String> stationsWithoutBehindGateTransfers = new HashSet<>(Arrays.asList(
             "place-coecl", "place-aport"));
     private static final Set<Set<String>> stationsConnected = new HashSet<>(Arrays.asList(new HashSet<>(Arrays.asList(
             "place-dwnxg", "place-pktrm"))));
-    private static final Logger LOG = LoggerFactory.getLogger(BostonInRoutingFareCalculator.class);
 
+    // Logging to facilitate debugging
+    private static final Logger LOG = LoggerFactory.getLogger(BostonInRoutingFareCalculator.class);
     private MersenneTwister logRandomizer = new MersenneTwister();
 
     /**
-     * For the MBTA, the value of a TransferAllowance is never greater than the subway fare.  We need to handle
-     * the special case of local bus -> subway -> local bus being covered by one subway fare, while all other fares
-     * allow only one transfer. We also need to override the base canTransferPrivilege dominate because of special
-     * rules about Express Buses.
+     * There are a few reasons we need to extend the base TransferAllowance class for the MBTA:
+     *
+     * The value of a TransferAllowance is never greater than the subway fare.
+     *
+     * Local bus -> subway -> local bus is covered by one subway fare, while all other fares allow only one transfer.
+     *
+     * We also need to override atLeastAsGoodForAllFutureRedemptions because of special rules about Express Buses.
      */
     public class BostonTransferAllowance extends TransferAllowance {
-        public BostonTransferAllowance () {
-            /* restore default constructor */
-        }
-
-        public BostonTransferAllowance(Fare fare, int startTime){
-            super(fare, priceToInt(Math.min(fares.byId.get(SUBWAY).fare_attribute.price, fare.fare_attribute
-                    .price)), startTime);
-        }
-
-        public BostonTransferAllowance(String fareId, int value, int number, int expirationTime, Set<String>
-                redeemableOnModes) {
-            super(fareId, value, number, expirationTime, redeemableOnModes);
-        }
-
-        public BostonTransferAllowance updateTransferAllowance(Fare fare, int clockTime){
-            if(fare.fare_attribute.transfers > 0){
-                // if the boarding includes transfer privileges, set the values needed to use them in subsequent
-                // journeyStages
-                return new BostonTransferAllowance(fare, clockTime);
-            } else {
-                //TODO SL Airport
-                //otherwise return the previous transfer privilege.
-                return this;
-            }
-        }
-
-        public BostonTransferAllowance localBusToSubwayTransferAllowance(int clockTime){
-            String fareId = LOCAL_BUS;
-            FareAttribute fareAttribute = fares.byId.get(LOCAL_BUS).fare_attribute;
-            //TODO refactor to populate by iterating over fare groups
-            Set<String> redeemableOnModes = new HashSet<>(Arrays.asList(LOCAL_BUS, SUBWAY, SL_AIRPORT));
-            int value = priceToInt(fares.byId.get(SUBWAY).fare_attribute.price);
-            int expirationTime = clockTime + fareAttribute.transfer_duration;
-            // transferAllowance.number set to -1 as a signal to check for local bus -> subway -> bus special case;
-            return new BostonTransferAllowance(fareId, value, -1, expirationTime, redeemableOnModes);
-        }
-
-        }
 
         /**
-         * Where did this transfer allowance come from?
+         * What rules condition the issuance and acceptance of this transfer allowance?
          *
          * Transfer allowances from subway, local bus and express bus are all non-comparable, because
          * 1. Subway allows boarding local and express buses, and other subways that are behind the same fare gates
@@ -126,14 +99,97 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
          *
          * * actually, due to implementation, the transfer allowance from the train is 2.25, vs. 1.70 for the bus, because the algorithm doesn't
          *   know there is no behind the gates transfer to any other train at Cleveland Circle.
-         * @return
          */
-        private FareGroup getTransferPrivilegeSource() {
-            if (INNER_EXPRESS_BUS.equals(this.fareId) || OUTER_EXPRESS_BUS.equals(this.fareId))
-                return FareGroup.EXPRESS_BUS;
-            else if (SUBWAY.equals(this.fareId)) return FareGroup.SUBWAY;
-            else if (LOCAL_BUS.equals(this.fareId)) return FareGroup.LOCAL_BUS;
-            else return FareGroup.OTHER;
+        private final TransferRuleGroup transferRuleGroup;
+
+        /**
+         * No transfer allowance
+         */
+        private BostonTransferAllowance () {
+            super();
+            this.transferRuleGroup = TransferRuleGroup.NONE;
+        }
+
+        /**
+         * Explicitly set a TransferRuleGroup, and use the fare price as the value of the transfer allowance (e.g. in a
+         * pay-the-difference fare system).
+         * @param transferRuleGroup one of the enumerated TransferRuleGroup
+         * @param fare used to set the number of transfers allowed, the validity duration, and the value.
+         * @param startTime clock time when the validity of this transferAllowance starts.  The base constructor is
+         *                  called with this time plus the fare's transfer_duration.
+         */
+        private BostonTransferAllowance (TransferRuleGroup transferRuleGroup, Fare fare, int startTime){
+            super(priceToInt(fare.fare_attribute.price),
+                    fare.fare_attribute.transfers,
+                    startTime + fare.fare_attribute.transfer_duration);
+            this.transferRuleGroup = transferRuleGroup;
+        }
+
+        /**
+         * Determine the TransferRuleGroup from the fare_id.
+         * @param fare used to set the transferRuleGroup, the number of transfers allowed, the validity duration, and
+         *             the value if the value is less than the subway value.
+         * @param startTime clock time when the validity of this transferAllowance starts.
+         */
+        private BostonTransferAllowance(Fare fare, int startTime){
+            super(fare,
+                    priceToInt(Math.min(fares.byId.get(SUBWAY_FARE_ID).fare_attribute.price, fare.fare_attribute.price)),
+                    startTime + fare.fare_attribute.transfer_duration);
+            this.transferRuleGroup = fareGroups.get(fare.fare_id);
+        }
+
+        /**
+         * Create a new transfer allowance if the fare allows it; otherwise return previous transfer allowance.  Note
+         * GTFS uses blank to indicate unlimited transfers, but gtfs-lib updates thi to Integer.MAX_VALUE.
+         */
+        private BostonTransferAllowance updateTransferAllowance(Fare fare, int clockTime){
+            if(fare.fare_attribute.transfers > 0){
+                // if the boarding includes transfer privileges, set the values needed to use them in subsequent
+                // journeyStages
+                return new BostonTransferAllowance(fare, clockTime);
+            } else {
+                if (this.transferRuleGroup == TransferRuleGroup.SUBWAY) {
+                    // if we've gone from subway to a fare that does not allow transfers (e.g. Commuter Rail, Ferry), we
+                    // could still transfer to a bus, but boarding the subway again would require full fare payment.
+                    // This example arises in Boston for travel between Back Bay and South Station.  If you make this
+                    // trip using Orange Line -> Red Line, you have full subway transfer privileges at South Station
+                    // (e.g. to Silver Line 1 behind fare gates or Silver Line 4 on the surface).  But if you make it
+                    // using Commuter Rail, you would need to pay full subway fare again to pass through the fare
+                    // gates to access the SL1, though you'd still have a free transfer to the SL4.
+                    return new BostonTransferAllowance(TransferRuleGroup.OUT_OF_SUBWAY,
+                            fares.byId.get(SUBWAY_FARE_ID),
+                            expirationTime);
+                }
+                //otherwise return the previous transfer privilege.
+                return this;
+            }
+        }
+
+        private BostonTransferAllowance localBusToSubwayTransferAllowance(){
+            Fare fare = fares.byId.get(SUBWAY_FARE_ID);
+            // Expiration time should be from original local bus boarding, not updated
+            int expirationTime = this.expirationTime;
+            return new BostonTransferAllowance(TransferRuleGroup.LOCAL_BUS_TO_SUBWAY, fare, expirationTime);
+        }
+
+        private BostonTransferAllowance checkForSubwayExit(int fromStopIndex, McRaptorSuboptimalPathProfileRouter
+                .McRaptorState state,TransitLayer transitLayer){
+            String fromStation = transitLayer.parentStationIdForStop.get(fromStopIndex);
+            int toStopIndex = state.stop;
+            String toStation = transitLayer.parentStationIdForStop.get(toStopIndex);
+            if (platformsConnected(fromStopIndex, fromStation,toStopIndex, toStation)) {
+                // Have not exited subway through fare gates; maintain transfer privilege
+                return this;
+            } else {
+                // exited subway through fare gates; value can still be used for transfers to bus, but a subsequent
+                // subway boarding requires payment of full subway fare.
+                Fare fare = fares.byId.get(SUBWAY_FARE_ID);
+                // Expiration time should be from original transfer allowance, not updated
+                int expirationTime = this.expirationTime;
+                return new BostonTransferAllowance(TransferRuleGroup.OUT_OF_SUBWAY, fare, expirationTime);
+            }
+        }
+
         @Override
         public boolean atLeastAsGoodForAllFutureRedemptions(TransferAllowance other) {
             return super.atLeastAsGoodForAllFutureRedemptions(other) &&
@@ -152,9 +208,18 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     // All routes with route_type 2 use the same Commuter Rail system of zones except FIXME CapeFlyer and Foxboro
     private static String getRouteId(RouteInfo route) {return route.route_type == 2 ? null : route.route_id;}
 
-    private static boolean isFreeTransferCandidate(String previousFareId, String fareId){
-        return (SUBWAY.equals(previousFareId) || SL_AIRPORT.equals(previousFareId)) &&
-                (SUBWAY.equals(fareId) || SL_AIRPORT.equals(fareId));
+    private static boolean servicesConnectedBehindFareGates(TransferRuleGroup issuing, TransferRuleGroup receiving){
+        return ((issuing == TransferRuleGroup.SUBWAY || issuing == TransferRuleGroup.SL_AIRPORT) &&
+                (receiving == TransferRuleGroup.SUBWAY || receiving == TransferRuleGroup.SL_AIRPORT));
+    }
+
+    private static boolean platformsConnected(int fromStopIndex, String fromStation, int toStopIndex, String toStation){
+        return (fromStopIndex == toStopIndex ||
+                (fromStation != null && fromStation.equals(toStation) &&
+                        // e.g. Copley has same parent station, but no behind-the-gate transfers between platforms
+                        !stationsWithoutBehindGateTransfers.contains(toStation)) ||
+                // e.g. Park Street and Downtown Crossing are connected by the Winter Street Concourse
+                stationsConnected.contains(new HashSet<>(Arrays.asList(fromStation, toStation))));
     }
 
     @Override
@@ -198,24 +263,30 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             state = state.back;
         }
 
-        // reverse data about the journey stages so we can step forward through them
+        // reverse data about the rides so we can step forward through them
         patterns.reverse();
         alightStops.reverse();
         boardStops.reverse();
         times.reverse();
 
-        for (int journeyStage = 0; journeyStage < patterns.size(); journeyStage ++) {
-            int pattern = patterns.get(journeyStage);
+        int alightStopIndex = 0;
+
+        for (int ride = 0; ride < patterns.size(); ride ++) {
+            int pattern = patterns.get(ride);
             RouteInfo route = transitLayer.routes.get(transitLayer.tripPatterns.get(pattern).routeIndex);
-            int boardStopIndex = boardStops.get(journeyStage);
+
+            // board stop for this ride
+            int boardStopIndex = boardStops.get(ride);
             String boardStation = transitLayer.parentStationIdForStop.get(boardStopIndex);
             String boardStopZoneId = transitLayer.fareZoneForStop.get(boardStopIndex);
 
-            int alightStopIndex = alightStops.get(journeyStage);
+            // alight stop for this ride
+            alightStopIndex = alightStops.get(ride);
             String alightStopZoneId = transitLayer.fareZoneForStop.get(alightStopIndex);
 
-            int clockTime = times.get(journeyStage);
+            int clockTime = times.get(ride);
 
+            // used for logging
             routeNames.add(route.route_short_name != null && !route.route_short_name.isEmpty() ?
                     route.route_short_name : route.route_long_name);
 
@@ -224,64 +295,59 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             Fare fare = fares.getFareOrDefault(routeId, boardStopZoneId, alightStopZoneId);
 
             // Check for transferValue expiration
-            if (transferAllowance.hasExpiredAt(times.get(journeyStage))) transferAllowance = noTransferAllowance;
+            if (transferAllowance.hasExpiredAt(times.get(ride))) transferAllowance = noTransferAllowance;
 
             if (fare == null) {
                 throw new IllegalArgumentException("FARE IS NULL");
             }
 
-            if (isFreeTransferCandidate(transferAllowance.fareId, fare.fare_id)) {
-                int previousAlightStopIndex = alightStops.get(journeyStage - 1);
-                String previousAlightStation = transitLayer.fareZoneForStop.get(previousAlightStopIndex);
-                // and if the previous alighting stop and this boarding stop are connected behind fare
-                // gates, continue to the next journeyStage.
-                if (previousAlightStopIndex == boardStopIndex ||
-                        (previousAlightStation != null && previousAlightStation.equals(boardStation) &&
-                                // e.g. Copley has same parent station, but no behind-the-gate transfers between platforms
-                                !stationsWithoutBehindGateTransfers.contains(boardStation)) ||
-                        // e.g. Park Street and Downtown Crossing are connected by the Winter Street Concourse
-                        stationsConnected.contains(new HashSet<>(Arrays.asList(previousAlightStation, boardStation))))
-                continue;
+            TransferRuleGroup issuing = transferAllowance.transferRuleGroup;
+            TransferRuleGroup receiving = fareGroups.get(fare.fare_id);
+
+            if (servicesConnectedBehindFareGates(issuing, receiving)) {
+                int fromStopIndex = alightStops.get(ride - 1);
+                String fromStation = transitLayer.parentStationIdForStop.get(fromStopIndex);
+                // if the previous alighting stop and this boarding stop are connected behind fare
+                // gates, continue to the next ride.
+                if (platformsConnected(fromStopIndex, fromStation, boardStopIndex, boardStation)) continue;
             }
 
-            boolean tryToRedeemTransfer = transferEligibleSequences.contains(
-                    Arrays.asList(fareGroups.get(transferAllowance.fareId), fareGroups.get(fare.fare_id)))
-                    && transferAllowance.value > 0
-                    && transferAllowance.number != 0; // Negative values signal special cases
+            boolean tryToRedeemTransfer =
+                    transferEligibleSequencePairs.contains(Arrays.asList(issuing, receiving)) &&
+                    transferAllowance.value > 0 &&
+                    transferAllowance.number > 0;
 
-            // If the fare for this boarding accepts transfers and transferValue is available, attempt to use it.
+            // If the fare for this boarding accepts transfers and transfer value is available, attempt to use it.
             if (tryToRedeemTransfer) {
 
                 // Handle special cases first
-                if (transferAllowance.number < 0){
-                    if (transferAllowance.number == -1) { // route prefix is (local bus -> subway)
-                        if (LOCAL_BUS.equals(fare.fare_id)){ // local bus -> subway -> bus special case
-                            //Don't increment cumulativeFarePaid, just clear transferAllowance.
-                            transferAllowance = noTransferAllowance;
-                            continue;
-                        } else { // (local bus -> subway -> anything other than local bus) requires full fare on
-                            // third boarding
-                            cumulativeFarePaid += payFullFare(fare);
-                            transferAllowance = transferAllowance.updateTransferAllowance(fare, clockTime);
-                            continue;
-                        }
-                    } else {
-                        throw new UnsupportedOperationException("Negative transfer allowance!");
+                // Special case: transfer is local bus -> subway
+                if (issuing == TransferRuleGroup.LOCAL_BUS && receiving == TransferRuleGroup.SUBWAY) {
+                    // pay difference and set special transfer allowance
+                    cumulativeFarePaid += transferAllowance.payDifference(priceToInt(fare.fare_attribute.price));
+                    transferAllowance = transferAllowance.localBusToSubwayTransferAllowance();
+                    continue;
+                }
+
+                // Special case: route prefix is (local bus -> subway)
+                if (issuing == TransferRuleGroup.LOCAL_BUS_TO_SUBWAY){
+                    // local bus -> subway -> bus special case
+                    if (receiving == TransferRuleGroup.LOCAL_BUS) {
+                        //Don't increment cumulativeFarePaid, just clear transferAllowance.
+                        transferAllowance = noTransferAllowance;
+                        continue;
+                    } else { // (local bus -> subway -> anything other than local bus) requires full fare on third
+                        // boarding
+                        cumulativeFarePaid += payFullFare(fare);
+                        transferAllowance = transferAllowance.updateTransferAllowance(fare, clockTime);
+                        continue;
                     }
                 }
 
-                 if (LOCAL_BUS.equals(fareGroups.get(transferAllowance.fareId)) && SUBWAY.equals(fareGroups.get(fare
-                         .fare_id))) { // local bus -> subway
-                        cumulativeFarePaid += transferAllowance.payDifference(priceToInt(fare.fare_attribute
-                                .price));
-                        transferAllowance = transferAllowance.localBusToSubwayTransferAllowance(clockTime);
-                        continue;
-                    }
-
-                // If we are not facing one of the special cases above, redeem the transfer.
+                // If we are not facing one of the special cases above, and redeem the transfer, exhausting its value;
                 cumulativeFarePaid += transferAllowance.payDifference(priceToInt(fare.fare_attribute.price));
                 transferAllowance = noTransferAllowance;
-            } else { // don't try to use transferValue; pay the full fare for this journeyStage
+            } else { // don't try to use transferValue; pay the full fare for this ride
                 cumulativeFarePaid += payFullFare(fare);
                 transferAllowance = transferAllowance.updateTransferAllowance(fare, clockTime);
             }
@@ -292,6 +358,12 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         //if (logRandomizer.nextInt(1000000) == 42) {
           //  LOG.info("Fare for {}: ${}", String.join(" -> ", routeNames), String.format("%.2f", cumulativeFarePaid / 100D));
         //}
+
+        if (transferAllowance.transferRuleGroup == TransferRuleGroup.SUBWAY){
+            // Check for out-of-subway transfers before returning the transfer allowance. We want to return the
+            // correct transfer allowance given the next boarding stop, even though we don't know the next ride.
+            transferAllowance = transferAllowance.checkForSubwayExit(alightStopIndex, state, transitLayer);
+        }
 
         return new FareBounds(cumulativeFarePaid, transferAllowance.tightenExpiration(maxClockTime));
     }
@@ -304,12 +376,12 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     private static class FareSystemWrapper{
         public RouteBasedFareRules fares;
 
-        public FareSystemWrapper(RouteBasedFareRules fares) {
+        private FareSystemWrapper(RouteBasedFareRules fares) {
             this.fares = fares;
         }
     }
 
-    public static FareSystemWrapper loadFaresFromGTFS(TransitLayer transitLayer){
+    private static FareSystemWrapper loadFaresFromGTFS(TransitLayer transitLayer){
         RouteBasedFareRules fares = new RouteBasedFareRules();
         // iterate through fares to record rules
         for (Fare fare : transitLayer.fares.values()){

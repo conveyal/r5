@@ -16,65 +16,45 @@ with information about the potential value of future transfer allowances.  A sta
  //TODO explain why fields are final.
  */
 public class TransferAllowance {
-    public final String fareId;
+
+    /**
+    In the paper, value is referred to as "maximum transfer allowance" to emphasize that not all the value of the
+     transfer allowance may be realized.
+     */
     public final int value;
     public final int number;
     public final int expirationTime;
-    public final Set<String> redemptionRestrictedTo; // null --> all eligible transfer sequences
 
     /**
      * Constructor used for no transfer allowance
       */
     public TransferAllowance(){
-        this.fareId = null;
         this.value = 0;
         this.number = 0;
         this.expirationTime = 0;
-        this.redemptionRestrictedTo = null;
     }
 
     /**
      * @param fare GTFS fare used to describe where this allowance was obtained and set a limit on the number of
      *             subsequent transfers and duration of validity
      * @param value Value (e.g. USD converted to cents)
-     * @param startTime clock time at which the allowance was obtained
-     */
-    public TransferAllowance(Fare fare, int value, int startTime) {
-        this.fareId = fare.fare_id;
-        this.value = value;
-        this.number = fare.fare_attribute.transfers;
-        this.expirationTime = startTime + fare.fare_attribute.transfer_duration;
-        this.redemptionRestrictedTo = null;
-    }
-    /**
-     * @param fareId The fare by which this allowance was obtained
-     * @param value Value (e.g. USD converted to cents)
-     * @param number Number of transfers for which this value can be redeemed
      * @param expirationTime Clock time at which the value expires
      */
-    public TransferAllowance(String fareId, int value, int number, int expirationTime){
-        this.fareId = fareId;
+    public TransferAllowance(Fare fare, int value, int expirationTime) {
         this.value = value;
-        this.number = number;
+        this.number = fare.fare_attribute.transfers;
         this.expirationTime = expirationTime;
-        this.redemptionRestrictedTo = null;
     }
 
     /**
-     * @param fareId The fare by which this allowance was obtained
      * @param value Value (e.g. USD converted to cents)
      * @param number Number of transfers for which this value can be redeemed
      * @param expirationTime Clock time at which the value expires
-     * @param redemptionRestrictedTo Set of services (e.g. route_id, route_type, agency_id, etc.) that will accept
-     *                               this transfer allowance.
      */
-    public TransferAllowance(String fareId, int value, int number, int expirationTime, Set<String>
-            redemptionRestrictedTo){
-        this.fareId = fareId;
+    public TransferAllowance(int value, int number, int expirationTime){
         this.value = value;
         this.number = number;
         this.expirationTime = expirationTime;
-        this.redemptionRestrictedTo = redemptionRestrictedTo;
     }
 
     public boolean hasExpiredAt(int otherTime){

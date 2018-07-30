@@ -195,7 +195,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             patterns.add(state.pattern);
             alightStops.add(state.stop);
             boardStops.add(transitLayer.tripPatterns.get(state.pattern).stops[state.boardStopPosition]);
-            times.add(state.time);
+            times.add(state.boardTime);
             state = state.back;
         }
 

@@ -147,7 +147,7 @@ public class McRaptorSuboptimalPathProfileRouter {
             // enqueue/relax access times, which are seconds of travel time (not clock time) by mode from the origin
             // to nearby stops
             accessTimes.forEach((mode, times) -> times.forEachEntry((stop, accessTime) -> {
-                if (addState(stop, -1, -1, finalDepartureTime + accessTime, -1, -1, null, mode))
+                if (addState(stop, -1, -1, finalDepartureTime + accessTime, -1, -1, -1, null, mode))
                     touchedStops.set(stop);
 
                 return true;
@@ -310,18 +310,20 @@ public class McRaptorSuboptimalPathProfileRouter {
                     int tripIndexInPattern = tripIndicesInPattern.get(state);
                     TripSchedule sched = pattern.tripSchedules.get(tripIndexInPattern);
                     int boardStopPosition = boardStopPositionInPattern.get(state);
-
-                    int arrival;
+                    int arrival, boardTime;
 
                     // we know we have no mixed schedule/frequency patterns, see check on boarding
                     if (sched.headwaySeconds != null) {
                         int travelTimeToStop = sched.arrivals[stopPositionInPattern] - sched.departures[boardStopPosition];
-                        arrival = boardTimeForFrequencyTrips.get(state) + travelTimeToStop;
+                        boardTime = boardTimeForFrequencyTrips.get(state);
+                        arrival = boardTime + travelTimeToStop;
                     } else {
                         arrival = sched.arrivals[stopPositionInPattern];
+                        boardTime = sched.departures[boardStopPosition];
                     }
 
-                    if (addState(stop, boardStopPosition, stopPositionInPattern, arrival, patIdx, tripIndexInPattern, state))
+                    if (addState(stop, boardStopPosition, stopPositionInPattern, arrival, boardTime, patIdx,
+                            tripIndexInPattern, state))
                         touchedStops.set(stop);
                 }
 
@@ -448,7 +450,7 @@ public class McRaptorSuboptimalPathProfileRouter {
                     int toStop = transfers.get(transfer);
                     int distanceMillimeters = transfers.get(transfer + 1);
                     int walkTimeSeconds = (int)(distanceMillimeters / walkSpeedMillimetersPerSecond);
-                    if (addState(toStop, -1, -1, state.time + walkTimeSeconds, -1, -1, state)) {
+                    if (addState(toStop, -1, -1, state.time + walkTimeSeconds, -1, -1, -1, state)) {
                         String to = network.transitLayer.stopNames.get(transfers.get(transfer));
                         //LOG.info("Transfer from {} to {} is optimal", from, to);
 
@@ -553,13 +555,16 @@ public class McRaptorSuboptimalPathProfileRouter {
         this.touchedStops.clear();
     }
 
-    private boolean addState (int stop, int boardStopPosition, int alightStopPosition, int time, int pattern, int trip, McRaptorState back) {
-        return addState(stop, boardStopPosition, alightStopPosition, time, pattern, trip, back, back.accessMode);
+    private boolean addState (int stop, int boardStopPosition, int alightStopPosition, int time, int boardTime, int
+            pattern, int trip, McRaptorState back) {
+        return addState(stop, boardStopPosition, alightStopPosition, time, boardTime, pattern, trip, back, back
+                .accessMode);
     }
 
 
         /** Add a state */
-    private boolean addState (int stop, int boardStopPosition, int alightStopPosition, int time, int pattern, int trip, McRaptorState back, LegMode accessMode) {
+    private boolean addState (int stop, int boardStopPosition, int alightStopPosition, int time, int boardTime, int
+            pattern, int trip, McRaptorState back, LegMode accessMode) {
         /**
          * local pruning, and cutting off of excessively long searches
          * NB need to have cutoff be relative to toTime because otherwise when we do range-RAPTOR we'll have left over states
@@ -581,6 +586,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         state.boardStopPosition = boardStopPosition;
         state.alightStopPosition = alightStopPosition;
         state.time = time;
+        state.boardTime = boardTime;
         state.pattern = pattern;
         state.trip = trip;
         state.back = back;
@@ -643,6 +649,9 @@ public class McRaptorSuboptimalPathProfileRouter {
 
         /** What is the clock time of this state (seconds since midnight) */
         public int time;
+
+        /** Board time of ride used to reach this stop */
+        public int boardTime;
 
         /** On what pattern did we reach this stop (-1 indicates this is the result of a transfer) */
         public int pattern;

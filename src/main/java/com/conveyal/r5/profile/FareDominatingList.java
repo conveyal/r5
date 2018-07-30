@@ -42,7 +42,7 @@ public class FareDominatingList implements DominatingList {
             // other transfer allowance (exact definition depends on the system, see javadoc), then there is no way that
             // dominatee could yield a better fare than dominator.
             if (dominator.fare.cumulativeFarePaid <= dominatee.fare.cumulativeFarePaid &&
-                    dominator.fare.transferAllowance.isAsGoodAsOrBetterThanForAllPossibleFutureTrips(dominatee.fare.transferAllowance)) {
+                    dominator.fare.transferAllowance.atLeastAsGoodForAllFutureRedemptions(dominatee.fare.transferAllowance)) {
                 return true;
             }
         }

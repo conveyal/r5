@@ -105,11 +105,6 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             return new BostonTransferAllowance(fareId, value, -1, expirationTime, redeemableOnModes);
         }
 
-        @Override
-        public boolean isAsGoodAsOrBetterThanForAllPossibleFutureTrips (TransferAllowance other) {
-            return super.isAsGoodAsOrBetterThanForAllPossibleFutureTrips(other) &&
-                    this.getTransferPrivilegeSource().equals(((BostonTransferAllowance) other).getTransferPrivilegeSource());
-
         }
 
         /**
@@ -139,6 +134,10 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             else if (SUBWAY.equals(this.fareId)) return FareGroup.SUBWAY;
             else if (LOCAL_BUS.equals(this.fareId)) return FareGroup.LOCAL_BUS;
             else return FareGroup.OTHER;
+        @Override
+        public boolean atLeastAsGoodForAllFutureRedemptions(TransferAllowance other) {
+            return super.atLeastAsGoodForAllFutureRedemptions(other) &&
+                    this.transferRuleGroup == ((BostonTransferAllowance) other).transferRuleGroup;
         }
 
     }
@@ -294,7 +293,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
           //  LOG.info("Fare for {}: ${}", String.join(" -> ", routeNames), String.format("%.2f", cumulativeFarePaid / 100D));
         //}
 
-        return new FareBounds(cumulativeFarePaid, transferAllowance.clean(maxClockTime));
+        return new FareBounds(cumulativeFarePaid, transferAllowance.tightenExpiration(maxClockTime));
     }
 
     @Override

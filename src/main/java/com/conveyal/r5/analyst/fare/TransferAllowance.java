@@ -85,12 +85,10 @@ public class TransferAllowance {
         return Math.max(0, grossFare - value);
     }
 
-    public TransferAllowance clean(int maxClockTime){
-        int valueLimit = Math.max(0, this.value);
-        int numberLimit = Math.max(0, this.number);
+    public TransferAllowance tightenExpiration(int maxClockTime){
         // cap expiration time of transfer at max clock time of search, so that transfer slips that technically have more time
         // remaining, but that time cannot be used within the constraints of this search, can be pruned.
-        return new TransferAllowance(this.fareId, valueLimit, numberLimit, Math.min(this.expirationTime, maxClockTime));
+        return new TransferAllowance(this.value, this.number, Math.min(this.expirationTime, maxClockTime));
 
     }
 
@@ -110,7 +108,7 @@ public class TransferAllowance {
      * express bus can be applied to only local bus or subway. So the values of those three types of transfers are not
      * comparable.
      */
-    public boolean isAsGoodAsOrBetterThanForAllPossibleFutureTrips (TransferAllowance other){
+    public boolean atLeastAsGoodForAllFutureRedemptions(TransferAllowance other){
         return value >= other.value && expirationTime >= other.expirationTime && number >= other.number;
     }
 

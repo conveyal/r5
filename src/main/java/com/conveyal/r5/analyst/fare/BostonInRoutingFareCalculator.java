@@ -23,6 +23,8 @@ import java.util.WeakHashMap;
  * Fare calculator for the MBTA, assuming use of CharlieCard where accepted
  */
 public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
+    /** If true, log a random 1e-6 sample of fares for spot checking */
+    public static final boolean LOG_FARES = true;
 
     private static final WeakHashMap<TransitLayer, FareSystemWrapper> fareSystemCache = new WeakHashMap<>();
     private RouteBasedFareRules fares;
@@ -67,7 +69,8 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
 
     // Logging to facilitate debugging
     private static final Logger LOG = LoggerFactory.getLogger(BostonInRoutingFareCalculator.class);
-    private MersenneTwister logRandomizer = new MersenneTwister();
+
+    private MersenneTwister logRandomizer = LOG_FARES ? new MersenneTwister() : null;
 
     /**
      * There are a few reasons we need to extend the base TransferAllowance class for the MBTA:
@@ -140,7 +143,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
 
         /**
          * Create a new transfer allowance if the fare allows it; otherwise return previous transfer allowance.  Note
-         * GTFS uses blank to indicate unlimited transfers, but gtfs-lib updates thi to Integer.MAX_VALUE.
+         * GTFS uses blank to indicate unlimited transfers, but gtfs-lib updates this to Integer.MAX_VALUE.
          */
         private BostonTransferAllowance updateTransferAllowance(Fare fare, int clockTime){
             if(fare.fare_attribute.transfers > 0){
@@ -148,6 +151,9 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
                 // journeyStages
                 return new BostonTransferAllowance(fare, clockTime);
             } else {
+                // We have boarded a service that does not provide a transfer allowance, preserve the previous transfer
+                // allowance UNLESS we are coming from the subway, in which case any other service will require the user to
+                // leave the paid area.
                 if (this.transferRuleGroup == TransferRuleGroup.SUBWAY) {
                     // if we've gone from subway to a fare that does not allow transfers (e.g. Commuter Rail, Ferry), we
                     // could still transfer to a bus, but boarding the subway again would require full fare payment.
@@ -173,11 +179,11 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         }
 
         private BostonTransferAllowance checkForSubwayExit(int fromStopIndex, McRaptorSuboptimalPathProfileRouter
-                .McRaptorState state,TransitLayer transitLayer){
+                .McRaptorState state, TransitLayer transitLayer){
             String fromStation = transitLayer.parentStationIdForStop.get(fromStopIndex);
             int toStopIndex = state.stop;
             String toStation = transitLayer.parentStationIdForStop.get(toStopIndex);
-            if (platformsConnected(fromStopIndex, fromStation,toStopIndex, toStation)) {
+            if (platformsConnected(fromStopIndex, fromStation, toStopIndex, toStation)) {
                 // Have not exited subway through fare gates; maintain transfer privilege
                 return this;
             } else {
@@ -208,16 +214,22 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     // All routes with route_type 2 use the same Commuter Rail system of zones except FIXME CapeFlyer and Foxboro
     private static String getRouteId(RouteInfo route) {return route.route_type == 2 ? null : route.route_id;}
 
+    /** Is it possibly possible that these services are connected behind the fare gates (i.e. is there anywhere in the system
+     * where both services share a station and can be transferred between without leaving the paid area).
+     */
     private static boolean servicesConnectedBehindFareGates(TransferRuleGroup issuing, TransferRuleGroup receiving){
         return ((issuing == TransferRuleGroup.SUBWAY || issuing == TransferRuleGroup.SL_AIRPORT) &&
                 (receiving == TransferRuleGroup.SUBWAY || receiving == TransferRuleGroup.SL_AIRPORT));
     }
 
     private static boolean platformsConnected(int fromStopIndex, String fromStation, int toStopIndex, String toStation){
-        return (fromStopIndex == toStopIndex ||
+        return (fromStopIndex == toStopIndex ||  // same platform
+
+                // different platforms, same station, in stations with behind-gate transfers between platforms
                 (fromStation != null && fromStation.equals(toStation) &&
                         // e.g. Copley has same parent station, but no behind-the-gate transfers between platforms
                         !stationsWithoutBehindGateTransfers.contains(toStation)) ||
+                // different stations connected behind faregates
                 // e.g. Park Street and Downtown Crossing are connected by the Winter Street Concourse
                 stationsConnected.contains(new HashSet<>(Arrays.asList(fromStation, toStation))));
     }
@@ -243,13 +255,14 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         int cumulativeFarePaid = 0;
         BostonTransferAllowance transferAllowance = noTransferAllowance;
 
-        // Extract relevant data about journey stages
+        // Extract relevant data about rides
         TIntList patterns = new TIntArrayList();
         TIntList boardStops = new TIntArrayList();
         TIntList alightStops = new TIntArrayList();
-        TIntList times = new TIntArrayList();
+        TIntList boardTimes = new TIntArrayList();
 
-        List<String> routeNames = new ArrayList();
+        List<String> routeNames;
+        if (LOG_FARES) routeNames = new ArrayList<>();
 
         while (state != null) {
             if (state.pattern == -1) {
@@ -259,7 +272,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             patterns.add(state.pattern);
             alightStops.add(state.stop);
             boardStops.add(transitLayer.tripPatterns.get(state.pattern).stops[state.boardStopPosition]);
-            times.add(state.boardTime);
+            boardTimes.add(state.boardTime);
             state = state.back;
         }
 
@@ -267,10 +280,11 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         patterns.reverse();
         alightStops.reverse();
         boardStops.reverse();
-        times.reverse();
+        boardTimes.reverse();
 
-        int alightStopIndex = 0;
+        int alightStopIndex = -1;
 
+        // Loop over rides to get to the state in forward-chronological order
         for (int ride = 0; ride < patterns.size(); ride ++) {
             int pattern = patterns.get(ride);
             RouteInfo route = transitLayer.routes.get(transitLayer.tripPatterns.get(pattern).routeIndex);
@@ -284,84 +298,92 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
             alightStopIndex = alightStops.get(ride);
             String alightStopZoneId = transitLayer.fareZoneForStop.get(alightStopIndex);
 
-            int clockTime = times.get(ride);
+            int boardClockTime = boardTimes.get(ride);
 
             // used for logging
-            routeNames.add(route.route_short_name != null && !route.route_short_name.isEmpty() ?
+            if (LOG_FARES) routeNames.add(route.route_short_name != null && !route.route_short_name.isEmpty() ?
                     route.route_short_name : route.route_long_name);
 
             String routeId = getRouteId(route);
 
             Fare fare = fares.getFareOrDefault(routeId, boardStopZoneId, alightStopZoneId);
 
-            // Check for transferValue expiration
-            if (transferAllowance.hasExpiredAt(times.get(ride))) transferAllowance = noTransferAllowance;
-
-            if (fare == null) {
-                throw new IllegalArgumentException("FARE IS NULL");
-            }
-
+            // TransferAllowance is from a past ride (possibly several rides ago, if, say, commuter rail was ridden between
+            // local bus trips.
+            // Issuing may not necessarily be the previous ride. For instance, if you ride local bus -> commuter rail,
+            // your transfer allowance after alighting is still LOCAL_BUS; the CharlieCard system doesn't know you rode commuter
+            // rail versus walked really fast, etc.
             TransferRuleGroup issuing = transferAllowance.transferRuleGroup;
             TransferRuleGroup receiving = fareGroups.get(fare.fare_id);
 
+            // servicesConnectedBehindFareGates contains an implicit bounds check that ride >= 1
             if (servicesConnectedBehindFareGates(issuing, receiving)) {
                 int fromStopIndex = alightStops.get(ride - 1);
                 String fromStation = transitLayer.parentStationIdForStop.get(fromStopIndex);
                 // if the previous alighting stop and this boarding stop are connected behind fare
-                // gates, continue to the next ride.
+                // gates (and without riding a vehicle!), continue to the next ride. There is no CharlieCard tap
+                // and thus for fare purposes these are a single ride.
                 if (platformsConnected(fromStopIndex, fromStation, boardStopIndex, boardStation)) continue;
             }
 
+            // Check for transferValue expiration
+            // This is not done on behind-faregate transfers because once you're in the subway, you don't tap your
+            // CharlieCard again, so, if you so desire, you can ride forever 'neath the streets of Boston (or at least
+            // until system closing).
+            if (transferAllowance.hasExpiredAt(boardTimes.get(ride))) transferAllowance = noTransferAllowance;
+
+            // We are doing a transfer that is not behind faregates, check if we might be able to redeem a transfer
             boolean tryToRedeemTransfer =
                     transferEligibleSequencePairs.contains(Arrays.asList(issuing, receiving)) &&
-                    transferAllowance.value > 0 &&
+                    transferAllowance.value > 0 && // last two checks probably not needed as issuing will be NONE in these cases
                     transferAllowance.number > 0;
 
             // If the fare for this boarding accepts transfers and transfer value is available, attempt to use it.
             if (tryToRedeemTransfer) {
-
                 // Handle special cases first
                 // Special case: transfer is local bus -> subway
                 if (issuing == TransferRuleGroup.LOCAL_BUS && receiving == TransferRuleGroup.SUBWAY) {
                     // pay difference and set special transfer allowance
                     cumulativeFarePaid += transferAllowance.payDifference(priceToInt(fare.fare_attribute.price));
                     transferAllowance = transferAllowance.localBusToSubwayTransferAllowance();
-                    continue;
                 }
-
                 // Special case: route prefix is (local bus -> subway)
-                if (issuing == TransferRuleGroup.LOCAL_BUS_TO_SUBWAY){
+                else if (issuing == TransferRuleGroup.LOCAL_BUS_TO_SUBWAY){
                     // local bus -> subway -> bus special case
                     if (receiving == TransferRuleGroup.LOCAL_BUS) {
-                        //Don't increment cumulativeFarePaid, just clear transferAllowance.
+                        //Don't increment cumulativeFarePaid, just clear transferAllowance. Local bus->subway->local bus is a free transfer.
                         transferAllowance = noTransferAllowance;
-                        continue;
                     } else { // (local bus -> subway -> anything other than local bus) requires full fare on third
                         // boarding
+                        // TODO suspect this is not true but other privileges are undocumented. On the ground verification
+                        // required. For instance, I (MWC) suspect local bus -> subway -> inner express bus costs 1.70 + 0.55 + 1.75 = 4
                         cumulativeFarePaid += payFullFare(fare);
-                        transferAllowance = transferAllowance.updateTransferAllowance(fare, clockTime);
-                        continue;
+                        transferAllowance = transferAllowance.updateTransferAllowance(fare, boardClockTime);
                     }
+                } else {
+                    // If we are not facing one of the special cases above, and redeem the transfer, exhausting its value;
+                    cumulativeFarePaid += transferAllowance.payDifference(priceToInt(fare.fare_attribute.price));
+                    transferAllowance = noTransferAllowance;
                 }
-
-                // If we are not facing one of the special cases above, and redeem the transfer, exhausting its value;
-                cumulativeFarePaid += transferAllowance.payDifference(priceToInt(fare.fare_attribute.price));
-                transferAllowance = noTransferAllowance;
             } else { // don't try to use transferValue; pay the full fare for this ride
                 cumulativeFarePaid += payFullFare(fare);
-                transferAllowance = transferAllowance.updateTransferAllowance(fare, clockTime);
+                transferAllowance = transferAllowance.updateTransferAllowance(fare, boardClockTime);
             }
         }
 
         // warning: reams of log output
-        // only log 1/10000 of the fares
-        //if (logRandomizer.nextInt(1000000) == 42) {
-          //  LOG.info("Fare for {}: ${}", String.join(" -> ", routeNames), String.format("%.2f", cumulativeFarePaid / 100D));
-        //}
+        // only log 1/1000000 of the fares
+        if (LOG_FARES && logRandomizer.nextInt(1000000) == 42) {
+            LOG.info("Fare for {}: ${}", String.join(" -> ", routeNames), String.format("%.2f", cumulativeFarePaid / 100D));
+        }
 
+        // Check for out-of-subway transfers before returning the transfer allowance. We want to return the
+        // correct transfer allowance given the next boarding stop, even though we don't know the next ride.
+        // If state is the result of an "on-street transfer" (excluding platform-to-platform within stations where
+        // platforms are connected) to another subway stop, we do not know the next ride, but know that it cannot be a
+        // free boarding to the subway. MBTA doesn't have designated free transfer stops, although it would be a good
+        // idea e.g. between the platforms of Copley, Charles/MGH and Bowdoin, or Cleveland Circle and Reservoir.
         if (transferAllowance.transferRuleGroup == TransferRuleGroup.SUBWAY){
-            // Check for out-of-subway transfers before returning the transfer allowance. We want to return the
-            // correct transfer allowance given the next boarding stop, even though we don't know the next ride.
             transferAllowance = transferAllowance.checkForSubwayExit(alightStopIndex, state, transitLayer);
         }
 

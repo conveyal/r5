@@ -20,11 +20,12 @@ import java.util.Set;
 import java.util.WeakHashMap;
 
 /**
- * Fare calculator for the MBTA, assuming use of CharlieCard where accepted
+ * Fare calculator for the MBTA, assuming use of CharlieCard where accepted.  For an overview of the logic of
+ * calculateFares(), including numerous MBTA special cases, see https://files.indicatrix.org/charlie.pdf
  */
 public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     /** If true, log a random 1e-6 sample of fares for spot checking */
-    public static final boolean LOG_FARES = true;
+    public static final boolean LOG_FARES = false;
 
     private static final WeakHashMap<TransitLayer, FareSystemWrapper> fareSystemCache = new WeakHashMap<>();
     private RouteBasedFareRules fares;
@@ -264,16 +265,17 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
         List<String> routeNames;
         if (LOG_FARES) routeNames = new ArrayList<>();
 
-        while (state != null) {
-            if (state.pattern == -1) {
-                state = state.back;
+        McRaptorSuboptimalPathProfileRouter.McRaptorState stateForTraversal = state;
+        while (stateForTraversal != null) {
+            if (stateForTraversal.pattern == -1) {
+                stateForTraversal = stateForTraversal.back;
                 continue; // on the street, not on transit
             }
-            patterns.add(state.pattern);
-            alightStops.add(state.stop);
-            boardStops.add(transitLayer.tripPatterns.get(state.pattern).stops[state.boardStopPosition]);
-            boardTimes.add(state.boardTime);
-            state = state.back;
+            patterns.add(stateForTraversal.pattern);
+            alightStops.add(stateForTraversal.stop);
+            boardStops.add(transitLayer.tripPatterns.get(stateForTraversal.pattern).stops[stateForTraversal.boardStopPosition]);
+            boardTimes.add(stateForTraversal.boardTime);
+            stateForTraversal = stateForTraversal.back;
         }
 
         // reverse data about the rides so we can step forward through them

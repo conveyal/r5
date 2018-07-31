@@ -67,6 +67,7 @@ public class McRaptorSuboptimalPathProfileRouter {
     private BitSet servicesActive;
     // Used in creating the McRaptorStateBag; the type of list supplied determines the domination rules. Receives the departure time as an argument.
     private IntFunction<DominatingList> listSupplier;
+    private MersenneTwister mersenneTwister;
 
     /** In order to properly do target pruning we store the best times at each target _by access mode_, so car trips don't quash walk trips */
     private TObjectIntMap<LegMode> bestTimesAtTargetByAccessMode = new TObjectIntHashMap<>(4, 0.95f, Integer.MAX_VALUE);
@@ -85,6 +86,10 @@ public class McRaptorSuboptimalPathProfileRouter {
         this.patternsNearDestination = new BitSet(network.transitLayer.tripPatterns.size());
         this.servicesActive = network.transitLayer.getActiveServicesForDate(req.date);
         this.offsets = new FrequencyRandomOffsets(network.transitLayer);
+        // To make results repeatable from one run to the next, seed with some characteristic of the request itself,
+        // e.g. (int) (request.fromLat * 1e9).  Leaving out an argument will make it use a combination of time and
+        // the instance's identity hash code, which makes it truly random for all practical purposes.
+        this.mersenneTwister = new MersenneTwister((int) (request.fromLat * 1e9));
     }
 
     /** Get a McRAPTOR state bag for every departure minute */
@@ -127,8 +132,11 @@ public class McRaptorSuboptimalPathProfileRouter {
         }
 
 
-        // TODO repeat until exact number of samples requested is generated.
-        ArrayList<Integer> departureTimes = generateDepartureTimesToSample(request);
+        ArrayList<Integer> departureTimes = new ArrayList<>();
+
+        while(departureTimes.size() != request.monteCarloDraws){
+            departureTimes = generateDepartureTimesToSample(request);
+        }
 
         for (int n = 0; n < departureTimes.size(); n++) {
             departureTime = departureTimes.get(n);
@@ -492,26 +500,21 @@ public class McRaptorSuboptimalPathProfileRouter {
     }
 
     private ArrayList<Integer> generateDepartureTimesToSample (ProfileRequest request) {
-        //TODO take step first, so first time sampled isn't always the start of the time window.
         // See Owen and Jiang 2016 (unfortunately no longer available online), add between f / 2 and
         // f + f / 2, where f is the mean step.
         int randomWalkStepMean = (request.toTime - request.fromTime) / request.monteCarloDraws;
         int randomWalkStepWidthOneSided = randomWalkStepMean / 2;
 
-        // This random number generator will be seeded with a combination of time and the instance's identity hash code.
-        // This makes it truly random for all practical purposes. To make results repeatable from one run to the next,
-        // seed with some characteristic of the request itself, e.g. (int) (request.fromLat * 1e9)
-        MersenneTwister mersenneTwister = new MersenneTwister((int) (request.fromLat * 1e9));
-
         ArrayList<Integer> departureTimes = new ArrayList<>();
 
-        for (int departureTime = request.fromTime;
+        for (int departureTime = request.fromTime + mersenneTwister.nextInt(randomWalkStepMean);
              departureTime < request.toTime;
              departureTime += mersenneTwister.nextInt(randomWalkStepMean) + randomWalkStepWidthOneSided) {
-             departureTimes.add(departureTime);
+            departureTimes.add(departureTime);
         }
 
         return departureTimes;
+
     }
 
     private void collateTravelTimes(int departureTime) {

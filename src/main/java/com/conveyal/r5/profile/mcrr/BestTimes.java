@@ -78,15 +78,12 @@ final class BestTimes {
         return new BitSetIterator(reachedCurrentRound);
     }
 
-    final int[] copyOfTimes() {
-        return Arrays.copyOf(times, times.length);
-    }
-
     final void gotoNextRound() {
         BitSet tmp = reachedLastRound;
         reachedLastRound = reachedCurrentRound;
         reachedCurrentRound = tmp;
         reachedCurrentRound.clear();
+
         for (int i = 0; i < times.length; i++) {
             timesLastRound[i] = times[i];
 

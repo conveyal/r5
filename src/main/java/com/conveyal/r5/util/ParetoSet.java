@@ -77,6 +77,10 @@ public class ParetoSet<T extends ParetoSortable> {
         return Domainace.Equal;
     }
 
+    public int size() {
+        return paretoSet.size();
+    }
+
     enum Domainace {
         LeftDominatesRight,
         RightDominatesLeft,

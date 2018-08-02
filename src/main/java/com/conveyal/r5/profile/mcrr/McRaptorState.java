@@ -34,7 +34,7 @@ public final class McRaptorState {
      */
     public static final int UNREACHED = Integer.MAX_VALUE;
 
-    public static final int NOT_SET = -1;
+    static final int NOT_SET = -1;
 
     private final StopStateFlyWeight state;
     private final int nRounds;
@@ -98,16 +98,12 @@ public final class McRaptorState {
         return moreRoundsToGo && isCurrentRoundUpdated();
     }
 
-    private boolean isCurrentRoundUpdated() {
-        return !(bestOveral.isCurrentRoundEmpty() && bestTransit.isCurrentRoundEmpty());
-    }
-
     /**
      * This method search the stop from roundMax and back to round 1 to find
      * the last round with a transit time set. This is sufficient for finding the
      * best time, since the state is only recorded iff it is faster then previous rounds.
      */
-    public void findLastRoundWithTransitTimeSet(int stop) {
+    void findLastRoundWithTransitTimeSet(int stop) {
         round = roundMax;
 
         while (round > 0 && !stop(stop).isTransitTimeSet()) {
@@ -116,42 +112,30 @@ public final class McRaptorState {
         }
     }
 
-    public boolean isStopReachedByTransit(int stop) {
+    boolean isStopReachedByTransit(int stop) {
         return this.bestTransit.isReached(stop);
     }
 
-    public boolean isStopReachedInLastRound(int stop) {
+    boolean isStopReachedInLastRound(int stop) {
         return bestOveral.isReachedLastRound(stop);
     }
 
-    public BitSetIterator bestStopsTouchedLastRoundIterator() {
+    BitSetIterator bestStopsTouchedLastRoundIterator() {
         return bestOveral.stopsReachedLastRound();
     }
 
-    public BitSetIterator stopsTouchedByTransitLastRoundIterator() {
-        return bestTransit.stopsReachedLastRound();
-    }
-
-    public BitSetIterator stopsTouchedByTransitCurrentRoundIterator() {
+    BitSetIterator stopsTouchedByTransitCurrentRoundIterator() {
         return bestTransit.stopsReachedCurrentRound();
     }
 
-    public int bestTime(int stop) {
-        return bestOveral.time(stop);
-    }
-
-    public int bestTimePreviousRound(int stop) {
+    int bestTimePreviousRound(int stop) {
         // TODO TGR
         //return state.time(stateStopIndex[round-1][stop]);
         return bestOveral.timeLastRound(stop);
     }
 
-    public int bestTransitTime(int stop) {
+    int bestTransitTime(int stop) {
         return bestTransit.time(stop);
-    }
-
-    public int[] bestTransitTimes() {
-        return bestTransit.copyOfTimes();
     }
 
     StopState stop(int stop) {
@@ -164,7 +148,7 @@ public final class McRaptorState {
         return state;
     }
 
-    public void initNewDepatureForMinute(int roundDepartureTime) {
+    void initNewDepatureForMinute(int roundDepartureTime) {
         //this.departureTime = departureTime;
         this.maxTimeLimit = roundDepartureTime + maxDurationSeconds;
         // clear all touched stops to avoid constant reëxploration
@@ -173,7 +157,7 @@ public final class McRaptorState {
         round = 0;
     }
 
-    public void setInitialTime(int stop, int time) {
+    void setInitialTime(int stop, int time) {
         final int stateIndex = findOrCreateStopIndex(stop);
         state.setInitalTime(stateIndex, time);
         bestOveral.setTime(stop, time);
@@ -183,7 +167,7 @@ public final class McRaptorState {
     /**
      * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the transitTime
      */
-    public void transitToStop(int stop, int time, int fromPattern, int boardStop, int tripIndex, int boardTime) {
+    void transitToStop(int stop, int time, int fromPattern, int boardStop, int tripIndex, int boardTime) {
         if (time > maxTimeLimit) {
             return;
         }
@@ -208,7 +192,7 @@ public final class McRaptorState {
     /**
      * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the nonTransferTime
      */
-    public void transferToStop(int stop, int time, int fromStop, int transferTime) {
+    void transferToStop(int stop, int time, int fromStop, int transferTime) {
 
         if (time > maxTimeLimit) {
             return;
@@ -227,7 +211,7 @@ public final class McRaptorState {
         }
     }
 
-    public int getPatternIndexForPreviousRound(int stop) {
+    int getPatternIndexForPreviousRound(int stop) {
         StopState state = stopPreviousRound(stop);
         int previousStop = state.boardStop();
         return previousStop == NOT_SET
@@ -235,17 +219,13 @@ public final class McRaptorState {
                 : stopPreviousRound(previousStop).previousPattern();
     }
 
-    public void debugListedStops(String descr, int round, int stop) {
-        if (DEBUG && debugStops.contains(stop)) debugStop(descr, round, stop);
-    }
-
-    public static void debugStopHeader(String title) {
+    static void debugStopHeader(String title) {
         if(!DEBUG) return;
         System.err.printf("  S %-24s  -------- BEST OVERALL -------   %s%n", title, StopStateFlyWeight.HEADERS[0]);
         System.err.printf("  S %-24s  Rnd  Stop  Time C L Trans C L   %s%n", "", StopStateFlyWeight.HEADERS[1]);
     }
 
-    public void debugStop(String descr, int round, int stop) {
+    void debugStop(String descr, int round, int stop) {
         if(!DEBUG) return;
 
         if(round < 0 || stop < 1) {
@@ -266,14 +246,16 @@ public final class McRaptorState {
 
     /* private methods */
 
+    private boolean isCurrentRoundUpdated() {
+        return !(bestOveral.isCurrentRoundEmpty() && bestTransit.isCurrentRoundEmpty());
+    }
+
+    private void debugListedStops(String descr, int round, int stop) {
+        if (DEBUG && debugStops.contains(stop)) debugStop(descr, round, stop);
+    }
+
     private int stopIndex(int stop) {
-        // TODO TGR  - Remove try/catch when working
-        try {
-            return stateStopIndex[round][stop];
-        }
-        catch (Exception e) {
-            throw new IllegalStateException("State do not exist. Round=" + round + ", Stop=" + stop,  e);
-        }
+        return stateStopIndex[round][stop];
     }
 
     private int findOrCreateStopIndex(int stop) {

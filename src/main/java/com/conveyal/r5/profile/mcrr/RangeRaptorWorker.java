@@ -1,24 +1,15 @@
 package com.conveyal.r5.profile.mcrr;
 
-import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.profile.Path;
-import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.transit.RouteInfo;
-import com.conveyal.r5.transit.TransitLayer;
-import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
 import com.conveyal.r5.util.AvgTimer;
 import gnu.trove.list.TIntList;
-import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
-import java.util.stream.IntStream;
+
 
 /**
  * RaptorWorker is fast, but FastRaptorWorker is knock-your-socks-off fast, and also more maintainable.
@@ -42,11 +33,7 @@ import java.util.stream.IntStream;
  * (generating randomized schedules).
  */
 @SuppressWarnings("Duplicates")
-public class MultiCriteriaRangeRaptorWorker {
-
-    private static final Logger LOG = LoggerFactory.getLogger(MultiCriteriaRangeRaptorWorker.class);
-    private static boolean PRINT_REFILTERING_PATTERNS_INFO = true;
-
+public class RangeRaptorWorker {
     /**
      * Step for departure times. Use caution when changing this as we use the functions
      * request.getTimeWindowLengthMinutes and request.getMonteCarloDrawsPerMinute below which assume this value is 1 minute.
@@ -58,7 +45,9 @@ public class MultiCriteriaRangeRaptorWorker {
     /** Minimum wait for boarding to account for schedule variation */
     private static final int MINIMUM_BOARD_WAIT_SEC = 60;
 
-    public final int nMinutes;
+    private final int nMinutes;
+    private final int toTimeSeconds;
+    private final int fromTimeSeconds;
 
     // Variables to track time spent
     private static final AvgTimer TIMER_ROUTE = AvgTimer.timerMilliSec("McRRaptor:route");
@@ -68,8 +57,8 @@ public class MultiCriteriaRangeRaptorWorker {
     private static final AvgTimer TIMER_BY_MINUTE_SCHEDULE_SEARCH = AvgTimer.timerMicroSec("McRRaptor:runRaptorForMinute Schedule Search");
     private static final AvgTimer TIMER_BY_MINUTE_TRANSFERS = AvgTimer.timerMicroSec("McRRaptor:runRaptorForMinute Transfers");
 
-    /** the transit layer to route on */
-    private final TransitLayer transit;
+    /** the transit data role needed for routing */
+    private final RaptorWorkerTransitDataProvider transit;
 
     /** Times to access each transit stop using the street network (seconds) */
     private final TIntIntMap accessStops;
@@ -77,43 +66,47 @@ public class MultiCriteriaRangeRaptorWorker {
     /** List of all possible egress stops. */
     private final int[] egressStops;
 
-    /** The profilerequest describing routing parameters */
-    private final ProfileRequest request;
-
-    /** Schedule-based trip patterns running on a given day */
-    private TripPattern[] runningScheduledPatterns;
-
-    /** Map from internal, filtered pattern indices back to original pattern indices for scheduled patterns */
-    private int[] originalPatternIndexForScheduledIndex;
-
-    /** Array mapping from original pattern indices to the filtered scheduled indices */
-    private int[] scheduledIndexForOriginalPatternIndex;
-
-    /** Services active on the date of the search */
-    private final BitSet servicesActive;
+    private final int walkSpeedMillimetersPerSecond;
+    private final int maxWalkMillimeters;
 
     // TODO add javadoc to field
-    private final RaptorWorkerState state;
+    private final RangeRaptorWorkerState state;
 
     /** If we're going to store paths to every destination (e.g. for static sites) then they'll be retained here. */
     public List<Path[]> pathsPerIteration;
 
-    private final McPathBuilder pathBuilder;
+    private final PathBuilder pathBuilder;
 
-
-    public MultiCriteriaRangeRaptorWorker(TransitLayer transitLayer, ProfileRequest request, TIntIntMap accessStops, int[] egressStops) {
-        this.transit = transitLayer;
-        this.request = request;
+    public RangeRaptorWorker(
+            RaptorWorkerTransitDataProvider transitData,
+            RangeRaptorWorkerState state,
+            PathBuilder pathBuilder,
+            int fromTimeInSeconds,
+            int toTimeInSeconds,
+            float walkSpeedMPerS,
+            int maxWalkTimeMinutes,
+            TIntIntMap accessStops,
+            int[] egressStops
+    ) {
+        this.transit = transitData;
         this.accessStops = accessStops;
         this.egressStops = egressStops;
-        this.servicesActive  = transit.getActiveServicesForDate(request.date);
 
-        McRaptorStateImpl stateImpl = new McRaptorStateImpl(transit.getStopCount(), request.maxRides + 1, request.maxTripDurationMinutes * 60, request.fromTime);
-        pathBuilder = new McPathBuilder(stateImpl);
-        state = stateImpl.newWorkerState();
+        // Convert to int to avoid integer casts in calculation
+        this.walkSpeedMillimetersPerSecond = (int) (walkSpeedMPerS * 1000);
+        this.maxWalkMillimeters = walkSpeedMillimetersPerSecond * maxWalkTimeMinutes * 60;
 
+        this.pathBuilder = pathBuilder;
+        this.state = state;
+
+        this.toTimeSeconds = toTimeInSeconds;
+        this.fromTimeSeconds = fromTimeInSeconds;
         // compute number of minutes for scheduled search
-        nMinutes = request.getTimeWindowLengthMinutes();
+        this.nMinutes = (toTimeInSeconds - fromTimeInSeconds) / 60;
+    }
+
+    public int nMinutes() {
+        return nMinutes;
     }
 
     /**
@@ -125,14 +118,17 @@ public class MultiCriteriaRangeRaptorWorker {
         //LOG.info("Performing {} rounds (minutes)",  nMinutes);
 
         TIMER_ROUTE.time(() -> {
-            TIMER_ROUTE_SETUP.time(this::prefilterPatterns);
+            TIMER_ROUTE_SETUP.start();
+            transit.init();
+            TIMER_ROUTE_SETUP.stop();
+
 
             pathsPerIteration = new ArrayList<>();
 
 
             // The main outer loop iterates backward over all minutes in the departure times window.
-            for (int departureTime = request.toTime - DEPARTURE_STEP_SEC, minute = nMinutes;
-                 departureTime >= request.fromTime;
+            for (int departureTime = toTimeSeconds - DEPARTURE_STEP_SEC, minute = nMinutes;
+                 departureTime >= fromTimeSeconds;
                  departureTime -= DEPARTURE_STEP_SEC, minute--) {
 
                 int finalDepartureTime = departureTime;
@@ -145,40 +141,6 @@ public class MultiCriteriaRangeRaptorWorker {
                 );
             }
         });
-    }
-
-    /** Prefilter the patterns to only ones that are running */
-    private void prefilterPatterns () {
-        TIntList scheduledPatterns = new TIntArrayList();
-        scheduledIndexForOriginalPatternIndex = new int[transit.tripPatterns.size()];
-        Arrays.fill(scheduledIndexForOriginalPatternIndex, -1);
-
-        int patternIndex = -1; // first increment lands at 0
-        int scheduledIndex = 0;
-
-        for (TripPattern pattern : transit.tripPatterns) {
-            patternIndex++;
-            RouteInfo routeInfo = transit.routes.get(pattern.routeIndex);
-            TransitModes mode = TransitLayer.getTransitModes(routeInfo.route_type);
-            if (pattern.servicesActive.intersects(servicesActive) && request.transitModes.contains(mode)) {
-                // at least one trip on this pattern is relevant, based on the profile request's date and modes
-                if (pattern.hasSchedules) { // NB not else b/c we still support combined frequency and schedule patterns.
-                    scheduledPatterns.add(patternIndex);
-                    scheduledIndexForOriginalPatternIndex[patternIndex] = scheduledIndex++;
-                }
-            }
-        }
-
-        originalPatternIndexForScheduledIndex = scheduledPatterns.toArray();
-
-        runningScheduledPatterns = IntStream.of(originalPatternIndexForScheduledIndex)
-                .mapToObj(transit.tripPatterns::get).toArray(TripPattern[]::new);
-
-        if (PRINT_REFILTERING_PATTERNS_INFO) {
-            LOG.info("Prefiltering patterns based on date active reduced {} patterns to {} scheduled patterns",
-                    transit.tripPatterns.size(), scheduledPatterns.size());
-            PRINT_REFILTERING_PATTERNS_INFO = false;
-        }
     }
 
     /**
@@ -248,18 +210,21 @@ public class MultiCriteriaRangeRaptorWorker {
 
     /** Perform a scheduled search */
     private void doScheduledSearchForRound() {
-        BitSet patternsTouched = getPatternsTouchedForStops(scheduledIndexForOriginalPatternIndex);
 
-        for (int patternIndex = patternsTouched.nextSetBit(0); patternIndex >= 0; patternIndex = patternsTouched.nextSetBit(patternIndex + 1)) {
-            int originalPatternIndex = originalPatternIndexForScheduledIndex[patternIndex];
-            TripPattern pattern = runningScheduledPatterns[patternIndex];
+        BitSet patternsTouched = getPatternsTouchedForStops(transit.getScheduledIndexForOriginalPatternIndex());
+        TransitLayerRRDataProvider.PatternIterator patternIterator = transit.patternIterator(patternsTouched);
+
+
+        while(patternIterator.morePatterns()) {
+            TransitLayerRRDataProvider.Pattern pattern = patternIterator.next();
+            int originalPatternIndex = pattern.originalPatternIndex();
             int onTrip = -1;
             int boardTime = 0;
             int boardStop = -1;
             TripSchedule schedule = null;
 
-            for (int stopPositionInPattern = 0; stopPositionInPattern < pattern.stops.length; stopPositionInPattern++) {
-                int stop = pattern.stops[stopPositionInPattern];
+            for (int stopPositionInPattern = 0; stopPositionInPattern < pattern.currentPatternStopsSize(); stopPositionInPattern++) {
+                int stop = pattern.currentPatternStop(stopPositionInPattern);
 
                 // attempt to alight if we're on board, done above the board search so that we don't check for alighting
                 // when boarding
@@ -270,7 +235,7 @@ public class MultiCriteriaRangeRaptorWorker {
                             stop,
                             alightTime,
                             originalPatternIndex,
-                            pattern.tripSchedules.indexOf(schedule),
+                            pattern.getTripSchedulesIndex(schedule),
                             boardStop,
                             boardTime
                     );
@@ -287,10 +252,10 @@ public class MultiCriteriaRangeRaptorWorker {
                     if (onTrip == -1) {
                         int candidateTripIndex = -1;
                         EARLIEST_TRIP:
-                        for (TripSchedule candidateSchedule : pattern.tripSchedules) {
+                        for (TripSchedule candidateSchedule : pattern.getTripSchedules()) {
                             candidateTripIndex++;
 
-                            if (!servicesActive.get(candidateSchedule.serviceCode) || candidateSchedule.headwaySeconds != null) {
+                            if (transit.skipCalendarService(candidateSchedule.serviceCode) || candidateSchedule.headwaySeconds != null) {
                                 // frequency trip or not running
                                 continue;
                             }
@@ -308,8 +273,8 @@ public class MultiCriteriaRangeRaptorWorker {
                         // check if we can back up to an earlier trip due to this stop being reached earlier
                         int bestTripIdx = onTrip;
                         while (--bestTripIdx >= 0) {
-                            TripSchedule trip = pattern.tripSchedules.get(bestTripIdx);
-                            if (trip.headwaySeconds != null || !servicesActive.get(trip.serviceCode)) {
+                            TripSchedule trip = pattern.getTripSchedule(bestTripIdx);
+                            if (trip.headwaySeconds != null || transit.skipCalendarService(trip.serviceCode)) {
                                 // This is a frequency trip or it is not running on the day of the search.
                                 continue;
                             }
@@ -330,16 +295,13 @@ public class MultiCriteriaRangeRaptorWorker {
     }
 
     private void doTransfers () {
-        // avoid integer casts in tight loop below
-        int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
-        int maxWalkMillimeters = (int) (request.walkSpeed * request.maxWalkTime * 60 * 1000);
 
         BitSetIterator it = state.stopsTouchedByTransitCurrentRoundIterator();
 
         for (int stop = it.next(); stop > -1; stop = it.next()) {
             // no need to consider loop transfers, since we don't mark patterns here any more
             // loop transfers are already included by virtue of those stops having been reached
-            TIntList transfersFromStop = transit.transfersForStop.get(stop);
+            TIntList transfersFromStop = transit.getTransfersDistancesInMMForStop(stop);
 
             if (transfersFromStop != null) {
                 for (int stopIdx = 0; stopIdx < transfersFromStop.size(); stopIdx += 2) {
@@ -366,6 +328,9 @@ public class MultiCriteriaRangeRaptorWorker {
      * Get a list of the internal IDs of the patterns "touched" using the given index (frequency or scheduled)
      * "touched" means they were reached in the last round, and the index maps from the original pattern index to the
      * local index of the filtered patterns.
+     *
+     * TODO TGR - The responsibility of this method overlap with the transit data provider, but it is
+     * TODO TGR - tied to the store, so I leave it for now. Task: Pull it appart and push to data provider.
      */
     private BitSet getPatternsTouchedForStops(int[] index) {
 
@@ -375,7 +340,7 @@ public class MultiCriteriaRangeRaptorWorker {
         for (int stop = it.next(); stop >= 0; stop = it.next()) {
             // copy stop to a new final variable to get around Java 8 "effectively final" nonsense
             final int finalStop = stop;
-            transit.patternsForStop.get(stop).forEach(originalPattern -> {
+            transit.getPatternsForStop(stop).forEach(originalPattern -> {
                 int filteredPattern = index[originalPattern];
 
                 if (filteredPattern < 0) {
@@ -394,7 +359,6 @@ public class MultiCriteriaRangeRaptorWorker {
                 return true; // continue iteration
             });
         }
-
         return patternsTouched;
     }
 }

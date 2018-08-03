@@ -8,7 +8,7 @@ import gnu.trove.list.array.TIntArrayList;
 /**
  * Class used to represent transit paths in Browsochrones and Modeify.
  */
-public class McPathBuilder {
+public class PathBuilder {
     private final McRaptorStateImpl state;
     private final TIntList patterns = new TIntArrayList();
     private final TIntList boardStops = new TIntArrayList();
@@ -20,7 +20,7 @@ public class McPathBuilder {
     private final TIntList trips = new TIntArrayList();
 
 
-    public McPathBuilder(McRaptorStateImpl state) {
+    public PathBuilder(McRaptorStateImpl state) {
         this.state = state;
     }
 

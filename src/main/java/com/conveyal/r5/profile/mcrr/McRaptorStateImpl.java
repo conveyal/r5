@@ -21,7 +21,7 @@ import static com.conveyal.r5.profile.mcrr.StopState.NOT_SET;
  *
  * @author mattwigway
  */
-final class McRaptorStateImpl {
+public final class McRaptorStateImpl {
 
     /**
      * To debug a particular journey set DEBUG to true and add all visited stops in the debugStops list.
@@ -58,7 +58,7 @@ final class McRaptorStateImpl {
 
 
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
-    McRaptorStateImpl(int nStops, int nRounds, int maxDurationSeconds, int earliestDepartureTime) {
+    public McRaptorStateImpl(int nStops, int nRounds, int maxDurationSeconds, int earliestDepartureTime) {
         this.nRounds = nRounds;
         this.state = new StopStateFlyWeight(nStops * 3);
 
@@ -138,8 +138,8 @@ final class McRaptorStateImpl {
      *
      * @return the state innerclass representation of the worker state role.
      */
-    RaptorWorkerState newWorkerState() {
-        return new RaptorWorkerState() {
+    public RangeRaptorWorkerState newWorkerState() {
+        return new RangeRaptorWorkerState() {
             @Override public void gotoNextRound () {
                 bestOveral.gotoNextRound();
                 bestTransit.gotoNextRound();

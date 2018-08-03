@@ -15,7 +15,7 @@ package com.conveyal.r5.profile.mcrr;
  * TODO {@link #bestStopsTouchedLastRoundIterator()} is probebly not nessessary, because we allways alter beetween
  * TODO these.
  */
-public interface RaptorWorkerState {
+public interface RangeRaptorWorkerState {
 
     void initNewDepatureForMinute(int nextMinuteDepartureTime);
 

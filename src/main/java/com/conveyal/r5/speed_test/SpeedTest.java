@@ -7,8 +7,12 @@ import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.SearchAlgorithm;
 import com.conveyal.r5.profile.StreetPath;
-import com.conveyal.r5.profile.mcrr.MultiCriteriaRangeRaptorWorker;
+import com.conveyal.r5.profile.mcrr.PathBuilder;
+import com.conveyal.r5.profile.mcrr.McRaptorStateImpl;
+import com.conveyal.r5.profile.mcrr.RangeRaptorWorker;
 import com.conveyal.r5.profile.mcrr.PathParetoSortableWrapper;
+import com.conveyal.r5.profile.mcrr.RaptorWorkerTransitDataProvider;
+import com.conveyal.r5.profile.mcrr.TransitLayerRRDataProvider;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.Place;
 import com.conveyal.r5.speed_test.api.model.TripPlan;
@@ -218,13 +222,29 @@ public class SpeedTest {
 
             TIMER_WORKER.start();
 
-            MultiCriteriaRangeRaptorWorker worker = new MultiCriteriaRangeRaptorWorker(
-                    transportNetwork.transitLayer,
-                    request,
+
+            RaptorWorkerTransitDataProvider transitData = new TransitLayerRRDataProvider(
+                    transportNetwork.transitLayer, request.date, request.transitModes
+            );
+
+            McRaptorStateImpl stateImpl = new McRaptorStateImpl(
+                    transportNetwork.transitLayer.getStopCount(),
+                    request.maxRides + 1,
+                    request.maxTripDurationMinutes * 60,
+                    request.fromTime
+            );
+
+            RangeRaptorWorker worker = new RangeRaptorWorker(
+                    transitData,
+                    stateImpl.newWorkerState(),
+                    new PathBuilder(stateImpl),
+                    request.fromTime,
+                    request.toTime,
+                    request.walkSpeed,
+                    request.maxWalkTime,
                     streetRouter.accessTimesToStopsInSeconds,
                     streetRouter.egressTimesToStopsInSeconds.keys()
             );
-
             worker.route();
 
             TIMER_WORKER.stop();
@@ -250,9 +270,9 @@ public class SpeedTest {
                 egressTimeIterator.advance();
 //                int stopIndex = egressTimeIterator.key();
                 int egressTime = egressTimeIterator.value();
-                int minuteReversed = worker.nMinutes;
+                int minuteReversed = worker.nMinutes();
 
-                for (int minute = 0; minute < worker.nMinutes; minute++) {
+                for (int minute = 0; minute < worker.nMinutes(); minute++) {
                     --minuteReversed;
 
                     Path path = worker.pathsPerIteration.get(minute)[i];

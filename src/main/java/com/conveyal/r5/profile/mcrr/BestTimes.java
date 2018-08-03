@@ -1,10 +1,9 @@
 package com.conveyal.r5.profile.mcrr;
 
-import java.util.Arrays;
 import java.util.BitSet;
 
 import static com.conveyal.r5.profile.mcrr.IntUtils.newIntArray;
-import static com.conveyal.r5.profile.mcrr.McRaptorState.UNREACHED;
+import static com.conveyal.r5.profile.mcrr.StopState.UNREACHED;
 
 final class BestTimes {
     /** Format: [time] [reached current round] [reached previous round] */

@@ -48,13 +48,6 @@ public class MultiCriteriaRangeRaptorWorker {
     private static boolean PRINT_REFILTERING_PATTERNS_INFO = true;
 
     /**
-     * This value essentially serves as Infinity for ints - it's bigger than every other number.
-     * It is the travel time to a transit stop or a target before that stop or target is ever reached.
-     * Be careful when propagating travel times from stops to targets, adding something to UNREACHED will cause overflow.
-     */
-    public static final int UNREACHED = Integer.MAX_VALUE;
-
-    /**
      * Step for departure times. Use caution when changing this as we use the functions
      * request.getTimeWindowLengthMinutes and request.getMonteCarloDrawsPerMinute below which assume this value is 1 minute.
      * The same functions are also used in BootstrappingTravelTimeReducer where we assume that their product is the number
@@ -100,12 +93,12 @@ public class MultiCriteriaRangeRaptorWorker {
     private final BitSet servicesActive;
 
     // TODO add javadoc to field
-    private final McRaptorState state;
+    private final RaptorWorkerState state;
 
     /** If we're going to store paths to every destination (e.g. for static sites) then they'll be retained here. */
     public List<Path[]> pathsPerIteration;
 
-    private final McPathBuilder pathBuilder = new McPathBuilder();
+    private final McPathBuilder pathBuilder;
 
 
     public MultiCriteriaRangeRaptorWorker(TransitLayer transitLayer, ProfileRequest request, TIntIntMap accessStops, int[] egressStops) {
@@ -115,7 +108,9 @@ public class MultiCriteriaRangeRaptorWorker {
         this.egressStops = egressStops;
         this.servicesActive  = transit.getActiveServicesForDate(request.date);
 
-        this.state = new McRaptorState(transit.getStopCount(), request.maxRides + 1, request.maxTripDurationMinutes * 60, request.fromTime);
+        McRaptorStateImpl stateImpl = new McRaptorStateImpl(transit.getStopCount(), request.maxRides + 1, request.maxTripDurationMinutes * 60, request.fromTime);
+        pathBuilder = new McPathBuilder(stateImpl);
+        state = stateImpl.newWorkerState();
 
         // compute number of minutes for scheduled search
         nMinutes = request.getTimeWindowLengthMinutes();
@@ -207,7 +202,7 @@ public class MultiCriteriaRangeRaptorWorker {
      * @return an array of length iterationsPerMinute, containing the arrival (clock) times at each stop for each iteration.
      */
     private void runRaptorForMinute (int departureTime) {
-        McRaptorState.debugStopHeader("runRaptorForMin "+departureTime);
+        McRaptorStateImpl.debugStopHeader("runRaptorForMin "+departureTime);
 
         TIMER_BY_MINUTE_INIT.time(() ->
                 advanceScheduledSearchToPreviousMinute(departureTime)
@@ -246,7 +241,7 @@ public class MultiCriteriaRangeRaptorWorker {
         Path[] paths = new Path[nStops];
         for (int s = 0; s < nStops; s++) {
             int stopIndex = egressStops[s];
-            paths[s] = pathBuilder.extractPathForStop(state, stopIndex);
+            paths[s] = pathBuilder.extractPathForStop(stopIndex);
         }
         return paths;
     }
@@ -259,7 +254,6 @@ public class MultiCriteriaRangeRaptorWorker {
             int originalPatternIndex = originalPatternIndexForScheduledIndex[patternIndex];
             TripPattern pattern = runningScheduledPatterns[patternIndex];
             int onTrip = -1;
-            int waitTime = 0;
             int boardTime = 0;
             int boardStop = -1;
             TripSchedule schedule = null;
@@ -271,18 +265,13 @@ public class MultiCriteriaRangeRaptorWorker {
                 // when boarding
                 if (onTrip > -1) {
                     int alightTime = schedule.arrivals[stopPositionInPattern];
-                    int onVehicleTime = alightTime - boardTime;
-
-                    if (waitTime + onVehicleTime + state.bestTimePreviousRound(boardStop) > alightTime) {
-                        throw new IllegalStateException("Components of travel time are larger than travel time!");
-                    }
 
                     state.transitToStop(
                             stop,
                             alightTime,
                             originalPatternIndex,
-                            boardStop,
                             pattern.tripSchedules.indexOf(schedule),
+                            boardStop,
                             boardTime
                     );
                 }
@@ -311,7 +300,6 @@ public class MultiCriteriaRangeRaptorWorker {
                                 onTrip = candidateTripIndex;
                                 schedule = candidateSchedule;
                                 boardTime = candidateSchedule.departures[stopPositionInPattern];
-                                waitTime = boardTime - state.bestTimePreviousRound(stop);
                                 boardStop = stop;
                                 break EARLIEST_TRIP;
                             }
@@ -329,7 +317,6 @@ public class MultiCriteriaRangeRaptorWorker {
                                 onTrip = bestTripIdx;
                                 schedule = trip;
                                 boardTime = trip.departures[stopPositionInPattern];
-                                waitTime = boardTime - state.bestTimePreviousRound(stop);
                                 boardStop = stop;
                             } else {
                                 // this trip arrives too early, break loop since they are sorted by departure time
@@ -365,7 +352,7 @@ public class MultiCriteriaRangeRaptorWorker {
                         int timeAtTargetStop = state.bestTransitTime(stop) + walkTimeToTargetStopSeconds;
 
                         if (walkTimeToTargetStopSeconds < 0) {
-                            LOG.error("Negative transfer time!!");
+                            throw new IllegalStateException("Negative transfer time!!");
                         }
 
                         state.transferToStop(targetStop, timeAtTargetStop, stop, walkTimeToTargetStopSeconds);

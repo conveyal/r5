@@ -2,8 +2,6 @@ package com.conveyal.r5.profile.mcrr;
 
 
 import static com.conveyal.r5.profile.mcrr.IntUtils.newIntArray;
-import static com.conveyal.r5.profile.mcrr.McRaptorState.NOT_SET;
-import static com.conveyal.r5.profile.mcrr.McRaptorState.UNREACHED;
 import static com.conveyal.r5.profile.mcrr.TimeUtils.timeToString;
 
 public final class StopStateFlyWeight implements StopState {
@@ -79,7 +77,7 @@ public final class StopStateFlyWeight implements StopState {
 
     @Override
     public boolean isTransitTimeSet() {
-        return transitTimes[cursor] != McRaptorState.UNREACHED;
+        return transitTimes[cursor] != UNREACHED;
     }
 
     @Override

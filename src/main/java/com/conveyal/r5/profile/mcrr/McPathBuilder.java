@@ -9,20 +9,25 @@ import gnu.trove.list.array.TIntArrayList;
  * Class used to represent transit paths in Browsochrones and Modeify.
  */
 public class McPathBuilder {
-    private TIntList patterns = new TIntArrayList();
-    private TIntList boardStops = new TIntArrayList();
-    private TIntList alightStops = new TIntArrayList();
+    private final McRaptorStateImpl state;
+    private final TIntList patterns = new TIntArrayList();
+    private final TIntList boardStops = new TIntArrayList();
+    private final TIntList alightStops = new TIntArrayList();
 //    private TIntList times = new TIntArrayList();
-    private TIntList alightTimes = new TIntArrayList();
-    private TIntList boardTimes = new TIntArrayList();
-    private TIntList transferTimes = new TIntArrayList();
-    private TIntList trips = new TIntArrayList();
+    private final TIntList alightTimes = new TIntArrayList();
+    private final TIntList boardTimes = new TIntArrayList();
+    private final TIntList transferTimes = new TIntArrayList();
+    private final TIntList trips = new TIntArrayList();
 
+
+    public McPathBuilder(McRaptorStateImpl state) {
+        this.state = state;
+    }
 
     /**
      * Scan over a raptor state and extract the path leading up to that state.
      */
-    public  Path extractPathForStop(McRaptorState state, int stop) {
+    public  Path extractPathForStop(int stop) {
         if(!state.isStopReachedByTransit(stop)) {
             return null;
         }
@@ -36,7 +41,7 @@ public class McPathBuilder {
         transferTimes.clear();
         trips.clear();
 
-        McRaptorState.debugStopHeader("FIND PATH");
+        McRaptorStateImpl.debugStopHeader("FIND PATH");
 
         // find the fewest-transfers trip that is still optimal in terms of travel time
         state.findLastRoundWithTransitTimeSet(stop);

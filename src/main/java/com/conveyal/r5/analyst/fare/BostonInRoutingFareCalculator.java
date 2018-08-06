@@ -30,6 +30,8 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
     private static final WeakHashMap<TransitLayer, FareSystemWrapper> fareSystemCache = new WeakHashMap<>();
     private RouteBasedFareRules fares;
 
+    public volatile int count;
+
     // Some fares may confer different transfer allowance values, but have the same issuing and acceptance rules.
     // For example, in Boston, the transfer allowances from inner and outer express bus fares have different values,
     // but they are issued and accepted under the same circumstances.
@@ -237,7 +239,7 @@ public class BostonInRoutingFareCalculator extends InRoutingFareCalculator {
 
     @Override
     public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state, int maxClockTime) {
-
+        count ++;
         // First, load fare data from GTFS
         if (fares == null){
             synchronized (this) {

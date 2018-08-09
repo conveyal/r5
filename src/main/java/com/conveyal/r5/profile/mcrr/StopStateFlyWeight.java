@@ -9,6 +9,9 @@ public final class StopStateFlyWeight implements StopState {
     private int size = 0;
     private int cursor = NOT_SET;
 
+    private final int[][] stateStopIndex;
+
+
     private final int[] times;
     private final int[] transitTimes;
     private final int[] previousPatterns;
@@ -19,20 +22,26 @@ public final class StopStateFlyWeight implements StopState {
     private final int[] transferFromStops;
 
 
-    StopStateFlyWeight(int size) {
-        this.times = newIntArray(size, UNREACHED);
+    StopStateFlyWeight(int rounds, int stops) {
+        this.stateStopIndex = new int[rounds][stops];
 
-        this.boardStops = newIntArray(size, NOT_SET);
-        this.transitTimes = newIntArray(size, UNREACHED);
-        this.previousPatterns = newIntArray(size, NOT_SET);
-        this.previousTrips = newIntArray(size, NOT_SET);
-        this.boardTimes = newIntArray(size, UNREACHED);
+        final int limit = 3 * stops;
 
-        this.transferFromStops = newIntArray(size, NOT_SET);
-        this.transferTimes = newIntArray(size, NOT_SET);
+        this.times = newIntArray(limit, UNREACHED);
+
+        this.boardStops = newIntArray(limit, NOT_SET);
+        this.transitTimes = newIntArray(limit, UNREACHED);
+        this.previousPatterns = newIntArray(limit, NOT_SET);
+        this.previousTrips = newIntArray(limit, NOT_SET);
+        this.boardTimes = newIntArray(limit, UNREACHED);
+
+        this.transferFromStops = newIntArray(limit, NOT_SET);
+        this.transferTimes = newIntArray(limit, NOT_SET);
     }
 
-    public void transitToStop(int index, int time, int fromPattern, int boardStop, int tripIndex, int boardTime, boolean bestTime) {
+    public void transitToStop(int round, int stop, int time, int fromPattern, int boardStop, int tripIndex, int boardTime, boolean bestTime) {
+        final int index = findOrCreateStopIndex(round, stop);
+
         transitTimes[index] = time;
         previousPatterns[index] = fromPattern;
         previousTrips[index] = tripIndex;
@@ -48,27 +57,30 @@ public final class StopStateFlyWeight implements StopState {
     /**
      * Set the time at a transit index iff it is optimal. This sets both the best time and the nonTransferTime
      */
-    public void transferToStop(int index, int time, int fromStop, int transferTime) {
+    public void transferToStop(int round, int stop, int time, int fromStop, int transferTime) {
+        final int index = findOrCreateStopIndex(round, stop);
         times[index] = time;
         transferFromStops[index] = fromStop;
         transferTimes[index] = transferTime;
     }
 
-    public void setInitalTime(int index, int time) {
+    public void setInitalTime(int round, int stop, int time) {
+        final int index = findOrCreateStopIndex(round, stop);
         times[index] = time;
     }
 
-    public void setCursor(int cursor) {
-        this.cursor = cursor;
+    public final int time(int round, int stop) {
+        final int index = stateStopIndex[round][stop];
+        return times[index];
+    }
+
+    public void setCursor(int round, int stop) {
+        this.cursor = stateStopIndex[round][stop];
     }
 
     @Override
     public final int time() {
         return times[cursor];
-    }
-
-    public final int time(int index) {
-        return times[index];
     }
     @Override
     public int transitTime() {
@@ -126,7 +138,8 @@ public final class StopStateFlyWeight implements StopState {
             " Time   Stop  Dur    Time B.Stop B.Time  Pttrn Trip"
     };
 
-    public String stopToString(int stopIndex) {
+    public String stopToString(int round, int stop) {
+        final int stopIndex = stateStopIndex[round][stop];
         return String.format("%5s %6s %4s   %5s %6s %6s %6s %4s",
                 timeToString(times[stopIndex], UNREACHED),
                 intToString(transferFromStops[stopIndex]),
@@ -140,4 +153,12 @@ public final class StopStateFlyWeight implements StopState {
     }
 
     private static String intToString(int value) { return value == -1 ? "" : Integer.toString(value); }
+
+    private int findOrCreateStopIndex(final int round, final int stop) {
+        if(stateStopIndex[round][stop] == 0) {
+            stateStopIndex[round][stop] = nextAvailable();
+        }
+        return stateStopIndex[round][stop];
+    }
+
 }

@@ -48,8 +48,6 @@ public final class McRaptorStateImpl {
     private int maxTimeLimit;
 
 
-    private final int[][] stateStopIndex;
-
     /** The best times to reach each stop, whether via a transfer or via transit directly. */
     private final BestTimes bestOveral;
 
@@ -60,9 +58,7 @@ public final class McRaptorStateImpl {
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
     public McRaptorStateImpl(int nStops, int nRounds, int maxDurationSeconds, int earliestDepartureTime) {
         this.nRounds = nRounds;
-        this.state = new StopStateFlyWeight(nStops * 3);
-
-        this.stateStopIndex = new int[nRounds][nStops];
+        this.state = new StopStateFlyWeight(nRounds, nStops);
 
         this.bestOveral = new BestTimes(nStops);
         this.bestTransit = new BestTimes(nStops);
@@ -99,12 +95,12 @@ public final class McRaptorStateImpl {
     }
 
     StopState stop(int stop) {
-        state.setCursor(stopIndex(stop));
+        state.setCursor(round, stop);
         return state;
     }
 
     StopState stopPreviousRound(int stop) {
-        state.setCursor(stateStopIndex[round-1][stop]);
+        state.setCursor(round-1, stop);
         return state;
     }
 
@@ -128,7 +124,7 @@ public final class McRaptorStateImpl {
                 stop,
                 bestOveral.toString(stop),
                 bestTransit.toString(stop),
-                state.stopToString(stateStopIndex[round][stop])
+                state.stopToString(round, stop)
         );
     }
 
@@ -164,7 +160,7 @@ public final class McRaptorStateImpl {
 
             @Override public int bestTimePreviousRound(int stop) {
                 // TODO TGR
-                return state.time(stateStopIndex[round-1][stop]);
+                return state.time(round-1, stop);
                 //return bestOveral.timeLastRound(stop);
             }
 
@@ -181,8 +177,7 @@ public final class McRaptorStateImpl {
             }
 
             @Override public void setInitialTime(int stop, int time) {
-                final int stateIndex = findOrCreateStopIndex(stop);
-                state.setInitalTime(stateIndex, time);
+                state.setInitalTime(round, stop, time);
                 bestOveral.setTime(stop, time);
                 debugListedStops("init", round, stop);
             }
@@ -197,12 +192,10 @@ public final class McRaptorStateImpl {
 
                 if (bestTransit.updateNewBestTime(stop, alightTime)) {
 
-                    final int stateIndex = findOrCreateStopIndex(stop);
-
                     // transitTimes upper bounds bestTimes
                     final boolean newBestOveral = bestOveral.updateNewBestTime(stop, alightTime);
 
-                    state.transitToStop(stateIndex, alightTime, pattern, boardStop, trip, boardTime, newBestOveral);
+                    state.transitToStop(round, stop, alightTime, pattern, boardStop, trip, boardTime, newBestOveral);
 
                     // skip: transferTimes
                     debugListedStops("transit to stop", round, stop);
@@ -221,8 +214,7 @@ public final class McRaptorStateImpl {
                 // enter this conditional it has already been updated.
                 if (bestOveral.updateNewBestTime(stop, time)) {
 
-                    final int stateIndex = findOrCreateStopIndex(stop);
-                    state.transferToStop(stateIndex, time, fromStop, transferTime);
+                    state.transferToStop(round, stop, time, fromStop, transferTime);
 
                     debugListedStops("transfer to stop", round, stop);
                 }
@@ -247,16 +239,5 @@ public final class McRaptorStateImpl {
 
     private void debugListedStops(String descr, int round, int stop) {
         if (DEBUG && debugStops.contains(stop)) debugStop(descr, round, stop);
-    }
-
-    private int stopIndex(int stop) {
-        return stateStopIndex[round][stop];
-    }
-
-    private int findOrCreateStopIndex(int stop) {
-        if(stateStopIndex[round][stop] == 0) {
-            stateStopIndex[round][stop] = state.nextAvailable();
-        }
-        return stopIndex(stop);
     }
 }

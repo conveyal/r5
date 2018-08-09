@@ -1,5 +1,7 @@
 package com.conveyal.r5.profile.mcrr;
 
+import com.conveyal.r5.util.TimeUtils;
+
 import java.util.BitSet;
 
 import static com.conveyal.r5.profile.mcrr.IntUtils.newIntArray;

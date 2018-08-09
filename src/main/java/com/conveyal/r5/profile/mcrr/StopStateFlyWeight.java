@@ -2,7 +2,7 @@ package com.conveyal.r5.profile.mcrr;
 
 
 import static com.conveyal.r5.profile.mcrr.IntUtils.newIntArray;
-import static com.conveyal.r5.profile.mcrr.TimeUtils.timeToString;
+import static com.conveyal.r5.util.TimeUtils.timeToString;
 
 public final class StopStateFlyWeight implements StopState {
 

@@ -35,6 +35,7 @@ import java.util.List;
 
 import static com.conveyal.r5.profile.SearchAlgorithm.MultiCriteriaRangeRaptor;
 import static com.conveyal.r5.profile.SearchAlgorithm.RangeRaptor;
+import static com.conveyal.r5.util.TimeUtils.midnightOf;
 
 /**
  * Test response times for a large batch of origin/destination points.
@@ -106,13 +107,16 @@ public class SpeedTest {
             nRoutesComputed += ok ? 1 : 0;
         }
 
+        int tcSize = testCases.size();
+
         LOG.info(
                 "\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [ SUMMARY ]\n" +
                 AvgTimer.listResults().stream().reduce("", (text, line) -> text + line + "\n") +
                 "\n" +
                 "\nPaths found: " + numOfPathsFound.stream().mapToInt((it) -> it).sum() + " " + numOfPathsFound +
-                "\nSuccessful searches: " + nRoutesComputed + " / " + testCases.size() +
-                "\nTotal time: " + TIMER.totalTimeInSeconds() + " seconds"
+                "\nSuccessful searches: " + nRoutesComputed + " / " + tcSize +
+                "\nTotal time: " + TIMER.totalTimeInSeconds() + " seconds" +
+                (nRoutesComputed == tcSize ? "" : "\n!!! UNEXPECTED RESULTS: " + (tcSize - nRoutesComputed) + " OF " + tcSize + " TEST CASES DID NOT RETURN THE EXPECTED TRIPS. SEE ABOVE !!!")
         );
 
     }
@@ -128,6 +132,7 @@ public class SpeedTest {
             if (opts.printItineraries()) {
                 printResult(route.getItineraries().size(), testCase, TIMER.lapTime(), "");
                 route.speedTestPrintItineraries();
+                testCase.assertResult(route.itinerariesAsCompactStrings());
             }
             return true;
         } catch (ConcurrentModificationException | NullPointerException e) {
@@ -199,11 +204,7 @@ public class SpeedTest {
 
             if (itinerary != null) {
                 tripPlan.addItinerary(itinerary);
-                Calendar fromMidnight = (Calendar) itinerary.startTime.clone();
-                fromMidnight.set(Calendar.HOUR, 0);
-                fromMidnight.set(Calendar.MINUTE, 0);
-                fromMidnight.set(Calendar.SECOND, 0);
-                fromMidnight.set(Calendar.MILLISECOND, 0);
+                Calendar fromMidnight =  midnightOf(itinerary.startTime);
                 request.fromTime = (int) (itinerary.startTime.getTimeInMillis() - fromMidnight.getTimeInMillis()) / 1000 + 60;
                 request.toTime = request.fromTime + 60;
             } else {
@@ -382,7 +383,7 @@ public class SpeedTest {
         request.toLon = testCase.toLon;
         request.fromTime = 8 * 60 * 60; // 8AM in seconds since midnight
         request.toTime = request.fromTime + 60 * opts.searchWindowInMinutes();
-        request.date = LocalDate.of(2018, 05, 25);
+        request.date = LocalDate.of(2018, 5, 25);
         request.numberOfItineraries = opts.numOfItineraries();
         return request;
     }

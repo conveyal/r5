@@ -46,12 +46,6 @@ public class TripPlan {
 
     public TripPlan() { }
 
-    public TripPlan(Place from, Place to, Date date) {
-        this.from = from;
-        this.to = to;
-        this.date = date;
-    }
-
     public Collection<Itinerary> getItineraries() {
         return itineraries;
     }
@@ -69,5 +63,25 @@ public class TripPlan {
     public void speedTestPrintItineraries() {
         System.err.println(SpeedTestItinerary.toStringHeader());
         itineraries.forEach(System.err::println);
+    }
+
+    /**
+     * Create a compact representation of all itineraries on format:
+     * {@code }
+     * @return
+     */
+    public String[] itinerariesAsCompactStrings() {
+        String[] result = new String[itineraries.size()];
+        int i = 0;
+        for (Itinerary it : itineraries) {
+            if(it instanceof SpeedTestItinerary) {
+                result[i] = ((SpeedTestItinerary)it).toStringCompact();
+            }
+            else {
+                return null;
+            }
+            ++i;
+        }
+        return result;
     }
 }

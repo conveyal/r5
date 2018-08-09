@@ -113,6 +113,36 @@ public class SpeedTestItinerary extends Itinerary implements ParetoSortable {
                 toStr(endTime)
         );
     }
+
+    /**
+     * Create a compact representation of an itinerary.
+     * Example:
+     * <pre>
+     * 09:29 > 09:30-37358-NW180-18:20-86727 > 19:30-3551-NW130-22:40-4917 > 22:40
+     * </pre>
+     */
+    public String toStringCompact() {
+        StringBuilder buf = new StringBuilder();
+        buf.append(toStr(startTime));
+        buf.append(" > ");
+
+        for (Leg it : legs) {
+            if(it.isTransitLeg()) {
+                buf.append(toStr(it.startTime));
+                buf.append("_");
+                buf.append(it.routeShortName);
+                buf.append("_");
+                buf.append(it.from.stopIndex);
+                buf.append("_");
+                buf.append(it.to.stopIndex);
+                buf.append(" > ");
+            }
+        }
+        buf.append(toStr(endTime));
+        return buf.toString();
+    }
+
+
     public static String toStringHeader() {
         return String.format("%2s %5s %5s %-16s %-30s %-30s %-40s %s", "TF", "Time", "Walk", "Modes", "Agencies", "Routes", "Stops", "start end");
     }

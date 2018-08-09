@@ -20,16 +20,18 @@ public class SpeedTestItinerary extends Itinerary implements ParetoSortable {
     private static final Map<String, String> AGENCY_NAMES_SHORT = new HashMap<>();
 
     static {
-        AGENCY_NAMES_SHORT.put("Nettbuss Travel AS","Nettbuss");
-        AGENCY_NAMES_SHORT.put("Norgesbuss Ekspress AS","Norgesbuss");
+        AGENCY_NAMES_SHORT.put("Hedmark Trafikk FKF", "Hedmark");
         AGENCY_NAMES_SHORT.put("Indre Namdal Trafikk A/S","I.Namdal");
+        AGENCY_NAMES_SHORT.put("Møre og Romsdal fylkeskommune", "M&R FK");
+        AGENCY_NAMES_SHORT.put("Nettbuss Travel AS","Nettbuss");
         AGENCY_NAMES_SHORT.put("Nord-Trøndelag fylkeskommune","N-Trøndelag");
-        AGENCY_NAMES_SHORT.put("Møre og Romsdal fylkeskommune", "MøreRomsdal");
+        AGENCY_NAMES_SHORT.put("Norgesbuss Ekspress AS","Norgesbuss");
         AGENCY_NAMES_SHORT.put("NOR-WAY Bussekspress", "NOR-WAY");
+        AGENCY_NAMES_SHORT.put("Nordland fylkeskommune", "Nordland");
+        AGENCY_NAMES_SHORT.put("Opplandstrafikk", "Oppland");
         AGENCY_NAMES_SHORT.put("Troms fylkestrafikk", "Troms");
         AGENCY_NAMES_SHORT.put("Vestfold Kollektivtrafikk as", "Vestfold");
         AGENCY_NAMES_SHORT.put("Østfold fylkeskommune", "Østfold");
-        AGENCY_NAMES_SHORT.put("Hedmark Trafikk FKF", "Hedmark");
     }
 
 
@@ -93,7 +95,7 @@ public class SpeedTestItinerary extends Itinerary implements ParetoSortable {
             if(it.isTransitLeg()) {
                 modes.add(it.mode);
                 agencies.add(AGENCY_NAMES_SHORT.getOrDefault(it.agencyName, it.agencyName));
-                stops.add(toStr(it.startTime) + " " + it.from.stopIndex + "->" +it.to.stopIndex);
+                stops.add(toStr(it.startTime) + " " + it.from.stopIndex + "->" +it.to.stopIndex + " " + toStr(it.endTime));
 
                 if(append) routesBuf.append(" > ");
                 append = true;
@@ -101,17 +103,22 @@ public class SpeedTestItinerary extends Itinerary implements ParetoSortable {
             }
         }
         return String.format(
-                "%2d %5d %5.0f %-16s %-30s %-30s %-40s %s %s",
+                "%2d %5d %5.0f  %5s %5s  %-16s %-30s %-28s %s",
                 transfers,
                 duration/60,
                 walkDistance,
+                toStr(startTime),
+                toStr(endTime),
                 modes,
                 agencies,
                 routesBuf,
-                stops,
-                toStr(startTime),
-                toStr(endTime)
+                stops
         );
+    }
+
+
+    public static String toStringHeader() {
+        return String.format("%2s %5s %5s  %-5s %-5s  %-16s %-30s %-28s %s", "TF", "Time", "Walk", "Start", "End", "Modes", "Agencies", "Routes", "Stops");
     }
 
     /**
@@ -140,11 +147,6 @@ public class SpeedTestItinerary extends Itinerary implements ParetoSortable {
         }
         buf.append(toStr(endTime));
         return buf.toString();
-    }
-
-
-    public static String toStringHeader() {
-        return String.format("%2s %5s %5s %-16s %-30s %-30s %-40s %s", "TF", "Time", "Walk", "Modes", "Agencies", "Routes", "Stops", "start end");
     }
 
     private String toStr(Calendar c) {

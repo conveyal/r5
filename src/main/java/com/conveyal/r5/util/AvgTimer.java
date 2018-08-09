@@ -14,11 +14,11 @@ import java.util.stream.Stream;
  * This class is used to collect data and print a summary after some period of time.
  *
  * <pre>
- *       METHOD CALLS DURATION |              SUCCESS               |         FAILURE         |        ALL CALLS
- *                             |  Min   Max  Avg     Count   Total  | Average  Count   Total  | Average  Count   Total
- *       AvgTimer:main t1      | 1345  3715 2592 ms     50  129,6 s | 2843 ms      5   14,2 s | 2615 ms     55  143,8 s
- *       AvgTimer:main t2      |   45   699  388 ms     55   21,4 s |    0 ms      0    0,0 s |  388 ms     55   21,4 s
- *       AvgTimer:main t3      |    4   692  375 ms    110   41,3 s |    0 ms      0    0,0 s |  375 ms    110   41,3 s
+ *       METHOD CALLS DURATION |              SUCCESS               |         FAILURE
+ *                             |  Min   Max  Avg     Count   Total  | Average  Count   Total
+ *       AvgTimer:main t1      | 1345  3715 2592 ms     50  129,6 s | 2843 ms      5   14,2 s
+ *       AvgTimer:main t2      |   45   699  388 ms     55   21,4 s |    0 ms      0    0,0 s
+ *       AvgTimer:main t3      |    4   692  375 ms    110   41,3 s |    0 ms      0    0,0 s
  * </pre>
  *
  * See the {@link #main(String[])} for usage and example code.
@@ -178,8 +178,7 @@ public abstract class AvgTimer {
                 method,
                 width,
                 formatResultAvg(totalTimeSuccess, counterSuccess),
-                formatResult(totalTimeFailed, counterFailed),
-                formatResult(totalTimeSuccess + totalTimeFailed, counterSuccess + counterFailed)
+                formatResult(totalTimeFailed, counterFailed)
         );
     }
 
@@ -192,8 +191,7 @@ public abstract class AvgTimer {
                 RESULT_TABLE_TITLE,
                 width,
                 "             SUCCESS",
-                "        FAILURE",
-                "       ALL CALLS"
+                "        FAILURE"
         );
     }
 
@@ -201,7 +199,7 @@ public abstract class AvgTimer {
         return formatLine(
                 "",
                 width,
-                columnHeaderAvg(), columnHeader(), columnHeader()
+                columnHeaderAvg(), columnFailureHeader()
         );
     }
 
@@ -217,12 +215,12 @@ public abstract class AvgTimer {
         return String.format("%4d %s %6d %6s s", average(time, count), unit(), count, toSec(time));
     }
 
-    private static String columnHeader() {
+    private static String columnFailureHeader() {
         return "Average  Count   Total";
     }
 
-    private static String formatLine(String label, int labelWidth, String column1, String column2, String column3) {
-        return String.format("%-" + labelWidth + "s | %-35s| %-24s| %-24s", label, column1, column2, column3);
+    private static String formatLine(String label, int labelWidth, String column1, String column2) {
+        return String.format("%-" + labelWidth + "s | %-35s| %-24s", label, column1, column2);
     }
 
     private static long average(long total, int count) {

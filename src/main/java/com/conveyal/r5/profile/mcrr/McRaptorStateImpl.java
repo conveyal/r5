@@ -30,6 +30,7 @@ public final class McRaptorStateImpl {
     private static final List<Integer> debugStops = Arrays.asList(5757, 32489, 17270, 21469, 22102);
 
     private final StopStateFlyWeight state;
+    private final StopStateFlyWeight.Cursor cursor;
     private final int nRounds;
 
     private int round = 0;
@@ -59,6 +60,7 @@ public final class McRaptorStateImpl {
     public McRaptorStateImpl(int nStops, int nRounds, int maxDurationSeconds, int earliestDepartureTime) {
         this.nRounds = nRounds;
         this.state = new StopStateFlyWeight(nRounds, nStops);
+        this.cursor = state.newCursor();
 
         this.bestOveral = new BestTimes(nStops);
         this.bestTransit = new BestTimes(nStops);
@@ -95,13 +97,11 @@ public final class McRaptorStateImpl {
     }
 
     StopState stop(int stop) {
-        state.setCursor(round, stop);
-        return state;
+        return cursor.stop(round, stop);
     }
 
-    StopState stopPreviousRound(int stop) {
-        state.setCursor(round-1, stop);
-        return state;
+    private StopState stopPreviousRound(int stop) {
+        return cursor.stop(round-1, stop);
     }
 
     static void debugStopHeader(String title) {

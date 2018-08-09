@@ -2,12 +2,13 @@ package com.conveyal.r5.profile.mcrr;
 
 
 import static com.conveyal.r5.profile.mcrr.IntUtils.newIntArray;
+import static com.conveyal.r5.profile.mcrr.StopState.NOT_SET;
+import static com.conveyal.r5.profile.mcrr.StopState.UNREACHED;
 import static com.conveyal.r5.util.TimeUtils.timeToString;
 
-public final class StopStateFlyWeight implements StopState {
+public final class StopStateFlyWeight {
 
     private int size = 0;
-    private int cursor = NOT_SET;
 
     private final int[][] stateStopIndex;
 
@@ -74,62 +75,74 @@ public final class StopStateFlyWeight implements StopState {
         return times[index];
     }
 
-    public void setCursor(int round, int stop) {
-        this.cursor = stateStopIndex[round][stop];
-    }
 
-    @Override
-    public final int time() {
-        return times[cursor];
-    }
-    @Override
-    public int transitTime() {
-        return transitTimes[cursor];
-    }
 
-    @Override
-    public boolean isTransitTimeSet() {
-        return transitTimes[cursor] != UNREACHED;
-    }
-
-    @Override
-    public int previousPattern() {
-        return previousPatterns[cursor];
-    }
-
-    @Override
-    public int previousTrip() {
-        return previousTrips[cursor];
-    }
-
-    @Override
-    public int transferTime() {
-        return transferTimes[cursor];
-    }
-
-    @Override
-    public int boardStop() {
-        return boardStops[cursor];
-    }
-
-    @Override
-    public int boardTime() {
-        return boardTimes[cursor];
-    }
-
-    @Override
-    public int transferFromStop() {
-        return transferFromStops[cursor];
-    }
-
-    @Override
-    public boolean arrivedByTransfer() {
-        return transferFromStops[cursor] != NOT_SET;
-    }
-
-    public int nextAvailable() {
+    private int nextAvailable() {
         // Skip the first element, index 0 is not used for optimaziations reasons
         return ++size;
+    }
+
+    public Cursor newCursor() {
+        return new Cursor();
+    }
+
+    public class Cursor implements StopState {
+        private int cursor;
+
+        public Cursor stop(int round, int stop) {
+            this.cursor = stateStopIndex[round][stop];
+            return this;
+        }
+
+        @Override
+        public final int time() {
+            return times[cursor];
+        }
+
+        @Override
+        public int transitTime() {
+            return transitTimes[cursor];
+        }
+
+        @Override
+        public boolean isTransitTimeSet() {
+            return transitTimes[cursor] != UNREACHED;
+        }
+
+        @Override
+        public int previousPattern() {
+            return previousPatterns[cursor];
+        }
+
+        @Override
+        public int previousTrip() {
+            return previousTrips[cursor];
+        }
+
+        @Override
+        public int transferTime() {
+            return transferTimes[cursor];
+        }
+
+        @Override
+        public int boardStop() {
+            return boardStops[cursor];
+        }
+
+        @Override
+        public int boardTime() {
+            return boardTimes[cursor];
+        }
+
+        @Override
+        public int transferFromStop() {
+            return transferFromStops[cursor];
+        }
+
+        @Override
+        public boolean arrivedByTransfer() {
+            return transferFromStops[cursor] != NOT_SET;
+        }
     }
 
 

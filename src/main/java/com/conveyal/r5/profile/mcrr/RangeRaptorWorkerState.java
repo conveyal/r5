@@ -40,4 +40,8 @@ public interface RangeRaptorWorkerState {
     BitSetIterator stopsTouchedByTransitCurrentRoundIterator();
 
     BitSetIterator bestStopsTouchedLastRoundIterator();
+
+    int getMaxRound();
+
+    boolean isStopReachedByTransit(int stop);
 }

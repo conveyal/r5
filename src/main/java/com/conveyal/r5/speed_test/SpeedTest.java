@@ -12,6 +12,7 @@ import com.conveyal.r5.profile.mcrr.McRaptorStateImpl;
 import com.conveyal.r5.profile.mcrr.RangeRaptorWorker;
 import com.conveyal.r5.profile.mcrr.PathParetoSortableWrapper;
 import com.conveyal.r5.profile.mcrr.RaptorWorkerTransitDataProvider;
+import com.conveyal.r5.profile.mcrr.StopStateFlyWeight;
 import com.conveyal.r5.profile.mcrr.TransitLayerRRDataProvider;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.Place;
@@ -24,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.lang.ref.WeakReference;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -92,6 +94,9 @@ public class SpeedTest {
         int nRoutesComputed = 0;
         numOfPathsFound.clear();
 
+        // Force GC to avoid GC during the test
+        forceGCToAvoidGCLater();
+
         // Warm up JIT compiler
         runSingleTestCase(tripPlans, testCases.get(9), opts);
         //if(true) return;
@@ -119,6 +124,15 @@ public class SpeedTest {
                 (nRoutesComputed == tcSize ? "" : "\n!!! UNEXPECTED RESULTS: " + (tcSize - nRoutesComputed) + " OF " + tcSize + " TEST CASES DID NOT RETURN THE EXPECTED TRIPS. SEE ABOVE !!!")
         );
 
+    }
+
+    private void forceGCToAvoidGCLater() {
+        Object obj = new Object();
+        WeakReference ref = new WeakReference<Object>(obj);
+        obj = null;
+        while(ref.get() != null) {
+            System.gc();
+        }
     }
 
     private boolean runSingleTestCase(List<TripPlan> tripPlans, CsvTestCase testCase, SpeedTestCmdLineOpts opts) {
@@ -227,18 +241,23 @@ public class SpeedTest {
             RaptorWorkerTransitDataProvider transitData = new TransitLayerRRDataProvider(
                     transportNetwork.transitLayer, request.date, request.transitModes
             );
+            final int nRounds = request.maxRides + 1;
+            final int nStops = transportNetwork.transitLayer.getStopCount();
+
+            StopStateFlyWeight stopStateFlyWeight = new StopStateFlyWeight(nRounds, nStops);
 
             McRaptorStateImpl stateImpl = new McRaptorStateImpl(
-                    transportNetwork.transitLayer.getStopCount(),
-                    request.maxRides + 1,
+                    nStops,
+                    nRounds,
                     request.maxTripDurationMinutes * 60,
-                    request.fromTime
+                    request.fromTime,
+                    stopStateFlyWeight
             );
 
             RangeRaptorWorker worker = new RangeRaptorWorker(
                     transitData,
-                    stateImpl.newWorkerState(),
-                    new PathBuilder(stateImpl),
+                    stateImpl,
+                    new PathBuilder(stopStateFlyWeight.newCursor()),
                     request.fromTime,
                     request.toTime,
                     request.walkSpeed,

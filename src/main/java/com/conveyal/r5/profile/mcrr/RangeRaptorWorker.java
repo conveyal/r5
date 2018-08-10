@@ -203,7 +203,9 @@ public class RangeRaptorWorker {
         Path[] paths = new Path[nStops];
         for (int s = 0; s < nStops; s++) {
             int stopIndex = egressStops[s];
-            paths[s] = pathBuilder.extractPathForStop(stopIndex);
+            if(state.isStopReachedByTransit(stopIndex)) {
+                paths[s] = pathBuilder.extractPathForStop(state.getMaxRound(), stopIndex);
+            }
         }
         return paths;
     }

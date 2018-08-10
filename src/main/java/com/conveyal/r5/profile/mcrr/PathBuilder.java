@@ -9,7 +9,11 @@ import gnu.trove.list.array.TIntArrayList;
  * Class used to represent transit paths in Browsochrones and Modeify.
  */
 public class PathBuilder {
-    private final McRaptorStateImpl state;
+    private final StopStateFlyWeight.Cursor cursor;
+    private int round;
+    //private int stop;
+
+
     private final TIntList patterns = new TIntArrayList();
     private final TIntList boardStops = new TIntArrayList();
     private final TIntList alightStops = new TIntArrayList();
@@ -20,17 +24,17 @@ public class PathBuilder {
     private final TIntList trips = new TIntArrayList();
 
 
-    public PathBuilder(McRaptorStateImpl state) {
-        this.state = state;
+    public PathBuilder(StopStateFlyWeight.Cursor cursor) {
+        this.cursor = cursor;
     }
 
     /**
      * Scan over a raptor state and extract the path leading up to that state.
      */
-    public  Path extractPathForStop(int stop) {
-        if(!state.isStopReachedByTransit(stop)) {
-            return null;
-        }
+    Path extractPathForStop(int maxRound, int egressStop) {
+        this.round = maxRound;
+        this.cursor.stop(round, egressStop);
+
         // trace the path back from this RaptorState
         patterns.clear();
         boardStops.clear();
@@ -44,41 +48,41 @@ public class PathBuilder {
         McRaptorStateImpl.debugStopHeader("FIND PATH");
 
         // find the fewest-transfers trip that is still optimal in terms of travel time
-        state.findLastRoundWithTransitTimeSet(stop);
+        boolean found = findLastRoundWithTransitTimeSet(egressStop);
 
-        if(state.round() == 0) {
-            return null;
+        if(!found) {
+            throw new IllegalStateException("Transit for stop not found. Stop: " + egressStop + ".");
         }
 
+        //state.debugStop("egress stop", state.round(), stop);
 
-        state.debugStop("egress stop", state.round(), stop);
+        int currentStop = egressStop;
 
-        while (state.round() > 0) {
-            StopState it = state.stop(stop);
-
-            patterns.add(it.previousPattern());
-            trips.add(it.previousTrip());
-            alightStops.add(stop);
+        while (round > 0) {
+            patterns.add(cursor.previousPattern());
+            trips.add(cursor.previousTrip());
+            alightStops.add(currentStop);
 //            times.add(it.time());
-            boardTimes.add(it.boardTime());
-            alightTimes.add(it.transitTime());
+            boardTimes.add(cursor.boardTime());
+            alightTimes.add(cursor.transitTime());
 
             // TODO
-            stop = it.boardStop();
+            currentStop = cursor.boardStop();
 
-            boardStops.add(stop);
+            boardStops.add(currentStop);
 
             // go to previous state before handling transfers as transfers are done at the end of a round
-            state.gotoPreviousRound();
-            it = state.stop(stop);
-            state.debugStop("by", state.round(), stop);
+            --round;
+            cursor.stop(round, currentStop);
+            cursor.debugStop("by", round, currentStop);
 
 
             // handle transfers
-            if (it.arrivedByTransfer()) {
-                transferTimes.add(it.time());
-                stop = it.transferFromStop();
-                state.debugStop("transfer", state.round(), stop);
+            if (cursor.arrivedByTransfer()) {
+                transferTimes.add(cursor.time());
+                currentStop = cursor.transferFromStop();
+                cursor.stop(round, currentStop);
+                cursor.debugStop("transfer", round, currentStop);
             }
             else {
                 transferTimes.add(-1);
@@ -106,5 +110,21 @@ public class PathBuilder {
                 boardTimes.toArray(),
                 transferTimes.toArray()
         );
+    }
+
+    /**
+     * This method search the stop from roundMax and back to round 1 to find
+     * the last round with a transit time set. This is sufficient for finding the
+     * best time, since the state is only recorded iff it is faster then previous rounds.
+     */
+    private boolean findLastRoundWithTransitTimeSet(int egressStop) {
+
+        while (round > 0 && !cursor.isTransitTimeSet()) {
+
+            //debugListedStops("skip no transit", round, stop);
+            --round;
+            cursor.stop(round, egressStop);
+        }
+        return round > 0;
     }
 }

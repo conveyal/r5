@@ -32,4 +32,8 @@ public interface StopState {
     boolean arrivedByTransfer();
 
     int transferTime();
+
+    void debugStopHeader(String title);
+
+    void debugStop(String descr, int round, int stop);
 }

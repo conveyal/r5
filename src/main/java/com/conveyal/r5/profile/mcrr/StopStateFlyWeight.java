@@ -7,6 +7,7 @@ import static com.conveyal.r5.profile.mcrr.StopState.UNREACHED;
 import static com.conveyal.r5.util.TimeUtils.timeToString;
 
 public final class StopStateFlyWeight {
+    static final boolean DEBUG = false;
 
     private int size = 0;
 
@@ -23,7 +24,7 @@ public final class StopStateFlyWeight {
     private final int[] transferFromStops;
 
 
-    StopStateFlyWeight(int rounds, int stops) {
+    public StopStateFlyWeight(int rounds, int stops) {
         this.stateStopIndex = new int[rounds][stops];
 
         final int limit = 3 * stops;
@@ -40,7 +41,12 @@ public final class StopStateFlyWeight {
         this.transferTimes = newIntArray(limit, NOT_SET);
     }
 
-    public void transitToStop(int round, int stop, int time, int fromPattern, int boardStop, int tripIndex, int boardTime, boolean bestTime) {
+    void setInitalTime(int round, int stop, int time) {
+        final int index = findOrCreateStopIndex(round, stop);
+        times[index] = time;
+    }
+
+    void transitToStop(int round, int stop, int time, int fromPattern, int boardStop, int tripIndex, int boardTime, boolean bestTime) {
         final int index = findOrCreateStopIndex(round, stop);
 
         transitTimes[index] = time;
@@ -58,16 +64,11 @@ public final class StopStateFlyWeight {
     /**
      * Set the time at a transit index iff it is optimal. This sets both the best time and the nonTransferTime
      */
-    public void transferToStop(int round, int stop, int time, int fromStop, int transferTime) {
+    void transferToStop(int round, int stop, int time, int fromStop, int transferTime) {
         final int index = findOrCreateStopIndex(round, stop);
         times[index] = time;
         transferFromStops[index] = fromStop;
         transferTimes[index] = transferTime;
-    }
-
-    public void setInitalTime(int round, int stop, int time) {
-        final int index = findOrCreateStopIndex(round, stop);
-        times[index] = time;
     }
 
     public final int time(int round, int stop) {
@@ -75,6 +76,20 @@ public final class StopStateFlyWeight {
         return times[index];
     }
 
+    public Cursor newCursor() {
+        return new Cursor();
+    }
+
+    static String[] stopToStringHeaders() {
+        return new String[] {
+            "- TRANSFER FROM -   ----------- TRANSIT -----------",
+            " Time   Stop  Dur    Time B.Stop B.Time  Pttrn Trip"
+        };
+    };
+
+    String stopToString(int round, int stop) {
+        return stopToString(stateStopIndex[round][stop]);
+    }
 
 
     private int nextAvailable() {
@@ -82,8 +97,26 @@ public final class StopStateFlyWeight {
         return ++size;
     }
 
-    public Cursor newCursor() {
-        return new Cursor();
+    private String stopToString(int stopIndex) {
+        return String.format("%5s %6s %4s   %5s %6s %6s %6s %4s",
+                timeToString(times[stopIndex], UNREACHED),
+                intToString(transferFromStops[stopIndex]),
+                intToString(transferTimes[stopIndex]),
+                timeToString(transitTimes[stopIndex], UNREACHED),
+                intToString(boardStops[stopIndex]),
+                timeToString(boardTimes[stopIndex], UNREACHED),
+                intToString(previousPatterns[stopIndex]),
+                intToString(previousTrips[stopIndex])
+        );
+    }
+
+    private static String intToString(int value) { return value == -1 ? "" : Integer.toString(value); }
+
+    private int findOrCreateStopIndex(final int round, final int stop) {
+        if(stateStopIndex[round][stop] == 0) {
+            stateStopIndex[round][stop] = nextAvailable();
+        }
+        return stateStopIndex[round][stop];
     }
 
     public class Cursor implements StopState {
@@ -143,35 +176,35 @@ public final class StopStateFlyWeight {
         public boolean arrivedByTransfer() {
             return transferFromStops[cursor] != NOT_SET;
         }
-    }
 
-
-    static final String[] HEADERS = {
-            "- TRANSFER FROM -   ----------- TRANSIT -----------",
-            " Time   Stop  Dur    Time B.Stop B.Time  Pttrn Trip"
-    };
-
-    public String stopToString(int round, int stop) {
-        final int stopIndex = stateStopIndex[round][stop];
-        return String.format("%5s %6s %4s   %5s %6s %6s %6s %4s",
-                timeToString(times[stopIndex], UNREACHED),
-                intToString(transferFromStops[stopIndex]),
-                intToString(transferTimes[stopIndex]),
-                timeToString(transitTimes[stopIndex], UNREACHED),
-                intToString(boardStops[stopIndex]),
-                timeToString(boardTimes[stopIndex], UNREACHED),
-                intToString(previousPatterns[stopIndex]),
-                intToString(previousTrips[stopIndex])
-        );
-    }
-
-    private static String intToString(int value) { return value == -1 ? "" : Integer.toString(value); }
-
-    private int findOrCreateStopIndex(final int round, final int stop) {
-        if(stateStopIndex[round][stop] == 0) {
-            stateStopIndex[round][stop] = nextAvailable();
+        @Override
+        public String toString() {
+            return stopToString(cursor);
         }
-        return stateStopIndex[round][stop];
-    }
 
+        @Override
+        public void debugStopHeader(String title) {
+            if(!DEBUG) return;
+            String[] headers = stopToStringHeaders();
+            System.err.printf("  S %-24s              %s%n", title, headers[0]);
+            System.err.printf("  S %-24s  Rnd  Stop   %s%n", "", headers[1]);
+        }
+
+        @Override
+        public void debugStop(String descr, int round, int stop) {
+            if(!DEBUG) return;
+
+            if(round < 0 || stop < 1) {
+                System.err.printf("  S %-24s  %2d %6d  STOP DOES NOT EXIST!%n", descr, round, stop);
+                return;
+            }
+
+            System.err.printf("  S %-24s  %2d %6d   %s%n",
+                    descr,
+                    round,
+                    stop,
+                    stopToString(round, stop)
+            );
+        }
+    }
 }

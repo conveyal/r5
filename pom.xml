@@ -107,6 +107,9 @@
                 </executions>
                 <configuration>
                     <dotGitDirectory>${project.basedir}/.git</dotGitDirectory>
+                    <gitDescribe>
+                        <tags>true</tags>
+                    </gitDescribe>
                 </configuration>
             </plugin>
 

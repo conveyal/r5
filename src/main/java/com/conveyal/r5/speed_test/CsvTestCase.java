@@ -2,13 +2,14 @@ package com.conveyal.r5.speed_test;
 
 import com.csvreader.CsvReader;
 
+import javax.validation.constraints.NotNull;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 class CsvTestCase {
+    public int tcNumber;
     public String origin;
     public double fromLat;
     public double fromLon;
@@ -16,19 +17,24 @@ class CsvTestCase {
     public double toLat;
     public double toLon;
 
-    public String[] expectedResult;
+    private String[] expectedResult;
+    private List<AssertErrorMessage> errors = new ArrayList<>();
+
 
     @Override
     public String toString() {
-        return String.format("%s -> %s, (%.3f, %.3f) -> (%.3f, %.3f)", origin, destination, fromLat, fromLon, toLat, toLon);
+        return String.format("#%d %s -> %s, (%.3f, %.3f) -> (%.3f, %.3f)", tcNumber, origin, destination, fromLat, fromLon, toLat, toLon);
     }
 
-    static List<CsvTestCase> getCoordPairs(File csvFile) throws IOException {
+    static List<CsvTestCase> readTestCasesFromFile(File csvFile) throws IOException {
         List<CsvTestCase> testCases = new ArrayList<>();
         CsvReader csvReader = new CsvReader(csvFile.getAbsolutePath());
         csvReader.readRecord(); // Skip header
+        int tcNumber = 0;
+
         while (csvReader.readRecord()) {
             CsvTestCase tc = new CsvTestCase();
+            tc.tcNumber = tcNumber++;
             tc.origin = csvReader.get(4);
             tc.fromLat = Double.parseDouble(csvReader.get(2));
             tc.fromLon = Double.parseDouble(csvReader.get(3));
@@ -61,15 +67,13 @@ class CsvTestCase {
             return;
         }
 
-        boolean error = false;
 
         boolean[] resultMatch = new boolean[results.length];
 
         for (String exp : expectedResult) {
             int i = find(exp, results);
             if(i == -1) {
-                error = true;
-                System.err.println("Unable to find expected trip:   " + exp);
+                errors.add(new AssertErrorMessage(exp, "- Unable to find expected trip:"));
             }
             else {
                 resultMatch[i] = true;
@@ -79,13 +83,17 @@ class CsvTestCase {
         // Log all results not matched
         for (int i=0; i<resultMatch.length; ++i) {
             if(!resultMatch[i]) {
-                System.err.println("Trip returned but not expected: " + results[i]);
+                errors.add(new AssertErrorMessage(results[i], "+ Trip returned but not expected:"));
             }
         }
 
-        if(error) {
-            throw new IllegalStateException("Expected trips not found.");
+        if(failed()) {
+            throw new IllegalStateException("Trip errors");
         }
+    }
+
+    String errorDetails() {
+        return  errors.stream().sorted().map(s -> s + "\n").reduce((s, t) -> s + t).orElse("");
     }
 
     private void logTheResult(String[] results) {
@@ -105,5 +113,31 @@ class CsvTestCase {
             if(expected.equals(results[i])) return i;
         }
         return -1;
+    }
+
+    public boolean failed() {
+        return !errors.isEmpty();
+    }
+
+    private static class AssertErrorMessage implements Comparable<AssertErrorMessage>{
+        private static int maxLength = 0;
+        String msg;
+        String trip;
+
+        AssertErrorMessage(String trip, String msg) {
+            this.msg = msg;
+            this.trip = trip;
+            maxLength = Math.max(msg.length(), maxLength);
+        }
+
+        @Override
+        public String toString() {
+            return String.format("%-"+(maxLength+1)+"s  %s", msg, trip);
+        }
+
+        @Override
+        public int compareTo(@NotNull AssertErrorMessage o) {
+            return trip.compareTo(o.trip);
+        }
     }
 }

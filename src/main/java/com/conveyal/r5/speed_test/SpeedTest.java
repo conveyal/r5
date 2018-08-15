@@ -30,7 +30,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.ConcurrentModificationException;
+import java.util.Collection;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.List;
@@ -87,7 +87,7 @@ public class SpeedTest {
     }
 
     public void run(SpeedTestCmdLineOpts opts) throws Exception {
-        List<CsvTestCase> testCases = CsvTestCase.getCoordPairs(new File(this.opts.rootDir(), COORD_PAIRS));
+        List<CsvTestCase> testCases = CsvTestCase.readTestCasesFromFile(new File(this.opts.rootDir(), COORD_PAIRS));
         List<TripPlan> tripPlans = new ArrayList<>();
 
 
@@ -149,9 +149,6 @@ public class SpeedTest {
                 testCase.assertResult(route.itinerariesAsCompactStrings());
             }
             return true;
-        } catch (ConcurrentModificationException | NullPointerException e) {
-            printError(testCase, TIMER.lapTime(), e);
-            e.printStackTrace();
         } catch (Exception e) {
             printError(testCase, TIMER.lapTime(), e);
             e.printStackTrace();
@@ -265,7 +262,7 @@ public class SpeedTest {
                     streetRouter.accessTimesToStopsInSeconds,
                     streetRouter.egressTimesToStopsInSeconds.keys()
             );
-            worker.route();
+            Collection<Path> mpaths = worker.route();
 
             TIMER_WORKER.stop();
 
@@ -274,8 +271,6 @@ public class SpeedTest {
             TIMER_COLLECT_RESULTS.start();
             TIMER_COLLECT_RESULTS_PATHS.start();
 
-
-
             /*
                 TODO TGR We filter paths (ParetoSet) because the algorithm now return duplicates,
                 we could probably do this with a HashSet instead, but the optimal solution is to fix the
@@ -283,38 +278,15 @@ public class SpeedTest {
             */
             ParetoSet<PathParetoSortableWrapper> paths = new ParetoSet<>(PathParetoSortableWrapper.paretoDominanceFunctions());
 
-            TIntIntIterator egressTimeIterator = streetRouter.egressTimesToStopsInSeconds.iterator();
 
-            int egressIndex = 0;
-            while (egressTimeIterator.hasNext()) {
-                egressTimeIterator.advance();
-//                int stopIndex = egressTimeIterator.key();
-                int egressTime = egressTimeIterator.value();
-                int minuteReversed = worker.nMinutes();
+            for (Path path : mpaths) {
+                int egressTransferTime = streetRouter.egressTimesToStopsInSeconds.get(path.egressStop());
+                int accessTransferTime = streetRouter.accessTimesToStopsInSeconds.get(path.accessStop());
+                int totalTime = accessTransferTime + path.travelTime() + egressTransferTime;
 
-                for (int minute = 0; minute < worker.nMinutes(); minute++) {
-                    --minuteReversed;
-
-                    Path path = worker.pathsPerIteration.get(minute)[i];
-                    if (path != null) {
-
-                        // TGR - This is not correct, it calculates the time from the fromTime, not from
-                        // when the travel need to start. Lets say the access walk takes 3 minutes and the
-                        // first available buss start 16:30 and take 10 minutes. Then the travel time is
-                        // 3 min access + 10 min = 13 min, not (fromTime=16:00): 43 minutes.
-                        // I don´t want to fix it because it would affect the test, also it is parially
-                        // handled by the paths pareto set and the fact that from time is adjusted by the
-                        // RR minutes starting point.
-
-                        int travelTimeToStop = path.alightTimes[path.length - 1] - request.fromTime - minuteReversed * 60;
-
-                        int totalTime = travelTimeToStop + egressTime;
-
-                        paths.add(new PathParetoSortableWrapper(path, totalTime));
-                    }
-                }
-                egressIndex++;
+                paths.add(new PathParetoSortableWrapper(path, totalTime));
             }
+
             TIMER_COLLECT_RESULTS_PATHS.stop();
             TIMER_COLLECT_RESULTS_ITINERARIES.start();
 
@@ -374,6 +346,9 @@ public class SpeedTest {
                 tc.toString(),
                 details
         );
+        if(tc.failed()) {
+            System.err.println(tc.errorDetails());
+        }
     }
 
 

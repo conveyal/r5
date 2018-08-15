@@ -6,9 +6,9 @@ import com.conveyal.r5.util.AvgTimer;
 import gnu.trove.list.TIntList;
 import gnu.trove.map.TIntIntMap;
 
-import java.util.ArrayList;
 import java.util.BitSet;
-import java.util.List;
+import java.util.Collection;
+import java.util.HashSet;
 
 
 /**
@@ -73,7 +73,7 @@ public class RangeRaptorWorker {
     private final RangeRaptorWorkerState state;
 
     /** If we're going to store paths to every destination (e.g. for static sites) then they'll be retained here. */
-    public List<Path[]> pathsPerIteration;
+    public Collection<Path> paths;
 
     private final PathBuilder pathBuilder;
 
@@ -103,6 +103,7 @@ public class RangeRaptorWorker {
         this.fromTimeSeconds = fromTimeInSeconds;
         // compute number of minutes for scheduled search
         this.nMinutes = (toTimeInSeconds - fromTimeInSeconds) / 60;
+        this.paths = new HashSet<>();
     }
 
     public int nMinutes() {
@@ -112,8 +113,10 @@ public class RangeRaptorWorker {
     /**
      * For each iteration (minute + MC draw combination), return the minimum travel time to each transit stop in seconds.
      * Return value dimension order is [searchIteration][transitStopIndex]
+     *
+     * @return a unique set of paths
      */
-    public void route () {
+    public Collection<Path> route () {
 
         //LOG.info("Performing {} rounds (minutes)",  nMinutes);
 
@@ -121,10 +124,6 @@ public class RangeRaptorWorker {
             TIMER_ROUTE_SETUP.start();
             transit.init();
             TIMER_ROUTE_SETUP.stop();
-
-
-            pathsPerIteration = new ArrayList<>();
-
 
             // The main outer loop iterates backward over all minutes in the departure times window.
             for (int departureTime = toTimeSeconds - DEPARTURE_STEP_SEC, minute = nMinutes;
@@ -141,6 +140,7 @@ public class RangeRaptorWorker {
                 );
             }
         });
+        return paths;
     }
 
     /**
@@ -191,23 +191,22 @@ public class RangeRaptorWorker {
         // This state is repeatedly modified as the outer loop progresses over departure minutes.
         // We have to be careful here that creating these paths does not modify the state, and makes
         // protective copies of any information we want to retain.
-        pathsPerIteration.add(pathToEachStop());
+        addPathsForCurrentIteration();
     }
 
 
     /**
      * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
      */
-    private Path[] pathToEachStop () {
-        int nStops = egressStops.length;
-        Path[] paths = new Path[nStops];
-        for (int s = 0; s < nStops; s++) {
-            int stopIndex = egressStops[s];
+    private void addPathsForCurrentIteration () {
+        for (int stopIndex : egressStops) {
             if(state.isStopReachedByTransit(stopIndex)) {
-                paths[s] = pathBuilder.extractPathForStop(state.getMaxRound(), stopIndex);
+                Path p = pathBuilder.extractPathForStop(state.getMaxRound(), stopIndex);
+                if(p != null) {
+                    paths.add(p);
+                }
             }
         }
-        return paths;
     }
 
     /** Perform a scheduled search */

@@ -77,8 +77,7 @@ public class Path {
             if (state.transferStop[stop] != -1) {
                 transferTimes.add(state.transferTimes[stop]);
                 stop = state.transferStop[stop];
-            }
-            else {
+            } else {
                 transferTimes.add(-1);
             }
         }
@@ -100,11 +99,11 @@ public class Path {
         this.boardTimes = boardTimes.toArray();
         this.trips = trips.toArray();
         this.transferTimes = transferTimes.toArray();
-
         this.length = this.patterns.length;
 
-        if (this.patterns.length == 0)
-            LOG.error("Transit path computed without a transit segment!");
+        if (length == 0) {
+            throw new IllegalStateException("Transit path computed without a transit segment!");
+        }
     }
 
     /**
@@ -152,8 +151,9 @@ public class Path {
         this.alightStopPositions = alightStopPositions.toArray();
         this.length = this.patterns.length;
 
-        if (this.patterns.length == 0)
-            LOG.error("Transit path computed without a transit segment!");
+        if (this.patterns.length == 0) {
+            throw new IllegalStateException("Transit path computed without a transit segment!");
+        }
     }
 
     public Path(
@@ -177,7 +177,6 @@ public class Path {
         this.boardTimes = boardTimes;
         this.transferTimes = transferTimes;
         this.length = patterns.length;
-
 
         if (patterns.length == 0) {
             throw new IllegalStateException("Transit path computed without a transit segment!");
@@ -218,12 +217,27 @@ public class Path {
 
     /**
      * Gets tripPattern at provided pathIndex
-     * @param transitLayer
-     * @param pathIndex
-     * @return
      */
     public TripPattern getPattern(TransitLayer transitLayer, int pathIndex) {
         return transitLayer.tripPatterns.get(this.patterns[pathIndex]);
     }
 
+    public int egressStop() {
+        return alightStops[length - 1];
+    }
+
+    public int accessStop() {
+        return boardStops[0];
+    }
+
+    public int travelTime() {
+        return alightTimes[length - 1] - boardTimes[0];
+    }
+
+    private static String toTime(int time) {
+        time /= 60;
+        int min = time % 60;
+        int hour = time / 60;
+        return String.format("%02d:%02d", hour, min);
+    }
 }

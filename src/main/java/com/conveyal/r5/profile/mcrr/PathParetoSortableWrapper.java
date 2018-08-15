@@ -33,6 +33,9 @@ public class PathParetoSortableWrapper implements ParetoSortable {
     }
 
 
+    /* private methods */
+
+
     /**
      * As all other hash functions this function may lead to collision, but only if the vector passed inn have
      * the same length for all length < 127.

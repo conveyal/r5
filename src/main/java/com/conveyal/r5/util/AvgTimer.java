@@ -24,7 +24,7 @@ import java.util.stream.Stream;
  * See the {@link #main(String[])} for usage and example code.
  */
 public abstract class AvgTimer {
-    private static final boolean NOOP = true;
+    private static final boolean NOOP = false;
     private static final String RESULT_TABLE_TITLE = "METHOD CALLS DURATION";
     //    private static final Logger LOG = LoggerFactory.getLogger(AvgTimer.class);
 

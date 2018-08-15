@@ -201,7 +201,7 @@ public class RangeRaptorWorker {
     private void addPathsForCurrentIteration () {
         for (int stopIndex : egressStops) {
             if(state.isStopReachedByTransit(stopIndex)) {
-                Path p = pathBuilder.extractPathForStop(state.getMaxRound(), stopIndex);
+                Path p = pathBuilder.extractPathForStop(state.getMaxNumberOfRounds(), stopIndex);
                 if(p != null) {
                     paths.add(p);
                 }
@@ -242,11 +242,13 @@ public class RangeRaptorWorker {
                     );
                 }
 
-                int sourcePatternIndex = state.getPatternIndexForPreviousRound(stop);
+                //int sourcePatternIndex = state.getPatternIndexForPreviousRound(stop);
 
                 // Don't attempt to board if this stop was not reached in the last round, and don't attempt to
                 // reboard the same pattern
-                if (state.isStopReachedInLastRound(stop) && sourcePatternIndex != originalPatternIndex) {
+                // TODO TGR - Allow reboarding - loop case;
+                // TODO TGR - Remove commentted out code, if this change proves to work, and update comment above
+                if (state.isStopReachedInLastRound(stop)) { // && sourcePatternIndex != originalPatternIndex) {
                     int earliestBoardTime = state.bestTimePreviousRound(stop) + MINIMUM_BOARD_WAIT_SEC;
 
                     // only attempt to board if the stop was touched
@@ -339,8 +341,10 @@ public class RangeRaptorWorker {
         BitSetIterator it = state.bestStopsTouchedLastRoundIterator();
 
         for (int stop = it.next(); stop >= 0; stop = it.next()) {
-            // copy stop to a new final variable to get around Java 8 "effectively final" nonsense
-            final int finalStop = stop;
+
+            // TODO TGR - look below.
+            //final int sourcePatternIndex = state.getPatternIndexForPreviousRoundPatternsTouched(stop);
+
             transit.getPatternsForStop(stop).forEach(originalPattern -> {
                 int filteredPattern = index[originalPattern];
 
@@ -348,15 +352,18 @@ public class RangeRaptorWorker {
                     return true; // this pattern does not exist in the local subset of patterns, continue iteration
                 }
 
-                int sourcePatternIndex = state.getPatternIndexForPreviousRound(finalStop);
+                // don't re-explore the same pattern we used to reach this stop
+                // we forbid riding the same pattern twice in a row in the search code above, this will prevent
+                // us even having to loop over the stops in the pattern if potential board stops were only reached
+                // using this pattern.
+                // TODO TGR - What happens if a pattern goes in a loop before it goes to the final destination stop;
+                // TODO TGR - It might be possible to ride into the loop, get off and board an earlier trip before
+                // TODO TGR - going to the final destination.
+                //if (sourcePatternIndex == originalPattern) {
+                //    return true;
+                //}
 
-                if (sourcePatternIndex != originalPattern) {
-                    // don't re-explore the same pattern we used to reach this stop
-                    // we forbid riding the same pattern twice in a row in the search code above, this will prevent
-                    // us even having to loop over the stops in the pattern if potential board stops were only reached
-                    // using this pattern.
-                    patternsTouched.set(filteredPattern);
-                }
+                patternsTouched.set(filteredPattern);
                 return true; // continue iteration
             });
         }

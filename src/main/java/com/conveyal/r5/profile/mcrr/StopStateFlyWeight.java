@@ -62,7 +62,7 @@ public final class StopStateFlyWeight {
     }
 
     /**
-     * Set the time at a transit index iff it is optimal. This sets both the best time and the nonTransferTime
+     * Set the time at a transit index iff it is optimal. This sets both the best time and the transfer time
      */
     void transferToStop(int round, int stop, int time, int fromStop, int transferTime) {
         final int index = findOrCreateStopIndex(round, stop);

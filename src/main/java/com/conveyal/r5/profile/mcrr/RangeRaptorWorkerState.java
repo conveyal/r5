@@ -33,15 +33,13 @@ public interface RangeRaptorWorkerState {
 
     boolean isStopReachedInLastRound(int stop);
 
-    int getPatternIndexForPreviousRound(int stop);
-
     int bestTimePreviousRound(int stop);
 
     BitSetIterator stopsTouchedByTransitCurrentRoundIterator();
 
     BitSetIterator bestStopsTouchedLastRoundIterator();
 
-    int getMaxRound();
+    int getMaxNumberOfRounds();
 
     boolean isStopReachedByTransit(int stop);
 }

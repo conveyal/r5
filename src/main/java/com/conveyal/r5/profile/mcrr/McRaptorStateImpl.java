@@ -88,7 +88,7 @@ public final class McRaptorStateImpl implements RangeRaptorWorkerState {
     }
 
     @Override
-    public int getMaxRound() {
+    public int getMaxNumberOfRounds() {
         return roundMax;
     }
 
@@ -102,9 +102,7 @@ public final class McRaptorStateImpl implements RangeRaptorWorkerState {
     }
 
     @Override public int bestTimePreviousRound(int stop) {
-        // TODO TGR
-        return state.time(round-1, stop);
-        //return bestOveral.timeLastRound(stop);
+        return cursor.stop(round-1, stop).time();
     }
 
     @Override public int bestTransitTime(int stop) {
@@ -163,13 +161,18 @@ public final class McRaptorStateImpl implements RangeRaptorWorkerState {
         }
     }
 
-    @Override public int getPatternIndexForPreviousRound(int stop) {
-        StopState state = cursor.stop(round-1, stop);
-        int boardStop = state.boardStop();
-        return boardStop == NOT_SET
-                ? state.previousPattern()
-                : cursor.stop(round-1, boardStop).previousPattern();
-    }
+
+// TODO TGR - This code is was used to not reboard the same pattern, but this is
+// TODO TGR - problematic: Loop case.
+//    @Override public int getPatternIndexForPreviousRound(int stop) {
+//        //return -1;
+//        return cursor.stop(round-1, stop).previousPattern();
+//    }
+
+//    @Override public int getPatternIndexForPreviousRoundPatternsTouched(int stop) {
+//        //return -1;
+//        return cursor.stop(round-1, stop).previousPattern();
+//    }
 
 
     /* private methods */

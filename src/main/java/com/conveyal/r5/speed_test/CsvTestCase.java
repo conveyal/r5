@@ -9,7 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 class CsvTestCase {
-    public int tcNumber;
+    public int index;
     public String origin;
     public double fromLat;
     public double fromLon;
@@ -23,18 +23,18 @@ class CsvTestCase {
 
     @Override
     public String toString() {
-        return String.format("#%d %s -> %s, (%.3f, %.3f) -> (%.3f, %.3f)", tcNumber, origin, destination, fromLat, fromLon, toLat, toLon);
+        return String.format("#%d %s -> %s, (%.3f, %.3f) -> (%.3f, %.3f)", index, origin, destination, fromLat, fromLon, toLat, toLon);
     }
 
     static List<CsvTestCase> readTestCasesFromFile(File csvFile) throws IOException {
         List<CsvTestCase> testCases = new ArrayList<>();
         CsvReader csvReader = new CsvReader(csvFile.getAbsolutePath());
         csvReader.readRecord(); // Skip header
-        int tcNumber = 0;
+        int index = 0;
 
         while (csvReader.readRecord()) {
             CsvTestCase tc = new CsvTestCase();
-            tc.tcNumber = tcNumber++;
+            tc.index = index++;
             tc.origin = csvReader.get(4);
             tc.fromLat = Double.parseDouble(csvReader.get(2));
             tc.fromLon = Double.parseDouble(csvReader.get(3));
@@ -66,7 +66,6 @@ class CsvTestCase {
             logTheResult(results);
             return;
         }
-
 
         boolean[] resultMatch = new boolean[results.length];
 

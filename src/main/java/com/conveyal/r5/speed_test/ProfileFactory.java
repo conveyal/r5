@@ -12,6 +12,8 @@ import com.conveyal.r5.profile.mcrr.StopStateCollection;
 import com.conveyal.r5.profile.mcrr.StopStatesIntArray;
 import com.conveyal.r5.profile.mcrr.StopStatesStructArray;
 import com.conveyal.r5.profile.mcrr.Worker;
+import com.conveyal.r5.profile.mcrr.mc.McRangeRaptorWorker;
+import com.conveyal.r5.profile.mcrr.mc.McWorkerState;
 
 import java.util.Arrays;
 import java.util.List;
@@ -27,27 +29,27 @@ enum ProfileFactory {
             return new StopStatesStructArray(nRounds, nStops);
         }
     },
-//    multi_criteria("mc", "Multi criteria pareto state with new McRangeRaptor") {
-//        @Override
-//        public Worker createWorker(ProfileRequest request, int nRounds, int nStops, RaptorWorkerTransitDataProvider transitData, EgressAccessRouter streetRouter) {
-//            McWorkerState state = new McWorkerState(
-//                    nRounds,
-//                    nStops,
-//                    request.maxTripDurationMinutes * 60
-//            );
-//
-//            return new McRangeRaptorWorker(
-//                    transitData,
-//                    state,
-//                    request.fromTime,
-//                    request.toTime,
-//                    request.walkSpeed,
-//                    request.maxWalkTime,
-//                    streetRouter.accessTimesToStopsInSeconds,
-//                    streetRouter.egressTimesToStopsInSeconds.keys()
-//            );
-//        }
-//    }
+    multi_criteria("mc", "Multi criteria pareto state with new McRangeRaptor") {
+        @Override
+        public Worker createWorker(ProfileRequest request, int nRounds, int nStops, RaptorWorkerTransitDataProvider transitData, EgressAccessRouter streetRouter) {
+            McWorkerState state = new McWorkerState(
+                    nRounds,
+                    nStops,
+                    request.maxTripDurationMinutes * 60
+            );
+
+            return new McRangeRaptorWorker(
+                    transitData,
+                    state,
+                    request.fromTime,
+                    request.toTime,
+                    request.walkSpeed,
+                    request.maxWalkTime,
+                    streetRouter.accessTimesToStopsInSeconds,
+                    streetRouter.egressTimesToStopsInSeconds.keys()
+            );
+        }
+    }
     ;
     final String shortName;
     final String description;
@@ -66,7 +68,7 @@ enum ProfileFactory {
 
         switch (algorithm) {
             case RangeRaptor: return original;
-//            case MultiCriteriaRangeRaptor: return multi_criteria;
+            case MultiCriteriaRangeRaptor: return multi_criteria;
             case StructRangeRaptor: return struct_arrays;
             case IntArrayRangeRaptor: return int_arrays;
         }

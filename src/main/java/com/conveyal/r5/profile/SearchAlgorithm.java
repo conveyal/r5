@@ -4,5 +4,5 @@ public enum SearchAlgorithm {
     RangeRaptor,
     StructRangeRaptor,
     IntArrayRangeRaptor,
-//    MultiCriteriaRangeRaptor
+    MultiCriteriaRangeRaptor
 }

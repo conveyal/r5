@@ -34,6 +34,15 @@ public class PathBuilder {
         this.round = maxRound;
         this.cursor.stop(round, egressStop);
 
+        RangeRaptorWorkerStateImpl.debugStopHeader("FIND PATH");
+
+        // find the fewest-transfers trip that is still optimal in terms of travel time
+        StopState currentStop = findLastRoundWithTransitTimeSet(egressStop);
+
+        if(currentStop == null) {
+            return null;
+        }
+
         // trace the path back from this RaptorState
         patterns.clear();
         boardStops.clear();
@@ -44,14 +53,6 @@ public class PathBuilder {
         transferTimes.clear();
         trips.clear();
 
-        RangeRaptorWorkerStateImpl.debugStopHeader("FIND PATH");
-
-        // find the fewest-transfers trip that is still optimal in terms of travel time
-        StopState currentStop = findLastRoundWithTransitTimeSet(egressStop);
-
-        if(currentStop == null) {
-            throw new IllegalStateException("Transit for stop not found. Stop: " + egressStop + ".");
-        }
 
         //state.debugStop("egress stop", state.round(), stop);
 
@@ -118,17 +119,14 @@ public class PathBuilder {
      */
     private StopState findLastRoundWithTransitTimeSet(int egressStop) {
 
-        StopState currentStop = cursor.stop(round, egressStop);
-
-        while(!currentStop.isTransitTimeSet()) {
+        while(cursor.stopNotVisited(round, egressStop) || !cursor.stop(round, egressStop).isTransitTimeSet()) {
 
             //debugListedStops("skip no transit", round, stop);
             --round;
             if(round == -1) {
                 return null;
             }
-            currentStop = cursor.stop(round, egressStop);
         }
-        return currentStop;
+        return cursor.stop(round, egressStop);
     }
 }

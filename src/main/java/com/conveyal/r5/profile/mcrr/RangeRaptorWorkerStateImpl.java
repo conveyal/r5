@@ -58,7 +58,7 @@ public final class RangeRaptorWorkerStateImpl implements RangeRaptorWorkerState 
 
 
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
-    public RangeRaptorWorkerStateImpl(int nStops, int nRounds, int maxDurationSeconds, int earliestDepartureTime, StopStateCollection stops) {
+    public RangeRaptorWorkerStateImpl(int nRounds, int nStops, int earliestDepartureTime, int maxDurationSeconds, StopStateCollection stops) {
         this.nRounds = nRounds;
         this.stops = stops;
         this.cursor = stops.newCursor();

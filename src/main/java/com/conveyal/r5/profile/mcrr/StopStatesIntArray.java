@@ -5,7 +5,7 @@ import static com.conveyal.r5.profile.mcrr.IntUtils.newIntArray;
 import static com.conveyal.r5.profile.mcrr.StopState.NOT_SET;
 import static com.conveyal.r5.profile.mcrr.StopState.UNREACHED;
 
-public final class StopStateFlyWeight implements StopStateCollection {
+public final class StopStatesIntArray implements StopStateCollection {
     private int size = 0;
 
     private final int[][] stateStopIndex;
@@ -20,7 +20,7 @@ public final class StopStateFlyWeight implements StopStateCollection {
     private final int[] transferFromStops;
 
 
-    public StopStateFlyWeight(int rounds, int stops) {
+    public StopStatesIntArray(int rounds, int stops) {
         this.stateStopIndex = new int[rounds][stops];
 
         final int limit = 3 * stops;
@@ -88,13 +88,25 @@ public final class StopStateFlyWeight implements StopStateCollection {
         return stateStopIndex[round][stop];
     }
 
-    public class Cursor implements StopStateCursor, StopState {
+    public final class Cursor implements StopStateCursor, StopState {
         private int cursor;
 
-        public StopState stop(int round, int stop) {
+
+        /* Implement StopStateCursor */
+
+        @Override
+        public final StopState stop(int round, int stop) {
             this.cursor = stateStopIndex[round][stop];
             return this;
         }
+
+        @Override
+        public final boolean stopNotVisited(int round, int stop) {
+            return stateStopIndex[round][stop] == 0;
+        }
+
+
+        /* Implement StopState */
 
         @Override
         public final int time() {
@@ -102,52 +114,52 @@ public final class StopStateFlyWeight implements StopStateCollection {
         }
 
         @Override
-        public int transitTime() {
+        public final int transitTime() {
             return transitTimes[cursor];
         }
 
         @Override
-        public boolean isTransitTimeSet() {
+        public final boolean isTransitTimeSet() {
             return transitTimes[cursor] != UNREACHED;
         }
 
         @Override
-        public int previousPattern() {
+        public final int previousPattern() {
             return previousPatterns[cursor];
         }
 
         @Override
-        public int previousTrip() {
+        public final int previousTrip() {
             return previousTrips[cursor];
         }
 
         @Override
-        public int transferTime() {
+        public final int transferTime() {
             return transferTimes[cursor];
         }
 
         @Override
-        public int boardStop() {
+        public final int boardStop() {
             return boardStops[cursor];
         }
 
         @Override
-        public int boardTime() {
+        public final int boardTime() {
             return boardTimes[cursor];
         }
 
         @Override
-        public int transferFromStop() {
+        public final int transferFromStop() {
             return transferFromStops[cursor];
         }
 
         @Override
-        public boolean arrivedByTransfer() {
+        public final boolean arrivedByTransfer() {
             return transferFromStops[cursor] != NOT_SET;
         }
 
         @Override
-        public String toString() {
+        public final String toString() {
             return asString();
         }
     }

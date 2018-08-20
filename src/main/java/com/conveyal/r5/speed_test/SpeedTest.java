@@ -8,13 +8,11 @@ import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.SearchAlgorithm;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.profile.mcrr.PathBuilder;
-import com.conveyal.r5.profile.mcrr.RangeRaptorWorkerStateImpl;
-import com.conveyal.r5.profile.mcrr.RangeRaptorWorker;
 import com.conveyal.r5.profile.mcrr.PathParetoSortableWrapper;
+import com.conveyal.r5.profile.mcrr.RangeRaptorWorker;
+import com.conveyal.r5.profile.mcrr.RangeRaptorWorkerState;
 import com.conveyal.r5.profile.mcrr.RaptorWorkerTransitDataProvider;
 import com.conveyal.r5.profile.mcrr.StopStateCollection;
-import com.conveyal.r5.profile.mcrr.StopStateFlyWeight;
-import com.conveyal.r5.profile.mcrr.StopStateFlyWeight2;
 import com.conveyal.r5.profile.mcrr.TransitLayerRRDataProvider;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.Place;
@@ -35,7 +33,9 @@ import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static com.conveyal.r5.profile.SearchAlgorithm.MultiCriteriaRangeRaptor;
 import static com.conveyal.r5.profile.SearchAlgorithm.RangeRaptor;
@@ -67,9 +67,17 @@ public class SpeedTest {
     private static final AvgTimer TIMER_COLLECT_RESULTS_TRIP_PLAN = AvgTimer.timerMilliSec("SpeedTest:route CR TripPlan");
 
     private List<Integer> numOfPathsFound = new ArrayList<>();
+    private Map<StateFactory, List<Integer>> workerResults = new HashMap<>();
+    private Map<StateFactory, List<Integer>> totalResults = new HashMap<>();
+
+    private StateFactory stateFactory = StateFactory.parallel_int_arrays;
 
     SpeedTest(CommandLineOpts opts) throws Exception {
         this.opts = opts;
+        for(StateFactory key : StateFactory.values()) {
+            workerResults.put(key, new ArrayList<>());
+            totalResults.put(key, new ArrayList<>());
+        }
         initTransportNetwork();
     }
 
@@ -85,7 +93,21 @@ public class SpeedTest {
 
     public static void main(String[] args) throws Exception {
         SpeedTestCmdLineOpts opts = new SpeedTestCmdLineOpts(args);
-        new SpeedTest(opts).run(opts);
+        SpeedTest test = new SpeedTest(opts);
+
+        int SAMPLE_SIZE = 1;
+        //StateFactory[] startegies = StateFactory.values();
+        StateFactory[] startegies = StateFactory.struct_arrays.asArray();
+
+        for (int i=0; i < SAMPLE_SIZE; ++i) {
+            for (StateFactory stateFactory : startegies) {
+                test.stateFactory = stateFactory;
+                test.run(opts);
+            }
+        }
+
+        printResults("Worker: ", test.workerResults);
+        printResults("Total:  ", test.totalResults);
     }
 
     public void run(SpeedTestCmdLineOpts opts) throws Exception {
@@ -105,7 +127,7 @@ public class SpeedTest {
         runSingleTestCase(tripPlans, testCases.get(15), opts);
 
 
-        LOG.info("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [ START ]");
+        LOG.info("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [ START " + stateFactory + " ]");
 
         AvgTimer.resetAll();
 
@@ -117,7 +139,7 @@ public class SpeedTest {
         int tcSize = testCases.size();
 
         LOG.info(
-                "\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [ SUMMARY ]\n" +
+                "\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [ SUMMARY " + stateFactory + " ]\n" +
                 AvgTimer.listResults().stream().reduce("", (text, line) -> text + line + "\n") +
                 "\n" +
                 "\nPaths found: " + numOfPathsFound.stream().mapToInt((it) -> it).sum() + " " + numOfPathsFound +
@@ -125,7 +147,8 @@ public class SpeedTest {
                 "\nTotal time: " + TIMER.totalTimeInSeconds() + " seconds" +
                 (nRoutesComputed == tcSize ? "" : "\n!!! UNEXPECTED RESULTS: " + (tcSize - nRoutesComputed) + " OF " + tcSize + " TEST CASES DID NOT RETURN THE EXPECTED TRIPS. SEE ABOVE !!!")
         );
-
+        workerResults.get(stateFactory).add((int)TIMER_WORKER.avgTime());
+        totalResults.get(stateFactory).add((int)TIMER.avgTime());
     }
 
     private void forceGCToAvoidGCLater() {
@@ -173,7 +196,7 @@ public class SpeedTest {
     }
 
 
-    public TripPlan routeRangeRaptor(ProfileRequest request) {
+    private TripPlan routeRangeRaptor(ProfileRequest request) {
         TripPlan tripPlan = createTripPlanForRequest(request);
 
         for (int i = 0; i < request.numberOfItineraries; i++) {
@@ -244,21 +267,19 @@ public class SpeedTest {
             final int nStops = transportNetwork.transitLayer.getStopCount();
 
 
+            StopStateCollection stops = stateFactory.createStopStateCollection(nRounds, nStops);
 
-
-            StopStateCollection stops = new StopStateFlyWeight(nRounds, nStops);
-
-            RangeRaptorWorkerStateImpl stateImpl = new RangeRaptorWorkerStateImpl(
-                    nStops,
+            RangeRaptorWorkerState state = stateFactory.createWorkerState(
                     nRounds,
-                    request.maxTripDurationMinutes * 60,
+                    nStops,
                     request.fromTime,
+                    request.maxTripDurationMinutes * 60,
                     stops
             );
 
             RangeRaptorWorker worker = new RangeRaptorWorker(
                     transitData,
-                    stateImpl,
+                    state,
                     new PathBuilder(stops.newCursor()),
                     request.fromTime,
                     request.toTime,
@@ -356,7 +377,6 @@ public class SpeedTest {
         }
     }
 
-
     private static TripPlan createTripPlanForRequest(ProfileRequest request) {
         TripPlan tripPlan = new TripPlan();
         tripPlan.date = new Date(request.date.atStartOfDay(ZoneId.of("Europe/Oslo")).toInstant().toEpochMilli() + request.fromTime * 1000);
@@ -387,4 +407,13 @@ public class SpeedTest {
         return request;
     }
 
+    private static void printResults(String header, Map<StateFactory, List<Integer>> result) {
+        System.err.println();
+        System.err.println(header);
+        result.forEach((k,v) -> {
+            if(!v.isEmpty()) {
+                System.err.printf(" ==> %-14s : %s Avg: %4.1f%n", k.name, v, v.stream().mapToInt(it -> it).average().orElse(0d));
+            }
+        });
+    }
 }

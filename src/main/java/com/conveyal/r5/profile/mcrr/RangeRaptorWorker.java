@@ -212,7 +212,7 @@ public class RangeRaptorWorker {
     /** Perform a scheduled search */
     private void doScheduledSearchForRound() {
 
-        BitSet patternsTouched = getPatternsTouchedForStops(transit.getScheduledIndexForOriginalPatternIndex());
+        BitSet patternsTouched = getPatternsTouchedForStops();
         TransitLayerRRDataProvider.PatternIterator patternIterator = transit.patternIterator(patternsTouched);
 
 
@@ -335,8 +335,8 @@ public class RangeRaptorWorker {
      * TODO TGR - The responsibility of this method overlap with the transit data provider, but it is
      * TODO TGR - tied to the store, so I leave it for now. Task: Pull it appart and push to data provider.
      */
-    private BitSet getPatternsTouchedForStops(int[] index) {
-
+    private BitSet getPatternsTouchedForStops() {
+        int[] index = transit.getScheduledIndexForOriginalPatternIndex();
         BitSet patternsTouched = new BitSet();
         BitSetIterator it = state.bestStopsTouchedLastRoundIterator();
 

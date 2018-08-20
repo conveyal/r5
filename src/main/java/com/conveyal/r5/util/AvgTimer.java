@@ -166,6 +166,10 @@ public abstract class AvgTimer {
         return lapTime;
     }
 
+    public long avgTime() {
+        return average(totalTimeSuccess, counterSuccess);
+    }
+
     public String totalTimeInSeconds() {
         return toSec(totalTimeSuccess + totalTimeFailed);
     }

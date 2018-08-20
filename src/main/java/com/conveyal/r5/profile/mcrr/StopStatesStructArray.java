@@ -2,47 +2,35 @@ package com.conveyal.r5.profile.mcrr;
 
 
 import static com.conveyal.r5.profile.mcrr.StopState.NOT_SET;
-import static com.conveyal.r5.profile.mcrr.StopState.UNREACHED;
-import static com.conveyal.r5.util.TimeUtils.timeToString;
-
-public final class StopStateFlyWeight2 implements StopStateCollection {
-
-    private int size = 0;
-
-    private final int[][] stateStopIndex;
 
 
-    private final State[] stops;
+public final class StopStatesStructArray implements StopStateCollection {
+
+    private final State[][] stops;
 
 
-    public StopStateFlyWeight2(int rounds, int stops) {
-        this.stateStopIndex = new int[rounds][stops];
-
-        final int limit = 3 * stops;
-        this.stops = new State[limit];
-        this.stops[size] = new State();
-
+    public StopStatesStructArray(int rounds, int stops) {
+        this.stops = new State[rounds][stops];
     }
 
     @Override
     public void setInitalTime(int round, int stop, int time) {
-        final int index = findOrCreateStopIndex(round, stop);
-        stops[index].time = time;
+        findOrCreateStopIndex(round, stop).time = time;
     }
 
     @Override
     public void transitToStop(int round, int stop, int time, int fromPattern, int boardStop, int tripIndex, int boardTime, boolean bestTime) {
-        final int index = findOrCreateStopIndex(round, stop);
+        final State state = findOrCreateStopIndex(round, stop);
 
-        stops[index].transitTime = time;
-        stops[index].previousPattern = fromPattern;
-        stops[index].previousTrip = tripIndex;
-        stops[index].boardTime = boardTime;
-        stops[index].boardStop = boardStop;
+        state.transitTime = time;
+        state.previousPattern = fromPattern;
+        state.previousTrip = tripIndex;
+        state.boardTime = boardTime;
+        state.boardStop = boardStop;
 
         if(bestTime) {
-            stops[index].time = time;
-            stops[index].transferFromStop = NOT_SET;
+            state.time = time;
+            state.transferFromStop = NOT_SET;
         }
     }
 
@@ -51,49 +39,38 @@ public final class StopStateFlyWeight2 implements StopStateCollection {
      */
     @Override
     public void transferToStop(int round, int stop, int time, int fromStop, int transferTime) {
-        final int index = findOrCreateStopIndex(round, stop);
-        stops[index].time = time;
-        stops[index].transferFromStop = fromStop;
-        stops[index].transferTime = transferTime;
+        final State state = findOrCreateStopIndex(round, stop);
+        state.time = time;
+        state.transferFromStop = fromStop;
+        state.transferTime = transferTime;
     }
 
     public final int time(int round, int stop) {
-        final int index = stateStopIndex[round][stop];
-        return stops[index].time;
+        return stops[round][stop].time;
     }
 
     public Cursor newCursor() {
         return new Cursor();
     }
 
-
-    private String stopToString(int round, int stop) {
-        return stops[stateStopIndex[round][stop]].asString();
-    }
-
-
-    private int nextAvailable() {
-        // Skip the first element, index 0 is not used for optimaziations reasons
-        ++size;
-        stops[size] = new State();
-        return size;
-    }
-
-    private static String intToString(int value) { return value == -1 ? "" : Integer.toString(value); }
-
-    private int findOrCreateStopIndex(final int round, final int stop) {
-        if(stateStopIndex[round][stop] == 0) {
-            stateStopIndex[round][stop] = nextAvailable();
+    private State findOrCreateStopIndex(final int round, final int stop) {
+        if(stops[round][stop] == null) {
+            stops[round][stop] = new State();
         }
-        return stateStopIndex[round][stop];
+        return stops[round][stop];
     }
 
     public class Cursor implements StopStateCursor {
         private State currentStop;
 
         public State stop(int round, int stop) {
-            this.currentStop = stops[stateStopIndex[round][stop]];
+            this.currentStop = stops[round][stop];
             return currentStop;
+        }
+
+        @Override
+        public boolean stopNotVisited(int round, int stop) {
+            return stops[round][stop] == null;
         }
     }
 

@@ -3,8 +3,6 @@ package com.conveyal.r5.profile.mcrr;
 import com.conveyal.r5.transit.TripSchedule;
 import gnu.trove.list.TIntList;
 
-import java.util.BitSet;
-
 
 /**
  * <p>
@@ -48,11 +46,7 @@ public interface RaptorWorkerTransitDataProvider {
     boolean skipCalendarService(int serviceCode);
 
     // TODO TGR - add JavaDoc
-    int[] getScheduledIndexForOriginalPatternIndex();
-
-    // TODO TGR - add JavaDoc
-    PatternIterator patternIterator(BitSet patternsTouched);
-
+    PatternIterator patternIterator(BitSetIterator stops);
 
     // TODO TGR - add JavaDoc
     interface PatternIterator {

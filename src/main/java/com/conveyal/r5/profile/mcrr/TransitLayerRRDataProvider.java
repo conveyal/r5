@@ -46,11 +46,6 @@ public class TransitLayerRRDataProvider implements RaptorWorkerTransitDataProvid
     }
 
     @Override
-    public int[] getScheduledIndexForOriginalPatternIndex() {
-        return scheduledIndexForOriginalPatternIndex;
-    }
-
-    @Override
     public TIntList getTransfersDistancesInMMForStop(int stop) {
         return transitLayer.transfersForStop.get(stop);
     }
@@ -99,9 +94,35 @@ public class TransitLayerRRDataProvider implements RaptorWorkerTransitDataProvid
         }
     }
 
-    @Override public PatternIterator patternIterator(BitSet patternsTouched) {
-        return new InternalPatternIterator(patternsTouched);
+    @Override public PatternIterator patternIterator(BitSetIterator stops) {
+        return new InternalPatternIterator(getPatternsTouchedForStops(stops));
     }
+
+    /**
+     * TODO TGR - Verify JavaDoc make sence
+     * Get a list of the internal IDs of the patterns "touched" using the given index (frequency or scheduled)
+     * "touched" means they were reached in the last round, and the index maps from the original pattern index to the
+     * local index of the filtered patterns.
+     */
+    private BitSet getPatternsTouchedForStops(BitSetIterator stops) {
+        BitSet patternsTouched = new BitSet();
+
+        for (int stop = stops.next(); stop >= 0; stop = stops.next()) {
+
+            getPatternsForStop(stop).forEach(originalPattern -> {
+                int filteredPattern = scheduledIndexForOriginalPatternIndex[originalPattern];
+
+                if (filteredPattern < 0) {
+                    return true; // this pattern does not exist in the local subset of patterns, continue iteration
+                }
+
+                patternsTouched.set(filteredPattern);
+                return true; // continue iteration
+            });
+        }
+        return patternsTouched;
+    }
+
 
     class InternalPatternIterator implements PatternIterator, Pattern {
         private int nextPatternIndex;

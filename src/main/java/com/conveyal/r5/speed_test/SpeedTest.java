@@ -95,9 +95,9 @@ public class SpeedTest {
         SpeedTestCmdLineOpts opts = new SpeedTestCmdLineOpts(args);
         SpeedTest test = new SpeedTest(opts);
 
-        int SAMPLE_SIZE = 1;
-        //StateFactory[] startegies = StateFactory.values();
-        StateFactory[] startegies = StateFactory.struct_arrays.asArray();
+        int SAMPLE_SIZE = 3;
+        StateFactory[] startegies = StateFactory.values();
+        //StateFactory[] startegies = StateFactory.struct_arrays.asArray();
 
         for (int i=0; i < SAMPLE_SIZE; ++i) {
             for (StateFactory stateFactory : startegies) {

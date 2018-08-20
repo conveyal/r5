@@ -6,7 +6,6 @@ import com.conveyal.r5.util.AvgTimer;
 import gnu.trove.list.TIntList;
 import gnu.trove.map.TIntIntMap;
 
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.HashSet;
 
@@ -212,9 +211,7 @@ public class RangeRaptorWorker {
     /** Perform a scheduled search */
     private void doScheduledSearchForRound() {
 
-        BitSet patternsTouched = getPatternsTouchedForStops();
-        TransitLayerRRDataProvider.PatternIterator patternIterator = transit.patternIterator(patternsTouched);
-
+        TransitLayerRRDataProvider.PatternIterator patternIterator = transit.patternIterator(state.bestStopsTouchedLastRoundIterator());
 
         while(patternIterator.morePatterns()) {
             TransitLayerRRDataProvider.Pattern pattern = patternIterator.next();
@@ -327,46 +324,4 @@ public class RangeRaptorWorker {
         }
     }
 
-    /**
-     * Get a list of the internal IDs of the patterns "touched" using the given index (frequency or scheduled)
-     * "touched" means they were reached in the last round, and the index maps from the original pattern index to the
-     * local index of the filtered patterns.
-     *
-     * TODO TGR - The responsibility of this method overlap with the transit data provider, but it is
-     * TODO TGR - tied to the store, so I leave it for now. Task: Pull it appart and push to data provider.
-     */
-    private BitSet getPatternsTouchedForStops() {
-        int[] index = transit.getScheduledIndexForOriginalPatternIndex();
-        BitSet patternsTouched = new BitSet();
-        BitSetIterator it = state.bestStopsTouchedLastRoundIterator();
-
-        for (int stop = it.next(); stop >= 0; stop = it.next()) {
-
-            // TODO TGR - look below.
-            //final int sourcePatternIndex = state.getPatternIndexForPreviousRoundPatternsTouched(stop);
-
-            transit.getPatternsForStop(stop).forEach(originalPattern -> {
-                int filteredPattern = index[originalPattern];
-
-                if (filteredPattern < 0) {
-                    return true; // this pattern does not exist in the local subset of patterns, continue iteration
-                }
-
-                // don't re-explore the same pattern we used to reach this stop
-                // we forbid riding the same pattern twice in a row in the search code above, this will prevent
-                // us even having to loop over the stops in the pattern if potential board stops were only reached
-                // using this pattern.
-                // TODO TGR - What happens if a pattern goes in a loop before it goes to the final destination stop;
-                // TODO TGR - It might be possible to ride into the loop, get off and board an earlier trip before
-                // TODO TGR - going to the final destination.
-                //if (sourcePatternIndex == originalPattern) {
-                //    return true;
-                //}
-
-                patternsTouched.set(filteredPattern);
-                return true; // continue iteration
-            });
-        }
-        return patternsTouched;
-    }
 }

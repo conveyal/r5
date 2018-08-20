@@ -3,7 +3,8 @@ package com.conveyal.r5.profile.mcrr;
 import java.util.Arrays;
 import java.util.List;
 
-import static com.conveyal.r5.profile.mcrr.StopState.NOT_SET;
+import static com.conveyal.r5.profile.mcrr.StopState.STOP_HEADERS;
+
 
 /**
  * Tracks the state of a RAPTOR search, specifically the best arrival times at each transit stop at the end of a
@@ -21,16 +22,16 @@ import static com.conveyal.r5.profile.mcrr.StopState.NOT_SET;
  *
  * @author mattwigway
  */
-public final class McRaptorStateImpl implements RangeRaptorWorkerState {
+public final class RangeRaptorWorkerStateImpl implements RangeRaptorWorkerState {
 
     /**
      * To debug a particular journey set DEBUG to true and add all visited stops in the debugStops list.
      */
-    private static final boolean DEBUG = StopStateFlyWeight.DEBUG;
+    private static final boolean DEBUG = StopState.DEBUG;
     private static final List<Integer> debugStops = Arrays.asList(5757, 32489, 17270, 21469, 22102);
 
-    private final StopStateFlyWeight state;
-    private final StopStateFlyWeight.Cursor cursor;
+    private final StopStateCollection stops;
+    private final StopStateCursor cursor;
     private final int nRounds;
     private int round = 0;
     private int roundMax = -1;
@@ -57,10 +58,10 @@ public final class McRaptorStateImpl implements RangeRaptorWorkerState {
 
 
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
-    public McRaptorStateImpl(int nStops, int nRounds, int maxDurationSeconds, int earliestDepartureTime, StopStateFlyWeight stopState) {
+    public RangeRaptorWorkerStateImpl(int nStops, int nRounds, int maxDurationSeconds, int earliestDepartureTime, StopStateCollection stops) {
         this.nRounds = nRounds;
-        this.state = stopState;
-        this.cursor = state.newCursor();
+        this.stops = stops;
+        this.cursor = stops.newCursor();
 
         this.bestOveral = new BestTimes(nStops);
         this.bestTransit = new BestTimes(nStops);
@@ -108,9 +109,10 @@ public final class McRaptorStateImpl implements RangeRaptorWorkerState {
     @Override public int bestTransitTime(int stop) {
         return bestTransit.time(stop);
     }
-    @Override public void initNewDepatureForMinute(int roundDepartureTime) {
+
+    @Override public void initNewDepatureForMinute(int departureTime) {
         //this.departureTime = departureTime;
-        maxTimeLimit = roundDepartureTime + maxDurationSeconds;
+        maxTimeLimit = departureTime + maxDurationSeconds;
         // clear all touched stops to avoid constant reëxploration
         bestOveral.clearCurrent();
         bestTransit.clearCurrent();
@@ -118,7 +120,7 @@ public final class McRaptorStateImpl implements RangeRaptorWorkerState {
     }
 
     @Override public void setInitialTime(int stop, int time) {
-        state.setInitalTime(round, stop, time);
+        stops.setInitalTime(round, stop, time);
         bestOveral.setTime(stop, time);
         debugListedStops("init", round, stop);
     }
@@ -136,7 +138,7 @@ public final class McRaptorStateImpl implements RangeRaptorWorkerState {
             // transitTimes upper bounds bestTimes
             final boolean newBestOveral = bestOveral.updateNewBestTime(stop, alightTime);
 
-            state.transitToStop(round, stop, alightTime, pattern, boardStop, trip, boardTime, newBestOveral);
+            stops.transitToStop(round, stop, alightTime, pattern, boardStop, trip, boardTime, newBestOveral);
 
             // skip: transferTimes
             debugListedStops("transit to stop", round, stop);
@@ -155,7 +157,7 @@ public final class McRaptorStateImpl implements RangeRaptorWorkerState {
         // enter this conditional it has already been updated.
         if (bestOveral.updateNewBestTime(stop, time)) {
 
-            state.transferToStop(round, stop, time, fromStop, transferTime);
+            stops.transferToStop(round, stop, time, fromStop, transferTime);
 
             debugListedStops("transfer to stop", round, stop);
         }
@@ -180,9 +182,8 @@ public final class McRaptorStateImpl implements RangeRaptorWorkerState {
 
     static void debugStopHeader(String title) {
         if(!DEBUG) return;
-        String[] headers = StopStateFlyWeight.stopToStringHeaders();
-        System.err.printf("  S %-24s  -------- BEST OVERALL -------   %s%n", title, headers[0]);
-        System.err.printf("  S %-24s  Rnd  Stop  Time C L Trans C L   %s%n", "", headers[1]);
+        System.err.printf("  S %-24s  -------- BEST OVERALL -------   %s%n", title, STOP_HEADERS[0]);
+        System.err.printf("  S %-24s  Rnd  Stop  Time C L Trans C L   %s%n", "", STOP_HEADERS[1]);
     }
 
     private void debugStop(String descr, int round, int stop) {
@@ -199,7 +200,7 @@ public final class McRaptorStateImpl implements RangeRaptorWorkerState {
                 stop,
                 bestOveral.toString(stop),
                 bestTransit.toString(stop),
-                state.stopToString(round, stop)
+                cursor.stop(round, stop)
         );
     }
 

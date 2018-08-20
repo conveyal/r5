@@ -9,9 +9,8 @@ import gnu.trove.list.array.TIntArrayList;
  * Class used to represent transit paths in Browsochrones and Modeify.
  */
 public class PathBuilder {
-    private final StopStateFlyWeight.Cursor cursor;
+    private final StopStateCursor cursor;
     private int round;
-    //private int stop;
 
 
     private final TIntList patterns = new TIntArrayList();
@@ -24,7 +23,7 @@ public class PathBuilder {
     private final TIntList trips = new TIntArrayList();
 
 
-    public PathBuilder(StopStateFlyWeight.Cursor cursor) {
+    public PathBuilder(StopStateCursor cursor) {
         this.cursor = cursor;
     }
 
@@ -45,44 +44,44 @@ public class PathBuilder {
         transferTimes.clear();
         trips.clear();
 
-        McRaptorStateImpl.debugStopHeader("FIND PATH");
+        RangeRaptorWorkerStateImpl.debugStopHeader("FIND PATH");
 
         // find the fewest-transfers trip that is still optimal in terms of travel time
-        boolean found = findLastRoundWithTransitTimeSet(egressStop);
+        StopState currentStop = findLastRoundWithTransitTimeSet(egressStop);
 
-        if(!found) {
+        if(currentStop == null) {
             throw new IllegalStateException("Transit for stop not found. Stop: " + egressStop + ".");
         }
 
         //state.debugStop("egress stop", state.round(), stop);
 
-        int currentStop = egressStop;
+        int currentStopIndex = egressStop;
 
         while (round > 0) {
-            patterns.add(cursor.previousPattern());
-            trips.add(cursor.previousTrip());
-            alightStops.add(currentStop);
+            patterns.add(currentStop.previousPattern());
+            trips.add(currentStop.previousTrip());
+            alightStops.add(currentStopIndex);
 //            times.add(it.time());
-            boardTimes.add(cursor.boardTime());
-            alightTimes.add(cursor.transitTime());
+            boardTimes.add(currentStop.boardTime());
+            alightTimes.add(currentStop.transitTime());
 
             // TODO
-            currentStop = cursor.boardStop();
+            currentStopIndex = currentStop.boardStop();
 
-            boardStops.add(currentStop);
+            boardStops.add(currentStopIndex);
 
             // go to previous state before handling transfers as transfers are done at the end of a round
             --round;
-            cursor.stop(round, currentStop);
-            cursor.debugStop("by", round, currentStop);
+            currentStop = cursor.stop(round, currentStopIndex);
+            currentStop.debugStop("by", round, currentStopIndex);
 
 
             // handle transfers
-            if (cursor.arrivedByTransfer()) {
-                transferTimes.add(cursor.time());
-                currentStop = cursor.transferFromStop();
-                cursor.stop(round, currentStop);
-                cursor.debugStop("transfer", round, currentStop);
+            if (currentStop.arrivedByTransfer()) {
+                transferTimes.add(currentStop.time());
+                currentStopIndex = currentStop.transferFromStop();
+                currentStop = cursor.stop(round, currentStopIndex);
+                currentStop.debugStop("transfer", round, currentStopIndex);
             }
             else {
                 transferTimes.add(-1);
@@ -117,14 +116,19 @@ public class PathBuilder {
      * the last round with a transit time set. This is sufficient for finding the
      * best time, since the state is only recorded iff it is faster then previous rounds.
      */
-    private boolean findLastRoundWithTransitTimeSet(int egressStop) {
+    private StopState findLastRoundWithTransitTimeSet(int egressStop) {
 
-        while (round > 0 && !cursor.isTransitTimeSet()) {
+        StopState currentStop = cursor.stop(round, egressStop);
+
+        while(!currentStop.isTransitTimeSet()) {
 
             //debugListedStops("skip no transit", round, stop);
             --round;
-            cursor.stop(round, egressStop);
+            if(round == -1) {
+                return null;
+            }
+            currentStop = cursor.stop(round, egressStop);
         }
-        return round > 0;
+        return currentStop;
     }
 }

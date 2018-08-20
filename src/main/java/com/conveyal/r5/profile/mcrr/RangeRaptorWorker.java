@@ -164,7 +164,7 @@ public class RangeRaptorWorker {
      * @return an array of length iterationsPerMinute, containing the arrival (clock) times at each stop for each iteration.
      */
     private void runRaptorForMinute (int departureTime) {
-        McRaptorStateImpl.debugStopHeader("runRaptorForMin "+departureTime);
+        RangeRaptorWorkerStateImpl.debugStopHeader("runRaptorForMin "+departureTime);
 
         TIMER_BY_MINUTE_INIT.time(() ->
                 advanceScheduledSearchToPreviousMinute(departureTime)

@@ -8,11 +8,13 @@ import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.SearchAlgorithm;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.profile.mcrr.PathBuilder;
-import com.conveyal.r5.profile.mcrr.McRaptorStateImpl;
+import com.conveyal.r5.profile.mcrr.RangeRaptorWorkerStateImpl;
 import com.conveyal.r5.profile.mcrr.RangeRaptorWorker;
 import com.conveyal.r5.profile.mcrr.PathParetoSortableWrapper;
 import com.conveyal.r5.profile.mcrr.RaptorWorkerTransitDataProvider;
+import com.conveyal.r5.profile.mcrr.StopStateCollection;
 import com.conveyal.r5.profile.mcrr.StopStateFlyWeight;
+import com.conveyal.r5.profile.mcrr.StopStateFlyWeight2;
 import com.conveyal.r5.profile.mcrr.TransitLayerRRDataProvider;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.Place;
@@ -241,20 +243,23 @@ public class SpeedTest {
             final int nRounds = request.maxRides + 1;
             final int nStops = transportNetwork.transitLayer.getStopCount();
 
-            StopStateFlyWeight stopStateFlyWeight = new StopStateFlyWeight(nRounds, nStops);
 
-            McRaptorStateImpl stateImpl = new McRaptorStateImpl(
+
+
+            StopStateCollection stops = new StopStateFlyWeight(nRounds, nStops);
+
+            RangeRaptorWorkerStateImpl stateImpl = new RangeRaptorWorkerStateImpl(
                     nStops,
                     nRounds,
                     request.maxTripDurationMinutes * 60,
                     request.fromTime,
-                    stopStateFlyWeight
+                    stops
             );
 
             RangeRaptorWorker worker = new RangeRaptorWorker(
                     transitData,
                     stateImpl,
-                    new PathBuilder(stopStateFlyWeight.newCursor()),
+                    new PathBuilder(stops.newCursor()),
                     request.fromTime,
                     request.toTime,
                     request.walkSpeed,

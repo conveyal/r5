@@ -164,19 +164,6 @@ public final class RangeRaptorWorkerStateImpl implements RangeRaptorWorkerState 
     }
 
 
-// TODO TGR - This code is was used to not reboard the same pattern, but this is
-// TODO TGR - problematic: Loop case.
-//    @Override public int getPatternIndexForPreviousRound(int stop) {
-//        //return -1;
-//        return cursor.stop(round-1, stop).previousPattern();
-//    }
-
-//    @Override public int getPatternIndexForPreviousRoundPatternsTouched(int stop) {
-//        //return -1;
-//        return cursor.stop(round-1, stop).previousPattern();
-//    }
-
-
     /* private methods */
 
 

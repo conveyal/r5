@@ -132,7 +132,7 @@ public class TransitLayerRRDataProvider implements RaptorWorkerTransitDataProvid
 
         InternalPatternIterator(BitSet patternsTouched) {
             this.patternsTouched = patternsTouched;
-            this.nextPatternIndex = 0;
+            this.nextPatternIndex = patternsTouched.isEmpty() ? -1 : 0;
         }
 
         /*  PatternIterator interface implementation */
@@ -166,11 +166,6 @@ public class TransitLayerRRDataProvider implements RaptorWorkerTransitDataProvid
         }
 
         @Override
-        public Iterable<TripSchedule> getTripSchedules() {
-            return pattern.tripSchedules;
-        }
-
-        @Override
         public int getTripSchedulesIndex(TripSchedule schedule) {
             return pattern.tripSchedules.indexOf(schedule);
         }
@@ -178,6 +173,11 @@ public class TransitLayerRRDataProvider implements RaptorWorkerTransitDataProvid
         @Override
         public TripSchedule getTripSchedule(int index) {
             return pattern.tripSchedules.get(index);
+        }
+
+        @Override
+        public int getTripScheduleSize() {
+            return pattern.tripSchedules.size();
         }
     }
 }

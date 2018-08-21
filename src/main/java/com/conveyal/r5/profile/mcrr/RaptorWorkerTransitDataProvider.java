@@ -69,12 +69,12 @@ public interface RaptorWorkerTransitDataProvider {
         int currentPatternStopsSize();
 
         // TODO TGR - add JavaDoc
-        Iterable<TripSchedule> getTripSchedules();
-
-        // TODO TGR - add JavaDoc
         int getTripSchedulesIndex(TripSchedule schedule);
 
         // TODO TGR - add JavaDoc
         TripSchedule getTripSchedule(int index);
+
+        // TODO TGR - add JavaDoc
+        int getTripScheduleSize();
     }
 }

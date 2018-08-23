@@ -54,7 +54,6 @@ public class RangeRaptorWorker {
     private static final AvgTimer TIMER_ROUTE = AvgTimer.timerMilliSec("McRRaptor:route");
     private static final AvgTimer TIMER_ROUTE_SETUP = AvgTimer.timerMilliSec("McRRaptor:route Init");
     private static final AvgTimer TIMER_ROUTE_BY_MINUTE = AvgTimer.timerMilliSec("McRRaptor:route Run Raptor For Minute");
-    private static final AvgTimer TIMER_BY_MINUTE_INIT = AvgTimer.timerMilliSec("McRRaptor:runRaptorForMinute Init");
     private static final AvgTimer TIMER_BY_MINUTE_SCHEDULE_SEARCH = AvgTimer.timerMicroSec("McRRaptor:runRaptorForMinute Schedule Search");
     private static final AvgTimer TIMER_BY_MINUTE_TRANSFERS = AvgTimer.timerMicroSec("McRRaptor:runRaptorForMinute Transfers");
 
@@ -163,9 +162,7 @@ public class RangeRaptorWorker {
     private void runRaptorForMinute(int departureTime) {
         RangeRaptorWorkerStateImpl.debugStopHeader("runRaptorForMin " + departureTime);
 
-        TIMER_BY_MINUTE_INIT.time(() ->
-                advanceScheduledSearchToPreviousMinute(departureTime)
-        );
+        advanceScheduledSearchToPreviousMinute(departureTime);
 
         // Run the scheduled search
         // round 0 is the street search

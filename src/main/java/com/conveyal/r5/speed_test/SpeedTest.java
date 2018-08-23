@@ -7,7 +7,6 @@ import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.SearchAlgorithm;
 import com.conveyal.r5.profile.StreetPath;
-import com.conveyal.r5.profile.mcrr.PathBuilder;
 import com.conveyal.r5.profile.mcrr.PathParetoSortableWrapper;
 import com.conveyal.r5.profile.mcrr.RangeRaptorWorker;
 import com.conveyal.r5.profile.mcrr.RangeRaptorWorkerState;
@@ -24,6 +23,7 @@ import gnu.trove.iterator.TIntIntIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.io.File;
 import java.lang.ref.WeakReference;
 import java.time.LocalDate;
@@ -58,27 +58,26 @@ public class SpeedTest {
     private static ItineraryMapper itineraryMapper;
 
     private CommandLineOpts opts;
-    private static final AvgTimer TIMER = AvgTimer.timerMilliSec("SpeedTest:route");
-    private static final AvgTimer TIMER_WORKER = AvgTimer.timerMilliSec("SpeedTest:route Worker");
-    private static final AvgTimer TIMER_COLLECT_RESULTS = AvgTimer.timerMilliSec("SpeedTest:route Collect Results");
-    private static final AvgTimer TIMER_COLLECT_RESULTS_PATHS = AvgTimer.timerMilliSec("SpeedTest:route CR Paths");
-    private static final AvgTimer TIMER_COLLECT_RESULTS_ITINERARIES = AvgTimer.timerMilliSec("SpeedTest:route CR Itineraries");
-    private static final AvgTimer TIMER_COLLECT_RESULTS_ITINERARIES_CREATE = AvgTimer.timerMilliSec("SpeedTest:route CR Itineraries create");
-    private static final AvgTimer TIMER_COLLECT_RESULTS_TRIP_PLAN = AvgTimer.timerMilliSec("SpeedTest:route CR TripPlan");
+    private final AvgTimer TOT_TIMER = AvgTimer.timerMilliSec("SpeedTest:route");
+    private final AvgTimer TIMER_WORKER = AvgTimer.timerMilliSec("SpeedTest:route Worker");
+    private final AvgTimer TIMER_COLLECT_RESULTS = AvgTimer.timerMilliSec("SpeedTest:route Collect Results");
+    private final AvgTimer TIMER_COLLECT_RESULTS_ITINERARIES = AvgTimer.timerMilliSec("SpeedTest:route CR Itineraries");
 
     private List<Integer> numOfPathsFound = new ArrayList<>();
-    private Map<StateFactory, List<Integer>> workerResults = new HashMap<>();
-    private Map<StateFactory, List<Integer>> totalResults = new HashMap<>();
+    private Map<ProfileFactory, List<Integer>> workerResults = new HashMap<>();
+    private Map<ProfileFactory, List<Integer>> totalResults = new HashMap<>();
 
-    private StateFactory stateFactory = StateFactory.parallel_int_arrays;
+    /** Init profile used by the HttpServer */
+    private ProfileFactory stateFactory = ProfileFactory.struct_arrays;
 
     SpeedTest(CommandLineOpts opts) throws Exception {
         this.opts = opts;
-        for(StateFactory key : StateFactory.values()) {
-            workerResults.put(key, new ArrayList<>());
-            totalResults.put(key, new ArrayList<>());
-        }
         initTransportNetwork();
+    }
+
+    public static void main(String[] args) throws Exception {
+        AvgTimer.NOOP = false;
+        new SpeedTest(new SpeedTestCmdLineOpts(args)).runTest();
     }
 
     private void initTransportNetwork() throws Exception {
@@ -91,31 +90,26 @@ public class SpeedTest {
         }
     }
 
-    public static void main(String[] args) throws Exception {
-        SpeedTestCmdLineOpts opts = new SpeedTestCmdLineOpts(args);
-        SpeedTest test = new SpeedTest(opts);
+    private void runTest() throws Exception {
+        final SpeedTestCmdLineOpts opts = (SpeedTestCmdLineOpts) this.opts;
+        final ProfileFactory[] strategies = opts.profiles();
+        final int samples = opts.numberOfTestsSamplesToRun();
 
-        int SAMPLE_SIZE = 3;
-        StateFactory[] startegies = StateFactory.values();
-        //StateFactory[] startegies = StateFactory.struct_arrays.asArray();
+        initProfileStatistics();
 
-        for (int i=0; i < SAMPLE_SIZE; ++i) {
-            for (StateFactory stateFactory : startegies) {
-                test.stateFactory = stateFactory;
-                test.run(opts);
-            }
+        for (int i = 0; i < samples; ++i) {
+            stateFactory = strategies[i % strategies.length];
+            runSingleTest(opts);
         }
-
-        printResults("Worker: ", test.workerResults);
-        printResults("Total:  ", test.totalResults);
+        printProfileStatistics();
     }
 
-    public void run(SpeedTestCmdLineOpts opts) throws Exception {
+    private void runSingleTest(SpeedTestCmdLineOpts opts) throws Exception {
         List<CsvTestCase> testCases = CsvTestCase.readTestCasesFromFile(new File(this.opts.rootDir(), COORD_PAIRS));
         List<TripPlan> tripPlans = new ArrayList<>();
 
 
-        int nRoutesComputed = 0;
+        int nSuccess = 0;
         numOfPathsFound.clear();
 
         // Force GC to avoid GC during the test
@@ -132,8 +126,7 @@ public class SpeedTest {
         AvgTimer.resetAll();
 
         for (CsvTestCase testCase : testCases) {
-            boolean ok = runSingleTestCase(tripPlans, testCase, opts);
-            nRoutesComputed += ok ? 1 : 0;
+            nSuccess += runSingleTestCase(tripPlans, testCase, opts) ? 1 : 0;
         }
 
         int tcSize = testCases.size();
@@ -143,42 +136,44 @@ public class SpeedTest {
                 AvgTimer.listResults().stream().reduce("", (text, line) -> text + line + "\n") +
                 "\n" +
                 "\nPaths found: " + numOfPathsFound.stream().mapToInt((it) -> it).sum() + " " + numOfPathsFound +
-                "\nSuccessful searches: " + nRoutesComputed + " / " + tcSize +
-                "\nTotal time: " + TIMER.totalTimeInSeconds() + " seconds" +
-                (nRoutesComputed == tcSize ? "" : "\n!!! UNEXPECTED RESULTS: " + (tcSize - nRoutesComputed) + " OF " + tcSize + " TEST CASES DID NOT RETURN THE EXPECTED TRIPS. SEE ABOVE !!!")
+                "\nSuccessful searches: " + nSuccess + " / " + tcSize +
+                "\nTotal time: " + TOT_TIMER.totalTimeInSeconds() + " seconds" +
+                (nSuccess == tcSize ? "" : "\n!!! UNEXPECTED RESULTS: " + (tcSize - nSuccess) + " OF " + tcSize + " FAILED. SEE LOG ABOVE FOR ERRORS !!!")
         );
         workerResults.get(stateFactory).add((int)TIMER_WORKER.avgTime());
-        totalResults.get(stateFactory).add((int)TIMER.avgTime());
+        totalResults.get(stateFactory).add((int) TOT_TIMER.avgTime());
     }
 
-    private void forceGCToAvoidGCLater() {
-        Object obj = new Object();
-        WeakReference ref = new WeakReference<Object>(obj);
-        obj = null;
-        while(ref.get() != null) {
-            System.gc();
+    private void printProfileStatistics() {
+        printProfileResults("Worker: ", workerResults);
+        printProfileResults("Total:  ", totalResults);
+    }
+
+    private void initProfileStatistics() {
+        for(ProfileFactory key : ProfileFactory.values()) {
+            workerResults.put(key, new ArrayList<>());
+            totalResults.put(key, new ArrayList<>());
         }
     }
 
     private boolean runSingleTestCase(List<TripPlan> tripPlans, CsvTestCase testCase, SpeedTestCmdLineOpts opts) {
+        TripPlan route = null;
         try {
-
             final ProfileRequest request = buildDefaultRequest(testCase, opts);
-            TripPlan route = TIMER.timeAndReturn(() ->
-                    route(request)
-            );
+
+            // Perform routing
+            route = TOT_TIMER.timeAndReturn(() -> route(request) );
+
             tripPlans.add(route);
-            if (opts.printItineraries()) {
-                printResult(route.getItineraries().size(), testCase, TIMER.lapTime(), "");
-                route.speedTestPrintItineraries();
-                testCase.assertResult(route.itinerariesAsCompactStrings());
-            }
+
+            testCase.assertResult(route.itinerariesAsCompactStrings());
+            printResultOk(testCase, route, TOT_TIMER.lapTime(), opts.printItineraries());
             return true;
-        } catch (Exception e) {
-            printError(testCase, TIMER.lapTime(), e);
-            e.printStackTrace();
         }
-        return false;
+        catch (Exception e) {
+            printResultFailed(testCase, route, TOT_TIMER.lapTime(), e);
+            return false;
+        }
     }
 
     public TripPlan route(ProfileRequest request) {
@@ -280,7 +275,7 @@ public class SpeedTest {
             RangeRaptorWorker worker = new RangeRaptorWorker(
                     transitData,
                     state,
-                    new PathBuilder(stops.newCursor()),
+                    stateFactory.createPathBuilder(stops),
                     request.fromTime,
                     request.toTime,
                     request.walkSpeed,
@@ -295,7 +290,6 @@ public class SpeedTest {
             // -------------------------------------------------------- [ COLLECT RESULTS ]
 
             TIMER_COLLECT_RESULTS.start();
-            TIMER_COLLECT_RESULTS_PATHS.start();
 
             /*
                 TODO TGR We filter paths (ParetoSet) because the algorithm now return duplicates,
@@ -313,20 +307,19 @@ public class SpeedTest {
                 paths.add(new PathParetoSortableWrapper(path, totalTime));
             }
 
-            TIMER_COLLECT_RESULTS_PATHS.stop();
-            TIMER_COLLECT_RESULTS_ITINERARIES.start();
 
             if (paths.isEmpty()) {
                 throw new IllegalStateException("NO RESULT FOUND");
             }
+
             numOfPathsFound.add(paths.size());
+
+            TIMER_COLLECT_RESULTS_ITINERARIES.start();
 
             ItinerarySet itineraries = new ItinerarySet();
 
             for (PathParetoSortableWrapper transitPaths : paths.paretoSet()) {
-                TIMER_COLLECT_RESULTS_ITINERARIES_CREATE.start();
                 SpeedTestItinerary itinerary = createItinerary(request, streetRouter, transitPaths.path);
-                TIMER_COLLECT_RESULTS_ITINERARIES_CREATE.stop();
 
                 itineraries.add(itinerary);
             }
@@ -334,7 +327,6 @@ public class SpeedTest {
             itineraries.filter();
 
             TIMER_COLLECT_RESULTS_ITINERARIES.stop();
-            TIMER_COLLECT_RESULTS_TRIP_PLAN.start();
 
             TripPlan tripPlan = createTripPlanForRequest(request);
 
@@ -343,13 +335,13 @@ public class SpeedTest {
             }
             tripPlan.sort();
 
-            TIMER_COLLECT_RESULTS_TRIP_PLAN.stop();
             TIMER_COLLECT_RESULTS.stop();
 
             return tripPlan;
         } finally {
             TIMER_WORKER.fail();
             TIMER_COLLECT_RESULTS.fail();
+            TIMER_COLLECT_RESULTS_ITINERARIES.fail();
         }
     }
 
@@ -357,24 +349,6 @@ public class SpeedTest {
         StreetPath accessPath = streetRouter.accessPath(path.boardStops[0]);
         StreetPath egressPath = streetRouter.egressPath(path.alightStops[path.alightStops.length - 1]);
         return itineraryMapper.createItinerary(request, path, accessPath, egressPath);
-    }
-
-    private void printError(CsvTestCase tc, long lapTime, Exception e) {
-        printResult(-1, tc, lapTime, e.getMessage() + "  (" + e.getClass().getSimpleName() + ")");
-    }
-
-    private void printResult(int itineraries, CsvTestCase tc, long lapTime, String details) {
-        String status = itineraries > 0 ? "SUCCESS" : "FAILED";
-        System.err.printf(
-                "\nSpeedTest %-7s  %4d ms  %-66s %s %n",
-                status,
-                lapTime,
-                tc.toString(),
-                details
-        );
-        if(tc.failed()) {
-            System.err.println(tc.errorDetails());
-        }
     }
 
     private static TripPlan createTripPlanForRequest(ProfileRequest request) {
@@ -407,13 +381,52 @@ public class SpeedTest {
         return request;
     }
 
-    private static void printResults(String header, Map<StateFactory, List<Integer>> result) {
+
+    private void printResultOk(CsvTestCase testCase, TripPlan route, long lapTime, boolean printItineraries) {
+        printResult("SUCCESS", testCase, route, lapTime, printItineraries, "");
+        testCase.logResultIfExpectedCsvInputIsMissing();
+    }
+
+    private void printResultFailed(CsvTestCase testCase, @Nullable TripPlan route, long lapTime, Exception e) {
+        String errorDetails = " - " + e.getMessage() + "  (" + e.getClass().getSimpleName() + ")";
+        printResult("FAILED", testCase, route, TOT_TIMER.lapTime(),true, errorDetails);
+    }
+
+
+    private void printResult(String status, CsvTestCase tc, @Nullable TripPlan route, long lapTime, boolean printItineraries, String errorDetails) {
+        if(printItineraries || tc.failed() || !tc.expectedCSVInputExist()) {
+            System.err.printf(
+                    "\nSpeedTest %-7s  %4d ms  %-66s %s %n",
+                    status,
+                    lapTime,
+                    tc.toString(),
+                    errorDetails
+            );
+        }
+        if(printItineraries && route != null) {
+            route.speedTestPrintItineraries();
+        }
+        if(tc.failed()) {
+            System.err.println(tc.errorDetails());
+        }
+    }
+
+    private static void printProfileResults(String header, Map<ProfileFactory, List<Integer>> result) {
         System.err.println();
         System.err.println(header);
-        result.forEach((k,v) -> {
-            if(!v.isEmpty()) {
-                System.err.printf(" ==> %-14s : %s Avg: %4.1f%n", k.name, v, v.stream().mapToInt(it -> it).average().orElse(0d));
-            }
-        });
+        result.forEach((k,v) -> printProfileResultLine(k.name, v));
+    }
+
+    private static void printProfileResultLine(String label, List<Integer> v) {
+        if(!v.isEmpty()) {
+            System.err.printf(" ==> %-14s : %s Avg: %4.1f%n", label, v, v.stream().mapToInt(it -> it).average().orElse(0d));
+        }
+    }
+
+    private void forceGCToAvoidGCLater() {
+        WeakReference ref = new WeakReference<>(new Object());
+        while(ref.get() != null) {
+            System.gc();
+        }
     }
 }

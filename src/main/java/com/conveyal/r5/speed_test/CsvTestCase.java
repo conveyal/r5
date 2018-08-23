@@ -9,22 +9,18 @@ import java.util.ArrayList;
 import java.util.List;
 
 class CsvTestCase {
-    public int index;
-    public String origin;
-    public double fromLat;
-    public double fromLon;
-    public String destination;
-    public double toLat;
-    public double toLon;
+    private int index;
+    String origin;
+    double fromLat;
+    double fromLon;
+    String destination;
+    double toLat;
+    double toLon;
 
-    private String[] expectedResult;
+    private String[] results;
+    private String[] expectedResults;
     private List<AssertErrorMessage> errors = new ArrayList<>();
 
-
-    @Override
-    public String toString() {
-        return String.format("#%d %s -> %s, (%.3f, %.3f) -> (%.3f, %.3f)", index, origin, destination, fromLat, fromLon, toLat, toLon);
-    }
 
     static List<CsvTestCase> readTestCasesFromFile(File csvFile) throws IOException {
         List<CsvTestCase> testCases = new ArrayList<>();
@@ -41,35 +37,30 @@ class CsvTestCase {
             tc.destination = csvReader.get(8);
             tc.toLat = Double.parseDouble(csvReader.get(6));
             tc.toLon = Double.parseDouble(csvReader.get(7));
-            tc.expectedResult = expectedResult(csvReader.get(10));
+            tc.expectedResults = expectedResult(csvReader.get(10));
             testCases.add(tc);
         }
         return testCases;
     }
 
-
-    private static String[] expectedResult(String text) {
-        if(text == null || text.isEmpty()) {
-            return null;
-        }
-        return text.split("\\s*\\|\\s*");
+    @Override
+    public String toString() {
+        return String.format("#%d %s -> %s, (%.3f, %.3f) -> (%.3f, %.3f)", index, origin, destination, fromLat, fromLon, toLat, toLon);
     }
 
     /**
      * Verify the result by matching it with the {@code expectedResult} from the csv file.
      */
     void assertResult(String[] results) {
+        this.results = results;
 
-        // If no expected result exist, then log the results os it ca be used and copied into the
-        // CSV input files
-        if(expectedResult == null) {
-            logTheResult(results);
+        if(expectedResults == null) {
             return;
         }
 
         boolean[] resultMatch = new boolean[results.length];
 
-        for (String exp : expectedResult) {
+        for (String exp : expectedResults) {
             int i = find(exp, results);
             if(i == -1) {
                 errors.add(new AssertErrorMessage(exp, "- Unable to find expected trip:"));
@@ -78,32 +69,56 @@ class CsvTestCase {
                 resultMatch[i] = true;
             }
         }
-
         // Log all results not matched
         for (int i=0; i<resultMatch.length; ++i) {
             if(!resultMatch[i]) {
                 errors.add(new AssertErrorMessage(results[i], "+ Trip returned but not expected:"));
             }
         }
-
         if(failed()) {
-            throw new IllegalStateException("Trip errors");
+            throw new IllegalStateException("Test assert errors");
         }
+    }
+
+    /**
+     * If no expected result exist, then log the results os it ca be used and copied into the
+     * CSV input files
+     */
+    void logResultIfExpectedCsvInputIsMissing() {
+        if(expectedCSVInputExist()) {
+            return;
+        }
+        System.err.println("!!  The following result can be added to the test case (csv-input-files) as " +
+                "'expectedResult'.");
+        boolean first = true;
+        for (String result : results) {
+            System.err.print(first ? "!!  " : " | ");
+            System.err.print(result);
+            first = false;
+        }
+        System.err.println();
+    }
+
+    boolean expectedCSVInputExist() {
+        return expectedResults != null;
     }
 
     String errorDetails() {
         return  errors.stream().sorted().map(s -> s + "\n").reduce((s, t) -> s + t).orElse("");
     }
 
-    private void logTheResult(String[] results) {
-        System.err.println("INFO! The following result can be added to the test case (csv-input-files) as expectedResult:");
-        boolean first = true;
-        for (String result : results) {
-            if(!first) System.err.print(" | ");
-            System.err.print(result);
-            first = false;
+    boolean failed() {
+        return !errors.isEmpty();
+    }
+
+
+    /* private methods */
+
+    private static String[] expectedResult(String text) {
+        if(text == null || text.isEmpty()) {
+            return null;
         }
-        System.err.println();
+        return text.split("\\s*\\|\\s*");
     }
 
     /** Find the expected in the results. */
@@ -114,9 +129,6 @@ class CsvTestCase {
         return -1;
     }
 
-    public boolean failed() {
-        return !errors.isEmpty();
-    }
 
     private static class AssertErrorMessage implements Comparable<AssertErrorMessage>{
         private static int maxLength = 0;

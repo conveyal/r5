@@ -80,7 +80,8 @@ public final class RangeRaptorWorkerStateImpl implements RangeRaptorWorkerState 
         final boolean moreRoundsToGo = round < nRounds-1;
         return moreRoundsToGo && isCurrentRoundUpdated();
     }
-    @Override public boolean isStopReachedInLastRound(int stop) {
+
+    @Override public boolean isStopReachedInPreviousRound(int stop) {
         return bestOveral.isReachedLastRound(stop);
     }
 
@@ -163,15 +164,14 @@ public final class RangeRaptorWorkerStateImpl implements RangeRaptorWorkerState 
         }
     }
 
-
-    /* private methods */
-
-
     static void debugStopHeader(String title) {
         if(!DEBUG) return;
         System.err.printf("  S %-24s  -------- BEST OVERALL -------   %s%n", title, STOP_HEADERS[0]);
         System.err.printf("  S %-24s  Rnd  Stop  Time C L Trans C L   %s%n", "", STOP_HEADERS[1]);
     }
+
+
+    /* private methods */
 
     private void debugStop(String descr, int round, int stop) {
         if(!DEBUG) return;

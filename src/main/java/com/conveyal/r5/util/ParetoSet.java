@@ -5,7 +5,6 @@ import java.util.List;
 
 
 public class ParetoSet<T extends ParetoSortable> {
-    private static final AvgTimer TIMER_ADD = AvgTimer.timerMicroSec("ParetoSet:add");
 
     private final ParetoDominateFunction[] dominateFunctions;
     private List<T> paretoSet = new ArrayList<>();
@@ -14,24 +13,23 @@ public class ParetoSet<T extends ParetoSortable> {
         this.dominateFunctions = builder.build();
     }
 
-    public void add(T newValue) {
-        TIMER_ADD.time(() -> {
-            List<T> discard = new ArrayList<>();
+    public boolean add(T newValue) {
+        List<T> discard = new ArrayList<>();
 
-            for (T it : paretoSet) {
-                switch (dominate(it, newValue)) {
-                    case LeftDominatesRight:
-                        return;
-                    case RightDominatesLeft:
-                        discard.add(it);
-                        break;
-                    case Equal:
-                        break;
-                }
+        for (T it : paretoSet) {
+            switch (dominate(it, newValue)) {
+                case LeftDominatesRight:
+                    return false;
+                case RightDominatesLeft:
+                    discard.add(it);
+                    break;
+                case Equal:
+                    break;
             }
-            paretoSet.add(newValue);
-            paretoSet.removeAll(discard);
-        });
+        }
+        paretoSet.add(newValue);
+        paretoSet.removeAll(discard);
+        return true;
     }
 
     public Iterable<T> paretoSet() {
@@ -40,6 +38,10 @@ public class ParetoSet<T extends ParetoSortable> {
 
     public boolean isEmpty() {
         return paretoSet.isEmpty();
+    }
+
+    public T get(int index) {
+        return paretoSet.get(index);
     }
 
     private Domainace dominate(ParetoSortable lhs, ParetoSortable rhs) {

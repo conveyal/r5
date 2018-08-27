@@ -61,11 +61,9 @@ public final class StopStatesStructArray implements StopStateCollection {
     }
 
     public class Cursor implements StopStateCursor {
-        private State currentStop;
 
         public State stop(int round, int stop) {
-            this.currentStop = stops[round][stop];
-            return currentStop;
+            return stops[round][stop];
         }
 
         @Override

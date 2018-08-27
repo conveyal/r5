@@ -32,7 +32,7 @@ import java.util.HashSet;
  * (generating randomized schedules).
  */
 @SuppressWarnings("Duplicates")
-public class RangeRaptorWorker {
+public class RangeRaptorWorker implements Worker {
     /**
      * Step for departure times. Use caution when changing this as we use the functions
      * request.getTimeWindowLengthMinutes and request.getMonteCarloDrawsPerMinute below which assume this value is 1 minute.
@@ -51,11 +51,11 @@ public class RangeRaptorWorker {
     private final int fromTimeSeconds;
 
     // Variables to track time spent
-    private static final AvgTimer TIMER_ROUTE = AvgTimer.timerMilliSec("McRRaptor:route");
-    private static final AvgTimer TIMER_ROUTE_SETUP = AvgTimer.timerMilliSec("McRRaptor:route Init");
-    private static final AvgTimer TIMER_ROUTE_BY_MINUTE = AvgTimer.timerMilliSec("McRRaptor:route Run Raptor For Minute");
-    private static final AvgTimer TIMER_BY_MINUTE_SCHEDULE_SEARCH = AvgTimer.timerMicroSec("McRRaptor:runRaptorForMinute Schedule Search");
-    private static final AvgTimer TIMER_BY_MINUTE_TRANSFERS = AvgTimer.timerMicroSec("McRRaptor:runRaptorForMinute Transfers");
+    private static final AvgTimer TIMER_ROUTE = AvgTimer.timerMilliSec("RRaptor:route");
+    private static final AvgTimer TIMER_ROUTE_SETUP = AvgTimer.timerMilliSec("RRaptor:route Init");
+    private static final AvgTimer TIMER_ROUTE_BY_MINUTE = AvgTimer.timerMilliSec("RRaptor:route Run Raptor For Minute");
+    private static final AvgTimer TIMER_BY_MINUTE_SCHEDULE_SEARCH = AvgTimer.timerMicroSec("RRaptor:runRaptorForMinute Schedule Search");
+    private static final AvgTimer TIMER_BY_MINUTE_TRANSFERS = AvgTimer.timerMicroSec("RRaptor:runRaptorForMinute Transfers");
 
     /** the transit data role needed for routing */
     private final RaptorWorkerTransitDataProvider transit;
@@ -222,7 +222,7 @@ public class RangeRaptorWorker {
 
                 // attempt to alight if we're on board, done above the board search so that we don't check for alighting
                 // when boarding
-                if (onTrip > -1) {
+                if (onTrip != -1) {
                     state.transitToStop(
                             stop,
                             boardTrip.arrivals[stopPositionInPattern],
@@ -235,7 +235,7 @@ public class RangeRaptorWorker {
 
                 // Don't attempt to board if this stop was not reached in the last round.
                 // Allow to reboard the same pattern - a pattern may loop and visit the same stop twice
-                if (state.isStopReachedInLastRound(stop)) {
+                if (state.isStopReachedInPreviousRound(stop)) {
                     int earliestBoardTime = state.bestTimePreviousRound(stop) + MINIMUM_BOARD_WAIT_SEC;
                     int tripIndexUpperBound = (onTrip == -1 ? pattern.getTripScheduleSize() : onTrip);
 
@@ -267,9 +267,15 @@ public class RangeRaptorWorker {
                     int targetStop = transfersFromStop.get(stopIdx);
                     int distanceToTargetStopMillimeters = transfersFromStop.get(stopIdx + 1);
 
+
+                    // TODO TGR - This check is most likely not needed - this limit should be part of generating
+                    // TODO TGR - transfers, and approval of a individual transfer is the job of the state.
                     if (distanceToTargetStopMillimeters < maxWalkMillimeters) {
                         // transfer length to stop is acceptable
                         int walkTimeToTargetStopSeconds = distanceToTargetStopMillimeters / walkSpeedMillimetersPerSecond;
+
+
+                       // TODO TGR - It could be left tot the state to calculate this
                         int timeAtTargetStop = state.bestTransitTime(stop) + walkTimeToTargetStopSeconds;
 
                         if (walkTimeToTargetStopSeconds < 0) {

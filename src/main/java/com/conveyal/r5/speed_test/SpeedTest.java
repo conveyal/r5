@@ -8,11 +8,9 @@ import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.SearchAlgorithm;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.profile.mcrr.PathParetoSortableWrapper;
-import com.conveyal.r5.profile.mcrr.RangeRaptorWorker;
-import com.conveyal.r5.profile.mcrr.RangeRaptorWorkerState;
 import com.conveyal.r5.profile.mcrr.RaptorWorkerTransitDataProvider;
-import com.conveyal.r5.profile.mcrr.StopStateCollection;
 import com.conveyal.r5.profile.mcrr.TransitLayerRRDataProvider;
+import com.conveyal.r5.profile.mcrr.Worker;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.Place;
 import com.conveyal.r5.speed_test.api.model.TripPlan;
@@ -185,7 +183,7 @@ public class SpeedTest {
             case RangeRaptor:
                 return routeRangeRaptor(request);
             case MultiCriteriaRangeRaptor:
-                return routeMcrr(request);
+                return routeNewRRaptor(request);
         }
         throw new IllegalArgumentException("Algorithm not supported: " + request.algorithm);
     }
@@ -245,7 +243,7 @@ public class SpeedTest {
         return tripPlan;
     }
 
-    private TripPlan routeMcrr(ProfileRequest request) {
+    private TripPlan routeNewRRaptor(ProfileRequest request) {
         try {
             EgressAccessRouter streetRouter = new EgressAccessRouter(transportNetwork, request);
             streetRouter.route();
@@ -262,28 +260,10 @@ public class SpeedTest {
             final int nStops = transportNetwork.transitLayer.getStopCount();
 
 
-            StopStateCollection stops = stateFactory.createStopStateCollection(nRounds, nStops);
 
-            RangeRaptorWorkerState state = stateFactory.createWorkerState(
-                    nRounds,
-                    nStops,
-                    request.fromTime,
-                    request.maxTripDurationMinutes * 60,
-                    stops
-            );
+            Worker worker = stateFactory.createWorker(request, nRounds, nStops, transitData, streetRouter);
 
-            RangeRaptorWorker worker = new RangeRaptorWorker(
-                    transitData,
-                    state,
-                    stateFactory.createPathBuilder(stops),
-                    request.fromTime,
-                    request.toTime,
-                    request.walkSpeed,
-                    request.maxWalkTime,
-                    streetRouter.accessTimesToStopsInSeconds,
-                    streetRouter.egressTimesToStopsInSeconds.keys()
-            );
-            Collection<Path> mpaths = worker.route();
+            Collection<Path> workerPaths = worker.route();
 
             TIMER_WORKER.stop();
 
@@ -389,7 +369,10 @@ public class SpeedTest {
 
     private void printResultFailed(CsvTestCase testCase, @Nullable TripPlan route, long lapTime, Exception e) {
         String errorDetails = " - " + e.getMessage() + "  (" + e.getClass().getSimpleName() + ")";
-        printResult("FAILED", testCase, route, TOT_TIMER.lapTime(),true, errorDetails);
+        printResult("FAILED", testCase, route, lapTime,true, errorDetails);
+        if(route == null) {
+            e.printStackTrace();
+        }
     }
 
 

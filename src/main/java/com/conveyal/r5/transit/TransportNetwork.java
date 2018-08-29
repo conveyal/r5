@@ -6,8 +6,14 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.kryo.InstanceCountingClassResolver;
+import com.conveyal.r5.kryo.TIntArrayListSerializer;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
-import com.conveyal.r5.util.ExpandingMMFBytez;
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import com.esotericsoftware.kryo.serializers.ExternalizableSerializer;
+import com.esotericsoftware.kryo.serializers.JavaSerializer;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
 import com.conveyal.r5.analyst.fare.GreedyFareCalculator;
@@ -16,9 +22,10 @@ import com.google.common.io.Files;
 import com.vividsolutions.jts.geom.Envelope;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
+import gnu.trove.impl.hash.TIntHash;
+import gnu.trove.list.array.TIntArrayList;
 import org.mapdb.Fun;
-import org.nustaq.serialization.FSTObjectInput;
-import org.nustaq.serialization.FSTObjectOutput;
+import org.objenesis.strategy.SerializingInstantiatorStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -80,15 +87,56 @@ public class TransportNetwork implements Serializable {
     /** Non-fatal warnings encountered when applying the scenario, null on a base network */
     public List<TaskError> scenarioApplicationWarnings;
 
+
+    /**
+     * Factory method ensuring that we configure Kryo exactly the same way when saving and loading networks, without
+     * duplicating code. We could explicitly register all classes in this method, which would avoid writing out the
+     * class names the first time they are encountered and guarantee that the desired serialization approach was used.
+     * Because these networks are so big though, pre-registration should provide very little savings.
+     * Registration would be more important for small network messages.
+     */
+    private static Kryo makeKryo () {
+        // Use custom ClassResolver to count instances and see what serializers they are using
+        // Kryo kryo = new Kryo(new InstanceCountingClassResolver(), new MapReferenceResolver(), new DefaultStreamFactory());
+        Kryo kryo = new Kryo();
+        // Allow classes to be auto-associated with default serializers the first time they are seen.
+        kryo.setRegistrationRequired(false);
+        // Handle references and loops in the object graph, do not repeatedly serialize the same instance.
+        kryo.setReferences(true);
+        // Certain Trove class hierarchies are all Externalizable, defining their own efficient methods.
+        // addDefaultSerializer will create a serializer instance for any subclass of the specified class.
+        // Kryo's default serializers and instantiation strategies also don't seem to deal well with Trove Maps.
+        kryo.addDefaultSerializer(TIntHash.class, ExternalizableSerializer.class);
+        // We've got a custom serializer for primitive int array lists, because there are a lot of them and it's
+        // much faster than deferring to their Externalizable implementation.
+        kryo.register(TIntArrayList.class, new TIntArrayListSerializer());
+        // Kryo default instantiation and deserialization of BitSets leaves them empty.
+        // The Kryo BitSet serializer in magro/kryo-serializers naively writes out a dense stream of booleans.
+        // BitSet's built-in Java serializer saves the internal bitfields, which is efficient.
+        kryo.register(BitSet.class, new JavaSerializer());
+        // Instantiation strategy: how should Kryo make new instances of objects when they are deserialized?
+        // The default strategy requires every class you serialize, even in your dependencies, to have a zero-arg
+        // constructor (which can be private).
+        // Setting the instantiator strategy as follows completely replaces that default strategy:
+        // kryo.setInstantiatorStrategy(new SerializingInstantiatorStrategy());
+        // We instead want to specify a fallback strategy for the default strategy:
+        kryo.setInstantiatorStrategy(new Kryo.DefaultInstantiatorStrategy(new SerializingInstantiatorStrategy()));
+        return kryo;
+    }
+
     public void write (File file) throws IOException {
         LOG.info("Writing transport network...");
-        ExpandingMMFBytez.writeObjectToFile(file, this);
+        Output output = new Output(new FileOutputStream(file));
+        makeKryo().writeClassAndObject(output, this);
+        output.close();
         LOG.info("Done writing.");
     }
 
     public static TransportNetwork read (File file) throws Exception {
         LOG.info("Reading transport network...");
-        TransportNetwork result = ExpandingMMFBytez.readObjectFromFile(file, TransportNetwork.class);
+        Input input = new Input(new FileInputStream(file));
+        TransportNetwork result = (TransportNetwork) makeKryo().readClassAndObject(input);
+        input.close();
         LOG.info("Done reading.");
         if (result.fareCalculator != null) {
             result.fareCalculator.transitLayer = result.transitLayer;
@@ -108,32 +156,6 @@ public class TransportNetwork implements Serializable {
         result.rebuildTransientIndexes();
         return result;
     }
-
-    // Old method that has the advantage of not using hidden black magic memory map methods, but buffers entirely in memory
-    public void writeStream (File file) throws IOException {
-        LOG.info("Writing transport network...");
-        OutputStream stream = new BufferedOutputStream(new FileOutputStream(file));
-        FSTObjectOutput out = new FSTObjectOutput(stream);
-        out.writeObject(this, TransportNetwork.class);
-        out.close();
-        LOG.info("Done writing.");
-    }
-
-    // Old method that has the advantage of not using hidden black magic memory map methods, but buffers entirely in memory
-    public static TransportNetwork readStream (File file) throws Exception {
-        LOG.info("Reading transport network...");
-        InputStream stream = new BufferedInputStream(new FileInputStream(file));
-        FSTObjectInput in = new FSTObjectInput(stream);
-        TransportNetwork result = (TransportNetwork) in.readObject(TransportNetwork.class);
-        in.close();
-        LOG.info("Done reading.");
-        if (result.fareCalculator != null) {
-            result.fareCalculator.transitLayer = result.transitLayer;
-        }
-        result.rebuildTransientIndexes();
-        return result;
-    }
-
 
     /**
      * Build some simple derived index tables that are not serialized with the network.

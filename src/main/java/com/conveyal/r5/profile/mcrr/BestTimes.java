@@ -1,15 +1,15 @@
 package com.conveyal.r5.profile.mcrr;
 
-import com.conveyal.r5.util.TimeUtils;
+import com.conveyal.r5.profile.mcrr.util.TimeUtils;
 
 import java.util.BitSet;
 
-import static com.conveyal.r5.profile.mcrr.IntUtils.newIntArray;
 import static com.conveyal.r5.profile.mcrr.StopState.UNREACHED;
+import static com.conveyal.r5.profile.mcrr.util.IntUtils.newIntArray;
 
 final class BestTimes {
     /** Format: [time] [reached current round] [reached previous round] */
-    private static final String FORMAT_STRING = "%5s %c %c";
+    private static final String FORMAT_STRING = "%8s %c %c";
 
     /** The best times to reach a stop (ALL rounds). */
     private final int[] times;
@@ -96,14 +96,14 @@ final class BestTimes {
     }
 
     String toString(int stop) {
-        return String.format(FORMAT_STRING, timeToString(stop), mark(stop, reachedCurrentRound, 'X'), mark(stop, reachedLastRound, 'X'));
+        return String.format(FORMAT_STRING, timeToString(stop), mark(stop, reachedCurrentRound), mark(stop, reachedLastRound));
     }
 
-    private static char mark(int stop, BitSet bitSet, char checked) {
-        return bitSet.get(stop) ? checked : ' ';
+    private static char mark(int stop, BitSet bitSet) {
+        return bitSet.get(stop) ? 'X' : ' ';
     }
 
     private String timeToString(int stop) {
-        return TimeUtils.timeToString(times[stop], UNREACHED);
+        return TimeUtils.timeToStrLong(times[stop], UNREACHED);
     }
 }

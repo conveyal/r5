@@ -23,8 +23,9 @@ enum ProfileFactory {
             return new StopStatesStructArray(nRounds, nStops);
         }
     },
-//    pareto_set("pareto set") {
-//        public Worker createWorker(ProfileRequest request, int nRounds, int nStops, TransitLayerRRDataProvider transitData, EgressAccessRouter streetRouter) {
+    multi_criteria("mc set") {
+//        @Override
+//        public Worker createWorker(ProfileRequest request, int nRounds, int nStops, RaptorWorkerTransitDataProvider transitData, EgressAccessRouter streetRouter) {
 //            McWorkerState state = new McWorkerState(
 //                    nRounds,
 //                    nStops,
@@ -42,7 +43,7 @@ enum ProfileFactory {
 //                    streetRouter.egressTimesToStopsInSeconds.keys()
 //            );
 //        }
-//    }
+    }
     ;
     final String name;
 
@@ -51,7 +52,21 @@ enum ProfileFactory {
     }
 
     public static ProfileFactory[] parse(String profiles) {
-        return Arrays.stream(profiles.split(",")).map(ProfileFactory::valueOf).toArray(ProfileFactory[]::new);
+        return Arrays.stream(profiles.split(",")).map(ProfileFactory::parseOne).toArray(ProfileFactory[]::new);
+    }
+
+    private static ProfileFactory parseOne(String value) {
+        try {
+            return valueOf(value);
+        } catch (IllegalArgumentException e) {
+            for (ProfileFactory it : values()) {
+                if(value == null) { throw e; }
+                if(it.name.toLowerCase().startsWith(value)) {
+                    return it;
+                }
+            }
+            throw e;
+        }
     }
 
     StopStateCollection createStopStateCollection(int nRounds, int nStops) {

@@ -1,9 +1,9 @@
 package com.conveyal.r5.profile.mcrr;
 
 
-import static com.conveyal.r5.profile.mcrr.IntUtils.newIntArray;
 import static com.conveyal.r5.profile.mcrr.StopState.NOT_SET;
 import static com.conveyal.r5.profile.mcrr.StopState.UNREACHED;
+import static com.conveyal.r5.profile.mcrr.util.IntUtils.newIntArray;
 
 public final class StopStatesIntArray implements StopStateCollection {
     private int size = 0;
@@ -39,12 +39,21 @@ public final class StopStatesIntArray implements StopStateCollection {
 
     @Override
     public void setInitalTime(int round, int stop, int time) {
+        assert time > 0;
+        assert stop > 0;
+
         final int index = findOrCreateStopIndex(round, stop);
         times[index] = time;
     }
 
     @Override
     public void transitToStop(int round, int stop, int time, int fromPattern, int boardStop, int tripIndex, int boardTime, boolean bestTime) {
+        assert time > 0;
+        assert fromPattern >= 0;
+        assert boardStop > 0;
+        assert tripIndex >= 0;
+        assert boardTime > 0;
+
         final int index = findOrCreateStopIndex(round, stop);
 
         transitTimes[index] = time;
@@ -64,6 +73,11 @@ public final class StopStatesIntArray implements StopStateCollection {
      */
     @Override
     public void transferToStop(int round, int stop, int time, int fromStop, int transferTime) {
+        assert time > 0;
+        assert fromStop > 0;
+        assert transferTime < 0;
+
+
         final int index = findOrCreateStopIndex(round, stop);
         times[index] = time;
         transferFromStops[index] = fromStop;
@@ -89,6 +103,8 @@ public final class StopStatesIntArray implements StopStateCollection {
     }
 
     public final class Cursor implements StopStateCursor, StopState {
+        private int round;
+        private int stop;
         private int cursor;
 
 
@@ -97,6 +113,8 @@ public final class StopStatesIntArray implements StopStateCollection {
         @Override
         public final StopState stop(int round, int stop) {
             this.cursor = stateStopIndex[round][stop];
+            this.round = round;
+            this.stop = stop;
             return this;
         }
 
@@ -119,17 +137,17 @@ public final class StopStatesIntArray implements StopStateCollection {
         }
 
         @Override
-        public final boolean isTransitTimeSet() {
+        public final boolean arrivedByTransit() {
             return transitTimes[cursor] != UNREACHED;
         }
 
         @Override
-        public final int previousPattern() {
+        public final int pattern() {
             return previousPatterns[cursor];
         }
 
         @Override
-        public final int previousTrip() {
+        public final int trip() {
             return previousTrips[cursor];
         }
 
@@ -160,7 +178,7 @@ public final class StopStatesIntArray implements StopStateCollection {
 
         @Override
         public final String toString() {
-            return asString();
+            return asString("int array", round, stop);
         }
     }
 }

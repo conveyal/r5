@@ -1,11 +1,10 @@
 package com.conveyal.r5.profile.mcrr;
 
 import com.conveyal.r5.profile.Path;
-import com.conveyal.r5.util.ParetoDominateFunction;
-import com.conveyal.r5.util.ParetoSortable;
+import com.conveyal.r5.profile.mcrr.util.ParetoDominanceFunctions;
+import com.conveyal.r5.profile.mcrr.util.ParetoSortable;
 
-
-import static com.conveyal.r5.util.ParetoDominateFunction.createParetoDominanceFunctionArray;
+import static com.conveyal.r5.profile.mcrr.util.ParetoDominanceFunctions.createParetoDominanceFunctionArray;
 
 public class PathParetoSortableWrapper implements ParetoSortable {
 
@@ -25,7 +24,7 @@ public class PathParetoSortableWrapper implements ParetoSortable {
         return paretoValues;
     }
 
-    public static ParetoDominateFunction.Builder paretoDominanceFunctions() {
+    public static ParetoDominanceFunctions.Builder paretoDominanceFunctions() {
         return createParetoDominanceFunctionArray()
                 .different()
                 .different()

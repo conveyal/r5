@@ -1,8 +1,13 @@
 package com.conveyal.r5.profile.mcrr;
 
 import com.conveyal.r5.profile.Path;
+import com.conveyal.r5.profile.mcrr.util.DebugState;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
+
+import static com.conveyal.r5.profile.mcrr.util.DebugState.Type.Access;
+import static com.conveyal.r5.profile.mcrr.util.DebugState.Type.Transfer;
+import static com.conveyal.r5.profile.mcrr.util.DebugState.Type.Transit;
 
 
 /**
@@ -34,14 +39,14 @@ public class PathBuilderCursorBased implements PathBuilder {
         this.round = maxRound;
         this.cursor.stop(round, egressStop);
 
-        RangeRaptorWorkerStateImpl.debugStopHeader("FIND PATH");
-
         // find the fewest-transfers trip that is still optimal in terms of travel time
         StopState currentStop = findLastRoundWithTransitTimeSet(egressStop);
 
         if(currentStop == null) {
             return null;
         }
+
+        DebugState.debugStopHeader("Extract path");
 
         // trace the path back from this RaptorState
         patterns.clear();
@@ -59,8 +64,8 @@ public class PathBuilderCursorBased implements PathBuilder {
         int currentStopIndex = egressStop;
 
         while (round > 0) {
-            patterns.add(currentStop.previousPattern());
-            trips.add(currentStop.previousTrip());
+            patterns.add(currentStop.pattern());
+            trips.add(currentStop.trip());
             alightStops.add(currentStopIndex);
 //            times.add(it.time());
             boardTimes.add(currentStop.boardTime());
@@ -74,15 +79,18 @@ public class PathBuilderCursorBased implements PathBuilder {
             // go to previous state before handling transfers as transfers are done at the end of a round
             --round;
             currentStop = cursor.stop(round, currentStopIndex);
-            currentStop.debugStop("by", round, currentStopIndex);
+
+            DebugState.debugStop(round==0 ? Access : Transit, round, currentStopIndex, currentStop);
 
 
             // handle transfers
             if (currentStop.arrivedByTransfer()) {
                 transferTimes.add(currentStop.time());
+
+                DebugState.debugStop(Transfer, round, currentStopIndex, currentStop);
+
                 currentStopIndex = currentStop.transferFromStop();
                 currentStop = cursor.stop(round, currentStopIndex);
-                currentStop.debugStop("transfer", round, currentStopIndex);
             }
             else {
                 transferTimes.add(-1);
@@ -119,7 +127,7 @@ public class PathBuilderCursorBased implements PathBuilder {
      */
     private StopState findLastRoundWithTransitTimeSet(int egressStop) {
 
-        while(cursor.stopNotVisited(round, egressStop) || !cursor.stop(round, egressStop).isTransitTimeSet()) {
+        while(cursor.stopNotVisited(round, egressStop) || !cursor.stop(round, egressStop).arrivedByTransit()) {
 
             //debugListedStops("skip no transit", round, stop);
             --round;

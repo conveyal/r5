@@ -1,18 +1,18 @@
-package com.conveyal.r5.profile.mcrr;
+package com.conveyal.r5.profile.mcrr.util;
 
 import java.util.Arrays;
 
-final class IntUtils {
+public final class IntUtils {
     /** protect this class from being instantiated. */
     private IntUtils() {};
 
-    static int[] newIntArray(int size, int initalValue) {
+    public static int[] newIntArray(int size, int initalValue) {
         int [] array = new int[size];
         Arrays.fill(array, initalValue);
         return array;
     }
 
-    static String intToString(int value, int notSetValue) {
+    public static String intToString(int value, int notSetValue) {
         return value == notSetValue ? "" : Integer.toString(value);
     }
 }

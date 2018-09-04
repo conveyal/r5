@@ -1,6 +1,4 @@
-package com.conveyal.r5.profile.mcrr;
-
-import com.conveyal.r5.util.AvgTimer;
+package com.conveyal.r5.profile.mcrr.util;
 
 import java.util.ArrayList;
 import java.util.BitSet;

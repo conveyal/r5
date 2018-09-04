@@ -93,17 +93,17 @@ public final class StopStatesStructArray implements StopStateCollection {
         }
 
         @Override
-        public boolean isTransitTimeSet() {
+        public boolean arrivedByTransit() {
             return transitTime != UNREACHED;
         }
 
         @Override
-        public int previousPattern() {
+        public int pattern() {
             return previousPattern;
         }
 
         @Override
-        public int previousTrip() {
+        public int trip() {
             return previousTrip;
         }
 
@@ -134,7 +134,7 @@ public final class StopStatesStructArray implements StopStateCollection {
 
         @Override
         public String toString() {
-            return asString();
+            return asString("struct array", -1, -1);
         }
     }
 }

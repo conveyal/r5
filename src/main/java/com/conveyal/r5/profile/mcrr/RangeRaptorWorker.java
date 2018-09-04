@@ -1,8 +1,8 @@
 package com.conveyal.r5.profile.mcrr;
 
 import com.conveyal.r5.profile.Path;
+import com.conveyal.r5.profile.mcrr.util.AvgTimer;
 import com.conveyal.r5.transit.TripSchedule;
-import com.conveyal.r5.util.AvgTimer;
 import gnu.trove.list.TIntList;
 import gnu.trove.map.TIntIntMap;
 
@@ -160,7 +160,7 @@ public class RangeRaptorWorker implements Worker {
      * @return an array of length iterationsPerMinute, containing the arrival (clock) times at each stop for each iteration.
      */
     private void runRaptorForMinute(int departureTime) {
-        RangeRaptorWorkerStateImpl.debugStopHeader("runRaptorForMin " + departureTime);
+        RangeRaptorWorkerStateImpl.debugStopHeader("RUN RAPTOR FOR MINUTE: " + departureTime);
 
         advanceScheduledSearchToPreviousMinute(departureTime);
 

@@ -1,4 +1,4 @@
-package com.conveyal.r5.util;
+package com.conveyal.r5.profile.mcrr.util;
 
 import java.util.ArrayList;
 import java.util.HashMap;

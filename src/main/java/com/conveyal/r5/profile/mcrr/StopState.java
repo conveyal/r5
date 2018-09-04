@@ -1,10 +1,10 @@
 package com.conveyal.r5.profile.mcrr;
 
-import static com.conveyal.r5.profile.mcrr.IntUtils.intToString;
-import static com.conveyal.r5.util.TimeUtils.timeToString;
+import com.conveyal.r5.profile.mcrr.util.IntUtils;
+import com.conveyal.r5.profile.mcrr.util.TimeUtils;
+
 
 public interface StopState {
-    boolean DEBUG = false;
 
     /**
      * This value essentially serves as Infinity for ints - it's bigger than every other number.
@@ -22,11 +22,11 @@ public interface StopState {
 
     int transitTime();
 
-    boolean isTransitTimeSet();
+    boolean arrivedByTransit();
 
-    int previousPattern();
+    int pattern();
 
-    int previousTrip();
+    int trip();
 
     int boardStop();
 
@@ -38,38 +38,17 @@ public interface StopState {
 
     int transferTime();
 
-    default void debugStop(String descr, int round, int stop) {
-        if(!DEBUG) return;
-
-        if(round < 0 || stop < 1) {
-            System.err.printf("  S %-24s  %2d %6d  STOP DOES NOT EXIST!%n", descr, round, stop);
-            return;
-        }
-
-        System.err.printf("  S %-24s  %2d %6d   %s%n",
-                descr,
+    default String asString(String description, int round, int toStop) {
+        return String.format("State %s { rnd: %d, stop: %s - %s, alight: %s, board: %s, ptn: %s, trp: %s, transfer: %s }",
+                description,
                 round,
-                stop,
-                asString()
-        );
-    }
-
-
-    String[] STOP_HEADERS =  {
-            "- TRANSFER FROM -   ----------- TRANSIT -----------",
-            " Time   Stop  Dur    Time B.Stop B.Time  Pttrn Trip"
-    };
-
-    default String asString() {
-        return String.format("%5s %6s %4s   %5s %6s %6s %6s %4s",
-                timeToString(time(), UNREACHED),
-                intToString(transferFromStop(), NOT_SET),
-                intToString(transferTime(), NOT_SET),
-                timeToString(transitTime(), UNREACHED),
-                intToString(boardStop(), NOT_SET),
-                timeToString(boardTime(), UNREACHED),
-                intToString(previousPattern(), NOT_SET),
-                intToString(previousTrip(), NOT_SET)
+                IntUtils.intToString(arrivedByTransit() ? boardStop() : transferFromStop(), NOT_SET),
+                IntUtils.intToString(toStop, NOT_SET),
+                TimeUtils.timeToStrLong(time(), UNREACHED),
+                TimeUtils.timeToStrLong(boardTime(), UNREACHED),
+                IntUtils.intToString(pattern(), NOT_SET),
+                IntUtils.intToString(trip(), NOT_SET),
+                TimeUtils.timeToStrCompact(transferTime(), NOT_SET)
         );
     }
 }

@@ -1,14 +1,16 @@
 package com.conveyal.r5.util;
 
+import com.conveyal.r5.profile.mcrr.util.ParetoSet;
+import com.conveyal.r5.profile.mcrr.util.ParetoSortable;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.util.Arrays;
 import java.util.List;
 
-import static com.conveyal.r5.util.ParetoDominateFunction.createParetoDominanceFunctionArray;
+import static com.conveyal.r5.profile.mcrr.util.ParetoDominanceFunctions.createParetoDominanceFunctionArray;
 import static java.util.Collections.singletonList;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 public class ParetoSetTest {
 

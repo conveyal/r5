@@ -12,9 +12,21 @@ import java.io.File;
 class CommandLineOpts {
     private static final boolean OPTION_UNKNOWN_THEN_FAIL = false;
     protected CommandLine cmd;
+
+    /* Shared options */
     private static final String ROOT_DIR_OPT = "d";
-    private static final String MULTI_CRITERIA_RR_OPT = "c";
+    private static final String ORIGINAL_CODE = "o";
     private static final String HELP_OPT = "h";
+
+    /* Speed test options - defined here to keep all option together */
+    static final String VERBOSE_OPT = "v";
+    static final String NUM_OF_ITINERARIES_OPT = "i";
+    static final String SEARCH_WINDOW_IN_MINUTES_OPT = "t";
+    static final String SAMPLE_TEST_N_TIMES_OPT = "n";
+    static final String PROFILES_OPT = "p";
+    static final String TEST_CASES_OPT = "c";
+    static final String DEBUG_STOPS = "s";
+
 
     CommandLineOpts(String[] args) {
         Options options = speedTestOptions();
@@ -45,7 +57,7 @@ class CommandLineOpts {
     Options speedTestOptions() {
         Options options = new Options();
         options.addOption(ROOT_DIR_OPT, "rootDir", true, "Root directory where network and input files are located. (Optional)");
-        options.addOption(MULTI_CRITERIA_RR_OPT, "multiCriteria", false, "Use multi criteria version of range raptor. (Optional)");
+        options.addOption(ORIGINAL_CODE, "originalCode", false, "Use the original range raptor code. (Optional)");
         options.addOption(HELP_OPT, "help", false, "Print all command line options, then exit. (Optional)");
         return options;
     }
@@ -58,8 +70,8 @@ class CommandLineOpts {
         return rootDir;
     }
 
-    boolean useMultiCriteriaSearch() {
-        return cmd.hasOption(MULTI_CRITERIA_RR_OPT);
+    boolean useOriginalCode() {
+        return cmd.hasOption(ORIGINAL_CODE);
     }
 
     private boolean printHelpOptSet() {

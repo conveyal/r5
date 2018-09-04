@@ -1,4 +1,4 @@
-package com.conveyal.r5.speed_test;
+package com.conveyal.r5.speed_test.test;
 
 import com.csvreader.CsvReader;
 
@@ -8,36 +8,48 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-class CsvTestCase {
-    private int index;
-    String origin;
-    double fromLat;
-    double fromLon;
-    String destination;
-    double toLat;
-    double toLon;
+public class CsvTestCase {
+    public final int index;
+    public final String origin;
+    public final double fromLat;
+    public final double fromLon;
+    public final String destination;
+    public final double toLat;
+    public final double toLon;
 
+    private final String[] expectedResults;
     private String[] results;
-    private String[] expectedResults;
     private List<AssertErrorMessage> errors = new ArrayList<>();
 
+    private CsvTestCase(int index, String origin, double fromLat, double fromLon, String destination, double toLat, double toLon, String[] expectedResults) {
+        this.index = index;
+        this.origin = origin;
+        this.fromLat = fromLat;
+        this.fromLon = fromLon;
+        this.destination = destination;
+        this.toLat = toLat;
+        this.toLon = toLon;
+        this.expectedResults = expectedResults;
+    }
 
-    static List<CsvTestCase> readTestCasesFromFile(File csvFile) throws IOException {
+
+    public static List<CsvTestCase> readTestCasesFromFile(File csvFile) throws IOException {
         List<CsvTestCase> testCases = new ArrayList<>();
         CsvReader csvReader = new CsvReader(csvFile.getAbsolutePath());
         csvReader.readRecord(); // Skip header
         int index = 0;
 
         while (csvReader.readRecord()) {
-            CsvTestCase tc = new CsvTestCase();
-            tc.index = index++;
-            tc.origin = csvReader.get(4);
-            tc.fromLat = Double.parseDouble(csvReader.get(2));
-            tc.fromLon = Double.parseDouble(csvReader.get(3));
-            tc.destination = csvReader.get(8);
-            tc.toLat = Double.parseDouble(csvReader.get(6));
-            tc.toLon = Double.parseDouble(csvReader.get(7));
-            tc.expectedResults = expectedResult(csvReader.get(10));
+            CsvTestCase tc = new CsvTestCase(
+                index++,
+                csvReader.get(4),
+                Double.parseDouble(csvReader.get(2)),
+                Double.parseDouble(csvReader.get(3)),
+                csvReader.get(8),
+                Double.parseDouble(csvReader.get(6)),
+                Double.parseDouble(csvReader.get(7)),
+                expectedResult(csvReader.get(10))
+            );
             testCases.add(tc);
         }
         return testCases;
@@ -45,13 +57,13 @@ class CsvTestCase {
 
     @Override
     public String toString() {
-        return String.format("#%d %s -> %s, (%.3f, %.3f) -> (%.3f, %.3f)", index, origin, destination, fromLat, fromLon, toLat, toLon);
+        return String.format("#%d %s - %s, (%.3f, %.3f) - (%.3f, %.3f)", index, origin, destination, fromLat, fromLon, toLat, toLon);
     }
 
     /**
      * Verify the result by matching it with the {@code expectedResult} from the csv file.
      */
-    void assertResult(String[] results) {
+    public void assertResult(String[] results) {
         this.results = results;
 
         if(expectedResults == null) {
@@ -63,7 +75,7 @@ class CsvTestCase {
         for (String exp : expectedResults) {
             int i = find(exp, results);
             if(i == -1) {
-                errors.add(new AssertErrorMessage(exp, "- Unable to find expected trip:"));
+                errors.add(new AssertErrorMessage(exp, "- Expected:"));
             }
             else {
                 resultMatch[i] = true;
@@ -72,11 +84,11 @@ class CsvTestCase {
         // Log all results not matched
         for (int i=0; i<resultMatch.length; ++i) {
             if(!resultMatch[i]) {
-                errors.add(new AssertErrorMessage(results[i], "+ Trip returned but not expected:"));
+                errors.add(new AssertErrorMessage(results[i], "+ Returned:"));
             }
         }
         if(failed()) {
-            throw new IllegalStateException("Test assert errors");
+            throw new TestAssertException();
         }
     }
 
@@ -84,7 +96,7 @@ class CsvTestCase {
      * If no expected result exist, then log the results os it ca be used and copied into the
      * CSV input files
      */
-    void logResultIfExpectedCsvInputIsMissing() {
+    public void logResultIfExpectedCsvInputIsMissing() {
         if(expectedCSVInputExist()) {
             return;
         }
@@ -99,15 +111,15 @@ class CsvTestCase {
         System.err.println();
     }
 
-    boolean expectedCSVInputExist() {
+    public boolean expectedCSVInputExist() {
         return expectedResults != null;
     }
 
-    String errorDetails() {
+    public String errorDetails() {
         return  errors.stream().sorted().map(s -> s + "\n").reduce((s, t) -> s + t).orElse("");
     }
 
-    boolean failed() {
+    public boolean failed() {
         return !errors.isEmpty();
     }
 

@@ -1,4 +1,4 @@
-package com.conveyal.r5.util;
+package com.conveyal.r5.profile.mcrr.util;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -6,10 +6,10 @@ import java.util.List;
 
 public class ParetoSet<T extends ParetoSortable> {
 
-    private final ParetoDominateFunction[] dominateFunctions;
+    private final ParetoDominanceFunction[] dominateFunctions;
     private List<T> paretoSet = new ArrayList<>();
 
-    public ParetoSet(ParetoDominateFunction.Builder builder) {
+    public ParetoSet(ParetoDominanceFunctions.Builder builder) {
         this.dominateFunctions = builder.build();
     }
 
@@ -56,7 +56,7 @@ public class ParetoSet<T extends ParetoSortable> {
         for (int i = 0; i < size; ++i) {
             int left = l[i];
             int right = r[i];
-            ParetoDominateFunction func = dominateFunctions[i];
+            ParetoDominanceFunction func = dominateFunctions[i];
 
             if (func.mutualDominance(left, right)) {
                 return Domainace.Equal;

@@ -1,9 +1,9 @@
-package com.conveyal.r5.util;
+package com.conveyal.r5.profile.mcrr.util;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public enum ParetoDominateFunction {
+public enum ParetoDominanceFunctions implements ParetoDominanceFunction {
     LESS_THEN {
         @Override public final boolean dominates(int v, int u) {
             return v < u;
@@ -16,21 +16,19 @@ public enum ParetoDominateFunction {
         }
         @Override public boolean mutualDominance(int v, int u) { return false; }
     },
-    DIFFRENT {
+    DIFFERENT {
         @Override public final boolean dominates(int v, int u) {
             return v != u;
         }
         @Override public boolean mutualDominance(int v, int u) { return v != u; }
     };
-    public abstract boolean dominates(int v, int u);
-    public abstract boolean mutualDominance(int v, int u);
 
     public static Builder createParetoDominanceFunctionArray() {
         return new Builder();
     }
 
     public static class Builder {
-        private List<ParetoDominateFunction> list = new ArrayList<>();
+        private List<ParetoDominanceFunction> list = new ArrayList<>();
 
         private Builder() {}
 
@@ -38,17 +36,32 @@ public enum ParetoDominateFunction {
             list.add(LESS_THEN);
             return this;
         }
+        public Builder lessThen(int delta) {
+            list.add(new LessThenDelta(delta));
+            return this;
+        }
         public Builder greaterThen() {
             list.add(GRATER_THEN);
             return this;
         }
         public Builder different() {
-            list.add(DIFFRENT);
+            list.add(DIFFERENT);
             return this;
         }
 
-        public ParetoDominateFunction[] build() {
-            return list.toArray(new ParetoDominateFunction[list.size()]);
+        public ParetoDominanceFunction[] build() {
+            return list.toArray(new ParetoDominanceFunction[list.size()]);
         }
+    }
+
+
+    static class LessThenDelta implements ParetoDominanceFunction {
+        private final int delta;
+
+        LessThenDelta(int delta) {
+            this.delta = delta;
+        }
+        @Override public final boolean dominates(int v, int u) { return v < (u + delta); }
+        @Override public boolean mutualDominance(int v, int u) { return false; }
     }
 }

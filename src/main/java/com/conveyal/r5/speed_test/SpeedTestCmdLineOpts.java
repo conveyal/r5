@@ -6,11 +6,7 @@ import java.util.Arrays;
 
 public class SpeedTestCmdLineOpts extends CommandLineOpts {
 
-    private static final String PRINT_ITINERARIES_OPT = "p";
-    private static final String NUM_OF_ITINERARIES_OPT = "i";
-    private static final String SEARCH_WINDOW_IN_MINUTES_OPT = "t";
-    private static final String SAMPLE_TEST_N_TIMES = "n";
-    private static final String PROFILES = "o";
+    // For list of options see super class
 
     SpeedTestCmdLineOpts(String[] args) {
         super(args);
@@ -20,15 +16,17 @@ public class SpeedTestCmdLineOpts extends CommandLineOpts {
     Options speedTestOptions() {
         Options options = super.speedTestOptions();
         options.addOption(NUM_OF_ITINERARIES_OPT, "numOfItineraries", true, "Number of itineraries to return");
-        options.addOption(PRINT_ITINERARIES_OPT, "printItineraries", false, "Print itineraries found");
+        options.addOption(VERBOSE_OPT, "verbose", false, "Verbose output: Print itineraries");
         options.addOption(SEARCH_WINDOW_IN_MINUTES_OPT, "searchTimeWindowInMinutes", true, "The time in minutes to add to from to time");
-        options.addOption(SAMPLE_TEST_N_TIMES, "sampleTestNTimes", true, "Repeat the test N times. Profiles are altered in a round robin fashion.");
-        options.addOption(PROFILES, "profiles", true, "A coma separated list of configuration profiles: " + Arrays.toString(ProfileFactory.values()));
+        options.addOption(SAMPLE_TEST_N_TIMES_OPT, "sampleTestNTimes", true, "Repeat the test N times. Profiles are altered in a round robin fashion.");
+        options.addOption(PROFILES_OPT, "profiles", true, "A coma separated list of configuration profiles: " + Arrays.toString(ProfileFactory.values()));
+        options.addOption(TEST_CASES_OPT, "testCases", true, "A coma separated list of test case numbers to run.");
+        options.addOption(DEBUG_STOPS, "debugStops", true, "A coma separated list of stops to debug.");
         return options;
     }
 
-    boolean printItineraries() {
-        return cmd.hasOption(PRINT_ITINERARIES_OPT);
+    boolean verbose() {
+        return cmd.hasOption(VERBOSE_OPT);
     }
 
     int numOfItineraries() {
@@ -40,10 +38,27 @@ public class SpeedTestCmdLineOpts extends CommandLineOpts {
     }
 
     int numberOfTestsSamplesToRun() {
-        return Integer.valueOf(cmd.getOptionValue(SAMPLE_TEST_N_TIMES, Integer.toString(profiles().length)));
+        return Integer.valueOf(cmd.getOptionValue(SAMPLE_TEST_N_TIMES_OPT, Integer.toString(profiles().length)));
     }
 
     ProfileFactory[] profiles() {
-        return cmd.hasOption(PROFILES) ? ProfileFactory.parse(cmd.getOptionValue(PROFILES)) : ProfileFactory.values();
+        return cmd.hasOption(PROFILES_OPT) ? ProfileFactory.parse(cmd.getOptionValue(PROFILES_OPT)) : ProfileFactory.values();
+    }
+
+    int[] testCases() {
+        return parseCSVToInt(TEST_CASES_OPT);
+    }
+
+    int[] debugStops() {
+        return parseCSVToInt(DEBUG_STOPS);
+    }
+
+
+    /* private methods */
+
+    private int[] parseCSVToInt(String opt) {
+        return cmd.hasOption(opt)
+                ? Arrays.stream(cmd.getOptionValue(opt).split(",")).mapToInt(Integer::parseInt).toArray()
+                : null;
     }
 }

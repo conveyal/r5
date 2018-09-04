@@ -1,10 +1,11 @@
 package com.conveyal.r5.profile.mcrr;
 
-import java.util.Arrays;
-import java.util.List;
 
-import static com.conveyal.r5.profile.mcrr.StopState.STOP_HEADERS;
+import com.conveyal.r5.profile.mcrr.util.DebugState;
 
+import static com.conveyal.r5.profile.mcrr.util.DebugState.Type.Access;
+import static com.conveyal.r5.profile.mcrr.util.DebugState.Type.Transfer;
+import static com.conveyal.r5.profile.mcrr.util.DebugState.Type.Transit;
 
 /**
  * Tracks the state of a RAPTOR search, specifically the best arrival times at each transit stop at the end of a
@@ -27,9 +28,6 @@ public final class RangeRaptorWorkerStateImpl implements RangeRaptorWorkerState 
     /**
      * To debug a particular journey set DEBUG to true and add all visited stops in the debugStops list.
      */
-    private static final boolean DEBUG = StopState.DEBUG;
-    private static final List<Integer> debugStops = Arrays.asList(5757, 32489, 17270, 21469, 22102);
-
     private final StopStateCollection stops;
     private final StopStateCursor cursor;
     private final int nRounds;
@@ -123,7 +121,7 @@ public final class RangeRaptorWorkerStateImpl implements RangeRaptorWorkerState 
     @Override public void setInitialTime(int stop, int time) {
         stops.setInitalTime(round, stop, time);
         bestOveral.setTime(stop, time);
-        debugListedStops("init", round, stop);
+        debugStop(Access, round, stop);
     }
 
     /**
@@ -142,7 +140,7 @@ public final class RangeRaptorWorkerStateImpl implements RangeRaptorWorkerState 
             stops.transitToStop(round, stop, alightTime, pattern, boardStop, trip, boardTime, newBestOveral);
 
             // skip: transferTimes
-            debugListedStops("transit to stop", round, stop);
+            debugStop(Transit, round, stop);
         }
     }
 
@@ -160,42 +158,24 @@ public final class RangeRaptorWorkerStateImpl implements RangeRaptorWorkerState 
 
             stops.transferToStop(round, stop, time, fromStop, transferTime);
 
-            debugListedStops("transfer to stop", round, stop);
+            debugStop(Transfer, round, stop);
         }
     }
 
     static void debugStopHeader(String title) {
-        if(!DEBUG) return;
-        System.err.printf("  S %-24s  -------- BEST OVERALL -------   %s%n", title, STOP_HEADERS[0]);
-        System.err.printf("  S %-24s  Rnd  Stop  Time C L Trans C L   %s%n", "", STOP_HEADERS[1]);
+        DebugState.debugStopHeader(title, "Best     C P | Transit  C P");
     }
 
 
     /* private methods */
 
-    private void debugStop(String descr, int round, int stop) {
-        if(!DEBUG) return;
-
-        if(round < 0 || stop < 1) {
-            System.err.printf("  S %-24s  %2d %6d  STOP DOES NOT EXIST!%n", descr, round, stop);
-            return;
-        }
-
-        System.err.printf("  S %-24s  %2d %6d %s %s   %s%n",
-                descr,
-                round,
-                stop,
-                bestOveral.toString(stop),
-                bestTransit.toString(stop),
-                cursor.stop(round, stop)
-        );
-    }
-
     private boolean isCurrentRoundUpdated() {
         return !(bestOveral.isCurrentRoundEmpty() && bestTransit.isCurrentRoundEmpty());
     }
 
-    private void debugListedStops(String descr, int round, int stop) {
-        if (DEBUG && debugStops.contains(stop)) debugStop(descr, round, stop);
+    private void debugStop(DebugState.Type type, int round, int stop) {
+        if(DebugState.isDebug(stop)) {
+            DebugState.debugStop(type, round, stop, cursor.stop(round, stop), bestOveral.toString(stop) + " | " + bestTransit.toString(stop));
+        }
     }
 }

@@ -11,12 +11,14 @@ import com.conveyal.r5.profile.mcrr.PathParetoSortableWrapper;
 import com.conveyal.r5.profile.mcrr.RaptorWorkerTransitDataProvider;
 import com.conveyal.r5.profile.mcrr.TransitLayerRRDataProvider;
 import com.conveyal.r5.profile.mcrr.Worker;
+import com.conveyal.r5.profile.mcrr.util.AvgTimer;
+import com.conveyal.r5.profile.mcrr.util.DebugState;
+import com.conveyal.r5.profile.mcrr.util.ParetoSet;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.Place;
 import com.conveyal.r5.speed_test.api.model.TripPlan;
+import com.conveyal.r5.speed_test.test.CsvTestCase;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.util.AvgTimer;
-import com.conveyal.r5.util.ParetoSet;
 import gnu.trove.iterator.TIntIntIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,6 +29,7 @@ import java.lang.ref.WeakReference;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
@@ -34,10 +37,11 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static com.conveyal.r5.profile.SearchAlgorithm.MultiCriteriaRangeRaptor;
 import static com.conveyal.r5.profile.SearchAlgorithm.RangeRaptor;
-import static com.conveyal.r5.util.TimeUtils.midnightOf;
+import static com.conveyal.r5.profile.mcrr.util.TimeUtils.midnightOf;
 
 /**
  * Test response times for a large batch of origin/destination points.
@@ -93,6 +97,8 @@ public class SpeedTest {
         final ProfileFactory[] strategies = opts.profiles();
         final int samples = opts.numberOfTestsSamplesToRun();
 
+        DebugState.init(opts.debugStops());
+
         initProfileStatistics();
 
         for (int i = 0; i < samples; ++i) {
@@ -113,21 +119,24 @@ public class SpeedTest {
         // Force GC to avoid GC during the test
         forceGCToAvoidGCLater();
 
-        // Warm up JIT compiler
-        runSingleTestCase(tripPlans, testCases.get(9), opts);
-        //if(true) return;
-        runSingleTestCase(tripPlans, testCases.get(15), opts);
+        boolean limitTestCases = opts.testCases() != null;
+        List<Integer> testCasesToRun = limitTestCases ? Arrays.stream(opts.testCases()).boxed().collect(Collectors.toList()) : null;
 
-
+        if(!limitTestCases) {
+            // Warm up JIT compiler
+            runSingleTestCase(tripPlans, testCases.get(9), opts);
+            runSingleTestCase(tripPlans, testCases.get(15), opts);
+        }
         LOG.info("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [ START " + stateFactory + " ]");
 
         AvgTimer.resetAll();
-
         for (CsvTestCase testCase : testCases) {
-            nSuccess += runSingleTestCase(tripPlans, testCase, opts) ? 1 : 0;
+            if(!limitTestCases || testCasesToRun.contains(testCase.index)) {
+                nSuccess += runSingleTestCase(tripPlans, testCase, opts) ? 1 : 0;
+            }
         }
 
-        int tcSize = testCases.size();
+        int tcSize = limitTestCases ? testCasesToRun.size() : testCases.size();
 
         LOG.info(
                 "\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [ SUMMARY " + stateFactory + " ]\n" +
@@ -165,7 +174,7 @@ public class SpeedTest {
             tripPlans.add(route);
 
             testCase.assertResult(route.itinerariesAsCompactStrings());
-            printResultOk(testCase, route, TOT_TIMER.lapTime(), opts.printItineraries());
+            printResultOk(testCase, route, TOT_TIMER.lapTime(), opts.verbose());
             return true;
         }
         catch (Exception e) {
@@ -177,7 +186,7 @@ public class SpeedTest {
     public TripPlan route(ProfileRequest request) {
         SearchAlgorithm algorithm = request.algorithm;
         if (algorithm == null) {
-            algorithm = opts.useMultiCriteriaSearch() ? MultiCriteriaRangeRaptor : RangeRaptor;
+            algorithm = opts.useOriginalCode() ? RangeRaptor : MultiCriteriaRangeRaptor;
         }
         switch (algorithm) {
             case RangeRaptor:
@@ -298,8 +307,8 @@ public class SpeedTest {
 
             ItinerarySet itineraries = new ItinerarySet();
 
-            for (PathParetoSortableWrapper transitPaths : paths.paretoSet()) {
-                SpeedTestItinerary itinerary = createItinerary(request, streetRouter, transitPaths.path);
+            for (PathParetoSortableWrapper p : paths.paretoSet()) {
+                SpeedTestItinerary itinerary = createItinerary(request, streetRouter, p.path);
 
                 itineraries.add(itinerary);
             }

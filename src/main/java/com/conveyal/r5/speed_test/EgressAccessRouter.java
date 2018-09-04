@@ -2,9 +2,9 @@ package com.conveyal.r5.speed_test;
 
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetPath;
+import com.conveyal.r5.profile.mcrr.util.AvgTimer;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.util.AvgTimer;
 import gnu.trove.map.TIntIntMap;
 
 public class EgressAccessRouter {

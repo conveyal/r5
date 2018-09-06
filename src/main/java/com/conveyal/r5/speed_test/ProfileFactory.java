@@ -1,6 +1,7 @@
 package com.conveyal.r5.speed_test;
 
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.profile.SearchAlgorithm;
 import com.conveyal.r5.profile.mcrr.PathBuilder;
 import com.conveyal.r5.profile.mcrr.PathBuilderCursorBased;
 import com.conveyal.r5.profile.mcrr.RangeRaptorWorker;
@@ -13,17 +14,20 @@ import com.conveyal.r5.profile.mcrr.StopStatesStructArray;
 import com.conveyal.r5.profile.mcrr.Worker;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 
 enum ProfileFactory {
-    int_arrays("int arrays"),
-    struct_arrays("struct arrays") {
+    original("original", "The original code with FastRaptorWorker"),
+    int_arrays("int", "Flyweight stop state using int arrays with new RangeRaptorWorker"),
+    struct_arrays("struct", "Simple POJO stop arrival state with new RangeRaptorWorker") {
         @Override
         StopStateCollection createStopStateCollection(int nRounds, int nStops) {
             return new StopStatesStructArray(nRounds, nStops);
         }
     },
-    multi_criteria("mc set") {
+//    multi_criteria("mc", "Multi criteria pareto state with new McRangeRaptor") {
 //        @Override
 //        public Worker createWorker(ProfileRequest request, int nRounds, int nStops, RaptorWorkerTransitDataProvider transitData, EgressAccessRouter streetRouter) {
 //            McWorkerState state = new McWorkerState(
@@ -43,30 +47,34 @@ enum ProfileFactory {
 //                    streetRouter.egressTimesToStopsInSeconds.keys()
 //            );
 //        }
-    }
+//    }
     ;
-    final String name;
+    final String shortName;
+    final String description;
 
-    ProfileFactory(String name) {
-        this.name = name;
+    ProfileFactory(String shortName, String description) {
+        this.shortName = shortName;
+        this.description = description;
     }
 
-    public static ProfileFactory[] parse(String profiles) {
+    static ProfileFactory[] parse(String profiles) {
         return Arrays.stream(profiles.split(",")).map(ProfileFactory::parseOne).toArray(ProfileFactory[]::new);
     }
 
-    private static ProfileFactory parseOne(String value) {
-        try {
-            return valueOf(value);
-        } catch (IllegalArgumentException e) {
-            for (ProfileFactory it : values()) {
-                if(value == null) { throw e; }
-                if(it.name.toLowerCase().startsWith(value)) {
-                    return it;
-                }
-            }
-            throw e;
+    static ProfileFactory from(SearchAlgorithm algorithm, ProfileFactory defaultFactory) {
+        if(algorithm == null) return defaultFactory;
+
+        switch (algorithm) {
+            case RangeRaptor: return original;
+//            case MultiCriteriaRangeRaptor: return multi_criteria;
+            case StructRangeRaptor: return struct_arrays;
+            case IntArrayRangeRaptor: return int_arrays;
         }
+        return defaultFactory;
+    }
+
+    public static List<String> options() {
+        return Arrays.stream(values()).map(ProfileFactory::description).collect(Collectors.toList());
     }
 
     StopStateCollection createStopStateCollection(int nRounds, int nStops) {
@@ -81,7 +89,7 @@ enum ProfileFactory {
         return new PathBuilderCursorBased(stops.newCursor());
     }
 
-    public Worker createWorker(ProfileRequest request, int nRounds, int nStops, RaptorWorkerTransitDataProvider transitData, EgressAccessRouter streetRouter) {
+    Worker createWorker(ProfileRequest request, int nRounds, int nStops, RaptorWorkerTransitDataProvider transitData, EgressAccessRouter streetRouter) {
         StopStateCollection stops = createStopStateCollection(nRounds, nStops);
 
         RangeRaptorWorkerState state = createWorkerState(
@@ -103,5 +111,34 @@ enum ProfileFactory {
                 streetRouter.accessTimesToStopsInSeconds,
                 streetRouter.egressTimesToStopsInSeconds.keys()
         );
+    }
+
+    boolean isOriginal() {
+        return this == original;
+    }
+
+
+    /* private methods */
+
+    private static ProfileFactory parseOne(String value) {
+        try {
+            return valueOf(value);
+        } catch (IllegalArgumentException e) {
+            for (ProfileFactory it : values()) {
+                if(it.shortName.toLowerCase().startsWith(value)) {
+                    return it;
+                }
+            }
+            throw e;
+        }
+    }
+
+    private String description() {
+        if(name().equals(shortName)) {
+            return String.format("'%s' : %s",   name(), description);
+        }
+        else {
+            return String.format("'%s' or '%s' : %s",   name(), shortName, description);
+        }
     }
 }

@@ -25,8 +25,9 @@ public final class DebugState {
     private static final String STOP_HEADER = "Description Rnd  From  To     Start    End        Time   Pattern Trp";
     private static final String LINE_FORMAT = " * %-8s %2d   %5s %5s  %8s %8s %8s  %6s %3s";
 
-    private static String lastTitle = "DEBUG";
-    private static String lastHeaderPostfix = null;
+    private static String title = "DEBUG";
+    private static String headerPostfix = null;
+    private static String lastTitle = null;
 
 
     /**
@@ -35,15 +36,13 @@ public final class DebugState {
     private DebugState() {
     }
 
-    public static void init(int[] debugStops) {
+    public static void init(List<Integer> debugStops) {
         if(debugStops == null) {
             DEBUG = false;
         }
         else {
             DEBUG = true;
-            for (int it : debugStops) {
-                DEBUG_STOPS.add(it);
-            }
+            DEBUG_STOPS.addAll(debugStops);
         }
     }
 
@@ -55,10 +54,10 @@ public final class DebugState {
         return DEBUG && DEBUG_STOPS.contains(stop);
     }
 
-    public static void debugStopHeader(String title, String headerPostfix) {
+    public static void debugStopHeader(String newTitle, String newHeaderPostfix) {
         if (DEBUG) {
-            lastTitle = title;
-            lastHeaderPostfix = headerPostfix;
+            title = newTitle;
+            headerPostfix = newHeaderPostfix;
         }
     }
 
@@ -75,7 +74,7 @@ public final class DebugState {
     }
 
     private static String toString(Type type, int round, int stopIndex, StopState state) {
-        debugStopHeaderAtLeastOnce();
+        debugStopHeaderAtMostOnce();
         if (type == Type.Access) {
             assertSet(state, state.boardTime(), UNREACHED);
             assertSet(state, state.boardStop(), NOT_SET);
@@ -159,11 +158,11 @@ public final class DebugState {
         }
     }
 
-    private static void debugStopHeaderAtLeastOnce() {
-        if (DEBUG && lastTitle != null) {
-            System.err.println(lastTitle);
-            System.err.println(STOP_HEADER + (lastHeaderPostfix == null ? "" : " | " + lastHeaderPostfix));
-            lastTitle = null;
+    private static void debugStopHeaderAtMostOnce() {
+        if (DEBUG && !title.equals(lastTitle)) {
+            System.err.println("\n" + title);
+            System.err.println(STOP_HEADER + (headerPostfix == null ? "" : " | " + headerPostfix));
+            lastTitle = title;
         }
     }
 }

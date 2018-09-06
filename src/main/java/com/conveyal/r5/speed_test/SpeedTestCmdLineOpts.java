@@ -3,6 +3,8 @@ package com.conveyal.r5.speed_test;
 import org.apache.commons.cli.Options;
 
 import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class SpeedTestCmdLineOpts extends CommandLineOpts {
 
@@ -19,7 +21,7 @@ public class SpeedTestCmdLineOpts extends CommandLineOpts {
         options.addOption(VERBOSE_OPT, "verbose", false, "Verbose output: Print itineraries");
         options.addOption(SEARCH_WINDOW_IN_MINUTES_OPT, "searchTimeWindowInMinutes", true, "The time in minutes to add to from to time");
         options.addOption(SAMPLE_TEST_N_TIMES_OPT, "sampleTestNTimes", true, "Repeat the test N times. Profiles are altered in a round robin fashion.");
-        options.addOption(PROFILES_OPT, "profiles", true, "A coma separated list of configuration profiles: " + Arrays.toString(ProfileFactory.values()));
+        options.addOption(PROFILES_OPT, "profiles", true, "A coma separated list of configuration profiles:\n" + String.join("\n", ProfileFactory.options()));
         options.addOption(TEST_CASES_OPT, "testCases", true, "A coma separated list of test case numbers to run.");
         options.addOption(DEBUG_STOPS, "debugStops", true, "A coma separated list of stops to debug.");
         return options;
@@ -45,20 +47,26 @@ public class SpeedTestCmdLineOpts extends CommandLineOpts {
         return cmd.hasOption(PROFILES_OPT) ? ProfileFactory.parse(cmd.getOptionValue(PROFILES_OPT)) : ProfileFactory.values();
     }
 
-    int[] testCases() {
-        return parseCSVToInt(TEST_CASES_OPT);
+    List<String> testCases() {
+        return parseCSVList(TEST_CASES_OPT);
     }
 
-    int[] debugStops() {
+    List<Integer> debugStops() {
         return parseCSVToInt(DEBUG_STOPS);
     }
 
 
     /* private methods */
 
-    private int[] parseCSVToInt(String opt) {
+    private List<Integer> parseCSVToInt(String opt) {
         return cmd.hasOption(opt)
-                ? Arrays.stream(cmd.getOptionValue(opt).split(",")).mapToInt(Integer::parseInt).toArray()
+                ? parseCSVList(opt).stream().map(Integer::valueOf).collect(Collectors.toList())
+                : null;
+    }
+
+    private List<String> parseCSVList(String opt) {
+        return cmd.hasOption(opt)
+                ? Arrays.asList(cmd.getOptionValue(opt).split("\\s*,\\s*"))
                 : null;
     }
 }

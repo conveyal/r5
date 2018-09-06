@@ -13,7 +13,6 @@
 
 package com.conveyal.r5.speed_test.api.model;
 
-import com.conveyal.r5.speed_test.SpeedTestItinerary;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import javax.xml.bind.annotation.XmlElement;
@@ -60,28 +59,4 @@ public class TripPlan {
         itineraries.sort(Comparator.comparing(o -> o.endTime));
     }
 
-    public void speedTestPrintItineraries() {
-        System.err.println(SpeedTestItinerary.toStringHeader());
-        itineraries.forEach(System.err::println);
-    }
-
-    /**
-     * Create a compact representation of all itineraries on format:
-     * {@code }
-     * @return
-     */
-    public String[] itinerariesAsCompactStrings() {
-        String[] result = new String[itineraries.size()];
-        int i = 0;
-        for (Itinerary it : itineraries) {
-            if(it instanceof SpeedTestItinerary) {
-                result[i] = ((SpeedTestItinerary)it).toStringCompact();
-            }
-            else {
-                return null;
-            }
-            ++i;
-        }
-        return result;
-    }
 }

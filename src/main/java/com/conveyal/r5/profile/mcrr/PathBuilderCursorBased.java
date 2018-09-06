@@ -46,7 +46,7 @@ public class PathBuilderCursorBased implements PathBuilder {
             return null;
         }
 
-        DebugState.debugStopHeader("Extract path");
+        DebugState.debugStopHeader("EXTRACT PATH");
 
         // trace the path back from this RaptorState
         patterns.clear();

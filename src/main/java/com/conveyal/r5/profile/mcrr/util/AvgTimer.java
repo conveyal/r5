@@ -85,7 +85,10 @@ public abstract class AvgTimer {
         result.add(header1(width));
         result.add(header2(width));
         for (String method : methods) {
-            result.add(allTimers.get(method).toString(width));
+            AvgTimer timer = allTimers.get(method);
+            if(timer.used()) {
+                result.add(timer.toString(width));
+            }
         }
         return result;
     }
@@ -176,6 +179,10 @@ public abstract class AvgTimer {
 
 
     /* private methods */
+
+    private boolean used() {
+        return counterSuccess != 0 || counterFailed != 0;
+    }
 
     private String toString(int width) {
         return formatLine(

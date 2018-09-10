@@ -176,7 +176,7 @@ public class SpeedTest {
             return true;
         }
         catch (Exception e) {
-            if(ignoreResults) {
+            if(!ignoreResults) {
                 printResultFailed(testCase, TOT_TIMER.lapTime(), e);
             }
             return false;

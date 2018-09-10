@@ -1,4 +1,4 @@
-package com.conveyal.r5.profile.mcrr;
+package com.conveyal.r5.profile.mcrr.api;
 
 import com.conveyal.r5.profile.Path;
 

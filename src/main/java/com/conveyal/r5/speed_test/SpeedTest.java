@@ -7,9 +7,9 @@ import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.profile.mcrr.PathParetoSortableWrapper;
-import com.conveyal.r5.profile.mcrr.RaptorWorkerTransitDataProvider;
+import com.conveyal.r5.profile.mcrr.api.TransitDataProvider;
 import com.conveyal.r5.profile.mcrr.TransitLayerRRDataProvider;
-import com.conveyal.r5.profile.mcrr.Worker;
+import com.conveyal.r5.profile.mcrr.api.Worker;
 import com.conveyal.r5.profile.mcrr.util.AvgTimer;
 import com.conveyal.r5.profile.mcrr.util.DebugState;
 import com.conveyal.r5.profile.mcrr.util.ParetoSet;
@@ -259,8 +259,8 @@ public class SpeedTest {
             TIMER_WORKER.start();
 
 
-            RaptorWorkerTransitDataProvider transitData = new TransitLayerRRDataProvider(
-                    transportNetwork.transitLayer, request.date, request.transitModes
+            TransitDataProvider transitData = new TransitLayerRRDataProvider(
+                    transportNetwork.transitLayer, request.date, request.transitModes, request.walkSpeed
             );
             final int nRounds = request.maxRides + 1;
             final int nStops = transportNetwork.transitLayer.getStopCount();
@@ -325,9 +325,9 @@ public class SpeedTest {
 
             return tripPlan;
         } finally {
-            TIMER_WORKER.fail();
-            TIMER_COLLECT_RESULTS.fail();
-            TIMER_COLLECT_RESULTS_ITINERARIES.fail();
+            TIMER_WORKER.failIfStarted();
+            TIMER_COLLECT_RESULTS.failIfStarted();
+            TIMER_COLLECT_RESULTS_ITINERARIES.failIfStarted();
         }
     }
 

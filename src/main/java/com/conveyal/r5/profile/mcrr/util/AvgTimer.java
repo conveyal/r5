@@ -134,7 +134,7 @@ public abstract class AvgTimer {
      * If not started, do nothing and return.
      * Else assume the request failed and collect data.
      */
-    public void fail() {
+    public void failIfStarted() {
         if (startTime == 0) {
             return;
         }
@@ -150,7 +150,7 @@ public abstract class AvgTimer {
             body.run();
             stop();
         } finally {
-            fail();
+            failIfStarted();
         }
     }
 
@@ -161,7 +161,7 @@ public abstract class AvgTimer {
             stop();
             return result;
         } finally {
-            fail();
+            failIfStarted();
         }
     }
 
@@ -321,7 +321,7 @@ public abstract class AvgTimer {
         }
         @Override public void start() { }
         @Override public void stop() { }
-        @Override public void fail() { }
+        @Override public void failIfStarted() { }
         @Override  public void time(Runnable body) { body.run(); }
         @Override public <T> T timeAndReturn(Supplier<T> body) { return body.get();  }
         @Override public long lapTime() {

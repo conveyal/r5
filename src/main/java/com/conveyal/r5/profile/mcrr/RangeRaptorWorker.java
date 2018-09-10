@@ -1,14 +1,17 @@
 package com.conveyal.r5.profile.mcrr;
 
 import com.conveyal.r5.profile.Path;
+import com.conveyal.r5.profile.mcrr.api.Pattern;
+import com.conveyal.r5.profile.mcrr.api.TimeToStop;
+import com.conveyal.r5.profile.mcrr.api.TransitDataProvider;
+import com.conveyal.r5.profile.mcrr.api.Worker;
 import com.conveyal.r5.profile.mcrr.util.AvgTimer;
 import com.conveyal.r5.profile.mcrr.util.TimeUtils;
 import com.conveyal.r5.transit.TripSchedule;
-import gnu.trove.list.TIntList;
-import gnu.trove.map.TIntIntMap;
 
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 
 
 /**
@@ -57,18 +60,16 @@ public class RangeRaptorWorker implements Worker {
     private static final AvgTimer TIMER_ROUTE_BY_MINUTE = AvgTimer.timerMilliSec("RRaptor:route Run Raptor For Minute");
     private static final AvgTimer TIMER_BY_MINUTE_SCHEDULE_SEARCH = AvgTimer.timerMicroSec("RRaptor:runRaptorForMinute Schedule Search");
     private static final AvgTimer TIMER_BY_MINUTE_TRANSFERS = AvgTimer.timerMicroSec("RRaptor:runRaptorForMinute Transfers");
+    private static final AvgTimer TIMER_TRIP = AvgTimer.timerMicroSec("TRIP");
 
     /** the transit data role needed for routing */
-    private final RaptorWorkerTransitDataProvider transit;
+    private final TransitDataProvider transit;
 
     /** Times to access each transit stop using the street network (seconds) */
-    private final TIntIntMap accessStops;
+    private final Collection<TimeToStop> accessStops;
 
     /** List of all possible egress stops. */
-    private final int[] egressStops;
-
-    private final int walkSpeedMillimetersPerSecond;
-    private final int maxWalkMillimeters;
+    private final Collection<TimeToStop> egressStops;
 
     // TODO add javadoc to field
     private final RangeRaptorWorkerState state;
@@ -79,23 +80,17 @@ public class RangeRaptorWorker implements Worker {
     private final PathBuilder pathBuilder;
 
     public RangeRaptorWorker(
-            RaptorWorkerTransitDataProvider transitData,
+            TransitDataProvider transitData,
             RangeRaptorWorkerState state,
             PathBuilder pathBuilder,
             int fromTimeInSeconds,
             int toTimeInSeconds,
-            float walkSpeedMPerS,
-            int maxWalkTimeMinutes,
-            TIntIntMap accessStops,
-            int[] egressStops
+            Collection<TimeToStop> accessStops,
+            Collection<TimeToStop> egressStops
     ) {
         this.transit = transitData;
         this.accessStops = accessStops;
         this.egressStops = egressStops;
-
-        // Convert to int to avoid integer casts in calculation
-        this.walkSpeedMillimetersPerSecond = (int) (walkSpeedMPerS * 1000);
-        this.maxWalkMillimeters = walkSpeedMillimetersPerSecond * maxWalkTimeMinutes * 60;
 
         this.pathBuilder = pathBuilder;
         this.state = state;
@@ -123,9 +118,9 @@ public class RangeRaptorWorker implements Worker {
             TIMER_ROUTE_SETUP.stop();
 
             // The main outer loop iterates backward over all minutes in the departure times window.
-            for (int departureTime = toTimeSeconds - DEPARTURE_STEP_SEC, minute = nMinutes;
+            for (int departureTime = toTimeSeconds - DEPARTURE_STEP_SEC;
                  departureTime >= fromTimeSeconds;
-                 departureTime -= DEPARTURE_STEP_SEC, minute--) {
+                 departureTime -= DEPARTURE_STEP_SEC) {
 
                 int finalDepartureTime = departureTime;
 
@@ -148,10 +143,9 @@ public class RangeRaptorWorker implements Worker {
         state.initNewDepatureForMinute(nextMinuteDepartureTime);
 
         // add initial stops
-        accessStops.forEachEntry((stop, accessTime) -> {
-            state.setInitialTime(stop, accessTime + nextMinuteDepartureTime);
-            return true; // continue iteration
-        });
+        for (TimeToStop it : accessStops) {
+            state.setInitialTime(it.stop, it.time + nextMinuteDepartureTime);
+        }
     }
 
     /**
@@ -161,7 +155,7 @@ public class RangeRaptorWorker implements Worker {
      * @return an array of length iterationsPerMinute, containing the arrival (clock) times at each stop for each iteration.
      */
     private void runRaptorForMinute(int departureTime) {
-        RangeRaptorWorkerStateImpl.debugStopHeader("RUN RAPTOR FOR MINUTE: " + TimeUtils.timeToStrCompact(departureTime));
+        RangeRaptorWorkerState.debugStopHeader("RUN RAPTOR FOR MINUTE: " + TimeUtils.timeToStrCompact(departureTime));
 
         advanceScheduledSearchToPreviousMinute(departureTime);
 
@@ -193,9 +187,12 @@ public class RangeRaptorWorker implements Worker {
      * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
      */
     private void addPathsForCurrentIteration() {
-        for (int stopIndex : egressStops) {
-            if (state.isStopReachedByTransit(stopIndex)) {
-                Path p = pathBuilder.extractPathForStop(state.getMaxNumberOfRounds(), stopIndex);
+        for (TimeToStop it : egressStops) {
+
+            // TODO TGR -- Add egress transit time to path
+
+            if (state.isStopReachedByTransit(it.stop)) {
+                Path p = pathBuilder.extractPathForStop(state.getMaxNumberOfRounds(), it.stop);
                 if (p != null) {
                     paths.add(p);
                 }
@@ -206,10 +203,10 @@ public class RangeRaptorWorker implements Worker {
     /** Perform a scheduled search */
     private void scheduledSearchForRound() {
 
-        TransitLayerRRDataProvider.PatternIterator patternIterator = transit.patternIterator(state.bestStopsTouchedLastRoundIterator());
+        Iterator<Pattern> patternIterator = transit.patternIterator(state.bestStopsTouchedLastRoundIterator());
 
-        while (patternIterator.morePatterns()) {
-            TransitLayerRRDataProvider.Pattern pattern = patternIterator.next();
+        while (patternIterator.hasNext()) {
+            Pattern pattern = patternIterator.next();
             int originalPatternIndex = pattern.originalPatternIndex();
             int onTrip = -1;
             int boardTime = 0;
@@ -241,7 +238,9 @@ public class RangeRaptorWorker implements Worker {
                     int tripIndexUpperBound = (onTrip == -1 ? pattern.getTripScheduleSize() : onTrip);
 
                     // check if we can back up to an earlier trip due to this stop being reached earlier
+                    TIMER_TRIP.start();
                     boolean found = search.search(tripIndexUpperBound, earliestBoardTime, stopPositionInPattern);
+                    TIMER_TRIP.stop();
 
                     if (found) {
                         onTrip = search.candidateTripIndex;
@@ -255,37 +254,12 @@ public class RangeRaptorWorker implements Worker {
     }
 
     private void doTransfers() {
-
         BitSetIterator it = state.stopsTouchedByTransitCurrentRoundIterator();
-
-        for (int stop = it.next(); stop > -1; stop = it.next()) {
+        for (int fromStop = it.next(); fromStop > -1; fromStop = it.next()) {
             // no need to consider loop transfers, since we don't mark patterns here any more
             // loop transfers are already included by virtue of those stops having been reached
-            TIntList transfersFromStop = transit.getTransfersDistancesInMMForStop(stop);
-
-            if (transfersFromStop != null) {
-                for (int stopIdx = 0; stopIdx < transfersFromStop.size(); stopIdx += 2) {
-                    int targetStop = transfersFromStop.get(stopIdx);
-                    int distanceToTargetStopMillimeters = transfersFromStop.get(stopIdx + 1);
-
-
-                    // TODO TGR - This check is most likely not needed - this limit should be part of generating
-                    // TODO TGR - transfers, and approval of a individual transfer is the job of the state.
-                    if (distanceToTargetStopMillimeters < maxWalkMillimeters) {
-                        // transfer length to stop is acceptable
-                        int walkTimeToTargetStopSeconds = distanceToTargetStopMillimeters / walkSpeedMillimetersPerSecond;
-
-
-                       // TODO TGR - It could be left tot the state to calculate this
-                        int timeAtTargetStop = state.bestTransitTime(stop) + walkTimeToTargetStopSeconds;
-
-                        if (walkTimeToTargetStopSeconds < 0) {
-                            throw new IllegalStateException("Negative transfer time!!");
-                        }
-
-                        state.transferToStop(targetStop, timeAtTargetStop, stop, walkTimeToTargetStopSeconds);
-                    }
-                }
+            for (TimeToStop transfer : transit.getTransfers(fromStop)) {
+                state.transferToStop(fromStop, transfer.stop, transfer.time);
             }
         }
     }

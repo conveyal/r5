@@ -6,16 +6,19 @@ import com.conveyal.r5.profile.mcrr.PathBuilder;
 import com.conveyal.r5.profile.mcrr.PathBuilderCursorBased;
 import com.conveyal.r5.profile.mcrr.RangeRaptorWorker;
 import com.conveyal.r5.profile.mcrr.RangeRaptorWorkerState;
-import com.conveyal.r5.profile.mcrr.RangeRaptorWorkerStateImpl;
-import com.conveyal.r5.profile.mcrr.RaptorWorkerTransitDataProvider;
+import com.conveyal.r5.profile.mcrr.api.TimeToStop;
+import com.conveyal.r5.profile.mcrr.api.TransitDataProvider;
 import com.conveyal.r5.profile.mcrr.StopStateCollection;
 import com.conveyal.r5.profile.mcrr.StopStatesIntArray;
 import com.conveyal.r5.profile.mcrr.StopStatesStructArray;
-import com.conveyal.r5.profile.mcrr.Worker;
+import com.conveyal.r5.profile.mcrr.api.Worker;
 import com.conveyal.r5.profile.mcrr.mc.McRangeRaptorWorker;
 import com.conveyal.r5.profile.mcrr.mc.McWorkerState;
+import gnu.trove.map.TIntIntMap;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -31,7 +34,7 @@ enum ProfileFactory {
     },
     multi_criteria("mc", "Multi criteria pareto state with new McRangeRaptor") {
         @Override
-        public Worker createWorker(ProfileRequest request, int nRounds, int nStops, RaptorWorkerTransitDataProvider transitData, EgressAccessRouter streetRouter) {
+        public Worker createWorker(ProfileRequest request, int nRounds, int nStops, TransitDataProvider transitData, EgressAccessRouter streetRouter) {
             McWorkerState state = new McWorkerState(
                     nRounds,
                     nStops,
@@ -43,10 +46,8 @@ enum ProfileFactory {
                     state,
                     request.fromTime,
                     request.toTime,
-                    request.walkSpeed,
-                    request.maxWalkTime,
-                    streetRouter.accessTimesToStopsInSeconds,
-                    streetRouter.egressTimesToStopsInSeconds.keys()
+                    timeToStops(streetRouter.accessTimesToStopsInSeconds),
+                    timeToStops(streetRouter.egressTimesToStopsInSeconds)
             );
         }
     }
@@ -84,14 +85,14 @@ enum ProfileFactory {
     }
 
     RangeRaptorWorkerState createWorkerState(int nRounds, int nStops, int earliestDepartureTime, int maxDurationSeconds, StopStateCollection stops) {
-        return new RangeRaptorWorkerStateImpl(nRounds, nStops, earliestDepartureTime, maxDurationSeconds, stops);
+        return new RangeRaptorWorkerState(nRounds, nStops, earliestDepartureTime, maxDurationSeconds, stops);
     }
 
     PathBuilder createPathBuilder(StopStateCollection stops) {
         return new PathBuilderCursorBased(stops.newCursor());
     }
 
-    Worker createWorker(ProfileRequest request, int nRounds, int nStops, RaptorWorkerTransitDataProvider transitData, EgressAccessRouter streetRouter) {
+    Worker createWorker(ProfileRequest request, int nRounds, int nStops, TransitDataProvider transitData, EgressAccessRouter streetRouter) {
         StopStateCollection stops = createStopStateCollection(nRounds, nStops);
 
         RangeRaptorWorkerState state = createWorkerState(
@@ -108,10 +109,8 @@ enum ProfileFactory {
                 createPathBuilder(stops),
                 request.fromTime,
                 request.toTime,
-                request.walkSpeed,
-                request.maxWalkTime,
-                streetRouter.accessTimesToStopsInSeconds,
-                streetRouter.egressTimesToStopsInSeconds.keys()
+                timeToStops(streetRouter.accessTimesToStopsInSeconds),
+                timeToStops(streetRouter.egressTimesToStopsInSeconds)
         );
     }
 
@@ -121,6 +120,15 @@ enum ProfileFactory {
 
 
     /* private methods */
+
+    private static Collection<TimeToStop> timeToStops(TIntIntMap timesToStopsInSeconds) {
+        Collection<TimeToStop> times = new ArrayList<>();
+        timesToStopsInSeconds.forEachEntry((s,t) -> {
+            times.add(new TimeToStop(s, t));
+            return true;
+        });
+        return times;
+    }
 
     private static ProfileFactory parseOne(String value) {
         try {

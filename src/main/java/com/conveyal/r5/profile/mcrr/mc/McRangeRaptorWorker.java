@@ -2,17 +2,17 @@ package com.conveyal.r5.profile.mcrr.mc;
 
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.mcrr.BitSetIterator;
-import com.conveyal.r5.profile.mcrr.RaptorWorkerTransitDataProvider;
-import com.conveyal.r5.profile.mcrr.TransitLayerRRDataProvider;
+import com.conveyal.r5.profile.mcrr.api.Pattern;
+import com.conveyal.r5.profile.mcrr.api.TimeToStop;
+import com.conveyal.r5.profile.mcrr.api.TransitDataProvider;
 import com.conveyal.r5.profile.mcrr.TripScheduleBoardSearch;
-import com.conveyal.r5.profile.mcrr.Worker;
+import com.conveyal.r5.profile.mcrr.api.Worker;
 import com.conveyal.r5.profile.mcrr.util.AvgTimer;
 import com.conveyal.r5.transit.TripSchedule;
-import gnu.trove.list.TIntList;
-import gnu.trove.map.TIntIntMap;
 
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Set;
 
 import static com.conveyal.r5.profile.mcrr.mc.McWorkerState.debugStopHeader;
@@ -65,41 +65,39 @@ public class McRangeRaptorWorker implements Worker {
     private static final AvgTimer TIMER_BY_MINUTE_SCHEDULE_SEARCH = AvgTimer.timerMicroSec("McRRaptor:runRaptorForMinute Schedule Search");
     private static final AvgTimer TIMER_BY_MINUTE_TRANSFERS = AvgTimer.timerMicroSec("McRRaptor:runRaptorForMinute Transfers");
 
-    /** the transit data role needed for routing */
-    private final RaptorWorkerTransitDataProvider transit;
+    /**
+     * the transit data role needed for routing
+     */
+    private final TransitDataProvider transit;
 
-    /** Times to access each transit stop using the street network (seconds) */
-    private final TIntIntMap accessStops;
+    /**
+     * Times to access each transit stop using the street network (seconds)
+     */
+    private final Collection<TimeToStop> accessStops;
 
-    /** List of all possible egress stops. */
-    private final int[] egressStops;
-
-    private final int walkSpeedMillimetersPerSecond;
-    private final int maxWalkMillimeters;
+    /**
+     * List of all possible egress stops.
+     */
+    private final Collection<TimeToStop> egressStops;
 
     // TODO add javadoc to field
     private final McWorkerState state;
 
 
     public McRangeRaptorWorker(
-            RaptorWorkerTransitDataProvider transitData,
+            TransitDataProvider transitData,
             McWorkerState state,
             int fromTimeInSeconds,
             int toTimeInSeconds,
-            float walkSpeedMPerS,
-            int maxWalkTimeMinutes,
-            TIntIntMap accessStops,
-            int[] egressStops
+            Collection<TimeToStop> accessStops,
+            Collection<TimeToStop> egressStops
     ) {
         this.transit = transitData;
+        this.state = state;
+
         this.accessStops = accessStops;
         this.egressStops = egressStops;
 
-        // Convert to int to avoid integer casts in calculation
-        this.walkSpeedMillimetersPerSecond = (int) (walkSpeedMPerS * 1000);
-        this.maxWalkMillimeters = walkSpeedMillimetersPerSecond * maxWalkTimeMinutes * 60;
-
-        this.state = state;
 
         this.toTimeSeconds = toTimeInSeconds;
         this.fromTimeSeconds = fromTimeInSeconds;
@@ -149,10 +147,9 @@ public class McRangeRaptorWorker implements Worker {
         state.initNewDepatureForMinute(nextMinuteDepartureTime);
 
         // add initial stops
-        accessStops.forEachEntry((stop, accessTime) -> {
-            state.setInitialTime(stop, accessTime + nextMinuteDepartureTime);
-            return true; // continue iteration
-        });
+        for (TimeToStop it : accessStops) {
+            state.setInitialTime(it.stop, it.time + nextMinuteDepartureTime);
+        }
     }
 
     /**
@@ -190,13 +187,15 @@ public class McRangeRaptorWorker implements Worker {
     }
 
 
-    /** Perform a scheduled search */
+    /**
+     * Perform a scheduled search
+     */
     private void scheduledSearchForRound() {
         BitSetIterator stops = state.stopsTouchedPreviousRound();
-        TransitLayerRRDataProvider.PatternIterator patternIterator = transit.patternIterator(stops);
+        Iterator<Pattern> patternIterator = transit.patternIterator(stops);
 
-        while (patternIterator.morePatterns()) {
-            TransitLayerRRDataProvider.Pattern pattern = patternIterator.next();
+        while (patternIterator.hasNext()) {
+            Pattern pattern = patternIterator.next();
             int originalPatternIndex = pattern.originalPatternIndex();
 
             TripScheduleBoardSearch search = new TripScheduleBoardSearch(pattern, this::skipTripSchedule);
@@ -235,33 +234,15 @@ public class McRangeRaptorWorker implements Worker {
         for (int fromStop = it.next(); fromStop > -1; fromStop = it.next()) {
             // no need to consider loop transfers, since we don't mark patterns here any more
             // loop transfers are already included by virtue of those stops having been reached
-            TIntList transfersFromStop = transit.getTransfersDistancesInMMForStop(fromStop);
-
-            if (transfersFromStop != null) {
-                for (int stopIdx = 0; stopIdx < transfersFromStop.size(); stopIdx += 2) {
-                    int targetStop = transfersFromStop.get(stopIdx);
-                    int distanceToTargetStopMillimeters = transfersFromStop.get(stopIdx + 1);
-
-
-                    // TODO TGR - This check is most likely not needed - this limit should be part of generating
-                    // TODO TGR - transfers, and approval of a individual transfer is the job of the state.
-                    if (distanceToTargetStopMillimeters < maxWalkMillimeters) {
-                        // transfer length to stop is acceptable
-                        int walkTimeToTargetStopSeconds = distanceToTargetStopMillimeters / walkSpeedMillimetersPerSecond;
-                        //int timeAtTargetStop = state.bestTransitTime(stop) + walkTimeToTargetStopSeconds;
-
-                        if (walkTimeToTargetStopSeconds < 0) {
-                            throw new IllegalStateException("Negative transfer time!!");
-                        }
-
-                        state.transferToStop(fromStop, targetStop, walkTimeToTargetStopSeconds);
-                    }
-                }
+            for (TimeToStop transfer : transit.getTransfers(fromStop)) {
+                state.transferToStop(fromStop, transfer.stop, transfer.time);
             }
         }
     }
 
-    /** Skip trips NOT running on the day of the search and skip frequency trips */
+    /**
+     * Skip trips NOT running on the day of the search and skip frequency trips
+     */
     private boolean skipTripSchedule(TripSchedule trip) {
         return trip.headwaySeconds != null || transit.skipCalendarService(trip.serviceCode);
     }

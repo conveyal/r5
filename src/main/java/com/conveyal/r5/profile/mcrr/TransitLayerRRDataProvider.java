@@ -1,6 +1,9 @@
 package com.conveyal.r5.profile.mcrr;
 
 import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.r5.profile.mcrr.api.Pattern;
+import com.conveyal.r5.profile.mcrr.api.TimeToStop;
+import com.conveyal.r5.profile.mcrr.api.TransitDataProvider;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
@@ -11,12 +14,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.EnumSet;
+import java.util.Iterator;
+import java.util.List;
 import java.util.stream.IntStream;
 
-public class TransitLayerRRDataProvider implements RaptorWorkerTransitDataProvider {
+import static java.util.Collections.emptyList;
+
+public class TransitLayerRRDataProvider implements TransitDataProvider {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransitLayerRRDataProvider.class);
     private static boolean PRINT_REFILTERING_PATTERNS_INFO = true;
@@ -38,21 +46,38 @@ public class TransitLayerRRDataProvider implements RaptorWorkerTransitDataProvid
     /** Allowed transit modes */
     private final EnumSet<TransitModes> transitModes;
 
+    private final int walkSpeedMillimetersPerSecond;
 
-    public TransitLayerRRDataProvider(TransitLayer transitLayer, LocalDate date, EnumSet<TransitModes> transitModes) {
+
+    public TransitLayerRRDataProvider(TransitLayer transitLayer, LocalDate date, EnumSet<TransitModes> transitModes, float walkSpeedMetersPerSecond) {
         this.transitLayer = transitLayer;
         this.servicesActive  = transitLayer.getActiveServicesForDate(date);
         this.transitModes = transitModes;
+        this.walkSpeedMillimetersPerSecond = (int)(walkSpeedMetersPerSecond * 1000f);
     }
 
     @Override
-    public TIntList getTransfersDistancesInMMForStop(int stop) {
-        return transitLayer.transfersForStop.get(stop);
-    }
+    public Iterable<TimeToStop> getTransfers(int stop) {
+        TIntList m = transitLayer.transfersForStop.get(stop);
 
-    @Override
-    public TIntList getPatternsForStop(int stop) {
-        return transitLayer.patternsForStop.get(stop);
+        if(m == null) {
+            return emptyList();
+        }
+
+        List<TimeToStop> stopTimes = new ArrayList<>(m.size());
+
+        for(int i=0; i<m.size();) {
+            int toStop = m.get(i);
+            ++i;
+            int walkTime = m.get(i) / walkSpeedMillimetersPerSecond;
+            ++i;
+
+            if (walkTime < 0) {
+                throw new IllegalStateException("Negative transfer time!!");
+            }
+            stopTimes.add(new TimeToStop(toStop, walkTime));
+        }
+        return stopTimes;
     }
 
     @Override
@@ -94,7 +119,7 @@ public class TransitLayerRRDataProvider implements RaptorWorkerTransitDataProvid
         }
     }
 
-    @Override public PatternIterator patternIterator(BitSetIterator stops) {
+    @Override public Iterator<Pattern> patternIterator(BitSetIterator stops) {
         return new InternalPatternIterator(getPatternsTouchedForStops(stops));
     }
 
@@ -108,7 +133,6 @@ public class TransitLayerRRDataProvider implements RaptorWorkerTransitDataProvid
         BitSet patternsTouched = new BitSet();
 
         for (int stop = stops.next(); stop >= 0; stop = stops.next()) {
-
             getPatternsForStop(stop).forEach(originalPattern -> {
                 int filteredPattern = scheduledIndexForOriginalPatternIndex[originalPattern];
 
@@ -123,8 +147,11 @@ public class TransitLayerRRDataProvider implements RaptorWorkerTransitDataProvid
         return patternsTouched;
     }
 
+    private TIntList getPatternsForStop(int stop) {
+        return transitLayer.patternsForStop.get(stop);
+    }
 
-    class InternalPatternIterator implements PatternIterator, Pattern {
+    class InternalPatternIterator implements Pattern, Iterator<Pattern> {
         private int nextPatternIndex;
         private int originalPatternIndex;
         private BitSet patternsTouched;
@@ -137,7 +164,7 @@ public class TransitLayerRRDataProvider implements RaptorWorkerTransitDataProvid
 
         /*  PatternIterator interface implementation */
 
-        @Override public boolean morePatterns() {
+        @Override public boolean hasNext() {
             return nextPatternIndex >=0;
         }
 

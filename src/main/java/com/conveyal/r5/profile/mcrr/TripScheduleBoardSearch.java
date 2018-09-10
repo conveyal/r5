@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile.mcrr;
 
+import com.conveyal.r5.profile.mcrr.api.Pattern;
 import com.conveyal.r5.transit.TripSchedule;
 
 import java.util.function.Function;
@@ -24,13 +25,13 @@ public class TripScheduleBoardSearch {
      * between 10 and 100 does not affect the performance mutch.
      */
     private final static int BINARY_SEARCH_THRESHOLD = 46;
-    private final TransitLayerRRDataProvider.Pattern pattern;
+    private final Pattern pattern;
     private final Function<TripSchedule, Boolean> skipTripScheduleCallback;
 
     public TripSchedule candidateTrip;
     public int candidateTripIndex;
 
-    public TripScheduleBoardSearch(TransitLayerRRDataProvider.Pattern pattern, Function<TripSchedule, Boolean> skipTripScheduleCallback) {
+    public TripScheduleBoardSearch(Pattern pattern, Function<TripSchedule, Boolean> skipTripScheduleCallback) {
         this.pattern = pattern;
         this.skipTripScheduleCallback = skipTripScheduleCallback;
     }

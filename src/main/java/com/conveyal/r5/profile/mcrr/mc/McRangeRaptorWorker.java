@@ -1,7 +1,7 @@
 package com.conveyal.r5.profile.mcrr.mc;
 
-import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.mcrr.BitSetIterator;
+import com.conveyal.r5.profile.mcrr.api.Path2;
 import com.conveyal.r5.profile.mcrr.api.Pattern;
 import com.conveyal.r5.profile.mcrr.api.TimeToStop;
 import com.conveyal.r5.profile.mcrr.api.TransitDataProvider;
@@ -40,7 +40,7 @@ import static com.conveyal.r5.profile.mcrr.mc.McWorkerState.debugStopHeader;
  * (generating randomized schedules).
  */
 @SuppressWarnings("Duplicates")
-public class McRangeRaptorWorker implements Worker {
+public class McRangeRaptorWorker {
     /**
      * Step for departure times. Use caution when changing this as we use the functions
      * request.getTimeWindowLengthMinutes and request.getMonteCarloDrawsPerMinute below which assume this value is 1 minute.
@@ -111,10 +111,8 @@ public class McRangeRaptorWorker implements Worker {
      *
      * @return a unique set of paths
      */
-    public Collection<Path> route() {
+    public Collection<Path2> route() {
         //LOG.info("Performing {} rounds (minutes)",  nMinutes);
-
-        Set<Path> paths = new HashSet<>();
 
         TIMER_ROUTE.time(() -> {
             TIMER_ROUTE_SETUP.start();
@@ -133,10 +131,9 @@ public class McRangeRaptorWorker implements Worker {
                 runRaptorForMinute(departureTime);
                 TIMER_ROUTE_BY_MINUTE.stop();
 
-                paths.addAll(state.extractPaths(egressStops));
             }
         });
-        return paths;
+        return state.extractPaths(egressStops);
     }
 
     /**
@@ -148,7 +145,7 @@ public class McRangeRaptorWorker implements Worker {
 
         // add initial stops
         for (TimeToStop it : accessStops) {
-            state.setInitialTime(it.stop, it.time + nextMinuteDepartureTime);
+            state.setInitialTime(it.stop, nextMinuteDepartureTime, it.time);
         }
     }
 

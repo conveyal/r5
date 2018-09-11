@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile.mcrr.mc;
 
 
+import com.conveyal.r5.profile.mcrr.api.PathLeg;
 import com.conveyal.r5.profile.mcrr.util.DebugState;
 
 import static com.conveyal.r5.profile.mcrr.util.DebugState.Type.Transit;
@@ -43,4 +44,9 @@ public final class McTransitStopState extends McStopState {
 
     @Override
     DebugState.Type type() { return Transit; }
+
+    @Override
+    PathLeg mapToLeg() {
+        return McPathLeg.createTransitLeg(this);
+    }
 }

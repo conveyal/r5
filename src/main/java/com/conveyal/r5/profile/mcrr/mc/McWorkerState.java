@@ -2,6 +2,7 @@ package com.conveyal.r5.profile.mcrr.mc;
 
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.mcrr.BitSetIterator;
+import com.conveyal.r5.profile.mcrr.api.Path2;
 import com.conveyal.r5.profile.mcrr.api.TimeToStop;
 import com.conveyal.r5.profile.mcrr.util.DebugState;
 
@@ -68,8 +69,8 @@ public final class McWorkerState {
         round = 0;
     }
 
-    void setInitialTime(int stop, int time) {
-        stops.setInitialTime(stop, time);
+    void setInitialTime(int stop, int fromTime,  int accessTime) {
+        stops.setInitialTime(stop, fromTime, accessTime);
         touchedCurrent.set(stop);
         debugStops(Access, round, stop);
     }
@@ -131,13 +132,13 @@ public final class McWorkerState {
         debugStops(Transfer, round, targetStop);
     }
 
-    Collection<Path> extractPaths(Collection<TimeToStop> egressStops) {
-        List<Path> paths = new ArrayList<>();
-        McPathBuilder builder = new McPathBuilder();
+    Collection<Path2> extractPaths(Collection<TimeToStop> egressStops) {
+        List<Path2> paths = new ArrayList<>();
+        McPath2Builder builder = new McPath2Builder();
 
         for (TimeToStop egressStop : egressStops) {
             for (McStopState it : stops.listAll(egressStop.stop)) {
-                Path p = builder.extractPathsForStop(it);
+                Path2 p = builder.extractPathsForStop(it, egressStop.time);
                 if(p != null) {
                     paths.add(p);
                 }

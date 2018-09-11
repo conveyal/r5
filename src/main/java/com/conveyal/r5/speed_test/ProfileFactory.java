@@ -32,25 +32,7 @@ enum ProfileFactory {
             return new StopStatesStructArray(nRounds, nStops);
         }
     },
-    multi_criteria("mc", "Multi criteria pareto state with new McRangeRaptor") {
-        @Override
-        public Worker createWorker(ProfileRequest request, int nRounds, int nStops, TransitDataProvider transitData, EgressAccessRouter streetRouter) {
-            McWorkerState state = new McWorkerState(
-                    nRounds,
-                    nStops,
-                    request.maxTripDurationMinutes * 60
-            );
-
-            return new McRangeRaptorWorker(
-                    transitData,
-                    state,
-                    request.fromTime,
-                    request.toTime,
-                    timeToStops(streetRouter.accessTimesToStopsInSeconds),
-                    timeToStops(streetRouter.egressTimesToStopsInSeconds)
-            );
-        }
-    }
+    multi_criteria("mc", "Multi criteria pareto state with new McRangeRaptor")
     ;
     final String shortName;
     final String description;
@@ -114,10 +96,35 @@ enum ProfileFactory {
         );
     }
 
-    boolean isOriginal() {
-        return this == original;
+    public McRangeRaptorWorker createWorker2(ProfileRequest request, int nRounds, int nStops, TransitDataProvider transitData, EgressAccessRouter streetRouter) {
+        McWorkerState state = new McWorkerState(
+                nRounds,
+                nStops,
+                request.maxTripDurationMinutes * 60
+        );
+
+        return new McRangeRaptorWorker(
+                transitData,
+                state,
+                request.fromTime,
+                request.toTime,
+                timeToStops(streetRouter.accessTimesToStopsInSeconds),
+                timeToStops(streetRouter.egressTimesToStopsInSeconds)
+        );
     }
 
+    boolean is(ProfileFactory other) {
+        return this == other;
+    }
+
+
+    boolean isOriginal() {
+        return is(original);
+    }
+
+    boolean isMultiCriteria() {
+        return is(multi_criteria);
+    }
 
     /* private methods */
 

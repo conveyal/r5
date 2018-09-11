@@ -7,7 +7,8 @@ import java.util.Arrays;
 import java.util.stream.StreamSupport;
 
 public class StopStateParetoSetTest {
-
+    // 08:35 in seconds
+    private static final int A_TIME = ((8 * 60) + 35) * 60;
     private static final int ANY = 3;
     private static final int ROUND_1 = 1;
     private static final int ROUND_2 = 2;
@@ -19,20 +20,20 @@ public class StopStateParetoSetTest {
     private static final int STOP_5 = 5;
     private static final int STOP_6 = 6;
     private StopStateParetoSet subject = StopStatesParetoSet.createState();
-    private McStopState A_STATE = new McAccessStopState(999, 10);
+    private McStopState A_STATE = new McAccessStopState(999, A_TIME, 10);
 
     @Test
     public void addOneElementToSet() {
-        subject.add(new McAccessStopState(1, 10));
+        subject.add(new McAccessStopState(1, A_TIME, 10));
         assertStopsInSet(1);
     }
 
     @Test
     public void testTimeDominance() {
-        subject.add(new McAccessStopState(STOP_1, 10));
-        subject.add(new McAccessStopState(STOP_2, 9));
-        subject.add(new McAccessStopState(STOP_3, 9));
-        subject.add(new McAccessStopState(STOP_4, 11));
+        subject.add(new McAccessStopState(STOP_1, A_TIME, 10));
+        subject.add(new McAccessStopState(STOP_2, A_TIME, 9));
+        subject.add(new McAccessStopState(STOP_3, A_TIME, 9));
+        subject.add(new McAccessStopState(STOP_4,  A_TIME,11));
         assertStopsInSet(STOP_2);
     }
 
@@ -69,7 +70,7 @@ public class StopStateParetoSetTest {
 
     @Test
     public void testTransitAndTransferDoesAffectDominance() {
-        subject.add(new McAccessStopState(STOP_1, 20));
+        subject.add(new McAccessStopState(STOP_1, A_TIME, 20));
         subject.add(new McTransitStopState(A_STATE, ROUND_1, STOP_2, 10, ANY, ANY, ANY));
         subject.add(new McTransitStopState(A_STATE, ROUND_1, STOP_3, 11, ANY, ANY, ANY));
         subject.add(new McTransferStopState(A_STATE, ROUND_1, STOP_4, 8, ANY));

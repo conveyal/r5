@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile.mcrr.mc;
 
 import com.conveyal.r5.profile.mcrr.StopState;
+import com.conveyal.r5.profile.mcrr.api.PathLeg;
 import com.conveyal.r5.profile.mcrr.util.DebugState;
 import com.conveyal.r5.profile.mcrr.util.ParetoSortable;
 
@@ -92,19 +93,20 @@ public abstract class McStopState implements StopState, ParetoSortable {
         return false;
     }
 
-    abstract DebugState.Type type();
-
     @Override
     public String toString() {
         return asString(type().name(), round(), previousState==null ? -1 : previousState.stopIndex);
     }
 
+    abstract DebugState.Type type();
+
+    abstract PathLeg mapToLeg();
+
     public void debug() {
         DebugState.debugStop(type(), round, stopIndex, this);
     }
 
-    /** TODO TGR - Temporarilly create a path, this can possibly replace the path building process. */
-    public Iterable<McStopState> path() {
+    public List<McStopState> path() {
         List<McStopState> path = new LinkedList<>();
         McStopState current = this;
 

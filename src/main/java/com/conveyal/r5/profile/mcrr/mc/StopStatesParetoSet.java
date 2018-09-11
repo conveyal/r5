@@ -25,8 +25,8 @@ final class StopStatesParetoSet  {
         this.stops = new StopStateParetoSet[stops];
     }
 
-    void setInitialTime(int stop, int time) {
-        findOrCreateSet(stop).add(new McAccessStopState(stop, time));
+    void setInitialTime(int stop, int fromTime,  int accessTime) {
+        findOrCreateSet(stop).add(new McAccessStopState(stop, fromTime,  accessTime));
     }
 
     boolean transitToStop(StopState previous, int round, int stop, int time, int pattern, int trip, int boardTime) {

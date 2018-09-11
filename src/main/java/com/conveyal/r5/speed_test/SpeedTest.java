@@ -7,7 +7,9 @@ import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.profile.mcrr.PathParetoSortableWrapper;
+import com.conveyal.r5.profile.mcrr.api.DurationToStop;
 import com.conveyal.r5.profile.mcrr.api.Path2;
+import com.conveyal.r5.profile.mcrr.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.mcrr.api.TransitDataProvider;
 import com.conveyal.r5.profile.mcrr.TransitLayerRRDataProvider;
 import com.conveyal.r5.profile.mcrr.api.Worker;
@@ -23,6 +25,7 @@ import com.conveyal.r5.speed_test.test.TestCase;
 import com.conveyal.r5.speed_test.test.TestCaseFailedException;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.iterator.TIntIntIterator;
+import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -270,12 +273,13 @@ public class SpeedTest {
             final int nStops = transportNetwork.transitLayer.getStopCount();
             ItinerarySet itineraries = new ItinerarySet();
 
+            RangeRaptorRequest req = createRequest(request, streetRouter);
 
             // TODO TGR - his is a temp hack
             if(stateFactory.isMultiCriteria()) {
-                McRangeRaptorWorker worker = stateFactory.createWorker2(request, nRounds, nStops, transitData, streetRouter);
+                McRangeRaptorWorker worker = stateFactory.createWorker2(request, nRounds, nStops, transitData);
 
-                Collection<Path2> path2s = worker.route();
+                Collection<Path2> path2s = worker.route(req);
 
                 TIMER_WORKER.stop();
 
@@ -306,9 +310,9 @@ public class SpeedTest {
                 TIMER_COLLECT_RESULTS_ITINERARIES.stop();
             }
             else {
-                Worker worker = stateFactory.createWorker(request, nRounds, nStops, transitData, streetRouter);
+                Worker worker = stateFactory.createWorker(request, nRounds, nStops, transitData);
 
-                Collection<Path> workerPaths = worker.route();
+                Collection<Path> workerPaths = worker.route(req);
 
                 TIMER_WORKER.stop();
 
@@ -368,6 +372,26 @@ public class SpeedTest {
             TIMER_COLLECT_RESULTS.failIfStarted();
             TIMER_COLLECT_RESULTS_ITINERARIES.failIfStarted();
         }
+    }
+
+    RangeRaptorRequest createRequest(ProfileRequest request, EgressAccessRouter streetRouter) {
+        return new RangeRaptorRequest(
+                request.fromTime,
+                request.toTime,
+                timeToStops(streetRouter.accessTimesToStopsInSeconds),
+                timeToStops(streetRouter.egressTimesToStopsInSeconds),
+                60,
+                60
+        );
+    }
+
+    private static Collection<DurationToStop> timeToStops(TIntIntMap timesToStopsInSeconds) {
+        Collection<DurationToStop> times = new ArrayList<>();
+        timesToStopsInSeconds.forEachEntry((s,t) -> {
+            times.add(new DurationToStop(s, t));
+            return true;
+        });
+        return times;
     }
 
     private SpeedTestItinerary createItinerary(ProfileRequest request, EgressAccessRouter streetRouter, Path path) {

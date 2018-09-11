@@ -6,7 +6,6 @@ import com.conveyal.r5.profile.mcrr.PathBuilder;
 import com.conveyal.r5.profile.mcrr.PathBuilderCursorBased;
 import com.conveyal.r5.profile.mcrr.RangeRaptorWorker;
 import com.conveyal.r5.profile.mcrr.RangeRaptorWorkerState;
-import com.conveyal.r5.profile.mcrr.api.TimeToStop;
 import com.conveyal.r5.profile.mcrr.api.TransitDataProvider;
 import com.conveyal.r5.profile.mcrr.StopStateCollection;
 import com.conveyal.r5.profile.mcrr.StopStatesIntArray;
@@ -14,11 +13,8 @@ import com.conveyal.r5.profile.mcrr.StopStatesStructArray;
 import com.conveyal.r5.profile.mcrr.api.Worker;
 import com.conveyal.r5.profile.mcrr.mc.McRangeRaptorWorker;
 import com.conveyal.r5.profile.mcrr.mc.McWorkerState;
-import gnu.trove.map.TIntIntMap;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -66,21 +62,20 @@ enum ProfileFactory {
         return new StopStatesIntArray(nRounds, nStops);
     }
 
-    RangeRaptorWorkerState createWorkerState(int nRounds, int nStops, int earliestDepartureTime, int maxDurationSeconds, StopStateCollection stops) {
-        return new RangeRaptorWorkerState(nRounds, nStops, earliestDepartureTime, maxDurationSeconds, stops);
+    RangeRaptorWorkerState createWorkerState(int nRounds, int nStops, int maxDurationSeconds, StopStateCollection stops) {
+        return new RangeRaptorWorkerState(nRounds, nStops, maxDurationSeconds, stops);
     }
 
     PathBuilder createPathBuilder(StopStateCollection stops) {
         return new PathBuilderCursorBased(stops.newCursor());
     }
 
-    Worker createWorker(ProfileRequest request, int nRounds, int nStops, TransitDataProvider transitData, EgressAccessRouter streetRouter) {
+    Worker createWorker(ProfileRequest request, int nRounds, int nStops, TransitDataProvider transitData) {
         StopStateCollection stops = createStopStateCollection(nRounds, nStops);
 
         RangeRaptorWorkerState state = createWorkerState(
                 nRounds,
                 nStops,
-                request.fromTime,
                 request.maxTripDurationMinutes * 60,
                 stops
         );
@@ -88,15 +83,11 @@ enum ProfileFactory {
         return new RangeRaptorWorker(
                 transitData,
                 state,
-                createPathBuilder(stops),
-                request.fromTime,
-                request.toTime,
-                timeToStops(streetRouter.accessTimesToStopsInSeconds),
-                timeToStops(streetRouter.egressTimesToStopsInSeconds)
+                createPathBuilder(stops)
         );
     }
 
-    public McRangeRaptorWorker createWorker2(ProfileRequest request, int nRounds, int nStops, TransitDataProvider transitData, EgressAccessRouter streetRouter) {
+    public McRangeRaptorWorker createWorker2(ProfileRequest request, int nRounds, int nStops, TransitDataProvider transitData) {
         McWorkerState state = new McWorkerState(
                 nRounds,
                 nStops,
@@ -105,11 +96,7 @@ enum ProfileFactory {
 
         return new McRangeRaptorWorker(
                 transitData,
-                state,
-                request.fromTime,
-                request.toTime,
-                timeToStops(streetRouter.accessTimesToStopsInSeconds),
-                timeToStops(streetRouter.egressTimesToStopsInSeconds)
+                state
         );
     }
 
@@ -127,15 +114,6 @@ enum ProfileFactory {
     }
 
     /* private methods */
-
-    private static Collection<TimeToStop> timeToStops(TIntIntMap timesToStopsInSeconds) {
-        Collection<TimeToStop> times = new ArrayList<>();
-        timesToStopsInSeconds.forEachEntry((s,t) -> {
-            times.add(new TimeToStop(s, t));
-            return true;
-        });
-        return times;
-    }
 
     private static ProfileFactory parseOne(String value) {
         try {

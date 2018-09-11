@@ -24,10 +24,11 @@ import java.util.List;
 import java.util.TimeZone;
 import java.util.stream.Collectors;
 
-public class ItineraryMapper {
+
+class ItineraryMapper {
     private TransportNetwork transportNetwork;
 
-    public ItineraryMapper(TransportNetwork transportNetwork) {
+    ItineraryMapper(TransportNetwork transportNetwork) {
         this.transportNetwork = transportNetwork;
     }
 
@@ -36,6 +37,9 @@ public class ItineraryMapper {
         if (path == null) {
             return null;
         }
+
+        // TODO TGR - Use request param here
+        int MINIMUM_BOARD_WAIT_SEC = 60;
 
         itinerary.walkDistance = 0.0;
         itinerary.transitTime = 0;
@@ -56,8 +60,9 @@ public class ItineraryMapper {
 
         Stop firstStop = transportNetwork.transitLayer.stopForIndex.get(path.boardStops[0]);
 
-        accessLeg.startTime = createCalendar(request.date, (path.boardTimes[0] - accessTime));
-        accessLeg.endTime = createCalendar(request.date, path.boardTimes[0]);
+        int accessLegEndTime = path.boardTimes[0] - MINIMUM_BOARD_WAIT_SEC;
+        accessLeg.startTime = createCalendar(request.date,  accessLegEndTime - accessTime);
+        accessLeg.endTime = createCalendar(request.date, accessLegEndTime);
         accessLeg.from = new Place(request.fromLon, request.fromLat, "Origin");
         accessLeg.from.stopIndex = -1;
         accessLeg.to = new Place(firstStop.stop_lat, firstStop.stop_lon, firstStop.stop_name);
@@ -164,9 +169,9 @@ public class ItineraryMapper {
 
         itinerary.addLeg(egressLeg);
 
-        itinerary.duration = (long) accessTime + (path.alightTimes[path.length - 1] - path.boardTimes[0]) + egressTime;
         itinerary.startTime = accessLeg.startTime;
         itinerary.endTime = egressLeg.endTime;
+        itinerary.duration = (itinerary.endTime.getTimeInMillis() - itinerary.startTime.getTimeInMillis())/1000;
 
         itinerary.transfers = path.patterns.length - 1;
 

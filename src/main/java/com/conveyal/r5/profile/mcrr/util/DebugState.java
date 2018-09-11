@@ -19,7 +19,6 @@ public final class DebugState {
 
     public enum Type {Access, Transfer, Transit}
 
-    private static boolean DEBUG = true;
     private static final List<Integer> DEBUG_STOPS = new ArrayList<>();
 
     private static final String STOP_HEADER = "Description Rnd  From  To     Start    End        Time   Pattern Trp";
@@ -38,10 +37,10 @@ public final class DebugState {
 
     public static void init(List<Integer> debugStops) {
         if(debugStops == null) {
-            DEBUG = false;
+            Debug.setDebug(false);
         }
         else {
-            DEBUG = true;
+            Debug.setDebug(true);
             DEBUG_STOPS.addAll(debugStops);
         }
     }
@@ -51,11 +50,11 @@ public final class DebugState {
     }
 
     public static boolean isDebug(int stop) {
-        return DEBUG && DEBUG_STOPS.contains(stop);
+        return Debug.isDebug() && DEBUG_STOPS.contains(stop);
     }
 
     public static void debugStopHeader(String newTitle, String newHeaderPostfix) {
-        if (DEBUG) {
+        if (Debug.isDebug()) {
             title = newTitle;
             headerPostfix = newHeaderPostfix;
         }
@@ -159,7 +158,7 @@ public final class DebugState {
     }
 
     private static void debugStopHeaderAtMostOnce() {
-        if (DEBUG && !title.equals(lastTitle)) {
+        if (Debug.isDebug() && !title.equals(lastTitle)) {
             System.err.println("\n" + title);
             System.err.println(STOP_HEADER + (headerPostfix == null ? "" : " | " + headerPostfix));
             lastTitle = title;

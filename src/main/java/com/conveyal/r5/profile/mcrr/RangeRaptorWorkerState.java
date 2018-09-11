@@ -23,7 +23,7 @@ import static com.conveyal.r5.profile.mcrr.util.DebugState.Type.Transit;
  *
  * @author mattwigway
  */
-public final class RangeRaptorWorkerState {
+public final class RangeRaptorWorkerState implements WorkerState {
 
     /**
      * To debug a particular journey set DEBUG to true and add all visited stops in the debugStops list.
@@ -34,12 +34,6 @@ public final class RangeRaptorWorkerState {
     private int round = 0;
     private int roundMax = -1;
 
-
-    /**
-     * Earliest possible departure time for the search.
-     * RangeRaptor iterate over departure times, but this is the first one.
-     */
-    private final int earliestDepartureTime;
 
     /** Maximum duration of trips stored by this RaptorState */
     private final int maxDurationSeconds;
@@ -56,7 +50,7 @@ public final class RangeRaptorWorkerState {
 
 
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
-    public RangeRaptorWorkerState(int nRounds, int nStops, int earliestDepartureTime, int maxDurationSeconds, StopStateCollection stops) {
+    public RangeRaptorWorkerState(int nRounds, int nStops, int maxDurationSeconds, StopStateCollection stops) {
         this.nRounds = nRounds;
         this.stops = stops;
         this.cursor = stops.newCursor();
@@ -65,16 +59,18 @@ public final class RangeRaptorWorkerState {
         this.bestTransit = new BestTimes(nStops);
 
         this.maxDurationSeconds = maxDurationSeconds;
-        this.earliestDepartureTime = earliestDepartureTime;
     }
 
-    void gotoNextRound () {
+    @Override
+    public void gotoNextRound() {
         bestOveral.gotoNextRound();
         bestTransit.gotoNextRound();
         ++round;
         roundMax = Math.max(roundMax, round);
     }
-    boolean isNewRoundAvailable() {
+
+    @Override
+    public boolean isNewRoundAvailable() {
         final boolean moreRoundsToGo = round < nRounds-1;
         return moreRoundsToGo && isCurrentRoundUpdated();
     }
@@ -95,7 +91,8 @@ public final class RangeRaptorWorkerState {
         return bestTransit.isReached(stop);
     }
 
-    BitSetIterator stopsTouchedByTransitCurrentRoundIterator() {
+    @Override
+    public BitSetIterator stopsTouchedByTransitCurrentRound() {
         return bestTransit.stopsReachedCurrentRound();
     }
 
@@ -103,7 +100,8 @@ public final class RangeRaptorWorkerState {
         return cursor.stop(round-1, stop).time();
     }
 
-    void initNewDepatureForMinute(int departureTime) {
+    @Override
+    public void initNewDepatureForMinute(int departureTime) {
         //this.departureTime = departureTime;
         maxTimeLimit = departureTime + maxDurationSeconds;
         // clear all touched stops to avoid constant reëxploration
@@ -112,9 +110,11 @@ public final class RangeRaptorWorkerState {
         round = 0;
     }
 
-    void setInitialTime(int stop, int time) {
-        stops.setInitalTime(round, stop, time);
-        bestOveral.setTime(stop, time);
+    @Override
+    public void setInitialTime(int stop, int fromTime, int accessTime) {
+        final int arrivalTime = fromTime + accessTime;
+        stops.setInitalTime(round, stop, arrivalTime);
+        bestOveral.setTime(stop, accessTime);
         debugStop(Access, round, stop);
     }
 
@@ -141,7 +141,8 @@ public final class RangeRaptorWorkerState {
     /**
      * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the nonTransferTime
      */
-    void transferToStop(int fromStop, int toStop, int transferTimeInSeconds) {
+    @Override
+    public void transferToStop(int fromStop, int toStop, int transferTimeInSeconds) {
 
         int time = bestTransit.time(fromStop) + transferTimeInSeconds;
 
@@ -158,7 +159,7 @@ public final class RangeRaptorWorkerState {
         }
     }
 
-    static void debugStopHeader(String title) {
+    public void debugStopHeader(String title) {
         DebugState.debugStopHeader(title, "Best     C P | Transit  C P");
     }
 

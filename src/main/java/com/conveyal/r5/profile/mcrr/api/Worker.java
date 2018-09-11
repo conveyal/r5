@@ -1,9 +1,8 @@
 package com.conveyal.r5.profile.mcrr.api;
 
-import com.conveyal.r5.profile.Path;
 
 import java.util.Collection;
 
-public interface Worker {
-    Collection<Path> route();
+public interface Worker<P> {
+    Collection<P> route(RangeRaptorRequest request);
 }

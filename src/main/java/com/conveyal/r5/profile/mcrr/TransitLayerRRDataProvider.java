@@ -2,7 +2,7 @@ package com.conveyal.r5.profile.mcrr;
 
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.profile.mcrr.api.Pattern;
-import com.conveyal.r5.profile.mcrr.api.TimeToStop;
+import com.conveyal.r5.profile.mcrr.api.DurationToStop;
 import com.conveyal.r5.profile.mcrr.api.TransitDataProvider;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
@@ -57,14 +57,14 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
     }
 
     @Override
-    public Iterable<TimeToStop> getTransfers(int stop) {
+    public Iterable<DurationToStop> getTransfers(int stop) {
         TIntList m = transitLayer.transfersForStop.get(stop);
 
         if(m == null) {
             return emptyList();
         }
 
-        List<TimeToStop> stopTimes = new ArrayList<>(m.size());
+        List<DurationToStop> stopTimes = new ArrayList<>(m.size());
 
         for(int i=0; i<m.size();) {
             int toStop = m.get(i);
@@ -75,7 +75,7 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
             if (walkTime < 0) {
                 throw new IllegalStateException("Negative transfer time!!");
             }
-            stopTimes.add(new TimeToStop(toStop, walkTime));
+            stopTimes.add(new DurationToStop(toStop, walkTime));
         }
         return stopTimes;
     }

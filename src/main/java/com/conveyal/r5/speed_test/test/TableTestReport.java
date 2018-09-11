@@ -1,5 +1,7 @@
 package com.conveyal.r5.speed_test.test;
 
+import com.conveyal.r5.profile.mcrr.util.Debug;
+import com.conveyal.r5.profile.mcrr.util.DebugState;
 import com.conveyal.r5.profile.mcrr.util.TimeUtils;
 
 import java.util.Arrays;
@@ -50,9 +52,9 @@ public class TableTestReport {
                 TimeUtils.timeToStrCompact(result.duration),
                 result.walkDistance,
                 // Strip of seconds for faster reading - most service schedules are by the minute not seconds
-                result.startTime.substring(0, 5),
+                Debug.isDebug() ? result.startTime : result.startTime.substring(0, 5),
                 // Strip of seconds for faster reading - most service schedules are by the minute not seconds
-                result.endTime.substring(0, 5),
+                Debug.isDebug() ? result.endTime : result.endTime.substring(0, 5),
                 toStr(result.modes),
                 toStr(result.agencies),
                 toStr(result.routes),

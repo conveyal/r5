@@ -32,7 +32,7 @@ public interface TransitDataProvider {
     /**
      * @return a map of distances from the given input stop to all other stops.
      */
-    Iterable<TimeToStop> getTransfers(int fromStop);
+    Iterable<DurationToStop> getTransfers(int fromStop);
 
     /**
      * Return a set of all patterns visiting the given set of stops.

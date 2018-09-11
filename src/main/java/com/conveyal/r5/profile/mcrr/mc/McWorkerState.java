@@ -1,9 +1,9 @@
 package com.conveyal.r5.profile.mcrr.mc;
 
-import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.mcrr.BitSetIterator;
+import com.conveyal.r5.profile.mcrr.WorkerState;
 import com.conveyal.r5.profile.mcrr.api.Path2;
-import com.conveyal.r5.profile.mcrr.api.TimeToStop;
+import com.conveyal.r5.profile.mcrr.api.DurationToStop;
 import com.conveyal.r5.profile.mcrr.util.DebugState;
 
 import java.util.ArrayList;
@@ -32,7 +32,7 @@ import static com.conveyal.r5.profile.mcrr.util.DebugState.Type.Transit;
  *
  * @author mattwigway
  */
-public final class McWorkerState {
+public final class McWorkerState implements WorkerState {
 
     /** Maximum duration of trips stored by this RaptorState */
     private final int maxDurationSeconds;
@@ -60,7 +60,7 @@ public final class McWorkerState {
         this.maxDurationSeconds = maxDurationSeconds;
     }
 
-    void initNewDepatureForMinute(int departureTime) {
+    @Override public void initNewDepatureForMinute(int departureTime) {
         //this.departureTime = departureTime;
         maxTimeLimit = departureTime + maxDurationSeconds;
         // clear all touched stops to avoid constant rexploration
@@ -69,18 +69,18 @@ public final class McWorkerState {
         round = 0;
     }
 
-    void setInitialTime(int stop, int fromTime,  int accessTime) {
+    @Override public void setInitialTime(int stop, int fromTime,  int accessTime) {
         stops.setInitialTime(stop, fromTime, accessTime);
         touchedCurrent.set(stop);
         debugStops(Access, round, stop);
     }
 
-    boolean isNewRoundAvailable() {
+    @Override public boolean isNewRoundAvailable() {
         final boolean moreRoundsToGo = round < nRounds-1;
         return moreRoundsToGo && isCurrentRoundUpdated();
     }
 
-    void gotoNextRound () {
+    @Override public void gotoNextRound () {
         ++round;
     }
 
@@ -89,7 +89,7 @@ public final class McWorkerState {
         return new BitSetIterator(touchedPrevious);
     }
 
-    BitSetIterator stopsTouchedByTransitCurrentRound() {
+    @Override public BitSetIterator stopsTouchedByTransitCurrentRound() {
         swapTouchedStops();
         return new BitSetIterator(touchedPrevious);
     }
@@ -119,7 +119,7 @@ public final class McWorkerState {
     /**
      * Set the time at a transit stop iff it is optimal.
      */
-    void transferToStop(int fromStop, int targetStop, int transferTimeInSeconds) {
+    @Override public void transferToStop(int fromStop, int targetStop, int transferTimeInSeconds) {
         for(McStopState it :  stops.listArrivedByTransit(round, fromStop)) {
             int arrivalTime = it.time() + transferTimeInSeconds;
 
@@ -132,11 +132,11 @@ public final class McWorkerState {
         debugStops(Transfer, round, targetStop);
     }
 
-    Collection<Path2> extractPaths(Collection<TimeToStop> egressStops) {
+    Collection<Path2> extractPaths(Collection<DurationToStop> egressStops) {
         List<Path2> paths = new ArrayList<>();
         McPath2Builder builder = new McPath2Builder();
 
-        for (TimeToStop egressStop : egressStops) {
+        for (DurationToStop egressStop : egressStops) {
             for (McStopState it : stops.listAll(egressStop.stop)) {
                 Path2 p = builder.extractPathsForStop(it, egressStop.time);
                 if(p != null) {
@@ -147,7 +147,7 @@ public final class McWorkerState {
         return paths;
     }
 
-    static void debugStopHeader(String title) {
+    @Override public void debugStopHeader(String title) {
         DebugState.debugStopHeader(title,"C P");
     }
 

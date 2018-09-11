@@ -56,7 +56,7 @@ public class TimeUtils {
         }
 
         int sec = time % 60;
-        time /= 60;
+        time =  time / 60;
         int min = time % 60;
         int hour = time / 60;
 

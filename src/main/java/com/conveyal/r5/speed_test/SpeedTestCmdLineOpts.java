@@ -24,6 +24,7 @@ public class SpeedTestCmdLineOpts extends CommandLineOpts {
         options.addOption(PROFILES_OPT, "profiles", true, "A coma separated list of configuration profiles:\n" + String.join("\n", ProfileFactory.options()));
         options.addOption(TEST_CASES_OPT, "testCases", true, "A coma separated list of test case numbers to run.");
         options.addOption(DEBUG_STOPS, "debugStops", true, "A coma separated list of stops to debug.");
+        options.addOption(DEBUG, "debug", false, "Enable debug info.");
         return options;
     }
 
@@ -68,5 +69,9 @@ public class SpeedTestCmdLineOpts extends CommandLineOpts {
         return cmd.hasOption(opt)
                 ? Arrays.asList(cmd.getOptionValue(opt).split("\\s*,\\s*"))
                 : null;
+    }
+
+    public boolean debug() {
+        return cmd.hasOption(DEBUG);
     }
 }

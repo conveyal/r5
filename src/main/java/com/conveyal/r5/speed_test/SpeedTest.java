@@ -98,7 +98,7 @@ public class SpeedTest {
         final ProfileFactory[] strategies = opts.profiles();
         final int samples = opts.numberOfTestsSamplesToRun();
 
-        DebugState.init(opts.debugStops());
+        DebugState.init(opts.debug(), opts.debugStops());
 
         initProfileStatistics();
 

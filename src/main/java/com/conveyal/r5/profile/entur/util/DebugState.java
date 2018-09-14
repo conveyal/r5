@@ -35,9 +35,9 @@ public final class DebugState {
     private DebugState() {
     }
 
-    public static void init(List<Integer> debugStops) {
+    public static void init(boolean debug, List<Integer> debugStops) {
         if(debugStops == null) {
-            Debug.setDebug(false);
+            Debug.setDebug(debug);
         }
         else {
             Debug.setDebug(true);

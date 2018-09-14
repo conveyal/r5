@@ -25,6 +25,7 @@ class CommandLineOpts {
     static final String PROFILES_OPT = "p";
     static final String TEST_CASES_OPT = "c";
     static final String DEBUG_STOPS = "s";
+    static final String DEBUG = "D";
 
 
     CommandLineOpts(String[] args) {

@@ -1,6 +1,5 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
-import com.conveyal.r5.profile.entur.api.PathLeg;
 import com.conveyal.r5.profile.entur.util.DebugState;
 
 public final class McTransferStopState extends McStopState {
@@ -29,8 +28,4 @@ public final class McTransferStopState extends McStopState {
     @Override
     DebugState.Type type() { return DebugState.Type.Transfer; }
 
-    @Override
-    PathLeg mapToLeg() {
-        return McPathLeg.createTransferLeg(this);
-    }
 }

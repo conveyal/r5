@@ -69,8 +69,8 @@ public final class McWorkerState implements WorkerState {
         round = 0;
     }
 
-    @Override public void setInitialTime(int stop, int fromTime,  int accessTime) {
-        stops.setInitialTime(stop, fromTime, accessTime);
+    @Override public void setInitialTime(int stop, int fromTime, int accesDurationInSeconds, int boardSlackInSeconds) {
+        stops.setInitialTime(stop, fromTime, accesDurationInSeconds, boardSlackInSeconds);
         touchedCurrent.set(stop);
         debugStops(Access, round, stop);
     }

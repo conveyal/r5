@@ -9,12 +9,12 @@ import com.conveyal.r5.profile.entur.util.DebugState;
  */
 class McPathBuilder {
 
-    Path2 extractPathsForStop(McStopState egressStop, int egressTime) {
+    Path2 extractPathsForStop(McStopState egressStop, int egressDurationInSeconds) {
         if (!egressStop.arrivedByTransit()) {
             return null;
         }
         debugPath(egressStop);
-        return new McPath(egressStop.path(), egressTime);
+        return new McPath(egressStop.path(), egressDurationInSeconds);
     }
 
     private void debugPath(McStopState egressStop) {

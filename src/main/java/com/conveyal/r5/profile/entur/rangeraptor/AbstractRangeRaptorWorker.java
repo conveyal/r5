@@ -99,19 +99,6 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, P> implem
     }
 
     /**
-     * Set the departure time in the scheduled search to the given departure time,
-     * and prepare for the scheduled search at the next-earlier minute
-     */
-    private void advanceScheduledSearchToPreviousMinute(int nextMinuteDepartureTime, Collection<DurationToStop> accessStops) {
-        state.initNewDepatureForMinute(nextMinuteDepartureTime);
-
-        // add initial stops
-        for (DurationToStop it : accessStops) {
-            state.setInitialTime(it.stop(), nextMinuteDepartureTime, it.durationInSeconds());
-        }
-    }
-
-    /**
      * Perform one minute of a RAPTOR search.
      *
      * @param departureTime When this search departs.
@@ -119,7 +106,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, P> implem
     private void runRaptorForMinute(int departureTime, RangeRaptorRequest request) {
         state.debugStopHeader("RUN RAPTOR FOR MINUTE: " + TimeUtils.timeToStrCompact(departureTime));
 
-        advanceScheduledSearchToPreviousMinute(departureTime, request.accessStops);
+        advanceScheduledSearchToPreviousMinute(departureTime, request.accessStops, request.boardSlackInSeconds);
 
         // Run the scheduled search
         // round 0 is the street search
@@ -142,6 +129,19 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, P> implem
         // We have to be careful here that creating these paths does not modify the state, and makes
         // protective copies of any information we want to retain.
         addPathsForCurrentIteration(request.egressStops);
+    }
+
+    /**
+     * Set the departure time in the scheduled search to the given departure time,
+     * and prepare for the scheduled search at the next-earlier minute
+     */
+    private void advanceScheduledSearchToPreviousMinute(int nextMinuteDepartureTime, Collection<DurationToStop> accessStops, int boardSlackInSeconds) {
+        state.initNewDepatureForMinute(nextMinuteDepartureTime);
+
+        // add initial stops
+        for (DurationToStop it : accessStops) {
+            state.setInitialTime(it.stop(), nextMinuteDepartureTime, it.durationInSeconds(), boardSlackInSeconds);
+        }
     }
 
 

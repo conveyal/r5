@@ -5,7 +5,7 @@ import com.conveyal.r5.profile.entur.util.BitSetIterator;
 public interface WorkerState {
     void initNewDepatureForMinute(int nextMinuteDepartureTime);
 
-    void setInitialTime(int stop, int nextMinuteDepartureTime, int time);
+    void setInitialTime(int stop, int nextMinuteDepartureTime, int accesDurationInSeconds, int boardSlackInSeconds);
 
     void debugStopHeader(String header);
 

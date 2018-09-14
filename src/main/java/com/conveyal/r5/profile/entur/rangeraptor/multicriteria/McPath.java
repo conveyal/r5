@@ -7,18 +7,18 @@ import java.util.ArrayList;
 import java.util.List;
 
 
-public class McPath implements Path2 {
-    private PathLeg accessLeg;
-    private List<PathLeg> legs = new ArrayList<>();
-    private PathLeg egressLeg;
+final class McPath implements Path2 {
+    private final PathLeg accessLeg;
+    private final List<PathLeg> legs = new ArrayList<>();
+    private final PathLeg egressLeg;
 
     McPath(List<McStopState> states, int egressTime) {
-        accessLeg = states.get(0).mapToLeg();
+        this.accessLeg = McPathLeg.createAccessLeg((McAccessStopState)states.get(0), states.get(1).boardTime());
 
         for (int i=1; i<states.size(); ++i) {
-            legs.add(states.get(i).mapToLeg());
+            this.legs.add(McPathLeg.createLeg(states.get(i)));
         }
-        this.egressLeg = McPathLeg.createEgressLeg(states.get(states.size()-1), egressTime);
+        this.egressLeg = McPathLeg.createEgressLeg((McTransitStopState) states.get(states.size()-1), egressTime);
     }
 
     @Override

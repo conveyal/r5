@@ -112,10 +112,10 @@ public final class RangeRaptorWorkerState implements WorkerState {
     }
 
     @Override
-    public void setInitialTime(int stop, int fromTime, int accessTime) {
-        final int arrivalTime = fromTime + accessTime;
+    public void setInitialTime(int stop, int fromTime, int accesDurationInSeconds, int boardSlackInSeconds) {
+        final int arrivalTime = fromTime + accesDurationInSeconds;
         stops.setInitalTime(round, stop, arrivalTime);
-        bestOveral.setTime(stop, accessTime);
+        bestOveral.setTime(stop, accesDurationInSeconds);
         debugStop(Access, round, stop);
     }
 

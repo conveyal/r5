@@ -100,8 +100,6 @@ public abstract class McStopState implements StopState, ParetoSortable {
 
     abstract DebugState.Type type();
 
-    abstract PathLeg mapToLeg();
-
     public void debug() {
         DebugState.debugStop(type(), round, stopIndex, this);
     }

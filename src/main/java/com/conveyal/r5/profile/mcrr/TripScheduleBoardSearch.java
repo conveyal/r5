@@ -1,7 +1,8 @@
 package com.conveyal.r5.profile.mcrr;
 
 import com.conveyal.r5.profile.mcrr.api.Pattern;
-import com.conveyal.r5.transit.TripSchedule;
+import com.conveyal.r5.profile.mcrr.api.TripScheduleInfo;
+
 
 import java.util.function.Function;
 
@@ -26,12 +27,12 @@ public class TripScheduleBoardSearch {
      */
     private final static int BINARY_SEARCH_THRESHOLD = 46;
     private final Pattern pattern;
-    private final Function<TripSchedule, Boolean> skipTripScheduleCallback;
+    private final Function<TripScheduleInfo, Boolean> skipTripScheduleCallback;
 
-    public TripSchedule candidateTrip;
+    public TripScheduleInfo candidateTrip;
     public int candidateTripIndex;
 
-    public TripScheduleBoardSearch(Pattern pattern, Function<TripSchedule, Boolean> skipTripScheduleCallback) {
+    public TripScheduleBoardSearch(Pattern pattern, Function<TripScheduleInfo, Boolean> skipTripScheduleCallback) {
         this.pattern = pattern;
         this.skipTripScheduleCallback = skipTripScheduleCallback;
     }
@@ -70,13 +71,13 @@ public class TripScheduleBoardSearch {
         candidateTrip = null;
 
         for(int index = tripIndexUpperBound-1; index >= 0;  --index) {
-            TripSchedule trip = pattern.getTripSchedule(index);
+            TripScheduleInfo trip = pattern.getTripSchedule(index);
 
             if (skipTripSchedule(trip)) {
                 continue;
             }
 
-            final int departure = trip.departures[stopPositionInPattern];
+            final int departure = trip.departure(stopPositionInPattern);
 
             if (departure > earliestBoardTime) {
                 candidateTrip = trip;
@@ -99,9 +100,9 @@ public class TripScheduleBoardSearch {
         while (upper - lower > BINARY_SEARCH_THRESHOLD) {
             int m = (lower + upper) / 2;
 
-            TripSchedule trip = pattern.getTripSchedule(m);
+            TripScheduleInfo trip = pattern.getTripSchedule(m);
 
-            int departure = trip.departures[stopPositionInPattern];
+            int departure = trip.departure(stopPositionInPattern);
 
             if (departure > earliestBoardTime) {
                 upper = m+1;
@@ -123,13 +124,13 @@ public class TripScheduleBoardSearch {
         // No trip schedule below the upper bound from the binary search exist.
         // So we have to search for the first valid trip schedule after that.
         for(int index = upper; index < tripIndexUpperBound ; ++index) {
-            TripSchedule trip = pattern.getTripSchedule(index);
+            TripScheduleInfo trip = pattern.getTripSchedule(index);
 
             if (skipTripSchedule(trip)) {
                 continue;
             }
 
-            final int departure = trip.departures[stopPositionInPattern];
+            final int departure = trip.departure(stopPositionInPattern);
 
             // It would be tempting to skip this check, but we can not.
             // Trips schedules are only ordered for the first stop, not
@@ -146,7 +147,7 @@ public class TripScheduleBoardSearch {
     }
 
     /** Skip trips not running on the day of the search and frequency trips  */
-    private boolean skipTripSchedule(TripSchedule trip) {
+    private boolean skipTripSchedule(TripScheduleInfo trip) {
         return skipTripScheduleCallback.apply(trip);
     }
 }

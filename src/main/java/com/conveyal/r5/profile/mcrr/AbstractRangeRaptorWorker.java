@@ -3,12 +3,13 @@ package com.conveyal.r5.profile.mcrr;
 import com.conveyal.r5.profile.mcrr.api.DurationToStop;
 import com.conveyal.r5.profile.mcrr.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.mcrr.api.TransitDataProvider;
+import com.conveyal.r5.profile.mcrr.api.TripScheduleInfo;
 import com.conveyal.r5.profile.mcrr.api.Worker;
 import com.conveyal.r5.profile.mcrr.util.AvgTimer;
 import com.conveyal.r5.profile.mcrr.util.TimeUtils;
-import com.conveyal.r5.transit.TripSchedule;
 
 import java.util.Collection;
+import java.util.Iterator;
 
 
 /**
@@ -104,7 +105,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, P> implem
 
         // add initial stops
         for (DurationToStop it : accessStops) {
-            state.setInitialTime(it.stop, nextMinuteDepartureTime, it.time);
+            state.setInitialTime(it.stop(), nextMinuteDepartureTime, it.durationInSeconds());
         }
     }
 
@@ -148,14 +149,16 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, P> implem
         for (int fromStop = it.next(); fromStop > -1; fromStop = it.next()) {
             // no need to consider loop transfers, since we don't mark patterns here any more
             // loop transfers are already included by virtue of those stops having been reached
-            for (DurationToStop transfer : transit.getTransfers(fromStop)) {
-                state.transferToStop(fromStop, transfer.stop, transfer.time);
+            Iterator<DurationToStop> transfers = transit.getTransfers(fromStop);
+            while (transfers.hasNext()) {
+                DurationToStop transfer = transfers.next();
+                state.transferToStop(fromStop, transfer.stop(), transfer.durationInSeconds());
             }
         }
     }
 
     /** Skip trips NOT running on the day of the search and skip frequency trips */
-    protected boolean skipTripSchedule(TripSchedule trip) {
-        return trip.headwaySeconds != null || transit.skipCalendarService(trip.serviceCode);
+    protected boolean skipTripSchedule(TripScheduleInfo trip) {
+        return !transit.isTripScheduleInService(trip);
     }
 }

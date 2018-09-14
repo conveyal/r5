@@ -30,22 +30,52 @@ public interface TransitDataProvider {
     void init();
 
     /**
+     * This method is responsible for providing all transfers from a given stop to all
+     * possible stops around that stop.
+     * <p/>
+     * The implementation may implement a lightweight {@link DurationToStop} representation.
+     * The iterator element only needs to be valid for the duration og a single iterator step.
+     * Hence; It is safe to use a cursor/flyweight pattern to represent both the DurationToStop
+     * and the Iterator<DurationToStop> - this will most likely be the best performing
+     * implementation.
+     * <p/>
+     * Example:
+     * <pre>
+     *class LightweightTransferIterator implements Iterator&lt;DurationToStop&gt;, DurationToStop {
+     *     private static final int[] EMPTY_ARRAY = new int[0];
+     *     private final int[] a;
+     *     private int index;
+     *
+     *     LightweightTransferIterator(int[] a) {
+     *         this.a = a == null ? EMPTY_ARRAY : a;
+     *         this.index = this.a.length == 0 ? 0 : -2;
+     *     }
+     *
+     *     public int stop()              { return a[index]; }
+     *     public int durationInSeconds() { return a[index+1]; }
+     *     public boolean hasNext()       { index += 2; return index < a.length; }
+     *     public DurationToStop next()   { return this; }
+     * }
+     * </pre>
      * @return a map of distances from the given input stop to all other stops.
      */
-    Iterable<DurationToStop> getTransfers(int fromStop);
+    Iterator<DurationToStop> getTransfers(int fromStop);
 
     /**
      * Return a set of all patterns visiting the given set of stops.
-     * @param stops the set of stops
+     * <p/>
+     * The implementation may implement a lightweight {@link Pattern} representation.
+     * See {@link #getTransfers(int)} for detail on how to implement this.
+     *
+     * @param stops set of stops for find all patterns for.
      */
     Iterator<Pattern> patternIterator(BitSetIterator stops);
 
     /**
-     * The adapter need to know based on the request input (date) if a service is available or not.
+     * The provider needs to know based on the request input (date) if a service is available or not.
      *
-     * @param serviceCode The service code (index).
-     * @return true if the service apply.
+     * @param trip The trip to check.
+     * @return true if the trip schedule is in service.
      */
-    boolean skipCalendarService(int serviceCode);
-
+    boolean isTripScheduleInService(TripScheduleInfo trip);
 }

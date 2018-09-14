@@ -8,8 +8,8 @@ import com.conveyal.r5.profile.mcrr.api.DurationToStop;
 import com.conveyal.r5.profile.mcrr.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.mcrr.api.TransitDataProvider;
 import com.conveyal.r5.profile.mcrr.TripScheduleBoardSearch;
+import com.conveyal.r5.profile.mcrr.api.TripScheduleInfo;
 import com.conveyal.r5.profile.mcrr.util.AvgTimer;
-import com.conveyal.r5.transit.TripSchedule;
 
 import java.util.Collection;
 import java.util.Iterator;
@@ -86,14 +86,14 @@ public class McRangeRaptorWorker extends AbstractRangeRaptorWorker<McWorkerState
                         int alightStopIndex = pattern.currentPatternStop(alightStopPosInPtn);
 
                         if (found) {
-                            TripSchedule trip = search.candidateTrip;
+                            TripScheduleInfo trip = search.candidateTrip;
                             state.transitToStop(
                                     boardStop,
                                     alightStopIndex,
-                                    trip.arrivals[alightStopPosInPtn],
+                                    trip.arrival(alightStopPosInPtn),
                                     originalPatternIndex,
                                     search.candidateTripIndex,
-                                    trip.departures[boardStopPosInPtn]
+                                    trip.departure(boardStopPosInPtn)
                             );
                         }
                     }

@@ -4,6 +4,8 @@ import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.profile.mcrr.api.Pattern;
 import com.conveyal.r5.profile.mcrr.api.DurationToStop;
 import com.conveyal.r5.profile.mcrr.api.TransitDataProvider;
+import com.conveyal.r5.profile.mcrr.api.TripScheduleInfo;
+import com.conveyal.r5.profile.mcrr.util.AvgTimer;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
@@ -22,9 +24,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.stream.IntStream;
 
-import static java.util.Collections.emptyList;
-
 public class TransitLayerRRDataProvider implements TransitDataProvider {
+
+    private static AvgTimer TIMER_INIT_STOP_TIMES = AvgTimer.timerMilliSec("TransitLayerRRDataProvider:init stops");
 
     private static final Logger LOG = LoggerFactory.getLogger(TransitLayerRRDataProvider.class);
     private static boolean PRINT_REFILTERING_PATTERNS_INFO = true;
@@ -48,41 +50,62 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
 
     private final int walkSpeedMillimetersPerSecond;
 
+    private final List<LightweightTransferIterator> transfers;
+
+    private static final Iterator<DurationToStop> EMPTY_TRANSFER_ITERATOR = new Iterator<DurationToStop>() {
+        @Override public boolean hasNext() { return false; }
+        @Override public DurationToStop next() { return null; }
+    };
 
     public TransitLayerRRDataProvider(TransitLayer transitLayer, LocalDate date, EnumSet<TransitModes> transitModes, float walkSpeedMetersPerSecond) {
+        TIMER_INIT_STOP_TIMES.start();
         this.transitLayer = transitLayer;
         this.servicesActive  = transitLayer.getActiveServicesForDate(date);
         this.transitModes = transitModes;
         this.walkSpeedMillimetersPerSecond = (int)(walkSpeedMetersPerSecond * 1000f);
+        this.transfers = createTransfers(transitLayer.transfersForStop, walkSpeedMillimetersPerSecond);
+        TIMER_INIT_STOP_TIMES.stop();
+    }
+
+    private static List<LightweightTransferIterator> createTransfers(List<TIntList> transfers, int walkSpeedMillimetersPerSecond) {
+
+        List<LightweightTransferIterator> list = new ArrayList<>();
+
+        for (int i = 0; i < transfers.size(); i++) {
+            list.add(transfersAt(transfers.get(i), walkSpeedMillimetersPerSecond));
+        }
+        return list;
     }
 
     @Override
-    public Iterable<DurationToStop> getTransfers(int stop) {
-        TIntList m = transitLayer.transfersForStop.get(stop);
+    public Iterator<DurationToStop> getTransfers(int stop) {
+        LightweightTransferIterator it = transfers.get(stop);
 
-        if(m == null) {
-            return emptyList();
-        }
+        if(it == null) return EMPTY_TRANSFER_ITERATOR;
 
-        List<DurationToStop> stopTimes = new ArrayList<>(m.size());
+        it.reset();
+
+        return it;
+    }
+
+    private static LightweightTransferIterator transfersAt(TIntList m, int walkSpeedMillimetersPerSecond) {
+        if(m == null) return null;
+
+        int[] stopTimes = new int[m.size()];
 
         for(int i=0; i<m.size();) {
-            int toStop = m.get(i);
+            stopTimes[i] = m.get(i);
             ++i;
-            int walkTime = m.get(i) / walkSpeedMillimetersPerSecond;
+            stopTimes[i] = m.get(i) / walkSpeedMillimetersPerSecond;
             ++i;
-
-            if (walkTime < 0) {
-                throw new IllegalStateException("Negative transfer time!!");
-            }
-            stopTimes.add(new DurationToStop(toStop, walkTime));
         }
-        return stopTimes;
+        return new LightweightTransferIterator(stopTimes);
     }
 
     @Override
-    public boolean skipCalendarService(int serviceCode) {
-        return !servicesActive.get(serviceCode);
+    public boolean isTripScheduleInService(TripScheduleInfo trip) {
+        TripSchedule t = (TripSchedule) trip;
+        return t.headwaySeconds == null && servicesActive.get(t.serviceCode);
     }
 
     /** Prefilter the patterns to only ones that are running */
@@ -193,12 +216,7 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
         }
 
         @Override
-        public int getTripSchedulesIndex(TripSchedule schedule) {
-            return pattern.tripSchedules.indexOf(schedule);
-        }
-
-        @Override
-        public TripSchedule getTripSchedule(int index) {
+        public TripScheduleInfo getTripSchedule(int index) {
             return pattern.tripSchedules.get(index);
         }
 

@@ -6,7 +6,7 @@ import com.conveyal.r5.profile.mcrr.api.DurationToStop;
 import com.conveyal.r5.profile.mcrr.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.mcrr.api.TransitDataProvider;
 import com.conveyal.r5.profile.mcrr.util.AvgTimer;
-import com.conveyal.r5.transit.TripSchedule;
+import com.conveyal.r5.profile.mcrr.api.TripScheduleInfo;
 
 import java.util.Collection;
 import java.util.HashSet;
@@ -43,7 +43,6 @@ public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWork
     private static final AvgTimer TIMER_ROUTE_BY_MINUTE = AvgTimer.timerMilliSec("RRaptor:route Run Raptor For Minute");
     private static final AvgTimer TIMER_BY_MINUTE_SCHEDULE_SEARCH = AvgTimer.timerMicroSec("RRaptor:runRaptorForMinute Schedule Search");
     private static final AvgTimer TIMER_BY_MINUTE_TRANSFERS = AvgTimer.timerMicroSec("RRaptor:runRaptorForMinute Transfers");
-    private static final AvgTimer TIMER_TRIP = AvgTimer.timerMicroSec("TRIP");
 
     /** If we're going to store paths to every destination (e.g. for static sites) then they'll be retained here. */
     public Collection<Path> paths;
@@ -74,8 +73,8 @@ public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWork
 
             // TODO TGR -- Add egress transit time to path
 
-            if (state.isStopReachedByTransit(it.stop)) {
-                Path p = pathBuilder.extractPathForStop(state.getMaxNumberOfRounds(), it.stop);
+            if (state.isStopReachedByTransit(it.stop())) {
+                Path p = pathBuilder.extractPathForStop(state.getMaxNumberOfRounds(), it.stop());
                 if (p != null) {
                     paths.add(p);
                 }
@@ -98,7 +97,7 @@ public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWork
             int onTrip = -1;
             int boardTime = 0;
             int boardStop = -1;
-            TripSchedule boardTrip = null;
+            TripScheduleInfo boardTrip = null;
 
             TripScheduleBoardSearch search = new TripScheduleBoardSearch(pattern, this::skipTripSchedule);
 
@@ -110,9 +109,9 @@ public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWork
                 if (onTrip != -1) {
                     state.transitToStop(
                             stop,
-                            boardTrip.arrivals[stopPositionInPattern],
+                            boardTrip.arrival(stopPositionInPattern),
                             originalPatternIndex,
-                            pattern.getTripSchedulesIndex(boardTrip),
+                            onTrip,
                             boardStop,
                             boardTime
                     );
@@ -125,14 +124,12 @@ public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWork
                     int tripIndexUpperBound = (onTrip == -1 ? pattern.getTripScheduleSize() : onTrip);
 
                     // check if we can back up to an earlier trip due to this stop being reached earlier
-                    TIMER_TRIP.start();
                     boolean found = search.search(tripIndexUpperBound, earliestBoardTime, stopPositionInPattern);
-                    TIMER_TRIP.stop();
 
                     if (found) {
                         onTrip = search.candidateTripIndex;
                         boardTrip = search.candidateTrip;
-                        boardTime = search.candidateTrip.departures[stopPositionInPattern];
+                        boardTime = search.candidateTrip.departure(stopPositionInPattern);
                         boardStop = stop;
                     }
                 }

@@ -31,7 +31,7 @@ public class RangeRaptorRequest {
 
     /**
      * The minimum wait time for transit boarding to account for schedule variation.
-     * This is applied between transits, between transfer and transit, and between access "walk" and transit.
+     * This is added between transits, between transfer and transit, and between access "walk" and transit.
      */
     public final int boardSlackInSeconds;
 

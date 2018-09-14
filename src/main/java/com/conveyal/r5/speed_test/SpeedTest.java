@@ -49,8 +49,6 @@ import static com.conveyal.r5.profile.mcrr.util.TimeUtils.midnightOf;
  * Also demonstrates how to run basic searches without using the graphQL profile routing API.
  */
 public class SpeedTest {
-
-
     private static final Logger LOG = LoggerFactory.getLogger(SpeedTest.class);
 
 
@@ -129,6 +127,7 @@ public class SpeedTest {
         if(!limitTestCases) {
             // Warm up JIT compiler
             runSingleTestCase(tripPlans, testCases.get(9), opts, true);
+            runSingleTestCase(tripPlans, testCases.get(17), opts, true);
         }
         LOG.info("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [ START " + stateFactory + " ]");
 
@@ -263,12 +262,13 @@ public class SpeedTest {
 
             // -------------------------------------------------------- [ WORKER ROUTE ]
 
-            TIMER_WORKER.start();
-
-
             TransitDataProvider transitData = new TransitLayerRRDataProvider(
                     transportNetwork.transitLayer, request.date, request.transitModes, request.walkSpeed
             );
+
+            TIMER_WORKER.start();
+
+
             final int nRounds = request.maxRides + 1;
             final int nStops = transportNetwork.transitLayer.getStopCount();
             ItinerarySet itineraries = new ItinerarySet();
@@ -378,17 +378,24 @@ public class SpeedTest {
         return new RangeRaptorRequest(
                 request.fromTime,
                 request.toTime,
-                timeToStops(streetRouter.accessTimesToStopsInSeconds),
-                timeToStops(streetRouter.egressTimesToStopsInSeconds),
+                mapToSurationToStops(streetRouter.accessTimesToStopsInSeconds),
+                mapToSurationToStops(streetRouter.egressTimesToStopsInSeconds),
                 60,
                 60
         );
     }
 
-    private static Collection<DurationToStop> timeToStops(TIntIntMap timesToStopsInSeconds) {
+    private static Collection<DurationToStop> mapToSurationToStops(TIntIntMap timesToStopsInSeconds) {
         Collection<DurationToStop> times = new ArrayList<>();
-        timesToStopsInSeconds.forEachEntry((s,t) -> {
-            times.add(new DurationToStop(s, t));
+        timesToStopsInSeconds.forEachEntry((s, t) -> {
+            times.add(new DurationToStop() {
+                @Override public int stop() {
+                    return s;
+                }
+                @Override public int durationInSeconds() {
+                    return t;
+                }
+            });
             return true;
         });
         return times;

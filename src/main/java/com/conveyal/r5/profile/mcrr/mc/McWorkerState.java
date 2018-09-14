@@ -137,8 +137,8 @@ public final class McWorkerState implements WorkerState {
         McPath2Builder builder = new McPath2Builder();
 
         for (DurationToStop egressStop : egressStops) {
-            for (McStopState it : stops.listAll(egressStop.stop)) {
-                Path2 p = builder.extractPathsForStop(it, egressStop.time);
+            for (McStopState it : stops.listAll(egressStop.stop())) {
+                Path2 p = builder.extractPathsForStop(it, egressStop.durationInSeconds());
                 if(p != null) {
                     paths.add(p);
                 }

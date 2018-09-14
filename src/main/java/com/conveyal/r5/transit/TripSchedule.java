@@ -2,12 +2,12 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.Trip;
+import com.conveyal.r5.profile.mcrr.api.TripScheduleInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.Collection;
-import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
  * If this is a frequency trip, it also records the different headways throughout the day, and when those headways
  * begin and end.
  */
-public class TripSchedule implements Serializable, Comparable<TripSchedule>, Cloneable {
+public class TripSchedule implements Serializable, Comparable<TripSchedule>, Cloneable, TripScheduleInfo {
 
     private static final Logger LOG = LoggerFactory.getLogger(TripSchedule.class);
 
@@ -257,4 +257,13 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
         return headwaySeconds.length;
     }
 
+    @Override
+    public int arrival(int stopPosInPattern) {
+        return arrivals[stopPosInPattern];
+    }
+
+    @Override
+    public int departure(int stopPosInPattern) {
+        return departures[stopPosInPattern];
+    }
 }

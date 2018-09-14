@@ -1,6 +1,6 @@
 package com.conveyal.r5.speed_test.test;
 
-import com.conveyal.r5.profile.mcrr.util.TimeUtils;
+import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 import javax.validation.constraints.NotNull;
 import java.util.ArrayList;

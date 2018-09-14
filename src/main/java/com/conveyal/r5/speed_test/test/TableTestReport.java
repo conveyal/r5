@@ -1,8 +1,7 @@
 package com.conveyal.r5.speed_test.test;
 
-import com.conveyal.r5.profile.mcrr.util.Debug;
-import com.conveyal.r5.profile.mcrr.util.DebugState;
-import com.conveyal.r5.profile.mcrr.util.TimeUtils;
+import com.conveyal.r5.profile.entur.util.Debug;
+import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 import java.util.Arrays;
 import java.util.Collection;

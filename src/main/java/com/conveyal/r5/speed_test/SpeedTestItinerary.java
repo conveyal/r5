@@ -1,17 +1,17 @@
 package com.conveyal.r5.speed_test;
 
-import com.conveyal.r5.profile.mcrr.util.ParetoDominanceFunctions;
-import com.conveyal.r5.profile.mcrr.util.ParetoSortable;
-import com.conveyal.r5.profile.mcrr.util.TimeUtils;
+import com.conveyal.r5.profile.entur.util.ParetoDominanceFunctions;
+import com.conveyal.r5.profile.entur.util.ParetoSortable;
+import com.conveyal.r5.profile.entur.util.TimeUtils;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.Leg;
 
 import java.util.HashSet;
 import java.util.Set;
 
-import static com.conveyal.r5.profile.mcrr.util.ParetoDominanceFunctions.createParetoDominanceFunctionArray;
-import static com.conveyal.r5.profile.mcrr.util.TimeUtils.timeToStrCompact;
-import static com.conveyal.r5.profile.mcrr.util.TimeUtils.timeToStrShort;
+import static com.conveyal.r5.profile.entur.util.ParetoDominanceFunctions.createParetoDominanceFunctionArray;
+import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrCompact;
+import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrShort;
 
 public class SpeedTestItinerary extends Itinerary implements ParetoSortable {
 

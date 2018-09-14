@@ -6,17 +6,17 @@ import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetPath;
-import com.conveyal.r5.profile.mcrr.PathParetoSortableWrapper;
-import com.conveyal.r5.profile.mcrr.api.DurationToStop;
-import com.conveyal.r5.profile.mcrr.api.Path2;
-import com.conveyal.r5.profile.mcrr.api.RangeRaptorRequest;
-import com.conveyal.r5.profile.mcrr.api.TransitDataProvider;
-import com.conveyal.r5.profile.mcrr.TransitLayerRRDataProvider;
-import com.conveyal.r5.profile.mcrr.api.Worker;
-import com.conveyal.r5.profile.mcrr.mc.McRangeRaptorWorker;
-import com.conveyal.r5.profile.mcrr.util.AvgTimer;
-import com.conveyal.r5.profile.mcrr.util.DebugState;
-import com.conveyal.r5.profile.mcrr.util.ParetoSet;
+import com.conveyal.r5.profile.entur.PathParetoSortableWrapper;
+import com.conveyal.r5.profile.entur.api.DurationToStop;
+import com.conveyal.r5.profile.entur.api.Path2;
+import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
+import com.conveyal.r5.profile.entur.api.TransitDataProvider;
+import com.conveyal.r5.profile.entur.transitadapter.TransitLayerRRDataProvider;
+import com.conveyal.r5.profile.entur.api.Worker;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McRangeRaptorWorker;
+import com.conveyal.r5.profile.entur.util.AvgTimer;
+import com.conveyal.r5.profile.entur.util.DebugState;
+import com.conveyal.r5.profile.entur.util.ParetoSet;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.Place;
 import com.conveyal.r5.speed_test.api.model.TripPlan;
@@ -42,7 +42,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static com.conveyal.r5.profile.mcrr.util.TimeUtils.midnightOf;
+import static com.conveyal.r5.profile.entur.util.TimeUtils.midnightOf;
 
 /**
  * Test response times for a large batch of origin/destination points.

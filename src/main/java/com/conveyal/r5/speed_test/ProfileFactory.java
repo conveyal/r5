@@ -2,17 +2,17 @@ package com.conveyal.r5.speed_test;
 
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.SearchAlgorithm;
-import com.conveyal.r5.profile.mcrr.PathBuilder;
-import com.conveyal.r5.profile.mcrr.PathBuilderCursorBased;
-import com.conveyal.r5.profile.mcrr.RangeRaptorWorker;
-import com.conveyal.r5.profile.mcrr.RangeRaptorWorkerState;
-import com.conveyal.r5.profile.mcrr.api.TransitDataProvider;
-import com.conveyal.r5.profile.mcrr.StopStateCollection;
-import com.conveyal.r5.profile.mcrr.StopStatesIntArray;
-import com.conveyal.r5.profile.mcrr.StopStatesStructArray;
-import com.conveyal.r5.profile.mcrr.api.Worker;
-import com.conveyal.r5.profile.mcrr.mc.McRangeRaptorWorker;
-import com.conveyal.r5.profile.mcrr.mc.McWorkerState;
+import com.conveyal.r5.profile.entur.rangeraptor.PathBuilder;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.PathBuilderCursorBased;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.RangeRaptorWorker;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.RangeRaptorWorkerState;
+import com.conveyal.r5.profile.entur.api.TransitDataProvider;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCollection;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.intarray.StopStatesIntArray;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.structarray.StopStatesStructArray;
+import com.conveyal.r5.profile.entur.api.Worker;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McRangeRaptorWorker;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McWorkerState;
 
 import java.util.Arrays;
 import java.util.List;

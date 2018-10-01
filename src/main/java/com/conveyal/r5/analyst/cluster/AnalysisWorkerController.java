@@ -2,6 +2,8 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.common.JsonUtilities;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import spark.Request;
 import spark.Response;
 
@@ -16,6 +18,8 @@ public class AnalysisWorkerController {
 
     private final AnalystWorker analystWorker;
 
+    private static final Logger LOG = LoggerFactory.getLogger(AnalysisWorkerController.class);
+
     public AnalysisWorkerController (AnalystWorker analystWorker) {
         this.analystWorker = analystWorker;
     }
@@ -23,6 +27,7 @@ public class AnalysisWorkerController {
     public Object handleSinglePoint (Request request, Response response) {
         // Record the fact that this worker is busy so it will not shut down
         analystWorker.lastSinglePointTime = System.currentTimeMillis();
+        LOG.info(request.body());
         TravelTimeSurfaceTask task = JsonUtilities.objectFromRequestBody(request, TravelTimeSurfaceTask.class);
         // TODO do not return raw binary data from method, return better typed response
         byte[] binaryResult = analystWorker.handleOneRequest(task);

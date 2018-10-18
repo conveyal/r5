@@ -17,6 +17,13 @@ aliases:
     echo 'export CIRCLE_SHA1="$CIRCLE_SHA1"' >> $BASH_ENV
     echo 'export BUILD_STATUS_API_KEY="$BUILD_STATUS_API_KEY"' >> $BASH_ENV
     /tools/build_notify.sh
+- &trigger-dependants
+  name: "Trigger dependant jobs"
+  command: |
+    circle_project_url="https://circleci.com/api/v1.1/project/"
+    branch="entur_raptor"
+    url="${circle_project_url}github/entur/${github_project}/build?circle-token=${CIRCLE_API_TOKEN}"
+    curl -X POST --header "Content-Type: application/json" -d '{"branch":"'${branch}'"}' "${url}"
 jobs:
   build:
     docker:
@@ -74,6 +81,7 @@ jobs:
         name: Docker build and push
         command: mvn docker:build docker:push -s /tools/m2/settings.xml
     - run: *post-hook
+    - run: *trigger-dependants
 workflows:
   version: 2
   build_test_deploy:

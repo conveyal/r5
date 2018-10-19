@@ -22,6 +22,7 @@ aliases:
   command: |
     circle_project_url="https://circleci.com/api/v1.1/project/"
     branch="entur_raptor"
+    github_project="OpenTripPlanner"
     url="${circle_project_url}github/entur/${github_project}/build?circle-token=${CIRCLE_API_TOKEN}"
     curl -X POST --header "Content-Type: application/json" -d '{"branch":"'${branch}'"}' "${url}"
 jobs:

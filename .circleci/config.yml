@@ -43,7 +43,7 @@ jobs:
         - ~/.m2
         key: dep-cache-{{ checksum "pom.xml" }}
     # Cannot use -o because of snapshot dependencies.
-    - run: mvn install -s /tools/m2/settings.xml
+    - run: mvn deploy -s /tools/m2/settings.xml
     - run:
         name: Save test results
         command: |

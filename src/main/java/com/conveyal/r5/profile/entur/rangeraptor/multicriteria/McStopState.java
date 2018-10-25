@@ -2,7 +2,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopState;
 import com.conveyal.r5.profile.entur.util.DebugState;
-import com.conveyal.r5.profile.entur.util.ParetoSortable;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoSortable;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -90,12 +90,12 @@ public abstract class McStopState implements StopState, ParetoSortable {
 
     @Override
     public final int paretoValue1() {
-        return roundPareto;
+        return time;
     }
 
     @Override
     public final int paretoValue2() {
-        return time;
+        return round;
     }
 
     @Override

@@ -1,8 +1,7 @@
-package com.conveyal.r5.profile.entur.util;
+package com.conveyal.r5.profile.entur.util.paretoset;
 
 public interface ParetoSortable {
     int paretoValue1();
-
     default int paretoValue2() {
         return 0;
     }

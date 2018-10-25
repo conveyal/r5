@@ -6,7 +6,7 @@ import java.util.Iterator;
 
 
 /**
- * Create a lightweigth DutationToStop iterator, using a singel object to represent
+ * Create a lightweight StopArrival iterator, using a singel object to represent
  * the iterator and all instances of the StopArrival. The StopArrival is
  * only valid for the duration of on step
  */

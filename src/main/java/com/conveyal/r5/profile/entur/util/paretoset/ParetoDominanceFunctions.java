@@ -1,9 +1,9 @@
-package com.conveyal.r5.profile.entur.util;
+package com.conveyal.r5.profile.entur.util.paretoset;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public enum ParetoDominanceFunctions implements ParetoDominanceFunction {
+public enum ParetoDominanceFunctions implements InternalParetoDominanceFunction {
     LESS_THEN {
         @Override public final boolean dominates(int v, int u) {
             return v < u;
@@ -11,9 +11,7 @@ public enum ParetoDominanceFunctions implements ParetoDominanceFunction {
         @Override public boolean mutualDominance(int v, int u) { return false; }
     },
     GRATER_THEN {
-        @Override public final boolean dominates(int v, int u) {
-            return u  < v;
-        }
+        @Override public final boolean dominates(int v, int u) { return v > u; }
         @Override public boolean mutualDominance(int v, int u) { return false; }
     },
     DIFFERENT {
@@ -28,7 +26,7 @@ public enum ParetoDominanceFunctions implements ParetoDominanceFunction {
     }
 
     public static class Builder {
-        private List<ParetoDominanceFunction> list = new ArrayList<>();
+        private List<InternalParetoDominanceFunction> list = new ArrayList<>();
 
         private Builder() {}
 
@@ -49,13 +47,13 @@ public enum ParetoDominanceFunctions implements ParetoDominanceFunction {
             return this;
         }
 
-        public ParetoDominanceFunction[] build() {
-            return list.toArray(new ParetoDominanceFunction[list.size()]);
+        public InternalParetoDominanceFunction[] build() {
+            return list.toArray(new InternalParetoDominanceFunction[list.size()]);
         }
     }
 
 
-    static class LessThenDelta implements ParetoDominanceFunction {
+    static class LessThenDelta implements InternalParetoDominanceFunction {
         private final int delta;
 
         LessThenDelta(int delta) {

@@ -3,17 +3,17 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopState;
-import com.conveyal.r5.profile.entur.util.ParetoDominanceFunctions;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoDominanceFunctions;
 
-import static com.conveyal.r5.profile.entur.util.ParetoDominanceFunctions.createParetoDominanceFunctionArray;
+import static com.conveyal.r5.profile.entur.util.paretoset.ParetoDominanceFunctions.createParetoDominanceFunctionArray;
 import static java.util.Collections.emptyList;
 
 
 
 final class StopStatesParetoSet  {
     private static final ParetoDominanceFunctions.Builder PARETO_FUNCTION = createParetoDominanceFunctionArray()
-            .lessThen() // rounds
             .lessThen(1) // time - needs to be 1 seconds better to make it into the pareto set.
+            .lessThen() // rounds
     ;
 
 

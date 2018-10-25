@@ -16,7 +16,7 @@ import com.conveyal.r5.profile.entur.api.Worker;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
 import com.conveyal.r5.profile.entur.util.DebugState;
-import com.conveyal.r5.profile.entur.util.ParetoSet;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.Place;
 import com.conveyal.r5.speed_test.api.model.TripPlan;

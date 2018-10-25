@@ -1,10 +1,10 @@
 package com.conveyal.r5.profile.entur;
 
 import com.conveyal.r5.profile.Path;
-import com.conveyal.r5.profile.entur.util.ParetoDominanceFunctions;
-import com.conveyal.r5.profile.entur.util.ParetoSortable;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoDominanceFunctions;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoSortable;
 
-import static com.conveyal.r5.profile.entur.util.ParetoDominanceFunctions.createParetoDominanceFunctionArray;
+import static com.conveyal.r5.profile.entur.util.paretoset.ParetoDominanceFunctions.createParetoDominanceFunctionArray;
 
 @Deprecated
 public class PathParetoSortableWrapper implements ParetoSortable {

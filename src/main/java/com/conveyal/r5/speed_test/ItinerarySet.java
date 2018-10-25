@@ -1,6 +1,6 @@
 package com.conveyal.r5.speed_test;
 
-import com.conveyal.r5.profile.entur.util.ParetoSet;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
 
 import java.util.ArrayList;
 import java.util.List;

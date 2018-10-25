@@ -1,9 +1,9 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
+import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.WorkerState;
 import com.conveyal.r5.profile.entur.api.Path2;
-import com.conveyal.r5.profile.entur.api.DurationToStop;
 import com.conveyal.r5.profile.entur.util.DebugState;
 
 import java.util.ArrayList;
@@ -69,10 +69,10 @@ public final class McWorkerState implements WorkerState {
         round = 0;
     }
 
-    @Override public void setInitialTime(int stop, int fromTime, int accesDurationInSeconds, int boardSlackInSeconds) {
-        stops.setInitialTime(stop, fromTime, accesDurationInSeconds, boardSlackInSeconds);
-        touchedCurrent.set(stop);
-        debugStops(Access, round, stop);
+    @Override public void setInitialTime(StopArrival stopArrival, int fromTime, int boardSlackInSeconds) {
+        stops.setInitialTime(stopArrival, fromTime, boardSlackInSeconds);
+        touchedCurrent.set(stopArrival.stop());
+        debugStops(Access, round, stopArrival.stop());
     }
 
     @Override public boolean isNewRoundAvailable() {
@@ -119,7 +119,10 @@ public final class McWorkerState implements WorkerState {
     /**
      * Set the time at a transit stop iff it is optimal.
      */
-    @Override public void transferToStop(int fromStop, int targetStop, int transferTimeInSeconds) {
+    @Override public void transferToStop(int fromStop, StopArrival transfer) {
+        final int targetStop = transfer.stop();
+        final int transferTimeInSeconds = transfer.durationInSeconds();
+
         for(McStopState it :  stops.listArrivedByTransit(round, fromStop)) {
             int arrivalTime = it.time() + transferTimeInSeconds;
 
@@ -132,11 +135,11 @@ public final class McWorkerState implements WorkerState {
         debugStops(Transfer, round, targetStop);
     }
 
-    Collection<Path2> extractPaths(Collection<DurationToStop> egressStops) {
+    Collection<Path2> extractPaths(Collection<StopArrival> egressStops) {
         List<Path2> paths = new ArrayList<>();
         McPathBuilder builder = new McPathBuilder();
 
-        for (DurationToStop egressStop : egressStops) {
+        for (StopArrival egressStop : egressStops) {
             for (McStopState it : stops.listAll(egressStop.stop())) {
                 Path2 p = builder.extractPathsForStop(it, egressStop.durationInSeconds());
                 if(p != null) {

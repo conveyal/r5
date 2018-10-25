@@ -19,10 +19,10 @@ public class RangeRaptorRequest {
     public final int toTime;
 
     /** Times to access each transit stop using the street network in seconds. */
-    public final Collection<DurationToStop> accessStops;
+    public final Collection<StopArrival> accessStops;
 
     /** List of all possible egress stops and time to reach destination in seconds. */
-    public final Collection<DurationToStop> egressStops;
+    public final Collection<StopArrival> egressStops;
 
     /**
      * Step for departure times between each RangeRaptor iterations.
@@ -36,7 +36,7 @@ public class RangeRaptorRequest {
     public final int boardSlackInSeconds;
 
 
-    public RangeRaptorRequest(int fromTime, int toTime, Collection<DurationToStop> accessStops, Collection<DurationToStop> egressStops, int departureStepInSeconds, int boardSlackInSeconds) {
+    public RangeRaptorRequest(int fromTime, int toTime, Collection<StopArrival> accessStops, Collection<StopArrival> egressStops, int departureStepInSeconds, int boardSlackInSeconds) {
         this.fromTime = fromTime;
         this.toTime = toTime;
         this.accessStops = accessStops;

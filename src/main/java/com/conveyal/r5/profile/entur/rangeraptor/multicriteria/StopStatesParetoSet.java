@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 
+import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopState;
 import com.conveyal.r5.profile.entur.util.ParetoDominanceFunctions;
 
@@ -25,8 +26,11 @@ final class StopStatesParetoSet  {
         this.stops = new StopStateParetoSet[stops];
     }
 
-    void setInitialTime(int stop, int fromTime, int accessTime, int boardSlackInSeconds) {
-        findOrCreateSet(stop).add(new McAccessStopState(stop, fromTime,  accessTime, boardSlackInSeconds));
+    void setInitialTime(StopArrival stopArrival, int fromTime, int boardSlackInSeconds) {
+        final int stop = stopArrival.stop();
+        findOrCreateSet(stop).add(
+                new McAccessStopState(stopArrival, fromTime, boardSlackInSeconds)
+        );
     }
 
     boolean transitToStop(StopState previous, int round, int stop, int time, int pattern, int trip, int boardTime) {

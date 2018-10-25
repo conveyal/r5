@@ -1,16 +1,16 @@
 package com.conveyal.r5.profile.entur.transitadapter;
 
-import com.conveyal.r5.profile.entur.api.DurationToStop;
+import com.conveyal.r5.profile.entur.api.StopArrival;
 
 import java.util.Iterator;
 
 
 /**
  * Create a lightweigth DutationToStop iterator, using a singel object to represent
- * the iterator and all instances of the DurationToStop. The DurationToStop is
+ * the iterator and all instances of the StopArrival. The StopArrival is
  * only valid for the duration of on step
  */
-class LightweightTransferIterator implements Iterator<DurationToStop>, DurationToStop {
+class LightweightTransferIterator implements Iterator<StopArrival>, StopArrival {
     private final int[] durationToStops;
     private int index;
 
@@ -20,7 +20,7 @@ class LightweightTransferIterator implements Iterator<DurationToStop>, DurationT
     }
 
 
-    /* Iterator<DurationToStop> methods */
+    /* Iterator<StopArrival> methods */
 
     @Override
     public boolean hasNext() {
@@ -29,11 +29,11 @@ class LightweightTransferIterator implements Iterator<DurationToStop>, DurationT
     }
 
     @Override
-    public DurationToStop next() {
+    public StopArrival next() {
         return this;
     }
 
-    /* DurationToStop, lightweight implementation */
+    /* StopArrival, lightweight implementation */
 
     @Override
     public int stop() {

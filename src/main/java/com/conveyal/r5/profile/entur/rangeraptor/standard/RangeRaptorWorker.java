@@ -1,9 +1,9 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 import com.conveyal.r5.profile.Path;
+import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.TripScheduleBoardSearch;
 import com.conveyal.r5.profile.entur.api.Pattern;
-import com.conveyal.r5.profile.entur.api.DurationToStop;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
@@ -63,7 +63,7 @@ public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWork
     }
 
     @Override
-    protected Collection<Path> paths(Collection<DurationToStop> egressStops) {
+    protected Collection<Path> paths(Collection<StopArrival> egressStops) {
         return paths;
     }
 
@@ -71,8 +71,8 @@ public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWork
      * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
      */
     @Override
-    protected void addPathsForCurrentIteration(Collection<DurationToStop> egressStops) {
-        for (DurationToStop it : egressStops) {
+    protected void addPathsForCurrentIteration(Collection<StopArrival> egressStops) {
+        for (StopArrival it : egressStops) {
 
             // TODO TGR -- Add egress transit time to path
 

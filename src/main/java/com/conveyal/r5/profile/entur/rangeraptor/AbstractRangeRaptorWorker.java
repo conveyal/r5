@@ -1,7 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor;
 
+import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.WorkerState;
-import com.conveyal.r5.profile.entur.api.DurationToStop;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
@@ -58,12 +58,12 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, P> implem
     protected abstract AvgTimer timerByMinuteScheduleSearch();
     protected abstract AvgTimer timerByMinuteTransfers();
 
-    protected abstract Collection<P> paths(Collection<DurationToStop> egressStops);
+    protected abstract Collection<P> paths(Collection<StopArrival> egressStops);
 
     /**
      * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
      */
-    protected abstract void addPathsForCurrentIteration(Collection<DurationToStop> egressStops);
+    protected abstract void addPathsForCurrentIteration(Collection<StopArrival> egressStops);
 
     /**
      * Perform a scheduled search
@@ -135,12 +135,12 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, P> implem
      * Set the departure time in the scheduled search to the given departure time,
      * and prepare for the scheduled search at the next-earlier minute
      */
-    private void advanceScheduledSearchToPreviousMinute(int nextMinuteDepartureTime, Collection<DurationToStop> accessStops, int boardSlackInSeconds) {
+    private void advanceScheduledSearchToPreviousMinute(int nextMinuteDepartureTime, Collection<StopArrival> accessStops, int boardSlackInSeconds) {
         state.initNewDepatureForMinute(nextMinuteDepartureTime);
 
         // add initial stops
-        for (DurationToStop it : accessStops) {
-            state.setInitialTime(it.stop(), nextMinuteDepartureTime, it.durationInSeconds(), boardSlackInSeconds);
+        for (StopArrival it : accessStops) {
+            state.setInitialTime(it, nextMinuteDepartureTime, boardSlackInSeconds);
         }
     }
 
@@ -151,10 +151,10 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, P> implem
         for (int fromStop = it.next(); fromStop > -1; fromStop = it.next()) {
             // no need to consider loop transfers, since we don't mark patterns here any more
             // loop transfers are already included by virtue of those stops having been reached
-            Iterator<DurationToStop> transfers = transit.getTransfers(fromStop);
+            Iterator<StopArrival> transfers = transit.getTransfers(fromStop);
             while (transfers.hasNext()) {
-                DurationToStop transfer = transfers.next();
-                state.transferToStop(fromStop, transfer.stop(), transfer.durationInSeconds());
+                StopArrival transfer = transfers.next();
+                state.transferToStop(fromStop, transfer);
             }
         }
     }

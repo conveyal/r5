@@ -1,7 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopState;
-import com.conveyal.r5.profile.entur.api.PathLeg;
 import com.conveyal.r5.profile.entur.util.DebugState;
 import com.conveyal.r5.profile.entur.util.ParetoSortable;
 
@@ -12,14 +11,15 @@ public abstract class McStopState implements StopState, ParetoSortable {
     private final McStopState previousState;
     private final int round;
     private final int stopIndex;
-    private final int[] paretoValues = new int[2];
+    private final int time;
+    private final int roundPareto;
 
     McStopState(McStopState previousState, int round, int roundPareto, int stopIndex, int time) {
         this.previousState = previousState;
         this.round = round;
         this.stopIndex = stopIndex;
-        this.paretoValues[0] = roundPareto;
-        this.paretoValues[1] = time;
+        this.time = time;
+        this.roundPareto = roundPareto;
     }
 
     final int previousStop() {
@@ -40,12 +40,7 @@ public abstract class McStopState implements StopState, ParetoSortable {
 
     @Override
     public final int time() {
-        return paretoValues[1];
-    }
-
-    @Override
-    public final int[] paretoValues() {
-        return paretoValues;
+        return time;
     }
 
     @Override
@@ -94,8 +89,18 @@ public abstract class McStopState implements StopState, ParetoSortable {
     }
 
     @Override
+    public final int paretoValue1() {
+        return roundPareto;
+    }
+
+    @Override
+    public final int paretoValue2() {
+        return time;
+    }
+
+    @Override
     public String toString() {
-        return asString(type().name(), round(), previousState==null ? -1 : previousState.stopIndex);
+        return asString(type().name(), round(), previousState == null ? -1 : previousState.stopIndex);
     }
 
     abstract DebugState.Type type();

@@ -1,10 +1,10 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
+import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.Pattern;
-import com.conveyal.r5.profile.entur.api.DurationToStop;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.TripScheduleBoardSearch;
@@ -51,12 +51,12 @@ public class McRangeRaptorWorker extends AbstractRangeRaptorWorker<McWorkerState
         super(transitData, state);
     }
 
-    @Override protected Collection<Path2> paths(Collection<DurationToStop> egressStops) {
+    @Override protected Collection<Path2> paths(Collection<StopArrival> egressStops) {
         return state.extractPaths(egressStops);
     }
 
 
-    @Override protected void addPathsForCurrentIteration(Collection<DurationToStop> egressStops) {
+    @Override protected void addPathsForCurrentIteration(Collection<StopArrival> egressStops) {
         // NOOP
     }
 

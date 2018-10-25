@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 
+import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.util.DebugState;
 
@@ -112,9 +113,12 @@ public final class RangeRaptorWorkerState implements WorkerState {
     }
 
     @Override
-    public void setInitialTime(int stop, int fromTime, int accesDurationInSeconds, int boardSlackInSeconds) {
+    public void setInitialTime(StopArrival stopArrival, int fromTime, int boardSlackInSeconds) {
+        final int accesDurationInSeconds = stopArrival.durationInSeconds();
+        final int stop = stopArrival.stop();
         final int arrivalTime = fromTime + accesDurationInSeconds;
-        stops.setInitalTime(round, stop, arrivalTime);
+
+        stops.setInitialTime(round, stop, arrivalTime);
         bestOveral.setTime(stop, accesDurationInSeconds);
         debugStop(Access, round, stop);
     }
@@ -143,18 +147,18 @@ public final class RangeRaptorWorkerState implements WorkerState {
      * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the nonTransferTime
      */
     @Override
-    public void transferToStop(int fromStop, int toStop, int transferTimeInSeconds) {
+    public void transferToStop(int fromStop, StopArrival toStopArrival) {
+        final int toStop = toStopArrival.stop();
 
-        int time = bestTransit.time(fromStop) + transferTimeInSeconds;
+        int arrivalTime = bestTransit.time(fromStop) + toStopArrival.durationInSeconds();
 
-        if (time > maxTimeLimit) {
+        if (arrivalTime > maxTimeLimit) {
             return;
         }
         // transitTimes upper bounds bestTimes so we don't need to update wait time and in-vehicle time here, if we
         // enter this conditional it has already been updated.
-        if (bestOveral.updateNewBestTime(toStop, time)) {
-
-            stops.transferToStop(round, toStop, time, fromStop, transferTimeInSeconds);
+        if (bestOveral.updateNewBestTime(toStop, arrivalTime)) {
+            stops.transferToStop(round, fromStop, toStopArrival, arrivalTime);
 
             debugStop(Transfer, round, toStop);
         }

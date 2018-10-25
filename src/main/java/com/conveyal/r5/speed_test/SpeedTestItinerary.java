@@ -60,8 +60,25 @@ public class SpeedTestItinerary extends Itinerary implements ParetoSortable {
     }
 
     @Override
-    public int[] paretoValues() {
-        return paretoValues;
+    public int paretoValue1() {
+        return paretoValues[0];
+    }
+
+    @Override
+    public int paretoValue2() {
+        return paretoValues[1];
+    }
+    @Override
+    public int paretoValue3() {
+        return paretoValues[2];
+    }
+    @Override
+    public int paretoValue4() {
+        return paretoValues[3];
+    }
+    @Override
+    public int paretoValue5() {
+        return paretoValues[4];
     }
 
     @Override

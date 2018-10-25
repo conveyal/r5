@@ -33,15 +33,15 @@ public interface TransitDataProvider {
      * This method is responsible for providing all transfers from a given stop to all
      * possible stops around that stop.
      * <p/>
-     * The implementation may implement a lightweight {@link DurationToStop} representation.
+     * The implementation may implement a lightweight {@link StopArrival} representation.
      * The iterator element only needs to be valid for the duration og a single iterator step.
-     * Hence; It is safe to use a cursor/flyweight pattern to represent both the DurationToStop
-     * and the Iterator<DurationToStop> - this will most likely be the best performing
+     * Hence; It is safe to use a cursor/flyweight pattern to represent both the StopArrival
+     * and the Iterator<StopArrival> - this will most likely be the best performing
      * implementation.
      * <p/>
      * Example:
      * <pre>
-     *class LightweightTransferIterator implements Iterator&lt;DurationToStop&gt;, DurationToStop {
+     *class LightweightTransferIterator implements Iterator&lt;StopArrival&gt;, StopArrival {
      *     private static final int[] EMPTY_ARRAY = new int[0];
      *     private final int[] a;
      *     private int index;
@@ -54,12 +54,12 @@ public interface TransitDataProvider {
      *     public int stop()              { return a[index]; }
      *     public int durationInSeconds() { return a[index+1]; }
      *     public boolean hasNext()       { index += 2; return index < a.length; }
-     *     public DurationToStop next()   { return this; }
+     *     public StopArrival next()   { return this; }
      * }
      * </pre>
      * @return a map of distances from the given input stop to all other stops.
      */
-    Iterator<DurationToStop> getTransfers(int fromStop);
+    Iterator<StopArrival> getTransfers(int fromStop);
 
     /**
      * Return a set of all patterns visiting the given set of stops.

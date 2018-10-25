@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
+import com.conveyal.r5.profile.entur.api.AStopArrival;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -19,22 +20,22 @@ public class StopStateParetoSetTest {
     private static final int STOP_4 = 4;
     private static final int STOP_5 = 5;
     private static final int STOP_6 = 6;
-    private McStopState A_STATE = new McAccessStopState(999, A_TIME, 10, ANY);
+    private McStopState A_STATE = newMcAccessStopState(999, A_TIME, 10, ANY);
 
     private StopStateParetoSet subject = StopStatesParetoSet.createState();
 
     @Test
     public void addOneElementToSet() {
-        subject.add(new McAccessStopState(1, A_TIME, 10, ANY));
+        subject.add(newMcAccessStopState(1, A_TIME, 10, ANY));
         assertStopsInSet(1);
     }
 
     @Test
     public void testTimeDominance() {
-        subject.add(new McAccessStopState(STOP_1, A_TIME, 10, ANY));
-        subject.add(new McAccessStopState(STOP_2, A_TIME, 9, ANY));
-        subject.add(new McAccessStopState(STOP_3, A_TIME, 9, ANY));
-        subject.add(new McAccessStopState(STOP_4,  A_TIME,11, ANY));
+        subject.add(newMcAccessStopState(STOP_1, A_TIME, 10, ANY));
+        subject.add(newMcAccessStopState(STOP_2, A_TIME, 9, ANY));
+        subject.add(newMcAccessStopState(STOP_3, A_TIME, 9, ANY));
+        subject.add(newMcAccessStopState(STOP_4,  A_TIME,11, ANY));
         assertStopsInSet(STOP_2);
     }
 
@@ -71,7 +72,7 @@ public class StopStateParetoSetTest {
 
     @Test
     public void testTransitAndTransferDoesAffectDominance() {
-        subject.add(new McAccessStopState(STOP_1, A_TIME, 20, ANY));
+        subject.add(newMcAccessStopState(STOP_1, A_TIME, 20, ANY));
         subject.add(new McTransitStopState(A_STATE, ROUND_1, STOP_2, 10, ANY, ANY, ANY));
         subject.add(new McTransitStopState(A_STATE, ROUND_1, STOP_3, 11, ANY, ANY, ANY));
         subject.add(new McTransferStopState(A_STATE, ROUND_1, STOP_4, 8, ANY));
@@ -83,4 +84,9 @@ public class StopStateParetoSetTest {
         int[] result = StreamSupport.stream(subject.paretoSet().spliterator(), false).mapToInt(McStopState::stopIndex).sorted().toArray();
         Assert.assertEquals("Stop indexes", Arrays.toString(expStopIndexes), Arrays.toString(result));
     }
+
+    private static McAccessStopState newMcAccessStopState(int stop, int time, int boardSlack, int transferTime) {
+        return new McAccessStopState(new AStopArrival(stop, transferTime), time, boardSlack);
+    }
+
 }

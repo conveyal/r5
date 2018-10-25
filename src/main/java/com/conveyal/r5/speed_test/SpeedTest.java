@@ -7,7 +7,7 @@ import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.profile.entur.PathParetoSortableWrapper;
-import com.conveyal.r5.profile.entur.api.DurationToStop;
+import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
@@ -385,10 +385,10 @@ public class SpeedTest {
         );
     }
 
-    private static Collection<DurationToStop> mapToSurationToStops(TIntIntMap timesToStopsInSeconds) {
-        Collection<DurationToStop> times = new ArrayList<>();
+    private static Collection<StopArrival> mapToSurationToStops(TIntIntMap timesToStopsInSeconds) {
+        Collection<StopArrival> times = new ArrayList<>();
         timesToStopsInSeconds.forEachEntry((s, t) -> {
-            times.add(new DurationToStop() {
+            times.add(new StopArrival() {
                 @Override public int stop() {
                     return s;
                 }

@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard.structarray;
 
 
+import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCollection;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCursor;
@@ -18,7 +19,7 @@ public final class StopStatesStructArray implements StopStateCollection {
     }
 
     @Override
-    public void setInitalTime(int round, int stop, int time) {
+    public void setInitialTime(int round, int stop, int time) {
         findOrCreateStopIndex(round, stop).time = time;
     }
 
@@ -42,11 +43,12 @@ public final class StopStatesStructArray implements StopStateCollection {
      * Set the time at a transit index iff it is optimal. This sets both the best time and the transfer time
      */
     @Override
-    public void transferToStop(int round, int stop, int time, int fromStop, int transferTime) {
+    public void transferToStop(int round, int fromStop, StopArrival toStopArrival, int arrivalTime) {
+        final int stop = toStopArrival.stop();
         final State state = findOrCreateStopIndex(round, stop);
-        state.time = time;
+        state.time = arrivalTime;
         state.transferFromStop = fromStop;
-        state.transferTime = transferTime;
+        state.transferTime = toStopArrival.durationInSeconds();
     }
 
     public final int time(int round, int stop) {

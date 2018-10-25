@@ -5,12 +5,13 @@ import java.util.List;
 
 
 public class ParetoSet<T extends ParetoSortable> {
-
+    private final int paretoVectorSize;
     private final ParetoDominanceFunction[] dominateFunctions;
     private List<T> paretoSet = new ArrayList<>();
 
     public ParetoSet(ParetoDominanceFunctions.Builder builder) {
         this.dominateFunctions = builder.build();
+        this.paretoVectorSize = dominateFunctions.length;
     }
 
     public boolean add(T newValue) {
@@ -44,18 +45,71 @@ public class ParetoSet<T extends ParetoSortable> {
         return paretoSet.get(index);
     }
 
+    boolean leftDominatesRight = false;
+    boolean rightDominatesLeft = false;
+
     private Domainace dominate(ParetoSortable lhs, ParetoSortable rhs) {
-        final int size = lhs.paretoValues().length;
-        final int[] l = lhs.paretoValues();
-        final int[] r = rhs.paretoValues();
+        leftDominatesRight = false;
+        rightDominatesLeft = false;
 
-        boolean leftDominatesRight = false;
-        boolean rightDominatesLeft = false;
+        if(paretoCompare(dominateFunctions[0], lhs.paretoValue1(), rhs.paretoValue1())) {
+            return Domainace.Equal;
+        }
+        if(paretoVectorSize == 1) {
+            return paretoResult();
+        }
 
+        if(paretoCompare(dominateFunctions[1], lhs.paretoValue2(), rhs.paretoValue2())) {
+            return Domainace.Equal;
+        }
+        if(paretoVectorSize == 2) {
+            return paretoResult();
+        }
 
-        for (int i = 0; i < size; ++i) {
-            int left = l[i];
-            int right = r[i];
+        if(paretoCompare(dominateFunctions[2], lhs.paretoValue3(), rhs.paretoValue3())) {
+            return Domainace.Equal;
+        }
+        if(paretoVectorSize == 3) {
+            return paretoResult();
+        }
+
+        if(paretoCompare(dominateFunctions[3], lhs.paretoValue4(), rhs.paretoValue4())) {
+            return Domainace.Equal;
+        }
+        if(paretoVectorSize == 4) {
+            return paretoResult();
+        }
+
+        if(paretoCompare(dominateFunctions[4], lhs.paretoValue5(), rhs.paretoValue5())) {
+            return Domainace.Equal;
+        }
+        if(paretoVectorSize == 5) {
+            return paretoResult();
+        }
+
+        if(paretoCompare(dominateFunctions[5], lhs.paretoValue6(), rhs.paretoValue6())) {
+            return Domainace.Equal;
+        }
+        if(paretoVectorSize == 6) {
+            return paretoResult();
+        }
+
+        if(paretoCompare(dominateFunctions[6], lhs.paretoValue7(), rhs.paretoValue7())) {
+            return Domainace.Equal;
+        }
+        if(paretoVectorSize == 7) {
+            return paretoResult();
+        }
+
+        if(paretoCompare(dominateFunctions[7], lhs.paretoValue8(), rhs.paretoValue8())) {
+            return Domainace.Equal;
+        }
+        return paretoResult();
+
+/*
+        for (int i = 0; i < paretoVectorSize; ++i) {
+            int left = value(lhs, i);
+            int right = value(rhs, i);
             ParetoDominanceFunction func = dominateFunctions[i];
 
             if (func.mutualDominance(left, right)) {
@@ -74,6 +128,31 @@ public class ParetoSet<T extends ParetoSortable> {
             }
             // else l[i] == r[i]
         }
+        if (leftDominatesRight) return Domainace.LeftDominatesRight;
+        if (rightDominatesLeft) return Domainace.RightDominatesLeft;
+        return Domainace.Equal;
+        */
+    }
+
+    private boolean paretoCompare(ParetoDominanceFunction func, int left, int right) {
+        if (func.mutualDominance(left, right)) {
+            return true;
+        }
+        if (func.dominates(left, right)) {
+            if (rightDominatesLeft) {
+                return true;
+            }
+            leftDominatesRight = true;
+        } else if (func.dominates(right, left)) {
+            if (leftDominatesRight) {
+                return true;
+            }
+            rightDominatesLeft = true;
+        }
+        return false;
+    }
+
+    private Domainace paretoResult() {
         if (leftDominatesRight) return Domainace.LeftDominatesRight;
         if (rightDominatesLeft) return Domainace.RightDominatesLeft;
         return Domainace.Equal;

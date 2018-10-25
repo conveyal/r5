@@ -93,8 +93,16 @@ public class ParetoSetTest {
         }
 
         @Override
-        public int[] paretoValues() {
-            return values;
+        public int paretoValue1() {
+            return values[0];
+        }
+        @Override
+        public int paretoValue2() {
+            return values[1];
+        }
+        @Override
+        public int paretoValue3() {
+            return values[3];
         }
 
         @Override

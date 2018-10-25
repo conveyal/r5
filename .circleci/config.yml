@@ -1,30 +1,4 @@
 version: 2
-aliases:
-- &GCP-auth
-  name: GCP Authenticate
-  command: |
-    echo 'export GCLOUD_SERVICE_KEY="$GCLOUD_SERVICE_KEY"' >> $BASH_ENV
-    /tools/gcp_authenticate.sh
-- &docker-login
-  name: Docker login
-  command: |
-    echo 'export GCLOUD_SERVICE_KEY="$GCLOUD_SERVICE_KEY"' >> $BASH_ENV
-    /tools/docker_login.sh
-- &post-hook
-  name: Notify about build and docker image pushed
-  command: |
-    echo 'export CIRCLE_PROJECT_REPONAME="$CIRCLE_PROJECT_REPONAME"' >> $BASH_ENV
-    echo 'export CIRCLE_SHA1="$CIRCLE_SHA1"' >> $BASH_ENV
-    echo 'export BUILD_STATUS_API_KEY="$BUILD_STATUS_API_KEY"' >> $BASH_ENV
-    /tools/build_notify.sh
-- &trigger-dependants
-  name: "Trigger dependant jobs"
-  command: |
-    circle_project_url="https://circleci.com/api/v1.1/project/"
-    branch="entur_raptor"
-    github_project="OpenTripPlanner"
-    url="${circle_project_url}github/entur/${github_project}/build?circle-token=${CIRCLE_API_TOKEN}"
-    curl -X POST --header "Content-Type: application/json" -d '{"branch":"'${branch}'"}' "${url}"
 jobs:
   build:
     docker:

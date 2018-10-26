@@ -7,13 +7,13 @@ import com.conveyal.r5.profile.entur.util.DebugState;
 import static com.conveyal.r5.profile.entur.util.DebugState.Type.Access;
 
 class McAccessStopState extends McStopState {
-    final int accessDuationInSeconds;
+    final int accessDurationInSeconds;
     final int boardSlackInSeconds;
 
 
     McAccessStopState(StopArrival stopArrival, int fromTime, int boardSlackInSeconds) {
-        super(null, 0, 0, stopArrival.stop(), fromTime + stopArrival.durationInSeconds());
-        this.accessDuationInSeconds = stopArrival.durationInSeconds();
+        super(stopArrival, fromTime + stopArrival.durationInSeconds());
+        this.accessDurationInSeconds = stopArrival.durationInSeconds();
         this.boardSlackInSeconds = boardSlackInSeconds;
     }
 

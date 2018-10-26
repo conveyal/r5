@@ -127,7 +127,7 @@ public final class McWorkerState implements WorkerState {
             int arrivalTime = it.time() + transferTimeInSeconds;
 
             if (arrivalTime < maxTimeLimit) {
-                if(stops.transferToStop(it, round, targetStop, arrivalTime, transferTimeInSeconds)) {
+                if(stops.transferToStop(it, round, transfer, arrivalTime)) {
                     touchedCurrent.set(targetStop);
                 }
             }

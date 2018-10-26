@@ -102,7 +102,7 @@ abstract class McPathLeg<S extends McStopState> implements PathLeg {
         private AccessLeg(McAccessStopState state, int boardTimeFirstTransitLeg) {
             super(state);
             this.toTime = boardTimeFirstTransitLeg - state.boardSlackInSeconds;
-            this.fromTime = this.toTime - state.accessDuationInSeconds;
+            this.fromTime = this.toTime - state.accessDurationInSeconds;
         }
 
         @Override public int fromStop() {

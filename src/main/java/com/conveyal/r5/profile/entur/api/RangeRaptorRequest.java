@@ -26,6 +26,13 @@ public class RangeRaptorRequest {
 
     /**
      * Step for departure times between each RangeRaptor iterations.
+     * This is a performance optimization parameter.
+     * A transit network usually uses minute resolution for the its timetable,
+     * so to match that set this variable to 60 seconds. Setting it
+     * to less then 60 will not give better result, but degrade performance.
+     * Setting it to 120 seconds will improve performance, but you might get a
+     * slack of 60 seconds somewhere in the result - most likely in the first
+     * walking leg.
      */
     public final int departureStepInSeconds;
 

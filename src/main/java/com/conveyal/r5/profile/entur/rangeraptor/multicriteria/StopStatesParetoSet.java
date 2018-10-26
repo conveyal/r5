@@ -11,11 +11,6 @@ import static java.util.Collections.emptyList;
 
 
 final class StopStatesParetoSet  {
-    private static final ParetoDominanceFunctions.Builder PARETO_FUNCTION = createParetoDominanceFunctionArray()
-            .lessThen(1) // time - needs to be 1 seconds better to make it into the pareto set.
-            .lessThen() // rounds
-    ;
-
 
     private final StopStateParetoSet[] stops;
 
@@ -38,8 +33,8 @@ final class StopStatesParetoSet  {
         return findOrCreateSet(stop).add(state);
     }
 
-    boolean transferToStop(McStopState previous, int round, int targetStop, int time, int transferTime) {
-        return findOrCreateSet(targetStop).add(new McTransferStopState(previous, round, targetStop, time, transferTime));
+    boolean transferToStop(McStopState previous, int round, StopArrival stopArrival, int arrivalTime) {
+        return findOrCreateSet(stopArrival.stop()).add(new McTransferStopState(previous, round, stopArrival, arrivalTime));
     }
 
     Iterable<? extends McStopState> listArrivedByTransit(int round, int stop) {
@@ -65,6 +60,6 @@ final class StopStatesParetoSet  {
     }
 
     static StopStateParetoSet createState() {
-        return new StopStateParetoSet(PARETO_FUNCTION);
+        return new StopStateParetoSet(McStopState.PARETO_FUNCTION);
     }
 }

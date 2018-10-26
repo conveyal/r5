@@ -45,6 +45,8 @@ class LightweightTransferIterator implements Iterator<StopArrival>, StopArrival 
         return durationToStops[index + 1];
     }
 
+    @Override
+    public int cost() { return durationInSeconds(); }
 
     /**
      * Used to reset the iterator, to start at the beginning again. This

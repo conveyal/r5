@@ -20,63 +20,63 @@ public class StopStateParetoSetTest {
     private static final int STOP_4 = 4;
     private static final int STOP_5 = 5;
     private static final int STOP_6 = 6;
-    private McStopState A_STATE = newMcAccessStopState(999, A_TIME, 10, ANY);
+    private McStopState A_STATE = newMcAccessStopState(999, 10);
 
     private StopStateParetoSet subject = StopStatesParetoSet.createState();
 
     @Test
     public void addOneElementToSet() {
-        subject.add(newMcAccessStopState(1, A_TIME, 10, ANY));
+        subject.add(newMcAccessStopState(1, 10));
         assertStopsInSet(1);
     }
 
     @Test
     public void testTimeDominance() {
-        subject.add(newMcAccessStopState(STOP_1, A_TIME, 10, ANY));
-        subject.add(newMcAccessStopState(STOP_2, A_TIME, 9, ANY));
-        subject.add(newMcAccessStopState(STOP_3, A_TIME, 9, ANY));
-        subject.add(newMcAccessStopState(STOP_4,  A_TIME,11, ANY));
+        subject.add(newMcAccessStopState(STOP_1, 10));
+        subject.add(newMcAccessStopState(STOP_2, 9));
+        subject.add(newMcAccessStopState(STOP_3, 9));
+        subject.add(newMcAccessStopState(STOP_4, 11));
         assertStopsInSet(STOP_2);
     }
 
     @Test
     public void testRoundDominance() {
-        subject.add(new McTransferStopState(A_STATE, ROUND_1, STOP_1, 10, ANY));
-        subject.add(new McTransferStopState(A_STATE, ROUND_2, STOP_2, 10, ANY));
+        subject.add(newMcTransferStopState(A_STATE, ROUND_1, STOP_1, 10));
+        subject.add(newMcTransferStopState(A_STATE, ROUND_2, STOP_2, 10));
         assertStopsInSet(STOP_1);
     }
 
     @Test
     public void testRoundAndTimeDominance() {
-        subject.add(new McTransferStopState(A_STATE, ROUND_1, STOP_1, 9, ANY));
-        subject.add(new McTransferStopState(A_STATE, ROUND_1, STOP_2, 8, ANY));
+        subject.add(newMcTransferStopState(A_STATE, ROUND_1, STOP_1, 9));
+        subject.add(newMcTransferStopState(A_STATE, ROUND_1, STOP_2, 8));
 
         assertStopsInSet(STOP_2);
 
-        subject.add(new McTransferStopState(A_STATE, ROUND_2, STOP_3, 8, ANY));
+        subject.add(newMcTransferStopState(A_STATE, ROUND_2, STOP_3, 8));
 
         assertStopsInSet(STOP_2);
 
-        subject.add(new McTransferStopState(A_STATE, ROUND_2, STOP_4, 7, ANY));
+        subject.add(newMcTransferStopState(A_STATE, ROUND_2, STOP_4, 7));
 
         assertStopsInSet(STOP_2, STOP_4);
 
-        subject.add(new McTransferStopState(A_STATE, ROUND_3, STOP_5, 6, ANY));
+        subject.add(newMcTransferStopState(A_STATE, ROUND_3, STOP_5, 6));
 
         assertStopsInSet(STOP_2, STOP_4, STOP_5);
 
-        subject.add(new McTransferStopState(A_STATE, ROUND_3, STOP_6, 6, ANY));
+        subject.add(newMcTransferStopState(A_STATE, ROUND_3, STOP_6, 6));
 
         assertStopsInSet(STOP_2, STOP_4, STOP_5);
     }
 
     @Test
     public void testTransitAndTransferDoesAffectDominance() {
-        subject.add(newMcAccessStopState(STOP_1, A_TIME, 20, ANY));
+        subject.add(newMcAccessStopState(STOP_1, 20));
         subject.add(new McTransitStopState(A_STATE, ROUND_1, STOP_2, 10, ANY, ANY, ANY));
         subject.add(new McTransitStopState(A_STATE, ROUND_1, STOP_3, 11, ANY, ANY, ANY));
-        subject.add(new McTransferStopState(A_STATE, ROUND_1, STOP_4, 8, ANY));
-        subject.add(new McTransferStopState(A_STATE, ROUND_1, STOP_4, 9, ANY));
+        subject.add(newMcTransferStopState(A_STATE, ROUND_1, STOP_4, 8));
+        subject.add(newMcTransferStopState(A_STATE, ROUND_1, STOP_4, 9));
         assertStopsInSet(STOP_1, STOP_2, STOP_4);
     }
 
@@ -85,8 +85,11 @@ public class StopStateParetoSetTest {
         Assert.assertEquals("Stop indexes", Arrays.toString(expStopIndexes), Arrays.toString(result));
     }
 
-    private static McAccessStopState newMcAccessStopState(int stop, int time, int boardSlack, int transferTime) {
-        return new McAccessStopState(new AStopArrival(stop, transferTime), time, boardSlack);
+    private static McAccessStopState newMcAccessStopState(int stop, int accessDurationInSeconds) {
+        return new McAccessStopState(new AStopArrival(stop, accessDurationInSeconds), A_TIME, ANY);
     }
 
+    private static McTransferStopState newMcTransferStopState(McStopState prev, int round, int stop, int arrivalTime) {
+        return new McTransferStopState(prev, round, new AStopArrival(stop, ANY), arrivalTime);
+    }
 }

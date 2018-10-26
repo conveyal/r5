@@ -78,7 +78,8 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
         String toFareZone = transitLayer.fareZoneForStop.get(toStopIndex);
 
         // If the fromStop and toStop are in the same parent station and fare zone, we have not crossed a fare gate.
-        return fromStation.equals(toStation) && fromFareZone.equals(toFareZone);
+        return fromStation != null && fromStation.equals(toStation) && fromFareZone != null && fromFareZone.equals
+                (toFareZone);
     }
 
     @Override
@@ -156,7 +157,7 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
             String issuingAgency = transferAllowance.agencyId;
 
             // Continue if boarding a route serving the paid area, without crossing fare gates since previous ride
-            if (faresAvailableInPaidArea.contains(fareId)) {
+            if (faresAvailableInPaidArea.contains(fareId) && ride >= 1) {
                 int fromStopIndex = alightStops.get(ride - 1);
                 if (doesNotCrossFareGates(fromStopIndex, boardStopIndex, transitLayer)) continue;
             }

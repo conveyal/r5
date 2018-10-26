@@ -57,7 +57,7 @@ public abstract class McStopState implements StopState, ParetoSortable {
     }
 
     /* pareto vector */
-    @Override public final int paretoValue1() {  return time;       }
+    @Override public final int paretoValue1() { return time;        }
     @Override public final int paretoValue2() { return roundPareto; }
     @Override public final int paretoValue3() { return cost;        }
 

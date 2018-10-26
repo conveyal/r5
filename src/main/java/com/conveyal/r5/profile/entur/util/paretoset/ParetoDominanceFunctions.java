@@ -59,7 +59,9 @@ public enum ParetoDominanceFunctions implements InternalParetoDominanceFunction 
         LessThenDelta(int delta) {
             this.delta = delta;
         }
-        @Override public final boolean dominates(int v, int u) { return v < (u + delta); }
+        @Override public final boolean dominates(int v, int u) {
+            return v < (u + delta);
+        }
         @Override public boolean mutualDominance(int v, int u) { return false; }
     }
 }

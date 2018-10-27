@@ -39,6 +39,10 @@ env:
   - secure: ti0pCe4W0mbc/wYrcAbemHYQFUGaCrPDPjHvaD2rU5Xyd7a1Z/p2aIPvApg+YtnUKXr7X718fFWGmz+U0kQgDfv05ZiRQeaSX8cQ2jWUxQurTax7EhqWjh6loxbKwZlKKjritDlcyS9/kwHxNQdTPNcmcHvM+7l+J8mndwhPs9Si9ln+FLALEgilDMRZwqqhpVkejZ3LQMJmvD7SGqz4kthlieSMo5m7AvwY3Kjs1o7d3ll9dRuOdt7rZHvIzXe7aH0RfhizrmDuxLLlLAxzonomxaPRtOj/qq3arpn+iVlXYjkO5A9nAAdJi6VYBO9Em+Ru0jMRuh57PjSpy6KngqywUBXvmZ6wTUyXthL0+VSqn/G4u6edQDewMINUQUfEfHiFY5y+oDUGlYll4J2T0T1eO6hTo03KfqUUF8Fz9T8dnIld8OLiqjF/uEAXmuOPWZIPtYekoZE4QSAaulDm8168ksXefWnUODBN/94kUxewNDFrpUVhL8QHTBU8oRlwMIhsudeFiCM3HZ+XlvjVSv4QoePiCOQVxdy5Od3M0xSNCFsgoW4fEzfQavjPUQm8HKUyLKjjMbxOQXjk2BdqBv3BdkMDja15wesf6BzFsZf/iSAKwKYW6OeeFPw+sXMvxtCi4xFD3y34tHeXYbaMtMpFDRKMlman56ujR/Cd+EI=
   - secure: dw6bS2P1iaoUaJKo18EtfwpycfcjDWbo7uhUegrA5CGUXnk5o3D7j0yz9uNwvxUByOWq8qRWoz/Y6rUC6cwrV596O/H3mk8Z+YU8kYHUptBJOSch3NtpyBFdc8ry4tV7qtW4Fg4WAcZWzGyT7KiKA532vXLWweHKKv/YqxscLneSgchBOCT2DnG0+mvDoQ+TB8kODo4AjSaSpciIhpq0EqagrJppRUW0DL2m8MYOmqjnMURaPkPqv4XRIdRDQH0d1CUgNDOM4l3ZrCTRFdZHOeryiLujLLtiTF1K7d1bFC6kS7WVEdqLJzOs2NGwVS8s/4dgc4GVHOwx8SJLor3sfzduh4Jk1YT46SMBHwwP3K4vsAIaw2NOu0ewjufC/LH1ZjfBeouS5sx7R4cCcPsEJr0hmg1jgFtTOIJrvINNl936eMLAG4maICXveGOrWmKflFKL8EiaO5E3p1NRCJkL/Yt27BL+kNz5GLByIfLS+CqsSBySG3WM5QrUw2EKpjWE6gqRml7o0c1Jmn+9yDLQhWtJ0JLN7Y3pP4HDtBgCO1WgN/0YAWdCc0e968gY9NeSm1SYZkUmpkWSMYb88kpjjQRW6BlDh1O+jnYa66o1GgmpI2XoBc6edDLg998nKzsbGFCuiwkLPO+Ccqk3vAlED0ZpoDt44cUn4Pl9ZBcpFe0=
 
+# Wipe out all the Conveyal artifacts in the local Maven repo before they get cached.
+# This forces download of fresh SNAPSHOT artifacts on the next build.
+before_cache: rm -rf $HOME/.m2/repository/com/conveyal
+
 after_success:
   # Upload shaded JAR to S3. The un-shaded jar was deployed to our Maven repo during the main build.
   # Ideally we'd use the Travis S3 deployer here instead of installing the AWS CLI software every time.
@@ -70,6 +74,8 @@ sudo: true # sudo: true gets us more memory, which we need, at the expense of sl
 git:
   depth: 150 # how many commits to clone, need to catch most recent tag for describe and 50 may not be enough
 
+# Retain the local Maven repository to speed up builds.
+# The Conveyal subdirectory is deleted in the script above to prevent retaining Conveyal snapshot artifacts across builds.
 cache:
   directories:
   - $HOME/.m2/repository

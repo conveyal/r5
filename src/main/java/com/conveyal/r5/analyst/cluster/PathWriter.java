@@ -1,90 +1,162 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.multipoint.MultipointDataStore;
+import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.profile.Path;
-import com.conveyal.r5.profile.PerTargetPropagater;
-import com.conveyal.r5.transit.TransportNetwork;
+import gnu.trove.iterator.TIntIterator;
+import gnu.trove.list.TIntList;
+import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.TObjectIntMap;
+import gnu.trove.map.hash.TObjectIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.DataOutput;
 import java.io.IOException;
-import java.io.OutputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 /**
- * Writes path for each departure minute, and list of all paths used, from a given origin to every destination.
+ * Accumulates information about paths from a given origin to all destinations in a grid, then writes them out for
+ * use in a static site. This could also be useful for displaying paths interactively on top of isochrones in the UI.
  *
- * This could be useful for static sites, for displaying paths in the UI on top of isochrones, etc.
- * At the moment, we return all paths (i.e. we don't reduce them); users might be confused if the path that happened to be associated with
- * the median travel time was not a commonly used one, etc.
+ * This used to write one path for every departure minute / MC draw at every destination, which the client
+ * filtered down to only a few for display, but that leads to huge files and a lot of post-processing.
  *
- * This implementation streams, which might be an example for hwo to reimplement TravelTimeSurfaceReducer.
+ * Users may be surprised to see an uncommon path that happens to be associated with the median travel time, so we now
+ * save several different ones.
  */
-public class PathWriter implements PerTargetPropagater.PathWriter {
+public class PathWriter {
+
     private static final Logger LOG = LoggerFactory.getLogger(PathWriter.class);
 
-        /** The network used to compute the travel time results */
-    public final TransportNetwork network;
+    /** This is a symbolic value used in the output file format an in our internal primitive int maps. */
+    public static final int NO_PATH = -1;
 
-    /** The task used to create travel times being reduced herein */
-    public final AnalysisTask task;
+    /** The task that created the paths being recorded. */
+    private final AnalysisTask task;
 
-    int[] paths;
+    /** A list of unique paths, each one associated with a positive integer index by its position in the list. */
+    private final List<Path> pathForIndex = new ArrayList<>();
 
-    List<Path> pathList;
+    /** The inverse of pathForIndex, giving the position of each path within that list. Used to deduplicate paths. */
+    private final TObjectIntMap<Path> indexForPath;
 
-    OutputStream outputStream;
+    /** The total number of targets for which we're recording paths, i.e. width * height of the destination grid. */
+    private final int nTargets;
 
-    public PathWriter (AnalysisTask task, TransportNetwork network, List<Path> pathList) {
+    /**
+     * The number of paths being recorded at each destination location.
+     * This may be much smaller than the number of iterations (MC draws). We only want to record a few paths with
+     * travel times near the selected percentile of travel time.
+     */
+    public final int nPathsPerTarget;
+
+    /**
+     * For each target, the index number of N paths that reach that target at roughly a selected percentile
+     * of all observed travel times. This is a flattened width * height * nPaths array.
+     */
+    private final TIntList pathIndexes = new TIntArrayList();
+
+    /** Constructor. Holds onto the task object, which is used to create unique names for the results files. */
+    public PathWriter (AnalysisTask task) {
         this.task = task;
-        this.network = network;
-        this.pathList = pathList;
-
-        try {
-            outputStream = MultipointDataStore.getOutputStream(task, task.taskId + "_paths.dat", "application/octet-stream");
-            outputStream.write("PATHGRID".getBytes());
-
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        this.nTargets = task.width * task.height;
+        indexForPath = new TObjectIntHashMap<>(nTargets / 2, 0.5f, NO_PATH);
+        nPathsPerTarget = task.nPathsPerTarget;
     }
 
-    public void recordPathsForTarget (int[] paths) {
-        try {
-
-            // write the path indexes used to reach the target at each iteration, delta coded within each target
-
-            int prev = 0;
-            for (int pathIdx : paths) {
-                outputStream.write(pathIdx - prev);
-                prev = pathIdx;
-            }
-
-            // write the number of different paths used
-            outputStream.write(pathList.size());
-
-            // write the details for each path used
-            for (Path path : pathList) {
-                outputStream.write(path.patterns.length);
-                for (int i = 0 ; i < path.patterns.length; i ++){
-                    outputStream.write(path.boardStops[i]);
-                    outputStream.write(path.patterns[i]);
-                    outputStream.write(path.alightStops[i]);
+    /**
+     * After construction, this method is called on every destination in order.
+     * The list of paths may contain nulls if there are not N transit paths to a particular target.
+     * Many adjacent destinations from the same origin might use the same path, so we deduplicate them.
+     * Note that if adjacent destinations have common paths, then adjacent origins
+     * should also have common paths. We currently don't have an optimization to deal with that.
+     *
+     * @param paths a collection of paths that reach a single destination. Only the first n paths will be recorded.
+     *              This collection should be pre-filtered to not include duplicate paths.
+     *
+     * TODO perform the creation and selection of N paths here rather than in the caller, for clearer deduplication.
+     */
+    public void recordPathsForTarget (Collection<Path> paths) {
+        int nPathsRecorded = 0;
+        for (Path path : paths) {
+            if (path != null) {
+                // Deduplicate paths across destinations using the map.
+                int pathIndex = indexForPath.get(path);
+                if (pathIndex == NO_PATH) {
+                    pathIndex = pathForIndex.size();
+                    pathForIndex.add(path);
+                    indexForPath.put(path, pathIndex);
                 }
+                pathIndexes.add(pathIndex);
+                nPathsRecorded += 1;
+                if (nPathsRecorded == nPathsPerTarget) {
+                    break;
+                }
+            }
+        }
+        // Pad output to ensure that we record exactly the same number of paths per destination.
+        while (nPathsRecorded < nPathsPerTarget) {
+            pathIndexes.add(NO_PATH);
+            nPathsRecorded += 1;
+        }
+    }
 
+    /**
+     * Once recordPathsForTarget has been called once for each target in order, this method is called to write out the
+     * full set of paths to a buffer, which is then saved to S3 (or other equivalent persistence system).
+     */
+    public void finishAndStorePaths () {
+        int nExpectedPaths = nTargets * nPathsPerTarget;
+        if (pathIndexes.size() != nExpectedPaths) {
+            throw new AssertionError(String.format("PathWriter expected to receive %d paths, received %d.",
+                    nExpectedPaths, pathIndexes.size()));
+        }
+        if (pathForIndex.isEmpty()) {
+            // No cells were reached with any transit paths. Do not write anything out to save storage space.
+            LOG.info("No transit paths were found for task {}, not saving static site path file.", task.taskId);
+            return;
+        }
+        // The path grid file will be built up in this buffer.
+        PersistenceBuffer persistenceBuffer = new PersistenceBuffer();
+        try {
+            // Write a header, consisting of the magic letters that identify the format, followed by
+            // the number of destinations and the number of paths at each destination.
+            DataOutput dataOutput = persistenceBuffer.getDataOutput();
+            dataOutput.write("PATHGRID".getBytes());
+            dataOutput.writeInt(nTargets);
+            dataOutput.writeInt(nPathsPerTarget);
+
+            // Write the number of different distinct paths used to reach all destination cells,
+            // followed by the details for each of those distinct paths.
+            dataOutput.writeInt(pathForIndex.size());
+            for (Path path : pathForIndex) {
+                dataOutput.writeInt(path.patterns.length);
+                for (int i = 0 ; i < path.patterns.length; i ++){
+                    dataOutput.writeInt(path.boardStops[i]);
+                    dataOutput.writeInt(path.patterns[i]);
+                    dataOutput.writeInt(path.alightStops[i]);
+                }
             }
 
+            // Record the paths used to reach each target in the grid. They are delta coded to improve gzip compression,
+            // on the assumption that adjacent targets use paths with similar index numbers (often the same index number).
+            int prevIndex = 0;
+            for (TIntIterator iterator = pathIndexes.iterator(); iterator.hasNext(); ) {
+                int pathIndex = iterator.next();
+                int indexDelta = pathIndex - prevIndex;
+                dataOutput.writeInt(indexDelta);
+                prevIndex = pathIndex;
+            }
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("IO exception while writing path grid.", e);
         }
+        persistenceBuffer.doneWriting();
+        String pathFileName = task.taskId + "_paths.dat";
+        AnalystWorker.filePersistence.saveStaticSiteData(task, pathFileName, persistenceBuffer);
     }
 
-    public void finishPaths(){
-        try{
-            outputStream.close();
-        } catch (IOException e) {
-            LOG.warn("Unexpected IOException closing pathWriter OutputStream", e);
-        }
-
-    }
 }
+

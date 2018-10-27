@@ -1,5 +1,5 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <name>r5</name>
@@ -8,7 +8,7 @@
 
     <groupId>com.conveyal</groupId>
     <artifactId>r5</artifactId>
-    <version>4.0.0-SNAPSHOT</version>
+    <version>4.2.0-SNAPSHOT</version>
     <packaging>jar</packaging>
     <licenses>
         <license>
@@ -18,7 +18,7 @@
     </licenses>
 
     <!-- Developer entries are provided for primary developers.
- For other contributors, see https://github.com/conveyal/r5/graphs/contributors -->
+   For other contributors, see https://github.com/conveyal/r5/graphs/contributors -->
     <developers>
         <developer>
             <name>Matt Conway</name>
@@ -55,7 +55,7 @@
     <!-- Define where the artifacts produced by this build will be deployed -->
     <distributionManagement>
         <!-- We are using Sonatype Nexus Staging instead of Maven Release plugin.
-                 Only a snapshot repo should be configured. Releases are done from that snapshot staging repo. -->
+             Only a snapshot repo should be configured. Releases are done from that snapshot staging repo. -->
         <snapshotRepository>
             <id>ossrh</id>
             <url>https://oss.sonatype.org/content/repositories/snapshots</url>
@@ -66,7 +66,10 @@
 
         <resources>
             <resource>
-                <!-- This allows Maven to substitute build and version details into a properties file for use at runtime. -->
+                <!-- Filtering means Maven will substitute some variables into files in the resources directory before
+                    including them in the JAR. This allows Maven to substitute build details and version number
+                    into a properties file, making them known to R5 at runtime. Some other files that server other
+                    purposes are also listed for inclusion in the JAR. -->
                 <directory>src/main/resources</directory>
                 <filtering>true</filtering>
                 <includes>
@@ -112,7 +115,7 @@
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>2.2</version>
                 <!-- Create a version of the JAR that includes all dependencies.
-                         We don't want this to be attached and deployed, but we'll have Travis upload it to S3. -->
+                     We don't want this to be attached and deployed, but we'll have Travis upload it to S3. -->
                 <executions>
                     <execution>
                         <phase>package</phase>
@@ -121,13 +124,13 @@
                         </goals>
                         <configuration>
                             <!-- Name the shaded JAR after the git describe string. This makes it uniquely identifiable so we can
-                                     run analysis workers with a specific commit or tag of R5. The shaded JAR is not "attached" to
-                                     deployments because this will cause it to be renamed to the standard timestamped name and sorted
-                                     into a Maven repo directory by version number. -->
+                                 run analysis workers with a specific commit or tag of R5. The shaded JAR is not "attached" to
+                                 deployments because this will cause it to be renamed to the standard timestamped name and sorted
+                                 into a Maven repo directory by version number. -->
                             <finalName>${git.commit.id.describe}</finalName>
                             <transformers>
                                 <transformer
-                                                implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                                        implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <manifestEntries>
                                         <Main-Class>com.conveyal.r5.R5Main</Main-Class>
                                         <!-- The ImageIO lines allow some image reader plugins to work see https://stackoverflow.com/questions/7051603/jai-vendorname-null#18495658 -->
@@ -141,9 +144,9 @@
                                     </manifestEntries>
                                 </transformer>
                                 <!-- files overwrite each other and geotools does not function without this.
-                                         http://docs.geotools.org/latest/userguide/faq.html#how-do-i-create-an-executable-jar-for-my-geotools-app -->
+                                     http://docs.geotools.org/latest/userguide/faq.html#how-do-i-create-an-executable-jar-for-my-geotools-app -->
                                 <transformer
-                                                implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                                        implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
                             <!-- signature files from included jars cause problems: http://stackoverflow.com/questions/999489 -->
                             <filters>
@@ -229,7 +232,7 @@
                     <execution>
                         <id>sign-artifacts</id>
                         <!-- We sign in the verify phase, which means it will happen before install and deploy (the last two phases)
-                                 but not before earlier phases like test or package. -->
+                             but not before earlier phases like test or package. -->
                         <phase>verify</phase>
                         <goals>
                             <goal>sign</goal>
@@ -263,9 +266,9 @@
 
     <repositories>
         <!-- Hack to force maven to check central first. Maven central is inherited from the superpom,
-                 but ends up at the end of the list. Though most of the time the artifact is in central,
-                 Maven tries to download from every other repository and fails before checking central.
-                 Do not change the id from central2 to central, otherwise the entry will be ignored. -->
+             but ends up at the end of the list. Though most of the time the artifact is in central,
+             Maven tries to download from every other repository and fails before checking central.
+             Do not change the id from central2 to central, otherwise the entry will be ignored. -->
         <repository>
             <id>central2</id>
             <name>check central first to avoid a lot of not found warnings</name>
@@ -277,11 +280,16 @@
             <url>https://maven.conveyal.com</url>
         </repository>
         <repository>
+            <id>conveyal-ossrh</id>
+            <name>releases on sonatype, which may not yet have been synced with central</name>
+            <url>https://oss.sonatype.org/content/repositories/releases/</url>
+        </repository>
+        <repository>
             <id>osgeo</id>
             <name>Open Source Geospatial Foundation Repository</name>
             <url>http://download.osgeo.org/webdav/geotools/</url>
         </repository>
-        <!-- Needed for graphql-java-->
+        <!-- Needed  for graphql-java-->
         <repository>
             <snapshots>
                 <enabled>false</enabled>
@@ -293,16 +301,15 @@
     </repositories>
 
     <dependencies>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>1.7.12</version>
-        </dependency>
+        <!-- Jackson provides fast streaming JSON (de)serialization of Java objects. -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
             <version>2.6.1</version>
         </dependency>
+        <!-- JTS does 2D geometry and topology. Recently moved from vividsolutions to locationtech.
+          We could update R5 to use the new locationtech class names and its built-in GeoJSON support.
+          However, Geotools still depends on vividsolution JTS so this might be complicated. -->
         <dependency>
             <groupId>com.vividsolutions</groupId>
             <artifactId>jts</artifactId>
@@ -313,6 +320,7 @@
             <artifactId>geojson-jackson</artifactId>
             <version>1.5</version>
         </dependency>
+        <!-- Trove provides optimized map/set collections for native types (int, long...) -->
         <dependency>
             <groupId>net.sf.trove4j</groupId>
             <artifactId>trove4j</artifactId>
@@ -323,6 +331,7 @@
             <artifactId>javacsv</artifactId>
             <version>2.0</version>
         </dependency>
+        <!-- GeoTools is a free software GIS toolkit. -->
         <dependency>
             <groupId>org.geotools</groupId>
             <artifactId>gt-opengis</artifactId>
@@ -368,56 +377,43 @@
             <artifactId>commons-math3</artifactId>
             <version>3.0</version>
         </dependency>
+        <!-- Guava is a set of core libraries that includes new collection types, among other things. -->
         <dependency>
             <groupId>com.google.guava</groupId>
             <artifactId>guava</artifactId>
-            <version>18.0</version>
+            <version>24.0-jre</version>
         </dependency>
-        <dependency>
-            <groupId>com.google.protobuf</groupId>
-            <artifactId>protobuf-java</artifactId>
-            <version>2.6.1</version>
-        </dependency>
+        <!-- Conveyal library for loading and storing GTFS transit data. -->
         <dependency>
             <groupId>com.conveyal</groupId>
             <artifactId>gtfs-lib</artifactId>
-            <version>3.0.0</version>
+            <version>3.0.6</version>
         </dependency>
+        <!-- Conveyal library for loading and storing OSM road data. -->
         <dependency>
             <groupId>com.conveyal</groupId>
             <artifactId>osm-lib</artifactId>
-            <version>1.1.1</version>
+            <version>1.4.0</version>
         </dependency>
-        <dependency>
-            <groupId>com.amazonaws</groupId>
-            <artifactId>aws-java-sdk-s3</artifactId>
-            <version>1.11.18</version>
-        </dependency>
-        <dependency>
-            <groupId>com.amazonaws</groupId>
-            <artifactId>aws-java-sdk-ec2</artifactId>
-            <version>1.11.18</version>
-        </dependency>
-        <dependency>
-            <groupId>com.amazonaws</groupId>
-            <artifactId>aws-lambda-java-core</artifactId>
-            <version>1.1.0</version>
-        </dependency>
-        <dependency>
-            <groupId>ch.qos.logback</groupId>
-            <artifactId>logback-classic</artifactId>
-            <version>1.1.3</version>
-        </dependency>
+        <!-- Fast serialization, used to save transport networks to disk (with some mmap hacks). -->
         <dependency>
             <groupId>de.ruedigermoeller</groupId>
             <artifactId>fst</artifactId>
-            <version>2.34</version>
+            <version>2.56</version>
         </dependency>
+        <!-- Logging API. -->
         <dependency>
-            <groupId>com.amazonaws</groupId>
-            <artifactId>aws-java-sdk-sqs</artifactId>
-            <version>1.11.18</version>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <version>1.7.25</version>
         </dependency>
+        <!-- Logging API implementation. -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>1.2.3</version>
+        </dependency>
+        <!-- Junit is for unit testing. -->
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
@@ -432,17 +428,18 @@
         <dependency>
             <groupId>com.sparkjava</groupId>
             <artifactId>spark-core</artifactId>
-            <version>2.3</version>
+            <version>2.7.1</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-simple</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.conveyal</groupId>
             <artifactId>jackson2-geojson</artifactId>
             <version>0.8</version>
-        </dependency>
-        <dependency>
-            <groupId>org.mapdb</groupId>
-            <artifactId>elsa</artifactId>
-            <version>3.0.0-M5</version>
         </dependency>
         <dependency>
             <groupId>com.axiomalaska</groupId>

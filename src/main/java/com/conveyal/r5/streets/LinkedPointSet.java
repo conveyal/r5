@@ -13,7 +13,6 @@ import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import com.conveyal.r5.streets.EdgeStore.Edge;
 import gnu.trove.set.TIntSet;
-import org.apache.commons.math3.util.FastMath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,10 +56,12 @@ public class LinkedPointSet implements Serializable {
      */
     public int[] edges;
 
-    /** For each point, distance from the initial vertex of the edge to the split point. */
+    /** For each point, distance from the beginning vertex of the edge geometry up to the split point (closest
+     * point on the edge to the point to be linked), plus the distance from the linked point to the split point */
     public int[] distances0_mm;
 
-    /** For each point, distance from the final vertex of the edge to the split point. */
+    /** For each point, distance from the end vertex of the edge geometry up to the split point (closest
+     * point on the edge to the point to be linked), plus the distance from the linked point to the split point */
     public int[] distances1_mm;
 
     /** For each transit stop, the distances to nearby PointSet points as packed (point_index, distance) pairs. */

@@ -14,6 +14,8 @@ import java.io.OutputStream;
  * a single origin point, and are sent back to the GridResultQueueConsumer via an SQS Queue for assembly into one big
  * result file for the entire job. These results include some metadata about the origin point itself (coordinates) and
  * a large array of accessibility values, which are the bootstrap replications.
+ *
+ * TODO DELETE ME
  */
 public class Origin {
     public static final Logger LOG = LoggerFactory.getLogger(Origin.class);

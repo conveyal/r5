@@ -70,6 +70,9 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         }
     }
 
+    /**
+     * Constructs a grid point set that covers the entire extent of the supplied transport network's street network.
+     */
     public WebMercatorGridPointSet(TransportNetwork transportNetwork) {
         LOG.info("Creating web mercator pointset for transport network with extents {}", transportNetwork.streetLayer.envelope);
 
@@ -88,7 +91,7 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
 
     @Override
     public int featureCount() {
-        return (int) (height * width);
+        return height * width;
     }
 
     @Override

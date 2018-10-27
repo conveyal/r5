@@ -37,6 +37,7 @@ public abstract class JsonUtilities {
     public static final ObjectMapper lenientObjectMapper = createBaseObjectMapper();
 
     static {
+        // Configure the two ObjectMappers to have opposite behavior with respect to unrecognized fields.
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
         lenientObjectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
     }
@@ -65,10 +66,12 @@ public abstract class JsonUtilities {
         return new ByteArrayEntity(objectToJsonBytes(object));
     }
 
-    /** Deserializes an object of the given type from the body of the supplied request. */
-    public static <T> T objectFromRequestBody(Request request, Class<T> classe) {
+    /**
+     * Deserializes an object of the given type from the body of the supplied Spark request.
+     */
+    public static <T> T objectFromRequestBody(spark.Request request, Class<T> classe) {
         try {
-            return lenientObjectMapper.readValue(request.getInputStream(), classe);
+            return lenientObjectMapper.readValue(request.bodyAsBytes(), classe);
         } catch (Exception e) {
             e.printStackTrace();
             return null;

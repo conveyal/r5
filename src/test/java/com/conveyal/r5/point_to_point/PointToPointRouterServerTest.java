@@ -1,5 +1,6 @@
 package com.conveyal.r5.point_to_point;
 
+import com.google.common.hash.Hashing;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.ReadContext;
 import net.minidev.json.JSONArray;
@@ -12,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 
+import static com.google.common.io.Files.asByteSource;
 import static io.restassured.RestAssured.given;
 import static io.restassured.module.jsv.JsonSchemaValidator.matchesJsonSchemaInClasspath;
 import static org.hamcrest.CoreMatchers.equalTo;
@@ -22,7 +24,6 @@ import static org.hamcrest.number.OrderingComparison.greaterThanOrEqualTo;
 
 public class PointToPointRouterServerTest {
     private static final String resourcesDir = "./src/test/resources/com/conveyal/r5/point_to_point";
-
 
     /**
      * Start up a point to point route server that will be queried in various tests
@@ -54,6 +55,12 @@ public class PointToPointRouterServerTest {
         // assert that network.dat file was written
         File networkDatFile = new File(tempDirPath + "/network.dat");
         assertThat(networkDatFile.exists(), is(true));
+
+        // assert that built network.dat file matches hash of network.dat file in test resources
+        assertThat(
+            getFileHash(getResourceFile("network.dat")),
+            equalTo(getFileHash(networkDatFile))
+        );
     }
 
     /**
@@ -87,22 +94,22 @@ public class PointToPointRouterServerTest {
         ReadContext ctx = JsonPath.parse(response);
 
         // expect a certain amount of reached stops
-        assertThat(ctx.read("$.data.features.length()"), equalTo(33));
+        assertThat(ctx.read("$.data.features.length()"), equalTo(30));
 
         // Search for the stop of Union Hospital
-        JSONArray foundStops = ctx.read("$.data.features.[?(@.properties.name=='Union Hospital')]");
+        JSONArray foundStops = ctx.read("$.data.features.[?(@.properties.name=='Bus Transfer Center')]");
         assertThat(foundStops.size(), equalTo(1));
-        LinkedHashMap unionHospitalStop = (LinkedHashMap) foundStops.get(0);
+        LinkedHashMap transferCenterStop = (LinkedHashMap) foundStops.get(0);
 
         // assert position of stop
-        JSONArray coordinates = (JSONArray) ((LinkedHashMap)unionHospitalStop.get("geometry")).get("coordinates");
-        assertThat(coordinates.get(0), equalTo(-87.40889));
-        assertThat(coordinates.get(1), equalTo(39.48484));
+        JSONArray coordinates = (JSONArray) ((LinkedHashMap)transferCenterStop.get("geometry")).get("coordinates");
+        assertThat(coordinates.get(0), equalTo(-87.4058699));
+        assertThat(coordinates.get(1), equalTo(39.46799));
 
         // assert properties of stop
-        LinkedHashMap properties = (LinkedHashMap) unionHospitalStop.get("properties");
-        assertThat(properties.get("distance_m"), equalTo(2284));
-        assertThat(properties.get("duration_s"), equalTo(1768));
+        LinkedHashMap properties = (LinkedHashMap) transferCenterStop.get("properties");
+        assertThat(properties.get("distance_m"), equalTo(772));
+        assertThat(properties.get("duration_s"), equalTo(596));
     }
 
     /**
@@ -409,6 +416,14 @@ public class PointToPointRouterServerTest {
      * Get the Path from strings of a directory and a filename
      */
     public static Path makePath(String dirName, String filename) {
-        return (new File(dirName + "/" + filename)).toPath();
+        return (new File(String.join(File.separator, dirName, filename))).toPath();
+    }
+
+    private File getResourceFile(String filename) {
+        return new File(String.join(File.separator, resourcesDir, filename));
+    }
+
+    private String getFileHash(File file) throws IOException {
+        return asByteSource(file).hash(Hashing.sha256()).toString();
     }
 }

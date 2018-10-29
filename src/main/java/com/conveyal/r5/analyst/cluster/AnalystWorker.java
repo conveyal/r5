@@ -1,7 +1,9 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.amazonaws.regions.Region;
 import com.amazonaws.regions.Regions;
 import com.conveyal.r5.OneOriginResult;
+import com.conveyal.r5.analyst.DataPreloader;
 import com.conveyal.r5.analyst.FilePersistence;
 import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.PersistenceBuffer;
@@ -14,6 +16,7 @@ import com.conveyal.r5.common.R5Version;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
 import com.conveyal.r5.transitive.TransitiveNetwork;
+import com.conveyal.r5.util.AsyncLoader;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.io.LittleEndianDataOutputStream;
@@ -106,7 +109,7 @@ public class AnalystWorker implements Runnable {
     public static FilePersistence filePersistence;
 
     /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
-    final TransportNetworkCache transportNetworkCache;
+    public final DataPreloader dataPreloader;
 
     /**
      * If this is true, the worker will not actually do any work. It will just report all tasks as completed
@@ -174,6 +177,10 @@ public class AnalystWorker implements Runnable {
                 .build();
     }
 
+    /**
+     * A loading cache of opportunity dataset grids (not grid pointsets or linkages).
+     * TODO use the WebMercatorGridExtents in these Grids.
+     */
     GridCache gridCache;
 
     /** The transport network this worker already has loaded, and therefore prefers to work on. */
@@ -219,7 +226,7 @@ public class AnalystWorker implements Runnable {
         return new AnalystWorker(config, cache);
     }
 
-    public AnalystWorker(Properties config, TransportNetworkCache cache) {
+    public AnalystWorker(Properties config, TransportNetworkCache transportNetworkCache) {
         // print out date on startup so that CloudWatch logs has a unique fingerprint
         LOG.info("Analyst worker {} starting at {}", machineId,
                 LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
@@ -250,7 +257,7 @@ public class AnalystWorker implements Runnable {
         this.networkId = config.getProperty("initial-graph-id");
 
         this.gridCache = new GridCache(config.getProperty("aws-region"), config.getProperty("pointsets-bucket"));
-        this.transportNetworkCache = cache;
+        this.dataPreloader = new DataPreloader(transportNetworkCache);
         this.autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown", "false"));
 
         // Consider shutting this worker down once per hour, starting 55 minutes after it started up.
@@ -313,31 +320,19 @@ public class AnalystWorker implements Runnable {
         // The default task rejection policy is "Abort".
         // The executor's queue is rather long because some tasks complete very fast and we poll max once per second.
         int availableProcessors = Runtime.getRuntime().availableProcessors();
-        BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>(availableProcessors * 6);
-        regionalTaskExecutor = new ThreadPoolExecutor(1, availableProcessors, 60, TimeUnit.SECONDS, taskQueue);
-
-        // If an initial graph ID was provided in the config file, build or load that TransportNetwork on startup.
-        // Pre-loading the graph is necessary because if the graph is not cached it can take several
-        // minutes to build it. Even if the graph is cached, reconstructing the indices and stop trees
-        // can take a while. The UI times out after 30 seconds, so the broker needs to return a response to tell it
-        // to try again later within that timespan. The broker can't do that after it's sent a task to a worker,
-        // so the worker needs to not come online until it's ready to process requests.
-        if (networkId != null) {
-            LOG.info("Pre-loading or building network with ID {}", networkId);
-            if (transportNetworkCache.getNetwork(networkId) == null) {
-                LOG.error("Failed to pre-load transport network {}", networkId);
-            } else {
-                LOG.info("Done pre-loading network {}", networkId);
-            }
-        }
+        LOG.info("Java reports the number of available processors is: {}", availableProcessors);
+        int maxThreads = availableProcessors;
+        int taskQueueLength = availableProcessors * 6;
+        LOG.info("Maximum number of regional processing threads is {}, length of task queue is {}.", maxThreads, taskQueueLength);
+        BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>(taskQueueLength);
+        regionalTaskExecutor = new ThreadPoolExecutor(1, maxThreads, 60, TimeUnit.SECONDS, taskQueue);
 
         // Before we go into an endless loop polling for regional tasks that can be computed asynchronously, start a
         // single-endpoint web server on this worker to receive single-point requests that must be handled immediately.
         // This is listening on a different port than the backend API so that a worker can be running on the backend.
         // Trying out the new Spark syntax for non-static configuration.
-        // TODO symbolic constants for the backend and worker ports
-        // To avoid port conflicts, do not start HTTP server when testing task redelivery, in which case many workers
-        // run on the same machine.
+        // When testing task redelivery, many  workers run on the same machine. In that case, do not start this HTTP
+        // server to avoid port conflicts.
         if (!testTaskRedelivery) {
             sparkHttpService = spark.Service.ignite()
                 .port(WORKER_LISTEN_PORT)
@@ -369,7 +364,7 @@ public class AnalystWorker implements Runnable {
             for (AnalysisTask task : tasks) {
                 while (true) {
                     try {
-                        // TODO define non-anonymous runnable class to instantiate here
+                        // TODO define non-anonymous runnable class to instantiate here, specifically for async regional tasks.
                         regionalTaskExecutor.execute(() -> this.handleOneRequest(task));
                         break;
                     } catch (RejectedExecutionException e) {
@@ -395,6 +390,15 @@ public class AnalystWorker implements Runnable {
         }
     }
 
+
+    protected void handleOneRegionalTask (RegionalTask regionalTask) {
+
+    }
+
+    protected void handleOneSinglePointTask (TravelTimeSurfaceTask regionalTask) {
+
+    }
+
     /**
      * This is the callback that processes a single task and returns the results upon completion.
      * It may be called several times simultaneously on different executor threads.
@@ -404,13 +408,15 @@ public class AnalystWorker implements Runnable {
      *
      * TODO split this out into one "handle immediately" method that returns a byte[] and a void method for async tasks
      */
-    protected byte[] handleOneRequest(AnalysisTask request) {
+    protected byte[] handleOneRequest(AnalysisTask request) { // TODO rename request to task
+
         // Record the fact that the worker is busy so it won't shut down.
         lastRegionalTaskTime = System.currentTimeMillis(); // FIXME both regional and single-point are handled here
+
+        // If this worker is being used in a test of task redelivery. It should report all work as completed without
+        // actually doing anything, but fail to report results a certain percentage of the time.
+        // TODO sleep and generate work result in another method
         if (testTaskRedelivery) {
-            // This worker is being used in a test of task redelivery. It should report all work as completed without
-            // actually doing anything, but fail to report results a certain percentage of the time.
-            // TODO sleep and generate work result in another method
             try {
                 // Pretend the task takes 1-2 seconds to complete.
                 Thread.sleep(random.nextInt(1000) + 1000);
@@ -429,25 +435,34 @@ public class AnalystWorker implements Runnable {
         }
 
         try {
-            long startTime = System.currentTimeMillis();
             LOG.info("Handling message {}", request.toString());
-            long graphStartTime = System.currentTimeMillis();
+            // Having a non-null opportunity density grid in the task triggers the computation of accessibility values.
+            // The gridData should not be set on static site tasks (or single-point tasks which don't even have the field).
+            // Resolve the grid ID to an actual grid - this is important to determine the grid extents for the key.
+            // Fetching data grids should be relatively fast so we can do it synchronously.
+            // Perhaps this can be done higher up in the call stack where we know whether or not it's a regional task.
+            // TODO move this after the asynchronous loading of the rest of the necessary data.
+            if (request instanceof RegionalTask && ! request.makeStaticSite) {
+                RegionalTask regionalTask = (RegionalTask) request;
+                regionalTask.gridData = gridCache.get(regionalTask.grid);
+            }
+
+            // Get all the data needed to run one analysis task, or at least begin preparing it.
+            // TODO synchronously handle regional tasks, or just ensure the specified graph is loaded at worker startup
+            final AsyncLoader.Response<TransportNetwork> networkResponse = dataPreloader.preloadData(request);
+
+            // If loading is not complete, bail out of this function.
+            if (networkResponse.status != AsyncLoader.Status.PRESENT) {
+                return networkResponse.toString().getBytes();
+            }
+
             // Get the graph object for the ID given in the task, fetching inputs and building as needed.
             // All requests handled together are for the same graph, and this call is synchronized so the graph will
             // only be built once.
-            // Record graphId so we "stick" to this same graph on subsequent polls.
-            // TODO allow for a list of multiple cached TransitNetworks.
+            // Record the currently loaded network ID so we "stick" to this same graph on subsequent polls.
+            // TODO allow for a list of multiple already loaded TransitNetworks.
             networkId = request.graphId;
-            // TODO fetch the scenario-applied transportNetwork out here, maybe using OptionalResult instead of exceptions
-            TransportNetwork transportNetwork = null;
-            try {
-                // FIXME ideally we should just be passing the scenario object into this function, and another separate function should get the scenario object from the task.
-                transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, request);
-            } catch (ScenarioApplicationException scenarioException) {
-                // Handle exceptions specifically representing a failure to apply the scenario.
-                // Any other kinds of exceptions will be caught by the outer catch clause
-                return reportTaskErrors(request, scenarioException.taskErrors);
-            }
+            TransportNetwork transportNetwork = networkResponse.value;
 
             // If we are generating a static site, there must be a single metadata file for an entire batch of results.
             // Arbitrarily we create this metadata as part of the first task in the job.

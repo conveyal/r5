@@ -4,6 +4,7 @@ import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.common.R5Version;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
+import com.google.common.collect.Sets;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,8 +59,11 @@ public class WorkerStatus {
         workerName = "R5";
         workerVersion = R5Version.describe;
         workerId = worker.machineId; // TODO overwrite with cloud provider (EC2) machine ID in a generic way
-        networks = worker.transportNetworkCache.getLoadedNetworkIds();
-        scenarios = worker.transportNetworkCache.getAppliedScenarios();
+        // Eventually we'll want to report all networks the worker has loaded.
+        // For now we report a single network, even before it's loaded.
+        // networks = worker.dataPreloader.transportNetworkCache.getLoadedNetworkIds();
+        networks = Sets.newHashSet(worker.networkId);
+        scenarios = worker.dataPreloader.transportNetworkCache.getAppliedScenarios();
         ec2 = worker.ec2info;
 
         OperatingSystemMXBean operatingSystemMXBean = ManagementFactory.getOperatingSystemMXBean();

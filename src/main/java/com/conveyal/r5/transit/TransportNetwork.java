@@ -43,6 +43,11 @@ public class TransportNetwork implements Serializable {
     /**
      * This stores any number of lightweight scenario networks built upon the current base network.
      * FIXME that sounds like a memory leak, should be a WeighingCache or at least size-limited.
+     * A single network cache at the top level could store base networks and scenarios since they all have globally
+     * unique IDs. A hierarchical cache does have the advantage of evicting all the scenarios with the associated
+     * base network, which keeps the references in the scenarios from holding on to the base network. But considering
+     * that we have never started evicting networks (other than for a "cache" of one element) this might be getting
+     * ahead of ourselves.
      */
     public transient Map<String, TransportNetwork> scenarios = new HashMap<>();
 
@@ -52,15 +57,18 @@ public class TransportNetwork implements Serializable {
      * created, this point set and its linkage to the street network are serialized along with the network, which makes
      * startup much faster. Note that there's a linkage cache with references to streetlayers in this GridPointSet,
      * so you should usually only serialize a TransportNetwork right after it's built, when that cache contains only
-     * the baseline linkage.
+     * the baseline linkage. This unlinked pointset is not specific to any mode of travel, it's just a set of points.
      */
     public WebMercatorGridPointSet gridPointSet;
 
     /**
-     * Linkages are cached within GridPointSets. Guava caches serialize their configuration but not
+     * This is a WALK linkage for the above gridPointSet, connecting it to the street network for walking purposes.
+     * Linkages are cached within GridPointSets in a Guava cache. Guava caches serialize their configuration but not
      * their contents, which is actually pretty sane behavior for a cache. So if we want a particular linkage to be
-     * available on reload, we have to store it in its own field.
-     * TODO it would be more "normalized" to keep only this field, and access the unlinked gridPointSet via linkedGridPointSet.pointset.
+     * available on reload, we have to store it in its own field rather than the cache. It would be possible to keep
+     * only this field, and access its unlinked gridPointSet via linkedGridPointSet.pointset, but less readable.
+     * TODO replace linkage cache with a manually managed, non-transient map outside the pointSets themselves.
+     * TODO rename so it's clear that this is a walk linkage, and that it's a default/base linkage for the network.
      */
     public LinkedPointSet linkedGridPointSet;
 
@@ -343,8 +351,8 @@ public class TransportNetwork implements Serializable {
 
     /**
      * Build an efficient implicit grid PointSet for this TransportNetwork if it doesn't already exist. Then link that
-     * grid pointset to the street layer. This is called when a network is built for analysis purposes, and also after a
-     * scenario is applied to rebuild the grid pointset on the scenario copy of the network.
+     * grid pointset to the street layer using the WALK mode. This is called when a network is first built for analysis
+     * purposes, and also after a scenario is applied to rebuild a grid pointset for the scenario copy of the network.
      *
      * This grid PointSet will cover the entire street network layer of this TransportNetwork, which should include
      * every point we can route from or to. Any other destination grid (for the same mode, walking) can be made as a
@@ -354,8 +362,8 @@ public class TransportNetwork implements Serializable {
         if (gridPointSet == null) {
             gridPointSet = new WebMercatorGridPointSet(this);
         }
-        // Here we are bypassing the GridPointSet's internal cache of linkages because we want this particular
-        // linkage to be serialized with the network. The internal Guava cache does not serialize its contents (by design).
+        // Here we are bypassing the GridPointSet's internal cache of linkages because we want this particular linkage
+        // to be serialized with the network. The internal Guava cache does not serialize its contents (by design).
         linkedGridPointSet = new LinkedPointSet(gridPointSet, streetLayer, StreetMode.WALK, linkedGridPointSet);
     }
 

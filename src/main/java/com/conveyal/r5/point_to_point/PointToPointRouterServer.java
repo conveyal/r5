@@ -106,6 +106,7 @@ public class PointToPointRouterServer {
                 TransportNetwork transportNetwork = TransportNetwork.read(new File(dir, "network.dat"));
                 transportNetwork.readOSM(new File(dir, "osm.mapdb"));
                 transportNetwork.transitLayer.buildDistanceTables(null);
+                // Build WALK and CAR linked pointsets because they are needed for isochrones (which are enabled).
                 transportNetwork.rebuildLinkedGridPointSet();
                 transportNetwork.linkedGridPointSet.pointSet.link(transportNetwork.streetLayer, StreetMode.CAR);
                 run(transportNetwork);

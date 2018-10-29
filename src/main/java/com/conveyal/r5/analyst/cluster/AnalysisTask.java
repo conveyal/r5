@@ -26,6 +26,12 @@ import java.util.List;
 })
 public abstract class AnalysisTask extends ProfileRequest {
 
+    /**
+     * A loading cache of gridded pointSets (not opportunity data grids), shared statically among all single point and
+     * multi-point (regional) requests. TODO make this non-static yet shared.
+     */
+    public static final WebMercatorGridPointSetCache gridPointSetCache = new WebMercatorGridPointSetCache();
+
     public int zoom;
     public int west;
     public int north;
@@ -85,16 +91,9 @@ public abstract class AnalysisTask extends ProfileRequest {
     public void setType (Type type) {};
     public void setTypes (String type) {};
 
-    /** Share this among both single and multipoint requests */
-    protected static WebMercatorGridPointSetCache gridPointSetCache = new WebMercatorGridPointSetCache();
-
     /** Whether this task is high priority and should jump in front of other work. */
     @JsonIgnore
     public abstract boolean isHighPriority();
-
-    /** Get the set of points to which we are measuring travel time. */
-    @JsonIgnore
-    public abstract List<PointSet> getDestinations(TransportNetwork network, GridCache gridCache);
 
     @JsonIgnore
     public WorkerCategory getWorkerCategory () {

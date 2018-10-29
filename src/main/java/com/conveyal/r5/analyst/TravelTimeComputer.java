@@ -17,9 +17,7 @@ import gnu.trove.map.hash.TIntIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.Arrays;
-import java.util.List;
 
 /**
  * This computes a surface representing travel time from one origin to all destination cells, and writes out a
@@ -44,7 +42,7 @@ public class TravelTimeComputer {
     }
 
     // We should try to decouple the internal representation of the results from how they're serialized to an API.
-    public OneOriginResult computeTravelTimes() throws IOException {
+    public OneOriginResult computeTravelTimes() {
 
         // The mode of travel that will be used to reach transit stations from the origin point.
         StreetMode accessMode = LegMode.getDominantStreetMode(request.accessModes);
@@ -53,11 +51,12 @@ public class TravelTimeComputer {
         // The mode of travel that would be used to reach the destination directly without using transit.
         StreetMode directMode = LegMode.getDominantStreetMode(request.directModes);
 
-        // The set of destinations in the one-to-many travel time calculations, not yet linked to the street network.
-        List<PointSet> destinationList = request.getDestinations(network, gridCache);
-
+        // Find the set of destinations in the one-to-many travel time calculations, not yet linked to the street network.
+        // Reuse the logic for finding the appropriate grid size and linking, which is now in the DataPreloader.
+        // We could change the preloader to retain these values in a compound return type, to avoid repetition here.
+        WebMercatorExtents destinationGridExtents = DataPreloader.Key.forTask(request).webMercatorExtents;
         // TODO wrap in loop to repeat for multiple destinations pointsets in a regional request.
-        PointSet destinations = destinationList.get(0);
+        PointSet destinations = AnalysisTask.gridPointSetCache.get(destinationGridExtents, network.gridPointSet);
 
         // TODO Create and encapsulate this within the propagator.
         TravelTimeReducer travelTimeReducer = new TravelTimeReducer(request);

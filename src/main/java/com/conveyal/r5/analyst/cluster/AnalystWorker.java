@@ -393,64 +393,57 @@ public class AnalystWorker implements Runnable {
      * @return the travel time grid (binary data) which will be passed back to the client UI. This binary response may
      *         have errors appended as JSON to the end.
      */
-    protected byte[] handleOneSinglePointTask (TravelTimeSurfaceTask task) {
+    protected byte[] handleOneSinglePointTask (TravelTimeSurfaceTask task) throws WorkerNotReadyException, IOException {
 
         // Record the fact that the worker is busy so it won't shut down.
         lastSinglePointTime = System.currentTimeMillis();
         LOG.info("Handling single-point task {}", task.toString());
 
-        try {
-            // Get all the data needed to run one analysis task, or at least begin preparing it.
-            // TODO synchronously handle regional tasks, or just ensure the specified graph is loaded at worker startup
-            final AsyncLoader.Response<TransportNetwork> networkResponse = dataPreloader.preloadData(task);
+        // Get all the data needed to run one analysis task, or at least begin preparing it.
+        // TODO synchronously handle regional tasks, or just ensure the specified graph is loaded at worker startup
+        final AsyncLoader.Response<TransportNetwork> networkResponse = dataPreloader.preloadData(task);
 
-            // If loading is not complete, bail out of this function.
-            if (networkResponse.status != AsyncLoader.Status.PRESENT) {
-                return networkResponse.toString().getBytes();
-            }
-
-            // Get the graph object for the ID given in the task, fetching inputs and building as needed.
-            // All requests handled together are for the same graph, and this call is synchronized so the graph will
-            // only be built once.
-            // Record the currently loaded network ID so we "stick" to this same graph on subsequent polls.
-            // TODO allow for a list of multiple already loaded TransitNetworks.
-            networkId = task.graphId;
-            TransportNetwork transportNetwork = networkResponse.value;
-
-            // Perform the core travel time computations.
-            TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork, gridCache);
-            OneOriginResult oneOriginResult = computer.computeTravelTimes();
-
-            // Prepare the travel time grid which will be written back to the client. We gzip the data before sending
-            // it back to the broker. Compression ratios here are extreme (100x is not uncommon).
-            // We had many "connection reset by peer" and buffer overflows errors on large files.
-            // Handle gzipping with HTTP headers (caller should already be doing this)
-            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-
-            // The single-origin travel time surface can be represented as a proprietary grid or as a GeoTIFF.
-            if (task.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
-                oneOriginResult.timeGrid.writeGeotiff(byteArrayOutputStream);
-            } else {
-                // Catch-all, if the client didn't specifically ask for a GeoTIFF give it a proprietary grid.
-                // Return raw byte array representing grid to caller, for return to client over HTTP.
-                // TODO eventually reuse same code path as static site time grid saving
-                oneOriginResult.timeGrid.writeGridToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
-                addErrorJson(byteArrayOutputStream, transportNetwork.scenarioApplicationWarnings);
-            }
-
-            // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
-            throughputTracker.recordTaskCompletion("SINGLE-" + transportNetwork.scenarioId);
-
-            // Return raw byte array containing grid or TIFF file to caller, for return to client over HTTP.
-            byteArrayOutputStream.close();
-            return byteArrayOutputStream.toByteArray();
-        } catch (Exception ex) {
-            // When unexpected problems occur, ensure that an error message makes its way back up to the web UI.
-            // TODO we may want to let exceptions bubble up one more layer, so they can affect the HTTP response code.
-            TaskError taskError = new TaskError(ex);
-            LOG.error("An error occurred while handling a single point request: {}", ExceptionUtils.asString(ex));
-            return reportTaskErrors(task, Arrays.asList(taskError));
+        // If loading is not complete, bail out of this function.
+        // Ideally we'd stall briefly using something like Future.get(timeout) in case loading finishes quickly.
+        if (networkResponse.status != AsyncLoader.Status.PRESENT) {
+            throw new WorkerNotReadyException(networkResponse.toString());
         }
+
+        // Get the graph object for the ID given in the task, fetching inputs and building as needed.
+        // All requests handled together are for the same graph, and this call is synchronized so the graph will
+        // only be built once.
+        // Record the currently loaded network ID so we "stick" to this same graph on subsequent polls.
+        // TODO allow for a list of multiple already loaded TransitNetworks.
+        networkId = task.graphId;
+        TransportNetwork transportNetwork = networkResponse.value;
+
+        // Perform the core travel time computations.
+        TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork, gridCache);
+        OneOriginResult oneOriginResult = computer.computeTravelTimes();
+
+        // Prepare the travel time grid which will be written back to the client. We gzip the data before sending
+        // it back to the broker. Compression ratios here are extreme (100x is not uncommon).
+        // We had many "connection reset by peer" and buffer overflows errors on large files.
+        // Handle gzipping with HTTP headers (caller should already be doing this)
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+
+        // The single-origin travel time surface can be represented as a proprietary grid or as a GeoTIFF.
+        if (task.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
+            oneOriginResult.timeGrid.writeGeotiff(byteArrayOutputStream);
+        } else {
+            // Catch-all, if the client didn't specifically ask for a GeoTIFF give it a proprietary grid.
+            // Return raw byte array representing grid to caller, for return to client over HTTP.
+            // TODO eventually reuse same code path as static site time grid saving
+            oneOriginResult.timeGrid.writeGridToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
+            addErrorJson(byteArrayOutputStream, transportNetwork.scenarioApplicationWarnings);
+        }
+
+        // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
+        throughputTracker.recordTaskCompletion("SINGLE-" + transportNetwork.scenarioId);
+
+        // Return raw byte array containing grid or TIFF file to caller, for return to client over HTTP.
+        byteArrayOutputStream.close();
+        return byteArrayOutputStream.toByteArray();
     }
 
     /**

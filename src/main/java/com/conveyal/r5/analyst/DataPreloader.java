@@ -2,7 +2,6 @@ package com.conveyal.r5.analyst;
 
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
-import com.conveyal.r5.analyst.cluster.ScenarioCache;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -66,12 +65,6 @@ public class DataPreloader extends AsyncLoader<DataPreloader.Key, TransportNetwo
 
     /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
     public final TransportNetworkCache transportNetworkCache;
-
-    /**
-     * A table of already seen scenarios, avoiding downloading them repeatedly from S3 and allowing us to replace
-     * scenarios with only their IDs, and reverse that replacement later.
-     */
-    private final ScenarioCache scenarioCache = new ScenarioCache();
 
     public DataPreloader(TransportNetworkCache transportNetworkCache) {
         this.transportNetworkCache = transportNetworkCache;

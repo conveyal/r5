@@ -2,7 +2,6 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.AStopArrival;
 import org.junit.Assert;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -28,7 +27,7 @@ public class StopStateParetoSetTest {
 
     private McStopState A_STATE = newMcAccessStopState(999, 10);
 
-    private StopStateParetoSet subject = StopStatesParetoSet.createState();
+    private StopStateParetoSet subject = StopStates.createState();
 
     @Test
     public void addOneElementToSet() {
@@ -37,7 +36,6 @@ public class StopStateParetoSetTest {
     }
 
     @Test
-    @Ignore
     public void testTimeDominance() {
         subject.add(newMcAccessStopState(STOP_1, 10));
         subject.add(newMcAccessStopState(STOP_2, 9));
@@ -54,7 +52,6 @@ public class StopStateParetoSetTest {
     }
 
     @Test
-    @Ignore
     public void testRoundAndTimeDominance() {
         subject.add(newMcTransferStopState(A_STATE, ROUND_1, STOP_1, 10));
         subject.add(newMcTransferStopState(A_STATE, ROUND_1, STOP_2, 8));
@@ -89,7 +86,7 @@ public class StopStateParetoSetTest {
     }
 
     private void assertStopsInSet(int ... expStopIndexes) {
-        int[] result = StreamSupport.stream(subject.paretoSet().spliterator(), false).mapToInt(McStopState::stopIndex).sorted().toArray();
+        int[] result = StreamSupport.stream(subject.spliterator(), false).mapToInt(McStopState::stopIndex).sorted().toArray();
         Assert.assertEquals("Stop indexes", Arrays.toString(expStopIndexes), Arrays.toString(result));
     }
 

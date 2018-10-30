@@ -3,19 +3,23 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopState;
 import com.conveyal.r5.profile.entur.util.DebugState;
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoDominanceFunctions;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSortable;
 
 import java.util.LinkedList;
 import java.util.List;
 
-import static com.conveyal.r5.profile.entur.util.paretoset.ParetoDominanceFunctions.createParetoDominanceFunctionArray;
+import static com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction.createParetoFunctions;
 
 public abstract class McStopState implements StopState, ParetoSortable {
-    static final ParetoDominanceFunctions.Builder PARETO_FUNCTION = createParetoDominanceFunctionArray()
-            .lessThen(1)  // time - needs to be 1 seconds better to make it into the pareto set.
-            .lessThen()   // rounds
-            .lessThen(55) // cost, assuming meters or seconds as unit for cost
+
+    /**
+     * The pareto function MUST match the {@code ParetoSortable} implementation below
+     */
+    static final ParetoFunction.Builder PARETO_FUNCTION = createParetoFunctions()
+            .lessThen()  // time
+            .lessThen()  // rounds
+            .lessThen()  // cost
             ;
 
     private final McStopState previousState;
@@ -56,7 +60,7 @@ public abstract class McStopState implements StopState, ParetoSortable {
         this(previousState, round, roundPareto, stopIndex, arrivalTime, previousState.cost);
     }
 
-    /* pareto vector */
+    /* pareto vector, the {@code ParetoSortable} implementation */
     @Override public final int paretoValue1() { return time;        }
     @Override public final int paretoValue2() { return roundPareto; }
     @Override public final int paretoValue3() { return cost;        }
@@ -129,7 +133,7 @@ public abstract class McStopState implements StopState, ParetoSortable {
 
     @Override
     public String toString() {
-        return asString(type().name(), round(), previousState == null ? -1 : previousState.stopIndex);
+        return asString(type().name(), round(), stopIndex);
     }
 
     abstract DebugState.Type type();

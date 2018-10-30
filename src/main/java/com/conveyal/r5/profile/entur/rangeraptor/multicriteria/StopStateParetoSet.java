@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoDominanceFunctions;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
 
 import java.util.Iterator;
@@ -8,7 +8,7 @@ import java.util.function.Predicate;
 
 class StopStateParetoSet extends ParetoSet<McStopState> {
 
-    StopStateParetoSet(ParetoDominanceFunctions.Builder function) {
+    StopStateParetoSet(ParetoFunction.Builder function) {
         super(function);
     }
 

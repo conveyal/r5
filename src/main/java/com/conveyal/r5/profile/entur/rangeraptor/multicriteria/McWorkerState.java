@@ -41,7 +41,7 @@ public final class McWorkerState implements WorkerState {
     private int maxTimeLimit;
 
 
-    private final StopStatesParetoSet stops;
+    private final StopStates stops;
     private final int nRounds;
     private int round = Integer.MIN_VALUE;
 
@@ -52,7 +52,7 @@ public final class McWorkerState implements WorkerState {
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
     public McWorkerState(int nRounds, int nStops, int maxDurationSeconds) {
         this.nRounds = nRounds;
-        this.stops = new StopStatesParetoSet(nStops);
+        this.stops = new StopStates(nStops);
 
         this.touchedCurrent = new BitSet(nStops);
         this.touchedPrevious = new BitSet(nStops);
@@ -147,6 +147,9 @@ public final class McWorkerState implements WorkerState {
                 }
             }
         }
+
+        stops.debugStateInfo();
+
         return paths;
     }
 

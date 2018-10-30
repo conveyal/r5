@@ -345,12 +345,10 @@ public class SpeedTest {
 
                 TIMER_COLLECT_RESULTS_ITINERARIES.start();
 
-                for (PathParetoSortableWrapper p : paths.paretoSet()) {
+                for (PathParetoSortableWrapper p : paths) {
                     SpeedTestItinerary itinerary = createItinerary(request, streetRouter, p.path);
-
                     itineraries.add(itinerary);
                 }
-
 
                 itineraries.filter();
 
@@ -359,7 +357,7 @@ public class SpeedTest {
 
             TripPlan tripPlan = createTripPlanForRequest(request);
 
-            for (SpeedTestItinerary it : itineraries.iterator()) {
+            for (SpeedTestItinerary it : itineraries) {
                 tripPlan.addItinerary(it);
             }
             tripPlan.sort();

@@ -1,10 +1,10 @@
 package com.conveyal.r5.profile.entur;
 
 import com.conveyal.r5.profile.Path;
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoDominanceFunctions;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSortable;
 
-import static com.conveyal.r5.profile.entur.util.paretoset.ParetoDominanceFunctions.createParetoDominanceFunctionArray;
+import static com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction.createParetoFunctions;
 
 @Deprecated
 public class PathParetoSortableWrapper implements ParetoSortable {
@@ -35,8 +35,8 @@ public class PathParetoSortableWrapper implements ParetoSortable {
         return totalJourneyDuration;
     }
 
-    public static ParetoDominanceFunctions.Builder paretoDominanceFunctions() {
-        return createParetoDominanceFunctionArray()
+    public static ParetoFunction.Builder paretoDominanceFunctions() {
+        return createParetoFunctions()
                 .different()
                 .different()
                 .lessThen();

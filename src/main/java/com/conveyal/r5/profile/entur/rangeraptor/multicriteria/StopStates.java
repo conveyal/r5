@@ -3,21 +3,20 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopState;
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoDominanceFunctions;
 
-import static com.conveyal.r5.profile.entur.util.paretoset.ParetoDominanceFunctions.createParetoDominanceFunctionArray;
+
 import static java.util.Collections.emptyList;
 
 
 
-final class StopStatesParetoSet  {
+final class StopStates {
 
     private final StopStateParetoSet[] stops;
 
         /**
          * Set the time at a transit index iff it is optimal. This sets both the best time and the transfer time
          */
-    StopStatesParetoSet(int stops) {
+    StopStates(int stops) {
         this.stops = new StopStateParetoSet[stops];
     }
 
@@ -49,7 +48,7 @@ final class StopStatesParetoSet  {
 
     Iterable<? extends McStopState> listAll(int stop) {
         StopStateParetoSet it = stops[stop];
-        return it == null ? emptyList() : it.paretoSet();
+        return it == null ? emptyList() : it;
     }
 
     private StopStateParetoSet findOrCreateSet(final int stop) {
@@ -61,5 +60,28 @@ final class StopStatesParetoSet  {
 
     static StopStateParetoSet createState() {
         return new StopStateParetoSet(McStopState.PARETO_FUNCTION);
+    }
+
+    void debugStateInfo() {
+        long total = 0;
+        long totalMemUsed = 0;
+        long numOfStops = 0;
+        int max = 0;
+
+        for (StopStateParetoSet stop : stops) {
+            if(stop != null) {
+                ++numOfStops;
+                total += stop.size();
+                max = Math.max(stop.size(), max);
+                totalMemUsed += stop.memUsed();
+            }
+        }
+        double avg = ((double)total) / numOfStops;
+        double avgMem = ((double)totalMemUsed) / numOfStops;
+
+        System.out.printf(
+                "%n  => Stop arrivals(McState obj): Avg: %.1f  max: %d  total: %d'  avg.mem: %.1f  tot.mem: %d'  #stops: %d'  tot#stops: %d' %n%n",
+                avg, max, total/1000, avgMem, totalMemUsed/1000, numOfStops/1000, stops.length/1000
+        );
     }
 }

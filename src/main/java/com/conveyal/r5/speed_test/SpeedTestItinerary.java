@@ -1,6 +1,6 @@
 package com.conveyal.r5.speed_test;
 
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoDominanceFunctions;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSortable;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
@@ -9,7 +9,7 @@ import com.conveyal.r5.speed_test.api.model.Leg;
 import java.util.HashSet;
 import java.util.Set;
 
-import static com.conveyal.r5.profile.entur.util.paretoset.ParetoDominanceFunctions.createParetoDominanceFunctionArray;
+import static com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction.createParetoFunctions;
 import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrCompact;
 import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrShort;
 
@@ -49,8 +49,8 @@ public class SpeedTestItinerary extends Itinerary implements ParetoSortable {
         paretoValues[i] = agencies.hashCode();
     }
 
-    static ParetoDominanceFunctions.Builder paretoDominanceFunctions() {
-        return createParetoDominanceFunctionArray()
+    static ParetoFunction.Builder paretoDominanceFunctions() {
+        return createParetoFunctions()
                 .lessThen()
                 .lessThen()
                 .lessThen()

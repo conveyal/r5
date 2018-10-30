@@ -397,6 +397,16 @@ public class TransportNetworkCache {
         return network;
     }
 
+    /**
+     * This will eventually be used in WorkerStatus to report to the backend all loaded networks, to give it hints about
+     * what kind of tasks the worker is ready to work on immediately. This is made more complicated by the fact that
+     * workers are started up with no networks loaded, but with the intent for them to work on a particular job. So
+     * currently the workers just report which network they were started up for, and this method is not used.
+     *
+     * In the future, workers should just report an empty set of loaded networks, and the back end should strategically
+     * send them tasks when they come on line to assign them to networks as needed. But this will require a new
+     * mechanism to fairly allocate the workers to jobs.
+     */
     public Set<String> getLoadedNetworkIds() {
         return cache.asMap().keySet();
     }
@@ -408,7 +418,6 @@ public class TransportNetworkCache {
                 .flatMap(Collection::stream)
                 .collect(Collectors.toSet());
     }
-
 
     /**
      * Given a network and scenario ID, retrieve that scenario from the local disk cache (falling back on S3).

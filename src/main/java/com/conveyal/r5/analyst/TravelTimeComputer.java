@@ -42,6 +42,11 @@ public class TravelTimeComputer {
     }
 
     // We should try to decouple the internal representation of the results from how they're serialized to an API.
+
+    /**
+     * The TravelTimeComputer can make travel time grids, accessibility indicators, or (eventually) both
+     * depending on what's in the task it's given.
+     */
     public OneOriginResult computeTravelTimes() {
 
         // The mode of travel that will be used to reach transit stations from the origin point.

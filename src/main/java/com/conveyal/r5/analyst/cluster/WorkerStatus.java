@@ -59,9 +59,16 @@ public class WorkerStatus {
         workerName = "R5";
         workerVersion = R5Version.describe;
         workerId = worker.machineId; // TODO overwrite with cloud provider (EC2) machine ID in a generic way
-        // Eventually we'll want to report all networks the worker has loaded.
-        // For now we report a single network, even before it's loaded.
+
+        // Eventually we'll want to report all networks the worker has loaded, to give the backend hints about what kind
+        // of tasks the worker is ready to work on immediately. This is made more complicated by the fact that workers are
+        // started up with no networks loaded, but with the intent for them to work on a particular job. So currently the
+        // workers just report which network they were started up for, and this method is not used.
+        // In the future, workers should just report an empty set of loaded networks, and the back end should strategically
+        // send them tasks when they come on line to assign them to networks as needed. But this will require a new
+        // mechanism to fairly allocate the workers to jobs.
         // networks = worker.dataPreloader.transportNetworkCache.getLoadedNetworkIds();
+        // For now we report a single network, even before it's loaded.
         networks = Sets.newHashSet(worker.networkId);
         scenarios = worker.dataPreloader.transportNetworkCache.getAppliedScenarios();
         ec2 = worker.ec2info;

@@ -94,6 +94,7 @@ public abstract class AsyncLoader<K,V> {
         synchronized (map) {
             response = map.get(key);
             if (response == null) {
+                // Only enqueue a task to load the value for this key if another call hasn't already done it.
                 response = new Response<V>(Status.WAITING, null, 0, null);
                 map.put(key, response);
                 enqueueLoadTask = true;

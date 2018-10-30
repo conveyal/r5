@@ -86,6 +86,13 @@ public class DataPreloader extends AsyncLoader<DataPreloader.Key, TransportNetwo
         return get(Key.forTask(task));
     }
 
+    /**
+     * For regional analysis workers, hackishly bypass our async loading mechanism, relying on the underlying caches.
+     */
+    public TransportNetwork preloadDataSynchronous (AnalysisTask task) {
+        return buildValue(Key.forTask(task));
+    }
+
     @Override
     protected TransportNetwork buildValue(Key key) {
 

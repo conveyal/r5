@@ -1,6 +1,5 @@
 package com.conveyal.r5.profile.entur.api;
 
-import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
 import java.util.Iterator;
 
@@ -69,7 +68,7 @@ public interface TransitDataProvider {
      *
      * @param stops set of stops for find all patterns for.
      */
-    Iterator<Pattern> patternIterator(BitSetIterator stops);
+    Iterator<Pattern> patternIterator(UnsignedIntIterator stops);
 
     /**
      * The provider needs to know based on the request input (date) if a service is available or not.
@@ -78,4 +77,11 @@ public interface TransitDataProvider {
      * @return true if the trip schedule is in service.
      */
     boolean isTripScheduleInService(TripScheduleInfo trip);
+
+
+    /**
+     * This is the total number of stops, it should be possible to retrieve transfers and pattern for every stop
+     * from 0 to {@code numberOfStops()-1}.
+     */
+    int numberOfStops();
 }

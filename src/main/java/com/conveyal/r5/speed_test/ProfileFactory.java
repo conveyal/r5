@@ -70,12 +70,12 @@ enum ProfileFactory {
         return new PathBuilderCursorBased(stops.newCursor());
     }
 
-    Worker createWorker(ProfileRequest request, int nRounds, int nStops, TransitDataProvider transitData) {
-        StopStateCollection stops = createStopStateCollection(nRounds, nStops);
+    Worker createWorker(ProfileRequest request, int nRounds, TransitDataProvider transitData) {
+        StopStateCollection stops = createStopStateCollection(nRounds, transitData.numberOfStops());
 
         RangeRaptorWorkerState state = createWorkerState(
                 nRounds,
-                nStops,
+                transitData.numberOfStops(),
                 request.maxTripDurationMinutes * 60,
                 stops
         );
@@ -87,10 +87,10 @@ enum ProfileFactory {
         );
     }
 
-    public McRangeRaptorWorker createWorker2(ProfileRequest request, int nRounds, int nStops, TransitDataProvider transitData) {
+    public McRangeRaptorWorker createWorker2(ProfileRequest request, int nRounds, TransitDataProvider transitData) {
         McWorkerState state = new McWorkerState(
                 nRounds,
-                nStops,
+                transitData.numberOfStops(),
                 request.maxTripDurationMinutes * 60
         );
 

@@ -263,21 +263,23 @@ public class SpeedTest {
             // -------------------------------------------------------- [ WORKER ROUTE ]
 
             TransitDataProvider transitData = new TransitLayerRRDataProvider(
-                    transportNetwork.transitLayer, request.date, request.transitModes, request.walkSpeed
+                    transportNetwork.transitLayer,
+                    request.date,
+                    request.transitModes,
+                    request.walkSpeed
             );
 
             TIMER_WORKER.start();
 
 
             final int nRounds = request.maxRides + 1;
-            final int nStops = transportNetwork.transitLayer.getStopCount();
             ItinerarySet itineraries = new ItinerarySet();
 
             RangeRaptorRequest req = createRequest(request, streetRouter);
 
             // TODO TGR - his is a temp hack
             if(stateFactory.isMultiCriteria()) {
-                McRangeRaptorWorker worker = stateFactory.createWorker2(request, nRounds, nStops, transitData);
+                McRangeRaptorWorker worker = stateFactory.createWorker2(request, nRounds, transitData);
 
                 Collection<Path2> path2s = worker.route(req);
 
@@ -310,7 +312,7 @@ public class SpeedTest {
                 TIMER_COLLECT_RESULTS_ITINERARIES.stop();
             }
             else {
-                Worker worker = stateFactory.createWorker(request, nRounds, nStops, transitData);
+                Worker worker = stateFactory.createWorker(request, nRounds, transitData);
 
                 Collection<Path> workerPaths = worker.route(req);
 

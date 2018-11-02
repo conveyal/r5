@@ -5,7 +5,11 @@ public interface Pattern {
     // TODO TGR - add JavaDoc
     int originalPatternIndex();
 
-    // TODO TGR - add JavaDoc
+    /**
+     * stop index
+     * @param stopPositionInPattern
+     * @return
+     */
     int currentPatternStop(int stopPositionInPattern);
 
     // TODO TGR - add JavaDoc

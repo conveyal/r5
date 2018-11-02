@@ -5,6 +5,7 @@ import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.Pattern;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.UnsignedIntIterator;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.transit.RouteInfo;
@@ -31,6 +32,8 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
 
     private static final Logger LOG = LoggerFactory.getLogger(TransitLayerRRDataProvider.class);
     private static boolean PRINT_REFILTERING_PATTERNS_INFO = true;
+
+    private int numberOfStops;
 
     private TransitLayer transitLayer;
 
@@ -109,8 +112,15 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
         return t.headwaySeconds == null && servicesActive.get(t.serviceCode);
     }
 
+    @Override
+    public int numberOfStops() {
+        return numberOfStops;
+    }
+
     /** Prefilter the patterns to only ones that are running */
     public void init() {
+        numberOfStops = transitLayer.getStopCount();
+
         TIntList scheduledPatterns = new TIntArrayList();
         scheduledIndexForOriginalPatternIndex = new int[transitLayer.tripPatterns.size()];
         Arrays.fill(scheduledIndexForOriginalPatternIndex, -1);
@@ -141,9 +151,10 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
                     transitLayer.tripPatterns.size(), scheduledPatterns.size());
             PRINT_REFILTERING_PATTERNS_INFO = false;
         }
+
     }
 
-    @Override public Iterator<Pattern> patternIterator(BitSetIterator stops) {
+    @Override public Iterator<Pattern> patternIterator(UnsignedIntIterator stops) {
         return new InternalPatternIterator(getPatternsTouchedForStops(stops));
     }
 
@@ -153,7 +164,7 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
      * "touched" means they were reached in the last round, and the index maps from the original pattern index to the
      * local index of the filtered patterns.
      */
-    private BitSet getPatternsTouchedForStops(BitSetIterator stops) {
+    private BitSet getPatternsTouchedForStops(UnsignedIntIterator stops) {
         BitSet patternsTouched = new BitSet();
 
         for (int stop = stops.next(); stop >= 0; stop = stops.next()) {

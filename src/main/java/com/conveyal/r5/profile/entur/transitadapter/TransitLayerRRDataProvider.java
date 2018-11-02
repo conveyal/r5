@@ -32,8 +32,6 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
     private static final Logger LOG = LoggerFactory.getLogger(TransitLayerRRDataProvider.class);
     private static boolean PRINT_REFILTERING_PATTERNS_INFO = true;
 
-    private int numberOfStops;
-
     private TransitLayer transitLayer;
 
     /** Array mapping from original pattern indices to the filtered scheduled indices */
@@ -113,13 +111,11 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
 
     @Override
     public int numberOfStops() {
-        return numberOfStops;
+        return transitLayer.getStopCount();
     }
 
     /** Prefilter the patterns to only ones that are running */
     public void init() {
-        numberOfStops = transitLayer.getStopCount();
-
         TIntList scheduledPatterns = new TIntArrayList();
         scheduledIndexForOriginalPatternIndex = new int[transitLayer.tripPatterns.size()];
         Arrays.fill(scheduledIndexForOriginalPatternIndex, -1);

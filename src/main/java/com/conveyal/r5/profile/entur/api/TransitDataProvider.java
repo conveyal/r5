@@ -26,7 +26,7 @@ public interface TransitDataProvider {
      * Strictly not needed, logic can be moved to constructor, but is separated out
      * to be able to measure performance as part of the route method.
      */
-    void init();
+    default void init() {}
 
     /**
      * This method is responsible for providing all transfers from a given stop to all

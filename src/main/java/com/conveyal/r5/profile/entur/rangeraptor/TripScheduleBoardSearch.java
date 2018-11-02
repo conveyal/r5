@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor;
 
-import com.conveyal.r5.profile.entur.api.Pattern;
+import com.conveyal.r5.profile.entur.api.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 
 
@@ -26,13 +26,13 @@ public class TripScheduleBoardSearch {
      * between 10 and 100 does not affect the performance mutch.
      */
     private final static int BINARY_SEARCH_THRESHOLD = 46;
-    private final Pattern pattern;
+    private final TripPatternInfo pattern;
     private final Function<TripScheduleInfo, Boolean> skipTripScheduleCallback;
 
     public TripScheduleInfo candidateTrip;
     public int candidateTripIndex;
 
-    public TripScheduleBoardSearch(Pattern pattern, Function<TripScheduleInfo, Boolean> skipTripScheduleCallback) {
+    public TripScheduleBoardSearch(TripPatternInfo pattern, Function<TripScheduleInfo, Boolean> skipTripScheduleCallback) {
         this.pattern = pattern;
         this.skipTripScheduleCallback = skipTripScheduleCallback;
     }

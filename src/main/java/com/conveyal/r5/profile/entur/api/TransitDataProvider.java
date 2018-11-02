@@ -63,21 +63,22 @@ public interface TransitDataProvider {
     /**
      * Return a set of all patterns visiting the given set of stops.
      * <p/>
-     * The implementation may implement a lightweight {@link Pattern} representation.
+     * The implementation may implement a lightweight {@link TripPatternInfo} representation.
      * See {@link #getTransfers(int)} for detail on how to implement this.
      *
      * @param stops set of stops for find all patterns for.
      */
-    Iterator<Pattern> patternIterator(UnsignedIntIterator stops);
+    Iterator<TripPatternInfo> patternIterator(UnsignedIntIterator stops);
 
     /**
      * The provider needs to know based on the request input (date) if a service is available or not.
+     * The provider can chose to do the filtering int the {@link #patternIterator(UnsignedIntIterator)}, if so
+     * there is no need to implement this method.
      *
      * @param trip The trip to check.
      * @return true if the trip schedule is in service.
      */
-    boolean isTripScheduleInService(TripScheduleInfo trip);
-
+    default boolean isTripScheduleInService(TripScheduleInfo trip) { return true; }
 
     /**
      * This is the total number of stops, it should be possible to retrieve transfers and pattern for every stop

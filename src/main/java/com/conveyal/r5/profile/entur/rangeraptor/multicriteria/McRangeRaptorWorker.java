@@ -1,10 +1,10 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.StopArrival;
+import com.conveyal.r5.profile.entur.api.TripPatternInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.api.Path2;
-import com.conveyal.r5.profile.entur.api.Pattern;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.TripScheduleBoardSearch;
@@ -66,10 +66,10 @@ public class McRangeRaptorWorker extends AbstractRangeRaptorWorker<McWorkerState
      */
     @Override protected void scheduledSearchForRound(final int boardSlackInSeconds) {
         BitSetIterator stops = state.stopsTouchedPreviousRound();
-        Iterator<Pattern> patternIterator = transit.patternIterator(stops);
+        Iterator<TripPatternInfo> patternIterator = transit.patternIterator(stops);
 
         while (patternIterator.hasNext()) {
-            Pattern pattern = patternIterator.next();
+            TripPatternInfo pattern = patternIterator.next();
             int originalPatternIndex = pattern.originalPatternIndex();
 
             TripScheduleBoardSearch search = new TripScheduleBoardSearch(pattern, this::skipTripSchedule);

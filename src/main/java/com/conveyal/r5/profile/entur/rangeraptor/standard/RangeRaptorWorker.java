@@ -2,8 +2,8 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.entur.api.StopArrival;
+import com.conveyal.r5.profile.entur.api.TripPatternInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.TripScheduleBoardSearch;
-import com.conveyal.r5.profile.entur.api.Pattern;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
@@ -92,10 +92,10 @@ public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWork
     @Override
     protected void scheduledSearchForRound(final int boardSlackInSeconds) {
 
-        Iterator<Pattern> patternIterator = transit.patternIterator(state.bestStopsTouchedLastRoundIterator());
+        Iterator<TripPatternInfo> patternIterator = transit.patternIterator(state.bestStopsTouchedLastRoundIterator());
 
         while (patternIterator.hasNext()) {
-            Pattern pattern = patternIterator.next();
+            TripPatternInfo pattern = patternIterator.next();
             int originalPatternIndex = pattern.originalPatternIndex();
             int onTrip = -1;
             int boardTime = 0;

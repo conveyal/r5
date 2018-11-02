@@ -2,12 +2,11 @@ package com.conveyal.r5.profile.entur.transitadapter;
 
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.profile.entur.api.StopArrival;
-import com.conveyal.r5.profile.entur.api.Pattern;
+import com.conveyal.r5.profile.entur.api.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.UnsignedIntIterator;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
-import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
@@ -154,7 +153,7 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
 
     }
 
-    @Override public Iterator<Pattern> patternIterator(UnsignedIntIterator stops) {
+    @Override public Iterator<TripPatternInfo> patternIterator(UnsignedIntIterator stops) {
         return new InternalPatternIterator(getPatternsTouchedForStops(stops));
     }
 
@@ -186,7 +185,7 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
         return transitLayer.patternsForStop.get(stop);
     }
 
-    class InternalPatternIterator implements Pattern, Iterator<Pattern> {
+    class InternalPatternIterator implements TripPatternInfo, Iterator<TripPatternInfo> {
         private int nextPatternIndex;
         private int originalPatternIndex;
         private BitSet patternsTouched;
@@ -203,7 +202,7 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
             return nextPatternIndex >=0;
         }
 
-        @Override public Pattern next() {
+        @Override public TripPatternInfo next() {
             pattern = runningScheduledPatterns[nextPatternIndex];
             originalPatternIndex = originalPatternIndexForScheduledIndex[nextPatternIndex];
             nextPatternIndex = patternsTouched.nextSetBit(nextPatternIndex + 1);

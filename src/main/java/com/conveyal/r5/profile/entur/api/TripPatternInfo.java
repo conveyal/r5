@@ -1,7 +1,10 @@
 package com.conveyal.r5.profile.entur.api;
 
-// TODO TGR - add JavaDoc
-public interface Pattern {
+
+/**
+ * This interface represent a trip pattern.
+ */
+public interface TripPatternInfo {
     // TODO TGR - add JavaDoc
     int originalPatternIndex();
 

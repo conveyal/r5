@@ -18,13 +18,17 @@ import java.util.Map;
 import java.util.WeakHashMap;
 
 /**
- * Fare calculator for systems with a single fare per route, in which at most one agency provides transfer privileges
- * (pay-the-difference when boarding a more expensive route).
- * This calculator is appropriate for regions with mixed formal and informal transit services, in which the formal
- * services issue and accept mutually recognized transfer privileges(e.g. between BRT and cheaper zonal/feeder
+ * Fare calculator for systems in which:
+ * - Each route has a single flat fare
+ * - At most one agency provides transfer privileges (pay-the-difference when boarding a more expensive route).
+ * - Unlimited transfers may be allowed allowed between routes with certain fares, between stops with zone_id =
+ * "station" and sharing the same (non-blank) parent_station
+ * This calculator is designed for regions with mixed formal and informal transit services such as Bogota, in which the
+ * formal services issue and accept mutually recognized transfer privileges(e.g. between BRT and cheaper zonal/feeder
  * routes) and the semi-formal services (e.g. cash-based private operators) do not.
- * This implementation relies on a non-standard convention for route_id and fare_id values in GTFS: routeIds are
- * prefixed with "fareId"+"--"
+ * This implementation relies on non-standard conventions being used in input GTFS:
+ * - Every route_id is prefixed with "fare_id"+"--"
+ * - Stops within the paid area have zone_id = "station"
  */
 public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator {
     /** If true, log a random 1e-6 sample of fares for spot checking */
@@ -43,12 +47,11 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
     // Relies on non-standard convention described in class javadoc
     private static String getFareIdFromRouteId(RouteInfo route) {return route.route_id.split("--")[0];}
 
-    // TODO read from GTFS
+    // fares for routes that serve "paid area" stops, at which unlimited transfers may be available
     private static ArrayList<String> faresAvailableInPaidArea = new ArrayList<>(Arrays.asList("T","D"));
 
-    /**
-     * Used when transfer allowances are only accepted on services operated by the issuing agency.
-     */
+    private static String STATION = "station";
+
     private class MixedSystemTransferAllowance extends TransferAllowance {
         // GTFS-lib does not read fare_attributes.agencyId.  We set it explicitly via routes.agencyId, relying on the
         // convention described above to map routes.route_id to fare_attributes.fare_id.
@@ -64,22 +67,23 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
             this.agencyId = agencyId;
         }
 
-        private MixedSystemTransferAllowance update(int fareValue) {
+        private MixedSystemTransferAllowance redeemForOneRide(int fareValue) {
             int allowanceValue = Math.max(fareValue, value);
             return new MixedSystemTransferAllowance(allowanceValue, number - 1, expirationTime, agencyId);
         }
 
     }
 
-    private static boolean doesNotCrossFareGates(int fromStopIndex, int toStopIndex, TransitLayer transitLayer){
-        String fromStation = transitLayer.parentStationIdForStop.get(fromStopIndex);
-        String toStation = transitLayer.parentStationIdForStop.get(toStopIndex);
+    private static boolean withinPaidArea(int fromStopIndex, int toStopIndex, TransitLayer transitLayer){
         String fromFareZone = transitLayer.fareZoneForStop.get(fromStopIndex);
         String toFareZone = transitLayer.fareZoneForStop.get(toStopIndex);
-
-        // If the fromStop and toStop are in the same parent station and fare zone, we have not crossed a fare gate.
-        return fromStation != null && fromStation.equals(toStation) && fromFareZone != null && fromFareZone.equals
-                (toFareZone);
+        if (STATION.equals(fromFareZone) && STATION.equals(toFareZone)){
+            String fromParentStation = transitLayer.parentStationIdForStop.get(fromStopIndex);
+            String toParentStation = transitLayer.parentStationIdForStop.get(toStopIndex);
+            return fromParentStation != null && fromParentStation.equals(toParentStation);
+        } else {
+            return false;
+        }
     }
 
     @Override
@@ -130,8 +134,6 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
         boardStops.reverse();
         boardTimes.reverse();
 
-        int alightStopIndex = -1;
-
         // Loop over rides to get to the state in forward-chronological order
         for (int ride = 0; ride < patterns.size(); ride ++) {
             int pattern = patterns.get(ride);
@@ -143,9 +145,6 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
             // board stop for this ride
             int boardStopIndex = boardStops.get(ride);
 
-            // alight stop for this ride
-            alightStopIndex = alightStops.get(ride);
-
             int boardClockTime = boardTimes.get(ride);
             String fareId = getFareIdFromRouteId(route);
             Fare fare = fares.get(fareId);
@@ -156,14 +155,14 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
             // Agency that issued the currently held transfer allowance (possibly several rides ago)
             String issuingAgency = transferAllowance.agencyId;
 
-            // Continue if boarding a route serving the paid area, without crossing fare gates since previous ride
-            if (faresAvailableInPaidArea.contains(fareId) && ride >= 1) {
+            // If this is the second ride or later, check whether the route stays within the paid area
+            if (ride >= 1) {
                 int fromStopIndex = alightStops.get(ride - 1);
-                if (doesNotCrossFareGates(fromStopIndex, boardStopIndex, transitLayer)) continue;
+                if (withinPaidArea(fromStopIndex, boardStopIndex, transitLayer)) continue;
             }
 
-            // We are not staying within the pay area.  So...
-            // Check for transferValue expiration
+            // We are not staying within the paid area.  So...
+            // Check if enough time has elapsed for our transfer allowance to expire
             if (transferAllowance.hasExpiredAt(boardTimes.get(ride))) transferAllowance = new MixedSystemTransferAllowance();
 
             // Then check if we might be able to redeem a transfer
@@ -172,21 +171,22 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
                     transferAllowance.number > 0;
 
             int undiscountedPrice = priceToInt(fare.fare_attribute.price);
+
             if (transferValueAvailable) {
                 // If transfer value is available, attempt to use it.
                 if (receivingAgency.equals(issuingAgency)) {
                     // Pay difference and set updated transfer allowance
                     cumulativeFarePaid += transferAllowance.payDifference(undiscountedPrice);
-                    transferAllowance = transferAllowance.update(undiscountedPrice);
+                    transferAllowance = transferAllowance.redeemForOneRide(undiscountedPrice);
                 } else {
                     // This agency will not accept transfer allowance.  Hold onto it, and pay full fare.
                     cumulativeFarePaid += undiscountedPrice;
                 }
             } else {
-                // Pay full fare and obtain transfer allowance
+                // Pay full fare and obtain new transfer allowance
                 cumulativeFarePaid += undiscountedPrice;
-                transferAllowance = new MixedSystemTransferAllowance(priceToInt(fare.fare_attribute.price), fare
-                                .fare_attribute.transfers,boardClockTime + fare.fare_attribute.transfer_duration,
+                transferAllowance = new MixedSystemTransferAllowance(priceToInt(fare.fare_attribute.price),
+                        fare.fare_attribute.transfers,boardClockTime + fare.fare_attribute.transfer_duration,
                         receivingAgency);
             }
         }

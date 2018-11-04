@@ -38,9 +38,6 @@ public class McRaptorSuboptimalPathProfileRouter {
 
     public static final int BOARD_SLACK = 60;
 
-    /** maximum number of rounds (rides) */
-    public static final int MAX_ROUNDS = 4;
-
     public static final int[] EMPTY_INT_ARRAY = new int[0];
 
     private final boolean DUMP_STOPS = false;
@@ -166,7 +163,7 @@ public class McRaptorSuboptimalPathProfileRouter {
             round++;
 
             // NB the walk search is an initial round, so MAX_ROUNDS + 1
-            while (doOneRound() && round < MAX_ROUNDS + 1);
+            while (doOneRound() && round < request.maxRides + 1);
 
             // TODO this means we wind up with some duplicated states.
             if (egressTimes != null) {
@@ -272,7 +269,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         });
 
         // optimization: on the last round, only explore patterns near the destination in a point to point search
-        if (round == MAX_ROUNDS && egressTimes != null)
+        if (round == request.maxRides && egressTimes != null)
             touchedPatterns.and(patternsNearDestination);
 
         for (int patIdx = touchedPatterns.nextSetBit(0); patIdx >= 0; patIdx = touchedPatterns.nextSetBit(patIdx + 1)) {

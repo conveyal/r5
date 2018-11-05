@@ -21,7 +21,12 @@ public class RangeRaptorRequest {
     /** Times to access each transit stop using the street network in seconds. */
     public final Collection<StopArrival> accessStops;
 
-    /** List of all possible egress stops and time to reach destination in seconds. */
+    /**
+     * List of all possible egress stops and time to reach destination in seconds.
+     * <p>
+     * NOTE! The {@link StopArrival#stop()} is the stop where the egress leg
+     * start, NOT the destination - think of it as a reversed leg.
+     */
     public final Collection<StopArrival> egressStops;
 
     /**

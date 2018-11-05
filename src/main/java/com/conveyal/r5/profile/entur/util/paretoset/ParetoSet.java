@@ -105,6 +105,7 @@ public class ParetoSet<T extends ParetoSortable> implements Iterable<T> {
             if (dominator.newVectorDominatesExistingVector()) {
                 --size;
                 paretoSet[index] = paretoSet[size];
+                paretoSet[size] = null;
             }
             else {
                 ++index;

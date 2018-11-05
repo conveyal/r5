@@ -46,11 +46,6 @@ abstract class McPathLeg<S extends McStopState> implements PathLeg {
     }
 
     @Override
-    public int transferTime() {
-        return state.transitTime();
-    }
-
-    @Override
     public boolean isTransfer() {
         return state.arrivedByTransfer();
     }

@@ -1,18 +1,17 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
-import com.conveyal.r5.profile.Path;
+import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripPatternInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.TripScheduleBoardSearch;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
-import com.conveyal.r5.profile.entur.rangeraptor.PathBuilder;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Iterator;
 
 
@@ -38,7 +37,7 @@ import java.util.Iterator;
  * (generating randomized schedules).
  */
 @SuppressWarnings("Duplicates")
-public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWorkerState, Path> {
+public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWorkerState, Path2> {
 
     // Variables to track time spent
     private static final AvgTimer TIMER_ROUTE = AvgTimer.timerMilliSec("RRaptor:route");
@@ -48,22 +47,24 @@ public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWork
     private static final AvgTimer TIMER_BY_MINUTE_TRANSFERS = AvgTimer.timerMicroSec("RRaptor:runRaptorForMinute Transfers");
 
     /** If we're going to store paths to every destination (e.g. for static sites) then they'll be retained here. */
-    public Collection<Path> paths;
+    public Collection<Path2> paths;
 
-    private final PathBuilder pathBuilder;
+    private final PathBuilderCursorBased pathBuilder;
 
     public RangeRaptorWorker(
+            int nRounds,
+            int nStops,
+            int maxDurationSeconds,
             TransitDataProvider transitData,
-            RangeRaptorWorkerState state,
-            PathBuilder pathBuilder
+            StopStateCollection stateCollection
     ) {
-        super(transitData, state);
-        this.pathBuilder = pathBuilder;
-        this.paths = new HashSet<>();
+        super(transitData, new RangeRaptorWorkerState(nRounds, nStops, maxDurationSeconds, stateCollection));
+        this.pathBuilder = new PathBuilderCursorBased(stateCollection.newCursor());
+        this.paths = new ArrayList<>();
     }
 
     @Override
-    protected Collection<Path> paths(Collection<StopArrival> egressStops) {
+    protected Collection<Path2> paths(Collection<StopArrival> egressStops) {
         return paths;
     }
 
@@ -71,13 +72,15 @@ public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWork
      * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
      */
     @Override
-    protected void addPathsForCurrentIteration(Collection<StopArrival> egressStops) {
+    protected void addPathsForCurrentIteration(int boardSlackInSeconds, Collection<StopArrival> accessStops, Collection<StopArrival> egressStops) {
+        pathBuilder.setBoardSlackInSeconds(boardSlackInSeconds);
+
         for (StopArrival it : egressStops) {
 
             // TODO TGR -- Add egress transit time to path
 
             if (state.isStopReachedByTransit(it.stop())) {
-                Path p = pathBuilder.extractPathForStop(state.getMaxNumberOfRounds(), it.stop());
+                Path2 p = pathBuilder.extractPathForStop(state.getMaxNumberOfRounds(), it, accessStops);
                 if (p != null) {
                     paths.add(p);
                 }

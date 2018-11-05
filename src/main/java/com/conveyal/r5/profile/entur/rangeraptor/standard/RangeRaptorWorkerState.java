@@ -45,7 +45,7 @@ public final class RangeRaptorWorkerState implements WorkerState {
 
 
     /** The best times to reach each stop, whether via a transfer or via transit directly. */
-    private final BestTimes bestOveral;
+    private final BestTimes bestOverall;
 
     /** Index to the best times for reaching stops via transit rather than via a transfer from another stop */
     private final BestTimes bestTransit;
@@ -57,7 +57,7 @@ public final class RangeRaptorWorkerState implements WorkerState {
         this.stops = stops;
         this.cursor = stops.newCursor();
 
-        this.bestOveral = new BestTimes(nStops);
+        this.bestOverall = new BestTimes(nStops);
         this.bestTransit = new BestTimes(nStops);
 
         this.maxDurationSeconds = maxDurationSeconds;
@@ -65,7 +65,7 @@ public final class RangeRaptorWorkerState implements WorkerState {
 
     @Override
     public void gotoNextRound() {
-        bestOveral.gotoNextRound();
+        bestOverall.gotoNextRound();
         bestTransit.gotoNextRound();
         ++round;
         roundMax = Math.max(roundMax, round);
@@ -78,11 +78,11 @@ public final class RangeRaptorWorkerState implements WorkerState {
     }
 
     boolean isStopReachedInPreviousRound(int stop) {
-        return bestOveral.isReachedLastRound(stop);
+        return bestOverall.isReachedLastRound(stop);
     }
 
     BitSetIterator bestStopsTouchedLastRoundIterator() {
-        return bestOveral.stopsReachedLastRound();
+        return bestOverall.stopsReachedLastRound();
     }
 
     int getMaxNumberOfRounds() {
@@ -107,19 +107,19 @@ public final class RangeRaptorWorkerState implements WorkerState {
         //this.departureTime = departureTime;
         maxTimeLimit = departureTime + maxDurationSeconds;
         // clear all touched stops to avoid constant reëxploration
-        bestOveral.clearCurrent();
+        bestOverall.clearCurrent();
         bestTransit.clearCurrent();
         round = 0;
     }
 
     @Override
     public void setInitialTime(StopArrival stopArrival, int fromTime, int boardSlackInSeconds) {
-        final int accesDurationInSeconds = stopArrival.durationInSeconds();
+        final int accessDurationInSeconds = stopArrival.durationInSeconds();
         final int stop = stopArrival.stop();
-        final int arrivalTime = fromTime + accesDurationInSeconds;
+        final int arrivalTime = fromTime + accessDurationInSeconds;
 
         stops.setInitialTime(round, stop, arrivalTime);
-        bestOveral.setTime(stop, accesDurationInSeconds);
+        bestOverall.setTime(stop, accessDurationInSeconds);
         debugStop(Access, round, stop);
     }
 
@@ -134,9 +134,9 @@ public final class RangeRaptorWorkerState implements WorkerState {
         if (bestTransit.updateNewBestTime(stop, alightTime)) {
 
             // transitTimes upper bounds bestTimes
-            final boolean newBestOveral = bestOveral.updateNewBestTime(stop, alightTime);
+            final boolean newBestOverall = bestOverall.updateNewBestTime(stop, alightTime);
 
-            stops.transitToStop(round, stop, alightTime, pattern, boardStop, trip, boardTime, newBestOveral);
+            stops.transitToStop(round, stop, alightTime, pattern, boardStop, trip, boardTime, newBestOverall);
 
             // skip: transferTimes
             debugStop(Transit, round, stop);
@@ -157,7 +157,7 @@ public final class RangeRaptorWorkerState implements WorkerState {
         }
         // transitTimes upper bounds bestTimes so we don't need to update wait time and in-vehicle time here, if we
         // enter this conditional it has already been updated.
-        if (bestOveral.updateNewBestTime(toStop, arrivalTime)) {
+        if (bestOverall.updateNewBestTime(toStop, arrivalTime)) {
             stops.transferToStop(round, fromStop, toStopArrival, arrivalTime);
 
             debugStop(Transfer, round, toStop);
@@ -172,12 +172,12 @@ public final class RangeRaptorWorkerState implements WorkerState {
     /* private methods */
 
     private boolean isCurrentRoundUpdated() {
-        return !(bestOveral.isCurrentRoundEmpty() && bestTransit.isCurrentRoundEmpty());
+        return !(bestOverall.isCurrentRoundEmpty() && bestTransit.isCurrentRoundEmpty());
     }
 
     private void debugStop(DebugState.Type type, int round, int stop) {
         if(DebugState.isDebug(stop)) {
-            DebugState.debugStop(type, round, stop, cursor.stop(round, stop), bestOveral.toString(stop) + " | " + bestTransit.toString(stop));
+            DebugState.debugStop(type, round, stop, cursor.stop(round, stop), bestOverall.toString(stop) + " | " + bestTransit.toString(stop));
         }
     }
 }

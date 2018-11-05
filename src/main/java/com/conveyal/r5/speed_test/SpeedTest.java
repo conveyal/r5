@@ -6,14 +6,13 @@ import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetPath;
-import com.conveyal.r5.profile.entur.PathParetoSortableWrapper;
+import com.conveyal.r5.profile.entur.Path2ParetoSortableWrapper;
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
 import com.conveyal.r5.profile.entur.transitadapter.TransitLayerRRDataProvider;
 import com.conveyal.r5.profile.entur.api.Worker;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
 import com.conveyal.r5.profile.entur.util.DebugState;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
@@ -41,6 +40,8 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import static com.conveyal.r5.profile.entur.util.TimeUtils.midnightOf;
 
@@ -277,85 +278,43 @@ public class SpeedTest {
 
             RangeRaptorRequest req = createRequest(request, streetRouter);
 
-            // TODO TGR - his is a temp hack
-            if(stateFactory.isMultiCriteria()) {
-                McRangeRaptorWorker worker = stateFactory.createWorker2(request, nRounds, transitData);
+            Worker<Path2> worker = stateFactory.createWorker(request, nRounds, transitData);
 
-                Collection<Path2> path2s = worker.route(req);
+            Collection<Path2> path2s = worker.route(req);
 
-                TIMER_WORKER.stop();
+            TIMER_WORKER.stop();
 
-                // -------------------------------------------------------- [ COLLECT RESULTS ]
+            // -------------------------------------------------------- [ COLLECT RESULTS ]
 
-                TIMER_COLLECT_RESULTS.start();
+            TIMER_COLLECT_RESULTS.start();
 
+            if (path2s.isEmpty()) {
+                throw new IllegalStateException("NO RESULT FOUND");
+            }
             /*
-                TODO TGR We filter paths (ParetoSet) because the algorithm now return duplicates,
-                we could probably do this with a HashSet instead, but the optimal solution is to fix the
-                route iterator to only return new paths.
+                TODO TGR - We filter paths (ParetoSet) because the algorithm now return duplicates,
+                TODO TGR - we could probably do this with a HashSet instead, but the optimal solution is to fix the
+                TODO TGR - route iterator to only return new paths.
             */
-
-                if (path2s.isEmpty()) {
-                    throw new IllegalStateException("NO RESULT FOUND");
-                }
-
-                numOfPathsFound.add(path2s.size());
-
-                TIMER_COLLECT_RESULTS_ITINERARIES.start();
-
+            if(!stateFactory.isMultiCriteria()) {
+                ParetoSet<Path2ParetoSortableWrapper> paths = new ParetoSet<>(Path2ParetoSortableWrapper.paretoDominanceFunctions());
                 for (Path2 p : path2s) {
-                    itineraries.add(createItinerary(request, streetRouter, p));
+                    paths.add(new Path2ParetoSortableWrapper(p));
                 }
-
-                itineraries.filter();
-
-                TIMER_COLLECT_RESULTS_ITINERARIES.stop();
+                path2s = StreamSupport.stream(paths.spliterator(), false).map(it -> it.path).collect(Collectors.toList());
             }
-            else {
-                Worker worker = stateFactory.createWorker(request, nRounds, transitData);
 
-                Collection<Path> workerPaths = worker.route(req);
+            numOfPathsFound.add(path2s.size());
 
-                TIMER_WORKER.stop();
+            TIMER_COLLECT_RESULTS_ITINERARIES.start();
 
-                // -------------------------------------------------------- [ COLLECT RESULTS ]
-
-                TIMER_COLLECT_RESULTS.start();
-
-            /*
-                TODO TGR We filter paths (ParetoSet) because the algorithm now return duplicates,
-                we could probably do this with a HashSet instead, but the optimal solution is to fix the
-                route iterator to only return new paths.
-            */
-                ParetoSet<PathParetoSortableWrapper> paths = new ParetoSet<>(PathParetoSortableWrapper.paretoDominanceFunctions());
-
-
-                for (Path path : workerPaths) {
-                    int egressTransferTime = streetRouter.egressTimesToStopsInSeconds.get(path.egressStop());
-                    int accessTransferTime = streetRouter.accessTimesToStopsInSeconds.get(path.accessStop());
-                    int totalTime = accessTransferTime + path.travelTime() + egressTransferTime;
-
-                    paths.add(new PathParetoSortableWrapper(path, totalTime));
-                }
-
-
-                if (paths.isEmpty()) {
-                    throw new IllegalStateException("NO RESULT FOUND");
-                }
-
-                numOfPathsFound.add(paths.size());
-
-                TIMER_COLLECT_RESULTS_ITINERARIES.start();
-
-                for (PathParetoSortableWrapper p : paths) {
-                    SpeedTestItinerary itinerary = createItinerary(request, streetRouter, p.path);
-                    itineraries.add(itinerary);
-                }
-
-                itineraries.filter();
-
-                TIMER_COLLECT_RESULTS_ITINERARIES.stop();
+            for (Path2 p : path2s) {
+                itineraries.add(createItinerary(request, streetRouter, p));
             }
+
+            itineraries.filter();
+
+            TIMER_COLLECT_RESULTS_ITINERARIES.stop();
 
             TripPlan tripPlan = createTripPlanForRequest(request);
 
@@ -409,7 +368,7 @@ public class SpeedTest {
 
     private SpeedTestItinerary createItinerary(ProfileRequest request, EgressAccessRouter streetRouter, Path2 path) {
         StreetPath accessPath = streetRouter.accessPath(path.accessLeg().toStop());
-        StreetPath egressPath = streetRouter.egressPath(path.egressLeg().toStop());
+        StreetPath egressPath = streetRouter.egressPath(path.egressLeg().fromStop());
         return itineraryMapper2.createItinerary(request, path, accessPath, egressPath);
     }
 

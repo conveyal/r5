@@ -83,8 +83,7 @@ public final class StopStatesIntArray implements StopStateCollection {
 
         assert time > 0;
         assert fromStop > 0;
-        assert transferTime < 0;
-
+        assert transferTime > 0;
 
         final int index = findOrCreateStopIndex(round, stop);
         times[index] = time;

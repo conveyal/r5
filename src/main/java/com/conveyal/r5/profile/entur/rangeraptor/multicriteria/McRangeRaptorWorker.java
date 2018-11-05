@@ -55,8 +55,12 @@ public class McRangeRaptorWorker extends AbstractRangeRaptorWorker<McWorkerState
         return state.extractPaths(egressStops);
     }
 
-
-    @Override protected void addPathsForCurrentIteration(Collection<StopArrival> egressStops) {
+    @Override
+    protected void addPathsForCurrentIteration(
+            int boardSlackInSeconds,
+            Collection<StopArrival> accessStops,
+            Collection<StopArrival> egressStops
+    ) {
         // NOOP
     }
 

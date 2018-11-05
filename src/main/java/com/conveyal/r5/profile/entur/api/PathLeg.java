@@ -10,8 +10,6 @@ public interface PathLeg {
     int pattern();
     int trip();
 
-    int transferTime();
-
     boolean isTransfer();
     boolean isTransit();
 }

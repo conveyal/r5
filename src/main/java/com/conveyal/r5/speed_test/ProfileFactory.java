@@ -2,10 +2,7 @@ package com.conveyal.r5.speed_test;
 
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.SearchAlgorithm;
-import com.conveyal.r5.profile.entur.rangeraptor.PathBuilder;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.PathBuilderCursorBased;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.RangeRaptorWorker;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.RangeRaptorWorkerState;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCollection;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.intarray.StopStatesIntArray;
@@ -22,14 +19,10 @@ import java.util.stream.Collectors;
 enum ProfileFactory {
     original("original", "The original code with FastRaptorWorker"),
     int_arrays("int", "Flyweight stop state using int arrays with new RangeRaptorWorker"),
-    struct_arrays("struct", "Simple POJO stop arrival state with new RangeRaptorWorker") {
-        @Override
-        StopStateCollection createStopStateCollection(int nRounds, int nStops) {
-            return new StopStatesStructArray(nRounds, nStops);
-        }
-    },
+    struct_arrays("struct", "Simple POJO stop arrival state with new RangeRaptorWorker"),
     multi_criteria("mc", "Multi criteria pareto state with new McRangeRaptor")
     ;
+
     final String shortName;
     final String description;
 
@@ -58,36 +51,29 @@ enum ProfileFactory {
         return Arrays.stream(values()).map(ProfileFactory::description).collect(Collectors.toList());
     }
 
-    StopStateCollection createStopStateCollection(int nRounds, int nStops) {
-        return new StopStatesIntArray(nRounds, nStops);
-    }
+    public Worker createWorker(ProfileRequest request, int nRounds, TransitDataProvider transitData) {
+        if(isMultiCriteria()) {
+            return createMcWorker(request, nRounds, transitData);
+        }
+        if(isOriginal()) {
+            throw new IllegalStateException("The original code lives in its original realm...");
+        }
 
-    RangeRaptorWorkerState createWorkerState(int nRounds, int nStops, int maxDurationSeconds, StopStateCollection stops) {
-        return new RangeRaptorWorkerState(nRounds, nStops, maxDurationSeconds, stops);
-    }
+        StopStateCollection stops =
+                isStructArrays()
+                        ? new StopStatesStructArray(nRounds, transitData.numberOfStops())
+                        : new StopStatesIntArray(nRounds, transitData.numberOfStops());
 
-    PathBuilder createPathBuilder(StopStateCollection stops) {
-        return new PathBuilderCursorBased(stops.newCursor());
-    }
-
-    Worker createWorker(ProfileRequest request, int nRounds, TransitDataProvider transitData) {
-        StopStateCollection stops = createStopStateCollection(nRounds, transitData.numberOfStops());
-
-        RangeRaptorWorkerState state = createWorkerState(
+        return new RangeRaptorWorker(
                 nRounds,
                 transitData.numberOfStops(),
                 request.maxTripDurationMinutes * 60,
-                stops
-        );
-
-        return new RangeRaptorWorker(
                 transitData,
-                state,
-                createPathBuilder(stops)
+                stops
         );
     }
 
-    public McRangeRaptorWorker createWorker2(ProfileRequest request, int nRounds, TransitDataProvider transitData) {
+    private McRangeRaptorWorker createMcWorker(ProfileRequest request, int nRounds, TransitDataProvider transitData) {
         McWorkerState state = new McWorkerState(
                 nRounds,
                 transitData.numberOfStops(),
@@ -100,10 +86,9 @@ enum ProfileFactory {
         );
     }
 
-    boolean is(ProfileFactory other) {
+    private boolean is(ProfileFactory other) {
         return this == other;
     }
-
 
     boolean isOriginal() {
         return is(original);
@@ -111,6 +96,10 @@ enum ProfileFactory {
 
     boolean isMultiCriteria() {
         return is(multi_criteria);
+    }
+
+    private boolean isStructArrays() {
+        return is(struct_arrays);
     }
 
     /* private methods */

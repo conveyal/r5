@@ -63,7 +63,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, P> implem
     /**
      * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
      */
-    protected abstract void addPathsForCurrentIteration(Collection<StopArrival> egressStops);
+    protected abstract void addPathsForCurrentIteration(int boardSlackInSeconds, Collection<StopArrival> accessStops, Collection<StopArrival> egressStops);
 
     /**
      * Perform a scheduled search
@@ -128,7 +128,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, P> implem
         // This state is repeatedly modified as the outer loop progresses over departure minutes.
         // We have to be careful here that creating these paths does not modify the state, and makes
         // protective copies of any information we want to retain.
-        addPathsForCurrentIteration(request.egressStops);
+        addPathsForCurrentIteration(request.boardSlackInSeconds, request.accessStops, request.egressStops);
     }
 
     /**

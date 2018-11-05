@@ -23,6 +23,7 @@ import com.vividsolutions.jts.geom.Envelope;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
 import gnu.trove.impl.hash.TIntHash;
+import gnu.trove.impl.hash.TPrimitiveHash;
 import gnu.trove.list.array.TIntArrayList;
 import org.mapdb.Fun;
 import org.objenesis.strategy.SerializingInstantiatorStrategy;
@@ -103,10 +104,12 @@ public class TransportNetwork implements Serializable {
         kryo.setRegistrationRequired(false);
         // Handle references and loops in the object graph, do not repeatedly serialize the same instance.
         kryo.setReferences(true);
-        // Certain Trove class hierarchies are all Externalizable, defining their own efficient methods.
-        // addDefaultSerializer will create a serializer instance for any subclass of the specified class.
+        // Hash maps generally cannot be properly serialized just by serializing their fields.
         // Kryo's default serializers and instantiation strategies also don't seem to deal well with Trove Maps.
-        kryo.addDefaultSerializer(TIntHash.class, ExternalizableSerializer.class);
+        // Certain Trove class hierarchies are all Externalizable, defining their own optimized serialization methods.
+        // addDefaultSerializer will create a serializer instance for any subclass of the specified class.
+        // With this hierarchy, we hit all the trove primitive-primitive and primitive-Object implementations.
+        kryo.addDefaultSerializer(TPrimitiveHash.class, ExternalizableSerializer.class);
         // We've got a custom serializer for primitive int array lists, because there are a lot of them and it's
         // much faster than deferring to their Externalizable implementation.
         kryo.register(TIntArrayList.class, new TIntArrayListSerializer());
@@ -447,6 +450,7 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
+     * FIXME why is this a long when crc32 returns an int?
      * @return a checksum of the graph, for use in verifying whether it changed or remained the same after
      * some operation.
      */

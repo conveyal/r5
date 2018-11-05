@@ -1,5 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
+import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.common.JsonUtilities;
 import org.eclipse.jetty.http.HttpStatus;
 import org.slf4j.Logger;
@@ -41,6 +42,10 @@ public class AnalysisWorkerController {
             response.status(HttpStatus.ACCEPTED_202);
             response.header("Content-Type", "text/plain");
             return workerNotReadyException.getMessage();
+        } catch (ScenarioApplicationException scenarioApplicationException) {
+            response.status(HttpStatus.BAD_REQUEST_400);
+            response.header("Content-Type", "application/json");
+            return AnalystWorker.reportTaskErrors(task, scenarioApplicationException.taskErrors);
         } catch (Exception exception) {
             response.status(HttpStatus.INTERNAL_SERVER_ERROR_500);
             response.header("Content-Type", "text/plain");

@@ -8,6 +8,7 @@ import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.S3FilePersistence;
 import com.conveyal.r5.analyst.TravelTimeComputer;
+import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
@@ -393,7 +394,8 @@ public class AnalystWorker implements Runnable {
      * @return the travel time grid (binary data) which will be passed back to the client UI. This binary response may
      *         have errors appended as JSON to the end.
      */
-    protected byte[] handleOneSinglePointTask (TravelTimeSurfaceTask task) throws WorkerNotReadyException, IOException {
+    protected byte[] handleOneSinglePointTask (TravelTimeSurfaceTask task)
+            throws WorkerNotReadyException, ScenarioApplicationException, IOException {
 
         // Record the fact that the worker is busy so it won't shut down.
         lastSinglePointTime = System.currentTimeMillis();
@@ -437,7 +439,6 @@ public class AnalystWorker implements Runnable {
             oneOriginResult.timeGrid.writeGridToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
             addErrorJson(byteArrayOutputStream, transportNetwork.scenarioApplicationWarnings);
         }
-
         // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
         throughputTracker.recordTaskCompletion("SINGLE-" + transportNetwork.scenarioId);
 
@@ -549,12 +550,15 @@ public class AnalystWorker implements Runnable {
      * even if it's an empty list.
      *
      * TODO use different HTTP codes and MIME types to return errors or valid results.
+     * We probably want to keep doing this though because we want to return a result AND the warnings.
      */
     public static void addErrorJson (OutputStream outputStream, List<TaskError> scenarioApplicationWarnings) throws IOException {
         LOG.info("Travel time surface written, appending metadata with scenario application {} warnings", scenarioApplicationWarnings.size());
         // We create a single-entry map because this converts easily to a JSON object.
         Map<String, List<TaskError>> errorsToSerialize = new HashMap<>();
         errorsToSerialize.put("scenarioApplicationWarnings", scenarioApplicationWarnings);
+        // We could do this when setting up the Spark handler, supplying writeValue as the response transformer
+        // But then you also have to handle the case where you are returning raw bytes.
         JsonUtilities.objectMapper.writeValue(outputStream, errorsToSerialize);
         LOG.info("Done writing");
     }
@@ -621,15 +625,12 @@ public class AnalystWorker implements Runnable {
 
     /**
      * Report that the task could not be processed due to errors.
-     * For the moment, we are sending back the list of TaskErrors appended as json to a default response.
+     * Reuses the code that appends warnings as JSON to a grid, but without the grid.
      */
-    public byte[] reportTaskErrors(TravelTimeSurfaceTask request, List<TaskError> taskErrors) {
+    public static byte[] reportTaskErrors(TravelTimeSurfaceTask request, List<TaskError> taskErrors) {
         try {
-            // For single-point requests, return a TimeGrid filled with UNREACHABLE, with the errors appended
             LOG.warn("Reporting errors in response to single-point request:\n" + taskErrors.toString());
-            TimeGrid emptyTimeGrid = new TimeGrid(request.zoom, request.west, request.north, request.width, request.height, request.percentiles.length);
             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-            emptyTimeGrid.writeGridToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
             addErrorJson(byteArrayOutputStream, taskErrors);
             byteArrayOutputStream.close();
             return byteArrayOutputStream.toByteArray();

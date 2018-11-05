@@ -26,7 +26,7 @@ import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
  * points on a regular grid in the web Mercator projection, we're keeping the abstraction so we can one day (re)-
  * implement freeform sets of points that are not on grids.
  */
-public abstract class PointSet implements Serializable {
+public abstract class PointSet {
 
     /** Maximum number of street network linkages to cache per PointSet. Affects memory consumption. */
     public static int LINKAGE_CACHE_SIZE = 5;
@@ -43,9 +43,7 @@ public abstract class PointSet implements Serializable {
      *
      * This is public so we can populate it during deserialization. It should generally not be accessed directly.
      */
-    public LoadingCache<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> linkageCache = CacheBuilder.newBuilder()
-            .maximumSize(LINKAGE_CACHE_SIZE)
-            .build(new LinkageCacheLoader());
+    public transient LoadingCache<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> linkageCache;
 
     private class LinkageCacheLoader extends CacheLoader<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> implements Serializable {
         @Override
@@ -66,10 +64,15 @@ public abstract class PointSet implements Serializable {
     /**
      * Makes it fast to get a set of all points within a given rectangle.
      * This is useful when finding distances from transit stops to points.
-     * FIXME we don't need a spatial index to do this on a gridded pointset. Make an method abstract and implement on subclasses.
-     * The spatial index is a hashgrid anyway though, not an STRtree.
+     * FIXME we don't need a spatial index to do this on a gridded pointset. Make an abstract methof and implement on subclasses.
+     * The spatial index is a hashgrid anyway though, not an STRtree, so it's more compact.
+     * FIXME this is apparently ONLY used for selecting points for which to rebuild distance tables. Can we just iterate and filter, and eliminate the index?
      */
     public transient IntHashGrid spatialIndex;
+
+    public PointSet() {
+        this.linkageCache = CacheBuilder.newBuilder().maximumSize(LINKAGE_CACHE_SIZE).build(new LinkageCacheLoader());
+    }
 
     /**
      * Associate each feature in this PointSet with a nearby street edge in the StreetLayer of the supplied

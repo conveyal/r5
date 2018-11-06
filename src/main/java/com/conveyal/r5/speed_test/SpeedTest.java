@@ -5,12 +5,15 @@ import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.profile.SearchAlgorithm;
 import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.profile.entur.Path2ParetoSortableWrapper;
+import com.conveyal.r5.profile.entur.ProfileFactory;
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
+import com.conveyal.r5.profile.entur.api.TuningParameters;
 import com.conveyal.r5.profile.entur.transitadapter.TransitLayerRRDataProvider;
 import com.conveyal.r5.profile.entur.api.Worker;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
@@ -40,9 +43,14 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
+import static com.conveyal.r5.profile.entur.ProfileFactory.int_arrays;
+import static com.conveyal.r5.profile.entur.ProfileFactory.multi_criteria;
+import static com.conveyal.r5.profile.entur.ProfileFactory.original;
+import static com.conveyal.r5.profile.entur.ProfileFactory.struct_arrays;
 import static com.conveyal.r5.profile.entur.util.TimeUtils.midnightOf;
 
 /**
@@ -71,7 +79,7 @@ public class SpeedTest {
     private Map<ProfileFactory, List<Integer>> totalResults = new HashMap<>();
 
     /** Init profile used by the HttpServer */
-    private ProfileFactory stateFactory = ProfileFactory.struct_arrays;
+    private ProfileFactory workerFactory = struct_arrays;
 
     SpeedTest(CommandLineOpts opts) throws Exception {
         this.opts = opts;
@@ -104,7 +112,7 @@ public class SpeedTest {
         initProfileStatistics();
 
         for (int i = 0; i < samples; ++i) {
-            stateFactory = strategies[i % strategies.length];
+            workerFactory = strategies[i % strategies.length];
             runSingleTest(opts);
         }
         printProfileStatistics();
@@ -130,7 +138,7 @@ public class SpeedTest {
             runSingleTestCase(tripPlans, testCases.get(9), opts, true);
             runSingleTestCase(tripPlans, testCases.get(17), opts, true);
         }
-        LOG.info("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [ START " + stateFactory + " ]");
+        LOG.info("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [ START " + workerFactory + " ]");
 
         AvgTimer.resetAll();
         for (TestCase testCase : testCases) {
@@ -142,7 +150,7 @@ public class SpeedTest {
         int tcSize = limitTestCases ? testCasesToRun.size() : testCases.size();
 
         LOG.info(
-                "\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [ SUMMARY " + stateFactory + " ]" +
+                "\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [ SUMMARY " + workerFactory + " ]" +
                 "\n" + String.join("\n", AvgTimer.listResults()) +
                 "\n" +
                 "\nPaths found: " + numOfPathsFound.stream().mapToInt((it) -> it).sum() + " " + numOfPathsFound +
@@ -150,8 +158,8 @@ public class SpeedTest {
                 "\nTotal time: " + TOT_TIMER.totalTimeInSeconds() + " seconds" +
                 (nSuccess == tcSize ? "" : "\n!!! UNEXPECTED RESULTS: " + (tcSize - nSuccess) + " OF " + tcSize + " FAILED. SEE LOG ABOVE FOR ERRORS !!!")
         );
-        workerResults.get(stateFactory).add((int)TIMER_WORKER.avgTime());
-        totalResults.get(stateFactory).add((int) TOT_TIMER.avgTime());
+        workerResults.get(workerFactory).add((int)TIMER_WORKER.avgTime());
+        totalResults.get(workerFactory).add((int) TOT_TIMER.avgTime());
 
         tcIO.writeResultsToFile(testCases);
     }
@@ -191,9 +199,9 @@ public class SpeedTest {
     }
 
     public TripPlan route(ProfileRequest request) {
-        stateFactory = ProfileFactory.from(request.algorithm, stateFactory);
+        workerFactory = mapAlgorithm(request.algorithm, workerFactory);
 
-        if(stateFactory.isOriginal()) {
+        if(workerFactory.isOriginal()) {
             return routeUsingOriginalRRaptor(request);
         }
         else {
@@ -273,14 +281,18 @@ public class SpeedTest {
             TIMER_WORKER.start();
 
 
-            final int nRounds = request.maxRides + 1;
             ItinerarySet itineraries = new ItinerarySet();
 
             RangeRaptorRequest req = createRequest(request, streetRouter);
 
-            Worker<Path2> worker = stateFactory.createWorker(request, nRounds, transitData);
+            TuningParameters tuningParameters = new TuningParameters.Builder()
+                    .maxNumberOfTransfers(request.maxRides)
+                    .build();
 
-            Collection<Path2> path2s = worker.route(req);
+
+            Worker worker = workerFactory.createWorker(req, transitData, tuningParameters);
+
+            Collection<Path2> path2s = worker.route();
 
             TIMER_WORKER.stop();
 
@@ -289,6 +301,7 @@ public class SpeedTest {
             TIMER_COLLECT_RESULTS.start();
 
             if (path2s.isEmpty()) {
+                numOfPathsFound.add(0);
                 throw new IllegalStateException("NO RESULT FOUND");
             }
             /*
@@ -296,7 +309,7 @@ public class SpeedTest {
                 TODO TGR - we could probably do this with a HashSet instead, but the optimal solution is to fix the
                 TODO TGR - route iterator to only return new paths.
             */
-            if(!stateFactory.isMultiCriteria()) {
+            if(!workerFactory.isMultiCriteria()) {
                 ParetoSet<Path2ParetoSortableWrapper> paths = new ParetoSet<>(Path2ParetoSortableWrapper.paretoDominanceFunctions());
                 for (Path2 p : path2s) {
                     paths.add(new Path2ParetoSortableWrapper(p));
@@ -334,30 +347,21 @@ public class SpeedTest {
     }
 
     RangeRaptorRequest createRequest(ProfileRequest request, EgressAccessRouter streetRouter) {
-        return new RangeRaptorRequest(
-                request.fromTime,
-                request.toTime,
-                mapToSurationToStops(streetRouter.accessTimesToStopsInSeconds),
-                mapToSurationToStops(streetRouter.egressTimesToStopsInSeconds),
-                60,
-                60
-        );
+        RangeRaptorRequest.Builder builder = new RangeRaptorRequest.Builder(request.fromTime, request.toTime)
+                .boardSlackInSeconds(60)
+                .departureStepInSeconds(60);
+
+        addStopTimes(streetRouter.accessTimesToStopsInSeconds, builder::addAccessStops);
+        addStopTimes(streetRouter.egressTimesToStopsInSeconds, builder::addEgressStop);
+
+        return builder.build();
     }
 
-    private static Collection<StopArrival> mapToSurationToStops(TIntIntMap timesToStopsInSeconds) {
-        Collection<StopArrival> times = new ArrayList<>();
-        timesToStopsInSeconds.forEachEntry((s, t) -> {
-            times.add(new StopArrival() {
-                @Override public int stop() {
-                    return s;
-                }
-                @Override public int durationInSeconds() {
-                    return t;
-                }
-            });
-            return true;
-        });
-        return times;
+    private static void addStopTimes(TIntIntMap timesToStopsInSeconds, Consumer<StopArrival> addStop) {
+        for(TIntIntIterator it = timesToStopsInSeconds.iterator(); it.hasNext(); ) {
+            it.advance();
+            addStop.accept(new InternalStopArrival(it.key(), it.value()));
+        }
     }
 
     private SpeedTestItinerary createItinerary(ProfileRequest request, EgressAccessRouter streetRouter, Path path) {
@@ -388,7 +392,7 @@ public class SpeedTest {
 
         request.accessModes = request.egressModes = request.directModes = EnumSet.of(LegMode.WALK);
         request.maxWalkTime = 20;
-        request.maxTripDurationMinutes = 1200;
+        request.maxTripDurationMinutes = 1200; // Not in use by the "new" RR or McRR
         request.transitModes = EnumSet.of(TransitModes.TRAM, TransitModes.SUBWAY, TransitModes.RAIL, TransitModes.BUS);
         request.description = testCase.origin + " -> " + testCase.destination;
         request.fromLat = testCase.fromLat;
@@ -445,5 +449,17 @@ public class SpeedTest {
         while(ref.get() != null) {
             System.gc();
         }
+    }
+
+    static ProfileFactory mapAlgorithm(SearchAlgorithm algorithm, ProfileFactory defaultFactory) {
+        if(algorithm == null) return defaultFactory;
+
+        switch (algorithm) {
+            case RangeRaptor: return original;
+            case MultiCriteriaRangeRaptor: return multi_criteria;
+            case StructRangeRaptor: return struct_arrays;
+            case IntArrayRangeRaptor: return int_arrays;
+        }
+        return defaultFactory;
     }
 }

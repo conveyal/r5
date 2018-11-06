@@ -2,6 +2,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard.intarray;
 
 
 import com.conveyal.r5.profile.entur.api.StopArrival;
+import com.conveyal.r5.profile.entur.api.TuningParameters;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCollection;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCursor;
@@ -25,8 +26,8 @@ public final class StopStatesIntArray implements StopStateCollection {
     private final int[] transferFromStops;
 
 
-    public StopStatesIntArray(int rounds, int stops) {
-        this.stateStopIndex = new int[rounds][stops];
+    public StopStatesIntArray(TuningParameters tuningParameters, int stops) {
+        this.stateStopIndex = new int[tuningParameters.nRounds()][stops];
 
         final int limit = 3 * stops;
 
@@ -52,18 +53,18 @@ public final class StopStatesIntArray implements StopStateCollection {
     }
 
     @Override
-    public void transitToStop(int round, int stop, int time, int fromPattern, int boardStop, int tripIndex, int boardTime, boolean bestTime) {
+    public void transitToStop(int round, int stop, int time, int boardStop, int boardTime, int pattern, int trip, boolean bestTime) {
         assert time > 0;
-        assert fromPattern >= 0;
+        assert pattern >= 0;
         assert boardStop > 0;
-        assert tripIndex >= 0;
+        assert trip >= 0;
         assert boardTime > 0;
 
         final int index = findOrCreateStopIndex(round, stop);
 
         transitTimes[index] = time;
-        previousPatterns[index] = fromPattern;
-        previousTrips[index] = tripIndex;
+        previousPatterns[index] = pattern;
+        previousTrips[index] = trip;
         boardTimes[index] = boardTime;
         boardStops[index] = boardStop;
 

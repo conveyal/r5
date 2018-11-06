@@ -1,7 +1,7 @@
-package com.conveyal.r5.speed_test;
+package com.conveyal.r5.profile.entur;
 
-import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.profile.SearchAlgorithm;
+import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
+import com.conveyal.r5.profile.entur.api.TuningParameters;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.RangeRaptorWorker;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCollection;
@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 
-enum ProfileFactory {
+public enum ProfileFactory {
     original("original", "The original code with FastRaptorWorker"),
     int_arrays("int", "Flyweight stop state using int arrays with new RangeRaptorWorker"),
     struct_arrays("struct", "Simple POJO stop arrival state with new RangeRaptorWorker"),
@@ -31,58 +31,63 @@ enum ProfileFactory {
         this.description = description;
     }
 
-    static ProfileFactory[] parse(String profiles) {
+    public static ProfileFactory[] parse(String profiles) {
         return Arrays.stream(profiles.split(",")).map(ProfileFactory::parseOne).toArray(ProfileFactory[]::new);
-    }
-
-    static ProfileFactory from(SearchAlgorithm algorithm, ProfileFactory defaultFactory) {
-        if(algorithm == null) return defaultFactory;
-
-        switch (algorithm) {
-            case RangeRaptor: return original;
-            case MultiCriteriaRangeRaptor: return multi_criteria;
-            case StructRangeRaptor: return struct_arrays;
-            case IntArrayRangeRaptor: return int_arrays;
-        }
-        return defaultFactory;
     }
 
     public static List<String> options() {
         return Arrays.stream(values()).map(ProfileFactory::description).collect(Collectors.toList());
     }
 
-    public Worker createWorker(ProfileRequest request, int nRounds, TransitDataProvider transitData) {
-        if(isMultiCriteria()) {
-            return createMcWorker(request, nRounds, transitData);
+    public Worker createWorker(RangeRaptorRequest request, TransitDataProvider transitData, TuningParameters tuningParameters) {
+        switch (this) {
+            case original:
+                throw new IllegalStateException("The original code lives in its original realm...");
+            case multi_criteria:
+                return createMcRRWorker(tuningParameters, transitData, request);
+            case struct_arrays:
+            case int_arrays:
+                return createRRWorker(tuningParameters, transitData, request);
+            default:
+                throw new IllegalStateException("Unknown profile: " + this);
         }
-        if(isOriginal()) {
-            throw new IllegalStateException("The original code lives in its original realm...");
-        }
-
-        StopStateCollection stops =
-                isStructArrays()
-                        ? new StopStatesStructArray(nRounds, transitData.numberOfStops())
-                        : new StopStatesIntArray(nRounds, transitData.numberOfStops());
-
-        return new RangeRaptorWorker(
-                nRounds,
-                transitData.numberOfStops(),
-                request.maxTripDurationMinutes * 60,
-                transitData,
-                stops
-        );
     }
 
-    private McRangeRaptorWorker createMcWorker(ProfileRequest request, int nRounds, TransitDataProvider transitData) {
+    public boolean isOriginal() {
+        return is(original);
+    }
+
+    public boolean isMultiCriteria() {
+        return is(multi_criteria);
+    }
+
+    /* private methods */
+
+    private McRangeRaptorWorker createMcRRWorker(TuningParameters tuningParameters, TransitDataProvider transitData, RangeRaptorRequest request) {
         McWorkerState state = new McWorkerState(
-                nRounds,
-                transitData.numberOfStops(),
-                request.maxTripDurationMinutes * 60
+                tuningParameters,
+                transitData.numberOfStops()
         );
 
         return new McRangeRaptorWorker(
                 transitData,
-                state
+                state,
+                request
+        );
+    }
+
+    public RangeRaptorWorker createRRWorker(TuningParameters tuningParameters, TransitDataProvider transitData, RangeRaptorRequest request) {
+
+        StopStateCollection stops =
+                isStructArrays()
+                        ? new StopStatesStructArray(tuningParameters, transitData.numberOfStops())
+                        : new StopStatesIntArray(tuningParameters, transitData.numberOfStops());
+
+        return new RangeRaptorWorker(
+                tuningParameters,
+                transitData,
+                stops,
+                request
         );
     }
 
@@ -90,19 +95,9 @@ enum ProfileFactory {
         return this == other;
     }
 
-    boolean isOriginal() {
-        return is(original);
-    }
-
-    boolean isMultiCriteria() {
-        return is(multi_criteria);
-    }
-
     private boolean isStructArrays() {
         return is(struct_arrays);
     }
-
-    /* private methods */
 
     private static ProfileFactory parseOne(String value) {
         try {

@@ -1,5 +1,6 @@
 package com.conveyal.r5.speed_test;
 
+import com.conveyal.r5.profile.entur.ProfileFactory;
 import org.apache.commons.cli.Options;
 
 import java.util.Arrays;

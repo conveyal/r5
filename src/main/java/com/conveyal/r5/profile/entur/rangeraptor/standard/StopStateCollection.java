@@ -6,7 +6,7 @@ public interface StopStateCollection {
 
     void setInitialTime(int round, int stop, int time);
 
-    void transitToStop(int round, int stop, int time, int fromPattern, int boardStop, int tripIndex, int boardTime, boolean bestTime);
+    void transitToStop(int round, int stop, int time, int boardStop, int boardTime, int pattern, int trip, boolean bestTime);
 
     /**
      * Set the time at a transit index iff it is optimal. This sets both the best time and the transfer time

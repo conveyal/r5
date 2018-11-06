@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.StopArrival;
+import com.conveyal.r5.profile.entur.api.TuningParameters;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.WorkerState;
 import com.conveyal.r5.profile.entur.api.Path2;
@@ -34,12 +35,12 @@ import static com.conveyal.r5.profile.entur.util.DebugState.Type.Transit;
  */
 public final class McWorkerState implements WorkerState {
 
-    /** Maximum duration of trips stored by this RaptorState */
-    private final int maxDurationSeconds;
-
-    /** Stop the search when the time exceeds the max time limit. */
+    /**
+     * Stop the search when the time exceeds the max time limit.
+     * TODO TGR - Set max limit to 5 days for now, replace this with a pareto check against the
+     * TODO TGR - destination location values.
+     */
     private int maxTimeLimit;
-
 
     private final StopStates stops;
     private final int nRounds;
@@ -50,19 +51,18 @@ public final class McWorkerState implements WorkerState {
 
 
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
-    public McWorkerState(int nRounds, int nStops, int maxDurationSeconds) {
-        this.nRounds = nRounds;
+    public McWorkerState(TuningParameters tuningParameters, int nStops) {
+        this.nRounds = tuningParameters.nRounds();
         this.stops = new StopStates(nStops);
 
         this.touchedCurrent = new BitSet(nStops);
         this.touchedPrevious = new BitSet(nStops);
-
-        this.maxDurationSeconds = maxDurationSeconds;
     }
 
     @Override public void initNewDepatureForMinute(int departureTime) {
-        //this.departureTime = departureTime;
-        maxTimeLimit = departureTime + maxDurationSeconds;
+        // TODO TGR - Set max limit to 5 days for now, replace this with a pareto check against the
+        // TODO TGR - destination location values.
+        maxTimeLimit = departureTime + 5 * 24 * 60 * 60;
         // clear all touched stops to avoid constant rexploration
         touchedCurrent.clear();
         touchedPrevious.clear();

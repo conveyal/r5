@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor;
 
+import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.WorkerState;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
@@ -36,7 +37,7 @@ import java.util.Iterator;
  * (generating randomized schedules).
  */
 @SuppressWarnings("Duplicates")
-public abstract class AbstractRangeRaptorWorker<S extends WorkerState, P> implements Worker<P> {
+public abstract class AbstractRangeRaptorWorker<S extends WorkerState> implements Worker {
 
     /** the transit data role needed for routing */
     protected final TransitDataProvider transit;
@@ -44,10 +45,13 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, P> implem
     // TODO add javadoc to field
     protected final S state;
 
+    // TODO add javadoc to field
+    protected final RangeRaptorRequest request;
 
-    public AbstractRangeRaptorWorker(TransitDataProvider transitData, S state) {
+    public AbstractRangeRaptorWorker(TransitDataProvider transitData, S state, RangeRaptorRequest request) {
         this.transit = transitData;
         this.state = state;
+        this.request = request;
     }
 
     // Track time spent, measure performance
@@ -58,18 +62,17 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, P> implem
     protected abstract AvgTimer timerByMinuteScheduleSearch();
     protected abstract AvgTimer timerByMinuteTransfers();
 
-    protected abstract Collection<P> paths(Collection<StopArrival> egressStops);
+    protected abstract Collection<Path2> paths();
 
     /**
      * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
      */
-    protected abstract void addPathsForCurrentIteration(int boardSlackInSeconds, Collection<StopArrival> accessStops, Collection<StopArrival> egressStops);
+    protected abstract void addPathsForCurrentIteration();
 
     /**
      * Perform a scheduled search
-     * @param boardSlackInSeconds {@link RangeRaptorRequest#boardSlackInSeconds}
      */
-    protected abstract void scheduledSearchForRound(final int boardSlackInSeconds);
+    protected abstract void scheduledSearchForRound();
 
 
     /**
@@ -78,9 +81,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, P> implem
      *
      * @return a unique set of paths
      */
-    public Collection<P> route(RangeRaptorRequest request) {
-        //LOG.info("Performing {} rounds (minutes)",  nMinutes);
-
+    public Collection<Path2> route() {
         timerRoute().time(() -> {
             timerSetup(transit::init);
 
@@ -92,21 +93,27 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, P> implem
                 // Run the raptor search. For this particular departure time, we receive N arrays of arrival times at all
                 // stops, one for each randomized schedule: resultsForMinute[randScheduleNumber][transitStop]
                 final int dep = departureTime;
-                timerRouteByMinute(() -> runRaptorForMinute(dep, request));
+                timerRouteByMinute(() -> runRaptorForMinute(dep));
             }
         });
-        return paths(request.egressStops);
+        return paths();
     }
+
+
+    protected final int earliestBoardTime(int time) {
+        return time + request.boardSlackInSeconds;
+    }
+
 
     /**
      * Perform one minute of a RAPTOR search.
      *
      * @param departureTime When this search departs.
      */
-    private void runRaptorForMinute(int departureTime, RangeRaptorRequest request) {
+    private void runRaptorForMinute(int departureTime) {
         state.debugStopHeader("RUN RAPTOR FOR MINUTE: " + TimeUtils.timeToStrCompact(departureTime));
 
-        advanceScheduledSearchToPreviousMinute(departureTime, request.accessStops, request.boardSlackInSeconds);
+        advanceScheduledSearchToPreviousMinute(departureTime);
 
         // Run the scheduled search
         // round 0 is the street search
@@ -120,7 +127,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, P> implem
 
             // NB since we have transfer limiting not bothering to cut off search when there are no more transfers
             // as that will be rare and complicates the code grabbing the results
-            timerByMinuteScheduleSearch().time(() -> scheduledSearchForRound(request.boardSlackInSeconds));
+            timerByMinuteScheduleSearch().time(this::scheduledSearchForRound);
 
             timerByMinuteTransfers().time(this::doTransfers);
         }
@@ -128,19 +135,21 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, P> implem
         // This state is repeatedly modified as the outer loop progresses over departure minutes.
         // We have to be careful here that creating these paths does not modify the state, and makes
         // protective copies of any information we want to retain.
-        addPathsForCurrentIteration(request.boardSlackInSeconds, request.accessStops, request.egressStops);
+        addPathsForCurrentIteration();
     }
 
     /**
      * Set the departure time in the scheduled search to the given departure time,
      * and prepare for the scheduled search at the next-earlier minute
      */
-    private void advanceScheduledSearchToPreviousMinute(int nextMinuteDepartureTime, Collection<StopArrival> accessStops, int boardSlackInSeconds) {
+    private void advanceScheduledSearchToPreviousMinute(
+            int nextMinuteDepartureTime
+    ) {
         state.initNewDepatureForMinute(nextMinuteDepartureTime);
 
         // add initial stops
-        for (StopArrival it : accessStops) {
-            state.setInitialTime(it, nextMinuteDepartureTime, boardSlackInSeconds);
+        for (StopArrival it : request.accessStops) {
+            state.setInitialTime(it, nextMinuteDepartureTime, request.boardSlackInSeconds);
         }
     }
 

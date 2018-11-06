@@ -37,7 +37,7 @@ import java.util.Iterator;
  * (generating randomized schedules).
  */
 @SuppressWarnings("Duplicates")
-public class McRangeRaptorWorker extends AbstractRangeRaptorWorker<McWorkerState, Path2> {
+public class McRangeRaptorWorker extends AbstractRangeRaptorWorker<McWorkerState> {
 
     // Variables to track time spent
     private static final AvgTimer TIMER_ROUTE = AvgTimer.timerMilliSec("McRR:route");
@@ -47,28 +47,23 @@ public class McRangeRaptorWorker extends AbstractRangeRaptorWorker<McWorkerState
     private static final AvgTimer TIMER_BY_MINUTE_TRANSFERS = AvgTimer.timerMicroSec("McRR:runRaptorForMinute Transfers");
 
 
-    public McRangeRaptorWorker(TransitDataProvider transitData, McWorkerState state) {
-        super(transitData, state);
+    public McRangeRaptorWorker(TransitDataProvider transitData, McWorkerState state, RangeRaptorRequest request) {
+        super(transitData, state, request);
     }
 
-    @Override protected Collection<Path2> paths(Collection<StopArrival> egressStops) {
-        return state.extractPaths(egressStops);
+    @Override protected Collection<Path2> paths() {
+        return state.extractPaths(request.egressStops);
     }
 
     @Override
-    protected void addPathsForCurrentIteration(
-            int boardSlackInSeconds,
-            Collection<StopArrival> accessStops,
-            Collection<StopArrival> egressStops
-    ) {
+    protected void addPathsForCurrentIteration() {
         // NOOP
     }
 
     /**
      * Perform a scheduled search
-     * @param boardSlackInSeconds {@link RangeRaptorRequest#boardSlackInSeconds}
      */
-    @Override protected void scheduledSearchForRound(final int boardSlackInSeconds) {
+    @Override protected void scheduledSearchForRound() {
         BitSetIterator stops = state.stopsTouchedPreviousRound();
         Iterator<TripPatternInfo> patternIterator = transit.patternIterator(stops);
 
@@ -83,7 +78,7 @@ public class McRangeRaptorWorker extends AbstractRangeRaptorWorker<McWorkerState
 
                 for (McStopState boardStop : state.listStopStatesPreviousRound(boardStopIndex)) {
 
-                    int earliestBoardTime = boardStop.time() + boardSlackInSeconds;
+                    int earliestBoardTime = earliestBoardTime(boardStop.time());
                     boolean found = search.search(earliestBoardTime, boardStopPosInPtn);
 
                     for (int alightStopPosInPtn = boardStopPosInPtn + 1; alightStopPosInPtn < pattern.currentPatternStopsSize(); alightStopPosInPtn++) {

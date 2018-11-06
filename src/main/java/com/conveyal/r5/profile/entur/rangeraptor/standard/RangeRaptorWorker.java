@@ -3,6 +3,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripPatternInfo;
+import com.conveyal.r5.profile.entur.api.TuningParameters;
 import com.conveyal.r5.profile.entur.rangeraptor.TripScheduleBoardSearch;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
@@ -37,7 +38,7 @@ import java.util.Iterator;
  * (generating randomized schedules).
  */
 @SuppressWarnings("Duplicates")
-public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWorkerState, Path2> {
+public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWorkerState> {
 
     // Variables to track time spent
     private static final AvgTimer TIMER_ROUTE = AvgTimer.timerMilliSec("RRaptor:route");
@@ -52,19 +53,18 @@ public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWork
     private final PathBuilderCursorBased pathBuilder;
 
     public RangeRaptorWorker(
-            int nRounds,
-            int nStops,
-            int maxDurationSeconds,
+            TuningParameters tuningParameters,
             TransitDataProvider transitData,
-            StopStateCollection stateCollection
+            StopStateCollection stateCollection,
+            RangeRaptorRequest request
     ) {
-        super(transitData, new RangeRaptorWorkerState(nRounds, nStops, maxDurationSeconds, stateCollection));
+        super(transitData, new RangeRaptorWorkerState(tuningParameters.nRounds(), transitData.numberOfStops(), stateCollection), request);
         this.pathBuilder = new PathBuilderCursorBased(stateCollection.newCursor());
         this.paths = new ArrayList<>();
     }
 
     @Override
-    protected Collection<Path2> paths(Collection<StopArrival> egressStops) {
+    protected Collection<Path2> paths() {
         return paths;
     }
 
@@ -72,15 +72,15 @@ public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWork
      * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
      */
     @Override
-    protected void addPathsForCurrentIteration(int boardSlackInSeconds, Collection<StopArrival> accessStops, Collection<StopArrival> egressStops) {
-        pathBuilder.setBoardSlackInSeconds(boardSlackInSeconds);
+    protected void addPathsForCurrentIteration() {
+        pathBuilder.setBoardSlackInSeconds(request.boardSlackInSeconds);
 
-        for (StopArrival it : egressStops) {
+        for (StopArrival it : request.egressStops) {
 
             // TODO TGR -- Add egress transit time to path
 
             if (state.isStopReachedByTransit(it.stop())) {
-                Path2 p = pathBuilder.extractPathForStop(state.getMaxNumberOfRounds(), it, accessStops);
+                Path2 p = pathBuilder.extractPathForStop(state.getMaxNumberOfRounds(), it, request.accessStops);
                 if (p != null) {
                     paths.add(p);
                 }
@@ -90,10 +90,9 @@ public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWork
 
     /**
      * Perform a scheduled search
-     * @param boardSlackInSeconds {@link RangeRaptorRequest#boardSlackInSeconds}
      */
     @Override
-    protected void scheduledSearchForRound(final int boardSlackInSeconds) {
+    protected void scheduledSearchForRound() {
 
         Iterator<TripPatternInfo> patternIterator = transit.patternIterator(state.bestStopsTouchedLastRoundIterator());
 
@@ -126,7 +125,7 @@ public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWork
                 // Don't attempt to board if this stop was not reached in the last round.
                 // Allow to reboard the same pattern - a pattern may loop and visit the same stop twice
                 if (state.isStopReachedInPreviousRound(stop)) {
-                    int earliestBoardTime = state.bestTimePreviousRound(stop) + boardSlackInSeconds;
+                    int earliestBoardTime = earliestBoardTime(state.bestTimePreviousRound(stop));
                     int tripIndexUpperBound = (onTrip == -1 ? pattern.getTripScheduleSize() : onTrip);
 
                     // check if we can back up to an earlier trip due to this stop being reached earlier

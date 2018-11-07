@@ -1,6 +1,5 @@
 package com.conveyal.r5.transit;
 
-import com.conveyal.gtfs.model.Shape;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.streets.VertexStore;
@@ -102,6 +101,7 @@ public class TripPattern implements Serializable, Cloneable {
     }
 
     public void addTrip (TripSchedule tripSchedule) {
+        tripSchedule.setPattern(this);
         tripSchedules.add(tripSchedule);
         hasFrequencies = hasFrequencies || tripSchedule.headwaySeconds != null;
         hasSchedules = hasSchedules || tripSchedule.headwaySeconds == null;
@@ -154,12 +154,7 @@ public class TripPattern implements Serializable, Cloneable {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("TripPattern on route ");
-        sb.append(routeId);
-        sb.append(" with stops ");
-        sb.append(Arrays.toString(stops));
-        return sb.toString();
+        return "TripPattern on route " + routeId + " with stops " + Arrays.toString(stops);
     }
 
     public String toStringDetailed (TransitLayer transitLayer) {
@@ -193,6 +188,7 @@ public class TripPattern implements Serializable, Cloneable {
             // This pattern has a shape. Using the segment indexes and segment fractions that were recorded for each
             // stop when the R5 network was built, split that shape up into segments between each pair of stops.
             LocationIndexedLine unprojectedLine = new LocationIndexedLine(shape);
+
             for (int stopPos = 0; stopPos < stops.length - 1; stopPos++) {
                 LinearLocation fromLocation =
                         new LinearLocation(stopShapeSegment[stopPos], stopShapeFraction[stopPos]);

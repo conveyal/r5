@@ -1,10 +1,11 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
+import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.util.IntUtils;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 
-public interface StopState {
+public interface StopState<T extends TripScheduleInfo> {
 
     /**
      * This value essentially serves as Infinity for ints - it's bigger than every other number.
@@ -24,9 +25,7 @@ public interface StopState {
 
     boolean arrivedByTransit();
 
-    int pattern();
-
-    int trip();
+    T trip();
 
     int boardStop();
 
@@ -39,15 +38,14 @@ public interface StopState {
     int transferTime();
 
     default String asString(String description, int round, int toStop) {
-        return String.format("State %s { rnd: %d, stop: %s - %s, alight: %s, board: %s, ptn: %s, trp: %s, transfer: %s }",
+        return String.format("State %s { rnd: %d, stop: %s - %s, alight: %s, board: %s, trp: %s, transfer: %s }",
                 description,
                 round,
                 IntUtils.intToString(arrivedByTransit() ? boardStop() : transferFromStop(), NOT_SET),
                 IntUtils.intToString(toStop, NOT_SET),
                 TimeUtils.timeToStrLong(time(), UNREACHED),
                 TimeUtils.timeToStrLong(boardTime(), UNREACHED),
-                IntUtils.intToString(pattern(), NOT_SET),
-                IntUtils.intToString(trip(), NOT_SET),
+                trip()==null ? "-" : trip().debugInfo(),
                 TimeUtils.timeToStrCompact(transferTime(), NOT_SET)
         );
     }

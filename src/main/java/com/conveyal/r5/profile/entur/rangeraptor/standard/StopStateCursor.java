@@ -1,8 +1,10 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
-public interface StopStateCursor {
+import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 
-    StopState stop(int round, int stop);
+public interface StopStateCursor<T extends TripScheduleInfo> {
+
+    StopState<T> stop(int round, int stop);
 
     boolean stopNotVisited(int round, int stop);
 }

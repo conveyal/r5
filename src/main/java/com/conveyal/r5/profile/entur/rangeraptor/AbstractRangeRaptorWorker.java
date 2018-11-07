@@ -37,10 +37,10 @@ import java.util.Iterator;
  * (generating randomized schedules).
  */
 @SuppressWarnings("Duplicates")
-public abstract class AbstractRangeRaptorWorker<S extends WorkerState> implements Worker {
+public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends TripScheduleInfo> implements Worker<T> {
 
     /** the transit data role needed for routing */
-    protected final TransitDataProvider transit;
+    protected final TransitDataProvider<T> transit;
 
     // TODO add javadoc to field
     protected final S state;
@@ -48,7 +48,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState> implement
     // TODO add javadoc to field
     protected final RangeRaptorRequest request;
 
-    public AbstractRangeRaptorWorker(TransitDataProvider transitData, S state, RangeRaptorRequest request) {
+    public AbstractRangeRaptorWorker(TransitDataProvider<T> transitData, S state, RangeRaptorRequest request) {
         this.transit = transitData;
         this.state = state;
         this.request = request;
@@ -62,7 +62,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState> implement
     protected abstract AvgTimer timerByMinuteScheduleSearch();
     protected abstract AvgTimer timerByMinuteTransfers();
 
-    protected abstract Collection<Path2> paths();
+    protected abstract Collection<Path2<T>> paths();
 
     /**
      * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
@@ -81,7 +81,8 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState> implement
      *
      * @return a unique set of paths
      */
-    public Collection<Path2> route() {
+    @Override
+    public Collection<Path2<T>> route() {
         timerRoute().time(() -> {
             timerSetup(transit::init);
 
@@ -104,6 +105,10 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState> implement
         return time + request.boardSlackInSeconds;
     }
 
+    /** Skip trips NOT running on the day of the search and skip frequency trips */
+    final protected boolean skipTripSchedule(T trip) {
+        return !transit.isTripScheduleInService(trip);
+    }
 
     /**
      * Perform one minute of a RAPTOR search.
@@ -145,7 +150,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState> implement
     private void advanceScheduledSearchToPreviousMinute(
             int nextMinuteDepartureTime
     ) {
-        state.initNewDepatureForMinute(nextMinuteDepartureTime);
+        state.initNewDepartureForMinute(nextMinuteDepartureTime);
 
         // add initial stops
         for (StopArrival it : request.accessStops) {
@@ -166,10 +171,5 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState> implement
                 state.transferToStop(fromStop, transfer);
             }
         }
-    }
-
-    /** Skip trips NOT running on the day of the search and skip frequency trips */
-    protected boolean skipTripSchedule(TripScheduleInfo trip) {
-        return !transit.isTripScheduleInService(trip);
     }
 }

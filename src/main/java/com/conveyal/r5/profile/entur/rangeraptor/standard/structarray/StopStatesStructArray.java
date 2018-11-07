@@ -2,29 +2,30 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard.structarray;
 
 
 import com.conveyal.r5.profile.entur.api.StopArrival;
+import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCollection;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCursor;
 
 
-public final class StopStatesStructArray implements StopStateCollection {
+public final class StopStatesStructArray<T extends TripScheduleInfo> implements StopStateCollection<T> {
 
-    private final StopStateStruct[][] stops;
+    private final StopStateStruct<T>[][] stops;
 
 
     public StopStatesStructArray(int nRounds, int stops) {
-        this.stops = new StopStateStruct[nRounds][stops];
+        this.stops = (StopStateStruct<T>[][]) new StopStateStruct[nRounds][stops];
     }
 
     @Override
     public void setInitialTime(int round, int stop, int time) {
-        findOrCreateStopIndex(round, stop).time = time;
+        findOrCreateStopIndex(round, stop).setTime(time);
     }
 
     @Override
-    public void transitToStop(int round, int stop, int time, int boardStop, int boardTime, int pattern, int trip, boolean bestTime) {
-        StopStateStruct state = findOrCreateStopIndex(round, stop);
+    public void transitToStop(int round, int stop, int time, int boardStop, int boardTime, T trip, boolean bestTime) {
+        StopStateStruct<T> state = findOrCreateStopIndex(round, stop);
 
-        state.arriveByTransit(time, boardStop, boardTime, pattern, trip);
+        state.arriveByTransit(time, boardStop, boardTime, trip);
 
         if(bestTime) {
             state.setBestTimeTransit(time);
@@ -43,23 +44,23 @@ public final class StopStatesStructArray implements StopStateCollection {
     }
 
     public final int time(int round, int stop) {
-        return stops[round][stop].time;
+        return stops[round][stop].time();
     }
 
     public Cursor newCursor() {
         return new Cursor();
     }
 
-    private StopStateStruct findOrCreateStopIndex(final int round, final int stop) {
+    private StopStateStruct<T> findOrCreateStopIndex(final int round, final int stop) {
         if(stops[round][stop] == null) {
-            stops[round][stop] = new StopStateStruct();
+            stops[round][stop] = new StopStateStruct<T>();
         }
         return stops[round][stop];
     }
 
-    public class Cursor implements StopStateCursor {
+    public class Cursor implements StopStateCursor<T> {
 
-        public StopStateStruct stop(int round, int stop) {
+        public StopStateStruct<T> stop(int round, int stop) {
             return stops[round][stop];
         }
 
@@ -68,5 +69,4 @@ public final class StopStatesStructArray implements StopStateCollection {
             return stops[round][stop] == null;
         }
     }
-
 }

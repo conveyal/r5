@@ -32,7 +32,7 @@ public class ItineraryMapper2 {
         this.transportNetwork = transportNetwork;
     }
 
-    SpeedTestItinerary createItinerary(ProfileRequest request, Path2 path, StreetPath accessPath, StreetPath egressPath) {
+    SpeedTestItinerary createItinerary(ProfileRequest request, Path2<TripSchedule> path, StreetPath accessPath, StreetPath egressPath) {
         SpeedTestItinerary itinerary = new SpeedTestItinerary();
         if (path == null) {
             return null;
@@ -55,7 +55,7 @@ public class ItineraryMapper2 {
 
         // Access leg
         Leg leg = new Leg();
-        PathLeg accessLeg = path.accessLeg();
+        PathLeg<TripSchedule> accessLeg = path.accessLeg();
 
         Stop firstStop = transitLayer().stopForIndex.get(accessLeg.toStop());
 
@@ -74,7 +74,7 @@ public class ItineraryMapper2 {
 
         PathLeg prevPathLeg = accessLeg;
 
-        for (PathLeg pathLeg :  path.legs()) {
+        for (PathLeg<TripSchedule> pathLeg :  path.legs()) {
             Stop fromStop = transitLayer().stopForIndex.get(pathLeg.fromStop());
             Stop toStop = transitLayer().stopForIndex.get(pathLeg.toStop());
             leg = new Leg();
@@ -102,9 +102,9 @@ public class ItineraryMapper2 {
                 ++numberOfTransits;
                 leg.distance = 0.0;
 
-                TripPattern tripPattern = transitLayer().tripPatterns.get(pathLeg.pattern());
+                TripSchedule tripSchedule = pathLeg.trip();
+                TripPattern tripPattern = tripSchedule.tripPattern();
                 RouteInfo routeInfo = transitLayer().routes.get(tripPattern.routeIndex);
-                TripSchedule tripSchedule = tripPattern.tripSchedules.get(pathLeg.trip());
 
                 itinerary.transitTime += pathLeg.toTime() - pathLeg.fromTime();
 
@@ -153,7 +153,7 @@ public class ItineraryMapper2 {
 
         // Egress leg
         leg = new Leg();
-        PathLeg egressLeg = path.egressLeg();
+        PathLeg<TripSchedule> egressLeg = path.egressLeg();
 
         Stop lastStop = transitLayer().stopForIndex.get(egressLeg.fromStop());
         leg.startTime = createCalendar(request.date, egressLeg.fromTime());

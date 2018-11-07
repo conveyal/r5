@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.AStopArrival;
+import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -14,6 +15,7 @@ public class StopStateParetoSetTest {
     private static final int ROUND_1 = 1;
     private static final int ROUND_2 = 2;
     private static final int ROUND_3 = 3;
+    private static final TripScheduleInfo ANY_TRIP = null;
 
     // In this test each stop is used to identify the pareto vector - it is just one
     // ParetoSet "subject" with multiple "stops" in it. The stop have no effect on
@@ -25,9 +27,9 @@ public class StopStateParetoSetTest {
     private static final int STOP_5 = 5;
     private static final int STOP_6 = 6;
 
-    private McStopState A_STATE = newMcAccessStopState(999, 10);
+    private McStopState<TripScheduleInfo> A_STATE = newMcAccessStopState(999, 10);
 
-    private StopStateParetoSet subject = StopStates.createState();
+    private StopStateParetoSet<TripScheduleInfo> subject = StopStates.createState();
 
     @Test
     public void addOneElementToSet() {
@@ -78,8 +80,8 @@ public class StopStateParetoSetTest {
     @Test
     public void testTransitAndTransferDoesAffectDominance() {
         subject.add(newMcAccessStopState(STOP_1, 20));
-        subject.add(new McTransitStopState(A_STATE, ROUND_1, STOP_2, 10, ANY, ANY, ANY));
-        subject.add(new McTransitStopState(A_STATE, ROUND_1, STOP_3, 11, ANY, ANY, ANY));
+        subject.add(newMcTransitStopState(A_STATE, ROUND_1, STOP_2, 10));
+        subject.add(newMcTransitStopState(A_STATE, ROUND_1, STOP_3, 11));
         subject.add(newMcTransferStopState(A_STATE, ROUND_1, STOP_4, 8));
         subject.add(newMcTransferStopState(A_STATE, ROUND_1, STOP_4, 9));
         assertStopsInSet(STOP_1, STOP_2, STOP_4);
@@ -90,11 +92,15 @@ public class StopStateParetoSetTest {
         Assert.assertEquals("Stop indexes", Arrays.toString(expStopIndexes), Arrays.toString(result));
     }
 
-    private static McAccessStopState newMcAccessStopState(int stop, int accessDurationInSeconds) {
-        return new McAccessStopState(new AStopArrival(stop, accessDurationInSeconds), A_TIME, ANY);
+    private static McAccessStopState<TripScheduleInfo> newMcAccessStopState(int stop, int accessDurationInSeconds) {
+        return new McAccessStopState<>(new AStopArrival(stop, accessDurationInSeconds), A_TIME, ANY);
     }
 
-    private static McTransferStopState newMcTransferStopState(McStopState prev, int round, int stop, int arrivalTime) {
-        return new McTransferStopState(prev, round, new AStopArrival(stop, ANY), arrivalTime);
+    private static McTransitStopState<TripScheduleInfo> newMcTransitStopState(McStopState<TripScheduleInfo> prev, int round, int stop, int arrivalTime) {
+        return new McTransitStopState<>(prev, round, stop, arrivalTime, ANY, ANY_TRIP);
+    }
+
+    private static McTransferStopState<TripScheduleInfo> newMcTransferStopState(McStopState<TripScheduleInfo> prev, int round, int stop, int arrivalTime) {
+        return new McTransferStopState<>(prev, round, new AStopArrival(stop, ANY), arrivalTime);
     }
 }

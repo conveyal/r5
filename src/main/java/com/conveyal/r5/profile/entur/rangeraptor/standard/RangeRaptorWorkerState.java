@@ -2,6 +2,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 
 import com.conveyal.r5.profile.entur.api.StopArrival;
+import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.util.DebugState;
 
@@ -25,7 +26,7 @@ import static com.conveyal.r5.profile.entur.util.DebugState.Type.Transit;
  *
  * @author mattwigway
  */
-public final class RangeRaptorWorkerState implements WorkerState {
+public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements WorkerState {
 
     /**
      * @deprecated TODO TGR - Replace with pareto destination check
@@ -37,8 +38,8 @@ public final class RangeRaptorWorkerState implements WorkerState {
     /**
      * To debug a particular journey set DEBUG to true and add all visited stops in the debugStops list.
      */
-    private final StopStateCollection stops;
-    private final StopStateCursor cursor;
+    private final StopStateCollection<T> stops;
+    private final StopStateCursor<T> cursor;
     private final int nRounds;
     private int round = 0;
     private int roundMax = -1;
@@ -55,7 +56,7 @@ public final class RangeRaptorWorkerState implements WorkerState {
 
 
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
-    RangeRaptorWorkerState(int nRounds, int nStops, StopStateCollection stops) {
+    RangeRaptorWorkerState(int nRounds, int nStops, StopStateCollection<T> stops) {
         this.nRounds = nRounds;
         this.stops = stops;
         this.cursor = stops.newCursor();
@@ -104,7 +105,7 @@ public final class RangeRaptorWorkerState implements WorkerState {
     }
 
     @Override
-    public void initNewDepatureForMinute(int departureTime) {
+    public void initNewDepartureForMinute(int departureTime) {
         // TODO TGR - Set max limit to 5 days for now, replace this with a pareto check against the
         // TODO TGR - destination location values.
         maxTimeLimit = departureTime + MAX_TRIP_DURATION_SECONDS;
@@ -129,7 +130,7 @@ public final class RangeRaptorWorkerState implements WorkerState {
     /**
      * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the transitTime
      */
-    void transitToStop(int stop, int alightTime, int pattern, int trip, int boardStop, int boardTime) {
+    void transitToStop(int stop, int alightTime, T trip, int boardStop, int boardTime) {
         if (alightTime > maxTimeLimit) {
             return;
         }
@@ -139,7 +140,7 @@ public final class RangeRaptorWorkerState implements WorkerState {
             // transitTimes upper bounds bestTimes
             final boolean newBestOverall = bestOverall.updateNewBestTime(stop, alightTime);
 
-            stops.transitToStop(round, stop, alightTime, boardStop, boardTime, pattern, trip, newBestOverall);
+            stops.transitToStop(round, stop, alightTime, boardStop, boardTime, trip, newBestOverall);
 
             // skip: transferTimes
             debugStop(Transit, round, stop);

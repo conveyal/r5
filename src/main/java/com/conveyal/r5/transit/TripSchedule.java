@@ -80,6 +80,8 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
      */
     public int[] stopSequences;
 
+    private TripPattern tripPattern;
+
     /** static factory so we can return null */
     public static TripSchedule create (Trip trip, int[] arrivals, int[] departures, Collection<Frequency> frequencies, int[] stopSequences, int serviceCode) {
         // ensure that trip times are monotonically increasing, otherwise throw them out
@@ -265,5 +267,21 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
     @Override
     public int departure(int stopPosInPattern) {
         return departures[stopPosInPattern];
+    }
+
+    @Override
+    public String debugInfo() {
+        return tripId;
+    }
+
+    public void setPattern(TripPattern tripPattern) {
+        if(this.tripPattern != null) {
+            throw new IllegalStateException("Trip schedule is added to more tan one pattern!!!!");
+        }
+        this.tripPattern = tripPattern;
+    }
+
+    public TripPattern tripPattern() {
+        return tripPattern;
     }
 }

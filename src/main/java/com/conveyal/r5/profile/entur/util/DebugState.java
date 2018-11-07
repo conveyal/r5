@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile.entur.util;
 
+import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopState;
 
 import java.util.ArrayList;
@@ -21,8 +22,8 @@ public final class DebugState {
 
     private static final List<Integer> DEBUG_STOPS = new ArrayList<>();
 
-    private static final String STOP_HEADER = "Description Rnd  From  To     Start    End        Time   Pattern Trp";
-    private static final String LINE_FORMAT = " * %-8s %2d   %5s %5s  %8s %8s %8s  %6s %3s";
+    private static final String STOP_HEADER = "Description Rnd  From  To     Start    End        Time   Trip";
+    private static final String LINE_FORMAT = " * %-8s %2d   %5s %5s  %8s %8s %8s  %6s";
 
     private static String title = "DEBUG";
     private static String headerPostfix = null;
@@ -60,27 +61,26 @@ public final class DebugState {
         }
     }
 
-    public static void debugStop(Type type, int round, int stop, StopState state) {
+    public static <T extends TripScheduleInfo> void debugStop(Type type, int round, int stop, StopState<T> state) {
         if (isDebug(stop)) {
             System.err.println(toString(type, round, stop, state));
         }
     }
 
-    public static void debugStop(Type type, int round, int stop, StopState state, String stopPostfix) {
+    public static <T extends TripScheduleInfo> void debugStop(Type type, int round, int stop, StopState<T> state, String stopPostfix) {
         if (isDebug(stop)) {
             System.err.println(toString(type, round, stop, state) + " | " + stopPostfix);
         }
     }
 
-    private static String toString(Type type, int round, int stopIndex, StopState state) {
+    private static <T extends TripScheduleInfo> String toString(Type type, int round, int stopIndex, StopState<T> state) {
         debugStopHeaderAtMostOnce();
         if (type == Type.Access) {
             assertSet(state, state.boardTime(), UNREACHED);
             assertSet(state, state.boardStop(), NOT_SET);
             assertSet(state, state.transferTime(), NOT_SET);
             assertSet(state, state.transferFromStop(), NOT_SET);
-            assertSet(state, state.pattern(), NOT_SET);
-            assertSet(state, state.trip(), NOT_SET);
+            assertNotNull(state, state.trip(), "trip");
 
             return format(
                     "Access",
@@ -90,15 +90,13 @@ public final class DebugState {
                     UNREACHED,
                     state.time(),
                     NOT_SET,
-                    NOT_SET,
-                    NOT_SET
+                    null
             );
         }
         else if (type == Type.Transit) {
             assertNotSet(state, state.boardTime(), UNREACHED);
             assertNotSet(state, state.boardStop(), NOT_SET);
-            assertNotSet(state, state.pattern(), NOT_SET);
-            assertNotSet(state, state.trip(), NOT_SET);
+            assertNull(state, state.trip(), "trip");
             return format(
                     "Transit",
                     round,
@@ -107,7 +105,6 @@ public final class DebugState {
                     state.boardTime(),
                     state.transitTime(),
                     state.transitTime() - state.boardTime(),
-                    state.pattern(),
                     state.trip()
             );
 
@@ -123,14 +120,13 @@ public final class DebugState {
                     state.time() - state.transferTime(),
                     state.time(),
                     state.transferTime(),
-                    NOT_SET,
-                    NOT_SET
+                    null
             );
         }
         throw new IllegalArgumentException("Type not supported: " + type);
     }
 
-    private static String format(String description, int round, int fromStop, int toStop, int fromTime, int toTime, int dTime, int pattern, int trip) {
+    private static <T extends TripScheduleInfo> String format(String description, int round, int fromStop, int toStop, int fromTime, int toTime, int dTime, T trip) {
         return String.format(
                 LINE_FORMAT,
                 description,
@@ -140,8 +136,7 @@ public final class DebugState {
                 timeToStrLong(fromTime, UNREACHED),
                 timeToStrLong(toTime, UNREACHED),
                 timeToStrCompact(dTime, NOT_SET),
-                intToString(pattern, NOT_SET),
-                intToString(trip, NOT_SET)
+                trip == null ? "" : trip.debugInfo()
         );
     }
 
@@ -154,6 +149,18 @@ public final class DebugState {
     private static void assertNotSet(StopState state, int value, int expectedDefault) {
         if (value == expectedDefault || value < 0) {
             throw new IllegalStateException("Unexpected value in state: " + value + ", state: " + state);
+        }
+    }
+
+    private static <T> void assertNotNull(StopState state, T value, String name) {
+        if (value == null) {
+            throw new IllegalStateException("Unexpected null value in state. " + name + " is null, state: " + state);
+        }
+    }
+
+    private static <T> void assertNull(StopState state, T value, String name) {
+        if (value != null) {
+            throw new IllegalStateException("Unexpected value in state, expected null. " + name + " is not null.  state: " + state);
         }
     }
 

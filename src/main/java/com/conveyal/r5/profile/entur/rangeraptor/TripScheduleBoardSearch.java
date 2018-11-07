@@ -18,7 +18,7 @@ import java.util.function.Function;
  * given threshold. A linear search is slow when the number of schedules is very
  * large, let say more than 300 trip schedules.
  */
-public class TripScheduleBoardSearch {
+public class TripScheduleBoardSearch<T extends TripScheduleInfo> {
     /**
      * The threshold is used to determine when to perform a binary search to reduce the
      * range to search in. The value ´46´ is based on testing with data from Entur and
@@ -26,13 +26,13 @@ public class TripScheduleBoardSearch {
      * between 10 and 100 does not affect the performance mutch.
      */
     private final static int BINARY_SEARCH_THRESHOLD = 46;
-    private final TripPatternInfo pattern;
-    private final Function<TripScheduleInfo, Boolean> skipTripScheduleCallback;
+    private final TripPatternInfo<T> pattern;
+    private final Function<T, Boolean> skipTripScheduleCallback;
 
-    public TripScheduleInfo candidateTrip;
+    public T candidateTrip;
     public int candidateTripIndex;
 
-    public TripScheduleBoardSearch(TripPatternInfo pattern, Function<TripScheduleInfo, Boolean> skipTripScheduleCallback) {
+    public TripScheduleBoardSearch(TripPatternInfo<T> pattern, Function<T, Boolean> skipTripScheduleCallback) {
         this.pattern = pattern;
         this.skipTripScheduleCallback = skipTripScheduleCallback;
     }
@@ -42,7 +42,7 @@ public class TripScheduleBoardSearch {
      * @param earliestBoardTime     The earliest point in time a trip can be boarded, exclusive.
      */
     public boolean search(int earliestBoardTime, int stopPositionInPattern) {
-        return searchBackwardsForTheFirstBoardingOnAValidTrip(pattern.getTripScheduleSize(), earliestBoardTime, stopPositionInPattern);
+        return searchBackwardsForTheFirstBoardingOnAValidTrip(pattern.numberOfTripSchedules(), earliestBoardTime, stopPositionInPattern);
     }
 
 
@@ -71,7 +71,7 @@ public class TripScheduleBoardSearch {
         candidateTrip = null;
 
         for(int index = tripIndexUpperBound-1; index >= 0;  --index) {
-            TripScheduleInfo trip = pattern.getTripSchedule(index);
+            T trip = pattern.getTripSchedule(index);
 
             if (skipTripSchedule(trip)) {
                 continue;
@@ -124,7 +124,7 @@ public class TripScheduleBoardSearch {
         // No trip schedule below the upper bound from the binary search exist.
         // So we have to search for the first valid trip schedule after that.
         for(int index = upper; index < tripIndexUpperBound ; ++index) {
-            TripScheduleInfo trip = pattern.getTripSchedule(index);
+            T trip = pattern.getTripSchedule(index);
 
             if (skipTripSchedule(trip)) {
                 continue;
@@ -147,7 +147,7 @@ public class TripScheduleBoardSearch {
     }
 
     /** Skip trips not running on the day of the search and frequency trips  */
-    private boolean skipTripSchedule(TripScheduleInfo trip) {
+    private boolean skipTripSchedule(T trip) {
         return skipTripScheduleCallback.apply(trip);
     }
 }

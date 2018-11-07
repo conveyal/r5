@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.StopArrival;
+import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.TuningParameters;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.WorkerState;
@@ -33,7 +34,7 @@ import static com.conveyal.r5.profile.entur.util.DebugState.Type.Transit;
  *
  * @author mattwigway
  */
-public final class McWorkerState implements WorkerState {
+public final class McWorkerState<T extends TripScheduleInfo> implements WorkerState {
 
     /**
      * Stop the search when the time exceeds the max time limit.
@@ -42,7 +43,7 @@ public final class McWorkerState implements WorkerState {
      */
     private int maxTimeLimit;
 
-    private final StopStates stops;
+    private final StopStates<T> stops;
     private final int nRounds;
     private int round = Integer.MIN_VALUE;
 
@@ -53,13 +54,13 @@ public final class McWorkerState implements WorkerState {
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
     public McWorkerState(int nRounds, int nStops) {
         this.nRounds = nRounds;
-        this.stops = new StopStates(nStops);
+        this.stops = new StopStates<>(nStops);
 
         this.touchedCurrent = new BitSet(nStops);
         this.touchedPrevious = new BitSet(nStops);
     }
 
-    @Override public void initNewDepatureForMinute(int departureTime) {
+    @Override public void initNewDepartureForMinute(int departureTime) {
         // TODO TGR - Set max limit to 5 days for now, replace this with a pareto check against the
         // TODO TGR - destination location values.
         maxTimeLimit = departureTime + 5 * 24 * 60 * 60;
@@ -94,7 +95,7 @@ public final class McWorkerState implements WorkerState {
         return new BitSetIterator(touchedPrevious);
     }
 
-    Iterable<? extends McStopState> listStopStatesPreviousRound(int stop) {
+    Iterable<? extends McStopState<T>> listStopStatesPreviousRound(int stop) {
         return stops.list(round-1, stop);
     }
 
@@ -102,12 +103,12 @@ public final class McWorkerState implements WorkerState {
     /**
      * Set the time at a transit stop iff it is optimal.
      */
-    void transitToStop(McStopState boardStop, int stop, int alightTime, int pattern, int trip, int boardTime) {
+    void transitToStop(McStopState<T> boardStop, int stop, int alightTime, int boardTime, T trip) {
         if (alightTime > maxTimeLimit) {
             return;
         }
 
-        boolean added = stops.transitToStop(boardStop, round, stop, alightTime, pattern, trip, boardTime);
+        boolean added = stops.transitToStop(boardStop, round, stop, alightTime, trip, boardTime);
 
         if (added) {
             touchedCurrent.set(stop);
@@ -123,7 +124,7 @@ public final class McWorkerState implements WorkerState {
         final int targetStop = transfer.stop();
         final int transferTimeInSeconds = transfer.durationInSeconds();
 
-        for(McStopState it :  stops.listArrivedByTransit(round, fromStop)) {
+        for(McStopState<T> it :  stops.listArrivedByTransit(round, fromStop)) {
             int arrivalTime = it.time() + transferTimeInSeconds;
 
             if (arrivalTime < maxTimeLimit) {
@@ -135,13 +136,13 @@ public final class McWorkerState implements WorkerState {
         debugStops(Transfer, round, targetStop);
     }
 
-    Collection<Path2> extractPaths(Collection<StopArrival> egressStops) {
-        List<Path2> paths = new ArrayList<>();
-        McPathBuilder builder = new McPathBuilder();
+    Collection<Path2<T>> extractPaths(Collection<StopArrival> egressStops) {
+        List<Path2<T>> paths = new ArrayList<>();
+        McPathBuilder<T> builder = new McPathBuilder<>();
 
         for (StopArrival egressStop : egressStops) {
-            for (McStopState it : stops.listAll(egressStop.stop())) {
-                Path2 p = builder.extractPathsForStop(it, egressStop.durationInSeconds());
+            for (McStopState<T> it : stops.listAll(egressStop.stop())) {
+                Path2<T> p = builder.extractPathsForStop(it, egressStop.durationInSeconds());
                 if(p != null) {
                     paths.add(p);
                 }
@@ -179,7 +180,7 @@ public final class McWorkerState implements WorkerState {
     private void debugStops(DebugState.Type type, int round, int stop) {
         if (DebugState.isDebug(stop)) {
             String postfix = (touchedCurrent.get(stop) ? "x " : "  ") + (touchedPrevious.get(stop) ? "x" : " ");
-            for (McStopState it : stops.list(round, stop)) {
+            for (McStopState<T> it : stops.list(round, stop)) {
                 if(it.type() == type) {
                     DebugState.debugStop(type, round, stop, it, postfix);
                 }

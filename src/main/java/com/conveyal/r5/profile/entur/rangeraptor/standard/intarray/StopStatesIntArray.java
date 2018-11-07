@@ -2,7 +2,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard.intarray;
 
 
 import com.conveyal.r5.profile.entur.api.StopArrival;
-import com.conveyal.r5.profile.entur.api.TuningParameters;
+import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCollection;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCursor;
@@ -11,15 +11,14 @@ import static com.conveyal.r5.profile.entur.rangeraptor.standard.StopState.NOT_S
 import static com.conveyal.r5.profile.entur.rangeraptor.standard.StopState.UNREACHED;
 import static com.conveyal.r5.profile.entur.util.IntUtils.newIntArray;
 
-public final class StopStatesIntArray implements StopStateCollection {
+public final class StopStatesIntArray<T extends TripScheduleInfo> implements StopStateCollection<T> {
     private int size = 0;
 
     private final int[][] stateStopIndex;
 
     private final int[] times;
     private final int[] transitTimes;
-    private final int[] previousPatterns;
-    private final int[] previousTrips;
+    private final T[] previousTrips;
     private final int[] boardTimes;
     private final int[] transferTimes;
     private final int[] boardStops;
@@ -35,8 +34,7 @@ public final class StopStatesIntArray implements StopStateCollection {
 
         this.boardStops = newIntArray(limit, NOT_SET);
         this.transitTimes = newIntArray(limit, UNREACHED);
-        this.previousPatterns = newIntArray(limit, NOT_SET);
-        this.previousTrips = newIntArray(limit, NOT_SET);
+        this.previousTrips = (T[]) new TripScheduleInfo[limit];
         this.boardTimes = newIntArray(limit, UNREACHED);
 
         this.transferFromStops = newIntArray(limit, NOT_SET);
@@ -53,17 +51,14 @@ public final class StopStatesIntArray implements StopStateCollection {
     }
 
     @Override
-    public void transitToStop(int round, int stop, int time, int boardStop, int boardTime, int pattern, int trip, boolean bestTime) {
+    public void transitToStop(int round, int stop, int time, int boardStop, int boardTime, T trip, boolean bestTime) {
         assert time > 0;
-        assert pattern >= 0;
         assert boardStop > 0;
-        assert trip >= 0;
         assert boardTime > 0;
 
         final int index = findOrCreateStopIndex(round, stop);
 
         transitTimes[index] = time;
-        previousPatterns[index] = pattern;
         previousTrips[index] = trip;
         boardTimes[index] = boardTime;
         boardStops[index] = boardStop;
@@ -92,7 +87,7 @@ public final class StopStatesIntArray implements StopStateCollection {
         transferTimes[index] = transferTime;
     }
 
-    public Cursor newCursor() {
+    public StopStateCursor<T> newCursor() {
         return new Cursor();
     }
 
@@ -110,7 +105,7 @@ public final class StopStatesIntArray implements StopStateCollection {
         return stateStopIndex[round][stop];
     }
 
-    public final class Cursor implements StopStateCursor, StopState {
+    public final class Cursor implements StopStateCursor<T>, StopState<T> {
         private int round;
         private int stop;
         private int cursor;
@@ -119,7 +114,7 @@ public final class StopStatesIntArray implements StopStateCollection {
         /* Implement StopStateCursor */
 
         @Override
-        public final StopState stop(int round, int stop) {
+        public final StopState<T> stop(int round, int stop) {
             this.cursor = stateStopIndex[round][stop];
             this.round = round;
             this.stop = stop;
@@ -150,12 +145,7 @@ public final class StopStatesIntArray implements StopStateCollection {
         }
 
         @Override
-        public final int pattern() {
-            return previousPatterns[cursor];
-        }
-
-        @Override
-        public final int trip() {
+        public final T trip() {
             return previousTrips[cursor];
         }
 

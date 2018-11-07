@@ -1,64 +1,63 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard.structarray;
 
+import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopState;
 
-class StopStateStruct implements StopState {
-    int time = UNREACHED;
-    int transitTime = UNREACHED;
-    int previousPattern = NOT_SET;
-    int previousTrip = NOT_SET;
-    int boardTime = UNREACHED;
-    int transferTime = NOT_SET;
-    int boardStop = NOT_SET;
-    int transferFromStop = NOT_SET;
+final class StopStateStruct<T extends TripScheduleInfo> implements StopState<T> {
+    private int time = UNREACHED;
+    private int transitTime = UNREACHED;
+    private T trip = null;
+    private int boardTime = UNREACHED;
+    private int transferTime = NOT_SET;
+    private int boardStop = NOT_SET;
+    private int transferFromStop = NOT_SET;
 
     @Override
     public final int time() {
         return time;
     }
 
+    void setTime(int time) {
+        this.time = time;
+    }
+
     @Override
-    public int transitTime() {
+    public final int transitTime() {
         return transitTime;
     }
 
     @Override
-    public boolean arrivedByTransit() {
+    public final boolean arrivedByTransit() {
         return transitTime != UNREACHED;
     }
 
     @Override
-    public int pattern() {
-        return previousPattern;
+    public final T trip() {
+        return trip;
     }
 
     @Override
-    public int trip() {
-        return previousTrip;
-    }
-
-    @Override
-    public int transferTime() {
+    public final int transferTime() {
         return transferTime;
     }
 
     @Override
-    public int boardStop() {
+    public final int boardStop() {
         return boardStop;
     }
 
     @Override
-    public int boardTime() {
+    public final int boardTime() {
         return boardTime;
     }
 
     @Override
-    public int transferFromStop() {
+    public final int transferFromStop() {
         return transferFromStop;
     }
 
     @Override
-    public boolean arrivedByTransfer() {
+    public final boolean arrivedByTransfer() {
         return transferFromStop != NOT_SET;
     }
 
@@ -67,15 +66,14 @@ class StopStateStruct implements StopState {
         return asString("struct array", -1, -1);
     }
 
-    void arriveByTransit(int time, int boardStop, int boardTime, int pattern, int trip) {
+    final void arriveByTransit(int time, int boardStop, int boardTime, T trip) {
         this.transitTime = time;
-        this.previousPattern = pattern;
-        this.previousTrip = trip;
+        this.trip = trip;
         this.boardTime = boardTime;
         this.boardStop = boardStop;
     }
 
-    void setBestTimeTransit(int time) {
+    final void setBestTimeTransit(int time) {
         this.time = time;
         this.transferFromStop = NOT_SET;
     }
@@ -83,7 +81,7 @@ class StopStateStruct implements StopState {
     /**
      * Set the time at a transit index iff it is optimal. This sets both the best time and the transfer time
      */
-    public void transferToStop(int fromStop, int arrivalTime, int transferTime) {
+    final void transferToStop(int fromStop, int arrivalTime, int transferTime) {
         this.time = arrivalTime;
         this.transferFromStop = fromStop;
         this.transferTime = transferTime;

@@ -25,4 +25,14 @@ public interface TripScheduleInfo {
      * @return the arrival time in seconds at the given stop
      */
     int departure(int stopPosInPattern);
+
+    /**
+     * The implementation should provide a very short description with enough information to identify
+     * the the trip.
+     * <p/>
+     * In a GTFS world this would be <em>pattern index/id</em> and <em>trip index</em>. Use something like this:
+     * <p/>
+     * {@code "ptn=5, trip=12"}
+     */
+    String debugInfo();
 }

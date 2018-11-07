@@ -3,6 +3,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.PathLeg;
 import com.conveyal.r5.profile.entur.api.StopArrival;
+import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.util.DebugState;
 
 import java.util.ArrayList;
@@ -17,13 +18,13 @@ import static com.conveyal.r5.profile.entur.rangeraptor.standard.StopState.NOT_S
 /**
  * Class used to represent transit paths in Browsochrones and Modeify.
  */
-class PathBuilderCursorBased {
-    private final StopStateCursor cursor;
+class PathBuilderCursorBased<T extends TripScheduleInfo> {
+    private final StopStateCursor<T> cursor;
     private int boardSlackInSeconds;
     private int round;
 
 
-    PathBuilderCursorBased(StopStateCursor cursor) {
+    PathBuilderCursorBased(StopStateCursor<T> cursor) {
         this.cursor = cursor;
     }
 
@@ -34,18 +35,18 @@ class PathBuilderCursorBased {
     /**
      * Scan over a raptor state and extract the path leading up to that state.
      */
-    Path2 extractPathForStop(int maxRound, StopArrival egressStop, Collection<StopArrival> accessStops) {
+    Path2<T> extractPathForStop(int maxRound, StopArrival egressStop, Collection<StopArrival> accessStops) {
         this.round = maxRound;
         int fromStopIndex = egressStop.stop();
 
         // find the fewest-transfers trip that is still optimal in terms of travel time
-        StopState state = findLastRoundWithTransitTimeSet(fromStopIndex);
+        StopState<T> state = findLastRoundWithTransitTimeSet(fromStopIndex);
 
         if (state == null) {
             return null;
         }
-        List<PathLeg> path = new ArrayList<>();
-        PathLeg egressLeg = new EgressLeg(fromStopIndex, state.transitTime(), egressStop.durationInSeconds());
+        List<PathLeg<T>> path = new ArrayList<>();
+        PathLeg<T> egressLeg = new EgressLeg<>(fromStopIndex, state.transitTime(), egressStop.durationInSeconds());
 
         DebugState.debugStopHeader("EXTRACT PATH");
         //state.debugStop("egress stop", state.round(), stop);
@@ -56,13 +57,10 @@ class PathBuilderCursorBased {
             toStopIndex = fromStopIndex;
             fromStopIndex = state.boardStop();
 
-            path.add(new TransitLeg(
+            path.add(new TransitLeg<>(
                     fromStopIndex,
                     toStopIndex,
-                    state.boardTime(),
-                    state.transitTime(),
-                    state.pattern(),
-                    state.trip()
+                    state
             ));
 
             state = cursor.stop(--round, fromStopIndex);
@@ -71,7 +69,7 @@ class PathBuilderCursorBased {
                 toStopIndex = fromStopIndex;
                 fromStopIndex = state.transferFromStop();
 
-                path.add(new TransferLeg(
+                path.add(new TransferLeg<>(
                         fromStopIndex,
                         toStopIndex,
                         state.time(),
@@ -88,9 +86,9 @@ class PathBuilderCursorBased {
         );
 
         // TODO TGR - This should be removed when access/egress becomes part of state.
-        PathLeg accessLeg = new AccessLeg(path.get(path.size()-1).fromTime() - boardSlackInSeconds , accessStop);
+        PathLeg<T> accessLeg = new AccessLeg<>(path.get(path.size()-1).fromTime() - boardSlackInSeconds , accessStop);
 
-        return new Path(accessLeg, path, egressLeg);
+        return new Path<>(accessLeg, path, egressLeg);
     }
 
     /**
@@ -98,7 +96,7 @@ class PathBuilderCursorBased {
      * the last round with a transit time set. This is sufficient for finding the
      * best time, since the state is only recorded iff it is faster then previous rounds.
      */
-    private StopState findLastRoundWithTransitTimeSet(int egressStop) {
+    private StopState<T> findLastRoundWithTransitTimeSet(int egressStop) {
 
         while (cursor.stopNotVisited(round, egressStop) || !cursor.stop(round, egressStop).arrivedByTransit()) {
 
@@ -111,7 +109,7 @@ class PathBuilderCursorBased {
         return cursor.stop(round, egressStop);
     }
 
-    static abstract class AbstractLeg implements PathLeg {
+    static abstract class AbstractLeg<T extends TripScheduleInfo> implements PathLeg<T> {
         private int fromStop;
         private int toStop;
         private int fromTime;
@@ -128,52 +126,48 @@ class PathBuilderCursorBased {
         @Override public int fromTime()       { return fromTime; }
         @Override public int toStop()         { return toStop; }
         @Override public int toTime()         { return toTime; }
-        @Override public int pattern()        { return NOT_SET; }
-        @Override public int trip()           { return NOT_SET; }
+        @Override public T trip()           { return null; }
         @Override public boolean isTransit()  { return false; }
         @Override public boolean isTransfer() { return false; }
     }
 
-    static final class TransitLeg extends AbstractLeg {
-        private int pattern;
-        private int trip;
+    static final class TransitLeg<T extends TripScheduleInfo> extends AbstractLeg<T> {
+        private T trip;
 
-        TransitLeg(int boardStop, int alightStop, int boardTime, int alightTime, int pattern, int trip) {
-            super(boardStop, alightStop, boardTime, alightTime);
-            this.pattern = pattern;
-            this.trip = trip;
+        TransitLeg(int boardStop, int alightStop, StopState<T> state) {
+            super(boardStop, alightStop, state.boardTime(), state.transitTime());
+            this.trip = state.trip();
         }
 
-        @Override public int pattern()       { return pattern; }
-        @Override public int trip()          { return trip; }
+        @Override public T trip()          { return trip; }
         @Override public boolean isTransit() { return true; }
     }
 
-    static final class TransferLeg extends AbstractLeg {
+    static final class TransferLeg<T extends TripScheduleInfo> extends AbstractLeg<T> {
         TransferLeg(int fromStop, int toStop, int toTime, int transferTime) {
             super(fromStop, toStop, toTime - transferTime, toTime);
         }
         @Override public boolean isTransfer() { return true; }
     }
 
-    static final class AccessLeg extends AbstractLeg {
+    static final class AccessLeg<T extends TripScheduleInfo> extends AbstractLeg<T> {
         AccessLeg(int toTime, StopArrival stopArrival) {
             super(NOT_SET, stopArrival.stop(), toTime - stopArrival.durationInSeconds(), toTime);
         }
     }
 
-    static final class EgressLeg extends AbstractLeg {
+    static final class EgressLeg<T extends TripScheduleInfo> extends AbstractLeg<T> {
         EgressLeg(int fromStop, int fromTime, int durationToStop) {
             super(fromStop, NOT_SET, fromTime, fromTime + durationToStop);
         }
     }
 
-    static class Path implements Path2, Iterable<PathLeg> {
-        private PathLeg accessLeg;
-        private List<PathLeg> path;
-        private PathLeg egressLeg;
+    static class Path<T extends TripScheduleInfo> implements Path2<T>, Iterable<PathLeg<T>> {
+        private PathLeg<T> accessLeg;
+        private List<PathLeg<T>> path;
+        private PathLeg<T> egressLeg;
 
-        public Path(PathLeg accessLeg, List<PathLeg> path, PathLeg egressLeg) {
+        public Path(PathLeg<T> accessLeg, List<PathLeg<T>> path, PathLeg<T> egressLeg) {
             this.accessLeg = accessLeg;
             this.path = path;
             this.egressLeg = egressLeg;
@@ -188,16 +182,16 @@ class PathBuilderCursorBased {
             }
         }
 
-        @Override public PathLeg accessLeg() {
+        @Override public PathLeg<T> accessLeg() {
             return accessLeg;
         }
-        @Override public Iterable<? extends PathLeg> legs() {
+        @Override public Iterable<PathLeg<T>> legs() {
             return path;
         }
-        @Override public PathLeg egressLeg() {
+        @Override public PathLeg<T> egressLeg() {
             return egressLeg;
         }
-        @Override public Iterator<PathLeg> iterator() {
+        @Override public Iterator<PathLeg<T>> iterator() {
             return path.iterator();
         }
     }

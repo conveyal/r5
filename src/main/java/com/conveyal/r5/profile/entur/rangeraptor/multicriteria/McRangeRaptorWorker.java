@@ -1,6 +1,5 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
-import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripPatternInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
@@ -37,7 +36,7 @@ import java.util.Iterator;
  * (generating randomized schedules).
  */
 @SuppressWarnings("Duplicates")
-public class McRangeRaptorWorker extends AbstractRangeRaptorWorker<McWorkerState> {
+public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRangeRaptorWorker<McWorkerState<T>, T> {
 
     // Variables to track time spent
     private static final AvgTimer TIMER_ROUTE = AvgTimer.timerMilliSec("McRR:route");
@@ -47,11 +46,11 @@ public class McRangeRaptorWorker extends AbstractRangeRaptorWorker<McWorkerState
     private static final AvgTimer TIMER_BY_MINUTE_TRANSFERS = AvgTimer.timerMicroSec("McRR:runRaptorForMinute Transfers");
 
 
-    public McRangeRaptorWorker(TransitDataProvider transitData, McWorkerState state, RangeRaptorRequest request) {
+    public McRangeRaptorWorker(TransitDataProvider<T> transitData, McWorkerState<T> state, RangeRaptorRequest request) {
         super(transitData, state, request);
     }
 
-    @Override protected Collection<Path2> paths() {
+    @Override protected Collection<Path2<T>> paths() {
         return state.extractPaths(request.egressStops);
     }
 
@@ -65,34 +64,32 @@ public class McRangeRaptorWorker extends AbstractRangeRaptorWorker<McWorkerState
      */
     @Override protected void scheduledSearchForRound() {
         BitSetIterator stops = state.stopsTouchedPreviousRound();
-        Iterator<? extends TripPatternInfo> patternIterator = transit.patternIterator(stops);
+        Iterator<? extends TripPatternInfo<T>> patternIterator = transit.patternIterator(stops);
 
         while (patternIterator.hasNext()) {
-            TripPatternInfo pattern = patternIterator.next();
-            int originalPatternIndex = pattern.originalPatternIndex();
+            TripPatternInfo<T> pattern = patternIterator.next();
 
-            TripScheduleBoardSearch search = new TripScheduleBoardSearch(pattern, this::skipTripSchedule);
+            TripScheduleBoardSearch<T> search = new TripScheduleBoardSearch<>(pattern, this::skipTripSchedule);
 
-            for (int boardStopPosInPtn = 0; boardStopPosInPtn < pattern.currentPatternStopsSize(); boardStopPosInPtn++) {
+            for (int boardStopPosInPtn = 0; boardStopPosInPtn < pattern.numberOfStopsInPattern(); boardStopPosInPtn++) {
                 int boardStopIndex = pattern.currentPatternStop(boardStopPosInPtn);
 
-                for (McStopState boardStop : state.listStopStatesPreviousRound(boardStopIndex)) {
+                for (McStopState<T> boardStop : state.listStopStatesPreviousRound(boardStopIndex)) {
 
                     int earliestBoardTime = earliestBoardTime(boardStop.time());
                     boolean found = search.search(earliestBoardTime, boardStopPosInPtn);
 
-                    for (int alightStopPosInPtn = boardStopPosInPtn + 1; alightStopPosInPtn < pattern.currentPatternStopsSize(); alightStopPosInPtn++) {
+                    for (int alightStopPosInPtn = boardStopPosInPtn + 1; alightStopPosInPtn < pattern.numberOfStopsInPattern(); alightStopPosInPtn++) {
                         int alightStopIndex = pattern.currentPatternStop(alightStopPosInPtn);
 
                         if (found) {
-                            TripScheduleInfo trip = search.candidateTrip;
+                            T trip = search.candidateTrip;
                             state.transitToStop(
                                     boardStop,
                                     alightStopIndex,
                                     trip.arrival(alightStopPosInPtn),
-                                    originalPatternIndex,
-                                    search.candidateTripIndex,
-                                    trip.departure(boardStopPosInPtn)
+                                    trip.departure(boardStopPosInPtn),
+                                    trip
                             );
                         }
                     }

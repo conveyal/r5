@@ -3,6 +3,6 @@ package com.conveyal.r5.profile.entur.api;
 
 import java.util.Collection;
 
-public interface Worker {
-    Collection<? extends Path2> route();
+public interface Worker<T extends TripScheduleInfo> {
+    Collection<Path2<T>> route();
 }

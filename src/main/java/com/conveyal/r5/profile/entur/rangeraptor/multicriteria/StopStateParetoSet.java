@@ -1,12 +1,13 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
+import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
 
 import java.util.Iterator;
 import java.util.function.Predicate;
 
-class StopStateParetoSet extends ParetoSet<McStopState> {
+class StopStateParetoSet<T extends TripScheduleInfo> extends ParetoSet<McStopState<T>> {
 
     StopStateParetoSet(ParetoFunction.Builder function) {
         super(function);
@@ -16,10 +17,10 @@ class StopStateParetoSet extends ParetoSet<McStopState> {
         return list(it -> it.round() == round);
     }
 
-    Iterable<? extends McStopState> list(Predicate<McStopState> test) {
-        return () -> new Iterator<McStopState>() {
+    Iterable<? extends McStopState<T>> list(Predicate<McStopState> test) {
+        return () -> new Iterator<McStopState<T>>() {
             private int index = 0;
-            private McStopState it;
+            private McStopState<T> it;
 
 
             @Override
@@ -33,7 +34,7 @@ class StopStateParetoSet extends ParetoSet<McStopState> {
                 }
                 return false;
             }
-            @Override public McStopState next() { return it; }
+            @Override public McStopState<T> next() { return it; }
         };
     }
 }

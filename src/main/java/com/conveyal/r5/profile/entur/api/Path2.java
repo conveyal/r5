@@ -1,11 +1,11 @@
 package com.conveyal.r5.profile.entur.api;
 
-public interface Path2 {
+public interface Path2<T extends TripScheduleInfo> {
 
-    PathLeg accessLeg();
+    PathLeg<T> accessLeg();
 
-    Iterable<? extends PathLeg> legs();
+    Iterable<PathLeg<T>> legs();
 
-    PathLeg egressLeg();
+    PathLeg<T> egressLeg();
 
 }

@@ -18,7 +18,7 @@ import java.util.Iterator;
  *     The implementation of this is refered to as the *adapter*.
  * </p>
  */
-public interface TransitDataProvider {
+public interface TransitDataProvider<T extends TripScheduleInfo> {
 
     /**
      * This method is called once, right after the constructor, before the routing start.
@@ -68,7 +68,7 @@ public interface TransitDataProvider {
      *
      * @param stops set of stops for find all patterns for.
      */
-    Iterator<? extends TripPatternInfo> patternIterator(UnsignedIntIterator stops);
+    Iterator<? extends TripPatternInfo<T>> patternIterator(UnsignedIntIterator stops);
 
     /**
      * The provider needs to know based on the request input (date) if a service is available or not.
@@ -78,7 +78,7 @@ public interface TransitDataProvider {
      * @param trip The trip to check.
      * @return true if the trip schedule is in service.
      */
-    default boolean isTripScheduleInService(TripScheduleInfo trip) { return true; }
+    default boolean isTripScheduleInService(T trip) { return true; }
 
     /**
      * This is the total number of stops, it should be possible to retrieve transfers and pattern for every stop

@@ -4,23 +4,19 @@ package com.conveyal.r5.profile.entur.api;
 /**
  * This interface represent a trip pattern.
  */
-public interface TripPatternInfo {
-    // TODO TGR - add JavaDoc
-    int originalPatternIndex();
+public interface TripPatternInfo<T extends TripScheduleInfo> {
 
     /**
-     * stop index
-     * @param stopPositionInPattern
-     * @return
+     * stop index in pattern
      */
     int currentPatternStop(int stopPositionInPattern);
 
     // TODO TGR - add JavaDoc
-    int currentPatternStopsSize();
+    int numberOfStopsInPattern();
 
     // TODO TGR - add JavaDoc
-    TripScheduleInfo getTripSchedule(int index);
+    T getTripSchedule(int index);
 
     // TODO TGR - add JavaDoc
-    int getTripScheduleSize();
+    int numberOfTripSchedules();
 }

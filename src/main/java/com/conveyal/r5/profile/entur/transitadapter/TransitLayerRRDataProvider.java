@@ -25,7 +25,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.stream.IntStream;
 
-public class TransitLayerRRDataProvider implements TransitDataProvider {
+public class TransitLayerRRDataProvider implements TransitDataProvider<TripSchedule> {
 
     private static AvgTimer TIMER_INIT_STOP_TIMES = AvgTimer.timerMilliSec("TransitLayerRRDataProvider:init stops");
 
@@ -40,16 +40,11 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
     /** Schedule-based trip patterns running on a given day */
     private TripPattern[] runningScheduledPatterns;
 
-    /** Map from internal, filtered pattern indices back to original pattern indices for scheduled patterns */
-    private int[] originalPatternIndexForScheduledIndex;
-
     /** Services active on the date of the search */
     private final BitSet servicesActive;
 
     /** Allowed transit modes */
     private final EnumSet<TransitModes> transitModes;
-
-    private final int walkSpeedMillimetersPerSecond;
 
     private final List<LightweightTransferIterator> transfers;
 
@@ -63,7 +58,7 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
         this.transitLayer = transitLayer;
         this.servicesActive  = transitLayer.getActiveServicesForDate(date);
         this.transitModes = transitModes;
-        this.walkSpeedMillimetersPerSecond = (int)(walkSpeedMetersPerSecond * 1000f);
+        int walkSpeedMillimetersPerSecond = (int) (walkSpeedMetersPerSecond * 1000f);
         this.transfers = createTransfers(transitLayer.transfersForStop, walkSpeedMillimetersPerSecond);
         TIMER_INIT_STOP_TIMES.stop();
     }
@@ -72,8 +67,8 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
 
         List<LightweightTransferIterator> list = new ArrayList<>();
 
-        for (int i = 0; i < transfers.size(); i++) {
-            list.add(transfersAt(transfers.get(i), walkSpeedMillimetersPerSecond));
+        for (TIntList transfer : transfers) {
+            list.add(transfersAt(transfer, walkSpeedMillimetersPerSecond));
         }
         return list;
     }
@@ -104,9 +99,8 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
     }
 
     @Override
-    public boolean isTripScheduleInService(TripScheduleInfo trip) {
-        TripSchedule t = (TripSchedule) trip;
-        return t.headwaySeconds == null && servicesActive.get(t.serviceCode);
+    public boolean isTripScheduleInService(TripSchedule trip) {
+        return trip.headwaySeconds == null && servicesActive.get(trip.serviceCode);
     }
 
     @Override
@@ -136,7 +130,8 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
             }
         }
 
-        originalPatternIndexForScheduledIndex = scheduledPatterns.toArray();
+        // Map from internal, filtered pattern indices back to original pattern indices for scheduled patterns
+        int[] originalPatternIndexForScheduledIndex = scheduledPatterns.toArray();
 
         runningScheduledPatterns = IntStream.of(originalPatternIndexForScheduledIndex)
                 .mapToObj(transitLayer.tripPatterns::get).toArray(TripPattern[]::new);
@@ -149,7 +144,7 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
 
     }
 
-    @Override public Iterator<TripPatternInfo> patternIterator(UnsignedIntIterator stops) {
+    @Override public Iterator<TripPatternInfo<TripSchedule>> patternIterator(UnsignedIntIterator stops) {
         return new InternalPatternIterator(getPatternsTouchedForStops(stops));
     }
 
@@ -181,9 +176,8 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
         return transitLayer.patternsForStop.get(stop);
     }
 
-    class InternalPatternIterator implements TripPatternInfo, Iterator<TripPatternInfo> {
+    class InternalPatternIterator implements TripPatternInfo<TripSchedule>, Iterator<TripPatternInfo<TripSchedule>> {
         private int nextPatternIndex;
-        private int originalPatternIndex;
         private BitSet patternsTouched;
         private TripPattern pattern;
 
@@ -198,9 +192,8 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
             return nextPatternIndex >=0;
         }
 
-        @Override public TripPatternInfo next() {
+        @Override public TripPatternInfo<TripSchedule> next() {
             pattern = runningScheduledPatterns[nextPatternIndex];
-            originalPatternIndex = originalPatternIndexForScheduledIndex[nextPatternIndex];
             nextPatternIndex = patternsTouched.nextSetBit(nextPatternIndex + 1);
             return this;
         }
@@ -208,27 +201,23 @@ public class TransitLayerRRDataProvider implements TransitDataProvider {
 
         /*  Pattern interface implementation */
 
-        @Override public int originalPatternIndex() {
-            return originalPatternIndex;
-        }
-
         @Override
         public int currentPatternStop(int stopPositionInPattern) {
             return pattern.stops[stopPositionInPattern];
         }
 
         @Override
-        public int currentPatternStopsSize() {
+        public int numberOfStopsInPattern() {
             return pattern.stops.length;
         }
 
         @Override
-        public TripScheduleInfo getTripSchedule(int index) {
+        public TripSchedule getTripSchedule(int index) {
             return pattern.tripSchedules.get(index);
         }
 
         @Override
-        public int getTripScheduleSize() {
+        public int numberOfTripSchedules() {
             return pattern.tripSchedules.size();
         }
     }

@@ -1,18 +1,17 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 
+import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.util.DebugState;
 
 import static com.conveyal.r5.profile.entur.util.DebugState.Type.Transit;
 
-public final class McTransitStopState extends McStopState {
+public final class McTransitStopState<T extends TripScheduleInfo> extends McStopState<T> {
     private final int boardTime;
-    private final int pattern;
-    private final int trip;
+    private final T trip;
 
-    McTransitStopState(McStopState previousState, int round, int stopIndex, int time, int boardTime, int pattern, int trip) {
+    McTransitStopState(McStopState<T> previousState, int round, int stopIndex, int time, int boardTime, T trip) {
         super(previousState, round, round*2, stopIndex, time);
-        this.pattern = pattern;
         this.trip = trip;
         this.boardTime = boardTime;
     }
@@ -25,11 +24,7 @@ public final class McTransitStopState extends McStopState {
         return true;
     }
 
-    @Override public int pattern() {
-        return pattern;
-    }
-
-    @Override public int trip() {
+    @Override public T trip() {
         return trip;
     }
 

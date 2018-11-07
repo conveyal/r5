@@ -1,14 +1,13 @@
 package com.conveyal.r5.profile.entur.api;
 
-public interface PathLeg {
+public interface PathLeg<T extends TripScheduleInfo> {
     int fromStop();
     int fromTime();
 
     int toStop();
     int toTime();
 
-    int pattern();
-    int trip();
+    T trip();
 
     boolean isTransfer();
     boolean isTransit();

@@ -25,7 +25,7 @@ public class RangeRaptorService {
         this.tuningParameters = tuningParameters;
     }
 
-    public Collection<Path2> route(RangeRaptorRequest request, TransitDataProvider transitData) {
+    public Collection<? extends Path2> route(RangeRaptorRequest request, TransitDataProvider transitData) {
         Worker worker = createWorker(request, transitData);
         return worker.route();
     }

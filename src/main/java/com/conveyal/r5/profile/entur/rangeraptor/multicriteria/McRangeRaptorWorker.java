@@ -65,7 +65,7 @@ public class McRangeRaptorWorker extends AbstractRangeRaptorWorker<McWorkerState
      */
     @Override protected void scheduledSearchForRound() {
         BitSetIterator stops = state.stopsTouchedPreviousRound();
-        Iterator<TripPatternInfo> patternIterator = transit.patternIterator(stops);
+        Iterator<? extends TripPatternInfo> patternIterator = transit.patternIterator(stops);
 
         while (patternIterator.hasNext()) {
             TripPatternInfo pattern = patternIterator.next();

@@ -58,7 +58,7 @@ public interface TransitDataProvider {
      * </pre>
      * @return a map of distances from the given input stop to all other stops.
      */
-    Iterator<StopArrival> getTransfers(int fromStop);
+    Iterator<? extends StopArrival> getTransfers(int fromStop);
 
     /**
      * Return a set of all patterns visiting the given set of stops.
@@ -68,7 +68,7 @@ public interface TransitDataProvider {
      *
      * @param stops set of stops for find all patterns for.
      */
-    Iterator<TripPatternInfo> patternIterator(UnsignedIntIterator stops);
+    Iterator<? extends TripPatternInfo> patternIterator(UnsignedIntIterator stops);
 
     /**
      * The provider needs to know based on the request input (date) if a service is available or not.

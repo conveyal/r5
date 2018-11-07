@@ -160,7 +160,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState> implement
         for (int fromStop = it.next(); fromStop > -1; fromStop = it.next()) {
             // no need to consider loop transfers, since we don't mark patterns here any more
             // loop transfers are already included by virtue of those stops having been reached
-            Iterator<StopArrival> transfers = transit.getTransfers(fromStop);
+            Iterator<? extends StopArrival> transfers = transit.getTransfers(fromStop);
             while (transfers.hasNext()) {
                 StopArrival transfer = transfers.next();
                 state.transferToStop(fromStop, transfer);

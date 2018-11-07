@@ -285,7 +285,7 @@ public class SpeedTest {
 
             RangeRaptorService service = new RangeRaptorService(tuningParameters);
 
-            Collection<Path2> path2s = service.route(req, transitData);
+            Collection<? extends Path2> path2s = service.route(req, transitData);
 
             TIMER_WORKER.stop();
 
@@ -346,7 +346,7 @@ public class SpeedTest {
 
         builder.profile(mapAlgorithm(profile));
 
-        addStopTimes(streetRouter.accessTimesToStopsInSeconds, builder::addAccessStops);
+        addStopTimes(streetRouter.accessTimesToStopsInSeconds, builder::addAccessStop);
         addStopTimes(streetRouter.egressTimesToStopsInSeconds, builder::addEgressStop);
 
         return builder.build();

@@ -144,13 +144,27 @@ public class RangeRaptorRequest {
             return this;
         }
 
-        public Builder addAccessStops(StopArrival accessStop) {
+        public Builder addAccessStop(StopArrival accessStop) {
             this.accessStops.add(accessStop);
+            return this;
+        }
+
+        public Builder addAccessStops(Iterable<StopArrival> accessStops) {
+            for (StopArrival it : accessStops) {
+                addAccessStop(it);
+            }
             return this;
         }
 
         public Builder addEgressStop(StopArrival egressStop) {
             this.egressStops.add(egressStop);
+            return this;
+        }
+
+        public Builder addEgressStops(Iterable<StopArrival> egressStops) {
+            for (StopArrival it : egressStops) {
+                addEgressStop(it);
+            }
             return this;
         }
 

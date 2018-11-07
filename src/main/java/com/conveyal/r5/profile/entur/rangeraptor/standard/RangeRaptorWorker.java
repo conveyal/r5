@@ -94,7 +94,7 @@ public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWork
     @Override
     protected void scheduledSearchForRound() {
 
-        Iterator<TripPatternInfo> patternIterator = transit.patternIterator(state.bestStopsTouchedLastRoundIterator());
+        Iterator<? extends TripPatternInfo> patternIterator = transit.patternIterator(state.bestStopsTouchedLastRoundIterator());
 
         while (patternIterator.hasNext()) {
             TripPatternInfo pattern = patternIterator.next();

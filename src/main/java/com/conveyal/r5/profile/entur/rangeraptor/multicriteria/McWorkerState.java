@@ -51,8 +51,8 @@ public final class McWorkerState implements WorkerState {
 
 
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
-    public McWorkerState(TuningParameters tuningParameters, int nStops) {
-        this.nRounds = tuningParameters.nRounds();
+    public McWorkerState(int nRounds, int nStops) {
+        this.nRounds = nRounds;
         this.stops = new StopStates(nStops);
 
         this.touchedCurrent = new BitSet(nStops);

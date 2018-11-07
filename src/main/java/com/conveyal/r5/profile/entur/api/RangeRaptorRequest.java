@@ -23,6 +23,9 @@ public class RangeRaptorRequest {
     private static final int NOT_SET = -1;
 
 
+    /** The profile/algorithm to use for this request. */
+    public final RaptorProfiles profile;
+
     /** The beginning of the departure window, in seconds since midnight. */
     public final int fromTime;
 
@@ -78,13 +81,16 @@ public class RangeRaptorRequest {
         this.toTime = NOT_SET;
         this.accessStops = Collections.emptyList();
         this.egressStops = Collections.emptyList();
+
         // Optional parameters with default values
+        this.profile = RaptorProfiles.MULTI_CRITERIA;
         this.departureStepInSeconds = 60;
         this.boardSlackInSeconds = 60;
         this.numberOfAdditionalTransfers = 3;
     }
 
     private RangeRaptorRequest(Builder builder) {
+        this.profile = builder.profile;
         this.fromTime = builder.fromTime;
         this.toTime = builder.toTime;
         this.accessStops = builder.accessStops;
@@ -93,6 +99,7 @@ public class RangeRaptorRequest {
         this.boardSlackInSeconds = builder.boardSlackInSeconds;
         this.numberOfAdditionalTransfers = builder.numberOfAdditionalTransfers;
     }
+
 
     /**
      * Compute number of Range Raptor iterations for scheduled search
@@ -118,6 +125,8 @@ public class RangeRaptorRequest {
         private int toTime;
         private final Collection<StopArrival> accessStops = new ArrayList<>();
         private final Collection<StopArrival> egressStops = new ArrayList<>();
+
+        private RaptorProfiles profile = DEFAULTS.profile;
         private int departureStepInSeconds = DEFAULTS.departureStepInSeconds;
         private int boardSlackInSeconds = DEFAULTS.boardSlackInSeconds;
         private int numberOfAdditionalTransfers = DEFAULTS.numberOfAdditionalTransfers;
@@ -128,6 +137,11 @@ public class RangeRaptorRequest {
                     + fromTime + ", toTime: " + toTime);
             this.fromTime = fromTime;
             this.toTime = toTime;
+        }
+
+        public Builder profile(RaptorProfiles profile) {
+            this.profile = profile;
+            return this;
         }
 
         public Builder addAccessStops(StopArrival accessStop) {

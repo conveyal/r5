@@ -53,12 +53,12 @@ public class RangeRaptorWorker extends AbstractRangeRaptorWorker<RangeRaptorWork
     private final PathBuilderCursorBased pathBuilder;
 
     public RangeRaptorWorker(
-            TuningParameters tuningParameters,
             TransitDataProvider transitData,
+            int nRounds,
             StopStateCollection stateCollection,
             RangeRaptorRequest request
     ) {
-        super(transitData, new RangeRaptorWorkerState(tuningParameters.nRounds(), transitData.numberOfStops(), stateCollection), request);
+        super(transitData, new RangeRaptorWorkerState(nRounds, transitData.numberOfStops(), stateCollection), request);
         this.pathBuilder = new PathBuilderCursorBased(stateCollection.newCursor());
         this.paths = new ArrayList<>();
     }

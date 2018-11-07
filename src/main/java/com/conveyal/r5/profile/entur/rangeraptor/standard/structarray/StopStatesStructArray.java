@@ -2,7 +2,6 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard.structarray;
 
 
 import com.conveyal.r5.profile.entur.api.StopArrival;
-import com.conveyal.r5.profile.entur.api.TuningParameters;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCollection;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCursor;
 
@@ -12,8 +11,8 @@ public final class StopStatesStructArray implements StopStateCollection {
     private final StopStateStruct[][] stops;
 
 
-    public StopStatesStructArray(TuningParameters tuningParameters, int stops) {
-        this.stops = new StopStateStruct[tuningParameters.nRounds()][stops];
+    public StopStatesStructArray(int nRounds, int stops) {
+        this.stops = new StopStateStruct[nRounds][stops];
     }
 
     @Override

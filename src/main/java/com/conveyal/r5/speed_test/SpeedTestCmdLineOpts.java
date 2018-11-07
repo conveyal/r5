@@ -1,6 +1,5 @@
 package com.conveyal.r5.speed_test;
 
-import com.conveyal.r5.profile.entur.ProfileFactory;
 import org.apache.commons.cli.Options;
 
 import java.util.Arrays;
@@ -22,7 +21,7 @@ public class SpeedTestCmdLineOpts extends CommandLineOpts {
         options.addOption(VERBOSE_OPT, "verbose", false, "Verbose output: Print itineraries");
         options.addOption(SEARCH_WINDOW_IN_MINUTES_OPT, "searchTimeWindowInMinutes", true, "The time in minutes to add to from to time");
         options.addOption(SAMPLE_TEST_N_TIMES_OPT, "sampleTestNTimes", true, "Repeat the test N times. Profiles are altered in a round robin fashion.");
-        options.addOption(PROFILES_OPT, "profiles", true, "A coma separated list of configuration profiles:\n" + String.join("\n", ProfileFactory.options()));
+        options.addOption(PROFILES_OPT, "profiles", true, "A coma separated list of configuration profiles:\n" + String.join("\n", SpeedTestProfiles.options()));
         options.addOption(TEST_CASES_OPT, "testCases", true, "A coma separated list of test case numbers to run.");
         options.addOption(DEBUG_STOPS, "debugStops", true, "A coma separated list of stops to debug.");
         options.addOption(DEBUG, "debug", false, "Enable debug info.");
@@ -45,8 +44,8 @@ public class SpeedTestCmdLineOpts extends CommandLineOpts {
         return Integer.valueOf(cmd.getOptionValue(SAMPLE_TEST_N_TIMES_OPT, Integer.toString(profiles().length)));
     }
 
-    ProfileFactory[] profiles() {
-        return cmd.hasOption(PROFILES_OPT) ? ProfileFactory.parse(cmd.getOptionValue(PROFILES_OPT)) : ProfileFactory.values();
+    SpeedTestProfiles[] profiles() {
+        return cmd.hasOption(PROFILES_OPT) ? SpeedTestProfiles.parse(cmd.getOptionValue(PROFILES_OPT)) : SpeedTestProfiles.values();
     }
 
     List<String> testCases() {

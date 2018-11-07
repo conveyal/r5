@@ -217,9 +217,6 @@ public class ProfileRequest implements Serializable, Cloneable {
      */
     public Integer numberOfItineraries = 1;
 
-    /** #Entur */
-    public SearchAlgorithm algorithm;
-
     public String description;
 
 

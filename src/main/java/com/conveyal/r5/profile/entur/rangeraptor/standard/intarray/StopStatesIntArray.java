@@ -26,8 +26,8 @@ public final class StopStatesIntArray implements StopStateCollection {
     private final int[] transferFromStops;
 
 
-    public StopStatesIntArray(TuningParameters tuningParameters, int stops) {
-        this.stateStopIndex = new int[tuningParameters.nRounds()][stops];
+    public StopStatesIntArray(int nRounds, int stops) {
+        this.stateStopIndex = new int[nRounds][stops];
 
         final int limit = 3 * stops;
 

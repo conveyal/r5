@@ -1,4 +1,4 @@
-package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
+package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.path;
 
 import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
@@ -9,9 +9,9 @@ import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.Abstract
 /**
  * TODO TGR
  */
-class McPathBuilder<T extends TripScheduleInfo> {
+public class McPathBuilder<T extends TripScheduleInfo> {
 
-    Path2<T> extractPathsForStop(AbstractStopArrival<T> egressStop, int egressDurationInSeconds) {
+    public Path2<T> extractPathsForStop(AbstractStopArrival<T> egressStop, int egressDurationInSeconds) {
         if (!egressStop.arrivedByTransit()) {
             return null;
         }

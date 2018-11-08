@@ -1,4 +1,4 @@
-package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
+package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.path;
 
 import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.PathLeg;
@@ -10,9 +10,9 @@ import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitS
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McPathLeg.createAccessLeg;
-import static com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McPathLeg.createEgressLeg;
-import static com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McPathLeg.createLeg;
+import static com.conveyal.r5.profile.entur.rangeraptor.multicriteria.path.McPathLeg.createAccessLeg;
+import static com.conveyal.r5.profile.entur.rangeraptor.multicriteria.path.McPathLeg.createEgressLeg;
+import static com.conveyal.r5.profile.entur.rangeraptor.multicriteria.path.McPathLeg.createLeg;
 
 
 final class McPath<T extends TripScheduleInfo> implements Path2<T> {

@@ -1,4 +1,4 @@
-package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
+package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.path;
 
 import com.conveyal.r5.profile.entur.api.PathLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;

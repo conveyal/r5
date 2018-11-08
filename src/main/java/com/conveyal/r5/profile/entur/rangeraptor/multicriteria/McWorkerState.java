@@ -6,6 +6,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessSt
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransferStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.path.McPathBuilder;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.api.Path2;

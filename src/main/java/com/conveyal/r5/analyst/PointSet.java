@@ -64,7 +64,7 @@ public abstract class PointSet {
     /**
      * Makes it fast to get a set of all points within a given rectangle.
      * This is useful when finding distances from transit stops to points.
-     * FIXME we don't need a spatial index to do this on a gridded pointset. Make an abstract methof and implement on subclasses.
+     * FIXME we don't need a spatial index to do this on a gridded pointset. Make an abstract method and implement on subclasses.
      * The spatial index is a hashgrid anyway though, not an STRtree, so it's more compact.
      * FIXME this is apparently ONLY used for selecting points for which to rebuild distance tables. Can we just iterate and filter, and eliminate the index?
      */

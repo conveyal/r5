@@ -11,7 +11,7 @@ import java.util.List;
 
 import static com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction.createParetoFunctions;
 
-public abstract class McStopArrivalState<T extends TripScheduleInfo> implements StopArrivalState<T>, ParetoSortable {
+public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements StopArrivalState<T>, ParetoSortable {
 
     /**
      * The pareto function MUST match the {@code ParetoSortable} implementation below
@@ -22,7 +22,7 @@ public abstract class McStopArrivalState<T extends TripScheduleInfo> implements 
             .lessThen()  // cost
             ;
 
-    private final McStopArrivalState<T> previousState;
+    private final AbstractStopArrival<T> previousState;
     private final int round;
     private final int stop;
     private final int time;
@@ -33,7 +33,7 @@ public abstract class McStopArrivalState<T extends TripScheduleInfo> implements 
     /**
      * Transit or transfer
      */
-    McStopArrivalState(McStopArrivalState<T> previousState, int round, int roundPareto, int stop, int arrivalTime, int cost) {
+    AbstractStopArrival(AbstractStopArrival<T> previousState, int round, int roundPareto, int stop, int arrivalTime, int cost) {
         this.previousState = previousState;
         this.round = round;
         this.roundPareto = roundPareto;
@@ -45,7 +45,7 @@ public abstract class McStopArrivalState<T extends TripScheduleInfo> implements 
     /**
      * Initial state - first stop visited.
      */
-    McStopArrivalState(int stop, int arrivalTime, int initialCost) {
+    AbstractStopArrival(int stop, int arrivalTime, int initialCost) {
         this.previousState = null;
         this.round = 0;
         this.roundPareto = 0;
@@ -68,7 +68,7 @@ public abstract class McStopArrivalState<T extends TripScheduleInfo> implements 
         return previousState.stop;
     }
 
-    public final McStopArrivalState previousState() {
+    public final AbstractStopArrival previousState() {
         return previousState;
     }
 
@@ -138,9 +138,9 @@ public abstract class McStopArrivalState<T extends TripScheduleInfo> implements 
         DebugState.debugStop(round, stop, this);
     }
 
-    public List<McStopArrivalState<T>> path() {
-        List<McStopArrivalState<T>> path = new LinkedList<>();
-        McStopArrivalState<T> current = this;
+    public List<AbstractStopArrival<T>> path() {
+        List<AbstractStopArrival<T>> path = new LinkedList<>();
+        AbstractStopArrival<T> current = this;
 
         path.add(current);
 

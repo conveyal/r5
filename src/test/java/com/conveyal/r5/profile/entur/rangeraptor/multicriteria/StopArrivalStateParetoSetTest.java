@@ -2,10 +2,10 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.AStopArrival;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.McAccessStopArrivalState;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.McStopArrivalState;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.McTransferStopArrivalState;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.McTransitStopArrivalState;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransferStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -31,7 +31,7 @@ public class StopArrivalStateParetoSetTest {
     private static final int STOP_5 = 5;
     private static final int STOP_6 = 6;
 
-    private McStopArrivalState<TripScheduleInfo> A_STATE = newMcAccessStopState(999, 10);
+    private AbstractStopArrival<TripScheduleInfo> A_STATE = newMcAccessStopState(999, 10);
 
     private StopStateParetoSet<TripScheduleInfo> subject = StopStates.createState();
 
@@ -92,19 +92,19 @@ public class StopArrivalStateParetoSetTest {
     }
 
     private void assertStopsInSet(int ... expStopIndexes) {
-        int[] result = StreamSupport.stream(subject.spliterator(), false).mapToInt(McStopArrivalState::stopIndex).sorted().toArray();
+        int[] result = StreamSupport.stream(subject.spliterator(), false).mapToInt(AbstractStopArrival::stopIndex).sorted().toArray();
         Assert.assertEquals("Stop indexes", Arrays.toString(expStopIndexes), Arrays.toString(result));
     }
 
-    private static McAccessStopArrivalState<TripScheduleInfo> newMcAccessStopState(int stop, int accessDurationInSeconds) {
-        return new McAccessStopArrivalState<>(new AStopArrival(stop, accessDurationInSeconds), A_TIME, ANY);
+    private static AccessStopArrival<TripScheduleInfo> newMcAccessStopState(int stop, int accessDurationInSeconds) {
+        return new AccessStopArrival<>(new AStopArrival(stop, accessDurationInSeconds), A_TIME, ANY);
     }
 
-    private static McTransitStopArrivalState<TripScheduleInfo> newMcTransitStopState(McStopArrivalState<TripScheduleInfo> prev, int round, int stop, int arrivalTime) {
-        return new McTransitStopArrivalState<>(prev, round, stop, arrivalTime, ANY, ANY_TRIP);
+    private static TransitStopArrival<TripScheduleInfo> newMcTransitStopState(AbstractStopArrival<TripScheduleInfo> prev, int round, int stop, int arrivalTime) {
+        return new TransitStopArrival<>(prev, round, stop, arrivalTime, ANY, ANY_TRIP);
     }
 
-    private static McTransferStopArrivalState<TripScheduleInfo> newMcTransferStopState(McStopArrivalState<TripScheduleInfo> prev, int round, int stop, int arrivalTime) {
-        return new McTransferStopArrivalState<>(prev, round, new AStopArrival(stop, ANY), arrivalTime);
+    private static TransferStopArrival<TripScheduleInfo> newMcTransferStopState(AbstractStopArrival<TripScheduleInfo> prev, int round, int stop, int arrivalTime) {
+        return new TransferStopArrival<>(prev, round, new AStopArrival(stop, ANY), arrivalTime);
     }
 }

@@ -3,10 +3,10 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.McAccessStopArrivalState;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.McStopArrivalState;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.McTransferStopArrivalState;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.McTransitStopArrivalState;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransferStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
 
 
 import static java.util.Collections.emptyList;
@@ -27,30 +27,30 @@ final class StopStates<T extends TripScheduleInfo> {
     void setInitialTime(StopArrival stopArrival, int fromTime, int boardSlackInSeconds) {
         final int stop = stopArrival.stop();
         findOrCreateSet(stop).add(
-                new McAccessStopArrivalState<T>(stopArrival, fromTime, boardSlackInSeconds)
+                new AccessStopArrival<T>(stopArrival, fromTime, boardSlackInSeconds)
         );
     }
 
-    boolean transitToStop(McStopArrivalState<T> previous, int round, int stop, int time, T trip, int boardTime) {
-        McStopArrivalState<T> state = new McTransitStopArrivalState<>(previous, round, stop, time, boardTime, trip);
+    boolean transitToStop(AbstractStopArrival<T> previous, int round, int stop, int time, T trip, int boardTime) {
+        AbstractStopArrival<T> state = new TransitStopArrival<>(previous, round, stop, time, boardTime, trip);
         return findOrCreateSet(stop).add(state);
     }
 
-    boolean transferToStop(McStopArrivalState<T> previous, int round, StopArrival stopArrival, int arrivalTime) {
-        return findOrCreateSet(stopArrival.stop()).add(new McTransferStopArrivalState<>(previous, round, stopArrival, arrivalTime));
+    boolean transferToStop(AbstractStopArrival<T> previous, int round, StopArrival stopArrival, int arrivalTime) {
+        return findOrCreateSet(stopArrival.stop()).add(new TransferStopArrival<>(previous, round, stopArrival, arrivalTime));
     }
 
-    Iterable<? extends McStopArrivalState<T>> listArrivedByTransit(int round, int stop) {
+    Iterable<? extends AbstractStopArrival<T>> listArrivedByTransit(int round, int stop) {
         StopStateParetoSet<T> it = stops[stop];
         return it == null ? emptyList() : it.list(s -> s.round() == round && s.arrivedByTransit());
     }
 
-    Iterable<? extends McStopArrivalState<T>> list(int round, int stop) {
+    Iterable<? extends AbstractStopArrival<T>> list(int round, int stop) {
         StopStateParetoSet it = stops[stop];
         return it == null ? emptyList() : it.listRound(round);
     }
 
-    Iterable<? extends McStopArrivalState<T>> listAll(int stop) {
+    Iterable<? extends AbstractStopArrival<T>> listAll(int stop) {
         StopStateParetoSet it = stops[stop];
         return it == null ? emptyList() : it;
     }
@@ -63,7 +63,7 @@ final class StopStates<T extends TripScheduleInfo> {
     }
 
     static <T extends TripScheduleInfo> StopStateParetoSet<T> createState() {
-        return new StopStateParetoSet<>(McStopArrivalState.PARETO_FUNCTION);
+        return new StopStateParetoSet<>(AbstractStopArrival.PARETO_FUNCTION);
     }
 
     void debugStateInfo() {

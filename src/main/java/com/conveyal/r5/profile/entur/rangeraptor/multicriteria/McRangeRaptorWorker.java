@@ -2,7 +2,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.TripPatternInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.McStopArrivalState;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
@@ -75,7 +75,7 @@ public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRan
             for (int boardStopPosInPtn = 0; boardStopPosInPtn < pattern.numberOfStopsInPattern(); boardStopPosInPtn++) {
                 int boardStopIndex = pattern.currentPatternStop(boardStopPosInPtn);
 
-                for (McStopArrivalState<T> boardStop : state.listStopStatesPreviousRound(boardStopIndex)) {
+                for (AbstractStopArrival<T> boardStop : state.listStopStatesPreviousRound(boardStopIndex)) {
 
                     int earliestBoardTime = earliestBoardTime(boardStop.time());
                     boolean found = search.search(earliestBoardTime, boardStopPosInPtn);

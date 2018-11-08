@@ -1,27 +1,27 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.McStopArrivalState;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
 
 import java.util.Iterator;
 import java.util.function.Predicate;
 
-class StopStateParetoSet<T extends TripScheduleInfo> extends ParetoSet<McStopArrivalState<T>> {
+class StopStateParetoSet<T extends TripScheduleInfo> extends ParetoSet<AbstractStopArrival<T>> {
 
     StopStateParetoSet(ParetoFunction.Builder function) {
         super(function);
     }
 
-    Iterable<? extends McStopArrivalState> listRound(int round) {
+    Iterable<? extends AbstractStopArrival> listRound(int round) {
         return list(it -> it.round() == round);
     }
 
-    Iterable<? extends McStopArrivalState<T>> list(Predicate<McStopArrivalState> test) {
-        return () -> new Iterator<McStopArrivalState<T>>() {
+    Iterable<? extends AbstractStopArrival<T>> list(Predicate<AbstractStopArrival> test) {
+        return () -> new Iterator<AbstractStopArrival<T>>() {
             private int index = 0;
-            private McStopArrivalState<T> it;
+            private AbstractStopArrival<T> it;
 
 
             @Override
@@ -35,7 +35,7 @@ class StopStateParetoSet<T extends TripScheduleInfo> extends ParetoSet<McStopArr
                 }
                 return false;
             }
-            @Override public McStopArrivalState<T> next() { return it; }
+            @Override public AbstractStopArrival<T> next() { return it; }
         };
     }
 }

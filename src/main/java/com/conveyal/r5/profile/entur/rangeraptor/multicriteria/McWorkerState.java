@@ -2,10 +2,10 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.McAccessStopArrivalState;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.McStopArrivalState;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.McTransferStopArrivalState;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.McTransitStopArrivalState;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransferStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.api.Path2;
@@ -72,7 +72,7 @@ public final class McWorkerState<T extends TripScheduleInfo> implements WorkerSt
     @Override public void setInitialTime(StopArrival stopArrival, int fromTime, int boardSlackInSeconds) {
         stops.setInitialTime(stopArrival, fromTime, boardSlackInSeconds);
         touchedCurrent.set(stopArrival.stop());
-        debugStops(McAccessStopArrivalState.class, round, stopArrival.stop());
+        debugStops(AccessStopArrival.class, round, stopArrival.stop());
     }
 
     @Override public boolean isNewRoundAvailable() {
@@ -94,7 +94,7 @@ public final class McWorkerState<T extends TripScheduleInfo> implements WorkerSt
         return new BitSetIterator(touchedPrevious);
     }
 
-    Iterable<? extends McStopArrivalState<T>> listStopStatesPreviousRound(int stop) {
+    Iterable<? extends AbstractStopArrival<T>> listStopStatesPreviousRound(int stop) {
         return stops.list(round-1, stop);
     }
 
@@ -102,7 +102,7 @@ public final class McWorkerState<T extends TripScheduleInfo> implements WorkerSt
     /**
      * Set the time at a transit stop iff it is optimal.
      */
-    void transitToStop(McStopArrivalState<T> boardStop, int stop, int alightTime, int boardTime, T trip) {
+    void transitToStop(AbstractStopArrival<T> boardStop, int stop, int alightTime, int boardTime, T trip) {
         if (alightTime > maxTimeLimit) {
             return;
         }
@@ -112,7 +112,7 @@ public final class McWorkerState<T extends TripScheduleInfo> implements WorkerSt
         if (added) {
             touchedCurrent.set(stop);
             // skip: transferTimes
-            debugStops(McTransitStopArrivalState.class, round, stop);
+            debugStops(TransitStopArrival.class, round, stop);
         }
     }
 
@@ -123,7 +123,7 @@ public final class McWorkerState<T extends TripScheduleInfo> implements WorkerSt
         final int targetStop = transfer.stop();
         final int transferTimeInSeconds = transfer.durationInSeconds();
 
-        for(McStopArrivalState<T> it :  stops.listArrivedByTransit(round, fromStop)) {
+        for(AbstractStopArrival<T> it :  stops.listArrivedByTransit(round, fromStop)) {
             int arrivalTime = it.time() + transferTimeInSeconds;
 
             if (arrivalTime < maxTimeLimit) {
@@ -132,7 +132,7 @@ public final class McWorkerState<T extends TripScheduleInfo> implements WorkerSt
                 }
             }
         }
-        debugStops(McTransferStopArrivalState.class, round, targetStop);
+        debugStops(TransferStopArrival.class, round, targetStop);
     }
 
     Collection<Path2<T>> extractPaths(Collection<StopArrival> egressStops) {
@@ -140,7 +140,7 @@ public final class McWorkerState<T extends TripScheduleInfo> implements WorkerSt
         McPathBuilder<T> builder = new McPathBuilder<>();
 
         for (StopArrival egressStop : egressStops) {
-            for (McStopArrivalState<T> it : stops.listAll(egressStop.stop())) {
+            for (AbstractStopArrival<T> it : stops.listAll(egressStop.stop())) {
                 Path2<T> p = builder.extractPathsForStop(it, egressStop.durationInSeconds());
                 if(p != null) {
                     paths.add(p);
@@ -179,7 +179,7 @@ public final class McWorkerState<T extends TripScheduleInfo> implements WorkerSt
     private void debugStops(Class<?> type, int round, int stop) {
         if (DebugState.isDebug(stop)) {
             String postfix = (touchedCurrent.get(stop) ? "x " : "  ") + (touchedPrevious.get(stop) ? "x" : " ");
-            for (McStopArrivalState<T> it : stops.list(round, stop)) {
+            for (AbstractStopArrival<T> it : stops.list(round, stop)) {
                 if(it.getClass() == type) {
                     DebugState.debugStop(round, stop, it, postfix);
                 }

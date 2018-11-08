@@ -5,7 +5,7 @@ import com.conveyal.r5.profile.entur.util.IntUtils;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 
-public interface StopArrivalState<T extends TripScheduleInfo> {
+public interface RRStopArrival<T extends TripScheduleInfo> {
 
     /**
      * This value essentially serves as Infinity for ints - it's bigger than every other number.

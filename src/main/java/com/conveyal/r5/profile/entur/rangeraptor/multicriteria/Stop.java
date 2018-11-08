@@ -8,9 +8,9 @@ import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
 import java.util.Iterator;
 import java.util.function.Predicate;
 
-class StopStateParetoSet<T extends TripScheduleInfo> extends ParetoSet<AbstractStopArrival<T>> {
+class Stop<T extends TripScheduleInfo> extends ParetoSet<AbstractStopArrival<T>> {
 
-    StopStateParetoSet(ParetoFunction.Builder function) {
+    Stop(ParetoFunction.Builder function) {
         super(function);
     }
 

@@ -34,7 +34,7 @@ import java.util.List;
  *
  * @author mattwigway
  */
-public final class McWorkerState<T extends TripScheduleInfo> implements WorkerState {
+final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements WorkerState {
 
     /**
      * Stop the search when the time exceeds the max time limit.
@@ -43,7 +43,7 @@ public final class McWorkerState<T extends TripScheduleInfo> implements WorkerSt
      */
     private int maxTimeLimit;
 
-    private final StopStates<T> stops;
+    private final Stops<T> stops;
     private final int nRounds;
     private int round = Integer.MIN_VALUE;
 
@@ -52,9 +52,9 @@ public final class McWorkerState<T extends TripScheduleInfo> implements WorkerSt
 
 
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
-    public McWorkerState(int nRounds, int nStops) {
+    McRangeRaptorWorkerState(int nRounds, int nStops) {
         this.nRounds = nRounds;
-        this.stops = new StopStates<>(nStops);
+        this.stops = new Stops<>(nStops);
 
         this.touchedCurrent = new BitSet(nStops);
         this.touchedPrevious = new BitSet(nStops);

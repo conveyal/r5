@@ -37,7 +37,7 @@ import java.util.Iterator;
  * (generating randomized schedules).
  */
 @SuppressWarnings("Duplicates")
-public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRangeRaptorWorker<McWorkerState<T>, T> {
+public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRangeRaptorWorker<McRangeRaptorWorkerState<T>, T> {
 
     // Variables to track time spent
     private static final AvgTimer TIMER_ROUTE = AvgTimer.timerMilliSec("McRR:route");
@@ -47,8 +47,8 @@ public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRan
     private static final AvgTimer TIMER_BY_MINUTE_TRANSFERS = AvgTimer.timerMicroSec("McRR:runRaptorForMinute Transfers");
 
 
-    public McRangeRaptorWorker(TransitDataProvider<T> transitData, McWorkerState<T> state, RangeRaptorRequest request) {
-        super(transitData, state, request);
+    public McRangeRaptorWorker(TransitDataProvider<T> transitData, RangeRaptorRequest request, int nRounds) {
+        super(transitData, new McRangeRaptorWorkerState<>(nRounds, transitData.numberOfStops()), request);
     }
 
     @Override protected Collection<Path2<T>> paths() {

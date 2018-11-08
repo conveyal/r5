@@ -3,15 +3,15 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard.intarray;
 
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.StopArrivalState;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCollection;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCursor;
+import com.conveyal.r5.profile.entur.rangeraptor.RRStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalCursor;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalCollection;
 
-import static com.conveyal.r5.profile.entur.rangeraptor.StopArrivalState.NOT_SET;
-import static com.conveyal.r5.profile.entur.rangeraptor.StopArrivalState.UNREACHED;
+import static com.conveyal.r5.profile.entur.rangeraptor.RRStopArrival.NOT_SET;
+import static com.conveyal.r5.profile.entur.rangeraptor.RRStopArrival.UNREACHED;
 import static com.conveyal.r5.profile.entur.util.IntUtils.newIntArray;
 
-public final class StopStatesIntArray<T extends TripScheduleInfo> implements StopStateCollection<T> {
+public final class StopIntArray<T extends TripScheduleInfo> implements StopArrivalCollection<T> {
     private int size = 0;
 
     private final int[][] stateStopIndex;
@@ -25,7 +25,7 @@ public final class StopStatesIntArray<T extends TripScheduleInfo> implements Sto
     private final int[] transferFromStops;
 
 
-    public StopStatesIntArray(int nRounds, int stops) {
+    public StopIntArray(int nRounds, int stops) {
         this.stateStopIndex = new int[nRounds][stops];
 
         final int limit = 3 * stops;
@@ -34,6 +34,7 @@ public final class StopStatesIntArray<T extends TripScheduleInfo> implements Sto
 
         this.boardStops = newIntArray(limit, NOT_SET);
         this.transitTimes = newIntArray(limit, UNREACHED);
+        //noinspection unchecked
         this.previousTrips = (T[]) new TripScheduleInfo[limit];
         this.boardTimes = newIntArray(limit, UNREACHED);
 
@@ -87,7 +88,7 @@ public final class StopStatesIntArray<T extends TripScheduleInfo> implements Sto
         transferTimes[index] = transferTime;
     }
 
-    public StopStateCursor<T> newCursor() {
+    public StopArrivalCursor<T> newCursor() {
         return new Cursor();
     }
 
@@ -105,16 +106,16 @@ public final class StopStatesIntArray<T extends TripScheduleInfo> implements Sto
         return stateStopIndex[round][stop];
     }
 
-    public final class Cursor implements StopStateCursor<T>, StopArrivalState<T> {
+    public final class Cursor implements StopArrivalCursor<T>, RRStopArrival<T> {
         private int round;
         private int stop;
         private int cursor;
 
 
-        /* Implement StopStateCursor */
+        /* Implement StopArrivalCursor */
 
         @Override
-        public final StopArrivalState<T> stop(int round, int stop) {
+        public final RRStopArrival<T> stop(int round, int stop) {
             this.cursor = stateStopIndex[round][stop];
             this.round = round;
             this.stop = stop;
@@ -127,7 +128,7 @@ public final class StopStatesIntArray<T extends TripScheduleInfo> implements Sto
         }
 
 
-        /* Implement StopArrivalState */
+        /* Implement RRStopArrival */
 
         @Override
         public final int time() {

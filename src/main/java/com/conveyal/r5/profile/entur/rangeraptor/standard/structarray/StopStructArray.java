@@ -3,17 +3,18 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard.structarray;
 
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCollection;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCursor;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalCollection;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalCursor;
 
 
-public final class StopStatesStructArray<T extends TripScheduleInfo> implements StopStateCollection<T> {
+public final class StopStructArray<T extends TripScheduleInfo> implements StopArrivalCollection<T> {
 
-    private final StopArrivalStateStruct<T>[][] stops;
+    private final StructStopArrival<T>[][] stops;
 
 
-    public StopStatesStructArray(int nRounds, int stops) {
-        this.stops = (StopArrivalStateStruct<T>[][]) new StopArrivalStateStruct[nRounds][stops];
+    public StopStructArray(int nRounds, int stops) {
+        //noinspection unchecked
+        this.stops = (StructStopArrival<T>[][]) new StructStopArrival[nRounds][stops];
     }
 
     @Override
@@ -23,7 +24,7 @@ public final class StopStatesStructArray<T extends TripScheduleInfo> implements 
 
     @Override
     public void transitToStop(int round, int stop, int time, int boardStop, int boardTime, T trip, boolean bestTime) {
-        StopArrivalStateStruct<T> state = findOrCreateStopIndex(round, stop);
+        StructStopArrival<T> state = findOrCreateStopIndex(round, stop);
 
         state.arriveByTransit(time, boardStop, boardTime, trip);
 
@@ -38,7 +39,7 @@ public final class StopStatesStructArray<T extends TripScheduleInfo> implements 
     @Override
     public void transferToStop(int round, int fromStop, StopArrival toStopArrival, int arrivalTime) {
         int stop = toStopArrival.stop();
-        StopArrivalStateStruct state = findOrCreateStopIndex(round, stop);
+        StructStopArrival state = findOrCreateStopIndex(round, stop);
 
         state.transferToStop(fromStop, arrivalTime, toStopArrival.durationInSeconds());
     }
@@ -51,16 +52,16 @@ public final class StopStatesStructArray<T extends TripScheduleInfo> implements 
         return new Cursor();
     }
 
-    private StopArrivalStateStruct<T> findOrCreateStopIndex(final int round, final int stop) {
+    private StructStopArrival<T> findOrCreateStopIndex(final int round, final int stop) {
         if(stops[round][stop] == null) {
-            stops[round][stop] = new StopArrivalStateStruct<T>();
+            stops[round][stop] = new StructStopArrival<T>();
         }
         return stops[round][stop];
     }
 
-    public class Cursor implements StopStateCursor<T> {
+    public class Cursor implements StopArrivalCursor<T> {
 
-        public StopArrivalStateStruct<T> stop(int round, int stop) {
+        public StructStopArrival<T> stop(int round, int stop) {
             return stops[round][stop];
         }
 

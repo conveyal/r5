@@ -54,7 +54,7 @@ public class RangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRange
     public RangeRaptorWorker(
             TransitDataProvider<T> transitData,
             int nRounds,
-            StopStateCollection<T> stateCollection,
+            StopArrivalCollection<T> stateCollection,
             RangeRaptorRequest request
     ) {
         super(transitData, new RangeRaptorWorkerState<>(nRounds, transitData.numberOfStops(), stateCollection), request);

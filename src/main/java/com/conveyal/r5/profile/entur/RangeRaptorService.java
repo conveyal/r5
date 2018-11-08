@@ -8,11 +8,10 @@ import com.conveyal.r5.profile.entur.api.TuningParameters;
 import com.conveyal.r5.profile.entur.rangeraptor.Worker;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.RangeRaptorWorker;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCollection;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.intarray.StopStatesIntArray;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.structarray.StopStatesStructArray;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalCollection;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.intarray.StopIntArray;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.structarray.StopStructArray;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McRangeRaptorWorker;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McWorkerState;
 
 import java.util.Collection;
 
@@ -48,26 +47,16 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
 
     private Worker<T> createMcRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest request) {
         int nRounds = nRounds(tuningParameters);
-
-        McWorkerState<T> state = new McWorkerState<>(
-                nRounds,
-                transitData.numberOfStops()
-        );
-
-        return new McRangeRaptorWorker<T>(
-                transitData,
-                state,
-                request
-        );
+        return new McRangeRaptorWorker<>(transitData, request, nRounds);
     }
 
     private Worker<T> createRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest request) {
         int nRounds = nRounds(tuningParameters);
 
-        StopStateCollection<T> stops =
+        StopArrivalCollection<T> stops =
                 request.profile == RaptorProfiles.STRUCT_ARRAYS
-                        ? new StopStatesStructArray(nRounds, transitData.numberOfStops())
-                        : new StopStatesIntArray(nRounds, transitData.numberOfStops());
+                        ? new StopStructArray(nRounds, transitData.numberOfStops())
+                        : new StopIntArray(nRounds, transitData.numberOfStops());
 
         return new RangeRaptorWorker<T>(
                 transitData,

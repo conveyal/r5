@@ -3,7 +3,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 
-public interface StopStateCollection<T extends TripScheduleInfo> {
+public interface StopArrivalCollection<T extends TripScheduleInfo> {
 
     void setInitialTime(int round, int stop, int time);
 
@@ -15,5 +15,5 @@ public interface StopStateCollection<T extends TripScheduleInfo> {
     void transferToStop(int round, int fromStop, StopArrival stop, int arrivalTime);
 
 
-    StopStateCursor<T> newCursor();
+    StopArrivalCursor<T> newCursor();
 }

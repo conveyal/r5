@@ -7,7 +7,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.Abstract
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransferStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
 
-import static com.conveyal.r5.profile.entur.rangeraptor.StopArrivalState.NOT_SET;
+import static com.conveyal.r5.profile.entur.rangeraptor.RRStopArrival.NOT_SET;
 
 abstract class McPathLeg<S extends AbstractStopArrival<T>, T extends TripScheduleInfo> implements PathLeg<T> {
     final S state;

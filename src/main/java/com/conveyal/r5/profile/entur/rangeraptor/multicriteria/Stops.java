@@ -13,15 +13,15 @@ import static java.util.Collections.emptyList;
 
 
 
-final class StopStates<T extends TripScheduleInfo> {
+final class Stops<T extends TripScheduleInfo> {
 
-    private final StopStateParetoSet<T>[] stops;
+    private final Stop<T>[] stops;
 
         /**
          * Set the time at a transit index iff it is optimal. This sets both the best time and the transfer time
          */
-    StopStates(int stops) {
-        this.stops = (StopStateParetoSet<T>[]) new StopStateParetoSet[stops];
+    Stops(int stops) {
+        this.stops = (Stop<T>[]) new Stop[stops];
     }
 
     void setInitialTime(StopArrival stopArrival, int fromTime, int boardSlackInSeconds) {
@@ -41,29 +41,29 @@ final class StopStates<T extends TripScheduleInfo> {
     }
 
     Iterable<? extends AbstractStopArrival<T>> listArrivedByTransit(int round, int stop) {
-        StopStateParetoSet<T> it = stops[stop];
+        Stop<T> it = stops[stop];
         return it == null ? emptyList() : it.list(s -> s.round() == round && s.arrivedByTransit());
     }
 
     Iterable<? extends AbstractStopArrival<T>> list(int round, int stop) {
-        StopStateParetoSet it = stops[stop];
+        Stop it = stops[stop];
         return it == null ? emptyList() : it.listRound(round);
     }
 
     Iterable<? extends AbstractStopArrival<T>> listAll(int stop) {
-        StopStateParetoSet it = stops[stop];
+        Stop it = stops[stop];
         return it == null ? emptyList() : it;
     }
 
-    private StopStateParetoSet<T> findOrCreateSet(final int stop) {
+    private Stop<T> findOrCreateSet(final int stop) {
         if(stops[stop] == null) {
             stops[stop] = createState();
         }
         return stops[stop];
     }
 
-    static <T extends TripScheduleInfo> StopStateParetoSet<T> createState() {
-        return new StopStateParetoSet<>(AbstractStopArrival.PARETO_FUNCTION);
+    static <T extends TripScheduleInfo> Stop<T> createState() {
+        return new Stop<>(AbstractStopArrival.PARETO_FUNCTION);
     }
 
     void debugStateInfo() {
@@ -72,7 +72,7 @@ final class StopStates<T extends TripScheduleInfo> {
         long numOfStops = 0;
         int max = 0;
 
-        for (StopStateParetoSet stop : stops) {
+        for (Stop stop : stops) {
             if(stop != null) {
                 ++numOfStops;
                 total += stop.size();

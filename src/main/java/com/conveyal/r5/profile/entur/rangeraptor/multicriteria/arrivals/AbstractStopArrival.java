@@ -1,7 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.StopArrivalState;
+import com.conveyal.r5.profile.entur.rangeraptor.RRStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSortable;
@@ -11,7 +11,7 @@ import java.util.List;
 
 import static com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction.createParetoFunctions;
 
-public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements StopArrivalState<T>, ParetoSortable {
+public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements RRStopArrival<T>, ParetoSortable {
 
     /**
      * The pareto function MUST match the {@code ParetoSortable} implementation below

@@ -33,7 +33,7 @@ public class StopArrivalStateParetoSetTest {
 
     private AbstractStopArrival<TripScheduleInfo> A_STATE = newMcAccessStopState(999, 10);
 
-    private StopStateParetoSet<TripScheduleInfo> subject = StopStates.createState();
+    private Stop<TripScheduleInfo> subject = Stops.createState();
 
     @Test
     public void addOneElementToSet() {

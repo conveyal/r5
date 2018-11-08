@@ -36,8 +36,8 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
     /**
      * To debug a particular journey set DEBUG to true and add all visited stops in the debugStops list.
      */
-    private final StopStateCollection<T> stops;
-    private final StopStateCursor<T> cursor;
+    private final StopArrivalCollection<T> stops;
+    private final StopArrivalCursor<T> cursor;
     private final int nRounds;
     private int round = 0;
     private int roundMax = -1;
@@ -54,7 +54,7 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
 
 
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
-    RangeRaptorWorkerState(int nRounds, int nStops, StopStateCollection<T> stops) {
+    RangeRaptorWorkerState(int nRounds, int nStops, StopArrivalCollection<T> stops) {
         this.nRounds = nRounds;
         this.stops = stops;
         this.cursor = stops.newCursor();

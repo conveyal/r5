@@ -4,7 +4,7 @@ import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.PathLeg;
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.StopArrivalState;
+import com.conveyal.r5.profile.entur.rangeraptor.RRStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 
 import java.util.ArrayList;
@@ -13,19 +13,19 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
-import static com.conveyal.r5.profile.entur.rangeraptor.StopArrivalState.NOT_SET;
+import static com.conveyal.r5.profile.entur.rangeraptor.RRStopArrival.NOT_SET;
 
 
 /**
  * Class used to represent transit paths in Browsochrones and Modeify.
  */
 class PathBuilderCursorBased<T extends TripScheduleInfo> {
-    private final StopStateCursor<T> cursor;
+    private final StopArrivalCursor<T> cursor;
     private int boardSlackInSeconds;
     private int round;
 
 
-    PathBuilderCursorBased(StopStateCursor<T> cursor) {
+    PathBuilderCursorBased(StopArrivalCursor<T> cursor) {
         this.cursor = cursor;
     }
 
@@ -41,7 +41,7 @@ class PathBuilderCursorBased<T extends TripScheduleInfo> {
         int fromStopIndex = egressStop.stop();
 
         // find the fewest-transfers trip that is still optimal in terms of travel time
-        StopArrivalState<T> state = findLastRoundWithTransitTimeSet(fromStopIndex);
+        RRStopArrival<T> state = findLastRoundWithTransitTimeSet(fromStopIndex);
 
         if (state == null) {
             return null;
@@ -97,7 +97,7 @@ class PathBuilderCursorBased<T extends TripScheduleInfo> {
      * the last round with a transit time set. This is sufficient for finding the
      * best time, since the state is only recorded iff it is faster then previous rounds.
      */
-    private StopArrivalState<T> findLastRoundWithTransitTimeSet(int egressStop) {
+    private RRStopArrival<T> findLastRoundWithTransitTimeSet(int egressStop) {
 
         while (cursor.stopNotVisited(round, egressStop) || !cursor.stop(round, egressStop).arrivedByTransit()) {
 
@@ -135,7 +135,7 @@ class PathBuilderCursorBased<T extends TripScheduleInfo> {
     static final class TransitLeg<T extends TripScheduleInfo> extends AbstractLeg<T> {
         private T trip;
 
-        TransitLeg(int boardStop, int alightStop, StopArrivalState<T> state) {
+        TransitLeg(int boardStop, int alightStop, RRStopArrival<T> state) {
             super(boardStop, alightStop, state.boardTime(), state.transitTime());
             this.trip = state.trip();
         }

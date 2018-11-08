@@ -6,12 +6,12 @@ import com.conveyal.r5.profile.entur.util.DebugState;
 
 import static com.conveyal.r5.profile.entur.util.DebugState.Type.Transit;
 
-public final class McTransitStopState<T extends TripScheduleInfo> extends McStopState<T> {
+final class McTransitStopState<T extends TripScheduleInfo> extends McStopState<T> {
     private final int boardTime;
     private final T trip;
 
     McTransitStopState(McStopState<T> previousState, int round, int stopIndex, int time, int boardTime, T trip) {
-        super(previousState, round, round*2, stopIndex, time);
+        super(previousState, round, round*2, stopIndex, time, previousState.cost());
         this.trip = trip;
         this.boardTime = boardTime;
     }

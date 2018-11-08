@@ -1,6 +1,5 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
-import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopState;
 import com.conveyal.r5.profile.entur.util.DebugState;
@@ -25,17 +24,20 @@ public abstract class McStopState<T extends TripScheduleInfo> implements StopSta
 
     private final McStopState<T> previousState;
     private final int round;
-    private final int stopIndex;
+    private final int stop;
     private final int time;
     private final int roundPareto;
     private final int cost;
 
 
-    private McStopState(McStopState<T> previousState, int round, int roundPareto, int stopIndex, int arrivalTime, int cost) {
+    /**
+     * Transit or transfer
+     */
+    McStopState(McStopState<T> previousState, int round, int roundPareto, int stop, int arrivalTime, int cost) {
         this.previousState = previousState;
         this.round = round;
         this.roundPareto = roundPareto;
-        this.stopIndex = stopIndex;
+        this.stop = stop;
         this.time = arrivalTime;
         this.cost = cost;
     }
@@ -43,23 +45,15 @@ public abstract class McStopState<T extends TripScheduleInfo> implements StopSta
     /**
      * Initial state - first stop visited.
      */
-    McStopState(StopArrival stopArrival, int arrivalTime) {
-        this(null, 0, 0, stopArrival.stop(), arrivalTime, stopArrival.cost());
+    McStopState(int stop, int arrivalTime, int initialCost) {
+        this.previousState = null;
+        this.round = 0;
+        this.roundPareto = 0;
+        this.stop = stop;
+        this.time = arrivalTime;
+        this.cost = initialCost;
     }
 
-    /**
-     * Arrive by transfer.
-     */
-    McStopState(McStopState<T> previousState, int round, int roundPareto, StopArrival stopArrival, int arrivalTime) {
-        this(previousState, round, roundPareto, stopArrival.stop(), arrivalTime, stopArrival.cost());
-    }
-
-    /**
-     * Arrive by transfer.
-     */
-    McStopState(McStopState<T> previousState, int round, int roundPareto, int stopIndex, int arrivalTime) {
-        this(previousState, round, roundPareto, stopIndex, arrivalTime, previousState.cost);
-    }
 
     /* pareto vector, the {@code ParetoSortable} implementation */
     @Override public final int paretoValue1() { return time;        }
@@ -67,7 +61,7 @@ public abstract class McStopState<T extends TripScheduleInfo> implements StopSta
     @Override public final int paretoValue3() { return cost;        }
 
     final int previousStop() {
-        return previousState.stopIndex;
+        return previousState.stop;
     }
 
     final McStopState previousState() {
@@ -75,7 +69,7 @@ public abstract class McStopState<T extends TripScheduleInfo> implements StopSta
     }
 
     public final int stopIndex() {
-        return stopIndex;
+        return stop;
     }
 
     public final int round() {
@@ -127,15 +121,19 @@ public abstract class McStopState<T extends TripScheduleInfo> implements StopSta
         return false;
     }
 
+    int cost() {
+        return cost;
+    }
+
     @Override
     public String toString() {
-        return asString(type().name(), round(), stopIndex);
+        return asString(type().name(), round(), stop);
     }
 
     abstract DebugState.Type type();
 
     public void debug() {
-        DebugState.debugStop(type(), round, stopIndex, this);
+        DebugState.debugStop(type(), round, stop, this);
     }
 
     public List<McStopState<T>> path() {

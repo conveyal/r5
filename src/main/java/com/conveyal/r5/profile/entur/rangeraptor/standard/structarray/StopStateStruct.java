@@ -1,7 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard.structarray;
 
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.StopState;
+import com.conveyal.r5.profile.entur.rangeraptor.StopState;
 
 final class StopStateStruct<T extends TripScheduleInfo> implements StopState<T> {
     private int time = UNREACHED;

@@ -4,6 +4,7 @@ import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.PathLeg;
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.StopState;
 import com.conveyal.r5.profile.entur.util.DebugState;
 
 import java.util.ArrayList;
@@ -12,7 +13,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
-import static com.conveyal.r5.profile.entur.rangeraptor.standard.StopState.NOT_SET;
+import static com.conveyal.r5.profile.entur.rangeraptor.StopState.NOT_SET;
 
 
 /**

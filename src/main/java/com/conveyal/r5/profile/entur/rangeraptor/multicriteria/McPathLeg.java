@@ -3,7 +3,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 import com.conveyal.r5.profile.entur.api.PathLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 
-import static com.conveyal.r5.profile.entur.rangeraptor.standard.StopState.NOT_SET;
+import static com.conveyal.r5.profile.entur.rangeraptor.StopState.NOT_SET;
 
 abstract class McPathLeg<S extends McStopState<T>, T extends TripScheduleInfo> implements PathLeg<T> {
     final S state;

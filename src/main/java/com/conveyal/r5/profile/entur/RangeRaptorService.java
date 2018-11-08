@@ -5,12 +5,12 @@ import com.conveyal.r5.profile.entur.api.RaptorProfiles;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.TuningParameters;
+import com.conveyal.r5.profile.entur.rangeraptor.Worker;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.RangeRaptorWorker;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCollection;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.intarray.StopStatesIntArray;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.structarray.StopStatesStructArray;
-import com.conveyal.r5.profile.entur.api.Worker;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McWorkerState;
 
@@ -34,7 +34,7 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
 
     /* private methods */
 
-    private Worker createWorker(RangeRaptorRequest request, TransitDataProvider transitData) {
+    private Worker<T> createWorker(RangeRaptorRequest request, TransitDataProvider<T> transitData) {
         switch (request.profile) {
             case MULTI_CRITERIA:
                 return createMcRRWorker(transitData, request);
@@ -46,7 +46,7 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
         }
     }
 
-    private McRangeRaptorWorker createMcRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest request) {
+    private Worker<T> createMcRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest request) {
         int nRounds = nRounds(tuningParameters);
 
         McWorkerState<T> state = new McWorkerState<>(
@@ -61,7 +61,7 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
         );
     }
 
-    private RangeRaptorWorker createRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest request) {
+    private Worker<T> createRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest request) {
         int nRounds = nRounds(tuningParameters);
 
         StopStateCollection<T> stops =

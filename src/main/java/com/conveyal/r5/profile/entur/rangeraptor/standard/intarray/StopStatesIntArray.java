@@ -3,12 +3,12 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard.intarray;
 
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.StopState;
+import com.conveyal.r5.profile.entur.rangeraptor.StopState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCollection;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCursor;
 
-import static com.conveyal.r5.profile.entur.rangeraptor.standard.StopState.NOT_SET;
-import static com.conveyal.r5.profile.entur.rangeraptor.standard.StopState.UNREACHED;
+import static com.conveyal.r5.profile.entur.rangeraptor.StopState.NOT_SET;
+import static com.conveyal.r5.profile.entur.rangeraptor.StopState.UNREACHED;
 import static com.conveyal.r5.profile.entur.util.IntUtils.newIntArray;
 
 public final class StopStatesIntArray<T extends TripScheduleInfo> implements StopStateCollection<T> {

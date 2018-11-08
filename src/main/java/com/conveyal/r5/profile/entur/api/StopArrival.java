@@ -7,8 +7,8 @@ package com.conveyal.r5.profile.entur.api;
  * <p/>
  * The class is used to describe:
  * <ol>
- *     <li> assess legs
- *     <li> transfer legs
+ *     <li> assess legs (the arrival at the first stop in a trip)
+ *     <li> transfer legs (arrival at a stop from a transfer)
  *     <li> egress legs
  * </ol>
  * Note that the {@link #stop()} refer to the destination stop in the 2 first cases, and the departure stop for egress legs.
@@ -35,5 +35,5 @@ public interface StopArrival {
      */
     default int cost() {
         return 0;
-    };
+    }
 }

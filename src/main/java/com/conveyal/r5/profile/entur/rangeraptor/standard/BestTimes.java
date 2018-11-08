@@ -5,7 +5,7 @@ import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 import java.util.BitSet;
 
-import static com.conveyal.r5.profile.entur.rangeraptor.standard.StopState.UNREACHED;
+import static com.conveyal.r5.profile.entur.rangeraptor.StopState.UNREACHED;
 import static com.conveyal.r5.profile.entur.util.IntUtils.newIntArray;
 
 final class BestTimes {

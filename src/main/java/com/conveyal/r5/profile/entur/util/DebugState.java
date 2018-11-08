@@ -1,13 +1,13 @@
 package com.conveyal.r5.profile.entur.util;
 
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.StopState;
+import com.conveyal.r5.profile.entur.rangeraptor.StopState;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.conveyal.r5.profile.entur.rangeraptor.standard.StopState.NOT_SET;
-import static com.conveyal.r5.profile.entur.rangeraptor.standard.StopState.UNREACHED;
+import static com.conveyal.r5.profile.entur.rangeraptor.StopState.NOT_SET;
+import static com.conveyal.r5.profile.entur.rangeraptor.StopState.UNREACHED;
 import static com.conveyal.r5.profile.entur.util.IntUtils.intToString;
 import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrCompact;
 import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrLong;

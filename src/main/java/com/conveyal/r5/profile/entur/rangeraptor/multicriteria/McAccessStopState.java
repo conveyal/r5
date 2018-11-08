@@ -13,7 +13,7 @@ class McAccessStopState<T extends TripScheduleInfo> extends McStopState<T> {
 
 
     McAccessStopState(StopArrival stopArrival, int fromTime, int boardSlackInSeconds) {
-        super(stopArrival, fromTime + stopArrival.durationInSeconds());
+        super(stopArrival.stop(), fromTime + stopArrival.durationInSeconds(), stopArrival.cost());
         this.accessDurationInSeconds = stopArrival.durationInSeconds();
         this.boardSlackInSeconds = boardSlackInSeconds;
     }

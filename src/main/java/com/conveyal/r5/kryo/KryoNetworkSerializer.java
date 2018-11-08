@@ -77,9 +77,13 @@ public abstract class KryoNetworkSerializer {
     public static void write (TransportNetwork network, File file) throws IOException {
         LOG.info("Writing transport network...");
         Output output = new Output(new FileOutputStream(file));
-        makeKryo().writeClassAndObject(output, network);
+        Kryo kryo = makeKryo();
+        kryo.writeClassAndObject(output, network);
         output.close();
         LOG.info("Done writing.");
+        if (COUNT_CLASS_INSTANCES) {
+            ((InstanceCountingClassResolver)kryo.getClassResolver()).summarize();
+        }
     }
 
     /**

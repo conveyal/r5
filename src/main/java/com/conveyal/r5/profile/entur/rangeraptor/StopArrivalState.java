@@ -5,7 +5,7 @@ import com.conveyal.r5.profile.entur.util.IntUtils;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 
-public interface StopState<T extends TripScheduleInfo> {
+public interface StopArrivalState<T extends TripScheduleInfo> {
 
     enum Type { Access, Transfer, Transit }
 

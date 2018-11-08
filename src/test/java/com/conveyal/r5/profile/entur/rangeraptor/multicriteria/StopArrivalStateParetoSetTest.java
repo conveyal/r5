@@ -8,7 +8,7 @@ import org.junit.Test;
 import java.util.Arrays;
 import java.util.stream.StreamSupport;
 
-public class StopStateParetoSetTest {
+public class StopArrivalStateParetoSetTest {
     // 08:35 in seconds
     private static final int A_TIME = ((8 * 60) + 35) * 60;
     private static final int ANY = 3;
@@ -27,7 +27,7 @@ public class StopStateParetoSetTest {
     private static final int STOP_5 = 5;
     private static final int STOP_6 = 6;
 
-    private McStopState<TripScheduleInfo> A_STATE = newMcAccessStopState(999, 10);
+    private McStopArrivalState<TripScheduleInfo> A_STATE = newMcAccessStopState(999, 10);
 
     private StopStateParetoSet<TripScheduleInfo> subject = StopStates.createState();
 
@@ -88,19 +88,19 @@ public class StopStateParetoSetTest {
     }
 
     private void assertStopsInSet(int ... expStopIndexes) {
-        int[] result = StreamSupport.stream(subject.spliterator(), false).mapToInt(McStopState::stopIndex).sorted().toArray();
+        int[] result = StreamSupport.stream(subject.spliterator(), false).mapToInt(McStopArrivalState::stopIndex).sorted().toArray();
         Assert.assertEquals("Stop indexes", Arrays.toString(expStopIndexes), Arrays.toString(result));
     }
 
-    private static McAccessStopState<TripScheduleInfo> newMcAccessStopState(int stop, int accessDurationInSeconds) {
-        return new McAccessStopState<>(new AStopArrival(stop, accessDurationInSeconds), A_TIME, ANY);
+    private static McAccessStopArrivalState<TripScheduleInfo> newMcAccessStopState(int stop, int accessDurationInSeconds) {
+        return new McAccessStopArrivalState<>(new AStopArrival(stop, accessDurationInSeconds), A_TIME, ANY);
     }
 
-    private static McTransitStopState<TripScheduleInfo> newMcTransitStopState(McStopState<TripScheduleInfo> prev, int round, int stop, int arrivalTime) {
-        return new McTransitStopState<>(prev, round, stop, arrivalTime, ANY, ANY_TRIP);
+    private static McTransitStopArrivalState<TripScheduleInfo> newMcTransitStopState(McStopArrivalState<TripScheduleInfo> prev, int round, int stop, int arrivalTime) {
+        return new McTransitStopArrivalState<>(prev, round, stop, arrivalTime, ANY, ANY_TRIP);
     }
 
-    private static McTransferStopState<TripScheduleInfo> newMcTransferStopState(McStopState<TripScheduleInfo> prev, int round, int stop, int arrivalTime) {
-        return new McTransferStopState<>(prev, round, new AStopArrival(stop, ANY), arrivalTime);
+    private static McTransferStopArrivalState<TripScheduleInfo> newMcTransferStopState(McStopArrivalState<TripScheduleInfo> prev, int round, int stop, int arrivalTime) {
+        return new McTransferStopArrivalState<>(prev, round, new AStopArrival(stop, ANY), arrivalTime);
     }
 }

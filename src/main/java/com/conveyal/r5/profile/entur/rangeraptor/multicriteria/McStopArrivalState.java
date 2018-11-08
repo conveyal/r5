@@ -1,7 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.StopState;
+import com.conveyal.r5.profile.entur.rangeraptor.StopArrivalState;
 import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSortable;
@@ -11,7 +11,7 @@ import java.util.List;
 
 import static com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction.createParetoFunctions;
 
-public abstract class McStopState<T extends TripScheduleInfo> implements StopState<T>, ParetoSortable {
+public abstract class McStopArrivalState<T extends TripScheduleInfo> implements StopArrivalState<T>, ParetoSortable {
 
     /**
      * The pareto function MUST match the {@code ParetoSortable} implementation below
@@ -22,7 +22,7 @@ public abstract class McStopState<T extends TripScheduleInfo> implements StopSta
             .lessThen()  // cost
             ;
 
-    private final McStopState<T> previousState;
+    private final McStopArrivalState<T> previousState;
     private final int round;
     private final int stop;
     private final int time;
@@ -33,7 +33,7 @@ public abstract class McStopState<T extends TripScheduleInfo> implements StopSta
     /**
      * Transit or transfer
      */
-    McStopState(McStopState<T> previousState, int round, int roundPareto, int stop, int arrivalTime, int cost) {
+    McStopArrivalState(McStopArrivalState<T> previousState, int round, int roundPareto, int stop, int arrivalTime, int cost) {
         this.previousState = previousState;
         this.round = round;
         this.roundPareto = roundPareto;
@@ -45,7 +45,7 @@ public abstract class McStopState<T extends TripScheduleInfo> implements StopSta
     /**
      * Initial state - first stop visited.
      */
-    McStopState(int stop, int arrivalTime, int initialCost) {
+    McStopArrivalState(int stop, int arrivalTime, int initialCost) {
         this.previousState = null;
         this.round = 0;
         this.roundPareto = 0;
@@ -68,7 +68,7 @@ public abstract class McStopState<T extends TripScheduleInfo> implements StopSta
         return previousState.stop;
     }
 
-    final McStopState previousState() {
+    final McStopArrivalState previousState() {
         return previousState;
     }
 
@@ -138,9 +138,9 @@ public abstract class McStopState<T extends TripScheduleInfo> implements StopSta
         DebugState.debugStop(round, stop, this);
     }
 
-    public List<McStopState<T>> path() {
-        List<McStopState<T>> path = new LinkedList<>();
-        McStopState<T> current = this;
+    public List<McStopArrivalState<T>> path() {
+        List<McStopArrivalState<T>> path = new LinkedList<>();
+        McStopArrivalState<T> current = this;
 
         path.add(current);
 

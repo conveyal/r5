@@ -74,7 +74,7 @@ public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRan
             for (int boardStopPosInPtn = 0; boardStopPosInPtn < pattern.numberOfStopsInPattern(); boardStopPosInPtn++) {
                 int boardStopIndex = pattern.currentPatternStop(boardStopPosInPtn);
 
-                for (McStopState<T> boardStop : state.listStopStatesPreviousRound(boardStopIndex)) {
+                for (McStopArrivalState<T> boardStop : state.listStopStatesPreviousRound(boardStopIndex)) {
 
                     int earliestBoardTime = earliestBoardTime(boardStop.time());
                     boolean found = search.search(earliestBoardTime, boardStopPosInPtn);

@@ -9,11 +9,11 @@ import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCursor;
 
 public final class StopStatesStructArray<T extends TripScheduleInfo> implements StopStateCollection<T> {
 
-    private final StopStateStruct<T>[][] stops;
+    private final StopArrivalStateStruct<T>[][] stops;
 
 
     public StopStatesStructArray(int nRounds, int stops) {
-        this.stops = (StopStateStruct<T>[][]) new StopStateStruct[nRounds][stops];
+        this.stops = (StopArrivalStateStruct<T>[][]) new StopArrivalStateStruct[nRounds][stops];
     }
 
     @Override
@@ -23,7 +23,7 @@ public final class StopStatesStructArray<T extends TripScheduleInfo> implements 
 
     @Override
     public void transitToStop(int round, int stop, int time, int boardStop, int boardTime, T trip, boolean bestTime) {
-        StopStateStruct<T> state = findOrCreateStopIndex(round, stop);
+        StopArrivalStateStruct<T> state = findOrCreateStopIndex(round, stop);
 
         state.arriveByTransit(time, boardStop, boardTime, trip);
 
@@ -38,7 +38,7 @@ public final class StopStatesStructArray<T extends TripScheduleInfo> implements 
     @Override
     public void transferToStop(int round, int fromStop, StopArrival toStopArrival, int arrivalTime) {
         int stop = toStopArrival.stop();
-        StopStateStruct state = findOrCreateStopIndex(round, stop);
+        StopArrivalStateStruct state = findOrCreateStopIndex(round, stop);
 
         state.transferToStop(fromStop, arrivalTime, toStopArrival.durationInSeconds());
     }
@@ -51,16 +51,16 @@ public final class StopStatesStructArray<T extends TripScheduleInfo> implements 
         return new Cursor();
     }
 
-    private StopStateStruct<T> findOrCreateStopIndex(final int round, final int stop) {
+    private StopArrivalStateStruct<T> findOrCreateStopIndex(final int round, final int stop) {
         if(stops[round][stop] == null) {
-            stops[round][stop] = new StopStateStruct<T>();
+            stops[round][stop] = new StopArrivalStateStruct<T>();
         }
         return stops[round][stop];
     }
 
     public class Cursor implements StopStateCursor<T> {
 
-        public StopStateStruct<T> stop(int round, int stop) {
+        public StopArrivalStateStruct<T> stop(int round, int stop) {
             return stops[round][stop];
         }
 

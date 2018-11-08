@@ -7,20 +7,20 @@ import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
 import java.util.Iterator;
 import java.util.function.Predicate;
 
-class StopStateParetoSet<T extends TripScheduleInfo> extends ParetoSet<McStopState<T>> {
+class StopStateParetoSet<T extends TripScheduleInfo> extends ParetoSet<McStopArrivalState<T>> {
 
     StopStateParetoSet(ParetoFunction.Builder function) {
         super(function);
     }
 
-    Iterable<? extends McStopState> listRound(int round) {
+    Iterable<? extends McStopArrivalState> listRound(int round) {
         return list(it -> it.round() == round);
     }
 
-    Iterable<? extends McStopState<T>> list(Predicate<McStopState> test) {
-        return () -> new Iterator<McStopState<T>>() {
+    Iterable<? extends McStopArrivalState<T>> list(Predicate<McStopArrivalState> test) {
+        return () -> new Iterator<McStopArrivalState<T>>() {
             private int index = 0;
-            private McStopState<T> it;
+            private McStopArrivalState<T> it;
 
 
             @Override
@@ -34,7 +34,7 @@ class StopStateParetoSet<T extends TripScheduleInfo> extends ParetoSet<McStopSta
                 }
                 return false;
             }
-            @Override public McStopState<T> next() { return it; }
+            @Override public McStopArrivalState<T> next() { return it; }
         };
     }
 }

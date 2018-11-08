@@ -23,30 +23,30 @@ final class StopStates<T extends TripScheduleInfo> {
     void setInitialTime(StopArrival stopArrival, int fromTime, int boardSlackInSeconds) {
         final int stop = stopArrival.stop();
         findOrCreateSet(stop).add(
-                new McAccessStopState<T>(stopArrival, fromTime, boardSlackInSeconds)
+                new McAccessStopArrivalState<T>(stopArrival, fromTime, boardSlackInSeconds)
         );
     }
 
-    boolean transitToStop(McStopState<T> previous, int round, int stop, int time, T trip, int boardTime) {
-        McStopState<T> state = new McTransitStopState<>(previous, round, stop, time, boardTime, trip);
+    boolean transitToStop(McStopArrivalState<T> previous, int round, int stop, int time, T trip, int boardTime) {
+        McStopArrivalState<T> state = new McTransitStopArrivalState<>(previous, round, stop, time, boardTime, trip);
         return findOrCreateSet(stop).add(state);
     }
 
-    boolean transferToStop(McStopState<T> previous, int round, StopArrival stopArrival, int arrivalTime) {
-        return findOrCreateSet(stopArrival.stop()).add(new McTransferStopState<>(previous, round, stopArrival, arrivalTime));
+    boolean transferToStop(McStopArrivalState<T> previous, int round, StopArrival stopArrival, int arrivalTime) {
+        return findOrCreateSet(stopArrival.stop()).add(new McTransferStopArrivalState<>(previous, round, stopArrival, arrivalTime));
     }
 
-    Iterable<? extends McStopState<T>> listArrivedByTransit(int round, int stop) {
+    Iterable<? extends McStopArrivalState<T>> listArrivedByTransit(int round, int stop) {
         StopStateParetoSet<T> it = stops[stop];
         return it == null ? emptyList() : it.list(s -> s.round() == round && s.arrivedByTransit());
     }
 
-    Iterable<? extends McStopState<T>> list(int round, int stop) {
+    Iterable<? extends McStopArrivalState<T>> list(int round, int stop) {
         StopStateParetoSet it = stops[stop];
         return it == null ? emptyList() : it.listRound(round);
     }
 
-    Iterable<? extends McStopState<T>> listAll(int stop) {
+    Iterable<? extends McStopArrivalState<T>> listAll(int stop) {
         StopStateParetoSet it = stops[stop];
         return it == null ? emptyList() : it;
     }
@@ -59,7 +59,7 @@ final class StopStates<T extends TripScheduleInfo> {
     }
 
     static <T extends TripScheduleInfo> StopStateParetoSet<T> createState() {
-        return new StopStateParetoSet<>(McStopState.PARETO_FUNCTION);
+        return new StopStateParetoSet<>(McStopArrivalState.PARETO_FUNCTION);
     }
 
     void debugStateInfo() {

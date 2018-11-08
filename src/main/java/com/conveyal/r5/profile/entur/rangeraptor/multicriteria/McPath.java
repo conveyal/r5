@@ -7,19 +7,23 @@ import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McPathLeg.createAccessLeg;
+import static com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McPathLeg.createEgressLeg;
+import static com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McPathLeg.createLeg;
+
 
 final class McPath<T extends TripScheduleInfo> implements Path2<T> {
     private final PathLeg<T> accessLeg;
     private final List<PathLeg<T>> legs = new ArrayList<>();
     private final PathLeg<T> egressLeg;
 
-    McPath(List<McStopState<T>> states, int egressTime) {
-        this.accessLeg = McPathLeg.createAccessLeg((McAccessStopState<T>)states.get(0), states.get(1).boardTime());
+    McPath(List<McStopArrivalState<T>> states, int egressTime) {
+        this.accessLeg = createAccessLeg((McAccessStopArrivalState<T>)states.get(0), states.get(1).boardTime());
 
         for (int i=1; i<states.size(); ++i) {
-            this.legs.add(McPathLeg.createLeg(states.get(i)));
+            this.legs.add(createLeg(states.get(i)));
         }
-        this.egressLeg = McPathLeg.createEgressLeg((McTransitStopState<T>) states.get(states.size()-1), egressTime);
+        this.egressLeg = createEgressLeg((McTransitStopArrivalState<T>) states.get(states.size()-1), egressTime);
     }
 
     @Override

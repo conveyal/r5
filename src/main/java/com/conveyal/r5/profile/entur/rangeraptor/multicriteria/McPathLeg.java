@@ -3,30 +3,30 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 import com.conveyal.r5.profile.entur.api.PathLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 
-import static com.conveyal.r5.profile.entur.rangeraptor.StopState.NOT_SET;
+import static com.conveyal.r5.profile.entur.rangeraptor.StopArrivalState.NOT_SET;
 
-abstract class McPathLeg<S extends McStopState<T>, T extends TripScheduleInfo> implements PathLeg<T> {
+abstract class McPathLeg<S extends McStopArrivalState<T>, T extends TripScheduleInfo> implements PathLeg<T> {
     final S state;
 
     private McPathLeg(S state) {
         this.state = state;
     }
 
-    static <T extends TripScheduleInfo> PathLeg<T> createAccessLeg(McAccessStopState<T> state, int boardTimeFirstTransitLeg) {
+    static <T extends TripScheduleInfo> PathLeg<T> createAccessLeg(McAccessStopArrivalState<T> state, int boardTimeFirstTransitLeg) {
         return new AccessLeg<>(state, boardTimeFirstTransitLeg);
     }
 
-    static <T extends TripScheduleInfo> PathLeg<T> createLeg(McStopState<T> state) {
-        if(state instanceof McTransferStopState) {
-            return new TransferLeg<>((McTransferStopState<T>) state);
+    static <T extends TripScheduleInfo> PathLeg<T> createLeg(McStopArrivalState<T> state) {
+        if(state instanceof McTransferStopArrivalState) {
+            return new TransferLeg<>((McTransferStopArrivalState<T>) state);
         }
-        if(state instanceof McTransitStopState) {
-            return new TransitLeg<>((McTransitStopState<T>) state);
+        if(state instanceof McTransitStopArrivalState) {
+            return new TransitLeg<>((McTransitStopArrivalState<T>) state);
         }
         throw new IllegalStateException("Unsupported type: " + state.getClass());
     }
 
-    static <T extends TripScheduleInfo> PathLeg createEgressLeg(McTransitStopState<T> state, int egressTime) {
+    static <T extends TripScheduleInfo> PathLeg createEgressLeg(McTransitStopArrivalState<T> state, int egressTime) {
         return new EgressLeg<>(state, egressTime);
     }
 
@@ -56,9 +56,9 @@ abstract class McPathLeg<S extends McStopState<T>, T extends TripScheduleInfo> i
     }
 
 
-    private static final class TransitLeg<T extends TripScheduleInfo> extends McPathLeg<McTransitStopState<T>, T> {
+    private static final class TransitLeg<T extends TripScheduleInfo> extends McPathLeg<McTransitStopArrivalState<T>, T> {
 
-        private TransitLeg(McTransitStopState<T> state) {
+        private TransitLeg(McTransitStopArrivalState<T> state) {
             super(state);
         }
 
@@ -73,9 +73,9 @@ abstract class McPathLeg<S extends McStopState<T>, T extends TripScheduleInfo> i
         }
     }
 
-    private static final class TransferLeg<T extends TripScheduleInfo> extends McPathLeg<McTransferStopState<T>, T> {
+    private static final class TransferLeg<T extends TripScheduleInfo> extends McPathLeg<McTransferStopArrivalState<T>, T> {
 
-        private TransferLeg(McTransferStopState<T> state) {
+        private TransferLeg(McTransferStopArrivalState<T> state) {
             super(state);
         }
 
@@ -90,11 +90,11 @@ abstract class McPathLeg<S extends McStopState<T>, T extends TripScheduleInfo> i
         }
     }
 
-    private static final class AccessLeg<T extends TripScheduleInfo> extends McPathLeg<McAccessStopState<T>, T> {
+    private static final class AccessLeg<T extends TripScheduleInfo> extends McPathLeg<McAccessStopArrivalState<T>, T> {
         private final int fromTime;
         private final int toTime;
 
-        private AccessLeg(McAccessStopState<T> state, int boardTimeFirstTransitLeg) {
+        private AccessLeg(McAccessStopArrivalState<T> state, int boardTimeFirstTransitLeg) {
             super(state);
             this.toTime = boardTimeFirstTransitLeg - state.boardSlackInSeconds;
             this.fromTime = this.toTime - state.accessDurationInSeconds;
@@ -113,10 +113,10 @@ abstract class McPathLeg<S extends McStopState<T>, T extends TripScheduleInfo> i
 
 
     /** TODO TGR  - This class should be simplefied, when the egress path becomes part of mc raptor */
-    private static final class EgressLeg<T extends TripScheduleInfo> extends McPathLeg<McTransitStopState<T>, T> {
+    private static final class EgressLeg<T extends TripScheduleInfo> extends McPathLeg<McTransitStopArrivalState<T>, T> {
         private int egressTime;
 
-        private EgressLeg(McTransitStopState<T> fromState, int egressTime) {
+        private EgressLeg(McTransitStopArrivalState<T> fromState, int egressTime) {
             super(fromState);
             this.egressTime = egressTime;
         }

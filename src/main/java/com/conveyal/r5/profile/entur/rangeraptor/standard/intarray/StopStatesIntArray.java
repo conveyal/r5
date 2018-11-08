@@ -3,12 +3,12 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard.intarray;
 
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.StopState;
+import com.conveyal.r5.profile.entur.rangeraptor.StopArrivalState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCollection;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopStateCursor;
 
-import static com.conveyal.r5.profile.entur.rangeraptor.StopState.NOT_SET;
-import static com.conveyal.r5.profile.entur.rangeraptor.StopState.UNREACHED;
+import static com.conveyal.r5.profile.entur.rangeraptor.StopArrivalState.NOT_SET;
+import static com.conveyal.r5.profile.entur.rangeraptor.StopArrivalState.UNREACHED;
 import static com.conveyal.r5.profile.entur.util.IntUtils.newIntArray;
 
 public final class StopStatesIntArray<T extends TripScheduleInfo> implements StopStateCollection<T> {
@@ -105,7 +105,7 @@ public final class StopStatesIntArray<T extends TripScheduleInfo> implements Sto
         return stateStopIndex[round][stop];
     }
 
-    public final class Cursor implements StopStateCursor<T>, StopState<T> {
+    public final class Cursor implements StopStateCursor<T>, StopArrivalState<T> {
         private int round;
         private int stop;
         private int cursor;
@@ -114,7 +114,7 @@ public final class StopStatesIntArray<T extends TripScheduleInfo> implements Sto
         /* Implement StopStateCursor */
 
         @Override
-        public final StopState<T> stop(int round, int stop) {
+        public final StopArrivalState<T> stop(int round, int stop) {
             this.cursor = stateStopIndex[round][stop];
             this.round = round;
             this.stop = stop;
@@ -127,7 +127,7 @@ public final class StopStatesIntArray<T extends TripScheduleInfo> implements Sto
         }
 
 
-        /* Implement StopState */
+        /* Implement StopArrivalState */
 
         @Override
         public final int time() {

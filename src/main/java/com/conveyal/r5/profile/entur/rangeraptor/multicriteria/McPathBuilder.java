@@ -10,7 +10,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
  */
 class McPathBuilder<T extends TripScheduleInfo> {
 
-    Path2<T> extractPathsForStop(McStopState<T> egressStop, int egressDurationInSeconds) {
+    Path2<T> extractPathsForStop(McStopArrivalState<T> egressStop, int egressDurationInSeconds) {
         if (!egressStop.arrivedByTransit()) {
             return null;
         }
@@ -18,11 +18,11 @@ class McPathBuilder<T extends TripScheduleInfo> {
         return new McPath<T>(egressStop.path(), egressDurationInSeconds);
     }
 
-    private void debugPath(McStopState<T> egressStop) {
+    private void debugPath(McStopArrivalState<T> egressStop) {
         DebugState.debugStopHeader("MC - CREATE PATH FOR EGRESS STOP: " + egressStop.stopIndex());
 
         if(DebugState.isDebug(egressStop.stopIndex())) {
-            for (McStopState p : egressStop.path()) {
+            for (McStopArrivalState p : egressStop.path()) {
                 p.debug();
             }
         }

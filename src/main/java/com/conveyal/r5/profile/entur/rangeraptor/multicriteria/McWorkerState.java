@@ -5,16 +5,12 @@ import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.api.Path2;
-import com.conveyal.r5.profile.entur.util.DebugState;
+import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.List;
-
-import static com.conveyal.r5.profile.entur.util.DebugState.Type.Access;
-import static com.conveyal.r5.profile.entur.util.DebugState.Type.Transfer;
-import static com.conveyal.r5.profile.entur.util.DebugState.Type.Transit;
 
 
 /**
@@ -72,7 +68,7 @@ public final class McWorkerState<T extends TripScheduleInfo> implements WorkerSt
     @Override public void setInitialTime(StopArrival stopArrival, int fromTime, int boardSlackInSeconds) {
         stops.setInitialTime(stopArrival, fromTime, boardSlackInSeconds);
         touchedCurrent.set(stopArrival.stop());
-        debugStops(Access, round, stopArrival.stop());
+        debugStops(McAccessStopState.class, round, stopArrival.stop());
     }
 
     @Override public boolean isNewRoundAvailable() {
@@ -112,7 +108,7 @@ public final class McWorkerState<T extends TripScheduleInfo> implements WorkerSt
         if (added) {
             touchedCurrent.set(stop);
             // skip: transferTimes
-            debugStops(Transit, round, stop);
+            debugStops(McTransitStopState.class, round, stop);
         }
     }
 
@@ -132,7 +128,7 @@ public final class McWorkerState<T extends TripScheduleInfo> implements WorkerSt
                 }
             }
         }
-        debugStops(Transfer, round, targetStop);
+        debugStops(McTransferStopState.class, round, targetStop);
     }
 
     Collection<Path2<T>> extractPaths(Collection<StopArrival> egressStops) {
@@ -176,12 +172,12 @@ public final class McWorkerState<T extends TripScheduleInfo> implements WorkerSt
         touchedCurrent.clear();
     }
 
-    private void debugStops(DebugState.Type type, int round, int stop) {
+    private void debugStops(Class<?> type, int round, int stop) {
         if (DebugState.isDebug(stop)) {
             String postfix = (touchedCurrent.get(stop) ? "x " : "  ") + (touchedPrevious.get(stop) ? "x" : " ");
             for (McStopState<T> it : stops.list(round, stop)) {
-                if(it.type() == type) {
-                    DebugState.debugStop(type, round, stop, it, postfix);
+                if(it.getClass() == type) {
+                    DebugState.debugStop(round, stop, it, postfix);
                 }
             }
         }

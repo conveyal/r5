@@ -5,11 +5,8 @@ import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
-import com.conveyal.r5.profile.entur.util.DebugState;
+import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 
-import static com.conveyal.r5.profile.entur.util.DebugState.Type.Access;
-import static com.conveyal.r5.profile.entur.util.DebugState.Type.Transfer;
-import static com.conveyal.r5.profile.entur.util.DebugState.Type.Transit;
 
 /**
  * Tracks the state of a RAPTOR search, specifically the best arrival times at each transit stop at the end of a
@@ -125,7 +122,7 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
 
         stops.setInitialTime(round, stop, arrivalTime);
         bestOverall.setTime(stop, accessDurationInSeconds);
-        debugStop(Access, round, stop);
+        debugStop(round, stop);
     }
 
     /**
@@ -144,7 +141,7 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
             stops.transitToStop(round, stop, alightTime, boardStop, boardTime, trip, newBestOverall);
 
             // skip: transferTimes
-            debugStop(Transit, round, stop);
+            debugStop(round, stop);
         }
     }
 
@@ -165,7 +162,7 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
         if (bestOverall.updateNewBestTime(toStop, arrivalTime)) {
             stops.transferToStop(round, fromStop, toStopArrival, arrivalTime);
 
-            debugStop(Transfer, round, toStop);
+            debugStop(round, toStop);
         }
     }
 
@@ -180,9 +177,14 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
         return !(bestOverall.isCurrentRoundEmpty() && bestTransit.isCurrentRoundEmpty());
     }
 
-    private void debugStop(DebugState.Type type, int round, int stop) {
+    private void debugStop(int round, int stop) {
         if(DebugState.isDebug(stop)) {
-            DebugState.debugStop(type, round, stop, cursor.stop(round, stop), bestOverall.toString(stop) + " | " + bestTransit.toString(stop));
+            DebugState.debugStop(
+                    round,
+                    stop,
+                    cursor.stop(round, stop),
+                    bestOverall.toString(stop) + " | " + bestTransit.toString(stop)
+            );
         }
     }
 }

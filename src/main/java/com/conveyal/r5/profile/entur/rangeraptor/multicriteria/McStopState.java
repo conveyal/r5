@@ -2,7 +2,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.StopState;
-import com.conveyal.r5.profile.entur.util.DebugState;
+import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSortable;
 
@@ -60,6 +60,10 @@ public abstract class McStopState<T extends TripScheduleInfo> implements StopSta
     @Override public final int paretoValue2() { return roundPareto; }
     @Override public final int paretoValue3() { return cost;        }
 
+    /**
+     * @return previous state or throw a NPE if no previousState exist.
+     */
+    @SuppressWarnings({"ConstantConditions"})
     final int previousStop() {
         return previousState.stop;
     }
@@ -127,13 +131,11 @@ public abstract class McStopState<T extends TripScheduleInfo> implements StopSta
 
     @Override
     public String toString() {
-        return asString(type().name(), round(), stop);
+        return asString(getClass().getSimpleName(), round(), stop);
     }
 
-    abstract DebugState.Type type();
-
     public void debug() {
-        DebugState.debugStop(type(), round, stop, this);
+        DebugState.debugStop(round, stop, this);
     }
 
     public List<McStopState<T>> path() {

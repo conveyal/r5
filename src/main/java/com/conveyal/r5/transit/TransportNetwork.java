@@ -7,6 +7,7 @@ import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.kryo.InstanceCountingClassResolver;
+import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.kryo.TIntArrayListSerializer;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.esotericsoftware.kryo.Kryo;
@@ -87,78 +88,6 @@ public class TransportNetwork implements Serializable {
 
     /** Non-fatal warnings encountered when applying the scenario, null on a base network */
     public List<TaskError> scenarioApplicationWarnings;
-
-
-    /**
-     * Factory method ensuring that we configure Kryo exactly the same way when saving and loading networks, without
-     * duplicating code. We could explicitly register all classes in this method, which would avoid writing out the
-     * class names the first time they are encountered and guarantee that the desired serialization approach was used.
-     * Because these networks are so big though, pre-registration should provide very little savings.
-     * Registration would be more important for small network messages.
-     */
-    private static Kryo makeKryo () {
-        // Use custom ClassResolver to count instances and see what serializers they are using
-        // Kryo kryo = new Kryo(new InstanceCountingClassResolver(), new MapReferenceResolver(), new DefaultStreamFactory());
-        Kryo kryo = new Kryo();
-        // Allow classes to be auto-associated with default serializers the first time they are seen.
-        kryo.setRegistrationRequired(false);
-        // Handle references and loops in the object graph, do not repeatedly serialize the same instance.
-        kryo.setReferences(true);
-        // Hash maps generally cannot be properly serialized just by serializing their fields.
-        // Kryo's default serializers and instantiation strategies also don't seem to deal well with Trove Maps.
-        // Certain Trove class hierarchies are all Externalizable, defining their own optimized serialization methods.
-        // addDefaultSerializer will create a serializer instance for any subclass of the specified class.
-        // With this hierarchy, we hit all the trove primitive-primitive and primitive-Object implementations.
-        kryo.addDefaultSerializer(TPrimitiveHash.class, ExternalizableSerializer.class);
-        // We've got a custom serializer for primitive int array lists, because there are a lot of them and it's
-        // much faster than deferring to their Externalizable implementation.
-        kryo.register(TIntArrayList.class, new TIntArrayListSerializer());
-        // Kryo default instantiation and deserialization of BitSets leaves them empty.
-        // The Kryo BitSet serializer in magro/kryo-serializers naively writes out a dense stream of booleans.
-        // BitSet's built-in Java serializer saves the internal bitfields, which is efficient.
-        kryo.register(BitSet.class, new JavaSerializer());
-        // Instantiation strategy: how should Kryo make new instances of objects when they are deserialized?
-        // The default strategy requires every class you serialize, even in your dependencies, to have a zero-arg
-        // constructor (which can be private).
-        // Setting the instantiator strategy as follows completely replaces that default strategy:
-        // kryo.setInstantiatorStrategy(new SerializingInstantiatorStrategy());
-        // We instead want to specify a fallback strategy for the default strategy:
-        kryo.setInstantiatorStrategy(new Kryo.DefaultInstantiatorStrategy(new SerializingInstantiatorStrategy()));
-        return kryo;
-    }
-
-    public void write (File file) throws IOException {
-        LOG.info("Writing transport network...");
-        Output output = new Output(new FileOutputStream(file));
-        makeKryo().writeClassAndObject(output, this);
-        output.close();
-        LOG.info("Done writing.");
-    }
-
-    public static TransportNetwork read (File file) throws Exception {
-        LOG.info("Reading transport network...");
-        Input input = new Input(new FileInputStream(file));
-        TransportNetwork result = (TransportNetwork) makeKryo().readClassAndObject(input);
-        input.close();
-        LOG.info("Done reading.");
-        if (result.fareCalculator != null) {
-            result.fareCalculator.transitLayer = result.transitLayer;
-        }
-
-        // we need to put the linked grid pointset back in the linkage cache, as the contents of the linkage cache
-        // are not saved by Guava. This accelerates the time to first result after a prebuilt network has been loaded
-        // to just a few seconds even in the largest regions. However, currently only the linkage for walking is saved,
-        // so there will still be a long pause at the first request for driving or cycling.
-        // TODO just use a map for linkages? There should never be more than a handful per pointset, one for each mode.
-        // and the pointsets themselves are in a cache, although it does not currently have an eviction method.
-        if (result.gridPointSet != null && result.linkedGridPointSet != null) {
-            result.gridPointSet.linkageCache
-                    .put(new Fun.Tuple2<>(result.streetLayer, result.linkedGridPointSet.streetMode), result.linkedGridPointSet);
-        }
-
-        result.rebuildTransientIndexes();
-        return result;
-    }
 
     /**
      * Build some simple derived index tables that are not serialized with the network.
@@ -459,7 +388,7 @@ public class TransportNetwork implements Serializable {
         try {
             File tempFile = File.createTempFile("r5-network-checksum-", ".dat");
             tempFile.deleteOnExit();
-            this.write(tempFile);
+            KryoNetworkSerializer.write(this, tempFile);
             HashCode crc32 = Files.hash(tempFile, Hashing.crc32());
             tempFile.delete();
             LOG.info("Network CRC is {}", crc32.hashCode());

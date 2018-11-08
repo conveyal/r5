@@ -11,6 +11,7 @@ import com.conveyal.r5.analyst.cluster.BundleManifest;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.common.R5Version;
+import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.streets.OSMCache;
@@ -204,7 +205,7 @@ public class TransportNetworkCache {
                 }
             }
             LOG.info("Loading cached transport network at {}", cacheLocation);
-            return TransportNetwork.read(cacheLocation);
+            return KryoNetworkSerializer.read(cacheLocation);
         } catch (Exception e) {
             LOG.error("Exception occurred retrieving cached transport network", e);
             return null;
@@ -244,7 +245,7 @@ public class TransportNetworkCache {
 
         try {
             // Serialize TransportNetwork to local cache on this worker
-            network.write(cacheLocation);
+            KryoNetworkSerializer.write(network, cacheLocation);
             // Upload the serialized TransportNetwork to S3
             if (bucket != null) {
                 LOG.info("Uploading the serialized TransportNetwork to S3 for use by other workers.");

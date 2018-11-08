@@ -7,8 +7,6 @@ import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 public interface StopArrivalState<T extends TripScheduleInfo> {
 
-    enum Type { Access, Transfer, Transit }
-
     /**
      * This value essentially serves as Infinity for ints - it's bigger than every other number.
      * It is the travel time to a transit stop or a target before that stop or target is ever reached.
@@ -17,7 +15,7 @@ public interface StopArrivalState<T extends TripScheduleInfo> {
     int UNREACHED = Integer.MAX_VALUE;
 
     /**
-     * Used to initialize all none time based attribues.
+     * Used to initialize all none time based attributes.
      */
     int NOT_SET = -1;
 

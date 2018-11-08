@@ -1,4 +1,4 @@
-package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
+package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.StopArrivalState;
@@ -16,7 +16,7 @@ public abstract class McStopArrivalState<T extends TripScheduleInfo> implements 
     /**
      * The pareto function MUST match the {@code ParetoSortable} implementation below
      */
-    static final ParetoFunction.Builder PARETO_FUNCTION = createParetoFunctions()
+    public static final ParetoFunction.Builder PARETO_FUNCTION = createParetoFunctions()
             .lessThen()  // time
             .lessThen()  // rounds
             .lessThen()  // cost
@@ -68,7 +68,7 @@ public abstract class McStopArrivalState<T extends TripScheduleInfo> implements 
         return previousState.stop;
     }
 
-    final McStopArrivalState previousState() {
+    public final McStopArrivalState previousState() {
         return previousState;
     }
 

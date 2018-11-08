@@ -1,12 +1,12 @@
-package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
+package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 
-final class McTransferStopArrivalState<T extends TripScheduleInfo> extends McStopArrivalState<T> {
+public final class McTransferStopArrivalState<T extends TripScheduleInfo> extends McStopArrivalState<T> {
     private final int transferTime;
 
-    McTransferStopArrivalState(McStopArrivalState<T> previousState, int round, StopArrival stopArrival, int arrivalTime) {
+    public McTransferStopArrivalState(McStopArrivalState<T> previousState, int round, StopArrival stopArrival, int arrivalTime) {
         super(previousState, round, round*2+1,  stopArrival.stop(), arrivalTime, previousState.cost() + stopArrival.cost());
         this.transferTime = stopArrival.durationInSeconds();
     }

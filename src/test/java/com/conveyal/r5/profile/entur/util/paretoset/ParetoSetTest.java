@@ -23,7 +23,7 @@ public class ParetoSetTest {
     @Test
     public void initiallyEmpty() {
         // Given a empty set
-        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen());
+        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen().build());
 
         assertEquals("The initial set should be empty.", "{}", set.toString());
         assertTrue("The initial set should be empty.", set.isEmpty());
@@ -32,7 +32,7 @@ public class ParetoSetTest {
     @Test
     public void addVector() {
         // Given a empty set
-        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen());
+        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen().build());
 
         // When one element is added
         set.add(new Vector("V0", 5));
@@ -44,7 +44,7 @@ public class ParetoSetTest {
     @Test
     public void testLessThen() {
         // Given a set with one element: [5]
-        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen());
+        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen().build());
         set.add(new Vector("V0", 5));
 
         // When adding the same value
@@ -66,7 +66,7 @@ public class ParetoSetTest {
     @Test
     public void testGreaterThen() {
         // Given a set with one element: [5]
-        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().greaterThen());
+        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().greaterThen().build());
         set.add(new Vector("V0", 5));
 
         // When adding the same value
@@ -88,7 +88,7 @@ public class ParetoSetTest {
     @Test
     public void testDifferent() {
         // Given a set with one element: [5]
-        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().different());
+        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().different().build());
         set.add(new Vector("V0", 5));
 
         // When adding the same value
@@ -113,7 +113,7 @@ public class ParetoSetTest {
     public void testTwoCriteriaWithLessThen() {
         // Given a set with one element with 2 criteria: [5, 5]
         // and a function where at least one value is less then to make it into the set
-        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen().lessThen());
+        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen().lessThen().build());
         Vector v0 = new Vector("V0", 5, 5);
 
 
@@ -134,7 +134,7 @@ public class ParetoSetTest {
     @Test
     public void testTwoCriteria_lessThen_and_different() {
         // Given a set with one element with 2 criteria: [5, 5]
-        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen().different());
+        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen().different().build());
         Vector v0 = new Vector("V0", 5, 5);
 
 
@@ -154,7 +154,7 @@ public class ParetoSetTest {
     @Test
     public void testTwoCriteria_lessThen_and_lessThenValue() {
         // Given a set with one element with 2 criteria: [5, 5]
-        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen().lessThen(2));
+        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen().lessThen(2).build());
         Vector v0 = new Vector("V0", 5, 5);
 
 
@@ -178,7 +178,7 @@ public class ParetoSetTest {
         // Given a set with one element with 2 criteria: [5, 5]
         // and the pareto function is: <, !=, >, <+2
         ParetoSet<Vector> set = new ParetoSet<>(
-                createParetoFunctions().lessThen().different().greaterThen().lessThen(2)
+                createParetoFunctions().lessThen().different().greaterThen().lessThen(2).build()
         );
         Vector v0 = new Vector("V0", 5, 5, 5, 5);
 
@@ -217,7 +217,7 @@ public class ParetoSetTest {
     public void testAutoScalingOfParetoSet() {
         // Given a set with 2 criteria
         ParetoSet<Vector> set = new ParetoSet<>(
-                createParetoFunctions().lessThen().lessThen()
+                createParetoFunctions().lessThen().lessThen().build()
         );
 
         // The initial size is set to 16.
@@ -240,7 +240,7 @@ public class ParetoSetTest {
     public void testAddingMultipleElements() {
         // Given a set with 2 criteria: LT and LT
         ParetoSet<Vector> set = new ParetoSet<>(
-                createParetoFunctions().lessThen().lessThen()
+                createParetoFunctions().lessThen().lessThen().build()
         );
         Vector v55 = new Vector("v55", 5, 5);
         Vector v53 = new Vector("v53", 5, 3);
@@ -285,7 +285,7 @@ public class ParetoSetTest {
     public void randomlyGenerateVectorsAndOutputResult() {
         // Given a set with 2 criteria: LT and LT
         ParetoSet<Vector> set = new ParetoSet<>(
-                createParetoFunctions().lessThen().lessThen()
+                createParetoFunctions().lessThen().lessThen().build()
         );
         List<Vector> values = new ArrayList<>(Arrays.asList(
                 new Vector("0", 5, 5),
@@ -368,11 +368,7 @@ public class ParetoSetTest {
 
         Vector(String name, int... values) {
             this.name = name;
-            this.values = new int[values.length];
-
-            for (int i = 0; i < values.length; ++i) {
-                this.values[i] = values[i];
-            }
+            this.values = Arrays.copyOf(values, values.length);
         }
 
         Vector(Vector o) {

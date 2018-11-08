@@ -22,9 +22,10 @@ public class Path2ParetoSortableWrapper implements ParetoSortable {
     @Override public int paretoValue1() { return arrivalTime; }
     @Override public int paretoValue2() { return journeyDuration; }
 
-    public static ParetoFunction.Builder paretoDominanceFunctions() {
+    public static ParetoFunction[] paretoDominanceFunctions() {
         return createParetoFunctions()
                 .lessThen()
-                .lessThen();
+                .lessThen()
+                .build();
     }
 }

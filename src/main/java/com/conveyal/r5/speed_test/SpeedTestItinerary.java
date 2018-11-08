@@ -49,14 +49,15 @@ public class SpeedTestItinerary extends Itinerary implements ParetoSortable {
         paretoValues[i] = agencies.hashCode();
     }
 
-    static ParetoFunction.Builder paretoDominanceFunctions() {
+    static ParetoFunction[] paretoDominanceFunctions() {
         return createParetoFunctions()
                 .lessThen()
                 .lessThen()
                 .lessThen()
                 .lessThen()
                 //.different()
-                .different();
+                .different()
+                .build();
     }
 
     @Override

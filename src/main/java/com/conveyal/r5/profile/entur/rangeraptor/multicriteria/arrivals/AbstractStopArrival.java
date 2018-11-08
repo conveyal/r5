@@ -16,11 +16,11 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
     /**
      * The pareto function MUST match the {@code ParetoSortable} implementation below
      */
-    public static final ParetoFunction.Builder PARETO_FUNCTION = createParetoFunctions()
+    public static final ParetoFunction[] PARETO_FUNCTION = createParetoFunctions()
             .lessThen()  // time
             .lessThen()  // rounds
             .lessThen()  // cost
-            ;
+            .build();
 
     private final AbstractStopArrival<T> previousState;
     private final int round;

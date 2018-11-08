@@ -21,6 +21,7 @@ final class Stops<T extends TripScheduleInfo> {
          * Set the time at a transit index iff it is optimal. This sets both the best time and the transfer time
          */
     Stops(int stops) {
+        //noinspection unchecked
         this.stops = (Stop<T>[]) new Stop[stops];
     }
 

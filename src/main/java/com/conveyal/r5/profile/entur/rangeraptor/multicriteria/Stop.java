@@ -10,7 +10,7 @@ import java.util.function.Predicate;
 
 class Stop<T extends TripScheduleInfo> extends ParetoSet<AbstractStopArrival<T>> {
 
-    Stop(ParetoFunction.Builder function) {
+    Stop(ParetoFunction[] function) {
         super(function);
     }
 

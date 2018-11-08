@@ -7,12 +7,13 @@ import java.util.stream.Collectors;
 
 public class ParetoSet<T extends ParetoSortable> implements Iterable<T> {
     private final ParetoVectorDominator dominator;
-    private ParetoSortable[] paretoSet = new ParetoSortable[16];
+    @SuppressWarnings("unchecked")
+    private T[] paretoSet = (T[])new ParetoSortable[16];
     private int size = 0;
 
 
-    public ParetoSet(ParetoFunction.Builder builder) {
-        this.dominator = ParetoVectorDominator.create(builder.build());
+    public ParetoSet(ParetoFunction[] builder) {
+        this.dominator = ParetoVectorDominator.create(builder);
     }
 
     public void clear() {
@@ -87,7 +88,7 @@ public class ParetoSet<T extends ParetoSortable> implements Iterable<T> {
 
     @Override
     public Iterator<T> iterator() {
-        return (Iterator<T>) Arrays.stream(paretoSet, 0, size).iterator();
+        return Arrays.stream(paretoSet, 0, size).iterator();
     }
 
     /**

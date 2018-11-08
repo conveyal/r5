@@ -95,6 +95,10 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
         return false;
     }
 
+    public boolean arrivedByTransitLastRound() {
+        return false;
+    }
+
     @Override
     public T trip() {
         return null;

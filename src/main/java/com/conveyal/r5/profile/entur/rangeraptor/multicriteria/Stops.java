@@ -40,6 +40,11 @@ final class Stops<T extends TripScheduleInfo> {
         return findOrCreateSet(stopArrival.stop()).add(new TransferStopArrival<>(previous, round, stopArrival, arrivalTime));
     }
 
+    Iterable<? extends AbstractStopArrival<T>> listArrivedByTransitLastRound(int stop) {
+        Stop<T> it = stops[stop];
+        return it == null ? emptyList() : it.list(AbstractStopArrival::arrivedByTransitLastRound);
+    }
+
     Iterable<? extends AbstractStopArrival<T>> listArrivedByTransit(int round, int stop) {
         Stop<T> it = stops[stop];
         return it == null ? emptyList() : it.list(s -> s.round() == round && s.arrivedByTransit());

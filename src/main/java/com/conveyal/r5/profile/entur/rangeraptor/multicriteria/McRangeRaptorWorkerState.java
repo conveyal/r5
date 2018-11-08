@@ -124,7 +124,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         final int targetStop = transfer.stop();
         final int transferTimeInSeconds = transfer.durationInSeconds();
 
-        for(AbstractStopArrival<T> it :  stops.listArrivedByTransit(round, fromStop)) {
+        for(AbstractStopArrival<T> it :  stops.listArrivedByTransitLastRound(fromStop)) {
             int arrivalTime = it.time() + transferTimeInSeconds;
 
             if (arrivalTime < maxTimeLimit) {

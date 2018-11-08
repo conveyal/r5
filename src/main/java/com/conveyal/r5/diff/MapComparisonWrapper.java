@@ -7,9 +7,13 @@ package com.conveyal.r5.diff;
  * Created by abyrd on 2018-11-02
  */
 abstract class MapComparisonWrapper {
+
     public abstract Iterable<?> allKeys();
 
     public abstract boolean containsKey(Object key);
 
     public abstract Object get(Object key);
+
+    public abstract int size();
+
 }

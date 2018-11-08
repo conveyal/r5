@@ -40,4 +40,9 @@ class StandardMapWrapper extends MapComparisonWrapper {
         return map.get(key);
     }
 
+    @Override
+    public int size() {
+        return map.size();
+    }
+
 }

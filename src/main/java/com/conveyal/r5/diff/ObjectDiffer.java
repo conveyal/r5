@@ -19,6 +19,7 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -231,6 +232,18 @@ public class ObjectDiffer {
      * Note that arrays for example do not define deep equals, so will not be properly compared as map keys.
      */
     private void compareMaps(MapComparisonWrapper a, MapComparisonWrapper b) {
+        if (a.size() != b.size()) {
+            difference(a, b,"Maps differ in size: %d vs %d", a.size(), b.size());
+            return;
+        }
+        // Check that missing values are represented in the same way in the two maps.
+        // We use an unlikely key, which is a number in case the underlying map is keyed on primitive numbers.
+        final int dummyKey = 123456;
+        Object missingEntryA = a.get(dummyKey);
+        Object missingEntryB = b.get(dummyKey);
+        if (!Objects.equals(missingEntryA, missingEntryB)) {
+            difference(missingEntryA, missingEntryB, "No-entry value differs between two maps.");
+        }
         for (Object aKey : a.allKeys()) {
             if (b.containsKey(aKey)) {
                 Object aValue = a.get(aKey);

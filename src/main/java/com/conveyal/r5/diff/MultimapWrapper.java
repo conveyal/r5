@@ -7,6 +7,7 @@ import com.google.common.collect.Multimap;
  * Created by abyrd on 2018-11-02
  */
 public class MultimapWrapper extends MapComparisonWrapper {
+
     Multimap multimap;
 
     public MultimapWrapper(Multimap multimap) {
@@ -26,6 +27,11 @@ public class MultimapWrapper extends MapComparisonWrapper {
     @Override
     public Object get(Object key) {
         return multimap.get(key);
+    }
+
+    @Override
+    public int size() {
+        return multimap.size();
     }
 
 }

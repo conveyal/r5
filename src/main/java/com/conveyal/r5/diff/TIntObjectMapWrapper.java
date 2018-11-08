@@ -25,12 +25,17 @@ class TIntObjectMapWrapper extends MapComparisonWrapper {
 
     @Override
     public boolean containsKey(Object key) {
-        return map.containsKey((int) key);
+        return map.containsKey(((Number)key).intValue());
     }
 
     @Override
     public Object get(Object key) {
-        return map.get((int) key);
+        return map.get(((Number)key).intValue());
+    }
+
+    @Override
+    public int size() {
+        return map.size();
     }
 
 }

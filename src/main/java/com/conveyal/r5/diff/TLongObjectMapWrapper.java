@@ -23,12 +23,19 @@ class TLongObjectMapWrapper extends MapComparisonWrapper {
 
     @Override
     public boolean containsKey(Object key) {
-        return map.containsKey((long) key);
+        return map.containsKey(((Number)key).longValue());
     }
 
     @Override
     public Object get(Object key) {
-        return map.get((long) key);
+        // int casts to long, but Integer doesn't cast to Long. Do it manually to allow detecting no-entry value.
+        // This is used to allow testing missing element values with the same key across different kinds of maps.
+        return map.get(((Number)key).longValue());
+    }
+
+    @Override
+    public int size() {
+        return map.size();
     }
 
 }

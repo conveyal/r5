@@ -46,9 +46,6 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
 
     private static int priceToInt(double price) {return (int) (price);} // No conversion for now
 
-    // fares for routes that serve "paid area" stops, at which unlimited transfers may be available
-    private static ArrayList<String> faresAvailableInPaidArea = new ArrayList<>(Arrays.asList("T","D"));
-
     private static String STATION = "station";
 
     private class MixedSystemTransferAllowance extends TransferAllowance {

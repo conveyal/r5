@@ -44,6 +44,11 @@ public class InstanceCountingClassResolver extends DefaultClassResolver {
         return super.getRegistration(type);
     }
 
+    /**
+     * The output from this method can be sorted in a spreadsheet and formatted into a markdown table with
+     * http://www.tablesgenerator.com/markdown_tables
+     * for inclusion in Github issue or pull request comments.
+     */
     public void summarize() {
         instanceCounts.forEachEntry((classe, count) -> {
             Registration registration = getRegistration(classe);

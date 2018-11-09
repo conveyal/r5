@@ -10,6 +10,7 @@ import com.esotericsoftware.kryo.util.DefaultStreamFactory;
 import com.esotericsoftware.kryo.util.MapReferenceResolver;
 import gnu.trove.impl.hash.TPrimitiveHash;
 import gnu.trove.list.array.TIntArrayList;
+import gnu.trove.map.hash.TIntIntHashMap;
 import org.mapdb.Fun;
 import org.objenesis.strategy.SerializingInstantiatorStrategy;
 import org.slf4j.Logger;
@@ -59,6 +60,8 @@ public abstract class KryoNetworkSerializer {
         // We've got a custom serializer for primitive int array lists, because there are a lot of them and the custom
         // implementation is much faster than deferring to their Externalizable implementation.
         kryo.register(TIntArrayList.class, new TIntArrayListSerializer());
+        // Likewise for TIntIntHashMaps - there are lots of them in the distance tables.
+        kryo.register(TIntIntHashMap.class, new TIntIntHashMapSerializer());
         // Kryo's default instantiation and deserialization of BitSets leaves them empty.
         // The Kryo BitSet serializer in magro/kryo-serializers naively writes out a dense stream of booleans.
         // BitSet's built-in Java serializer saves the internal bitfields, which is efficient. We use that one.

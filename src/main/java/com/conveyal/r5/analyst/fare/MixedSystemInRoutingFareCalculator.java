@@ -36,6 +36,8 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
 
     private static final WeakHashMap<TransitLayer, FareSystemWrapper> fareSystemCache = new WeakHashMap<>();
     private Map<String, Fare> fares;
+    // Relies on non-standard convention described in class javadoc
+    private Map<String, String> fareIdForRouteId;
 
     // Logging to facilitate debugging
     private static final Logger LOG = LoggerFactory.getLogger(MixedSystemInRoutingFareCalculator.class);
@@ -43,9 +45,6 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
     private MersenneTwister logRandomizer = LOG_FARES ? new MersenneTwister() : null;
 
     private static int priceToInt(double price) {return (int) (price);} // No conversion for now
-
-    // Relies on non-standard convention described in class javadoc
-    private static String getFareIdFromRouteId(RouteInfo route) {return route.route_id.split("--")[0];}
 
     // fares for routes that serve "paid area" stops, at which unlimited transfers may be available
     private static ArrayList<String> faresAvailableInPaidArea = new ArrayList<>(Arrays.asList("T","D"));
@@ -74,7 +73,7 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
 
     }
 
-    private static boolean withinPaidArea(int fromStopIndex, int toStopIndex, TransitLayer transitLayer){
+    private boolean withinPaidArea(int fromStopIndex, int toStopIndex){
         String fromFareZone = transitLayer.fareZoneForStop.get(fromStopIndex);
         String toFareZone = transitLayer.fareZoneForStop.get(toStopIndex);
         if (STATION.equals(fromFareZone) && STATION.equals(toFareZone)){
@@ -97,6 +96,7 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
                         FareSystemWrapper fareSystem = fareSystemCache.computeIfAbsent(this.transitLayer,
                                 MixedSystemInRoutingFareCalculator::loadFaresFromGTFS);
                         this.fares = fareSystem.fares;
+                        this.fareIdForRouteId = fareSystem.fareIdForRouteId;
                     }
                 }
             }
@@ -145,8 +145,14 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
             // board stop for this ride
             int boardStopIndex = boardStops.get(ride);
 
+            // If this is the second ride or later, check whether the route stays within the paid area
+            if (ride >= 1) {
+                int fromStopIndex = alightStops.get(ride - 1);
+                if (withinPaidArea(fromStopIndex, boardStopIndex)) continue;
+            }
+
             int boardClockTime = boardTimes.get(ride);
-            String fareId = getFareIdFromRouteId(route);
+            String fareId = fareIdForRouteId.get(route.route_id);
             Fare fare = fares.get(fareId);
 
             // Agency of the board route
@@ -154,12 +160,6 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
 
             // Agency that issued the currently held transfer allowance (possibly several rides ago)
             String issuingAgency = transferAllowance.agencyId;
-
-            // If this is the second ride or later, check whether the route stays within the paid area
-            if (ride >= 1) {
-                int fromStopIndex = alightStops.get(ride - 1);
-                if (withinPaidArea(fromStopIndex, boardStopIndex, transitLayer)) continue;
-            }
 
             // We are not staying within the paid area.  So...
             // Check if enough time has elapsed for our transfer allowance to expire
@@ -179,7 +179,7 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
                     cumulativeFarePaid += transferAllowance.payDifference(undiscountedPrice);
                     transferAllowance = transferAllowance.redeemForOneRide(undiscountedPrice);
                 } else {
-                    // This agency will not accept transfer allowance.  Hold onto it, and pay full fare.
+                    // This agency will not accept currently held transfer allowance.  Hold onto it, and pay full fare.
                     cumulativeFarePaid += undiscountedPrice;
                 }
             } else {
@@ -207,18 +207,27 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
 
     private static class FareSystemWrapper{
         public Map<String, Fare> fares;
+        public Map<String, String> fareIdForRouteId;
 
-        private FareSystemWrapper(Map<String, Fare> fares) {
+        private FareSystemWrapper(Map<String, Fare> fares, Map<String, String> fareIdForRouteId) {
             this.fares = fares;
+            this.fareIdForRouteId = fareIdForRouteId;
         }
     }
 
     private static FareSystemWrapper loadFaresFromGTFS(TransitLayer transitLayer){
         Map<String, Fare> fares = new HashMap<>();
+        Map<String, String> fareIdForRouteId = new HashMap<>();
+
         // iterate through fares to record rules
         for (Fare fare : transitLayer.fares.values()){
             fares.putIfAbsent(fare.fare_id, fare);
         }
-        return new FareSystemWrapper(fares);
+
+        for (RouteInfo route : transitLayer.routes){
+            fareIdForRouteId.put(route.route_id, route.route_id.split("--")[0]);
+        }
+
+        return new FareSystemWrapper(fares, fareIdForRouteId);
     }
 }

@@ -7,10 +7,11 @@ import gnu.trove.map.hash.TObjectIntHashMap;
 
 /**
  * This class is used for configuring and optimizing Kryo configuration.
+ *
  * Kryo lets you register specific serializers for specific concrete classes, but also has quite a few built-in default
- * serializers for individual classes or trees of classes under some interface (e.g. Collection).
- * Writing and registering a custom serializer or choosing between a third party class's built-in Externalizable method
- * and such a custom serializer, can have significant effects on the speed of serialization and size of the resulting
+ * serializers for individual classes or trees of classes under some interface (e.g. Collection). Writing and
+ * registering a custom serializer or choosing between a third party class's built-in Externalizable method
+ * and such a custom serializer can have significant effects on the speed of serialization and size of the resulting
  * serialized data. In order to apply the 80/20 rule it's helpful to have a list of how often various classes are
  * serialized in your application.
  *
@@ -29,6 +30,8 @@ import gnu.trove.map.hash.TObjectIntHashMap;
  * kryo.setRegistrationRequired(false);
  * [...]
  * ((InstanceCountingClassResolver)kryo.getClassResolver()).summarize();
+ *
+ * In the case of R5 serialization, this can be enabled with a boolean constant in KryoNetworkSerializer.
  *
  * Created by abyrd on 2018-08-29
  */

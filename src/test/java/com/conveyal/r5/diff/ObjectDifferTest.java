@@ -22,6 +22,8 @@ import static org.junit.Assert.assertTrue;
  */
 public class ObjectDifferTest {
 
+    // TODO add tests that the differ can compare objects to themselves
+
     /**
      * Create two semantically equal object trees that are composed of completely separate instances.
      * No differences should be found between the two until we make a change to one of them.

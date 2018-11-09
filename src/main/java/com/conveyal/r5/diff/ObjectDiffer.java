@@ -154,14 +154,16 @@ public class ObjectDiffer {
             }
             return;
         }
-        // Object is non-primitive and non-trivial to compare. It is of a type susceptible to cause recursion.
-        // Perform cycle detection.
+        // Object is non-primitive and non-trivial to compare. It is a compound type susceptible to cause recursion.
+        // Perform cycle detection. There is no issue with distinct primitive wrapper instances with identical values
+        // being added to the IdentityHashSet because we only reach this point for compound types.
         if (alreadySeen.contains(a)) {
             return;
         } else {
-            alreadySeen.add(a); // FIXME for identityHashSet, this is adding duplicate Integers etc.
+            alreadySeen.add(a);
         }
         // We are going to recurse. Check that we won't exceed allowable depth.
+        // Note: there should be no early return statements below, to ensure that depth is decremented on method exit.
         depth += 1;
         if (depth > MAX_RECURSION_DEPTH) {
             throw new RuntimeException("Max recursion depth exceeded: " + MAX_RECURSION_DEPTH);
@@ -170,7 +172,8 @@ public class ObjectDiffer {
             maxDepthReached = depth;
         }
         // Choose comparison strategy for the objects based on their type.
-        if (a instanceof Map) { // Use isAssignableFrom(classToCompare) ?
+        // Should we use isAssignableFrom(classToCompare) to capture whole class hierarchies?
+        if (a instanceof Map) {
             compareMaps(new StandardMapWrapper((Map) a), new StandardMapWrapper((Map) b));
         }
         else if (a instanceof TIntIntMap) {
@@ -204,6 +207,7 @@ public class ObjectDiffer {
     /**
      * The fallback comparison method - compare every field of two objects of the same class.
      * Note that the two objects passed in must already be known to be of the same class by the caller.
+     * This can have unexpected effects if the class contains transient fields or memoized/cached values etc.
      */
     private void compareFieldByField (Object a, Object b) {
         Class classToCompare = a.getClass();
@@ -221,7 +225,7 @@ public class ObjectDiffer {
     }
 
     /**
-     * Not "primitive" strictly speaking, but things that can be compared with equals and no recursion.
+     * Not "primitive" strictly speaking, but non-compound values that can be compared with equals and no recursion.
      */
     private boolean isPrimitive(Object value) {
         return value instanceof Number || value instanceof String || value instanceof Boolean || value instanceof Character;
@@ -250,13 +254,13 @@ public class ObjectDiffer {
                 Object bValue = b.get(aKey);
                 compareTwoObjects(aValue, bValue);
             } else {
-                difference(a, b, "Right map does not contain key %s", aKey.toString());
+                difference(a, b, "Map B does not contain key from map A: %s", aKey.toString());
             }
         }
     }
 
     /**
-     * This can also handle primitive arrays.
+     * This can handle both reference and primitive arrays.
      */
     private void compareArrays (Object a, Object b) {
         if (Array.getLength(a) != Array.getLength(b)) {
@@ -275,13 +279,14 @@ public class ObjectDiffer {
             return;
         }
         if (a instanceof Set) {
-            // FIXME this is a lousy implementation
+            // TODO this implementation for Set is weak, it implicitly uses equals() and hashCode() on set members.
             if (!a.equals(b)) {
                 difference(a, b, "Sets are not equal.");
                 return;
             }
         } else {
             // If it's not a set, assume collection is ordered, compare by parallel iteration.
+            // Surprisingly often though, Lists are used in practice for what are conceptually unordered sets.
             Iterator leftIterator = a.iterator();
             Iterator rightIterator = b.iterator();
             while (leftIterator.hasNext()) {

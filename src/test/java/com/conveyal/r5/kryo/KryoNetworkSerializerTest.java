@@ -32,6 +32,10 @@ public class KryoNetworkSerializerTest {
         TransportNetwork originalNetwork = buildNetwork(FakeGraph.TransitNetwork.MULTIPLE_LINES);
         originalNetwork.rebuildLinkedGridPointSet();
 
+        // Test that the network is identical to itself. This is a test that the ObjectDiffer works and is configured
+        // properly, and enables a special option of that class.
+        assertNoDifferences(originalNetwork, originalNetwork);
+
         // Save the network to a temporary file on disk.
         File tempFile = File.createTempFile("r5-serialization-test-", ".dat");
         tempFile.deleteOnExit();
@@ -70,6 +74,10 @@ public class KryoNetworkSerializerTest {
         objectDiffer.useEquals(BitSet.class);
         // IntHashGrid contains unordered lists of elements in each bin. Lists are compared as ordered.
         objectDiffer.ignoreClasses(IntHashGrid.class);
+        // If the root objects are identity-equal, enable special testing mode that will compare the entire tree anyway.
+        if (a == b) {
+            objectDiffer.enableComparingIdenticalObjects();
+        }
         objectDiffer.compareTwoObjects(a, b);
         objectDiffer.printDifferences();
         assertFalse(objectDiffer.hasDifferences());

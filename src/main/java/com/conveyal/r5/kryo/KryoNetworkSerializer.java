@@ -1,5 +1,6 @@
 package com.conveyal.r5.kryo;
 
+import com.conveyal.r5.common.R5Version;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
@@ -8,6 +9,7 @@ import com.esotericsoftware.kryo.serializers.ExternalizableSerializer;
 import com.esotericsoftware.kryo.serializers.JavaSerializer;
 import com.esotericsoftware.kryo.util.DefaultStreamFactory;
 import com.esotericsoftware.kryo.util.MapReferenceResolver;
+import com.google.common.primitives.Ints;
 import gnu.trove.impl.hash.TPrimitiveHash;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TIntIntHashMap;
@@ -20,6 +22,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.BitSet;
 
 /**
@@ -29,6 +32,8 @@ import java.util.BitSet;
 public abstract class KryoNetworkSerializer {
 
     private static final Logger LOG = LoggerFactory.getLogger(KryoNetworkSerializer.class);
+
+    public static final byte[] HEADER = "R5NETWORK".getBytes();
 
     /** Set this to true to count instances and print a report including which serializer is handling each class. */
     private static final boolean COUNT_CLASS_INSTANCES = false;
@@ -81,7 +86,10 @@ public abstract class KryoNetworkSerializer {
         LOG.info("Writing transport network...");
         Output output = new Output(new FileOutputStream(file));
         Kryo kryo = makeKryo();
-        kryo.writeClassAndObject(output, network);
+        output.write(HEADER);
+        kryo.writeObject(output, R5Version.version);
+        kryo.writeObject(output, R5Version.commit);
+        kryo.writeObject(output, network);
         output.close();
         LOG.info("Done writing.");
         if (COUNT_CLASS_INSTANCES) {
@@ -96,7 +104,20 @@ public abstract class KryoNetworkSerializer {
     public static TransportNetwork read (File file) throws Exception {
         LOG.info("Reading transport network...");
         Input input = new Input(new FileInputStream(file));
-        TransportNetwork result = (TransportNetwork) makeKryo().readClassAndObject(input);
+        Kryo kryo = makeKryo();
+        byte[] header = new byte[HEADER.length];
+        input.read(header, 0, header.length);
+        if (!Arrays.equals(HEADER, header)) {
+            throw new RuntimeException("Unrecognized file header. Is this an R5 Kryo network?");
+        }
+        String version = kryo.readObject(input, String.class);
+        String commit = kryo.readObject(input, String.class);
+        LOG.info("Loading {} file saved by R5 version {} commit {}", new String(header), version, commit);
+        if (!R5Version.version.equals(version)) {
+            throw new RuntimeException(String.format("File version %s is not compatible with this R5 version %s",
+                    version, R5Version.version));
+        }
+        TransportNetwork result = kryo.readObject(input, TransportNetwork.class);
         input.close();
         LOG.info("Done reading.");
         if (result.fareCalculator != null) {

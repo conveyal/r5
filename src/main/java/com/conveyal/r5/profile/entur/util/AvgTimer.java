@@ -215,8 +215,21 @@ public abstract class AvgTimer {
     }
 
     private String formatResultAvg(long time, int count) {
-        return String.format("%4d %5d %4d %s %6d %6s s", minTime(), maxTime, average(time, count), unit(), count, toSec(time));
+        return String.format(
+                "%4s %5s %4s %s %6s %6s s",
+                str(minTime()),
+                str(maxTime),
+                str(average(time, count)),
+                unit(),
+                str(count),
+                toSec(time)
+        );
     }
+
+    private String str(long value) {
+        return value < 10_000 ? Long.toString(value) : Long.toString(value/1000) + "'";
+    }
+
 
     private static String columnHeaderAvg() {
         return " Min   Max  Avg     Count   Total";

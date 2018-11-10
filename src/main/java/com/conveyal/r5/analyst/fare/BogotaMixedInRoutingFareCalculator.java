@@ -11,7 +11,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -19,67 +18,65 @@ import java.util.WeakHashMap;
 
 /**
  * Fare calculator for systems in which:
- * - Each route has a single flat fare
- * - At most one agency provides transfer privileges (pay-the-difference when boarding a more expensive route).
- * - Unlimited transfers may be allowed allowed between routes with certain fares, between stops with zone_id =
- * "station" and sharing the same (non-blank) parent_station
+ * - Boarding any route has a cost that does not depend on where one alights (e.g. no zone-based fares)
+ * - A set of routes offers mutually recognized transfers. Other routes do not issue or accept transfers.
+ * - Transfers allow users to pay the difference when boarding a more expensive route
+ * - Certain stops are connected within paid areas, allowing unlimited free transfers between them (behind fare gates)
+ * - The most expensive fare allows entering fare gates once, and may allow other out-of-paid-area boardings
  * This calculator is designed for regions with mixed formal and informal transit services such as Bogota, in which the
- * formal services issue and accept mutually recognized transfer privileges(e.g. between BRT and cheaper zonal/feeder
- * routes) and the semi-formal services (e.g. cash-based private operators) do not.
+ * formal services issue and accept transfer privileges(e.g. between BRT and cheaper zonal/feeder routes) and the
+ * semi-formal services (e.g. cash-based private operators) do not.
  * This implementation relies on non-standard conventions being used in input GTFS:
- * - Every route_id is prefixed with "fare_id"+"--"
- * - Stops within the paid area have zone_id = "station"
+ * - routes:agency_id equals the corresponding fare_attributes:fare_id
+ * - Transfers are only accepted by routes with corresponding fare_attributes:transfers > 0.
+ * - unlimited free transfers are allowed between stops that share the same (non-blank) parent_station
  */
-public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator {
+public class BogotaMixedInRoutingFareCalculator extends InRoutingFareCalculator {
     /** If true, log a random 1e-6 sample of fares for spot checking */
-    public static final boolean LOG_FARES = false;
+    public static final boolean LOG_FARES = true;
 
     private static final WeakHashMap<TransitLayer, FareSystemWrapper> fareSystemCache = new WeakHashMap<>();
     private Map<String, Fare> fares;
-    // Relies on non-standard convention described in class javadoc
-    private Map<String, String> fareIdForRouteId;
+    // With a standard TransferAllowance, paying the fare to enter a station would confer a transfer allowance with
+    // that full fare, which we assume is the most expensive fare in the system.  But in practice, entering a paid
+    // area for a subsequent time in the same itinerary would require full payment again.  So the effective value of
+    // the transfer allowance is actually the price of the second highest fare that accepts transfers.
+    private int secondHighestFarePrice;
 
     // Logging to facilitate debugging
-    private static final Logger LOG = LoggerFactory.getLogger(MixedSystemInRoutingFareCalculator.class);
+    private static final Logger LOG = LoggerFactory.getLogger(BogotaMixedInRoutingFareCalculator.class);
 
     private MersenneTwister logRandomizer = LOG_FARES ? new MersenneTwister() : null;
 
     private static int priceToInt(double price) {return (int) (price);} // No conversion for now
 
-    private static String STATION = "station";
-
     private class MixedSystemTransferAllowance extends TransferAllowance {
-        // GTFS-lib does not read fare_attributes.agencyId.  We set it explicitly via routes.agencyId, relying on the
-        // convention described above to map routes.route_id to fare_attributes.fare_id.
-        private final String agencyId;
+        private final boolean redeemableAtFareGates;
 
+        // An empty allowance with no transfer privileges
         private MixedSystemTransferAllowance () {
             super();
-            this.agencyId = null;
+            this.redeemableAtFareGates = false;
         }
 
-        private MixedSystemTransferAllowance (int value, int number, int expirationTime, String agencyId){
+        private MixedSystemTransferAllowance (int value, int number, int expirationTime, boolean obtainedAtFareGates){
             super(value, number, expirationTime);
-            this.agencyId = agencyId;
+            // If a transfer allowance is obtained at fare gates, it cannot be used to enter fare gates again.
+            // Conversely, if a transfer allowance was not obtained at fare gates, it can be used at fare gates later
+            // in an itinerary.
+            this.redeemableAtFareGates = !obtainedAtFareGates;
         }
 
-        private MixedSystemTransferAllowance redeemForOneRide(int fareValue) {
-            int allowanceValue = Math.max(fareValue, value);
-            return new MixedSystemTransferAllowance(allowanceValue, number - 1, expirationTime, agencyId);
+        private MixedSystemTransferAllowance redeemForOneRide(int fareValue, boolean obtainedAtFareGates) {
+            int allowanceValue = obtainedAtFareGates ? secondHighestFarePrice : Math.max(fareValue, value);
+            return new MixedSystemTransferAllowance(allowanceValue, number - 1, expirationTime, obtainedAtFareGates);
         }
-
     }
 
     private boolean withinPaidArea(int fromStopIndex, int toStopIndex){
-        String fromFareZone = transitLayer.fareZoneForStop.get(fromStopIndex);
-        String toFareZone = transitLayer.fareZoneForStop.get(toStopIndex);
-        if (STATION.equals(fromFareZone) && STATION.equals(toFareZone)){
-            String fromParentStation = transitLayer.parentStationIdForStop.get(fromStopIndex);
-            String toParentStation = transitLayer.parentStationIdForStop.get(toStopIndex);
-            return fromParentStation != null && fromParentStation.equals(toParentStation);
-        } else {
-            return false;
-        }
+        String fromParentStation = transitLayer.parentStationIdForStop.get(fromStopIndex);
+        String toParentStation = transitLayer.parentStationIdForStop.get(toStopIndex);
+        return fromParentStation != null && fromParentStation.equals(toParentStation);
     }
 
     @Override
@@ -91,9 +88,9 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
                 if (fares == null){
                     synchronized (fareSystemCache) {
                         FareSystemWrapper fareSystem = fareSystemCache.computeIfAbsent(this.transitLayer,
-                                MixedSystemInRoutingFareCalculator::loadFaresFromGTFS);
+                                BogotaMixedInRoutingFareCalculator::loadFaresFromGTFS);
                         this.fares = fareSystem.fares;
-                        this.fareIdForRouteId = fareSystem.fareIdForRouteId;
+                        this.secondHighestFarePrice = fareSystem.secondHighestFarePrice;
                     }
                 }
             }
@@ -149,34 +146,29 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
             }
 
             int boardClockTime = boardTimes.get(ride);
-            String fareId = fareIdForRouteId.get(route.route_id);
-            Fare fare = fares.get(fareId);
-
-            // Agency of the board route
-            String receivingAgency = route.agency_id;
-
-            // Agency that issued the currently held transfer allowance (possibly several rides ago)
-            String issuingAgency = transferAllowance.agencyId;
+            Fare fare = fares.get(route.agency_id); // relies on non-standard convention described in class javadoc
 
             // We are not staying within the paid area.  So...
-            // Check if enough time has elapsed for our transfer allowance to expire
+            // boarding at a station implies passing through fare gates.
+            boolean passingThroughFareGates = transitLayer.parentStationIdForStop.get(boardStopIndex) != null;
+            // Check if enough time has elapsed for transfer allowance to expire
             if (transferAllowance.hasExpiredAt(boardTimes.get(ride))) transferAllowance = new MixedSystemTransferAllowance();
 
-            // Then check if we might be able to redeem a transfer
+            // Then check if a transfer might be redeemable
             boolean transferValueAvailable =
                     transferAllowance.value > 0 &&
-                    transferAllowance.number > 0;
+                    transferAllowance.number > 0 &&
+                    (transferAllowance.redeemableAtFareGates || !passingThroughFareGates);
 
             int undiscountedPrice = priceToInt(fare.fare_attribute.price);
 
-            if (transferValueAvailable) {
-                // If transfer value is available, attempt to use it.
-                if (receivingAgency.equals(issuingAgency)) {
+            if (transferValueAvailable) { // If transfer value is available...
+                if (fare.fare_attribute.transfers > 0) { // and, following above convention, this route accepts it...
                     // Pay difference and set updated transfer allowance
                     cumulativeFarePaid += transferAllowance.payDifference(undiscountedPrice);
-                    transferAllowance = transferAllowance.redeemForOneRide(undiscountedPrice);
+                    transferAllowance = transferAllowance.redeemForOneRide(undiscountedPrice, passingThroughFareGates);
                 } else {
-                    // This agency will not accept currently held transfer allowance.  Hold onto it, and pay full fare.
+                    // This route will not accept currently held transfer allowance.  Hold onto it, and pay full fare.
                     cumulativeFarePaid += undiscountedPrice;
                 }
             } else {
@@ -184,14 +176,14 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
                 cumulativeFarePaid += undiscountedPrice;
                 transferAllowance = new MixedSystemTransferAllowance(priceToInt(fare.fare_attribute.price),
                         fare.fare_attribute.transfers,boardClockTime + fare.fare_attribute.transfer_duration,
-                        receivingAgency);
+                        passingThroughFareGates);
             }
         }
 
         // warning: reams of log output
         // only log 1/1000000 of the fares
         if (LOG_FARES && logRandomizer.nextInt(1000000) == 42) {
-            LOG.info("Fare for {}: ${}", String.join(" -> ", routeNames), String.format("%.2f", cumulativeFarePaid / 100D));
+            LOG.info("Fare for {}: ${}", String.join(" -> ", routeNames), cumulativeFarePaid);
         }
 
         return new FareBounds(cumulativeFarePaid, transferAllowance.tightenExpiration(maxClockTime));
@@ -204,27 +196,27 @@ public class MixedSystemInRoutingFareCalculator extends InRoutingFareCalculator 
 
     private static class FareSystemWrapper{
         public Map<String, Fare> fares;
-        public Map<String, String> fareIdForRouteId;
+        public int secondHighestFarePrice;
 
-        private FareSystemWrapper(Map<String, Fare> fares, Map<String, String> fareIdForRouteId) {
+        private FareSystemWrapper(Map<String, Fare> fares, int secondHighestFarePrice) {
             this.fares = fares;
-            this.fareIdForRouteId = fareIdForRouteId;
+            this.secondHighestFarePrice = secondHighestFarePrice;
         }
     }
 
     private static FareSystemWrapper loadFaresFromGTFS(TransitLayer transitLayer){
         Map<String, Fare> fares = new HashMap<>();
-        Map<String, String> fareIdForRouteId = new HashMap<>();
 
+        int highestFarePrice = 0, secondHighestFarePrice = 0;
         // iterate through fares to record rules
         for (Fare fare : transitLayer.fares.values()){
             fares.putIfAbsent(fare.fare_id, fare);
+            if (fare.fare_attribute.transfers > 0 && fare.fare_attribute.price >= highestFarePrice){
+                secondHighestFarePrice = highestFarePrice;
+                highestFarePrice = priceToInt(fare.fare_attribute.price);
+            }
         }
 
-        for (RouteInfo route : transitLayer.routes){
-            fareIdForRouteId.put(route.route_id, route.route_id.split("--")[0]);
-        }
-
-        return new FareSystemWrapper(fares, fareIdForRouteId);
+        return new FareSystemWrapper(fares, secondHighestFarePrice);
     }
 }

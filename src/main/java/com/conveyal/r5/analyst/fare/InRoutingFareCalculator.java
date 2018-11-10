@@ -27,7 +27,7 @@ import java.util.function.ToIntFunction;
         @JsonSubTypes.Type(name = "bogota", value = BogotaInRoutingFareCalculator.class),
         @JsonSubTypes.Type(name = "chicago", value = ChicagoInRoutingFareCalculator.class),
         @JsonSubTypes.Type(name = "simple", value = SimpleInRoutingFareCalculator.class),
-        @JsonSubTypes.Type(name = "mixed-system", value = MixedSystemInRoutingFareCalculator.class)
+        @JsonSubTypes.Type(name = "bogota-mixed", value = BogotaMixedInRoutingFareCalculator.class)
 })
 public abstract class InRoutingFareCalculator implements Serializable {
     public static final long serialVersionUID = 0L;

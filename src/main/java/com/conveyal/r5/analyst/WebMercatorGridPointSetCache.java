@@ -15,6 +15,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * The WebMercatorGridPointSets are very small and fetching one doesn't include linking.
  * We cache these objects because once they are linked,they contain the linkages, and creating the linkages takes a
  * lot of time.
+ *
+ * Note that this cache will be serialized with the PointSet, but serializing a Guava cache only serializes the
+ * cache instance and its settings, not the contents of the cache. We consider this sane behavior.
  */
 public class WebMercatorGridPointSetCache {
 

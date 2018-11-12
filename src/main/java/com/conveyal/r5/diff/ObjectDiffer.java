@@ -27,8 +27,9 @@ import java.util.Set;
  * This is intended for testing that graph building is reproducible and serialization restores an identical graph.
  * It should be kept relatively simple.
  *
- * This class is not threadsafe. It holds configuration and state internally. Each instance should therefore be used
- * for one comparison only and thrown away.
+ * Each instance should be used for only one comparison and thrown away. It is not threadsafe.
+ * The instance holds configuration and state internally.
+ * TODO enforce single usage and/or provide a reset method so ObjectDiffers can be reused.
  *
  * The object differ started out as a copy of the one supplied by csolem via the Entur OTP branch at
  * https://github.com/entur/OpenTripPlanner/tree/protostuff_poc but has been mostly rewritten at this point.

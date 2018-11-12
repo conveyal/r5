@@ -27,6 +27,10 @@ import java.util.BitSet;
 
 /**
  * This class groups the static methods for saving and loading TransportNetworks.
+ *
+ * Each serialization or deserialization operation creates a completely new Kryo instance, so there should be no
+ * issues with thread safety, as long as the object being serialized is not being changed simultaneously.
+ *
  * Created by abyrd on 2018-11-08
  */
 public abstract class KryoNetworkSerializer {

@@ -91,7 +91,10 @@ public abstract class AnalysisTask extends ProfileRequest {
     public void setType (Type type) {};
     public void setTypes (String type) {};
 
-    /** Whether this task is high priority and should jump in front of other work. */
+    /**
+     * Whether this task is high priority and should jump in front of other work.
+     * TODO eliminate and use polymorphism, this is only used in one place.
+     */
     @JsonIgnore
     public abstract boolean isHighPriority();
 

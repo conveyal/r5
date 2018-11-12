@@ -74,7 +74,7 @@ public class SpeedTest {
     private Map<SpeedTestProfiles, List<Integer>> totalResults = new HashMap<>();
 
     /** Init profile used by the HttpServer */
-    private SpeedTestProfiles profile = SpeedTestProfiles.struct_arrays;
+    private SpeedTestProfiles profile = SpeedTestProfiles.mc_range_raptor;
 
     SpeedTest(CommandLineOpts opts) throws Exception {
         this.opts = opts;
@@ -448,9 +448,8 @@ public class SpeedTest {
 
     private static RaptorProfiles mapAlgorithm(SpeedTestProfiles profile) {
         switch (profile) {
-            case multi_criteria: return RaptorProfiles.MULTI_CRITERIA;
-            case struct_arrays: return RaptorProfiles.STRUCT_ARRAYS;
-            case int_arrays: return RaptorProfiles.INT_ARRAYS;
+            case mc_range_raptor: return RaptorProfiles.MULTI_CRITERIA_RANGE_RAPTOR;
+            case range_raptor: return RaptorProfiles.RANGE_RAPTOR;
         }
         throw new IllegalArgumentException("Unable to map algorithm: " + profile);
     }

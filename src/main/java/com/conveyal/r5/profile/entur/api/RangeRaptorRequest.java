@@ -83,7 +83,7 @@ public class RangeRaptorRequest {
         this.egressStops = Collections.emptyList();
 
         // Optional parameters with default values
-        this.profile = RaptorProfiles.MULTI_CRITERIA;
+        this.profile = RaptorProfiles.MULTI_CRITERIA_RANGE_RAPTOR;
         this.departureStepInSeconds = 60;
         this.boardSlackInSeconds = 60;
         this.numberOfAdditionalTransfers = 3;

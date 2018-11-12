@@ -18,7 +18,9 @@ import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrLong;
  */
 public final class DebugState {
 
-    private static final List<Integer> DEBUG_STOPS = Arrays.asList(); //23720, 86727); //86727 ,3516, 66915, 66907, 3540, 3551, 4917);
+    private static final List<Integer> DEBUG_STOPS = Arrays.asList(); //45185,62028,16157,16426,39886,82455);
+    private static final List<Integer> DEBUG_TRIP = Arrays.asList(45185,62028,16157,16426,39886,82455);
+    private static final int DEBUG_TRIP_START = 16157;
 
     private static final String STOP_HEADER = "Description Rnd  From  To     Start    End        Time   Trip";
     private static final String LINE_FORMAT = " * %-8s %2d   %5s %5s  %8s %8s %8s  %6s";

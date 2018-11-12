@@ -6,9 +6,8 @@ import java.util.stream.Collectors;
 
 enum SpeedTestProfiles {
     original("original", "The original code with FastRaptorWorker"),
-    int_arrays("int", "Flyweight stop state using int arrays with new RangeRaptorWorker"),
-    struct_arrays("struct", "Simple POJO stop arrival state with new RangeRaptorWorker"),
-    multi_criteria("mc", "Multi criteria pareto state with new McRangeRaptor");
+    range_raptor("rr", "Standard Range Raptor"),
+    mc_range_raptor("mc", "Multi criteria pareto optimal Range Raptor");
 
     final String shortName;
     final String description;
@@ -27,22 +26,10 @@ enum SpeedTestProfiles {
     }
 
     public boolean isOriginal() {
-        return is(original);
-    }
-
-    public boolean isMultiCriteria() {
-        return is(multi_criteria);
+        return this == original;
     }
 
     /* private methods */
-
-    private boolean is(SpeedTestProfiles other) {
-        return this == other;
-    }
-
-    private boolean isStructArrays() {
-        return is(struct_arrays);
-    }
 
     private static SpeedTestProfiles parseOne(String value) {
         try {

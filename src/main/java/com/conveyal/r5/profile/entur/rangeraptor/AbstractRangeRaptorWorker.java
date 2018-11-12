@@ -10,10 +10,11 @@ import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 import java.util.Collection;
-import java.util.Iterator;
 
 
 /**
+ * TODO TGR - Clean up
+ *
  * RaptorWorker is fast, but FastRaptorWorker is knock-your-socks-off fast, and also more maintainable.
  * It is also simpler, as it only focuses on the transit network; see the Propagater class for the methods that extend
  * the travel times from the final transit stop of a trip out to the individual targets.
@@ -40,10 +41,19 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
     /** the transit data role needed for routing */
     protected final TransitDataProvider<T> transit;
 
-    // TODO add javadoc to field
+    /**
+     * The RangeRaptor state - we delegate keeping track of state to the state object,
+     * this allow the worker implementation to focus on the algorithm, while
+     * the state keep track of the result.
+     * <p/>
+     * This also allow us to try out different strategies for storing the result in memory.
+     * For a long time we had a state witch stored all data as int arrays in addition to the
+     * current object-oriented approach. There were no performance differences(=> GC is not
+     * the bottle neck), so we dropped the integer array implementation.
+     */
     protected final S state;
 
-    // TODO add javadoc to field
+    /** The request input used to customize the worker to the clients needs. */
     protected final RangeRaptorRequest request;
 
     public AbstractRangeRaptorWorker(TransitDataProvider<T> transitData, S state, RangeRaptorRequest request) {

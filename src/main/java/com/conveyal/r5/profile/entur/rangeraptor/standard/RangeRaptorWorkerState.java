@@ -1,12 +1,17 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 
+import com.conveyal.r5.profile.entur.api.Path2;
+import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.structarray.Stops;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 
 
@@ -38,7 +43,7 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
     /**
      * To debug a particular journey set DEBUG to true and add all visited stops in the debugStops list.
      */
-    private final StopArrivalCollection<T> stops;
+    private final Stops<T> stops;
     private final StopArrivalCursor<T> cursor;
     private final int nRounds;
     private int round = 0;
@@ -54,15 +59,25 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
     /** Index to the best times for reaching stops via transit rather than via a transfer from another stop */
     private final BestTimes bestTransit;
 
+    /** The request input used to customize the worker to the clients needs. */
+    private final RangeRaptorRequest request;
+
+    /** If we're going to store paths to every destination (e.g. for static sites) then they'll be retained here. */
+    private final Collection<Path2<T>> paths = new ArrayList<>();
+
+    private final PathBuilderCursorBased pathBuilder;
 
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
-    RangeRaptorWorkerState(int nRounds, int nStops, StopArrivalCollection<T> stops) {
+    RangeRaptorWorkerState(int nRounds, int nStops, RangeRaptorRequest request) {
         this.nRounds = nRounds;
-        this.stops = stops;
+        this.stops = new Stops<>(nRounds, nStops);
         this.cursor = stops.newCursor();
 
         this.bestOverall = new BestTimes(nStops);
         this.bestTransit = new BestTimes(nStops);
+
+        this.request = request;
+        this.pathBuilder = new PathBuilderCursorBased<>(stops.newCursor());
     }
 
     @Override
@@ -79,6 +94,10 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
         return moreRoundsToGo && isCurrentRoundUpdated();
     }
 
+    public Collection<Path2<T>> paths() {
+        return paths;
+    }
+
     boolean isStopReachedInPreviousRound(int stop) {
         return bestOverall.isReachedLastRound(stop);
     }
@@ -87,11 +106,11 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
         return bestOverall.stopsReachedLastRound();
     }
 
-    int getMaxNumberOfRounds() {
+    private int getMaxNumberOfRounds() {
         return roundMax;
     }
 
-    boolean isStopReachedByTransit(int stop) {
+    private boolean isStopReachedByTransit(int stop) {
         return bestTransit.isReached(stop);
     }
 
@@ -156,6 +175,27 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
             transferToStop(fromStop, transfers.next());
         }
     }
+
+    /**
+     * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
+     */
+    void addPathsForCurrentIteration() {
+        pathBuilder.setBoardSlackInSeconds(request.boardSlackInSeconds);
+
+        for (StopArrival it : request.egressStops) {
+
+            // TODO TGR -- Add egress transit time to path
+
+            if (isStopReachedByTransit(it.stop())) {
+                Path2 p = pathBuilder.extractPathForStop(getMaxNumberOfRounds(), it, request.accessStops);
+                if (p != null) {
+                    paths.add(p);
+                }
+            }
+        }
+    }
+
+
 
     public void debugStopHeader(String title) {
         DebugState.debugStopHeader(title, "Best     C P | Transit  C P");

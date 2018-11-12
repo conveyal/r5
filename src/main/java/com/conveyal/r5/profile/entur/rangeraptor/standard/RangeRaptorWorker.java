@@ -1,7 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 import com.conveyal.r5.profile.entur.api.Path2;
-import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripPatternInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.TripScheduleBoardSearch;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
@@ -10,7 +9,6 @@ import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 
@@ -46,25 +44,21 @@ public class RangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRange
     private static final AvgTimer TIMER_BY_MINUTE_SCHEDULE_SEARCH = AvgTimer.timerMicroSec("RRaptor:runRaptorForMinute Schedule Search");
     private static final AvgTimer TIMER_BY_MINUTE_TRANSFERS = AvgTimer.timerMicroSec("RRaptor:runRaptorForMinute Transfers");
 
-    /** If we're going to store paths to every destination (e.g. for static sites) then they'll be retained here. */
-    public Collection<Path2<T>> paths;
-
-    private final PathBuilderCursorBased pathBuilder;
-
     public RangeRaptorWorker(
             TransitDataProvider<T> transitData,
             int nRounds,
-            StopArrivalCollection<T> stateCollection,
             RangeRaptorRequest request
     ) {
-        super(transitData, new RangeRaptorWorkerState<>(nRounds, transitData.numberOfStops(), stateCollection), request);
-        this.pathBuilder = new PathBuilderCursorBased<>(stateCollection.newCursor());
-        this.paths = new ArrayList<>();
+        super(
+                transitData,
+                new RangeRaptorWorkerState<>(nRounds, transitData.numberOfStops(), request),
+                request
+        );
     }
 
     @Override
     protected Collection<Path2<T>> paths() {
-        return paths;
+        return state.paths();
     }
 
     /**
@@ -72,19 +66,7 @@ public class RangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRange
      */
     @Override
     protected void addPathsForCurrentIteration() {
-        pathBuilder.setBoardSlackInSeconds(request.boardSlackInSeconds);
-
-        for (StopArrival it : request.egressStops) {
-
-            // TODO TGR -- Add egress transit time to path
-
-            if (state.isStopReachedByTransit(it.stop())) {
-                Path2 p = pathBuilder.extractPathForStop(state.getMaxNumberOfRounds(), it, request.accessStops);
-                if (p != null) {
-                    paths.add(p);
-                }
-            }
-        }
+        state.addPathsForCurrentIteration();
     }
 
     /**

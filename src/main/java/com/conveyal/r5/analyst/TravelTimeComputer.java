@@ -57,9 +57,9 @@ public class TravelTimeComputer {
         StreetMode directMode = LegMode.getDominantStreetMode(request.directModes);
 
         // Find the set of destinations in the one-to-many travel time calculations, not yet linked to the street network.
-        // Reuse the logic for finding the appropriate grid size and linking, which is now in the DataPreloader.
+        // Reuse the logic for finding the appropriate grid size and linking, which is now in the NetworkPreloader.
         // We could change the preloader to retain these values in a compound return type, to avoid repetition here.
-        WebMercatorExtents destinationGridExtents = DataPreloader.Key.forTask(request).webMercatorExtents;
+        WebMercatorExtents destinationGridExtents = NetworkPreloader.Key.forTask(request).webMercatorExtents;
         // TODO wrap in loop to repeat for multiple destinations pointsets in a regional request.
         PointSet destinations = AnalysisTask.gridPointSetCache.get(destinationGridExtents, network.gridPointSet);
 

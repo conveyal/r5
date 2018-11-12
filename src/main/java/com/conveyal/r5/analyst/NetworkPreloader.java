@@ -66,14 +66,14 @@ import java.util.Objects;
  *
  * Created by abyrd on 2018-09-17
  */
-public class DataPreloader extends AsyncLoader<DataPreloader.Key, TransportNetwork> {
+public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, TransportNetwork> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DataPreloader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(NetworkPreloader.class);
 
     /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
     public final TransportNetworkCache transportNetworkCache;
 
-    public DataPreloader(TransportNetworkCache transportNetworkCache) {
+    public NetworkPreloader(TransportNetworkCache transportNetworkCache) {
         this.transportNetworkCache = transportNetworkCache;
     }
 

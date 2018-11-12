@@ -2,7 +2,7 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.regions.Regions;
 import com.conveyal.r5.OneOriginResult;
-import com.conveyal.r5.analyst.DataPreloader;
+import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.FilePersistence;
 import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.PersistenceBuffer;
@@ -39,7 +39,6 @@ import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -108,7 +107,7 @@ public class AnalystWorker implements Runnable {
     public static FilePersistence filePersistence;
 
     /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
-    public final DataPreloader dataPreloader;
+    public final NetworkPreloader networkPreloader;
 
     /**
      * If this is true, the worker will not actually do any work. It will just report all tasks as completed
@@ -256,7 +255,7 @@ public class AnalystWorker implements Runnable {
         this.networkId = config.getProperty("initial-graph-id");
 
         this.gridCache = new GridCache(config.getProperty("aws-region"), config.getProperty("pointsets-bucket"));
-        this.dataPreloader = new DataPreloader(transportNetworkCache);
+        this.networkPreloader = new NetworkPreloader(transportNetworkCache);
         this.autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown", "false"));
 
         // Consider shutting this worker down once per hour, starting 55 minutes after it started up.
@@ -403,7 +402,7 @@ public class AnalystWorker implements Runnable {
 
         // Get all the data needed to run one analysis task, or at least begin preparing it.
         // TODO synchronously handle regional tasks, or just ensure the specified graph is loaded at worker startup
-        final AsyncLoader.Response<TransportNetwork> networkResponse = dataPreloader.preloadData(task);
+        final AsyncLoader.Response<TransportNetwork> networkResponse = networkPreloader.preloadData(task);
 
         // If loading is not complete, bail out of this function.
         // Ideally we'd stall briefly using something like Future.get(timeout) in case loading finishes quickly.
@@ -482,7 +481,7 @@ public class AnalystWorker implements Runnable {
             // only be built once.
             // Record the currently loaded network ID so we "stick" to this same graph on subsequent polls.
             networkId = task.graphId;
-            TransportNetwork transportNetwork = dataPreloader.preloadDataSynchronous(task);
+            TransportNetwork transportNetwork = networkPreloader.preloadDataSynchronous(task);
 
             // If we are generating a static site, there must be a single metadata file for an entire batch of results.
             // Arbitrarily we create this metadata as part of the first task in the job.

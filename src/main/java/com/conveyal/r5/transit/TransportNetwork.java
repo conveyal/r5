@@ -6,8 +6,15 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.kryo.InstanceCountingClassResolver;
+import com.conveyal.r5.kryo.KryoNetworkSerializer;
+import com.conveyal.r5.kryo.TIntArrayListSerializer;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
-import com.conveyal.r5.util.ExpandingMMFBytez;
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import com.esotericsoftware.kryo.serializers.ExternalizableSerializer;
+import com.esotericsoftware.kryo.serializers.JavaSerializer;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
 import com.conveyal.r5.analyst.fare.GreedyFareCalculator;
@@ -16,9 +23,11 @@ import com.google.common.io.Files;
 import com.vividsolutions.jts.geom.Envelope;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
+import gnu.trove.impl.hash.TIntHash;
+import gnu.trove.impl.hash.TPrimitiveHash;
+import gnu.trove.list.array.TIntArrayList;
 import org.mapdb.Fun;
-import org.nustaq.serialization.FSTObjectInput;
-import org.nustaq.serialization.FSTObjectOutput;
+import org.objenesis.strategy.SerializingInstantiatorStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,61 +88,6 @@ public class TransportNetwork implements Serializable {
 
     /** Non-fatal warnings encountered when applying the scenario, null on a base network */
     public List<TaskError> scenarioApplicationWarnings;
-
-    public void write (File file) throws IOException {
-        LOG.info("Writing transport network...");
-        ExpandingMMFBytez.writeObjectToFile(file, this);
-        LOG.info("Done writing.");
-    }
-
-    public static TransportNetwork read (File file) throws Exception {
-        LOG.info("Reading transport network...");
-        TransportNetwork result = ExpandingMMFBytez.readObjectFromFile(file, TransportNetwork.class);
-        LOG.info("Done reading.");
-        if (result.fareCalculator != null) {
-            result.fareCalculator.transitLayer = result.transitLayer;
-        }
-
-        // we need to put the linked grid pointset back in the linkage cache, as the contents of the linkage cache
-        // are not saved by Guava. This accelerates the time to first result after a prebuilt network has been loaded
-        // to just a few seconds even in the largest regions. However, currently only the linkage for walking is saved,
-        // so there will still be a long pause at the first request for driving or cycling.
-        // TODO just use a map for linkages? There should never be more than a handful per pointset, one for each mode.
-        // and the pointsets themselves are in a cache, although it does not currently have an eviction method.
-        if (result.gridPointSet != null && result.linkedGridPointSet != null) {
-            result.gridPointSet.linkageCache
-                    .put(new Fun.Tuple2<>(result.streetLayer, result.linkedGridPointSet.streetMode), result.linkedGridPointSet);
-        }
-
-        result.rebuildTransientIndexes();
-        return result;
-    }
-
-    // Old method that has the advantage of not using hidden black magic memory map methods, but buffers entirely in memory
-    public void writeStream (File file) throws IOException {
-        LOG.info("Writing transport network...");
-        OutputStream stream = new BufferedOutputStream(new FileOutputStream(file));
-        FSTObjectOutput out = new FSTObjectOutput(stream);
-        out.writeObject(this, TransportNetwork.class);
-        out.close();
-        LOG.info("Done writing.");
-    }
-
-    // Old method that has the advantage of not using hidden black magic memory map methods, but buffers entirely in memory
-    public static TransportNetwork readStream (File file) throws Exception {
-        LOG.info("Reading transport network...");
-        InputStream stream = new BufferedInputStream(new FileInputStream(file));
-        FSTObjectInput in = new FSTObjectInput(stream);
-        TransportNetwork result = (TransportNetwork) in.readObject(TransportNetwork.class);
-        in.close();
-        LOG.info("Done reading.");
-        if (result.fareCalculator != null) {
-            result.fareCalculator.transitLayer = result.transitLayer;
-        }
-        result.rebuildTransientIndexes();
-        return result;
-    }
-
 
     /**
      * Build some simple derived index tables that are not serialized with the network.
@@ -425,6 +379,7 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
+     * FIXME why is this a long when crc32 returns an int?
      * @return a checksum of the graph, for use in verifying whether it changed or remained the same after
      * some operation.
      */
@@ -433,7 +388,7 @@ public class TransportNetwork implements Serializable {
         try {
             File tempFile = File.createTempFile("r5-network-checksum-", ".dat");
             tempFile.deleteOnExit();
-            this.write(tempFile);
+            KryoNetworkSerializer.write(this, tempFile);
             HashCode crc32 = Files.hash(tempFile, Hashing.crc32());
             tempFile.delete();
             LOG.info("Network CRC is {}", crc32.hashCode());

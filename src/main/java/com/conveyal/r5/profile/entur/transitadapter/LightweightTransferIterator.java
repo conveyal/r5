@@ -6,9 +6,11 @@ import java.util.Iterator;
 
 
 /**
- * Create a lightweight StopArrival iterator, using a singel object to represent
+ * Create a lightweight StopArrival iterator, using a single object to represent
  * the iterator and all instances of the StopArrival. The StopArrival is
- * only valid for the duration of on step
+ * only valid for the duration of one step.
+ * <p/>
+ * NOT THREAD SAFE!
  */
 class LightweightTransferIterator implements Iterator<StopArrival>, StopArrival {
     private final int[] durationToStops;
@@ -50,8 +52,10 @@ class LightweightTransferIterator implements Iterator<StopArrival>, StopArrival 
 
     /**
      * Used to reset the iterator, to start at the beginning again. This
-     * enables the iterator to be reused, but be carefull to not use it in a multi
+     * enables the iterator to be reused, but be careful to not use it in a multi
      * threaded environment.
+     * <p/>
+     * NOT THREAD SAFE!
      */
     void reset() {
         this.index = this.durationToStops.length == 0 ? 0 : -2;

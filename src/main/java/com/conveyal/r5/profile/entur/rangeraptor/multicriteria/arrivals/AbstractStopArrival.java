@@ -22,7 +22,7 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
             .lessThen()  // cost
             .build();
 
-    private final AbstractStopArrival<T> previousState;
+    private final AbstractStopArrival<T> previousArrival;
     private final int round;
     private final int stop;
     private final int time;
@@ -33,8 +33,8 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
     /**
      * Transit or transfer
      */
-    AbstractStopArrival(AbstractStopArrival<T> previousState, int round, int roundPareto, int stop, int arrivalTime, int cost) {
-        this.previousState = previousState;
+    AbstractStopArrival(AbstractStopArrival<T> previousArrival, int round, int roundPareto, int stop, int arrivalTime, int cost) {
+        this.previousArrival = previousArrival;
         this.round = round;
         this.roundPareto = roundPareto;
         this.stop = stop;
@@ -46,7 +46,7 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
      * Initial state - first stop visited.
      */
     AbstractStopArrival(int stop, int arrivalTime, int initialCost) {
-        this.previousState = null;
+        this.previousArrival = null;
         this.round = 0;
         this.roundPareto = 0;
         this.stop = stop;
@@ -61,15 +61,23 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
     @Override public final int paretoValue3() { return cost;        }
 
     /**
-     * @return previous state or throw a NPE if no previousState exist.
+     * @return previous state or throw a NPE if no previousArrival exist.
      */
     @SuppressWarnings({"ConstantConditions"})
     final int previousStop() {
-        return previousState.stop;
+        return previousArrival.stop;
     }
 
-    public final AbstractStopArrival previousState() {
-        return previousState;
+    public final AbstractStopArrival<T> previousArrival() {
+        return previousArrival;
+    }
+
+    /**
+     * @see TransitStopArrival#originFromTime()
+     */
+    int originFromTime() {
+        //noinspection ConstantConditions - NPE is not possible unless there is a programming error.
+        return previousArrival.originFromTime();
     }
 
     public final int stopIndex() {
@@ -129,7 +137,7 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
         return false;
     }
 
-    int cost() {
+    public int cost() {
         return cost;
     }
 
@@ -148,8 +156,8 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
 
         path.add(current);
 
-        while (current.previousState != null) {
-            current = current.previousState;
+        while (current.previousArrival != null) {
+            current = current.previousArrival;
             path.add(0, current);
         }
         return path;

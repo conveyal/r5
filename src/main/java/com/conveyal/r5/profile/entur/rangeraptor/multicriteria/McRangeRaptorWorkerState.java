@@ -12,35 +12,25 @@ import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 
-import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
-import java.util.List;
+import java.util.Iterator;
+import java.util.stream.Collectors;
 
 
 /**
  * Tracks the state of a RAPTOR search, specifically the best arrival times at each transit stop at the end of a
  * particular round, along with associated data to reconstruct paths etc.
- * <p>
+ * <p/>
  * This is grouped into a separate class (rather than just having the fields in the raptor worker class) because we
- * need to make copies of it when doing Monte Carlo frequency searches. While performing the range-raptor search,
- * we keep performing raptor searches at different departure times, stepping back in time, but operating on the same
- * set of states (one for each round). But after each one of those departure time searches, we want to run sub-searches
- * with different randomly selected schedules (the Monte Carlo draws). We don't want those sub-searches to invalidate
- * the states for the ongoing range-raptor search, so we make a protective copy.
- * <p>
- * Note that this represents the entire state of the RAPTOR search for a single round, rather than the state at
- * a particular vertex (transit stop), as is the case with State objects in other search algorithms we have.
+ * want the Algorithm to be as clean as possible and to be able to swap the state implementation - try out and
+ * experiment with different state implementations.
+ * <p/>
  *
- * @author mattwigway
  */
 final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements WorkerState {
 
-    /**
-     * Stop the search when the time exceeds the max time limit.
-     * TODO TGR - Set max limit to 5 days for now, replace this with a pareto check against the
-     * TODO TGR - destination location values.
-     */
+    /** Stop the search when the time exceeds the max time limit. */
     private int maxTimeLimit;
 
     private final Stops<T> stops;
@@ -52,9 +42,9 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
 
 
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
-    McRangeRaptorWorkerState(int nRounds, int nStops) {
+    McRangeRaptorWorkerState(int nRounds, int nStops, Collection<StopArrival> egressStops) {
         this.nRounds = nRounds;
-        this.stops = new Stops<>(nStops);
+        this.stops = new Stops<>(nStops, egressStops);
 
         this.touchedCurrent = new BitSet(nStops);
         this.touchedPrevious = new BitSet(nStops);
@@ -118,13 +108,23 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     }
 
     /**
-     * Set the time at a transit stop iff it is optimal.
+     * Set the time at a transit stops iff it is optimal.
      */
-    @Override public void transferToStop(int fromStop, StopArrival transfer) {
+    @Override public void transferToStops(int fromStop, Iterator<? extends StopArrival> transfers) {
+        Iterable<? extends AbstractStopArrival<T>> fromArrivals = stops.listArrivedByTransitLastRound(fromStop);
+
+        while (transfers.hasNext()) {
+            StopArrival toStop = transfers.next();
+            transferToStop(fromArrivals, toStop);
+        }
+    }
+
+    private void transferToStop(Iterable<? extends AbstractStopArrival<T>> fromArrivals, StopArrival transfer) {
+
         final int targetStop = transfer.stop();
         final int transferTimeInSeconds = transfer.durationInSeconds();
 
-        for(AbstractStopArrival<T> it :  stops.listArrivedByTransitLastRound(fromStop)) {
+        for(AbstractStopArrival<T> it :  fromArrivals) {
             int arrivalTime = it.time() + transferTimeInSeconds;
 
             if (arrivalTime < maxTimeLimit) {
@@ -136,22 +136,8 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         debugStops(TransferStopArrival.class, round, targetStop);
     }
 
-    Collection<Path2<T>> extractPaths(Collection<StopArrival> egressStops) {
-        List<Path2<T>> paths = new ArrayList<>();
-        McPathBuilder<T> builder = new McPathBuilder<>();
-
-        for (StopArrival egressStop : egressStops) {
-            for (AbstractStopArrival<T> it : stops.listAll(egressStop.stop())) {
-                Path2<T> p = builder.extractPathsForStop(it, egressStop.durationInSeconds());
-                if(p != null) {
-                    paths.add(p);
-                }
-            }
-        }
-
-        stops.debugStateInfo();
-
-        return paths;
+    Collection<Path2<T>> extractPaths() {
+        return stops.extractPaths();
     }
 
     @Override public void debugStopHeader(String title) {

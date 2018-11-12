@@ -7,6 +7,8 @@ import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 
+import java.util.Iterator;
+
 
 /**
  * Tracks the state of a RAPTOR search, specifically the best arrival times at each transit stop at the end of a
@@ -149,7 +151,20 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
      * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the nonTransferTime
      */
     @Override
-    public void transferToStop(int fromStop, StopArrival toStopArrival) {
+    public void transferToStops(int fromStop, Iterator<? extends StopArrival> transfers) {
+        while (transfers.hasNext()) {
+            transferToStop(fromStop, transfers.next());
+        }
+    }
+
+    public void debugStopHeader(String title) {
+        DebugState.debugStopHeader(title, "Best     C P | Transit  C P");
+    }
+
+
+    /* private methods */
+
+    private void transferToStop(int fromStop, StopArrival toStopArrival) {
         final int toStop = toStopArrival.stop();
 
         int arrivalTime = bestTransit.time(fromStop) + toStopArrival.durationInSeconds();
@@ -165,13 +180,6 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
             debugStop(round, toStop);
         }
     }
-
-    public void debugStopHeader(String title) {
-        DebugState.debugStopHeader(title, "Best     C P | Transit  C P");
-    }
-
-
-    /* private methods */
 
     private boolean isCurrentRoundUpdated() {
         return !(bestOverall.isCurrentRoundEmpty() && bestTransit.isCurrentRoundEmpty());

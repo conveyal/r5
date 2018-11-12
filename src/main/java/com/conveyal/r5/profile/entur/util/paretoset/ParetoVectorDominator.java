@@ -19,12 +19,12 @@ abstract class ParetoVectorDominator {
     /**
      * Temporary storage for the calculation state - not thread safe.
      */
-    private boolean newCriteriaDominatesExistingCriteria;
+    private boolean aLeftCriteriaDominatesRightCriteria;
 
     /**
      * Temporary storage for the calculation state - not thread safe.
      */
-    private boolean existingCriteriaDominatesNewCriteria;
+    private boolean aRightCriteriaDominatesLeftCriteria;
 
     /**
      * Private constructor to force the use of {@link #create(ParetoFunction[])}.
@@ -121,31 +121,31 @@ abstract class ParetoVectorDominator {
     }
 
     final void applyDominance(boolean newDominatesExistingCriteria, boolean existingDominatesNewCriteria) {
-        this.newCriteriaDominatesExistingCriteria |= newDominatesExistingCriteria;
-        this.existingCriteriaDominatesNewCriteria |= existingDominatesNewCriteria;
+        this.aLeftCriteriaDominatesRightCriteria |= newDominatesExistingCriteria;
+        this.aRightCriteriaDominatesLeftCriteria |= existingDominatesNewCriteria;
     }
 
     abstract void doDominate(ParetoSortable lhs, ParetoSortable rhs);
 
     final void dominate(ParetoSortable lhs, ParetoSortable rhs) {
-        newCriteriaDominatesExistingCriteria = false;
-        existingCriteriaDominatesNewCriteria = false;
+        aLeftCriteriaDominatesRightCriteria = false;
+        aRightCriteriaDominatesLeftCriteria = false;
         doDominate(lhs, rhs);
     }
 
-    final boolean mutualVectorDominantesExist() {
-        return newCriteriaDominatesExistingCriteria && existingCriteriaDominatesNewCriteria;
+    final boolean mutualVectorDominanceExist() {
+        return aLeftCriteriaDominatesRightCriteria && aRightCriteriaDominatesLeftCriteria;
     }
 
-    final boolean newVectorDominatesExistingVector() {
-        return newCriteriaDominatesExistingCriteria && !existingCriteriaDominatesNewCriteria;
+    final boolean leftVectorDominatesRightVector() {
+        return aLeftCriteriaDominatesRightCriteria && !aRightCriteriaDominatesLeftCriteria;
     }
 
-    final boolean newCriteriaDominatesExist() {
-        return newCriteriaDominatesExistingCriteria;
+    final boolean leftCriteriaDominanceExist() {
+        return aLeftCriteriaDominatesRightCriteria;
     }
 
-    final boolean existingCriteriaDominanceExist() {
-        return existingCriteriaDominatesNewCriteria;
+    final boolean rightCriteriaDominanceExist() {
+        return aRightCriteriaDominatesLeftCriteria;
     }
 }

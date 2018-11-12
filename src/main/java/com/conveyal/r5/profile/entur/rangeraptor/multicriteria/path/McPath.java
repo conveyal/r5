@@ -5,7 +5,7 @@ import com.conveyal.r5.profile.entur.api.PathLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.DestinationArrival;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,13 +20,15 @@ final class McPath<T extends TripScheduleInfo> implements Path2<T> {
     private final List<PathLeg<T>> legs = new ArrayList<>();
     private final PathLeg<T> egressLeg;
 
-    McPath(List<AbstractStopArrival<T>> states, int egressTime) {
+    McPath(DestinationArrival<T> egressLeg) {
+        List<AbstractStopArrival<T>> states = egressLeg.getPreviousState().path();
         this.accessLeg = createAccessLeg((AccessStopArrival<T>)states.get(0), states.get(1).boardTime());
 
         for (int i=1; i<states.size(); ++i) {
             this.legs.add(createLeg(states.get(i)));
         }
-        this.egressLeg = createEgressLeg((TransitStopArrival<T>) states.get(states.size()-1), egressTime);
+        //noinspection unchecked
+        this.egressLeg = createEgressLeg(egressLeg);
     }
 
     @Override

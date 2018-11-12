@@ -4,10 +4,10 @@ import com.conveyal.r5.profile.entur.api.PathLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.DestinationArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransferStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
 
-import static com.conveyal.r5.profile.entur.rangeraptor.RRStopArrival.NOT_SET;
 
 abstract class McPathLeg<S extends AbstractStopArrival<T>, T extends TripScheduleInfo> implements PathLeg<T> {
     final S state;
@@ -30,124 +30,56 @@ abstract class McPathLeg<S extends AbstractStopArrival<T>, T extends TripSchedul
         throw new IllegalStateException("Unsupported type: " + state.getClass());
     }
 
-    static <T extends TripScheduleInfo> PathLeg createEgressLeg(TransitStopArrival<T> state, int egressTime) {
-        return new EgressLeg<>(state, egressTime);
+    static <T extends TripScheduleInfo> PathLeg<T> createEgressLeg(DestinationArrival<T> destinationArrival) {
+        return new EgressLeg<>(destinationArrival);
     }
 
-    @Override
-    public int toStop() {
+    @Override public int toStop() {
         return state.stopIndex();
     }
-
-    @Override
-    public int toTime() {
+    @Override public int toTime() {
         return state.time();
     }
 
-    @Override
-    public T trip() {
-        return state.trip();
-    }
-
-    @Override
-    public boolean isTransfer() {
-        return state.arrivedByTransfer();
-    }
-
-    @Override
-    public boolean isTransit() {
-        return state.arrivedByTransit();
-    }
-
-
     private static final class TransitLeg<T extends TripScheduleInfo> extends McPathLeg<TransitStopArrival<T>, T> {
-
-        private TransitLeg(TransitStopArrival<T> state) {
-            super(state);
-        }
-
-        @Override
-        public int fromStop() {
-            return state.boardStop();
-        }
-
-        @Override
-        public int fromTime() {
-            return state.boardTime();
-        }
+        private TransitLeg(TransitStopArrival<T> state) { super(state); }
+        @Override public int fromStop() { return state.boardStop(); }
+        @Override public int fromTime() { return state.boardTime(); }
+        @Override public T trip() { return state.trip(); }
+        @Override public boolean isTransit() { return true; }
     }
 
     private static final class TransferLeg<T extends TripScheduleInfo> extends McPathLeg<TransferStopArrival<T>, T> {
-
-        private TransferLeg(TransferStopArrival<T> state) {
-            super(state);
-        }
-
-        @Override
-        public int fromStop() {
-            return state.previousState().stopIndex();
-        }
-
-        @Override
-        public int fromTime() {
-            return state.time() - state.transferTime();
-        }
+        private TransferLeg(TransferStopArrival<T> state) { super(state); }
+        @Override public int fromStop() { return state.previousArrival().stopIndex(); }
+        @Override public int fromTime() { return state.time() - state.transferTime(); }
+        @Override public boolean isTransfer() { return true; }
     }
 
-    private static final class AccessLeg<T extends TripScheduleInfo> extends McPathLeg<AccessStopArrival<T>, T> {
+    private static final class AccessLeg<T extends TripScheduleInfo> implements PathLeg<T> {
         private final int fromTime;
         private final int toTime;
+        private final int toStop;
 
-        private AccessLeg(AccessStopArrival<T> state, int boardTimeFirstTransitLeg) {
-            super(state);
-            this.toTime = boardTimeFirstTransitLeg - state.boardSlackInSeconds;
-            this.fromTime = this.toTime - state.accessDurationInSeconds;
-        }
-
-        @Override public int fromStop() {
-            return NOT_SET;
+        private AccessLeg(AccessStopArrival<T> accessArrival, int firstTransitBoardTime) {
+            this.fromTime = accessArrival.originFromTime(firstTransitBoardTime);
+            this.toStop = accessArrival.stopIndex();
+            this.toTime = fromTime + accessArrival.accessDurationInSeconds;
         }
 
         @Override public int fromTime() { return fromTime; }
-
-        @Override public int toTime() {
-            return toTime;
-        }
+        @Override public int toTime() { return toTime; }
+        @Override public int toStop() { return toStop; }
     }
 
+    private static final class EgressLeg<T extends TripScheduleInfo> implements PathLeg<T> {
+        private DestinationArrival<T> destinationArrival;
 
-    /** TODO TGR  - This class should be simplefied, when the egress path becomes part of mc raptor */
-    private static final class EgressLeg<T extends TripScheduleInfo> extends McPathLeg<TransitStopArrival<T>, T> {
-        private int egressTime;
-
-        private EgressLeg(TransitStopArrival<T> fromState, int egressTime) {
-            super(fromState);
-            this.egressTime = egressTime;
+        private EgressLeg(DestinationArrival<T> destinationArrival) {
+            this.destinationArrival = destinationArrival;
         }
-
-        @Override
-        public int fromStop() {
-            return state.stopIndex();
-        }
-
-        @Override
-        public int fromTime() {
-            return state.time();
-        }
-
-        @Override
-        public int toTime() {
-            return state.time() + egressTime;
-        }
-
-        @Override
-        public boolean isTransfer() {
-            return false;
-        }
-
-        @Override
-        public boolean isTransit() {
-            return false;
-        }
+        @Override public int fromStop() { return destinationArrival.getPreviousState().stopIndex(); }
+        @Override public int fromTime() { return destinationArrival.getPreviousState().time(); }
+        @Override public int toTime() { return destinationArrival.getArrivalTime(); }
     }
 }

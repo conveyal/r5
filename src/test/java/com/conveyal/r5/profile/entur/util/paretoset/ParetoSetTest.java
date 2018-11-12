@@ -16,6 +16,7 @@ import java.util.stream.StreamSupport;
 
 import static com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction.createParetoFunctions;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class ParetoSetTest {
@@ -35,7 +36,7 @@ public class ParetoSetTest {
         ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen().build());
 
         // When one element is added
-        set.add(new Vector("V0", 5));
+        addOk(set, new Vector("V0", 5));
 
         // Then the element should be the only element in the set
         assertEquals("{V0[5]}", set.toString());
@@ -48,17 +49,17 @@ public class ParetoSetTest {
         set.add(new Vector("V0", 5));
 
         // When adding the same value
-        set.add(new Vector("Not", 5));
+        addRejected(set, new Vector("Not", 5));
         // Then expect no change in the set
         assertEquals("{V0[5]}", set.toString());
 
         // When adding a greater value
-        set.add(new Vector("Not", 6));
+        addRejected(set, new Vector("Not", 6));
         // Then expect no change in the set
         assertEquals("{V0[5]}", set.toString());
 
         // When adding the a lesser value
-        set.add(new Vector("V1", 4));
+        addOk(set, new Vector("V1", 4));
         // Then the lesser value should replace the bigger one
         assertEquals("{V1[4]}", set.toString());
     }
@@ -70,17 +71,17 @@ public class ParetoSetTest {
         set.add(new Vector("V0", 5));
 
         // When adding the same value
-        set.add(new Vector("Not", 5));
+        addRejected(set, new Vector("Not", 5));
         // Then NO elements should be added to the set
         assertEquals("{V0[5]}", set.toString());
 
         // When adding a lesser value
-        set.add(new Vector("Not", 4));
+        addRejected(set, new Vector("Not", 4));
         // Then expect no change in the set
         assertEquals("{V0[5]}", set.toString());
 
         // When adding the a greater value
-        set.add(new Vector("V1", 6));
+        addOk(set, new Vector("V1", 6));
         // Then the greather value should replace the bigger one
         assertEquals("{V1[6]}", set.toString());
     }
@@ -92,19 +93,19 @@ public class ParetoSetTest {
         set.add(new Vector("V0", 5));
 
         // When adding the same value
-        set.add(new Vector("NOT ADDED", 5));
+        addRejected(set, new Vector("NOT ADDED", 5));
         // Then expect no change in the set
         assertEquals("{V0[5]}", set.toString());
 
         // When adding the a different value
-        set.add(new Vector("D1", 6));
+        addOk(set, new Vector("D1", 6));
         // Then both values should be included
         assertEquals("{D1[6], V0[5]}", set.toString());
 
         // When adding the several more different values
-        set.add(new Vector("D2", 3));
-        set.add(new Vector("D3", 4));
-        set.add(new Vector("D4", 8));
+        addOk(set, new Vector("D2", 3));
+        addOk(set, new Vector("D3", 4));
+        addOk(set, new Vector("D4", 8));
         // Then all values should be included
         assertEquals("{D1[6], D2[3], D3[4], D4[8], V0[5]}", set.toString());
     }
@@ -308,11 +309,33 @@ public class ParetoSetTest {
         results.forEach(System.out::println);
     }
 
+    /**
+     * Test that both #add and #qualify return the same value - true.
+     * The set should contain the vector, but that is left to the
+     * caller to verify.
+     */
+    private static void addOk(ParetoSet<Vector> set,  Vector v) {
+        assertTrue(set.qualify(v));
+        assertTrue(set.add(v));
+    }
+
+    /**
+     * Test that both #add and #qualify return the same value - false.
+     * The set should not contain the vector, but that is left to the
+     * caller to verify.
+     */
+    private static void addRejected(ParetoSet<Vector> set,  Vector v) {
+        assertFalse(set.qualify(v));
+        assertFalse(set.add(v));
+    }
+
     private void test(ParetoSet<Vector> set, String expected, Vector... vectorsToAdd) {
         set.clear();
         for (Vector v : vectorsToAdd) {
             // Copy vector to avoid any identity pitfalls
-            set.add(new Vector(v));
+            Vector vector = new Vector(v);
+            boolean qualify= set.qualify(vector);
+            assertEquals("Qualify and add should return the same value.", qualify, set.add(vector));
         }
         assertEquals(expected, names(set, false));
     }
@@ -431,7 +454,10 @@ public class ParetoSetTest {
         void run(ParetoSet<Vector> set) {
             set.clear();
             set.add(v0);
-            set.add(v1);
+
+            boolean qualify = set.qualify(v1);
+            boolean added = set.add(v1);
+            assertEquals(description + " - qualify() and add() should return the same value. v0: " + v0 + ", v1: " + v1, qualify, added);
             assertEquals(description, expected, set.toString());
         }
     }

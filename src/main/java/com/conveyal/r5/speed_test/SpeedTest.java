@@ -25,6 +25,7 @@ import com.conveyal.r5.speed_test.test.CsvFileIO;
 import com.conveyal.r5.speed_test.test.TestCase;
 import com.conveyal.r5.speed_test.test.TestCaseFailedException;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TripSchedule;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
@@ -44,7 +45,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 import static com.conveyal.r5.profile.entur.util.TimeUtils.midnightOf;
 
@@ -265,7 +265,7 @@ public class SpeedTest {
 
             // -------------------------------------------------------- [ WORKER ROUTE ]
 
-            TransitDataProvider transitData = new TransitLayerRRDataProvider(
+            TransitDataProvider<TripSchedule> transitData = new TransitLayerRRDataProvider(
                     transportNetwork.transitLayer,
                     request.date,
                     request.transitModes,
@@ -283,9 +283,9 @@ public class SpeedTest {
                 @Override public int maxNumberOfTransfers() { return request.maxRides; }
             };
 
-            RangeRaptorService service = new RangeRaptorService(tuningParameters);
+            RangeRaptorService<TripSchedule> service = new RangeRaptorService<>(tuningParameters);
 
-            Collection<? extends Path2> path2s = service.route(req, transitData);
+            Collection<Path2<TripSchedule>> path2s = service.route(req, transitData);
 
             TIMER_WORKER.stop();
 
@@ -304,10 +304,10 @@ public class SpeedTest {
             */
             if(req.profile.isPlainRangeRaptor()) {
                 ParetoSet<Path2ParetoSortableWrapper> paths = new ParetoSet<>(Path2ParetoSortableWrapper.paretoDominanceFunctions());
-                for (Path2 p : path2s) {
+                for (Path2<TripSchedule> p : path2s) {
                     paths.add(new Path2ParetoSortableWrapper(p));
                 }
-                path2s = StreamSupport.stream(paths.spliterator(), false).map(it -> it.path).collect(Collectors.toList());
+                path2s = paths.stream().map(it -> it.path).collect(Collectors.toList());
             }
 
             numOfPathsFound.add(path2s.size());

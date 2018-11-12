@@ -48,11 +48,19 @@ public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRan
 
 
     public McRangeRaptorWorker(TransitDataProvider<T> transitData, RangeRaptorRequest request, int nRounds) {
-        super(transitData, new McRangeRaptorWorkerState<>(nRounds, transitData.numberOfStops()), request);
+        super(
+                transitData,
+                new McRangeRaptorWorkerState<>(
+                        nRounds,
+                        transitData.numberOfStops(),
+                        request.egressStops
+                ),
+                request
+        );
     }
 
     @Override protected Collection<Path2<T>> paths() {
-        return state.extractPaths(request.egressStops);
+        return state.extractPaths();
     }
 
     @Override

@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 public class ItineraryMapper2 {
     private TransportNetwork transportNetwork;
 
-    public ItineraryMapper2(TransportNetwork transportNetwork) {
+    ItineraryMapper2(TransportNetwork transportNetwork) {
         this.transportNetwork = transportNetwork;
     }
 

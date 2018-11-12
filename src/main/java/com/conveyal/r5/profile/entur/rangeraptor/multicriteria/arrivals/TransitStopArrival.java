@@ -24,15 +24,6 @@ public final class TransitStopArrival<T extends TripScheduleInfo> extends Abstra
         return true;
     }
 
-    public boolean arrivedByTransitLastRound() {
-        if(arrivedByTransitLastRound) {
-            arrivedByTransitLastRound = false;
-            return true;
-        }
-        return false;
-    }
-
-
     @Override
     public T trip() {
         return trip;
@@ -46,5 +37,35 @@ public final class TransitStopArrival<T extends TripScheduleInfo> extends Abstra
     @Override
     public int boardTime() {
         return boardTime;
+    }
+
+    /**
+     * The 'origin from time' is when the journey started. The access leg is time-shifted
+     * towards the first transit leg.
+     */
+    @Override
+    int originFromTime() {
+        // An access leg is allways followed by an Transit leg; Hence the
+        // implementation is put here and not in the super class
+        if(previousArrival() instanceof AccessStopArrival) {
+            return ((AccessStopArrival) previousArrival()).originFromTime(boardTime);
+        }
+        // If this transit is not the first, propagate forward to previous leg
+        return previousArrival().originFromTime();
+    }
+
+    /**
+     * This method return true if we arrived at this stop in the last round.
+     * <p/>
+     * NOTE! This method does not know about witch round it is, it just assume
+     * that is will be called ONCE pr round and that it can return 'true' the
+     * first time it is called.
+     */
+    public boolean arrivedByTransitLastRound() {
+        if(arrivedByTransitLastRound) {
+            arrivedByTransitLastRound = false;
+            return true;
+        }
+        return false;
     }
 }

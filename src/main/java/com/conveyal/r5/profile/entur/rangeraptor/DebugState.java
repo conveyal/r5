@@ -3,7 +3,7 @@ package com.conveyal.r5.profile.entur.rangeraptor;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.util.Debug;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static com.conveyal.r5.profile.entur.rangeraptor.RRStopArrival.NOT_SET;
@@ -18,7 +18,7 @@ import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrLong;
  */
 public final class DebugState {
 
-    private static final List<Integer> DEBUG_STOPS = new ArrayList<>();
+    private static final List<Integer> DEBUG_STOPS = Arrays.asList(); //23720, 86727); //86727 ,3516, 66915, 66907, 3540, 3551, 4917);
 
     private static final String STOP_HEADER = "Description Rnd  From  To     Start    End        Time   Trip";
     private static final String LINE_FORMAT = " * %-8s %2d   %5s %5s  %8s %8s %8s  %6s";
@@ -35,7 +35,7 @@ public final class DebugState {
     }
 
     public static void init(boolean debug, List<Integer> debugStops) {
-        if(debugStops == null) {
+        if(debugStops == null || debugStops.isEmpty()) {
             Debug.setDebug(debug);
         }
         else {
@@ -76,7 +76,8 @@ public final class DebugState {
         if (state.arrivedByTransit()) {
             assertNotSet(state, state.boardTime(), UNREACHED);
             assertNotSet(state, state.boardStop(), NOT_SET);
-            assertTripNull(state, state.trip());
+            assertTripNotNull(state);
+
             return format(
                     "Transit",
                     round,
@@ -92,6 +93,8 @@ public final class DebugState {
         else if (state.arrivedByTransfer()) {
             assertNotSet(state, state.transferTime(), NOT_SET);
             assertNotSet(state, state.transferFromStop(), NOT_SET);
+            assertTripNull(state);
+
             return format(
                     "Walk",
                     round,
@@ -108,7 +111,7 @@ public final class DebugState {
             assertSet(state, state.boardStop(), NOT_SET);
             assertSet(state, state.transferTime(), NOT_SET);
             assertSet(state, state.transferFromStop(), NOT_SET);
-            assertTripNotNull(state, state.trip());
+            assertTripNull(state);
 
             return format(
                     "Access",
@@ -149,14 +152,14 @@ public final class DebugState {
         }
     }
 
-    private static <T> void assertTripNotNull(RRStopArrival state, T value) {
-        if (value == null) {
+    private static <T> void assertTripNotNull(RRStopArrival state) {
+        if (state.trip() == null) {
             throw new IllegalStateException("Unexpected 'null' value for trip. State: " + state);
         }
     }
 
-    private static <T> void assertTripNull(RRStopArrival state, T value) {
-        if (value != null) {
+    private static void assertTripNull(RRStopArrival state) {
+        if (state.trip() != null) {
             throw new IllegalStateException("Unexpected value in for trip, expected 'null'. State: " + state);
         }
     }

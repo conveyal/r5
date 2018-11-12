@@ -3,6 +3,8 @@ package com.conveyal.r5.profile.entur.rangeraptor;
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
+import java.util.Iterator;
+
 public interface WorkerState {
     void initNewDepartureForMinute(int nextMinuteDepartureTime);
 
@@ -16,5 +18,5 @@ public interface WorkerState {
 
     BitSetIterator stopsTouchedByTransitCurrentRound();
 
-    void transferToStop(int fromStop, StopArrival transfer);
+    void transferToStops(int fromStop, Iterator<? extends StopArrival> transfers);
 }

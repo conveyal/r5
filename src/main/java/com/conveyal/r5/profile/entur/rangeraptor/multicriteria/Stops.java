@@ -1,34 +1,48 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 
+import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransferStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.path.McPathBuilder;
+import com.conveyal.r5.profile.entur.util.Debug;
 
+
+import java.util.Collection;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 
 
-
+/**
+ * This class serve as a thin wrapper around the stops array and the destination arrivals.
+ */
 final class Stops<T extends TripScheduleInfo> {
+    private McPathBuilder<T> pathBuilder = new McPathBuilder<>();
 
     private final Stop<T>[] stops;
+    private final Destination<T> destination = new Destination<>();
 
-        /**
-         * Set the time at a transit index iff it is optimal. This sets both the best time and the transfer time
-         */
-    Stops(int stops) {
+    /**
+     * Set the time at a transit index iff it is optimal. This sets both the best time and the transfer time
+     */
+    Stops(int stops, Collection<StopArrival> egressStops) {
         //noinspection unchecked
         this.stops = (Stop<T>[]) new Stop[stops];
+
+        for (StopArrival it : egressStops) {
+            this.stops[it.stop()] = new EgressStop<>(it, destination);
+        }
     }
 
     void setInitialTime(StopArrival stopArrival, int fromTime, int boardSlackInSeconds) {
         final int stop = stopArrival.stop();
         findOrCreateSet(stop).add(
-                new AccessStopArrival<T>(stopArrival, fromTime, boardSlackInSeconds)
+                new AccessStopArrival<>(stopArrival, fromTime, boardSlackInSeconds)
         );
     }
 
@@ -41,40 +55,38 @@ final class Stops<T extends TripScheduleInfo> {
         return findOrCreateSet(stopArrival.stop()).add(new TransferStopArrival<>(previous, round, stopArrival, arrivalTime));
     }
 
+    Collection<Path2<T>> extractPaths() {
+        debugStateInfo();
+        return destination.stream().map(pathBuilder::buildPath).collect(Collectors.toList());
+    }
+
+    /**
+     * List all transfers arrived last round.
+     * <p/>
+     * <b>NOTE! This method can only be called once per round, after the call the flags are cleared automatically.</b>
+     */
     Iterable<? extends AbstractStopArrival<T>> listArrivedByTransitLastRound(int stop) {
         Stop<T> it = stops[stop];
         return it == null ? emptyList() : it.list(AbstractStopArrival::arrivedByTransitLastRound);
     }
 
-    Iterable<? extends AbstractStopArrival<T>> listArrivedByTransit(int round, int stop) {
+    Iterable<? extends AbstractStopArrival<T>> list(final int round, int stop) {
         Stop<T> it = stops[stop];
-        return it == null ? emptyList() : it.list(s -> s.round() == round && s.arrivedByTransit());
-    }
-
-    Iterable<? extends AbstractStopArrival<T>> list(int round, int stop) {
-        Stop it = stops[stop];
-        return it == null ? emptyList() : it.listRound(round);
-    }
-
-    Iterable<? extends AbstractStopArrival<T>> listAll(int stop) {
-        Stop it = stops[stop];
-        return it == null ? emptyList() : it;
+        return it == null ? emptyList() : it.list(s -> s.round() == round);
     }
 
     private Stop<T> findOrCreateSet(final int stop) {
         if(stops[stop] == null) {
-            stops[stop] = createState();
+            stops[stop] = new Stop<>();
         }
         return stops[stop];
     }
 
-    static <T extends TripScheduleInfo> Stop<T> createState() {
-        return new Stop<>(AbstractStopArrival.PARETO_FUNCTION);
-    }
+    private void debugStateInfo() {
+        if(!Debug.isDebug()) return;
 
-    void debugStateInfo() {
         long total = 0;
-        long totalMemUsed = 0;
+        long arrayLen = 0;
         long numOfStops = 0;
         int max = 0;
 
@@ -83,15 +95,15 @@ final class Stops<T extends TripScheduleInfo> {
                 ++numOfStops;
                 total += stop.size();
                 max = Math.max(stop.size(), max);
-                totalMemUsed += stop.memUsed();
+                arrayLen += stop.elementArrayLen();
             }
         }
         double avg = ((double)total) / numOfStops;
-        double avgMem = ((double)totalMemUsed) / numOfStops;
+        double arrayLenAvg = ((double)arrayLen) / numOfStops;
 
         System.out.printf(
-                "%n  => Stop arrivals(McState obj): Avg: %.1f  max: %d  total: %d'  avg.mem: %.1f  tot.mem: %d'  #stops: %d'  tot#stops: %d' %n%n",
-                avg, max, total/1000, avgMem, totalMemUsed/1000, numOfStops/1000, stops.length/1000
+                " => STOP ARRIVALS  %.1f / %d / %d'  Array Length: %.1f / %d'  Stops: %d' / %d'%n",
+                avg, max, total/1000, arrayLenAvg, arrayLen/1000, numOfStops/1000, stops.length/1000
         );
     }
 }

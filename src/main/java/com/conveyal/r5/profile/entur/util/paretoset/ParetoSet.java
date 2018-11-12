@@ -1,14 +1,15 @@
 package com.conveyal.r5.profile.entur.util.paretoset;
 
+import java.util.AbstractCollection;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.stream.Collectors;
 
 
-public class ParetoSet<T extends ParetoSortable> implements Iterable<T> {
+public class ParetoSet<T extends ParetoSortable> extends AbstractCollection<T> {
     private final ParetoVectorDominator dominator;
     @SuppressWarnings("unchecked")
-    private T[] paretoSet = (T[])new ParetoSortable[16];
+    private T[] elements = (T[])new ParetoSortable[16];
     private int size = 0;
 
 
@@ -16,12 +17,24 @@ public class ParetoSet<T extends ParetoSortable> implements Iterable<T> {
         this.dominator = ParetoVectorDominator.create(builder);
     }
 
-    public void clear() {
-        size = 0;
+    public T get(int index) {
+        return elements[index];
     }
 
-    public boolean add(T newValue) {
+    @Override
+    public int size() {
+        return size;
+    }
 
+
+    @Override
+    @SuppressWarnings("NullableProblems")
+    public Iterator<T> iterator() {
+        return Arrays.stream(elements, 0, size).iterator();
+    }
+
+    @Override
+    public boolean add(T  newValue) {
         if (size == 0) {
             appendValue(newValue);
             return true;
@@ -33,19 +46,19 @@ public class ParetoSet<T extends ParetoSortable> implements Iterable<T> {
         int i = 0;
 
         for (; i < size; ++i) {
-            ParetoSortable it = paretoSet[i];
+            ParetoSortable it = elements[i];
 
             dominator.dominate(newValue, it);
 
-            if (dominator.mutualVectorDominantesExist()) {
+            if (dominator.mutualVectorDominanceExist()) {
                 mutualDominanceExist = true;
             }
-            else if (dominator.newCriteriaDominatesExist()) {
-                paretoSet[i] = newValue;
+            else if (dominator.leftCriteriaDominanceExist()) {
+                elements[i] = newValue;
                 removeDominatedElementsFromRestOfSet(newValue, i+1);
                 return true;
             }
-            else if (dominator.existingCriteriaDominanceExist()) {
+            else if (dominator.rightCriteriaDominanceExist()) {
                 return false;
             }
             else {
@@ -63,32 +76,71 @@ public class ParetoSet<T extends ParetoSortable> implements Iterable<T> {
         return false;
     }
 
-    public boolean isEmpty() {
-        return size == 0;
+    /**
+     * Test if an element qualify - the element is NOT added. Use the {@link #add(ParetoSortable)}
+     * method directly if the purpose is to add the new element to the collection.
+     * <p/>
+     * Both methods are optimized for performance; hence the add method does not use this method.
+     */
+    public boolean qualify(T  newValue) {
+        if (size == 0) {
+            return true;
+        }
+
+        boolean mutualDominanceExist = false;
+        boolean equivalentVectorExist = false;
+
+        int i = 0;
+
+        for (; i < size; ++i) {
+            dominator.dominate(newValue, elements[i]);
+
+            if (dominator.mutualVectorDominanceExist()) {
+                if(equivalentVectorExist) {
+                    return false;
+                }
+                mutualDominanceExist = true;
+            }
+            else if (dominator.leftCriteriaDominanceExist()) {
+                return true;
+            }
+            else if (dominator.rightCriteriaDominanceExist()) {
+                return false;
+            }
+            else {
+                if(mutualDominanceExist) {
+                    return false;
+                }
+                equivalentVectorExist = true;
+            }
+        }
+        return mutualDominanceExist;
     }
 
-    public T get(int index) {
-        return (T) paretoSet[index];
+    @Override
+    public boolean remove(Object o) {
+        throw new UnsupportedOperationException();
     }
 
-    public int size() {
-        return size;
+    @Override
+    public void clear() {
+        size = 0;
     }
-    public int memUsed() {
-        return paretoSet.length;
+
+    /**
+     * This is used for logging and tuning purposes - by looking at the statistics we can decide
+     * a good value for the initial size.
+     */
+    public int elementArrayLen() {
+        return elements.length;
     }
 
     @Override
     public String toString() {
-        return "{" + Arrays.stream(paretoSet, 0, size)
+        return "{" + Arrays.stream(elements, 0, size)
                 .map(Object::toString)
                 .sorted()
                 .collect(Collectors.joining(", ")) + "}";
-    }
-
-    @Override
-    public Iterator<T> iterator() {
-        return Arrays.stream(paretoSet, 0, size).iterator();
     }
 
     /**
@@ -98,15 +150,15 @@ public class ParetoSet<T extends ParetoSortable> implements Iterable<T> {
     private void removeDominatedElementsFromRestOfSet(final T newValue, int index) {
         // Be aware that the index method parameter is incremented
         while (index < size) {
-            dominator.dominate(newValue, paretoSet[index]);
+            dominator.dominate(newValue, elements[index]);
 
             // Find an element to skip, and move the last element into its position
             // Note! We can not advance the index `i`, because last element must also
             // be checked.
-            if (dominator.newVectorDominatesExistingVector()) {
+            if (dominator.leftVectorDominatesRightVector()) {
                 --size;
-                paretoSet[index] = paretoSet[size];
-                paretoSet[size] = null;
+                elements[index] = elements[size];
+                elements[size] = null;
             }
             else {
                 ++index;
@@ -115,12 +167,12 @@ public class ParetoSet<T extends ParetoSortable> implements Iterable<T> {
     }
 
     private void appendValue(T newValue) {
-        paretoSet[size++] = newValue;
+        elements[size++] = newValue;
     }
 
     private void assertEnoughSpaceInSet() {
-        if (size == paretoSet.length) {
-            paretoSet = Arrays.copyOf(paretoSet, paretoSet.length * 2);
+        if (size == elements.length) {
+            elements = Arrays.copyOf(elements, elements.length * 2);
         }
     }
 }

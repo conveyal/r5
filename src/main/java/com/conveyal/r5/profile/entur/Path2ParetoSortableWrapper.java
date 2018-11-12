@@ -3,17 +3,18 @@ package com.conveyal.r5.profile.entur;
 import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSortable;
+import com.conveyal.r5.transit.TripSchedule;
 
 import static com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction.createParetoFunctions;
 
 @Deprecated
 public class Path2ParetoSortableWrapper implements ParetoSortable {
 
-    public final Path2 path;
+    public final Path2<TripSchedule> path;
     private final int arrivalTime;
     private final int journeyDuration;
 
-    public Path2ParetoSortableWrapper(Path2 path) {
+    public Path2ParetoSortableWrapper(Path2<TripSchedule> path) {
         this.path = path;
         this.arrivalTime = path.egressLeg().toTime();
         this.journeyDuration = arrivalTime - path.accessLeg().fromTime();

@@ -12,7 +12,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.standard.RangeRaptorWorker;
 import java.util.Collection;
 
 /**
- * A service for performing Range Raptor routing request.
+ * A service for performing Range Raptor routing request. 
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */

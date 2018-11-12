@@ -1,10 +1,9 @@
 package com.conveyal.r5.profile.entur.transitadapter;
 
 import com.conveyal.r5.api.util.TransitModes;
-import com.conveyal.r5.profile.entur.api.StopArrival;
+import com.conveyal.r5.profile.entur.api.TransferLeg;
 import com.conveyal.r5.profile.entur.api.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.UnsignedIntIterator;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
 import com.conveyal.r5.transit.RouteInfo;
@@ -48,9 +47,9 @@ public class TransitLayerRRDataProvider implements TransitDataProvider<TripSched
 
     private final List<LightweightTransferIterator> transfers;
 
-    private static final Iterator<StopArrival> EMPTY_TRANSFER_ITERATOR = new Iterator<StopArrival>() {
+    private static final Iterator<TransferLeg> EMPTY_TRANSFER_ITERATOR = new Iterator<TransferLeg>() {
         @Override public boolean hasNext() { return false; }
-        @Override public StopArrival next() { return null; }
+        @Override public TransferLeg next() { return null; }
     };
 
     public TransitLayerRRDataProvider(TransitLayer transitLayer, LocalDate date, EnumSet<TransitModes> transitModes, float walkSpeedMetersPerSecond) {
@@ -74,7 +73,7 @@ public class TransitLayerRRDataProvider implements TransitDataProvider<TripSched
     }
 
     @Override
-    public Iterator<StopArrival> getTransfers(int stop) {
+    public Iterator<TransferLeg> getTransfers(int stop) {
         LightweightTransferIterator it = transfers.get(stop);
 
         if(it == null) return EMPTY_TRANSFER_ITERATOR;

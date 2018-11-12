@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard.structarray;
 
 
+import com.conveyal.r5.profile.entur.api.TransferLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalCursor;
 
@@ -32,11 +33,11 @@ public final class Stops<T extends TripScheduleInfo> {
     /**
      * Set the time at a transit index iff it is optimal. This sets both the best time and the transfer time
      */
-    public void transferToStop(int round, int fromStop, com.conveyal.r5.profile.entur.api.StopArrival toStopArrival, int arrivalTime) {
-        int stop = toStopArrival.stop();
+    public void transferToStop(int round, int fromStop, TransferLeg transferLeg, int arrivalTime) {
+        int stop = transferLeg.stop();
         StopArrival state = findOrCreateStopIndex(round, stop);
 
-        state.transferToStop(fromStop, arrivalTime, toStopArrival.durationInSeconds());
+        state.transferToStop(fromStop, arrivalTime, transferLeg.durationInSeconds());
     }
 
     public final int time(int round, int stop) {

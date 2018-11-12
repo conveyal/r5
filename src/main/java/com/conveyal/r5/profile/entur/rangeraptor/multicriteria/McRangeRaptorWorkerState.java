@@ -1,12 +1,13 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
-import com.conveyal.r5.profile.entur.api.StopArrival;
+import com.conveyal.r5.profile.entur.api.AccessLeg;
+import com.conveyal.r5.profile.entur.api.EgressLeg;
+import com.conveyal.r5.profile.entur.api.TransferLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransferStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.path.McPathBuilder;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.api.Path2;
@@ -15,7 +16,6 @@ import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.Iterator;
-import java.util.stream.Collectors;
 
 
 /**
@@ -42,9 +42,9 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
 
 
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
-    McRangeRaptorWorkerState(int nRounds, int nStops, Collection<StopArrival> egressStops) {
+    McRangeRaptorWorkerState(int nRounds, int nStops, Collection<EgressLeg> egressLegs) {
         this.nRounds = nRounds;
-        this.stops = new Stops<>(nStops, egressStops);
+        this.stops = new Stops<>(nStops, egressLegs);
 
         this.touchedCurrent = new BitSet(nStops);
         this.touchedPrevious = new BitSet(nStops);
@@ -60,10 +60,10 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         round = 0;
     }
 
-    @Override public void setInitialTime(StopArrival stopArrival, int fromTime, int boardSlackInSeconds) {
-        stops.setInitialTime(stopArrival, fromTime, boardSlackInSeconds);
-        touchedCurrent.set(stopArrival.stop());
-        debugStops(AccessStopArrival.class, round, stopArrival.stop());
+    @Override public void setInitialTime(AccessLeg accessLeg, int fromTime, int boardSlackInSeconds) {
+        stops.setInitialTime(accessLeg, fromTime, boardSlackInSeconds);
+        touchedCurrent.set(accessLeg.stop());
+        debugStops(AccessStopArrival.class, round, accessLeg.stop());
     }
 
     @Override public boolean isNewRoundAvailable() {
@@ -110,16 +110,16 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     /**
      * Set the time at a transit stops iff it is optimal.
      */
-    @Override public void transferToStops(int fromStop, Iterator<? extends StopArrival> transfers) {
+    @Override public void transferToStops(int fromStop, Iterator<? extends TransferLeg> transfers) {
         Iterable<? extends AbstractStopArrival<T>> fromArrivals = stops.listArrivedByTransitLastRound(fromStop);
 
         while (transfers.hasNext()) {
-            StopArrival toStop = transfers.next();
+            TransferLeg toStop = transfers.next();
             transferToStop(fromArrivals, toStop);
         }
     }
 
-    private void transferToStop(Iterable<? extends AbstractStopArrival<T>> fromArrivals, StopArrival transfer) {
+    private void transferToStop(Iterable<? extends AbstractStopArrival<T>> fromArrivals, TransferLeg transfer) {
 
         final int targetStop = transfer.stop();
         final int transferTimeInSeconds = transfer.durationInSeconds();

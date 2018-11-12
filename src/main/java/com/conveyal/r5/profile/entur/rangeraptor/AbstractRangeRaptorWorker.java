@@ -1,7 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor;
 
+import com.conveyal.r5.profile.entur.api.AccessLeg;
 import com.conveyal.r5.profile.entur.api.Path2;
-import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
@@ -161,7 +161,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
         state.initNewDepartureForMinute(nextMinuteDepartureTime);
 
         // add initial stops
-        for (StopArrival it : request.accessStops) {
+        for (AccessLeg it : request.accessLegs) {
             state.setInitialTime(it, nextMinuteDepartureTime, request.boardSlackInSeconds);
         }
     }

@@ -1,18 +1,18 @@
 package com.conveyal.r5.profile.entur.transitadapter;
 
-import com.conveyal.r5.profile.entur.api.StopArrival;
+import com.conveyal.r5.profile.entur.api.TransferLeg;
 
 import java.util.Iterator;
 
 
 /**
- * Create a lightweight StopArrival iterator, using a single object to represent
- * the iterator and all instances of the StopArrival. The StopArrival is
+ * Create a lightweight TransferLeg iterator, using a single object to represent
+ * the iterator and all instances of the TransferLeg. The TransferLeg is
  * only valid for the duration of one step.
  * <p/>
  * NOT THREAD SAFE!
  */
-class LightweightTransferIterator implements Iterator<StopArrival>, StopArrival {
+class LightweightTransferIterator implements Iterator<TransferLeg>, TransferLeg {
     private final int[] durationToStops;
     private int index;
 
@@ -22,7 +22,7 @@ class LightweightTransferIterator implements Iterator<StopArrival>, StopArrival 
     }
 
 
-    /* Iterator<StopArrival> methods */
+    /* Iterator<TransferLeg> methods */
 
     @Override
     public boolean hasNext() {
@@ -31,11 +31,11 @@ class LightweightTransferIterator implements Iterator<StopArrival>, StopArrival 
     }
 
     @Override
-    public StopArrival next() {
+    public TransferLeg next() {
         return this;
     }
 
-    /* StopArrival, lightweight implementation */
+    /* TransferLeg, lightweight implementation */
 
     @Override
     public int stop() {

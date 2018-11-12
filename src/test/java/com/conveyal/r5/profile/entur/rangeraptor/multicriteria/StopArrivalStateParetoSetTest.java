@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
-import com.conveyal.r5.profile.entur.api.AStopArrival;
+import com.conveyal.r5.profile.entur.api.TestLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
@@ -10,7 +10,6 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.Arrays;
-import java.util.stream.StreamSupport;
 
 public class StopArrivalStateParetoSetTest {
     // 08:35 in seconds
@@ -92,12 +91,12 @@ public class StopArrivalStateParetoSetTest {
     }
 
     private void assertStopsInSet(int ... expStopIndexes) {
-        int[] result = StreamSupport.stream(subject.spliterator(), false).mapToInt(AbstractStopArrival::stopIndex).sorted().toArray();
+        int[] result = subject.stream().mapToInt(AbstractStopArrival::stopIndex).sorted().toArray();
         Assert.assertEquals("Stop indexes", Arrays.toString(expStopIndexes), Arrays.toString(result));
     }
 
     private static AccessStopArrival<TripScheduleInfo> newMcAccessStopState(int stop, int accessDurationInSeconds) {
-        return new AccessStopArrival<>(new AStopArrival(stop, accessDurationInSeconds), A_TIME, ANY);
+        return new AccessStopArrival<>(new TestLeg(stop, accessDurationInSeconds), A_TIME, ANY);
     }
 
     private static TransitStopArrival<TripScheduleInfo> newMcTransitStopState(AbstractStopArrival<TripScheduleInfo> prev, int round, int stop, int arrivalTime) {
@@ -105,6 +104,6 @@ public class StopArrivalStateParetoSetTest {
     }
 
     private static TransferStopArrival<TripScheduleInfo> newMcTransferStopState(AbstractStopArrival<TripScheduleInfo> prev, int round, int stop, int arrivalTime) {
-        return new TransferStopArrival<>(prev, round, new AStopArrival(stop, ANY), arrivalTime);
+        return new TransferStopArrival<>(prev, round, new TestLeg(stop, ANY), arrivalTime);
     }
 }

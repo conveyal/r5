@@ -1,9 +1,11 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 
+import com.conveyal.r5.profile.entur.api.AccessLeg;
+import com.conveyal.r5.profile.entur.api.EgressLeg;
 import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
-import com.conveyal.r5.profile.entur.api.StopArrival;
+import com.conveyal.r5.profile.entur.api.TransferLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.structarray.Stops;
@@ -136,9 +138,9 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
     }
 
     @Override
-    public void setInitialTime(StopArrival stopArrival, int fromTime, int boardSlackInSeconds) {
-        final int accessDurationInSeconds = stopArrival.durationInSeconds();
-        final int stop = stopArrival.stop();
+    public void setInitialTime(AccessLeg accessLeg, int fromTime, int boardSlackInSeconds) {
+        final int accessDurationInSeconds = accessLeg.durationInSeconds();
+        final int stop = accessLeg.stop();
         final int arrivalTime = fromTime + accessDurationInSeconds;
 
         stops.setInitialTime(round, stop, arrivalTime);
@@ -170,7 +172,7 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
      * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the nonTransferTime
      */
     @Override
-    public void transferToStops(int fromStop, Iterator<? extends StopArrival> transfers) {
+    public void transferToStops(int fromStop, Iterator<? extends TransferLeg> transfers) {
         while (transfers.hasNext()) {
             transferToStop(fromStop, transfers.next());
         }
@@ -182,12 +184,12 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
     void addPathsForCurrentIteration() {
         pathBuilder.setBoardSlackInSeconds(request.boardSlackInSeconds);
 
-        for (StopArrival it : request.egressStops) {
+        for (EgressLeg it : request.egressLegs) {
 
             // TODO TGR -- Add egress transit time to path
 
             if (isStopReachedByTransit(it.stop())) {
-                Path2 p = pathBuilder.extractPathForStop(getMaxNumberOfRounds(), it, request.accessStops);
+                Path2 p = pathBuilder.extractPathForStop(getMaxNumberOfRounds(), it, request.accessLegs);
                 if (p != null) {
                     paths.add(p);
                 }
@@ -204,10 +206,10 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
 
     /* private methods */
 
-    private void transferToStop(int fromStop, StopArrival toStopArrival) {
-        final int toStop = toStopArrival.stop();
+    private void transferToStop(int fromStop, TransferLeg transferLeg) {
+        final int toStop = transferLeg.stop();
 
-        int arrivalTime = bestTransit.time(fromStop) + toStopArrival.durationInSeconds();
+        int arrivalTime = bestTransit.time(fromStop) + transferLeg.durationInSeconds();
 
         if (arrivalTime > maxTimeLimit) {
             return;
@@ -215,7 +217,7 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
         // transitTimes upper bounds bestTimes so we don't need to update wait time and in-vehicle time here, if we
         // enter this conditional it has already been updated.
         if (bestOverall.updateNewBestTime(toStop, arrivalTime)) {
-            stops.transferToStop(round, fromStop, toStopArrival, arrivalTime);
+            stops.transferToStop(round, fromStop, transferLeg, arrivalTime);
 
             debugStop(round, toStop);
         }

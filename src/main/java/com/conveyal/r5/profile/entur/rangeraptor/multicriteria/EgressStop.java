@@ -1,16 +1,16 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
-import com.conveyal.r5.profile.entur.api.StopArrival;
+import com.conveyal.r5.profile.entur.api.EgressLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
 
 class EgressStop<T extends TripScheduleInfo> extends Stop<T> {
 
-    private final StopArrival egressLeg;
+    private final EgressLeg egressLeg;
     private final Destination<T> destination;
 
-    EgressStop(StopArrival egressLeg, Destination<T> destination) {
+    EgressStop(EgressLeg egressLeg, Destination<T> destination) {
         this.egressLeg = egressLeg;
         this.destination = destination;
     }

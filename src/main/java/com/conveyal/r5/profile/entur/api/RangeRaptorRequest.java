@@ -33,15 +33,15 @@ public class RangeRaptorRequest {
     public final int toTime;
 
     /** Times to access each transit stop using the street network in seconds. */
-    public final Collection<StopArrival> accessStops;
+    public final Collection<AccessLeg> accessLegs;
 
     /**
      * List of all possible egress stops and time to reach destination in seconds.
      * <p>
-     * NOTE! The {@link StopArrival#stop()} is the stop where the egress leg
+     * NOTE! The {@link EgressLeg#stop()} is the stop where the egress leg
      * start, NOT the destination - think of it as a reversed leg.
      */
-    public final Collection<StopArrival> egressStops;
+    public final Collection<EgressLeg> egressLegs;
 
     /**
      * Step for departure times between each RangeRaptor iterations.
@@ -79,8 +79,8 @@ public class RangeRaptorRequest {
         // Required parameters
         this.fromTime = NOT_SET;
         this.toTime = NOT_SET;
-        this.accessStops = Collections.emptyList();
-        this.egressStops = Collections.emptyList();
+        this.accessLegs = Collections.emptyList();
+        this.egressLegs = Collections.emptyList();
 
         // Optional parameters with default values
         this.profile = RaptorProfiles.MULTI_CRITERIA_RANGE_RAPTOR;
@@ -93,8 +93,8 @@ public class RangeRaptorRequest {
         this.profile = builder.profile;
         this.fromTime = builder.fromTime;
         this.toTime = builder.toTime;
-        this.accessStops = builder.accessStops;
-        this.egressStops = builder.egressStops;
+        this.accessLegs = builder.accessLegs;
+        this.egressLegs = builder.egressLegs;
         this.departureStepInSeconds = builder.departureStepInSeconds;
         this.boardSlackInSeconds = builder.boardSlackInSeconds;
         this.numberOfAdditionalTransfers = builder.numberOfAdditionalTransfers;
@@ -113,8 +113,8 @@ public class RangeRaptorRequest {
         return "RangeRaptorRequest{" +
                 "from=" + TimeUtils.timeToStrLong(fromTime) +
                 ", toTime=" + TimeUtils.timeToStrLong(toTime) +
-                ", accessStops=" + accessStops +
-                ", egressStops=" + egressStops +
+                ", accessLegs=" + accessLegs +
+                ", egressLegs=" + egressLegs +
                 ", departureStepInSeconds=" + departureStepInSeconds +
                 ", boardSlackInSeconds=" + boardSlackInSeconds +
                 '}';
@@ -123,8 +123,8 @@ public class RangeRaptorRequest {
     public static class Builder {
         private int fromTime;
         private int toTime;
-        private final Collection<StopArrival> accessStops = new ArrayList<>();
-        private final Collection<StopArrival> egressStops = new ArrayList<>();
+        private final Collection<AccessLeg> accessLegs = new ArrayList<>();
+        private final Collection<EgressLeg> egressLegs = new ArrayList<>();
 
         private RaptorProfiles profile = DEFAULTS.profile;
         private int departureStepInSeconds = DEFAULTS.departureStepInSeconds;
@@ -144,25 +144,25 @@ public class RangeRaptorRequest {
             return this;
         }
 
-        public Builder addAccessStop(StopArrival accessStop) {
-            this.accessStops.add(accessStop);
+        public Builder addAccessStop(AccessLeg accessLeg) {
+            this.accessLegs.add(accessLeg);
             return this;
         }
 
-        public Builder addAccessStops(Iterable<StopArrival> accessStops) {
-            for (StopArrival it : accessStops) {
+        public Builder addAccessStops(Iterable<AccessLeg> accessLegs) {
+            for (AccessLeg it : accessLegs) {
                 addAccessStop(it);
             }
             return this;
         }
 
-        public Builder addEgressStop(StopArrival egressStop) {
-            this.egressStops.add(egressStop);
+        public Builder addEgressStop(EgressLeg egressLeg) {
+            this.egressLegs.add(egressLeg);
             return this;
         }
 
-        public Builder addEgressStops(Iterable<StopArrival> egressStops) {
-            for (StopArrival it : egressStops) {
+        public Builder addEgressStops(Iterable<EgressLeg> egressLegs) {
+            for (EgressLeg it : egressLegs) {
                 addEgressStop(it);
             }
             return this;
@@ -184,8 +184,8 @@ public class RangeRaptorRequest {
         }
 
         public RangeRaptorRequest build() {
-            assertProperty(!accessStops.isEmpty(), () ->"At least one 'accessStops' is required.");
-            assertProperty(!egressStops.isEmpty(), () ->"At least one 'egressStops' is required.");
+            assertProperty(!accessLegs.isEmpty(), () ->"At least one 'accessLegs' is required.");
+            assertProperty(!egressLegs.isEmpty(), () ->"At least one 'egressLegs' is required.");
             return new RangeRaptorRequest(this);
         }
 

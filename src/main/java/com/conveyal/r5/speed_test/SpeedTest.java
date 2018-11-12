@@ -9,7 +9,6 @@ import com.conveyal.r5.profile.StreetPath;
 import com.conveyal.r5.profile.entur.Path2ParetoSortableWrapper;
 import com.conveyal.r5.profile.entur.RangeRaptorService;
 import com.conveyal.r5.profile.entur.api.RaptorProfiles;
-import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
@@ -314,7 +313,7 @@ public class SpeedTest {
 
             TIMER_COLLECT_RESULTS_ITINERARIES.start();
 
-            for (Path2 p : path2s) {
+            for (Path2<TripSchedule> p : path2s) {
                 itineraries.add(createItinerary(request, streetRouter, p));
             }
 
@@ -352,10 +351,10 @@ public class SpeedTest {
         return builder.build();
     }
 
-    private static void addStopTimes(TIntIntMap timesToStopsInSeconds, Consumer<StopArrival> addStop) {
+    private static void addStopTimes(TIntIntMap timesToStopsInSeconds, Consumer<AccessEgressLeg> addStop) {
         for(TIntIntIterator it = timesToStopsInSeconds.iterator(); it.hasNext(); ) {
             it.advance();
-            addStop.accept(new InternalStopArrival(it.key(), it.value()));
+            addStop.accept(new AccessEgressLeg(it.key(), it.value()));
         }
     }
 
@@ -365,7 +364,9 @@ public class SpeedTest {
         return itineraryMapper.createItinerary(request, path, accessPath, egressPath);
     }
 
-    private SpeedTestItinerary createItinerary(ProfileRequest request, EgressAccessRouter streetRouter, Path2 path) {
+    private SpeedTestItinerary createItinerary(
+            ProfileRequest request, EgressAccessRouter streetRouter, Path2<TripSchedule> path
+    ) {
         StreetPath accessPath = streetRouter.accessPath(path.accessLeg().toStop());
         StreetPath egressPath = streetRouter.egressPath(path.egressLeg().fromStop());
         return itineraryMapper2.createItinerary(request, path, accessPath, egressPath);

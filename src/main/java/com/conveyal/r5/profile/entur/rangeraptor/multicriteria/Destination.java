@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
-import com.conveyal.r5.profile.entur.api.StopArrival;
+import com.conveyal.r5.profile.entur.api.EgressLeg;
+import com.conveyal.r5.profile.entur.api.TransferLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.DestinationArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
@@ -13,7 +14,7 @@ public class Destination<T extends TripScheduleInfo> extends ParetoSet<Destinati
         super(DestinationArrival.PARETO_FUNCTION);
     }
 
-    void transferToDestination(TransitStopArrival<T> lastTransitArrival, StopArrival egressLeg) {
+    void transferToDestination(TransitStopArrival<T> lastTransitArrival, EgressLeg egressLeg) {
         add(new DestinationArrival<>(
                 lastTransitArrival,
                 lastTransitArrival.transitTime() + egressLeg.durationInSeconds(),

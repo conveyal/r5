@@ -1,11 +1,11 @@
-package com.conveyal.r5.speed_test;
+package com.conveyal.r5.profile.entur.api;
 
-import com.conveyal.r5.profile.entur.api.StopArrival;
 
-class InternalStopArrival implements StopArrival {
-    private final int stop, durationInSeconds;
+public class TestLeg implements AccessLeg, EgressLeg, TransferLeg {
+    private final int stop;
+    private final int durationInSeconds;
 
-    InternalStopArrival(int stop, int durationInSeconds) {
+    public TestLeg(int stop, int durationInSeconds) {
         this.stop = stop;
         this.durationInSeconds = durationInSeconds;
     }
@@ -22,6 +22,6 @@ class InternalStopArrival implements StopArrival {
 
     @Override
     public int cost() {
-        return durationInSeconds;
+        return 0;
     }
 }

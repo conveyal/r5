@@ -53,7 +53,7 @@ public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRan
                 new McRangeRaptorWorkerState<>(
                         nRounds,
                         transitData.numberOfStops(),
-                        request.egressStops
+                        request.egressLegs
                 ),
                 request
         );

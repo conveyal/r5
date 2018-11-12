@@ -1,8 +1,9 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
+import com.conveyal.r5.profile.entur.api.AccessLeg;
+import com.conveyal.r5.profile.entur.api.EgressLeg;
 import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.PathLeg;
-import com.conveyal.r5.profile.entur.api.StopArrival;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.RRStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
@@ -36,9 +37,9 @@ class PathBuilderCursorBased<T extends TripScheduleInfo> {
     /**
      * Scan over a raptor state and extract the path leading up to that state.
      */
-    Path2<T> extractPathForStop(int maxRound, StopArrival egressStop, Collection<StopArrival> accessStops) {
+    Path2<T> extractPathForStop(int maxRound, EgressLeg apiEgressLeg, Collection<AccessLeg> apiAccessLegs) {
         this.round = maxRound;
-        int fromStopIndex = egressStop.stop();
+        int fromStopIndex = apiEgressLeg.stop();
 
         // find the fewest-transfers trip that is still optimal in terms of travel time
         RRStopArrival<T> state = findLastRoundWithTransitTimeSet(fromStopIndex);
@@ -47,7 +48,7 @@ class PathBuilderCursorBased<T extends TripScheduleInfo> {
             return null;
         }
         List<PathLeg<T>> path = new ArrayList<>();
-        PathLeg<T> egressLeg = new EgressLeg<>(fromStopIndex, state.transitTime(), egressStop.durationInSeconds());
+        PathLeg<T> egressLeg = new PathEgressLeg<>(fromStopIndex, state.transitTime(), apiEgressLeg.durationInSeconds());
 
         DebugState.debugStopHeader("EXTRACT PATH");
         //state.debugStop("egress stop", state.round(), stop);
@@ -70,7 +71,7 @@ class PathBuilderCursorBased<T extends TripScheduleInfo> {
                 toStopIndex = fromStopIndex;
                 fromStopIndex = state.transferFromStop();
 
-                path.add(new TransferLeg<>(
+                path.add(new PathTransferLeg<>(
                         fromStopIndex,
                         toStopIndex,
                         state.time(),
@@ -81,13 +82,13 @@ class PathBuilderCursorBased<T extends TripScheduleInfo> {
         }
 
         final int accessStopIndex = fromStopIndex;
-        StopArrival accessStop = accessStops.stream().filter(it -> it.stop() == accessStopIndex).findFirst().orElseThrow(() ->
+        AccessLeg apiAccessLeg = apiAccessLegs.stream().filter(it -> it.stop() == accessStopIndex).findFirst().orElseThrow(() ->
                 new IllegalStateException("Unable to find access stop in access times. Access stop= " + accessStopIndex
-                        + ", access stops= " + accessStops)
+                        + ", access stops= " + apiAccessLegs)
         );
 
         // TODO TGR - This should be removed when access/egress becomes part of state.
-        PathLeg<T> accessLeg = new AccessLeg<>(path.get(path.size()-1).fromTime() - boardSlackInSeconds , accessStop);
+        PathLeg<T> accessLeg = new PathAccessLeg<>(path.get(path.size()-1).fromTime() - boardSlackInSeconds , apiAccessLeg);
 
         return new Path<>(accessLeg, path, egressLeg);
     }
@@ -144,21 +145,21 @@ class PathBuilderCursorBased<T extends TripScheduleInfo> {
         @Override public boolean isTransit() { return true; }
     }
 
-    static final class TransferLeg<T extends TripScheduleInfo> extends AbstractLeg<T> {
-        TransferLeg(int fromStop, int toStop, int toTime, int transferTime) {
+    static final class PathTransferLeg<T extends TripScheduleInfo> extends AbstractLeg<T> {
+        PathTransferLeg(int fromStop, int toStop, int toTime, int transferTime) {
             super(fromStop, toStop, toTime - transferTime, toTime);
         }
         @Override public boolean isTransfer() { return true; }
     }
 
-    static final class AccessLeg<T extends TripScheduleInfo> extends AbstractLeg<T> {
-        AccessLeg(int toTime, StopArrival stopArrival) {
-            super(NOT_SET, stopArrival.stop(), toTime - stopArrival.durationInSeconds(), toTime);
+    static final class PathAccessLeg<T extends TripScheduleInfo> extends AbstractLeg<T> {
+        PathAccessLeg(int toTime, AccessLeg accessLeg) {
+            super(NOT_SET, accessLeg.stop(), toTime - accessLeg.durationInSeconds(), toTime);
         }
     }
 
-    static final class EgressLeg<T extends TripScheduleInfo> extends AbstractLeg<T> {
-        EgressLeg(int fromStop, int fromTime, int durationToStop) {
+    static final class PathEgressLeg<T extends TripScheduleInfo> extends AbstractLeg<T> {
+        PathEgressLeg(int fromStop, int fromTime, int durationToStop) {
             super(fromStop, NOT_SET, fromTime, fromTime + durationToStop);
         }
     }

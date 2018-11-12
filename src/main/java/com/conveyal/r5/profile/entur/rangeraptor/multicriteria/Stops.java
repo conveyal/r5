@@ -1,8 +1,10 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 
+import com.conveyal.r5.profile.entur.api.AccessLeg;
+import com.conveyal.r5.profile.entur.api.EgressLeg;
 import com.conveyal.r5.profile.entur.api.Path2;
-import com.conveyal.r5.profile.entur.api.StopArrival;
+import com.conveyal.r5.profile.entur.api.TransferLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
@@ -30,19 +32,19 @@ final class Stops<T extends TripScheduleInfo> {
     /**
      * Set the time at a transit index iff it is optimal. This sets both the best time and the transfer time
      */
-    Stops(int stops, Collection<StopArrival> egressStops) {
+    Stops(int nStops, Collection<EgressLeg> egressLegs) {
         //noinspection unchecked
-        this.stops = (Stop<T>[]) new Stop[stops];
+        this.stops = (Stop<T>[]) new Stop[nStops];
 
-        for (StopArrival it : egressStops) {
+        for (EgressLeg it : egressLegs) {
             this.stops[it.stop()] = new EgressStop<>(it, destination);
         }
     }
 
-    void setInitialTime(StopArrival stopArrival, int fromTime, int boardSlackInSeconds) {
-        final int stop = stopArrival.stop();
+    void setInitialTime(AccessLeg accessLeg, int fromTime, int boardSlackInSeconds) {
+        final int stop = accessLeg.stop();
         findOrCreateSet(stop).add(
-                new AccessStopArrival<>(stopArrival, fromTime, boardSlackInSeconds)
+                new AccessStopArrival<>(accessLeg, fromTime, boardSlackInSeconds)
         );
     }
 
@@ -51,8 +53,8 @@ final class Stops<T extends TripScheduleInfo> {
         return findOrCreateSet(stop).add(state);
     }
 
-    boolean transferToStop(AbstractStopArrival<T> previous, int round, StopArrival stopArrival, int arrivalTime) {
-        return findOrCreateSet(stopArrival.stop()).add(new TransferStopArrival<>(previous, round, stopArrival, arrivalTime));
+    boolean transferToStop(AbstractStopArrival<T> previous, int round, TransferLeg transferLeg, int arrivalTime) {
+        return findOrCreateSet(transferLeg.stop()).add(new TransferStopArrival<>(previous, round, transferLeg, arrivalTime));
     }
 
     Collection<Path2<T>> extractPaths() {

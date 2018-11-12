@@ -1,5 +1,7 @@
 package com.conveyal.r5.util;
 
+import com.conveyal.r5.analyst.error.ScenarioApplicationException;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -69,12 +71,22 @@ public abstract class AsyncLoader<K,V> {
         public final String message;
         public final int percentComplete;
         public final V value;
+        public final Exception exception;
 
         private Response(Status status, String message, int percentComplete, V value) {
             this.status = status;
             this.message = message;
             this.percentComplete = percentComplete;
             this.value = value;
+            this.exception = null;
+        }
+
+        private Response (Exception exception) {
+            this.status = Status.ERROR;
+            this.message = exception.toString();
+            this.percentComplete = 0;
+            this.value = null;
+            this.exception = exception;
         }
 
         @Override
@@ -111,7 +123,7 @@ public abstract class AsyncLoader<K,V> {
                         map.put(key, new Response(Status.PRESENT, null, 100, value));
                     }
                 } catch (Exception ex) {
-                    setError(key, ex.toString());
+                    setError(key, ex);
                 }
             });
         }
@@ -140,9 +152,9 @@ public abstract class AsyncLoader<K,V> {
      * Call this method inside the buildValue method to indicate progress.
      * FIXME this will permanently associate an error with the key. No further attempt will ever be made to create the value.
      */
-    protected void setError (K key, String message) {
+    protected void setError (K key, Exception exception) {
         synchronized (map) {
-            map.put(key, new Response(Status.ERROR, message, 0, null));
+            map.put(key, new Response(exception));
         }
     }
 }

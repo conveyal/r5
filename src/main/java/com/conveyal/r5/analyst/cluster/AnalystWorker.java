@@ -407,7 +407,7 @@ public class AnalystWorker implements Runnable {
         // If loading is not complete, bail out of this function.
         // Ideally we'd stall briefly using something like Future.get(timeout) in case loading finishes quickly.
         if (networkResponse.status != AsyncLoader.Status.PRESENT) {
-            throw new WorkerNotReadyException(networkResponse.toString());
+            throw new WorkerNotReadyException(networkResponse);
         }
 
         // Get the graph object for the ID given in the task, fetching inputs and building as needed.
@@ -618,23 +618,6 @@ public class AnalystWorker implements Runnable {
         synchronized (workResults) {
             // TODO check here that results are not piling up too much?
             workResults.addAll(workerStatus.results);
-        }
-        return null;
-    }
-
-    /**
-     * Report that the task could not be processed due to errors.
-     * Reuses the code that appends warnings as JSON to a grid, but without the grid.
-     */
-    public static byte[] reportTaskErrors(TravelTimeSurfaceTask request, List<TaskError> taskErrors) {
-        try {
-            LOG.warn("Reporting errors in response to single-point request:\n" + taskErrors.toString());
-            ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-            addErrorJson(byteArrayOutputStream, taskErrors);
-            byteArrayOutputStream.close();
-            return byteArrayOutputStream.toByteArray();
-        } catch (Exception e) {
-            LOG.error("An exception occurred while attempting to report an error:\n" + ExceptionUtils.asString(e));
         }
         return null;
     }

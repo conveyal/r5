@@ -8,7 +8,7 @@ import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransferLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.structarray.Stops;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.arrivals.Stops;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 

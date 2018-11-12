@@ -1,4 +1,4 @@
-package com.conveyal.r5.profile.entur.rangeraptor.standard.structarray;
+package com.conveyal.r5.profile.entur.rangeraptor.standard.arrivals;
 
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.RRStopArrival;

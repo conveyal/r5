@@ -130,6 +130,10 @@ public class TravelTimeComputer {
             // The request has the speed in float meters per second, internally we use integer millimeters per second.
             int offstreetTravelSpeedMillimetersPerSecond = (int) (request.getSpeedForMode(accessMode) * 1000);
 
+            if (offstreetTravelSpeedMillimetersPerSecond <= 0){
+                throw new IllegalArgumentException("Speed of access/direct modes must be greater than 0.");
+            }
+
             if (request.accessModes.contains(LegMode.CAR_PARK)) {
                 // Currently first search from origin to P+R is hardcoded as time dominance variable for Max car time seconds
                 // Second search from P+R to stops is not actually a search we just return list of all reached stops for each found P+R.

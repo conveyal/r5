@@ -103,7 +103,7 @@ public abstract class AsyncLoader<K,V> {
             state = map.get(key);
             if (state == null) {
                 // Only enqueue a task to load the value for this key if another call hasn't already done it.
-                state = new LoaderState<V>(Status.WAITING, null, 0, null);
+                state = new LoaderState<V>(Status.WAITING, "Enqueued task...", 0, null);
                 map.put(key, state);
                 enqueueLoadTask = true;
             }

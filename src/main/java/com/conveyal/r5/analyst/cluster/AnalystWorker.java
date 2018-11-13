@@ -402,12 +402,12 @@ public class AnalystWorker implements Runnable {
 
         // Get all the data needed to run one analysis task, or at least begin preparing it.
         // TODO synchronously handle regional tasks, or just ensure the specified graph is loaded at worker startup
-        final AsyncLoader.Response<TransportNetwork> networkResponse = networkPreloader.preloadData(task);
+        final AsyncLoader.LoaderState<TransportNetwork> networkLoaderState = networkPreloader.preloadData(task);
 
         // If loading is not complete, bail out of this function.
         // Ideally we'd stall briefly using something like Future.get(timeout) in case loading finishes quickly.
-        if (networkResponse.status != AsyncLoader.Status.PRESENT) {
-            throw new WorkerNotReadyException(networkResponse);
+        if (networkLoaderState.status != AsyncLoader.Status.PRESENT) {
+            throw new WorkerNotReadyException(networkLoaderState);
         }
 
         // Get the graph object for the ID given in the task, fetching inputs and building as needed.
@@ -416,7 +416,7 @@ public class AnalystWorker implements Runnable {
         // Record the currently loaded network ID so we "stick" to this same graph on subsequent polls.
         // TODO allow for a list of multiple already loaded TransitNetworks.
         networkId = task.graphId;
-        TransportNetwork transportNetwork = networkResponse.value;
+        TransportNetwork transportNetwork = networkLoaderState.value;
 
         // Perform the core travel time computations.
         TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork, gridCache);

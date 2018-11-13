@@ -12,15 +12,15 @@ import com.conveyal.r5.util.AsyncLoader;
  */
 public class WorkerNotReadyException extends Exception {
 
-    public final AsyncLoader.Response<TransportNetwork> asyncResponse;
+    public final AsyncLoader.LoaderState<TransportNetwork> asyncLoaderState;
 
-    public WorkerNotReadyException(AsyncLoader.Response<TransportNetwork> asyncResponse) {
-        super(asyncResponse.toString());
-        this.asyncResponse = asyncResponse;
+    public WorkerNotReadyException(AsyncLoader.LoaderState<TransportNetwork> asyncLoaderState) {
+        super(asyncLoaderState.toString());
+        this.asyncLoaderState = asyncLoaderState;
     }
 
     public boolean isError() {
-        return asyncResponse.status == AsyncLoader.Status.ERROR;
+        return asyncLoaderState.status == AsyncLoader.Status.ERROR;
     }
 
 }

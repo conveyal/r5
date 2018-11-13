@@ -1,7 +1,5 @@
 package com.conveyal.r5.util;
 
-import com.conveyal.r5.analyst.error.ScenarioApplicationException;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -37,7 +35,7 @@ public abstract class AsyncLoader<K,V> {
     /**
      * This map holds a loading progress object for each key, which will contain the requested object when complete.
      */
-    private Map<K, Response<V>> map = new HashMap<>();
+    private Map<K, LoaderState<V>> map = new HashMap<>();
 
     /**
      * Each cache has its own executor, so tiny things like loading grids are not held up by slower things like
@@ -63,17 +61,15 @@ public abstract class AsyncLoader<K,V> {
      * You have to repeat calls to get new responses that might contain the needed value.
      * i.e. this is a polling approach not an event driven approach to asynchronous loading.
      * The reason for that is that it's typically accessed over an HTTP API.
-     *
-     * TODO rename something like LoadingState
      */
-    public static class Response<V> {
+    public static class LoaderState<V> {
         public final Status status;
         public final String message;
         public final int percentComplete;
         public final V value;
         public final Exception exception;
 
-        private Response(Status status, String message, int percentComplete, V value) {
+        private LoaderState(Status status, String message, int percentComplete, V value) {
             this.status = status;
             this.message = message;
             this.percentComplete = percentComplete;
@@ -81,7 +77,7 @@ public abstract class AsyncLoader<K,V> {
             this.exception = null;
         }
 
-        private Response (Exception exception) {
+        private LoaderState(Exception exception) {
             this.status = Status.ERROR;
             this.message = exception.toString();
             this.percentComplete = 0;
@@ -100,15 +96,15 @@ public abstract class AsyncLoader<K,V> {
      * If the value is not yet present, and not yet being computed / fetched, enqueue a task to do so.
      * Return a response that reports status, and may or may not contain the value.
      */
-    public Response<V> get (K key) {
-        Response<V> response = null;
+    public LoaderState<V> get (K key) {
+        LoaderState<V> state = null;
         boolean enqueueLoadTask = false;
         synchronized (map) {
-            response = map.get(key);
-            if (response == null) {
+            state = map.get(key);
+            if (state == null) {
                 // Only enqueue a task to load the value for this key if another call hasn't already done it.
-                response = new Response<V>(Status.WAITING, null, 0, null);
-                map.put(key, response);
+                state = new LoaderState<V>(Status.WAITING, null, 0, null);
+                map.put(key, state);
                 enqueueLoadTask = true;
             }
         }
@@ -120,14 +116,14 @@ public abstract class AsyncLoader<K,V> {
                 try {
                     V value = buildValue(key);
                     synchronized (map) {
-                        map.put(key, new Response(Status.PRESENT, null, 100, value));
+                        map.put(key, new LoaderState(Status.PRESENT, null, 100, value));
                     }
                 } catch (Exception ex) {
                     setError(key, ex);
                 }
             });
         }
-        return response;
+        return state;
     }
 
     /**
@@ -144,7 +140,7 @@ public abstract class AsyncLoader<K,V> {
      */
     protected void setProgress(K key, int percentComplete, String message) {
         synchronized (map) {
-            map.put(key, new Response(Status.BUILDING, message, percentComplete, null));
+            map.put(key, new LoaderState(Status.BUILDING, message, percentComplete, null));
         }
     }
 
@@ -154,7 +150,7 @@ public abstract class AsyncLoader<K,V> {
      */
     protected void setError (K key, Exception exception) {
         synchronized (map) {
-            map.put(key, new Response(exception));
+            map.put(key, new LoaderState(exception));
         }
     }
 }

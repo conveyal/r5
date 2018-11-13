@@ -77,7 +77,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         this.transportNetworkCache = transportNetworkCache;
     }
 
-    public Response<TransportNetwork> preloadData (AnalysisTask task) {
+    public LoaderState<TransportNetwork> preloadData (AnalysisTask task) {
         if (task.scenario != null) {
             transportNetworkCache.rememberScenario(task.scenario);
         }

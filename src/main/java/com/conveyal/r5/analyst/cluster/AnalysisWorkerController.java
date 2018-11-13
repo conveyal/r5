@@ -3,7 +3,6 @@ package com.conveyal.r5.analyst.cluster;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.common.JsonUtilities;
-import com.conveyal.r5.util.AsyncLoader;
 import com.conveyal.r5.util.ExceptionUtils;
 import org.eclipse.jetty.http.HttpStatus;
 import org.slf4j.Logger;
@@ -56,12 +55,12 @@ public class AnalysisWorkerController {
             } catch (WorkerNotReadyException workerNotReadyException) {
                 // We're using exceptions for flow control here, which is kind of ugly. Define a ResultOrError<T> class?
                 if (workerNotReadyException.isError()) {
-                    if (workerNotReadyException.asyncResponse.exception instanceof ScenarioApplicationException) {
+                    if (workerNotReadyException.asyncLoaderState.exception instanceof ScenarioApplicationException) {
                         return reportTaskErrors(response,
-                                ((ScenarioApplicationException)workerNotReadyException.asyncResponse.exception).taskErrors);
+                                ((ScenarioApplicationException)workerNotReadyException.asyncLoaderState.exception).taskErrors);
                     } else {
                         return jsonResponse(response, HttpStatus.BAD_REQUEST_400,
-                                ExceptionUtils.asString(workerNotReadyException.asyncResponse.exception));
+                                ExceptionUtils.asString(workerNotReadyException.asyncLoaderState.exception));
                     }
                 } else {
                     return jsonResponse(response, HttpStatus.ACCEPTED_202, workerNotReadyException.getMessage());

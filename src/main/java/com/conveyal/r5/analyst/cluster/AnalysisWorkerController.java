@@ -20,7 +20,7 @@ import static com.conveyal.r5.analyst.cluster.AnalystWorker.addErrorJson;
 
 /**
  * This class contains Spark HTTP request handler methods that are served up by Analysis workers.
- * Currently the broker exposes only a single method that allows the broker to push it single point requests for
+ * Currently the worker exposes only a single method that allows the broker to push it single point requests for
  * immediate processing.
  */
 public class AnalysisWorkerController {

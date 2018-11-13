@@ -156,6 +156,7 @@ public class TimeGrid {
      * If an analysis task is supplied, add metadata to the GeoTIFF explaining what scenario it comes from.
      */
     public void writeGeotiff (OutputStream out, AnalysisTask request) {
+        LOG.info("Writing GeoTIFF file");
         try {
             // Inspired by org.geotools.coverage.grid.GridCoverageFactory
             final WritableRaster raster =

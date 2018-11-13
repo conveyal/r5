@@ -63,7 +63,7 @@ public class AnalysisWorkerController {
                                 ExceptionUtils.asString(workerNotReadyException.asyncLoaderState.exception));
                     }
                 } else {
-                    return jsonResponse(response, HttpStatus.ACCEPTED_202, workerNotReadyException.getMessage());
+                    return jsonResponse(response, HttpStatus.ACCEPTED_202, workerNotReadyException.asyncLoaderState.message);
                 }
             }
         } catch (Exception exception) {

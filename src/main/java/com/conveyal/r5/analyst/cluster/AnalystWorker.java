@@ -430,7 +430,7 @@ public class AnalystWorker implements Runnable {
 
         // The single-origin travel time surface can be represented as a proprietary grid or as a GeoTIFF.
         if (task.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
-            oneOriginResult.timeGrid.writeGeotiff(byteArrayOutputStream);
+            oneOriginResult.timeGrid.writeGeotiff(byteArrayOutputStream, task);
         } else {
             // Catch-all, if the client didn't specifically ask for a GeoTIFF give it a proprietary grid.
             // Return raw byte array representing grid to caller, for return to client over HTTP.

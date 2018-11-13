@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PersistenceBuffer;
+import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.google.common.io.LittleEndianDataOutputStream;
 import org.geotools.coverage.grid.GridCoverage2D;
@@ -150,8 +151,11 @@ public class TimeGrid {
         }
     }
 
-    /** Write this grid out in GeoTIFF format */
-    public void writeGeotiff (OutputStream out) {
+    /**
+     * Write this grid out in GeoTIFF format.
+     * If an analysis task is supplied, add metadata to the GeoTIFF explaining what scenario it comes from.
+     */
+    public void writeGeotiff (OutputStream out, AnalysisTask request) {
         try {
             // Inspired by org.geotools.coverage.grid.GridCoverageFactory
             final WritableRaster raster =
@@ -181,6 +185,23 @@ public class TimeGrid {
             params.parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString()).setValue(wp);
 
             GeoTiffWriter writer = new GeoTiffWriter(out);
+
+            // If the request that produced this TimeGrid was supplied, write scenario metadata into the GeoTIFF
+            if (request != null) {
+                AnalysisTask clonedRequest = request.clone();
+                // Save the scenario ID rather than the full scenario, to avoid making metadata too large. We're not
+                // losing information here, the scenario id used here is qualified with the CRC and is thus immutable
+                // and available from S3.
+                if (clonedRequest.scenario != null) {
+                    clonedRequest.scenarioId = clonedRequest.scenario.id;
+                    clonedRequest.scenario = null;
+                }
+                // 270: Image Description, 305: Software (https://www.awaresystems.be/imaging/tiff/tifftags/baseline.html)
+                writer.setMetadataValue("270", JsonUtilities.objectMapper.writerWithDefaultPrettyPrinter()
+                        .writeValueAsString(clonedRequest));
+                writer.setMetadataValue("305", "Conveyal R5");
+            }
+
             writer.write(coverage, params.values().toArray(new GeneralParameterValue[1]));
             writer.dispose();
         } catch (Exception e) {

@@ -228,7 +228,7 @@ public class IntHashGrid implements Serializable {
 
     public String toString() {
         return String
-                .format("HashGridSpatialIndex %f x %f, %d bins allocated, %d objs, %d entries (avg %.2f entries/bin, %.2f entries/object)",
+                .format("HashGridSpatialIndex %d x %d, %d bins allocated, %d objs, %d entries (avg %.2f entries/bin, %.2f entries/object)",
                         this.xBinSize, this.yBinSize, this.nBins, this.nObjects, this.nEntries,
                         this.nEntries * 1.0 / this.nBins, this.nEntries * 1.0 / this.nObjects);
     }

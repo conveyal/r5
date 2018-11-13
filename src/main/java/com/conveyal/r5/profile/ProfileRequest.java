@@ -135,10 +135,9 @@ public class ProfileRequest implements Serializable, Cloneable {
     public int suboptimalMinutes = 5;
 
     /**
-     * The maximum duration of any transit trip found by this search. Results used to be very sensitive to this
-     * when we were using mean travel times, now we use medians so we could set this to 2 hours.
+     * The maximum duration of any transit trip found by this search.
      */
-    public int maxTripDurationMinutes = 4 * 60;
+    public int maxTripDurationMinutes = 2 * 60;
 
     /**
      * The maximum number of rides, e.g. taking the L2 to the Red line to the Green line would be three rides.

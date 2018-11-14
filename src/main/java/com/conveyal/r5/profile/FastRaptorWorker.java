@@ -56,7 +56,6 @@ public class FastRaptorWorker {
      * TODO make this configurable, and use loop-transfers from transfers.txt.
      */
     public static final int BOARD_SLACK_SECONDS = 60;
-    static final int SECONDS_PER_MINUTE = 60;
 
     /**
      * Step for departure times. Use caution when changing this as we use the functions
@@ -139,7 +138,7 @@ public class FastRaptorWorker {
         this.servicesActive  = transit.getActiveServicesForDate(request.date);
         // we add one to request.maxRides, first state is result of initial walk
         this.scheduleState = IntStream.range(0, request.maxRides + 1)
-                .mapToObj((i) -> new RaptorState(transit.getStopCount(), request.maxTripDurationMinutes * SECONDS_PER_MINUTE))
+                .mapToObj((i) -> new RaptorState(transit.getStopCount(), request.maxTripDurationMinutes * 60))
                 .toArray(RaptorState[]::new);
 
         for (int i = 1; i < this.scheduleState.length; i++) this.scheduleState[i].previous = this.scheduleState[i - 1];
@@ -629,7 +628,7 @@ public class FastRaptorWorker {
     private void doTransfers (RaptorState state) {
         // avoid integer casts in tight loop below
         int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
-        int maxWalkMillimeters = (int) (request.walkSpeed * request.maxWalkTime * SECONDS_PER_MINUTE);
+        int maxWalkMillimeters = (int) (request.walkSpeed * request.maxWalkTime * 60 * 1000);
 
         for (int stop = state.nonTransferStopsTouched.nextSetBit(0); stop > -1; stop = state.nonTransferStopsTouched.nextSetBit(stop + 1)) {
             // no need to consider loop transfers, since we don't mark patterns here any more

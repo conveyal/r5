@@ -1,6 +1,5 @@
 package com.conveyal.r5.profile;
 
-import com.conveyal.r5.analyst.fare.BostonInRoutingFareCalculator;
 import com.conveyal.r5.analyst.fare.FareBounds;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.api.util.LegMode;
@@ -182,8 +181,7 @@ public class McRaptorSuboptimalPathProfileRouter {
         }
 
         LOG.info("McRAPTOR took {}ms", System.currentTimeMillis() - startTime);
-        LOG.info("Number fares calculated: {}", ((BostonInRoutingFareCalculator) request.inRoutingFareCalculator)
-                .count);
+
         // will be empty unless this is for a PointToPointQuery.
         return codominatingStatesToBeReturned;
     }

@@ -36,7 +36,7 @@ public class RaptorState {
     public int[] bestTimes;
 
     /** The best times for reaching stops via transit rather than via a transfer from another stop.
-     * We need to maintain separate dominating  */
+     * Used to record paths, keep number of transfers and transfer walking distance within requested limits, etc.  */
     public int[] bestNonTransferTimes;
 
     /** Cumulative transit wait time for the best path to each stop, parallel to bestNonTransferTimes. */

@@ -40,13 +40,26 @@ public class TravelTimeReducer {
 
     private final int timesPerDestination;
 
+    /**
+     *
+     * @param task specifies number of travel times calculated per destination, and how results should be summarized
+     *             for each origin (as a single cumulative opportunity accessibility value per origin, or as travel
+     *             times to all destinations). Knowing the number of times in advance allows us to pre-compute and
+     *             the positions within the sorted array at which percentiles will be found.
+     */
+
     public TravelTimeReducer (AnalysisTask task) {
         this(task, task.getMonteCarloDrawsPerMinute() * task.getTimeWindowLengthMinutes());
     }
 
     /**
-     * Knowing the number of times that will be provided per destination and holding that constant allows us to
-     * pre-compute and cache the positions within the sorted array at which percentiles will be found.
+     * Constructor to specify a number of timesPerDestination other than the default specified in the AnalysisTask
+     * (MC draws per minute times minutes in time window, as in above constructor).  Used in McRAPTOR searches, which
+     * are too slow to use every minute in the departure window and accordingly rely on a sample of departure times.
+     *
+     * @param task task to be performed, which specifies how we want the results summarized per origin: a single
+     *             cumulative opportunity accessibility value per origin, or travel times to all destinations.
+     * @param timesPerDestination Number of times that will be provided per destination.
      */
     public TravelTimeReducer (AnalysisTask task, int timesPerDestination) {
 

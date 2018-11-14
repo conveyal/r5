@@ -1,9 +1,9 @@
 package com.conveyal.r5.analyst.fare;
 
-/*
-Used in InRoutingFareCalculator (and its extensions) to track how much has been paid to reach a state
-(cumulativeFarePaid) and transfer privileges that may be redeemed at future boardings (transferAllowance).
-We need to track the latter to protect certain states from premature pruning in Pareto search.
+/**
+ * Used in InRoutingFareCalculator (and its extensions) to track how much has been paid to reach a state
+ * (cumulativeFarePaid) and transfer privileges that may be redeemed at future boardings (transferAllowance). We need
+ * to track the latter to protect certain states from premature pruning in Pareto search.
  */
 
 public class FareBounds {

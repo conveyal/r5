@@ -198,10 +198,13 @@ public class ProfileRequest implements Serializable, Cloneable {
      * high as it happens each minute, and there is likely a lot of repetition in the scheduled service
      * (i.e. many minutes look like each other), so several minutes' Monte Carlo draws are effectively pooled.
      *
-     * The algorithm divides up the number of draws into an equal number at each minute of the time window, then rounds up.
-     * Note that the algorithm may actually take somewhat more draws than this, depending on the width of your time window.
-     * As an extreme example, if your time window is 120 minutes and you request 121 draws, you will actually get 240, because
-     * 1 &lt; 121 / 120 &lt; 2.
+     * FastRaptorWorker divides up the number of draws into an equal number at each minute of the time window, then
+     * rounds up. Note that the algorithm may actually take somewhat more draws than this, depending on the width of
+     * your time window. As an extreme example, if your time window is 120 minutes and you request 121 draws, you
+     * will actually get 240, because 1 &lt; 121 / 120 &lt; 2.
+     *
+     * McRaptor worker samples departure times, repeating a random walk over the departure time window until a sample
+     * with exactly this number of departure times is generated.
      */
     public int monteCarloDraws = 220;
 

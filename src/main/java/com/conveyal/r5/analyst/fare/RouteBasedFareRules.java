@@ -8,8 +8,10 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- Multiple Fare Rules, with convenience methods for looking up by fare_id, route_id, origin zone, and destination zone
- **/
+ * Multiple Fare Rules, with convenience methods for looking up by fare_id, route_id, origin zone, and destination zone.
+ *
+ * Used with InRoutingFareCalculator (and subclasses) for Pareto searches including fares in McRaptorSuboptimalPathProfileRouter.
+ */
 public class RouteBasedFareRules {
     // Map from route_id values to Fare objects from gtfs-lib.  Per GTFS spec, fare_rules.txt can have multiple rows
     // with the same route (e.g. in a mixed route/zone fare system).

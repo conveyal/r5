@@ -177,7 +177,7 @@ public class McRaptorSuboptimalPathProfileRouter {
                 collateTravelTimes(departureTime);
             }
 
-            LOG.info("minute {} / ~{}", n + 1, request.monteCarloDraws);
+            LOG.info("minute {} / {}", n + 1, request.monteCarloDraws);
         }
 
         LOG.info("McRAPTOR took {}ms", System.currentTimeMillis() - startTime);

@@ -156,10 +156,12 @@ public class TravelTimeComputer {
                 nonTransitTravelTimesToDestinations = new int[accessModeLinkedDestinations.size()];
                 Arrays.fill(nonTransitTravelTimesToDestinations, FastRaptorWorker.UNREACHED);
             } else if (accessMode == StreetMode.WALK) {
-                // Special handling for walk search, find distance in seconds and divide to match behavior at egress
-                // (in stop trees). For bike/car searches this is immaterial as the access searches are already asymmetric.
+                // Special handling for walk search: find distance in millimeters and divide by speed to match behavior
+                // at egress (in stop trees). For bike/car searches this is immaterial as the access searches are
+                // already asymmetric.
                 // TODO clarify - I think this is referring to the fact that the egress trees are pre-calculated for a standard speed and must be adjusted.
-                sr.distanceLimitMeters = 2000; // TODO hardwired same as gridcomputer, at least use a symbolic constant
+                sr.distanceLimitMeters = (int) (request.getSpeedForMode(accessMode) *
+                        request.getMaxAccessTimeForMode(accessMode) * 60);
                 sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
                 sr.route();
 

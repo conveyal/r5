@@ -40,31 +40,24 @@ public class TravelTimeReducer {
 
     private final int timesPerDestination;
 
-    /**
-     *
-     * @param task specifies number of travel times calculated per destination, and how results should be summarized
-     *             for each origin (as a single cumulative opportunity accessibility value per origin, or as travel
-     *             times to all destinations). Knowing the number of times in advance allows us to pre-compute and
-     *             the positions within the sorted array at which percentiles will be found.
-     */
 
+    /**
+     * @param task task to be performed, which is used to determine how results are summarized at each origin: a single
+     *             cumulative opportunity accessibility value per origin, or selected percentiles of travel times to
+     *             all destinations.
+     *
+     *             The task is also used to determine the number of timesPerDestination, which depends on whether the
+     *             task specifies an inRoutingFareCalculator. A non-null inRoutingFareCalculator is used as a flag
+     *             for the multi-criteria McRaptor router, which is relatively slow, so it relies on sampling (using
+     *             a number of departure times specified by task.monteCarloDraws). FastRaptorworker is fast enough to
+     *             run Monte Carlo draws within departure minutes, so it uses the monteCarloDraws parameter in a way
+     *             that's consistent with its name.
+     */
     public TravelTimeReducer (AnalysisTask task) {
-        this(task, task.getMonteCarloDrawsPerMinute() * task.getTimeWindowLengthMinutes());
-    }
-
-    /**
-     * Constructor to specify a number of timesPerDestination other than the default specified in the AnalysisTask
-     * (MC draws per minute times minutes in time window, as in above constructor).  Used in McRAPTOR searches, which
-     * are too slow to use every minute in the departure window and accordingly rely on a sample of departure times.
-     *
-     * @param task task to be performed, which specifies how we want the results summarized per origin: a single
-     *             cumulative opportunity accessibility value per origin, or travel times to all destinations.
-     * @param timesPerDestination Number of times that will be provided per destination.
-     */
-    public TravelTimeReducer (AnalysisTask task, int timesPerDestination) {
 
         this.maxTripDurationMinutes = task.maxTripDurationMinutes;
-        this.timesPerDestination = timesPerDestination;
+        this.timesPerDestination = task.inRoutingFareCalculator == null ? task.getMonteCarloDrawsPerMinute
+                () * task.getTimeWindowLengthMinutes() : task.monteCarloDraws;
         this.nPercentiles = task.percentiles.length;
 
         // We pre-compute the indexes at which we'll find each percentile in a sorted list of the given length.

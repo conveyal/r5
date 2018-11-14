@@ -239,13 +239,7 @@ public class TravelTimeComputer {
 
             // We cannot yet merge the functionality of the TravelTimeReducer into the PerTargetPropagator
             // because in the non-transit case we call the reducer directly (see above).
-            if (request.inRoutingFareCalculator == null) {
-                perTargetPropagater.travelTimeReducer = travelTimeReducer;
-            } else {
-                perTargetPropagater.travelTimeReducer = new TravelTimeReducer(request, transitTravelTimesToStops
-                        .length);
-            }
-
+            perTargetPropagater.travelTimeReducer = travelTimeReducer;
 
             if (request.returnPaths || request.travelTimeBreakdown) {
                 perTargetPropagater.pathsToStopsForIteration = worker.pathsPerIteration;

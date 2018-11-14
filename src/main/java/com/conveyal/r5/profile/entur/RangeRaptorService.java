@@ -51,7 +51,7 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
     }
 
     /**
-     * Calculate the maximum number of rounds to perform. 
+     * Calculate the maximum number of rounds to perform.
      */
     private int nRounds(TuningParameters tuningParameters) {
         return tuningParameters.maxNumberOfTransfers() + 1;

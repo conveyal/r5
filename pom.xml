@@ -8,7 +8,7 @@
 
     <groupId>com.conveyal</groupId>
     <artifactId>r5</artifactId>
-    <version>4.2.0-SNAPSHOT</version>
+    <version>4.2.1-SNAPSHOT</version>
     <packaging>jar</packaging>
     <licenses>
         <license>
@@ -107,6 +107,14 @@
                 </executions>
                 <configuration>
                     <dotGitDirectory>${project.basedir}/.git</dotGitDirectory>
+                    <gitDescribe>
+                        <!--
+                        semantic-release appears to create lightweight tags, therefore the tags property here
+                        must be set to true so that the latest lightweight tag is recognized.
+                        See https://github.com/ktoso/maven-git-commit-id-plugin#git-describe-and-a-small-gotcha-with-tags
+                        -->
+                        <tags>true</tags>
+                    </gitDescribe>
                 </configuration>
             </plugin>
 

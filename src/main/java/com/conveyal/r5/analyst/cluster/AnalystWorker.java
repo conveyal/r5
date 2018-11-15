@@ -480,7 +480,7 @@ public class AnalystWorker implements Runnable {
                     oneOriginResult.timeGrid.writeGridToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
                     addErrorJson(byteArrayOutputStream, transportNetwork.scenarioApplicationWarnings);
                 } else if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
-                    oneOriginResult.timeGrid.writeGeotiff(byteArrayOutputStream);
+                    oneOriginResult.timeGrid.writeGeotiff(byteArrayOutputStream, request);
                 }
                 // FIXME strangeness, only travel time results are returned from method, accessibility results return null and are accumulated for async delivery.
                 // Return raw byte array containing grid or TIFF file to caller, for return to client over HTTP.

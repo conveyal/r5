@@ -2,6 +2,7 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.r5.common.GeoJsonFeature;
 import com.conveyal.r5.common.JsonUtilities;
+import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.set.TIntSet;
@@ -36,11 +37,8 @@ public class TransportNetworkVisualizer {
         TransportNetwork network;
         if (args.length == 1) {
             LOG.info("Reading serialized transport network");
-
-            // load serialized transportnetwork
             File in = new File(args[0]);
-            network = TransportNetwork.read(in);
-
+            network = KryoNetworkSerializer.read(in);
             LOG.info("Done reading serialized transport network");
         }
         else if (args.length == 2) {

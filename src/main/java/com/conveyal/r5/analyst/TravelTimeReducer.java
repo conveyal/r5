@@ -40,18 +40,24 @@ public class TravelTimeReducer {
 
     private final int timesPerDestination;
 
-    public TravelTimeReducer (AnalysisTask task) {
-        this(task, task.getMonteCarloDrawsPerMinute() * task.getTimeWindowLengthMinutes());
-    }
 
     /**
-     * Knowing the number of times that will be provided per destination and holding that constant allows us to
-     * pre-compute and cache the positions within the sorted array at which percentiles will be found.
+     * @param task task to be performed, which is used to determine how results are summarized at each origin: a single
+     *             cumulative opportunity accessibility value per origin, or selected percentiles of travel times to
+     *             all destinations.
+     *
+     *             The task is also used to determine the number of timesPerDestination, which depends on whether the
+     *             task specifies an inRoutingFareCalculator. A non-null inRoutingFareCalculator is used as a flag
+     *             for the multi-criteria McRaptor router, which is relatively slow, so it relies on sampling (using
+     *             a number of departure times specified by task.monteCarloDraws). FastRaptorworker is fast enough to
+     *             run Monte Carlo draws within departure minutes, so it uses the monteCarloDraws parameter in a way
+     *             that's consistent with its name.
      */
-    public TravelTimeReducer (AnalysisTask task, int timesPerDestination) {
+    public TravelTimeReducer (AnalysisTask task) {
 
         this.maxTripDurationMinutes = task.maxTripDurationMinutes;
-        this.timesPerDestination = timesPerDestination;
+        this.timesPerDestination = task.inRoutingFareCalculator == null ? task.getMonteCarloDrawsPerMinute
+                () * task.getTimeWindowLengthMinutes() : task.monteCarloDraws;
         this.nPercentiles = task.percentiles.length;
 
         // We pre-compute the indexes at which we'll find each percentile in a sorted list of the given length.

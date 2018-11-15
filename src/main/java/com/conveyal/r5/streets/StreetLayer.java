@@ -45,7 +45,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.LongStream;
 
-import static com.conveyal.r5.streets.VertexStore.FIXED_FACTOR;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreeGeometryToFloating;
 import static com.conveyal.r5.streets.VertexStore.fixedDegreesToFloating;
 
@@ -123,7 +122,7 @@ public class StreetLayer implements Serializable, Cloneable {
 
     // TODO these are only needed when building the network, should we really be keeping them here in the layer?
     // TODO don't hardwire to US
-    private transient TraversalPermissionLabeler permissions = new USTraversalPermissionLabeler();
+    private transient TraversalPermissionLabeler permissionLabeler = new USTraversalPermissionLabeler();
     private transient LevelOfTrafficStressLabeler stressLabeler = new LevelOfTrafficStressLabeler();
     private transient TypeOfEdgeLabeler typeOfEdgeLabeler = new TypeOfEdgeLabeler();
     private transient SpeedLabeler speedLabeler;
@@ -1040,7 +1039,7 @@ public class StreetLayer implements Serializable, Cloneable {
         short forwardSpeed = speedToShort(speedLabeler.getSpeedMS(way, false));
         short backwardSpeed = speedToShort(speedLabeler.getSpeedMS(way, true));
 
-        RoadPermission roadPermission = permissions.getPermissions(way);
+        RoadPermission roadPermission = permissionLabeler.getPermissions(way);
 
         // Create and store the forward and backward edge
         // FIXME these sets of flags should probably not leak outside the permissions/stress/etc. labeler methods

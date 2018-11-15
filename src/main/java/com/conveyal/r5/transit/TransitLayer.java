@@ -193,8 +193,8 @@ public class TransitLayer implements Serializable, Cloneable {
             indexForUnscopedStopId.put(stop.stop_id, stopIndex);
             stopIdForIndex.add(scopedStopId);
             // intern zone IDs to save memory
-            fareZoneForStop.add(stop.zone_id != null ? stop.zone_id.intern() : null);
-            parentStationIdForStop.add(stop.parent_station != null ? stop.parent_station.intern() : null);
+            fareZoneForStop.add(stop.zone_id);
+            parentStationIdForStop.add(stop.parent_station);
             stopForIndex.add(stop);
             if (stop.wheelchair_boarding != null && stop.wheelchair_boarding.trim().equals("1")) {
                 stopsWheelchair.set(stopIndex);

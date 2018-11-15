@@ -17,7 +17,7 @@ import com.esotericsoftware.kryo.serializers.ExternalizableSerializer;
 import com.esotericsoftware.kryo.serializers.JavaSerializer;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
-import com.conveyal.r5.analyst.fare.GreedyFareCalculator;
+import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.profile.StreetMode;
 import com.google.common.io.Files;
 import com.vividsolutions.jts.geom.Envelope;
@@ -84,7 +84,7 @@ public class TransportNetwork implements Serializable {
 
     public static final String BUILDER_CONFIG_FILENAME = "build-config.json";
 
-    public GreedyFareCalculator fareCalculator;
+    public InRoutingFareCalculator fareCalculator;
 
     /** Non-fatal warnings encountered when applying the scenario, null on a base network */
     public List<TaskError> scenarioApplicationWarnings;

@@ -2,6 +2,7 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.model.Fare;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.Trip;
@@ -80,6 +81,11 @@ public class TransitLayer implements Serializable, Cloneable {
     // It contains information that is temporarily also held in stopForIndex.
     public List<String> stopIdForIndex = new ArrayList<>();
 
+    /** Fare zones for stops */
+    public List<String> fareZoneForStop = new ArrayList<>();
+
+    public List<String> parentStationIdForStop = new ArrayList<>();
+
     // Inverse map of stopIdForIndex, reconstructed from that list (not serialized). No-entry value is -1.
     public transient TObjectIntMap<String> indexForStopId;
 
@@ -145,6 +151,8 @@ public class TransitLayer implements Serializable, Cloneable {
      */
     public TransportNetwork parentNetwork = null;
 
+    public Map<String, Fare> fares;
+
     /** Map from feed ID to feed CRC32 to ensure that we can't apply scenarios to the wrong feeds */
     public Map<String, Long> feedChecksums = new HashMap<>();
 
@@ -184,6 +192,9 @@ public class TransitLayer implements Serializable, Cloneable {
             // This is only used while building the TransitNetwork to look up StopTimes from the same feed.
             indexForUnscopedStopId.put(stop.stop_id, stopIndex);
             stopIdForIndex.add(scopedStopId);
+            // intern zone IDs to save memory
+            fareZoneForStop.add(stop.zone_id);
+            parentStationIdForStop.add(stop.parent_station);
             stopForIndex.add(stop);
             if (stop.wheelchair_boarding != null && stop.wheelchair_boarding.trim().equals("1")) {
                 stopsWheelchair.set(stopIndex);
@@ -431,6 +442,10 @@ public class TransitLayer implements Serializable, Cloneable {
                 LOG.warn(
                     "No agency in graph had valid timezone; API request times will be interpreted as GMT.");
             }
+        }
+
+        if (level == LoadLevel.FULL) {
+            this.fares = new HashMap<>(gtfs.fares);
         }
 
         // Will be useful in naming patterns.

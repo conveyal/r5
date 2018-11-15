@@ -3,9 +3,13 @@ package com.conveyal.r5.analyst;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
+import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
+import com.conveyal.r5.profile.DominatingList;
+import com.conveyal.r5.profile.FareDominatingList;
 import com.conveyal.r5.profile.FastRaptorWorker;
+import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
 import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
@@ -20,6 +24,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.IntFunction;
+import java.util.function.Supplier;
 
 /**
  * This computes a surface representing travel time from one origin to all destination cells, and writes out a
@@ -202,18 +208,32 @@ public class TravelTimeComputer {
                 return travelTimeReducer.finish();
             }
 
-            FastRaptorWorker worker = new FastRaptorWorker(network.transitLayer, request, accessTimes);
-            if (request.returnPaths || request.travelTimeBreakdown) {
-                // By default, this is false and intermediate results (e.g. paths) are discarded.
-                // TODO do we really need to save all states just to get the travel time breakdown?
-                worker.retainPaths = true;
+            int[][] transitTravelTimesToStops;
+            FastRaptorWorker worker = null;
+            if (request.inRoutingFareCalculator == null) {
+                worker = new FastRaptorWorker(network.transitLayer, request, accessTimes);
+                if (request.returnPaths || request.travelTimeBreakdown) {
+                    // By default, this is false and intermediate results (e.g. paths) are discarded.
+                    // TODO do we really need to save all states just to get the travel time breakdown?
+                    worker.retainPaths = true;
+                }
+
+                // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
+                // Returns the total travel times as a 2D array of [searchIteration][destinationStopIndex].
+                // Additional detailed path information is retained in the FastRaptorWorker after routing.
+                transitTravelTimesToStops = worker.route();
+            } else {
+                // TODO maxClockTime could provide a tighter bound, as it could be based on the actual departure time, not the last possible
+                IntFunction<DominatingList> listSupplier =
+                        (departureTime) -> new FareDominatingList(
+                                request.inRoutingFareCalculator,
+                                request.maxFare,
+                                departureTime + request.maxTripDurationMinutes * 60);
+                McRaptorSuboptimalPathProfileRouter mcRaptorWorker = new McRaptorSuboptimalPathProfileRouter(network,
+                        request, null, null, listSupplier, InRoutingFareCalculator.getCollator(request));
+                mcRaptorWorker.route();
+                transitTravelTimesToStops = mcRaptorWorker.getBestTimes();
             }
-
-            // Run the main RAPTOR algorithm to find paths and travel times to all stops in the network.
-            // Returns the total travel times as a 2D array of [searchIteration][destinationStopIndex].
-            // Additional detailed path information is retained in the FastRaptorWorker after routing.
-            int[][] transitTravelTimesToStops = worker.route();
-
             PerTargetPropagater perTargetPropagater = new PerTargetPropagater(egressModeLinkedDestinations, request,
                     transitTravelTimesToStops, nonTransitTravelTimesToDestinations);
 
@@ -221,7 +241,7 @@ public class TravelTimeComputer {
             // because in the non-transit case we call the reducer directly (see above).
             perTargetPropagater.travelTimeReducer = travelTimeReducer;
 
-            if (worker.retainPaths) {
+            if (request.returnPaths || request.travelTimeBreakdown) {
                 perTargetPropagater.pathsToStopsForIteration = worker.pathsPerIteration;
                 perTargetPropagater.pathWriter = new PathWriter(request);
             }

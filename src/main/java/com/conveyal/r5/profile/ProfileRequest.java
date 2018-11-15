@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile;
 
+import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
 
 import java.time.*;
@@ -170,7 +171,8 @@ public class ProfileRequest implements Serializable, Cloneable {
 
     /**
      * If true current search is reverse search AKA we are looking for a path from destination to origin in reverse
-     * It differs from searchType because it is used as egress search
+     * It differs from searchType because it is used as egress search.  Note that NON_DEFAULT allows the broker to
+     * talk to older workers.
      */
     @JsonInclude(JsonInclude.Include.NON_DEFAULT)
     public boolean reverseSearch = false;
@@ -182,6 +184,12 @@ public class ProfileRequest implements Serializable, Cloneable {
     public int maxFare = -1;
 
     /**
+     * An object that should have at a minimum a "type" set according to the list in InRoutingFareCalculator.
+     */
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+    public InRoutingFareCalculator inRoutingFareCalculator = null;
+
+    /**
      * Number of Monte Carlo draws to take for frequency searches.
      *
      * We loop over all departure minutes and do a search on the scheduled portion of the network, and then while
@@ -190,10 +198,13 @@ public class ProfileRequest implements Serializable, Cloneable {
      * high as it happens each minute, and there is likely a lot of repetition in the scheduled service
      * (i.e. many minutes look like each other), so several minutes' Monte Carlo draws are effectively pooled.
      *
-     * The algorithm divides up the number of draws into an equal number at each minute of the time window, then rounds up.
-     * Note that the algorithm may actually take somewhat more draws than this, depending on the width of your time window.
-     * As an extreme example, if your time window is 120 minutes and you request 121 draws, you will actually get 240, because
-     * 1 &lt; 121 / 120 &lt; 2.
+     * FastRaptorWorker divides up the number of draws into an equal number at each minute of the time window, then
+     * rounds up. Note that the algorithm may actually take somewhat more draws than this, depending on the width of
+     * your time window. As an extreme example, if your time window is 120 minutes and you request 121 draws, you
+     * will actually get 240, because 1 &lt; 121 / 120 &lt; 2.
+     *
+     * McRaptor worker samples departure times, repeating a random walk over the departure time window until a sample
+     * with exactly this number of departure times is generated.
      */
     public int monteCarloDraws = 220;
 

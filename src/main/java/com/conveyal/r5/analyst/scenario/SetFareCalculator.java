@@ -1,13 +1,13 @@
 package com.conveyal.r5.analyst.scenario;
 
-import com.conveyal.r5.analyst.fare.GreedyFareCalculator;
+import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.transit.TransportNetwork;
 
 /**
  * Set the fare calculator on a transport network.
  */
 public class SetFareCalculator extends Modification {
-    public GreedyFareCalculator fareCalculator;
+    public InRoutingFareCalculator fareCalculator;
 
     @Override
     public String getType() {

@@ -35,7 +35,8 @@ public class RaptorState {
     /** Best times to reach each stop, whether via a transfer or via transit directly. */
     public int[] bestTimes;
 
-    /** The best times for reaching stops via transit rather than via a transfer from another stop */
+    /** The best times for reaching stops via transit rather than via a transfer from another stop.
+     * Used to record paths, keep number of transfers and transfer walking distance within requested limits, etc.  */
     public int[] bestNonTransferTimes;
 
     /** Cumulative transit wait time for the best path to each stop, parallel to bestNonTransferTimes. */
@@ -62,10 +63,14 @@ public class RaptorState {
     /** If this stop is optimally reached via a transfer, the stop we transferred from */
     public int[] transferStop;
 
-    /** Stops touched by transit search */
+    /** Stops touched by transit search. This is used in an optimization to only check for transfers
+     * from stops that have been "touched" (i.e. updated with a lower time based on a direct egress rather than a
+     * transfer in this round) */
     public BitSet nonTransferStopsTouched;
 
-    /** Stops touched by transit or transfers */
+    /** Stops touched by transit or transfers.  Similar to nonTransferStopsTouched, but used to flag what should be
+     * checked in the next round, rather than what should be checked when doing transfers at the end of this
+     * round.*/
     public BitSet bestStopsTouched;
 
     /** Maximum duration of trips stored by this RaptorState */

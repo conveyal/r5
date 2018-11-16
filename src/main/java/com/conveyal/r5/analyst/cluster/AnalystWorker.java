@@ -483,11 +483,6 @@ public class AnalystWorker implements Runnable {
             networkId = task.graphId;
             TransportNetwork transportNetwork = networkPreloader.preloadDataSynchronous(task);
 
-            if (task.inRoutingFareCalculator != null) {
-                // inject transit layer to inroutingfarecalculator
-                task.inRoutingFareCalculator.transitLayer = transportNetwork.transitLayer;
-            }
-
             // If we are generating a static site, there must be a single metadata file for an entire batch of results.
             // Arbitrarily we create this metadata as part of the first task in the job.
             if (task.makeStaticSite && task.taskId == 0) {

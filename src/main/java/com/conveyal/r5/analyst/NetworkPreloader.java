@@ -87,6 +87,8 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
     /**
      * For regional analysis workers, hackishly bypass our async loading mechanism, relying on the underlying caches.
      * That asynchronous loading is mainly useful for single-point tasks where users expect high interactivity.
+     * This call does not extract the scenario from the task with rememberScenario. That's only necessary in async where
+     * we key a map on the scenario ID, and in any case we only send full scenarios inside single-point tasks.
      */
     public TransportNetwork preloadDataSynchronous (AnalysisTask task) {
         return buildValue(Key.forTask(task));

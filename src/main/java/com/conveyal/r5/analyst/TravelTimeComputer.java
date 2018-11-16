@@ -56,6 +56,12 @@ public class TravelTimeComputer {
      */
     public OneOriginResult computeTravelTimes() {
 
+        // If this request includes a fare calculator, inject the transport network's transit layer into it.
+        // This is threadsafe because deserializing each incoming request creates a new fare calculator instance.
+        if (request.inRoutingFareCalculator != null) {
+            request.inRoutingFareCalculator.transitLayer = network.transitLayer;
+        }
+
         // The mode of travel that will be used to reach transit stations from the origin point.
         StreetMode accessMode = LegMode.getDominantStreetMode(request.accessModes);
         // The mode of travel that will be used to reach destinations from transit stations.

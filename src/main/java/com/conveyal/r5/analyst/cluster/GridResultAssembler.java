@@ -26,23 +26,9 @@ import static com.conveyal.r5.common.Util.human;
 /**
  * Assemble the results of GridComputer into AccessGrids.
  *
- * During distributed computation of access to gridded destinations, workers place raw accessibility results for single
- * origins onto an Amazon SQS queue. These results contain one accessibility measurement per iteration (departure
- * minutes and Monte Carlo draws) per origin grid cell. This class pulls results off the queue as they become available,
- * and assembles them into a single large file containing a delta-coded version of the same data for all origin points.
- *
- * Access grids look like this:
- * Header (ASCII text "ACCESSGR") (note that this header is eight bytes, so the full grid can be mapped into a
- *   Javascript typed array if desired)
- * Version, 4-byte integer
- * (4 byte int) Web mercator zoom level
- * (4 byte int) west (x) edge of the grid, i.e. how many pixels this grid is east of the left edge of the world
- * (4 byte int) north (y) edge of the grid, i.e. how many pixels this grid is south of the top edge of the world
- * (4 byte int) width of the grid in pixels
- * (4 byte int) height of the grid in pixels
- * (4 byte int) number of values per pixel
- * (repeated 4-byte int) values of each pixel in row major order. Values within a given pixel are delta coded.
+ * DEPRECATED because this has been copied into analysis-backend where it belongs.
  */
+@Deprecated
 public class GridResultAssembler {
 
     public static final Logger LOG = LoggerFactory.getLogger(GridResultAssembler.class);
@@ -140,7 +126,8 @@ public class GridResultAssembler {
             File gzippedGridFile = File.createTempFile(request.jobId, ".access_grid.gz");
             randomAccessFile.close();
 
-            // There's probably a more elegant way to do this with NIO and without closing the buffer
+            // There's probably a more elegant way to do this with NIO and without closing the buffer.
+            // That would be Files.copy or ByteStreams.copy.
             InputStream is = new BufferedInputStream(new FileInputStream(bufferFile));
             OutputStream os = new GZIPOutputStream(new BufferedOutputStream(new FileOutputStream(gzippedGridFile)));
             ByteStreams.copy(is, os);
@@ -243,4 +230,5 @@ public class GridResultAssembler {
         this.randomAccessFile.close();
         bufferFile.delete();
     }
+
 }

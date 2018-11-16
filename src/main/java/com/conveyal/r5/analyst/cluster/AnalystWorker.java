@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.amazonaws.regions.Regions;
 import com.conveyal.r5.OneOriginResult;
+import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.FilePersistence;
 import com.conveyal.r5.analyst.GridCache;
 import com.conveyal.r5.analyst.PersistenceBuffer;
@@ -14,6 +15,7 @@ import com.conveyal.r5.common.R5Version;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TransportNetworkCache;
 import com.conveyal.r5.transitive.TransitiveNetwork;
+import com.conveyal.r5.util.AsyncLoader;
 import com.conveyal.r5.util.ExceptionUtils;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.io.LittleEndianDataOutputStream;
@@ -37,7 +39,6 @@ import java.io.OutputStream;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -106,7 +107,7 @@ public class AnalystWorker implements Runnable {
     public static FilePersistence filePersistence;
 
     /** Keeps some TransportNetworks around, lazy-loading or lazy-building them. */
-    final TransportNetworkCache transportNetworkCache;
+    public final NetworkPreloader networkPreloader;
 
     /**
      * If this is true, the worker will not actually do any work. It will just report all tasks as completed
@@ -174,6 +175,10 @@ public class AnalystWorker implements Runnable {
                 .build();
     }
 
+    /**
+     * A loading cache of opportunity dataset grids (not grid pointsets or linkages).
+     * TODO use the WebMercatorGridExtents in these Grids.
+     */
     GridCache gridCache;
 
     /** The transport network this worker already has loaded, and therefore prefers to work on. */
@@ -219,7 +224,7 @@ public class AnalystWorker implements Runnable {
         return new AnalystWorker(config, cache);
     }
 
-    public AnalystWorker(Properties config, TransportNetworkCache cache) {
+    public AnalystWorker(Properties config, TransportNetworkCache transportNetworkCache) {
         // print out date on startup so that CloudWatch logs has a unique fingerprint
         LOG.info("Analyst worker {} starting at {}", machineId,
                 LocalDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
@@ -250,7 +255,7 @@ public class AnalystWorker implements Runnable {
         this.networkId = config.getProperty("initial-graph-id");
 
         this.gridCache = new GridCache(config.getProperty("aws-region"), config.getProperty("pointsets-bucket"));
-        this.transportNetworkCache = cache;
+        this.networkPreloader = new NetworkPreloader(transportNetworkCache);
         this.autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown", "false"));
 
         // Consider shutting this worker down once per hour, starting 55 minutes after it started up.
@@ -313,31 +318,19 @@ public class AnalystWorker implements Runnable {
         // The default task rejection policy is "Abort".
         // The executor's queue is rather long because some tasks complete very fast and we poll max once per second.
         int availableProcessors = Runtime.getRuntime().availableProcessors();
-        BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>(availableProcessors * 6);
-        regionalTaskExecutor = new ThreadPoolExecutor(1, availableProcessors, 60, TimeUnit.SECONDS, taskQueue);
-
-        // If an initial graph ID was provided in the config file, build or load that TransportNetwork on startup.
-        // Pre-loading the graph is necessary because if the graph is not cached it can take several
-        // minutes to build it. Even if the graph is cached, reconstructing the indices and stop trees
-        // can take a while. The UI times out after 30 seconds, so the broker needs to return a response to tell it
-        // to try again later within that timespan. The broker can't do that after it's sent a task to a worker,
-        // so the worker needs to not come online until it's ready to process requests.
-        if (networkId != null) {
-            LOG.info("Pre-loading or building network with ID {}", networkId);
-            if (transportNetworkCache.getNetwork(networkId) == null) {
-                LOG.error("Failed to pre-load transport network {}", networkId);
-            } else {
-                LOG.info("Done pre-loading network {}", networkId);
-            }
-        }
+        LOG.info("Java reports the number of available processors is: {}", availableProcessors);
+        int maxThreads = availableProcessors;
+        int taskQueueLength = availableProcessors * 6;
+        LOG.info("Maximum number of regional processing threads is {}, length of task queue is {}.", maxThreads, taskQueueLength);
+        BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>(taskQueueLength);
+        regionalTaskExecutor = new ThreadPoolExecutor(1, maxThreads, 60, TimeUnit.SECONDS, taskQueue);
 
         // Before we go into an endless loop polling for regional tasks that can be computed asynchronously, start a
         // single-endpoint web server on this worker to receive single-point requests that must be handled immediately.
         // This is listening on a different port than the backend API so that a worker can be running on the backend.
         // Trying out the new Spark syntax for non-static configuration.
-        // TODO symbolic constants for the backend and worker ports
-        // To avoid port conflicts, do not start HTTP server when testing task redelivery, in which case many workers
-        // run on the same machine.
+        // When testing task redelivery, many  workers run on the same machine. In that case, do not start this HTTP
+        // server to avoid port conflicts.
         if (!testTaskRedelivery) {
             sparkHttpService = spark.Service.ignite()
                 .port(WORKER_LISTEN_PORT)
@@ -356,7 +349,7 @@ public class AnalystWorker implements Runnable {
         // A simpler approach might be to spin-wait checking whether the queue is low and sleeping briefly,
         // then fetch more work only when the queue is getting empty.
         while (true) {
-            List<AnalysisTask> tasks = getSomeWork();
+            List<RegionalTask> tasks = getSomeWork();
             if (tasks == null || tasks.isEmpty()) {
                 // Either there was no work, or some kind of error occurred.
                 // Sleep for a while before polling again, adding a random component to spread out the polling load.
@@ -366,11 +359,11 @@ public class AnalystWorker implements Runnable {
                 sleepSeconds(POLL_WAIT_SECONDS + randomWait);
                 continue;
             }
-            for (AnalysisTask task : tasks) {
+            for (RegionalTask task : tasks) {
                 while (true) {
                     try {
-                        // TODO define non-anonymous runnable class to instantiate here
-                        regionalTaskExecutor.execute(() -> this.handleOneRequest(task));
+                        // TODO define non-anonymous runnable class to instantiate here, specifically for async regional tasks.
+                        regionalTaskExecutor.execute(() -> this.handleOneRegionalTask(task));
                         break;
                     } catch (RejectedExecutionException e) {
                         // Queue is full, wait a bit and try to feed it more tasks.
@@ -396,139 +389,175 @@ public class AnalystWorker implements Runnable {
     }
 
     /**
-     * This is the callback that processes a single task and returns the results upon completion.
-     * It may be called several times simultaneously on different executor threads.
-     * This returns a byte array but only for single point requests at this point.
-     * It handles both regional and single point requests... and maybe that's a good thing, and we should make them
-     * ever more interchangeable.
-     *
-     * TODO split this out into one "handle immediately" method that returns a byte[] and a void method for async tasks
+     * Synchronously handle one single-point task.
+     * @return the travel time grid (binary data) which will be passed back to the client UI. This binary response may
+     *         have errors appended as JSON to the end.
      */
-    protected byte[] handleOneRequest(AnalysisTask request) {
+    protected byte[] handleOneSinglePointTask (TravelTimeSurfaceTask task)
+            throws WorkerNotReadyException, ScenarioApplicationException, IOException {
+
         // Record the fact that the worker is busy so it won't shut down.
-        lastRegionalTaskTime = System.currentTimeMillis(); // FIXME both regional and single-point are handled here
+        lastSinglePointTime = System.currentTimeMillis();
+        LOG.info("Handling single-point task {}", task.toString());
+
+        // Get all the data needed to run one analysis task, or at least begin preparing it.
+        // TODO synchronously handle regional tasks, or just ensure the specified graph is loaded at worker startup
+        final AsyncLoader.LoaderState<TransportNetwork> networkLoaderState = networkPreloader.preloadData(task);
+
+        // If loading is not complete, bail out of this function.
+        // Ideally we'd stall briefly using something like Future.get(timeout) in case loading finishes quickly.
+        if (networkLoaderState.status != AsyncLoader.Status.PRESENT) {
+            throw new WorkerNotReadyException(networkLoaderState);
+        }
+
+        // Get the graph object for the ID given in the task, fetching inputs and building as needed.
+        // All requests handled together are for the same graph, and this call is synchronized so the graph will
+        // only be built once.
+        // Record the currently loaded network ID so we "stick" to this same graph on subsequent polls.
+        // TODO allow for a list of multiple already loaded TransitNetworks.
+        networkId = task.graphId;
+        TransportNetwork transportNetwork = networkLoaderState.value;
+
+        // Perform the core travel time computations.
+        TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork, gridCache);
+        OneOriginResult oneOriginResult = computer.computeTravelTimes();
+
+        // Prepare the travel time grid which will be written back to the client. We gzip the data before sending
+        // it back to the broker. Compression ratios here are extreme (100x is not uncommon).
+        // We had many "connection reset by peer" and buffer overflows errors on large files.
+        // Handle gzipping with HTTP headers (caller should already be doing this)
+        ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+
+        // The single-origin travel time surface can be represented as a proprietary grid or as a GeoTIFF.
+        if (task.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
+            oneOriginResult.timeGrid.writeGeotiff(byteArrayOutputStream, task);
+        } else {
+            // Catch-all, if the client didn't specifically ask for a GeoTIFF give it a proprietary grid.
+            // Return raw byte array representing grid to caller, for return to client over HTTP.
+            // TODO eventually reuse same code path as static site time grid saving
+            oneOriginResult.timeGrid.writeGridToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
+            addErrorJson(byteArrayOutputStream, transportNetwork.scenarioApplicationWarnings);
+        }
+        // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
+        throughputTracker.recordTaskCompletion("SINGLE-" + transportNetwork.scenarioId);
+
+        // Return raw byte array containing grid or TIFF file to caller, for return to client over HTTP.
+        byteArrayOutputStream.close();
+        return byteArrayOutputStream.toByteArray();
+    }
+
+    /**
+     * Handle one task representing one of many origins within a regional analysis.
+     * This method is generally being executed asynchronously, handling a large number of tasks on a pool of worker
+     * threads. It stockpiles results as they are produced, so they can be returned to the backend in batches when the
+     * worker polls the backend.
+     */
+    protected void handleOneRegionalTask(RegionalTask task) {
+
+        // Record the fact that the worker is busy so it won't shut down.
+        lastRegionalTaskTime = System.currentTimeMillis();
+        LOG.info("Handling regional task {}", task.toString());
+
+        // If this worker is being used in a test of the task redelivery mechanism. Report most work as completed
+        // without actually doing anything, but fail to report results a certain percentage of the time.
         if (testTaskRedelivery) {
-            // This worker is being used in a test of task redelivery. It should report all work as completed without
-            // actually doing anything, but fail to report results a certain percentage of the time.
-            // TODO sleep and generate work result in another method
-            try {
-                // Pretend the task takes 1-2 seconds to complete.
-                Thread.sleep(random.nextInt(1000) + 1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-            if (random.nextInt(100) >= TESTING_FAILURE_RATE_PERCENT) {
-                RegionalWorkResult workResult = new RegionalWorkResult(request.jobId, request.taskId, 1, 1, 1);
-                synchronized (workResults) {
-                    workResults.add(workResult);
-                }
-            } else {
-                LOG.info("Intentionally failing to complete task {} for testing purposes.", request.taskId);
-            }
-            return null;
+            pretendToDoWork(task);
+            return;
         }
 
         try {
-            long startTime = System.currentTimeMillis();
-            LOG.info("Handling message {}", request.toString());
-            long graphStartTime = System.currentTimeMillis();
+            // Having a non-null opportunity density grid in the task triggers the computation of accessibility values.
+            // The gridData should not be set on static site tasks (or single-point tasks which don't even have the field).
+            // Resolve the grid ID to an actual grid - this is important to determine the grid extents for the key.
+            // Fetching data grids should be relatively fast so we can do it synchronously.
+            // Perhaps this can be done higher up in the call stack where we know whether or not it's a regional task.
+            // TODO move this after the asynchronous loading of the rest of the necessary data?
+            if (!task.makeStaticSite) {
+                task.gridData = gridCache.get(task.grid);
+            }
+
             // Get the graph object for the ID given in the task, fetching inputs and building as needed.
             // All requests handled together are for the same graph, and this call is synchronized so the graph will
             // only be built once.
-            // Record graphId so we "stick" to this same graph on subsequent polls.
-            // TODO allow for a list of multiple cached TransitNetworks.
-            networkId = request.graphId;
-            // TODO fetch the scenario-applied transportNetwork out here, maybe using OptionalResult instead of exceptions
-            TransportNetwork transportNetwork = null;
-            try {
-                // FIXME ideally we should just be passing the scenario object into this function, and another separate function should get the scenario object from the task.
-                transportNetwork = transportNetworkCache.getNetworkForScenario(networkId, request);
-            } catch (ScenarioApplicationException scenarioException) {
-                // Handle exceptions specifically representing a failure to apply the scenario.
-                // Any other kinds of exceptions will be caught by the outer catch clause
-                return reportTaskErrors(request, scenarioException.taskErrors);
-            }
-
-            if (request.inRoutingFareCalculator != null) {
-                // inject transit layer to inroutingfarecalculator
-                request.inRoutingFareCalculator.transitLayer = transportNetwork.transitLayer;
-            }
+            // Record the currently loaded network ID so we "stick" to this same graph on subsequent polls.
+            networkId = task.graphId;
+            TransportNetwork transportNetwork = networkPreloader.preloadDataSynchronous(task);
 
             // If we are generating a static site, there must be a single metadata file for an entire batch of results.
             // Arbitrarily we create this metadata as part of the first task in the job.
-            if (request instanceof RegionalTask && request.makeStaticSite && request.taskId == 0) {
+            if (task.makeStaticSite && task.taskId == 0) {
                 LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
-                saveStaticSiteMetadata(request, transportNetwork);
+                saveStaticSiteMetadata(task, transportNetwork);
             }
 
-            TravelTimeComputer computer = new TravelTimeComputer(request, transportNetwork, gridCache);
+            // Perform the core travel time and accessibility computations.
+            TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork, gridCache);
             OneOriginResult oneOriginResult = computer.computeTravelTimes();
-            // TODO switch mainly on what's present in the result, not on the request type
-            if (request.isHighPriority()) {
-                // This is a single point task. Return the travel time grid which will be written back to the client.
-                // We want to gzip the data before sending it back to the broker.
-                // Compression ratios here are extreme (100x is not uncommon).
-                // We had many connection reset by peer, buffer overflows on large files.
-                // Handle gzipping with HTTP headers (caller should already be doing this)
-                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                // This travel time surface is being produced by a single-origin task.
-                // We could be making a grid or a TIFF.
-                TravelTimeSurfaceTask timeSurfaceTask = (TravelTimeSurfaceTask) request;
-                if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GRID) {
-                    // Return raw byte array representing grid to caller, for return to client over HTTP.
-                    // TODO eventually reuse same code path as static site time grid saving
-                    oneOriginResult.timeGrid.writeGridToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
-                    addErrorJson(byteArrayOutputStream, transportNetwork.scenarioApplicationWarnings);
-                } else if (timeSurfaceTask.getFormat() == TravelTimeSurfaceTask.Format.GEOTIFF) {
-                    oneOriginResult.timeGrid.writeGeotiff(byteArrayOutputStream, request);
+
+            if (task.makeStaticSite) {
+                // Unlike a normal regional task, this will write a time grid rather than an accessibility indicator
+                // value because we're generating a set of time grids for a static site. We only save a file if it has
+                // non-default contents, as a way to save storage and bandwidth.
+                // TODO eventually carry out actions based on what's present in the result, not on the request type.
+                if (oneOriginResult.timeGrid.anyCellReached()) {
+                    PersistenceBuffer persistenceBuffer = oneOriginResult.timeGrid.writeToPersistenceBuffer();
+                    String timesFileName = task.taskId + "_times.dat";
+                    filePersistence.saveStaticSiteData(task, timesFileName, persistenceBuffer);
+                } else {
+                    LOG.info("No destination cells reached. Not saving static site file to reduce storage space.");
                 }
-                // FIXME strangeness, only travel time results are returned from method, accessibility results return null and are accumulated for async delivery.
-                // Return raw byte array containing grid or TIFF file to caller, for return to client over HTTP.
-                byteArrayOutputStream.close();
-                // Single-point tasks don't have a job ID. For now, we'll categorize them by scenario ID.
-                throughputTracker.recordTaskCompletion("SINGLE-" + transportNetwork.scenarioId);
-                return byteArrayOutputStream.toByteArray();
-            } else {
-                // This is a single task within a regional analysis with many origins.
-                if (request.makeStaticSite) {
-                    // Despite this being a regional task, this is actually writing a time grid because we're
-                    // generating a bunch of those for a static site. Only save a file if it has non-default contents.
-                    if (oneOriginResult.timeGrid.anyCellReached()) {
-                        PersistenceBuffer persistenceBuffer = oneOriginResult.timeGrid.writeToPersistenceBuffer();
-                        String timesFileName = request.taskId + "_times.dat";
-                        filePersistence.saveStaticSiteData(request, timesFileName, persistenceBuffer);
-                    } else {
-                        LOG.info("No destination cells reached. Not saving static site file to reduce storage space.");
-                    }
-                }
-                // Accumulate accessibility results to return to the backend in batches.
-                // This is usually an accessibility indicator value for one of many origins, but in the case of a static
-                // site we still want to return dummy / zero accessibility results so the backend is aware of progress.
-                synchronized (workResults) {
-                    workResults.add(oneOriginResult.toRegionalWorkResult(request));
-                }
-                throughputTracker.recordTaskCompletion(request.jobId);
             }
+
+            // Accumulate accessibility results, which will be returned to the backend in batches.
+            // For most regional analyses, this is an accessibility indicator value for one of many origins,
+            // but for static sites the indicator value is not known, it is computed in the UI. We still want to return
+            // dummy (zero) accessibility results so the backend is aware of progress through the list of origins.
+            synchronized (workResults) {
+                workResults.add(oneOriginResult.toRegionalWorkResult(task));
+            }
+            throughputTracker.recordTaskCompletion(task.jobId);
         } catch (Exception ex) {
-            // Catch any exceptions that were not handled by more specific catch clauses above.
-            // This ensures that some form of error message is passed all the way back up to the web UI.
-            TaskError taskError = new TaskError(ex);
-            LOG.error("An error occurred while routing: {}", ExceptionUtils.asString(ex));
-            reportTaskErrors(request, Arrays.asList(taskError));
+            LOG.error("An error occurred while handling a regional task: {}", ExceptionUtils.asString(ex));
+            // TODO communicate regional analysis errors to the backend (in workResults)
         }
-        return null;
+    }
+
+    /**
+     * Used in tests of the task redelivery mechanism. Report work as completed without actually doing anything,
+     * but fail to report results a certain percentage of the time.
+     */
+    private void pretendToDoWork (RegionalTask task) {
+        try {
+            // Pretend the task takes 1-2 seconds to complete.
+            Thread.sleep(random.nextInt(1000) + 1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        if (random.nextInt(100) >= TESTING_FAILURE_RATE_PERCENT) {
+            RegionalWorkResult workResult = new RegionalWorkResult(task.jobId, task.taskId, 1, 1, 1);
+            synchronized (workResults) {
+                workResults.add(workResult);
+            }
+        } else {
+            LOG.info("Intentionally failing to complete task {} for testing purposes.", task.taskId);
+        }
     }
 
     /**
      * This is somewhat hackish - when we want to return errors to the UI, we just append them as JSON at the end of
      * a binary result. We always append this JSON even when there are no errors so the UI has something to decode,
      * even if it's an empty list.
+     *
+     * TODO use different HTTP codes and MIME types to return errors or valid results.
+     * We probably want to keep doing this though because we want to return a result AND the warnings.
      */
     public static void addErrorJson (OutputStream outputStream, List<TaskError> scenarioApplicationWarnings) throws IOException {
         LOG.info("Travel time surface written, appending metadata with scenario application {} warnings", scenarioApplicationWarnings.size());
         // We create a single-entry map because this converts easily to a JSON object.
         Map<String, List<TaskError>> errorsToSerialize = new HashMap<>();
         errorsToSerialize.put("scenarioApplicationWarnings", scenarioApplicationWarnings);
+        // We could do this when setting up the Spark handler, supplying writeValue as the response transformer
+        // But then you also have to handle the case where you are returning raw bytes.
         JsonUtilities.objectMapper.writeValue(outputStream, errorsToSerialize);
         LOG.info("Done writing");
     }
@@ -539,7 +568,7 @@ public class AnalystWorker implements Runnable {
      * Also returns any accumulated work results to the backend.
      * @return a list of work tasks, or null if there was no work to do, or if no work could be fetched.
      */
-    public List<AnalysisTask> getSomeWork () {
+    public List<RegionalTask> getSomeWork () {
         String url = brokerBaseUrl + "/poll";
         HttpPost httpPost = new HttpPost(url);
         WorkerStatus workerStatus = new WorkerStatus(this);
@@ -574,7 +603,7 @@ public class AnalystWorker implements Runnable {
                 // newer version so sending unrecognizable fields.
                 // ReadValue closes the stream, releasing the HTTP connection.
                 return JsonUtilities.lenientObjectMapper.readValue(responseEntity.getContent(),
-                        new TypeReference<List<AnalysisTask>>() {});
+                        new TypeReference<List<RegionalTask>>() {});
             }
             // Non-200 response code or a null entity. Something is weird.
             LOG.error("Unsuccessful polling. HTTP response code: " + response.getStatusLine().getStatusCode());
@@ -589,31 +618,6 @@ public class AnalystWorker implements Runnable {
         synchronized (workResults) {
             // TODO check here that results are not piling up too much?
             workResults.addAll(workerStatus.results);
-        }
-        return null;
-    }
-
-    /**
-     * Report that the task could not be processed due to errors.
-     * For the moment, we are sending back the list of TaskErrors appended as json to a default response.
-     */
-    public byte[] reportTaskErrors(AnalysisTask request, List<TaskError> taskErrors) {
-        try {
-            if (request.isHighPriority()) {
-                // For single-point requests, return a TimeGrid filled with UNREACHABLE, with the errors appended
-                LOG.warn("Reporting errors in response to single-point request:\n" + taskErrors.toString());
-                TimeGrid emptyTimeGrid = new TimeGrid(request.zoom, request.west, request.north, request.width, request.height, request.percentiles.length);
-                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                emptyTimeGrid.writeGridToDataOutput(new LittleEndianDataOutputStream(byteArrayOutputStream));
-                addErrorJson(byteArrayOutputStream, taskErrors);
-                byteArrayOutputStream.close();
-                return byteArrayOutputStream.toByteArray();
-            } else {
-                // TODO handle regional result errors, or force users to "preflight" regional results by running single-point request in UI
-                LOG.warn("Errors while completing task:\n" + taskErrors.toString());
-            }
-        } catch (Exception e) {
-            LOG.error("An exception occurred while attempting to report an error:\n" + ExceptionUtils.asString(e));
         }
         return null;
     }

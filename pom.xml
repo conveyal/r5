@@ -370,6 +370,13 @@
             <artifactId>guava</artifactId>
             <version>24.0-jre</version>
         </dependency>
+        <!-- Caffeine is a Java 8 rewrite of the Guava cache with asynchronous LoadingCaches. We don't currently use
+             the async capabilities, but Caffeine's LoadingCache syntax is more modern idiomatic Java than Guava's. -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <version>2.6.2</version>
+        </dependency>
         <!-- Conveyal library for loading and storing GTFS transit data. -->
         <dependency>
             <groupId>com.conveyal</groupId>

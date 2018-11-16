@@ -9,6 +9,15 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Cache Web Mercator Grid Pointsets so that they are not recreated and relinked on every regional analysis task.
  * The cache does not have expiration, which is fine, because it exists on the workers which are short-lived.
+ * This is a loading cache, that will compute values when they are absent: the values are not explicitly added by the
+ * caller.
+ *
+ * The WebMercatorGridPointSets are very small and fetching one doesn't include linking.
+ * We cache these objects because once they are linked,they contain the linkages, and creating the linkages takes a
+ * lot of time.
+ *
+ * Note that this cache will be serialized with the PointSet, but serializing a Guava cache only serializes the
+ * cache instance and its settings, not the contents of the cache. We consider this sane behavior.
  */
 public class WebMercatorGridPointSetCache {
 
@@ -28,10 +37,11 @@ public class WebMercatorGridPointSetCache {
         return cache.computeIfAbsent(key, GridKey::toPointset);
     }
 
-    public WebMercatorGridPointSet get(Grid grid, WebMercatorGridPointSet base) {
-        return get(grid.zoom, grid.west, grid.north, grid.width, grid.height, base);
+    public WebMercatorGridPointSet get(WebMercatorExtents extents, WebMercatorGridPointSet base) {
+        return get(extents.zoom, extents.west, extents.north, extents.width, extents.height, base);
     }
 
+    // TODO make this a subclass of WebMercatorGridExtents
     private static class GridKey {
         public int zoom;
         public int west;

@@ -134,12 +134,12 @@ public class TransitLayer implements Serializable, Cloneable {
     public boolean hasSchedules = false;
 
     /**
-     * For each transit stop, an int-int map giving the distance of every reachable street vertex from that stop.
+     * For each transit stop, an int-int map giving the walking distance to every reachable street vertex from that stop.
      * This is the result of running a distance-constrained street search outward from every stop in the graph.
      * If these tables are present, we serialize them when persisting a network to disk to avoid recalculating them
-     * upon re-load. However, the tables are not computed when the network is first built, except in certain code
-     * paths used for analysis work. The tables are not necessary for basic routing.
-     * Serializing these tables makes files much bigger and makes our checks to ensure that scenario application
+     * upon re-load. However, these tables are only computed when the network is first built in certain code
+     * paths used for analysis work. The tables are not necessary for basic point-to-point routing.
+     * Serializing this table makes network files much bigger and makes our checks to ensure that scenario application
      * does not damage base graphs slower.
      */
     public List<TIntIntMap> stopToVertexDistanceTables;
@@ -560,7 +560,7 @@ public class TransitLayer implements Serializable, Cloneable {
     }
 
     /**
-     * Perform a single on-street search from the specified transit stop.
+     * Perform a single on-street WALK search from the specified transit stop.
      * Return the distance in millimeters to every reached street vertex.
      * @param stop the internal integer stop ID for which to build a distance table.
      * @return a map from street vertex numbers to distances in millimeters

@@ -21,7 +21,6 @@ import gnu.trove.map.hash.TIntIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.IntFunction;
@@ -50,7 +49,18 @@ public class TravelTimeComputer {
     }
 
     // We should try to decouple the internal representation of the results from how they're serialized to an API.
-    public OneOriginResult computeTravelTimes() throws IOException {
+
+    /**
+     * The TravelTimeComputer can make travel time grids, accessibility indicators, or (eventually) both
+     * depending on what's in the task it's given.
+     */
+    public OneOriginResult computeTravelTimes() {
+
+        // If this request includes a fare calculator, inject the transport network's transit layer into it.
+        // This is threadsafe because deserializing each incoming request creates a new fare calculator instance.
+        if (request.inRoutingFareCalculator != null) {
+            request.inRoutingFareCalculator.transitLayer = network.transitLayer;
+        }
 
         // The mode of travel that will be used to reach transit stations from the origin point.
         StreetMode accessMode = LegMode.getDominantStreetMode(request.accessModes);
@@ -59,11 +69,12 @@ public class TravelTimeComputer {
         // The mode of travel that would be used to reach the destination directly without using transit.
         StreetMode directMode = LegMode.getDominantStreetMode(request.directModes);
 
-        // The set of destinations in the one-to-many travel time calculations, not yet linked to the street network.
-        List<PointSet> destinationList = request.getDestinations(network, gridCache);
-
+        // Find the set of destinations in the one-to-many travel time calculations, not yet linked to the street network.
+        // Reuse the logic for finding the appropriate grid size and linking, which is now in the NetworkPreloader.
+        // We could change the preloader to retain these values in a compound return type, to avoid repetition here.
+        WebMercatorExtents destinationGridExtents = NetworkPreloader.Key.forTask(request).webMercatorExtents;
         // TODO wrap in loop to repeat for multiple destinations pointsets in a regional request.
-        PointSet destinations = destinationList.get(0);
+        PointSet destinations = AnalysisTask.gridPointSetCache.get(destinationGridExtents, network.gridPointSet);
 
         // TODO Create and encapsulate this within the propagator.
         TravelTimeReducer travelTimeReducer = new TravelTimeReducer(request);

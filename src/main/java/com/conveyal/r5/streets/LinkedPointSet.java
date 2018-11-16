@@ -432,6 +432,7 @@ public class LinkedPointSet implements Serializable {
         counter.done();
     }
 
+    // FIXME Method and block inside are both synchronized on "this", is that right?
     public synchronized void makePointToStopDistanceTablesIfNeeded () {
         if (pointToStopDistanceTables != null) return;
 

@@ -86,7 +86,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
 
     /**
      * For regional analysis workers, hackishly bypass our async loading mechanism, relying on the underlying caches.
-     * The asynchronous loading is mainly useful for single-point tasks where users expect high interactivity.
+     * That asynchronous loading is mainly useful for single-point tasks where users expect high interactivity.
      */
     public TransportNetwork preloadDataSynchronous (AnalysisTask task) {
         return buildValue(Key.forTask(task));

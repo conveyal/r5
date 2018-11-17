@@ -119,7 +119,6 @@ public class AnalystWorker implements Runnable {
     /** In the type of tests described above, this is how often the worker will fail to return a result for a task. */
     public static final int TESTING_FAILURE_RATE_PERCENT = 20;
 
-    /** How long (minimum, in milliseconds) should this worker stay alive after processing a single-point task. */
     /** The minimum amount of time (in minutes) that this worker should stay alive after processing a single-point task. */
     public static final int SINGLE_KEEPALIVE_MINUTES = 30;
 

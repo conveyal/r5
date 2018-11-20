@@ -80,6 +80,6 @@ abstract class McPathLeg<S extends AbstractStopArrival<T>, T extends TripSchedul
         }
         @Override public int fromStop() { return destinationArrival.getPreviousState().stopIndex(); }
         @Override public int fromTime() { return destinationArrival.getPreviousState().time(); }
-        @Override public int toTime() { return destinationArrival.getArrivalTime(); }
+        @Override public int toTime() { return destinationArrival.arrivalTime(); }
     }
 }

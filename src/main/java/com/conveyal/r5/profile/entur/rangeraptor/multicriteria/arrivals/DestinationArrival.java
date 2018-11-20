@@ -1,10 +1,8 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction;
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoSortable;
-
-import static com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction.createParetoFunctions;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparatorBuilder;
 
 
 /**
@@ -29,16 +27,7 @@ import static com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction.create
  *
  * </ul>
  */
-public final class DestinationArrival<T extends TripScheduleInfo> implements ParetoSortable {
-    /**
-     * The pareto function MUST match the {@code ParetoSortable} implementation below
-     */
-    public static final ParetoFunction[] PARETO_FUNCTION = createParetoFunctions()
-            .lessThen()  // arrival time
-            .lessThen()  // number of transfers
-            .lessThen()  // cost
-            .lessThen()  // Travel time duration
-            .build();
+public final class DestinationArrival<T extends TripScheduleInfo> {
 
     private final TransitStopArrival<T> previousState;
     private final int arrivalTime;
@@ -59,36 +48,20 @@ public final class DestinationArrival<T extends TripScheduleInfo> implements Par
         return previousState;
     }
 
-    public int getArrivalTime() {
+    public int arrivalTime() {
         return arrivalTime;
     }
 
-    public int getNumberOfTransfers() {
+    public int numberOfTransfers() {
         return numberOfTransfers;
     }
 
-    public int getTravelDuration() {
+    public int travelDuration() {
         return travelDuration;
     }
 
-    @Override
-    public int paretoValue1() {
-        return arrivalTime;
-    }
-
-    @Override
-    public int paretoValue2() {
-        return numberOfTransfers;
-    }
-
-    @Override
-    public int paretoValue3() {
+    public int cost() {
         return cost;
-    }
-
-    @Override
-    public int paretoValue4() {
-        return travelDuration;
     }
 
     @Override

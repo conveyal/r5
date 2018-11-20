@@ -14,7 +14,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-import static com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction.createParetoFunctions;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -24,7 +23,7 @@ public class ParetoSetTest {
     @Test
     public void initiallyEmpty() {
         // Given a empty set
-        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen().build());
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_THEN);
 
         assertEquals("The initial set should be empty.", "{}", set.toString());
         assertTrue("The initial set should be empty.", set.isEmpty());
@@ -33,7 +32,7 @@ public class ParetoSetTest {
     @Test
     public void addVector() {
         // Given a empty set
-        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen().build());
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_THEN);
 
         // When one element is added
         addOk(set, new Vector("V0", 5));
@@ -45,7 +44,7 @@ public class ParetoSetTest {
     @Test
     public void testLessThen() {
         // Given a set with one element: [5]
-        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen().build());
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_THEN);
         set.add(new Vector("V0", 5));
 
         // When adding the same value
@@ -65,31 +64,9 @@ public class ParetoSetTest {
     }
 
     @Test
-    public void testGreaterThen() {
-        // Given a set with one element: [5]
-        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().greaterThen().build());
-        set.add(new Vector("V0", 5));
-
-        // When adding the same value
-        addRejected(set, new Vector("Not", 5));
-        // Then NO elements should be added to the set
-        assertEquals("{V0[5]}", set.toString());
-
-        // When adding a lesser value
-        addRejected(set, new Vector("Not", 4));
-        // Then expect no change in the set
-        assertEquals("{V0[5]}", set.toString());
-
-        // When adding the a greater value
-        addOk(set, new Vector("V1", 6));
-        // Then the greather value should replace the bigger one
-        assertEquals("{V1[6]}", set.toString());
-    }
-
-    @Test
     public void testDifferent() {
         // Given a set with one element: [5]
-        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().different().build());
+        ParetoSet<Vector> set = new ParetoSet<>(DIFFERENT);
         set.add(new Vector("V0", 5));
 
         // When adding the same value
@@ -114,7 +91,7 @@ public class ParetoSetTest {
     public void testTwoCriteriaWithLessThen() {
         // Given a set with one element with 2 criteria: [5, 5]
         // and a function where at least one value is less then to make it into the set
-        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen().lessThen().build());
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN);
         Vector v0 = new Vector("V0", 5, 5);
 
 
@@ -135,7 +112,7 @@ public class ParetoSetTest {
     @Test
     public void testTwoCriteria_lessThen_and_different() {
         // Given a set with one element with 2 criteria: [5, 5]
-        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen().different().build());
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_DIFFERENT_THEN);
         Vector v0 = new Vector("V0", 5, 5);
 
 
@@ -155,9 +132,8 @@ public class ParetoSetTest {
     @Test
     public void testTwoCriteria_lessThen_and_lessThenValue() {
         // Given a set with one element with 2 criteria: [5, 5]
-        ParetoSet<Vector> set = new ParetoSet<>(createParetoFunctions().lessThen().lessThen(2).build());
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_2_THEN);
         Vector v0 = new Vector("V0", 5, 5);
-
 
         // Cases that does NOT make it into the set
         testNotAdded(set, v0, vector(6, 5), "1st value disqualifies it");
@@ -178,9 +154,7 @@ public class ParetoSetTest {
     public void testFourCriteria() {
         // Given a set with one element with 2 criteria: [5, 5]
         // and the pareto function is: <, !=, >, <+2
-        ParetoSet<Vector> set = new ParetoSet<>(
-                createParetoFunctions().lessThen().different().greaterThen().lessThen(2).build()
-        );
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_DIFFERENT_GREATER_LESS_2_THEN);
         Vector v0 = new Vector("V0", 5, 5, 5, 5);
 
 
@@ -217,9 +191,7 @@ public class ParetoSetTest {
     @Test
     public void testAutoScalingOfParetoSet() {
         // Given a set with 2 criteria
-        ParetoSet<Vector> set = new ParetoSet<>(
-                createParetoFunctions().lessThen().lessThen().build()
-        );
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN);
 
         // The initial size is set to 16.
         // Add 100 mutually dominant values
@@ -240,9 +212,7 @@ public class ParetoSetTest {
     @Test
     public void testAddingMultipleElements() {
         // Given a set with 2 criteria: LT and LT
-        ParetoSet<Vector> set = new ParetoSet<>(
-                createParetoFunctions().lessThen().lessThen().build()
-        );
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN);
         Vector v55 = new Vector("v55", 5, 5);
         Vector v53 = new Vector("v53", 5, 3);
         Vector v44 = new Vector("v44", 4, 4);
@@ -285,9 +255,7 @@ public class ParetoSetTest {
     @Ignore
     public void randomlyGenerateVectorsAndOutputResult() {
         // Given a set with 2 criteria: LT and LT
-        ParetoSet<Vector> set = new ParetoSet<>(
-                createParetoFunctions().lessThen().lessThen().build()
-        );
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN);
         List<Vector> values = new ArrayList<>(Arrays.asList(
                 new Vector("0", 5, 5),
                 new Vector("1", 5, 3),
@@ -314,7 +282,7 @@ public class ParetoSetTest {
      * The set should contain the vector, but that is left to the
      * caller to verify.
      */
-    private static void addOk(ParetoSet<Vector> set,  Vector v) {
+    private static void addOk(ParetoSet<Vector> set, Vector v) {
         assertTrue(set.qualify(v));
         assertTrue(set.add(v));
     }
@@ -324,7 +292,7 @@ public class ParetoSetTest {
      * The set should not contain the vector, but that is left to the
      * caller to verify.
      */
-    private static void addRejected(ParetoSet<Vector> set,  Vector v) {
+    private static void addRejected(ParetoSet<Vector> set, Vector v) {
         assertFalse(set.qualify(v));
         assertFalse(set.add(v));
     }
@@ -334,7 +302,7 @@ public class ParetoSetTest {
         for (Vector v : vectorsToAdd) {
             // Copy vector to avoid any identity pitfalls
             Vector vector = new Vector(v);
-            boolean qualify= set.qualify(vector);
+            boolean qualify = set.qualify(vector);
             assertEquals("Qualify and add should return the same value.", qualify, set.add(vector));
         }
         assertEquals(expected, names(set, false));
@@ -385,7 +353,7 @@ public class ParetoSetTest {
         new TestCase(v0, v1, description, expected).run(set);
     }
 
-    private static class Vector implements ParetoSortable {
+    private static class Vector {
         final String name;
         final int[] values;
 
@@ -399,23 +367,19 @@ public class ParetoSetTest {
             values = Arrays.copyOf(o.values, o.values.length);
         }
 
-        @Override
-        public int paretoValue1() {
+        int v1() {
             return values[0];
         }
 
-        @Override
-        public int paretoValue2() {
+        int v2() {
             return values[1];
         }
 
-        @Override
-        public int paretoValue3() {
+        int v3() {
             return values[2];
         }
 
-        @Override
-        public int paretoValue4() {
+        int v4() {
             return values[3];
         }
 
@@ -461,4 +425,40 @@ public class ParetoSetTest {
             assertEquals(description, expected, set.toString());
         }
     }
+
+    private static final ParetoComparator<Vector> DIFFERENT =
+            new ParetoComparatorBuilder<Vector>()
+                    .different(Vector::v1)
+                    .build();
+
+    private static final ParetoComparator<Vector> LESS_THEN =
+            new ParetoComparatorBuilder<Vector>()
+                    .lessThen(Vector::v1)
+                    .build();
+
+    private static final ParetoComparator<Vector> LESS_LESS_THEN =
+            new ParetoComparatorBuilder<Vector>()
+                    .lessThen(Vector::v1)
+                    .lessThen(Vector::v2)
+                    .build();
+
+    private static final ParetoComparator<Vector> LESS_DIFFERENT_THEN =
+            new ParetoComparatorBuilder<Vector>()
+                    .lessThen(Vector::v1)
+                    .different(Vector::v2)
+                    .build();
+
+    private static final ParetoComparator<Vector> LESS_LESS_2_THEN =
+            new ParetoComparatorBuilder<Vector>()
+                    .lessThen(Vector::v1)
+                    .lessThenDelta(Vector::v2, 2)
+                    .build();
+
+    private static final ParetoComparator<Vector> LESS_DIFFERENT_GREATER_LESS_2_THEN =
+            new ParetoComparatorBuilder<Vector>()
+                    .lessThen(Vector::v1)
+                    .different(Vector::v2)
+                    .greaterThen(Vector::v3)
+                    .lessThenDelta(Vector::v4, 2)
+                    .build();
 }

@@ -1,26 +1,27 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.RRStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction;
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoSortable;
+import com.conveyal.r5.profile.entur.rangeraptor.RRStopArrival;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparatorBuilder;
 
 import java.util.LinkedList;
 import java.util.List;
 
-import static com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction.createParetoFunctions;
 
-public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements RRStopArrival<T>, ParetoSortable {
+public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements RRStopArrival<T> {
 
     /**
      * The pareto function MUST match the {@code ParetoSortable} implementation below
      */
-    public static final ParetoFunction[] PARETO_FUNCTION = createParetoFunctions()
-            .lessThen()  // time
-            .lessThen()  // rounds
-            .lessThen()  // cost
-            .build();
+    public static <T extends TripScheduleInfo> ParetoComparator<AbstractStopArrival<T>> paretoComperator() {
+        return new ParetoComparatorBuilder<AbstractStopArrival<T>>()
+                .lessThen((v) -> v.time)
+                .lessThen((v) -> v.roundPareto)
+                .lessThen((v) -> v.cost)
+                .build();
+    }
 
     private final AbstractStopArrival<T> previousArrival;
     private final int round;
@@ -54,11 +55,6 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
         this.cost = initialCost;
     }
 
-
-    /* pareto vector, the {@code ParetoSortable} implementation */
-    @Override public final int paretoValue1() { return time;        }
-    @Override public final int paretoValue2() { return roundPareto; }
-    @Override public final int paretoValue3() { return cost;        }
 
     /**
      * @return previous state or throw a NPE if no previousArrival exist.

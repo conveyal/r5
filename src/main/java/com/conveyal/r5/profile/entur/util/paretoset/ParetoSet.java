@@ -6,15 +6,30 @@ import java.util.Iterator;
 import java.util.stream.Collectors;
 
 
-public class ParetoSet<T extends ParetoSortable> extends AbstractCollection<T> {
-    private final ParetoVectorDominator dominator;
+/**
+ * This {@link java.util.Collection} store all pareto-optimal elements. The
+ * {@link #add(Object)} method returns {@code true} if and only if the element
+ * was added successfully. When an element is added other elements witch are no
+ * longer pareto-optimal are droped.
+ * <p/>
+ * Like the {@link java.util.ArrayList} the elements are stored internally in
+ * an array for performance reasons, but the order is <em>not</em> guaranteed.
+ * New elements can be added at any index - replacing the element at that index,
+ * if the new element is dominates the old one.
+ * <p/>
+ * No methods for removing elements like {@link #remove(Object)} are supported.
+ *
+ * @param <T> the element type
+ */
+public class ParetoSet<T> extends AbstractCollection<T> {
+    private final ParetoComparator<T> comparator;
     @SuppressWarnings("unchecked")
-    private T[] elements = (T[])new ParetoSortable[16];
+    private T[] elements = (T[])new Object[16];
     private int size = 0;
 
 
-    public ParetoSet(ParetoFunction[] builder) {
-        this.dominator = ParetoVectorDominator.create(builder);
+    public ParetoSet(ParetoComparator<T> comparator) {
+        this.comparator = comparator;
     }
 
     public T get(int index) {
@@ -43,22 +58,21 @@ public class ParetoSet<T extends ParetoSortable> extends AbstractCollection<T> {
         boolean mutualDominanceExist = false;
         boolean equivalentVectorExist = false;
 
-        int i = 0;
+        for (int i = 0; i < size; ++i) {
+            T it = elements[i];
 
-        for (; i < size; ++i) {
-            ParetoSortable it = elements[i];
+            boolean leftDominance = comparator.leftDominanceExist(newValue, it);
+            boolean rightDominance = comparator.rightDominanceExist(newValue, it);
 
-            dominator.dominate(newValue, it);
-
-            if (dominator.mutualVectorDominanceExist()) {
+            if (leftDominance && rightDominance) {
                 mutualDominanceExist = true;
             }
-            else if (dominator.leftCriteriaDominanceExist()) {
+            else if (leftDominance) {
                 elements[i] = newValue;
                 removeDominatedElementsFromRestOfSet(newValue, i+1);
                 return true;
             }
-            else if (dominator.rightCriteriaDominanceExist()) {
+            else if (rightDominance) {
                 return false;
             }
             else {
@@ -77,7 +91,7 @@ public class ParetoSet<T extends ParetoSortable> extends AbstractCollection<T> {
     }
 
     /**
-     * Test if an element qualify - the element is NOT added. Use the {@link #add(ParetoSortable)}
+     * Test if an element qualify - the element is NOT added. Use the {@link #add(T)}
      * method directly if the purpose is to add the new element to the collection.
      * <p/>
      * Both methods are optimized for performance; hence the add method does not use this method.
@@ -90,21 +104,21 @@ public class ParetoSet<T extends ParetoSortable> extends AbstractCollection<T> {
         boolean mutualDominanceExist = false;
         boolean equivalentVectorExist = false;
 
-        int i = 0;
+        for (int i = 0; i < size; ++i) {
+            boolean leftDominance = comparator.leftDominanceExist(newValue, elements[i]);
+            boolean rightDominance = comparator.rightDominanceExist(newValue, elements[i]);
 
-        for (; i < size; ++i) {
-            dominator.dominate(newValue, elements[i]);
 
-            if (dominator.mutualVectorDominanceExist()) {
+            if (leftDominance && rightDominance) {
                 if(equivalentVectorExist) {
                     return false;
                 }
                 mutualDominanceExist = true;
             }
-            else if (dominator.leftCriteriaDominanceExist()) {
+            else if (leftDominance) {
                 return true;
             }
-            else if (dominator.rightCriteriaDominanceExist()) {
+            else if (rightDominance) {
                 return false;
             }
             else {
@@ -147,23 +161,28 @@ public class ParetoSet<T extends ParetoSortable> extends AbstractCollection<T> {
      * Remove all elements dominated by the {@code newValue} starting from
      * index {@code index}.
      */
-    private void removeDominatedElementsFromRestOfSet(final T newValue, int index) {
+    private void removeDominatedElementsFromRestOfSet(final T newValue, final int index) {
+        // Let 'i' be the current element index
+        int i = index;
         // Be aware that the index method parameter is incremented
-        while (index < size) {
-            dominator.dominate(newValue, elements[index]);
-
+        while (i < size) {
             // Find an element to skip, and move the last element into its position
             // Note! We can not advance the index `i`, because last element must also
             // be checked.
-            if (dominator.leftVectorDominatesRightVector()) {
+            if (leftVectorDominatesRightVector(newValue, elements[i])) {
                 --size;
-                elements[index] = elements[size];
+                elements[i] = elements[size];
                 elements[size] = null;
             }
             else {
-                ++index;
+                ++i;
             }
         }
+    }
+
+    private boolean leftVectorDominatesRightVector(T left, T right) {
+        return comparator.leftDominanceExist(left, right) &&
+                !comparator.rightDominanceExist(left, right);
     }
 
     private void appendValue(T newValue) {

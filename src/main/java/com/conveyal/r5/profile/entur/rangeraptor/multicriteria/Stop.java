@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 class Stop<T extends TripScheduleInfo> extends ParetoSet<AbstractStopArrival<T>> {
 
     Stop() {
-        super(AbstractStopArrival.PARETO_FUNCTION);
+        super(AbstractStopArrival.paretoComperator());
     }
 
     public Iterable<? extends AbstractStopArrival<T>> list(Predicate<AbstractStopArrival<T>> test) {

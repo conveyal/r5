@@ -1,14 +1,12 @@
 package com.conveyal.r5.profile.entur;
 
 import com.conveyal.r5.profile.entur.api.Path2;
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction;
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoSortable;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparatorBuilder;
 import com.conveyal.r5.transit.TripSchedule;
 
-import static com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction.createParetoFunctions;
-
 @Deprecated
-public class Path2ParetoSortableWrapper implements ParetoSortable {
+public class Path2ParetoSortableWrapper  {
 
     public final Path2<TripSchedule> path;
     private final int arrivalTime;
@@ -20,13 +18,10 @@ public class Path2ParetoSortableWrapper implements ParetoSortable {
         this.journeyDuration = arrivalTime - path.accessLeg().fromTime();
     }
 
-    @Override public int paretoValue1() { return arrivalTime; }
-    @Override public int paretoValue2() { return journeyDuration; }
-
-    public static ParetoFunction[] paretoDominanceFunctions() {
-        return createParetoFunctions()
-                .lessThen()
-                .lessThen()
+    public static ParetoComparator<Path2ParetoSortableWrapper> paretoDominanceFunctions() {
+        return new ParetoComparatorBuilder<Path2ParetoSortableWrapper>()
+                .lessThen(it -> it.arrivalTime)
+                .lessThen(it -> it.journeyDuration)
                 .build();
     }
 }

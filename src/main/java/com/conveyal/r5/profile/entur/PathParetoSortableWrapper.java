@@ -1,13 +1,11 @@
 package com.conveyal.r5.profile.entur;
 
 import com.conveyal.r5.profile.Path;
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction;
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoSortable;
-
-import static com.conveyal.r5.profile.entur.util.paretoset.ParetoFunction.createParetoFunctions;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparatorBuilder;
 
 @Deprecated
-public class PathParetoSortableWrapper implements ParetoSortable {
+public class PathParetoSortableWrapper {
 
     public final Path path;
     private final int patternsHash;
@@ -22,29 +20,16 @@ public class PathParetoSortableWrapper implements ParetoSortable {
         this.totalJourneyDuration = totalJourneyDuration;
     }
 
-    @Override
-    public int paretoValue1() {
-        return patternsHash;
-    }
-    @Override
-    public int paretoValue2() {
-        return boardTime;
-    }
-    @Override
-    public int paretoValue3() {
-        return totalJourneyDuration;
-    }
-
-    public static ParetoFunction.Builder paretoDominanceFunctions() {
-        return createParetoFunctions()
-                .different()
-                .different()
-                .lessThen();
+    public static ParetoComparator<PathParetoSortableWrapper> paretoComparator() {
+        return new ParetoComparatorBuilder<PathParetoSortableWrapper>()
+                .different(it -> it.patternsHash)
+                .different(it -> it.boardTime)
+                .lessThen(it -> it.totalJourneyDuration)
+                .build();
     }
 
 
     /* private methods */
-
 
     /**
      * As all other hash functions this function may lead to collision, but only if the vector passed inn have

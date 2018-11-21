@@ -33,7 +33,7 @@ import java.util.WeakHashMap;
  */
 public class BogotaMixedInRoutingFareCalculator extends InRoutingFareCalculator {
     /** If true, log a random 1e-6 sample of fares for spot checking */
-    public static final boolean LOG_FARES = true;
+    public static final boolean LOG_FARES = false;
 
     private static final WeakHashMap<TransitLayer, FareSystemWrapper> fareSystemCache = new WeakHashMap<>();
     private Map<String, Fare> fares;

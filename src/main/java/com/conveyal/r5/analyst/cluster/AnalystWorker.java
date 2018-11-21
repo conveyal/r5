@@ -400,7 +400,6 @@ public class AnalystWorker implements Runnable {
         LOG.info("Handling single-point task {}", task.toString());
 
         // Get all the data needed to run one analysis task, or at least begin preparing it.
-        // TODO synchronously handle regional tasks, or just ensure the specified graph is loaded at worker startup
         final AsyncLoader.LoaderState<TransportNetwork> networkLoaderState = networkPreloader.preloadData(task);
 
         // If loading is not complete, bail out of this function.
@@ -480,7 +479,10 @@ public class AnalystWorker implements Runnable {
             // only be built once.
             // Record the currently loaded network ID so we "stick" to this same graph on subsequent polls.
             networkId = task.graphId;
-            TransportNetwork transportNetwork = networkPreloader.preloadDataSynchronous(task);
+            // Note we're completely bypassing the async loader here and relying on the older nested LoadingCaches.
+            // If those are ever removed, the async loader will need a synchronous mode with per-key blocking (kind of
+            // reinventing the wheel of LoadingCache) or we'll need to make preparation for regional tasks async.
+            TransportNetwork transportNetwork = networkPreloader.transportNetworkCache.getNetwork(task.graphId);
 
             // If we are generating a static site, there must be a single metadata file for an entire batch of results.
             // Arbitrarily we create this metadata as part of the first task in the job.

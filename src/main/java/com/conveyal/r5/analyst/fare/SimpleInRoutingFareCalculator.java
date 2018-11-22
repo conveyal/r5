@@ -5,11 +5,11 @@ import com.conveyal.r5.profile.McRaptorSuboptimalPathProfileRouter;
 /**
  * A simple greedy fare calculator that simply applies a single fare at each boarding.
  */
-public class SimpleGreedyFareCalculator extends GreedyFareCalculator {
+public class SimpleInRoutingFareCalculator extends InRoutingFareCalculator {
     public int fare;
 
     @Override
-    public int calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state) {
+    public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state, int maxClockTime) {
         int fareForState = 0;
 
         while (state != null) {
@@ -17,7 +17,7 @@ public class SimpleGreedyFareCalculator extends GreedyFareCalculator {
             state = state.back;
         }
 
-        return fareForState;
+        return new FareBounds(fareForState, new TransferAllowance());
     }
 
     @Override

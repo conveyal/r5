@@ -132,6 +132,7 @@ public class Scenario implements Serializable {
 
         // Rebuild edge lists to account for changes from scenario application
         copiedNetwork.streetLayer.buildEdgeLists();
+        // TODO Elaborate on this
         // Rebuild distance tables affected by street network changes
         Geometry treeRebuildZone =
                 copiedNetwork.streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.DISTANCE_TABLE_SIZE_METERS);

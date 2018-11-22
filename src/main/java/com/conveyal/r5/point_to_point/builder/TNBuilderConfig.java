@@ -1,6 +1,6 @@
 package com.conveyal.r5.point_to_point.builder;
 
-import com.conveyal.r5.analyst.fare.GreedyFareCalculator;
+import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -123,7 +123,7 @@ public class TNBuilderConfig {
     public String bikeRentalFile;
 
     /** The fare calculator for analysis */
-    public GreedyFareCalculator analysisFareCalculator;
+    public InRoutingFareCalculator analysisFareCalculator;
 
     public TNBuilderConfig() {
         htmlAnnotations = false;

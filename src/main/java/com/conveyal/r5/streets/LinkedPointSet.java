@@ -395,6 +395,7 @@ public class LinkedPointSet implements Serializable {
      */
     public void makeStopToPointDistanceTables(Geometry treeRebuildZone) {
         LOG.info("Creating distance tables from each transit stop to PointSet points.");
+        // FIXME this is wasting a lot of memory and not needed for gridded pointsets - overload for gridded and freeform PointSets
         pointSet.createSpatialIndexAsNeeded();
         if (treeRebuildZone != null) {
             LOG.info("Selectively computing tables for only those stops that might be affected by the scenario.");
@@ -431,6 +432,7 @@ public class LinkedPointSet implements Serializable {
         counter.done();
     }
 
+    // FIXME Method and block inside are both synchronized on "this", is that right?
     public synchronized void makePointToStopDistanceTablesIfNeeded () {
         if (pointToStopDistanceTables != null) return;
 

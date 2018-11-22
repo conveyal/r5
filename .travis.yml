@@ -16,6 +16,11 @@ before_install: |
     gpg --import --batch maven-artifact-signing-key.asc
   fi
 
+# install dependencies used in after_success here because they don't get cached if called in after_success
+before_script:
+  - pip install --user awscli && export PATH=$PATH:~/.local/bin/
+  - yarn global add @conveyal/maven-semantic-release semantic-release
+
 # Replace Travis's default build step.
 # Run all Maven phases at once up through verify, install, and deploy.
 script: |
@@ -44,10 +49,11 @@ env:
 before_cache: rm -rf $HOME/.m2/repository/com/conveyal
 
 after_success:
+  # Perform a release to maven central using maven-semantic-release if needed
+  - semantic-release --prepare @conveyal/maven-semantic-release --publish @semantic-release/github,@conveyal/maven-semantic-release --verify-conditions @semantic-release/github --verify-release @conveyal/maven-semantic-release
   # Upload shaded JAR to S3. The un-shaded jar was deployed to our Maven repo during the main build.
   # Ideally we'd use the Travis S3 deployer here instead of installing the AWS CLI software every time.
   # See the analyst-server travis.yml for how to copy specific files to a subdirectory and deploy those.
-  - pip install --user awscli && export PATH=$PATH:~/.local/bin/
   # Upload the shaded jar. It's named with git describe, so begins with the last tag name, so begins with the letter v.
   # On the other hand, the main un-shaded artifact will begin with the project name 'r5'.
   - aws s3 cp --recursive --exclude "*" --include "v*.jar" /home/travis/build/conveyal/r5/target s3://r5-builds
@@ -78,7 +84,9 @@ git:
 # The Conveyal subdirectory is deleted in the script above to prevent retaining Conveyal snapshot artifacts across builds.
 cache:
   directories:
-  - $HOME/.m2/repository
+    - $HOME/.m2
+    - $HOME/.cache/yarn
+    - $HOME/.cache/pip
 
 notifications:
   slack: conveyal:vqrkN7708qU1OTL9XkbMqQFV

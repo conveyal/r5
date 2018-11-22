@@ -110,7 +110,9 @@ public class PointToPointQuery {
             Map<LegMode, TIntIntMap> egressTimes = egressRouter.entrySet().stream()
                     .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().getReachedStops()));
 
-            McRaptorSuboptimalPathProfileRouter router = new McRaptorSuboptimalPathProfileRouter(transportNetwork, request, accessTimes, egressTimes);
+            McRaptorSuboptimalPathProfileRouter router = new McRaptorSuboptimalPathProfileRouter(transportNetwork,
+                    request, accessTimes, egressTimes, (t)->new SuboptimalDominatingList(request.suboptimalMinutes),
+                    null);
             List<PathWithTimes> usefullpathList = new ArrayList<>();
 
             // getPaths actually returns a set, which is important so that things are deduplicated. However we need a list

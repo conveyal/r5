@@ -9,7 +9,7 @@ import gnu.trove.list.array.TIntArrayList;
 /**
  * Calculate fares in Bogotá, Colombia.
  */
-public class BogotaGreedyFareCalculator extends GreedyFareCalculator {
+public class BogotaInRoutingFareCalculator extends InRoutingFareCalculator {
     // base fares, all in Colombian pesos
     /** Fare to ride TPC (local service) */
     public int tpcBaseFare = 0;
@@ -40,7 +40,7 @@ public class BogotaGreedyFareCalculator extends GreedyFareCalculator {
     // There is also a maximum transfer window of 75 minutes but our analysis window is 60 minutes so it's non-binding
 
     @Override
-    public int calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state) {
+    public FareBounds calculateFare(McRaptorSuboptimalPathProfileRouter.McRaptorState state, int maxClockTime) {
         int fare = 0;
 
         // extract the relevant rides
@@ -79,7 +79,7 @@ public class BogotaGreedyFareCalculator extends GreedyFareCalculator {
             prevRouteType = routeType;
         }
 
-        return fare;
+        return new StandardFareBounds(fare);
     }
 
     @Override
@@ -90,7 +90,7 @@ public class BogotaGreedyFareCalculator extends GreedyFareCalculator {
     private enum RouteType {
         TPC, TRANSMILENIO;
 
-        public static RouteType fromAgencyName (String agencyName, BogotaGreedyFareCalculator calculator) {
+        public static RouteType fromAgencyName (String agencyName, BogotaInRoutingFareCalculator calculator) {
             if (calculator.tmAgencyName.equals(agencyName)) {
                 return TRANSMILENIO;
             } else {

@@ -58,8 +58,8 @@ public class PointToPointRouterServerTest {
 
         // assert that built network.dat file matches hash of network.dat file in test resources
         assertThat(
-            getFileHash(getResourceFile("network.dat")),
-            equalTo(getFileHash(networkDatFile))
+            getFileHash(networkDatFile),
+            equalTo(getFileHash(getResourceFile("network.dat")))
         );
     }
 

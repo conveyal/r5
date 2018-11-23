@@ -170,6 +170,7 @@ public class ObjectDiffer {
         depth += 1; // Depth could be read from breadcrumb length
         breadcrumbs.push(classToCompare);
         if (depth > MAX_RECURSION_DEPTH) {
+            difference("Max recursion depth exceeded."); // Print comparison stack to allow debugging
             throw new RuntimeException("Max recursion depth exceeded: " + MAX_RECURSION_DEPTH);
         }
         if (depth > maxDepthReached) {

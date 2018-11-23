@@ -129,7 +129,7 @@ public class ObjectDifferTest {
     private static void assertDifferences0 (boolean expectDifferences, Object a, Object b) {
         ObjectDiffer objectDiffer = new ObjectDiffer();
         objectDiffer.compareTwoObjects(a, b);
-        objectDiffer.printDifferences();
+        objectDiffer.printSummary();
         if (expectDifferences) {
             assertTrue(objectDiffer.hasDifferences());
         } else {

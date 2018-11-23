@@ -79,7 +79,7 @@ public class KryoNetworkSerializerTest {
             objectDiffer.enableComparingIdenticalObjects();
         }
         objectDiffer.compareTwoObjects(a, b);
-        objectDiffer.printDifferences();
+        objectDiffer.printSummary();
         assertFalse(objectDiffer.hasDifferences());
     }
 

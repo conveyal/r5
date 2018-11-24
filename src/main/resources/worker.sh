@@ -6,6 +6,10 @@
 # 0: the URL to grab the worker JAR from
 # 1: the AWS log group to use
 # 2: the worker configuration to use
+# 3: the (Auth0) accessGroup (useful for billing)
+# 4: the (Auth0) user who made the request that started the worker
+# 5: the UUID of the TransportNetwork the worker will start analyzing
+# 6: the worker version to use
 # If you are reading this comment inside the EC2 user data field, this variable substitution has already happened.
 # The string instance_id in curly brackets is substituted by EC2 at startup, not by our Java code. It and any shell
 # variable references that contain brackets are single-quoted to tell MessageFormat not to substitute them.
@@ -61,6 +65,17 @@ cat /etc/aws
 
 echo AWS Log agent logs:
 cat /var/log/awslogs.log
+
+# Set up aws cli
+mkdir ~/.aws
+cat > ~/.aws/config << EOF
+[default]
+region = $REGION
+EOF
+
+# Tag the instance (so we can identify it in the EC2 console)
+aws ec2 create-tags --resources '{instance_id}' --tags Key=Name,Value=AnalysisWorker,Key=Project,Value=Analysis&&
+Key=group,Value={3},Key=user,Value={4},Key=networkId,Value={5},Key=workerVersion,Value={6}
 
 # Download the worker
 sudo -u ec2-user wget -O ~ec2-user/r5.jar {0} >> $LOGFILE 2>&1

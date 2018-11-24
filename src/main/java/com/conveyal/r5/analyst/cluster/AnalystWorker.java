@@ -120,10 +120,10 @@ public class AnalystWorker implements Runnable {
     public static final int TESTING_FAILURE_RATE_PERCENT = 20;
 
     /** The minimum amount of time (in minutes) that this worker should stay alive after processing a single-point task. */
-    public static final int SINGLE_KEEPALIVE_MINUTES = 30;
+    public static final int SINGLE_KEEPALIVE_MINUTES = 20;
 
     /** The minimum amount of time (in minutes) that this worker should stay alive after processing a regional job task. */
-    public static final int REGIONAL_KEEPALIVE_MINUTES = 1;
+    public static final int REGIONAL_KEEPALIVE_MINUTES = 10;
 
     /** Whether this worker should shut down automatically when idle. */
     public final boolean autoShutdown;
@@ -257,9 +257,9 @@ public class AnalystWorker implements Runnable {
         this.networkPreloader = new NetworkPreloader(transportNetworkCache);
         this.autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown", "false"));
 
-        // Consider shutting this worker down once per hour, starting 55 minutes after it started up.
+        // Consider shutting this worker down every 10 minutes, starting 30 minutes after it started up.
         startupTime = System.currentTimeMillis();
-        nextShutdownCheckTime = startupTime + 55 * 60 * 1000;
+        nextShutdownCheckTime = startupTime + 30 * 60 * 1000;
 
         // Discover information about what EC2 instance / region we're running on, if any.
         // If the worker isn't running in Amazon EC2, then region will be unknown so fall back on a default, because
@@ -284,8 +284,8 @@ public class AnalystWorker implements Runnable {
     public void considerShuttingDown() {
         long now = System.currentTimeMillis();
         if (now > nextShutdownCheckTime && autoShutdown) {
-            // Check again exactly one hour later (assumes billing in one-hour increments)
-            nextShutdownCheckTime += 60 * 60 * 1000;
+            // Check again exactly ten minutes later (note that billing is now in second increments)
+            nextShutdownCheckTime += 10 * 60 * 1000;
             if (now > lastSinglePointTime + (SINGLE_KEEPALIVE_MINUTES * 60 * 1000) &&
                 now > lastRegionalTaskTime + (REGIONAL_KEEPALIVE_MINUTES * 60 * 1000)) {
                 LOG.info("Machine has been idle for at least {} minutes (single point) and {} minutes (regional), " +

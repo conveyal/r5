@@ -7,8 +7,6 @@ import com.conveyal.r5.profile.entur.util.Debug;
 import java.util.Arrays;
 import java.util.List;
 
-import static com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView.NOT_SET;
-import static com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView.UNREACHED;
 import static com.conveyal.r5.profile.entur.util.IntUtils.intToString;
 import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrCompact;
 import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrLong;
@@ -19,12 +17,14 @@ import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrLong;
  */
 public final class DebugState {
 
-    private static final List<Integer> DEBUG_STOPS = Arrays.asList();//45185,62028,16157,16426,39886,82455);
+    private static final List<Integer> DEBUG_STOPS = Arrays.asList(45185,62028,16157,16426,39886,82455);
     private static final List<Integer> DEBUG_TRIP = Arrays.asList(45185,62028,16157,16426,39886,82455);
     private static final int DEBUG_TRIP_START = 16157;
 
     private static final String STOP_HEADER = "Description Rnd  From  To     Start    End        Time   Trip";
     private static final String LINE_FORMAT = " * %-8s %2d   %5s %5s  %8s %8s %8s  %6s";
+
+    private static final int NOT_SET = Integer.MIN_VALUE;
 
     private static String title = "DEBUG";
     private static String headerPostfix = null;
@@ -77,9 +77,8 @@ public final class DebugState {
     private static <T extends TripScheduleInfo> String toString(StopArrivalView<T> state) {
 
         debugStopHeaderAtMostOnce();
+
         if (state.arrivedByTransit()) {
-            assertNotSet(state, state.departureTime(), UNREACHED);
-            assertNotSet(state, state.boardStop(), NOT_SET);
             assertTripNotNull(state);
 
             return format(
@@ -95,10 +94,6 @@ public final class DebugState {
 
         }
         else if (state.arrivedByTransfer()) {
-            assertNotSet(state, state.departureTime(), NOT_SET);
-            assertNotSet(state, state.transferFromStop(), NOT_SET);
-            assertTripNull(state);
-
             return format(
                     "Walk",
                     state.round(),
@@ -111,18 +106,13 @@ public final class DebugState {
             );
         }
         else {
-            assertSet(state, state.departureTime(), UNREACHED);
-            assertSet(state, state.boardStop(), NOT_SET);
-            assertSet(state, state.transferFromStop(), NOT_SET);
-            assertTripNull(state);
-
             return format(
                     "Access",
                     state.round(),
                     NOT_SET,
                     state.stop(),
-                    UNREACHED,
                     state.departureTime(),
+                    state.arrivalTime(),
                     NOT_SET,
                     null
             );
@@ -136,8 +126,8 @@ public final class DebugState {
                 round,
                 intToString(fromStop, NOT_SET),
                 toStop,
-                timeToStrLong(fromTime, UNREACHED),
-                timeToStrLong(toTime, UNREACHED),
+                timeToStrLong(fromTime, NOT_SET),
+                timeToStrLong(toTime, NOT_SET),
                 timeToStrCompact(dTime, NOT_SET),
                 trip == null ? "" : trip.debugInfo()
         );
@@ -158,12 +148,6 @@ public final class DebugState {
     private static <T extends TripScheduleInfo> void assertTripNotNull(StopArrivalView<T> state) {
         if (state.trip() == null) {
             throw new IllegalStateException("Unexpected 'null' value for trip. State: " + state);
-        }
-    }
-
-    private static <T extends TripScheduleInfo> void assertTripNull(StopArrivalView<T> state) {
-        if (state.trip() != null) {
-            throw new IllegalStateException("Unexpected value in for trip, expected 'null'. State: " + state);
         }
     }
 

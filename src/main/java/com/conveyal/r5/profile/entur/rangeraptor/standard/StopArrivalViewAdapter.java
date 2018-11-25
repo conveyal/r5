@@ -56,6 +56,16 @@ abstract class StopArrivalViewAdapter<T extends TripScheduleInfo> implements Sto
         }
 
         @Override
+        public int departureTimeAccess(int transitBoardTime) {
+            return departureTime;
+        }
+
+        @Override
+        public int arrivalTimeAccess(int transitBoardTime) {
+            return arrivalTime;
+        }
+
+        @Override
         public boolean arrivedByAccessLeg() {
             return true;
         }

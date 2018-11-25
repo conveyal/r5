@@ -22,47 +22,13 @@ public final class AccessStopArrival<T extends TripScheduleInfo> extends Abstrac
         return true;
     }
 
-    /**
-     * To
-     */
-    AbstractStopArrival<T> timeShifted(int boardTime) {
-        return new TimeShiftedAccessArrival<>(this, boardTime);
-    }
-
-    /* private methods */
-
-    private int departureTime(int transitBoardTime) {
+    @Override
+    public int departureTimeAccess(int transitBoardTime) {
         return calculator.originDepartureTime(transitBoardTime, accessDurationInSeconds);
     }
 
-    private int arrivalTime(int transitBoardTime) {
+    @Override
+    public int arrivalTimeAccess(int transitBoardTime) {
         return calculator.accessLegArrivalTime(transitBoardTime);
-    }
-
-
-    /* private classes */
-
-    private static class TimeShiftedAccessArrival<T extends TripScheduleInfo> extends AbstractStopArrival<T> {
-        private AccessStopArrival original;
-
-        private TimeShiftedAccessArrival(AccessStopArrival<T> origin, int transitBoardTime) {
-            super(
-                    origin.stop(),
-                    origin.departureTime(transitBoardTime),
-                    origin.arrivalTime(transitBoardTime),
-                    origin.cost()
-            );
-            this.original = origin;
-        }
-
-        @Override
-        public boolean arrivedByAccessLeg() {
-            return true;
-        }
-
-        @Override
-        public String toString() {
-            return asString("original: " + original);
-        }
     }
 }

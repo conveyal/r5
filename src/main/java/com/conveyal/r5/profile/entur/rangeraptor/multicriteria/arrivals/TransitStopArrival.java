@@ -9,7 +9,7 @@ public final class TransitStopArrival<T extends TripScheduleInfo> extends Abstra
 
     public TransitStopArrival(AbstractStopArrival<T> previousState, int round, int stopIndex, int arrivalTime, int boardTime, T trip) {
         super(
-                timeShifted(previousState, boardTime),
+                previousState,
                 round,
                 round * 2,
                 stopIndex,
@@ -48,13 +48,5 @@ public final class TransitStopArrival<T extends TripScheduleInfo> extends Abstra
             return true;
         }
         return false;
-    }
-
-    private static <T extends TripScheduleInfo> AbstractStopArrival<T> timeShifted(
-            AbstractStopArrival<T> previous, int boardTime
-    ) {
-        return previous.arrivedByAccessLeg()
-                ? ((AccessStopArrival<T>) previous).timeShifted(boardTime)
-                : previous;
     }
 }

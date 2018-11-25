@@ -66,10 +66,12 @@ public final class PathMapper {
         }
         while (from.arrivedByTransit());
 
+        int boardTimeTransit = transitLeg.fromTime();
+
         AccessPathLeg<T> accessLeg = new AccessPathLeg<T>(
-                from.departureTime(),
+                from.departureTimeAccess(boardTimeTransit),
                 from.stop(),
-                from.arrivalTime(),
+                from.arrivalTimeAccess(boardTimeTransit),
                 transitLeg
         );
 

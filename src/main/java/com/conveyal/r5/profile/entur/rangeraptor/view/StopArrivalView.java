@@ -4,33 +4,52 @@ package com.conveyal.r5.profile.entur.rangeraptor.view;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 
 public interface StopArrivalView<T extends TripScheduleInfo> {
-    /**
-     * Uninitialized
-     * This value essentially serves as Infinity for ints - it's bigger than every other number.
-     * It is the travel time to a transit stop or a target before that stop or target is ever reached.
-     * Be careful when propagating travel times from stops to targets, adding something to UNREACHED
-     * will cause an overflow error.
-     */
-    int UNREACHED = Integer.MAX_VALUE;
+
 
     /**
-     * Used to initialize all none time based attributes.
+     * Stop index where the arrival takes place
      */
-    int NOT_SET = -1;
-
-
     int stop();
 
+    /**
+     * The Range Raptor ROUND this stop is reached
+     */
     int round();
 
+    /**
+     * The last leg departure time.
+     */
     int departureTime();
 
+    /**
+     * The arrival time for when the stop is reached
+     */
     int arrivalTime();
 
+    /**
+     * Departure time from origin, time-shifted towards the transit board time.
+     */
+    default int departureTimeAccess(int transitBoardTime) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * The arrival time at the access stop, time-shifted towards the transit board time.
+     */
+    default int arrivalTimeAccess(int transitBoardTime) {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * The duration of the last leg
+     */
     default int legDuration() {
         return arrivalTime() - departureTime();
     }
 
+    /**
+     * The previous stop arrival state
+     */
     default StopArrivalView<T> previous() {
         throw new UnsupportedOperationException();
     }

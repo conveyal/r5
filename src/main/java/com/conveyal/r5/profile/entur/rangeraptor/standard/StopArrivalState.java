@@ -4,9 +4,6 @@ import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.util.IntUtils;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
 
-import static com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView.NOT_SET;
-import static com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView.UNREACHED;
-
 
 /**
  * This class main purpose is to hold data for a given arrival at a stop and raptor round. It should be as light
@@ -22,6 +19,22 @@ import static com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView.UNR
  * transit might be the best way (or only way) to get to another stop by transfer.
  */
 class StopArrivalState<T extends TripScheduleInfo> {
+    /**
+     * Uninitialized time values is set to this value to mark them as not set, and to mark the
+     * arrival as unreached. A big value is used to simplify the comparisons to see if a new
+     * arrival time is better (less).
+     * <p/>
+     * This value essentially serves as Infinity for ints - it's bigger than every other number.
+     * It is the travel time to a transit stop or a target before that stop or target is ever reached.
+     */
+    static final int UNREACHED = Integer.MAX_VALUE;
+
+    /**
+     * Used to initialize all none time based attributes.
+     */
+    private static final int NOT_SET = -1;
+
+
     // Best time
     private int bestArrivalTime = UNREACHED;
 

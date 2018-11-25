@@ -1,13 +1,14 @@
 package com.conveyal.r5.profile.entur.rangeraptor;
 
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 import com.conveyal.r5.profile.entur.util.Debug;
 
 import java.util.Arrays;
 import java.util.List;
 
-import static com.conveyal.r5.profile.entur.rangeraptor.RRStopArrival.NOT_SET;
-import static com.conveyal.r5.profile.entur.rangeraptor.RRStopArrival.UNREACHED;
+import static com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView.NOT_SET;
+import static com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView.UNREACHED;
 import static com.conveyal.r5.profile.entur.util.IntUtils.intToString;
 import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrCompact;
 import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrLong;
@@ -18,7 +19,7 @@ import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrLong;
  */
 public final class DebugState {
 
-    private static final List<Integer> DEBUG_STOPS = Arrays.asList(); //45185,62028,16157,16426,39886,82455);
+    private static final List<Integer> DEBUG_STOPS = Arrays.asList();//45185,62028,16157,16426,39886,82455);
     private static final List<Integer> DEBUG_TRIP = Arrays.asList(45185,62028,16157,16426,39886,82455);
     private static final int DEBUG_TRIP_START = 16157;
 
@@ -61,67 +62,67 @@ public final class DebugState {
         }
     }
 
-    public static <T extends TripScheduleInfo> void debugStop(int round, int stop, RRStopArrival<T> state) {
-        if (isDebug(stop)) {
-            System.err.println(toString(round, stop, state));
+    public static <T extends TripScheduleInfo> void debugStop(StopArrivalView<T> state) {
+        if (isDebug(state.stop())) {
+            System.err.println(toString(state));
         }
     }
 
-    public static <T extends TripScheduleInfo> void debugStop(int round, int stop, RRStopArrival<T> state, String stopPostfix) {
-        if (isDebug(stop)) {
-            System.err.println(toString(round, stop, state) + " | " + stopPostfix);
+    public static <T extends TripScheduleInfo> void debugStop(StopArrivalView<T> state, String stopPostfix) {
+        if (isDebug(state.stop())) {
+            System.err.println(toString(state) + " | " + stopPostfix);
         }
     }
 
-    private static <T extends TripScheduleInfo> String toString(int round, int stopIndex, RRStopArrival<T> state) {
+    private static <T extends TripScheduleInfo> String toString(StopArrivalView<T> state) {
+
         debugStopHeaderAtMostOnce();
         if (state.arrivedByTransit()) {
-            assertNotSet(state, state.boardTime(), UNREACHED);
+            assertNotSet(state, state.departureTime(), UNREACHED);
             assertNotSet(state, state.boardStop(), NOT_SET);
             assertTripNotNull(state);
 
             return format(
                     "Transit",
-                    round,
+                    state.round(),
                     state.boardStop(),
-                    stopIndex,
-                    state.boardTime(),
-                    state.transitTime(),
-                    state.transitTime() - state.boardTime(),
+                    state.stop(),
+                    state.departureTime(),
+                    state.arrivalTime(),
+                    state.legDuration(),
                     state.trip()
             );
 
         }
         else if (state.arrivedByTransfer()) {
-            assertNotSet(state, state.transferTime(), NOT_SET);
+            assertNotSet(state, state.departureTime(), NOT_SET);
             assertNotSet(state, state.transferFromStop(), NOT_SET);
             assertTripNull(state);
 
             return format(
                     "Walk",
-                    round,
+                    state.round(),
                     state.transferFromStop(),
-                    stopIndex,
-                    state.time() - state.transferTime(),
-                    state.time(),
-                    state.transferTime(),
+                    state.stop(),
+                    state.departureTime(),
+                    state.arrivalTime(),
+                    state.legDuration(),
                     null
             );
         }
         else {
-            assertSet(state, state.boardTime(), UNREACHED);
+            assertSet(state, state.departureTime(), UNREACHED);
             assertSet(state, state.boardStop(), NOT_SET);
-            assertSet(state, state.transferTime(), NOT_SET);
             assertSet(state, state.transferFromStop(), NOT_SET);
             assertTripNull(state);
 
             return format(
                     "Access",
-                    round,
+                    state.round(),
                     NOT_SET,
-                    stopIndex,
+                    state.stop(),
                     UNREACHED,
-                    state.time(),
+                    state.departureTime(),
                     NOT_SET,
                     null
             );
@@ -142,25 +143,25 @@ public final class DebugState {
         );
     }
 
-    private static void assertSet(RRStopArrival state, int value, int expectedDefault) {
+    private static <T extends TripScheduleInfo> void assertSet(StopArrivalView<T> state, int value, int expectedDefault) {
         if (value != expectedDefault) {
             throw new IllegalStateException("Unexpected value in state: " + value + ", state: " + state);
         }
     }
 
-    private static void assertNotSet(RRStopArrival state, int value, int expectedDefault) {
+    private static <T extends TripScheduleInfo> void assertNotSet(StopArrivalView<T> state, int value, int expectedDefault) {
         if (value == expectedDefault || value < 0) {
             throw new IllegalStateException("Unexpected value in state: " + value + ", state: " + state);
         }
     }
 
-    private static <T> void assertTripNotNull(RRStopArrival state) {
+    private static <T extends TripScheduleInfo> void assertTripNotNull(StopArrivalView<T> state) {
         if (state.trip() == null) {
             throw new IllegalStateException("Unexpected 'null' value for trip. State: " + state);
         }
     }
 
-    private static void assertTripNull(RRStopArrival state) {
+    private static <T extends TripScheduleInfo> void assertTripNull(StopArrivalView<T> state) {
         if (state.trip() != null) {
             throw new IllegalStateException("Unexpected value in for trip, expected 'null'. State: " + state);
         }

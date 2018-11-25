@@ -23,7 +23,7 @@ public class Destination<T extends TripScheduleInfo> extends ParetoSet<Destinati
     void transferToDestination(TransitStopArrival<T> lastTransitArrival, EgressLeg egressLeg) {
         add(new DestinationArrival<>(
                 lastTransitArrival,
-                lastTransitArrival.transitTime() + egressLeg.durationInSeconds(),
+                lastTransitArrival.arrivalTime() + egressLeg.durationInSeconds(),
                 lastTransitArrival.round(),
                 lastTransitArrival.cost() + egressLeg.cost()
         ));

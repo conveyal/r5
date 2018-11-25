@@ -2,36 +2,30 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 
 import com.conveyal.r5.profile.entur.api.AccessLeg;
-import com.conveyal.r5.profile.entur.api.EgressLeg;
-import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransferLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.arrivals.Stops;
-import com.conveyal.r5.profile.entur.util.BitSetIterator;
+import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
+import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
+import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Iterator;
 
 
 /**
- * Tracks the state of a RAPTOR search, specifically the best arrival times at each transit stop at the end of a
+ * Tracks the state of a Range Raptor search, specifically the best arrival times at each transit stop at the end of a
  * particular round, along with associated data to reconstruct paths etc.
  * <p>
  * This is grouped into a separate class (rather than just having the fields in the raptor worker class) because we
- * need to make copies of it when doing Monte Carlo frequency searches. While performing the range-raptor search,
- * we keep performing raptor searches at different departure times, stepping back in time, but operating on the same
- * set of states (one for each round). But after each one of those departure time searches, we want to run sub-searches
- * with different randomly selected schedules (the Monte Carlo draws). We don't want those sub-searches to invalidate
- * the states for the ongoing range-raptor search, so we make a protective copy.
+ * want to separate the logic of maintaining stop arrival state and performing the steps of the algorithm. This
+ * also make it possible to have more than one state implementation, which have ben used in the past to test different
+ * memory optimizations.
  * <p>
- * Note that this represents the entire state of the RAPTOR search for a single round, rather than the state at
- * a particular vertex (transit stop), as is the case with State objects in other search algorithms we have.
- *
- * @author mattwigway
+ * Note that this represents the entire state of the Range Raptor search for all rounds, rather than the state at
+ * a particular transit stop.
  */
 public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements WorkerState {
 
@@ -46,40 +40,43 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
      * To debug a particular journey set DEBUG to true and add all visited stops in the debugStops list.
      */
     private final Stops<T> stops;
-    private final StopArrivalCursor<T> cursor;
+    private final StopsCursor<T> cursor;
     private final int nRounds;
+    private final DestinationArrivals<T> results;
+
     private int round = 0;
     private int roundMax = -1;
 
-    /** Stop the search when the time excids the max time limit. */
+    /**
+     * Stop the search when the time excids the max time limit.
+     */
     private int maxTimeLimit;
 
 
-    /** The best times to reach each stop, whether via a transfer or via transit directly. */
+    /**
+     * The best times to reach each stop, whether via a transfer or via transit directly.
+     */
     private final BestTimes bestOverall;
 
-    /** Index to the best times for reaching stops via transit rather than via a transfer from another stop */
+    /**
+     * Index to the best times for reaching stops via transit rather than via a transfer from another stop
+     */
     private final BestTimes bestTransit;
 
-    /** The request input used to customize the worker to the clients needs. */
-    private final RangeRaptorRequest request;
 
-    /** If we're going to store paths to every destination (e.g. for static sites) then they'll be retained here. */
-    private final Collection<Path2<T>> paths = new ArrayList<>();
-
-    private final PathBuilderCursorBased pathBuilder;
-
-    /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
+    /**
+     * create a RaptorState for a network with a particular number of stops, and a given maximum duration
+     */
     RangeRaptorWorkerState(int nRounds, int nStops, RangeRaptorRequest request) {
+        TransitCalculator calculator = new TransitCalculator(request);
+
         this.nRounds = nRounds;
-        this.stops = new Stops<>(nRounds, nStops);
-        this.cursor = stops.newCursor();
+        this.stops = new Stops<>(nRounds, nStops, request.egressLegs, this::handleEgressStopArrival);
+        this.cursor = new StopsCursor<>(stops, calculator);
 
         this.bestOverall = new BestTimes(nStops);
         this.bestTransit = new BestTimes(nStops);
-
-        this.request = request;
-        this.pathBuilder = new PathBuilderCursorBased<>(stops.newCursor());
+        this.results = new DestinationArrivals<>(nRounds, new StopsCursor<>(stops, calculator));
     }
 
     @Override
@@ -92,12 +89,12 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
 
     @Override
     public boolean isNewRoundAvailable() {
-        final boolean moreRoundsToGo = round < nRounds-1;
+        final boolean moreRoundsToGo = round < nRounds - 1;
         return moreRoundsToGo && isCurrentRoundUpdated();
     }
 
-    public Collection<Path2<T>> paths() {
-        return paths;
+    public Collection<Path<T>> paths() {
+        return results.paths();
     }
 
     boolean isStopReachedInPreviousRound(int stop) {
@@ -108,21 +105,13 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
         return bestOverall.stopsReachedLastRound();
     }
 
-    private int getMaxNumberOfRounds() {
-        return roundMax;
-    }
-
-    private boolean isStopReachedByTransit(int stop) {
-        return bestTransit.isReached(stop);
-    }
-
     @Override
     public BitSetIterator stopsTouchedByTransitCurrentRound() {
         return bestTransit.stopsReachedCurrentRound();
     }
 
     int bestTimePreviousRound(int stop) {
-        return cursor.stop(round-1, stop).time();
+        return stops.get(round - 1, stop).time();
     }
 
     @Override
@@ -138,7 +127,7 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
     }
 
     @Override
-    public void setInitialTime(AccessLeg accessLeg, int fromTime, int boardSlackInSeconds) {
+    public void setInitialTime(AccessLeg accessLeg, int fromTime) {
         final int accessDurationInSeconds = accessLeg.durationInSeconds();
         final int stop = accessLeg.stop();
         final int arrivalTime = fromTime + accessDurationInSeconds;
@@ -182,22 +171,8 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
      * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
      */
     void addPathsForCurrentIteration() {
-        pathBuilder.setBoardSlackInSeconds(request.boardSlackInSeconds);
-
-        for (EgressLeg it : request.egressLegs) {
-
-            // TODO TGR -- Add egress transit time to path
-
-            if (isStopReachedByTransit(it.stop())) {
-                Path2 p = pathBuilder.extractPathForStop(getMaxNumberOfRounds(), it, request.accessLegs);
-                if (p != null) {
-                    paths.add(p);
-                }
-            }
-        }
+        results.addPathsForCurrentIteration();
     }
-
-
 
     public void debugStopHeader(String title) {
         DebugState.debugStopHeader(title, "Best     C P | Transit  C P");
@@ -228,13 +203,15 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
     }
 
     private void debugStop(int round, int stop) {
-        if(DebugState.isDebug(stop)) {
+        if (DebugState.isDebug(stop)) {
             DebugState.debugStop(
-                    round,
-                    stop,
                     cursor.stop(round, stop),
                     bestOverall.toString(stop) + " | " + bestTransit.toString(stop)
             );
         }
+    }
+
+    private void handleEgressStopArrival(EgressStopArrivalState<T> arrival) {
+        results.add(arrival);
     }
 }

@@ -5,7 +5,6 @@ import java.util.Iterator;
 
 
 /**
- * <p>
  *     This interface defines the data needed for the RangeRaptorWorker
  *     to do transit. {@link com.conveyal.r5.transit.TransitLayer} contains
  *     all that data - but not exactly in the flavour needed by the
@@ -13,10 +12,8 @@ import java.util.Iterator;
  *     possible to write small adapter in between. This also simplify
  *     the use of the Worker with other data sources, importing
  *     and adapting this code into other software like OTP.
- * </p>
- * <p>
- *     The implementation of this is refered to as the *adapter*.
- * </p>
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public interface TransitDataProvider<T extends TripScheduleInfo> {
 

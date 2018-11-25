@@ -1,13 +1,13 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
-import com.conveyal.r5.profile.entur.api.Path2;
-import com.conveyal.r5.profile.entur.api.TripPatternInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.TripScheduleBoardSearch;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
-import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
-import com.conveyal.r5.profile.entur.util.AvgTimer;
+import com.conveyal.r5.profile.entur.api.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.path.Path;
+import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleBoardSearch;
+import com.conveyal.r5.profile.entur.util.AvgTimer;
 
 import java.util.Collection;
 import java.util.Iterator;
@@ -57,7 +57,7 @@ public class RangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRange
     }
 
     @Override
-    protected Collection<Path2<T>> paths() {
+    protected Collection<Path<T>> paths() {
         return state.paths();
     }
 
@@ -87,7 +87,7 @@ public class RangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRange
             TripScheduleBoardSearch<T> search = new TripScheduleBoardSearch<>(pattern, this::skipTripSchedule);
 
             for (int stopPositionInPattern = 0; stopPositionInPattern < pattern.numberOfStopsInPattern(); stopPositionInPattern++) {
-                int stop = pattern.currentPatternStop(stopPositionInPattern);
+                int stop = pattern.stopIndex(stopPositionInPattern);
 
                 // attempt to alight if we're on board, done above the board search so that we don't check for alighting
                 // when boarding

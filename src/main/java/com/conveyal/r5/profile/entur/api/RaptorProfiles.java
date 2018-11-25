@@ -6,9 +6,14 @@ package com.conveyal.r5.profile.entur.api;
  * that suites your need best.
  */
 public enum RaptorProfiles {
-    /** Range Raptor finding the earliest arrival time, shortest travel duration and fewest transfers. */
+    /**
+     * Range Raptor finding the earliest arrival time, shortest travel duration and fewest transfers.
+     * The cost is not used.
+     */
     RANGE_RAPTOR,
-    /** Multi criteria pareto state with McRangeRaptor */
+    /**
+     * Multi criteria pareto state with McRangeRaptor.
+     */
     MULTI_CRITERIA_RANGE_RAPTOR
     ;
 
@@ -20,6 +25,9 @@ public enum RaptorProfiles {
     public boolean isPlainRangeRaptor() {
         return is(RANGE_RAPTOR);
     }
+
+
+    /* private methods */
 
     private boolean is(RaptorProfiles other) {
         return this == other;

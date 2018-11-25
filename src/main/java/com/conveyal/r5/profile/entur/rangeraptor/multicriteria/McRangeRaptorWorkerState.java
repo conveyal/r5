@@ -4,14 +4,15 @@ import com.conveyal.r5.profile.entur.api.AccessLeg;
 import com.conveyal.r5.profile.entur.api.EgressLeg;
 import com.conveyal.r5.profile.entur.api.TransferLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
+import com.conveyal.r5.profile.entur.api.path.Path;
+import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
+import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransferStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
-import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
-import com.conveyal.r5.profile.entur.api.Path2;
-import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 
 import java.util.BitSet;
 import java.util.Collection;
@@ -42,9 +43,9 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
 
 
     /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
-    McRangeRaptorWorkerState(int nRounds, int nStops, Collection<EgressLeg> egressLegs) {
+    McRangeRaptorWorkerState(int nRounds, int nStops, Collection<EgressLeg> egressLegs, TransitCalculator calculator) {
         this.nRounds = nRounds;
-        this.stops = new Stops<>(nStops, egressLegs);
+        this.stops = new Stops<>(nStops, egressLegs, calculator);
 
         this.touchedCurrent = new BitSet(nStops);
         this.touchedPrevious = new BitSet(nStops);
@@ -60,8 +61,8 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         round = 0;
     }
 
-    @Override public void setInitialTime(AccessLeg accessLeg, int fromTime, int boardSlackInSeconds) {
-        stops.setInitialTime(accessLeg, fromTime, boardSlackInSeconds);
+    @Override public void setInitialTime(AccessLeg accessLeg, int fromTime) {
+        stops.setInitialTime(accessLeg, fromTime);
         touchedCurrent.set(accessLeg.stop());
         debugStops(AccessStopArrival.class, round, accessLeg.stop());
     }
@@ -85,7 +86,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         return new BitSetIterator(touchedPrevious);
     }
 
-    Iterable<? extends AbstractStopArrival<T>> listStopStatesPreviousRound(int stop) {
+    Iterable<? extends AbstractStopArrival<T>> listStopArrivalsPreviousRound(int stop) {
         return stops.list(round-1, stop);
     }
 
@@ -125,7 +126,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         final int transferTimeInSeconds = transfer.durationInSeconds();
 
         for(AbstractStopArrival<T> it :  fromArrivals) {
-            int arrivalTime = it.time() + transferTimeInSeconds;
+            int arrivalTime = it.arrivalTime() + transferTimeInSeconds;
 
             if (arrivalTime < maxTimeLimit) {
                 if(stops.transferToStop(it, round, transfer, arrivalTime)) {
@@ -136,7 +137,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         debugStops(TransferStopArrival.class, round, targetStop);
     }
 
-    Collection<Path2<T>> extractPaths() {
+    Collection<Path<T>> extractPaths() {
         return stops.extractPaths();
     }
 
@@ -168,7 +169,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
             String postfix = (touchedCurrent.get(stop) ? "x " : "  ") + (touchedPrevious.get(stop) ? "x" : " ");
             for (AbstractStopArrival<T> it : stops.list(round, stop)) {
                 if(it.getClass() == type) {
-                    DebugState.debugStop(round, stop, it, postfix);
+                    DebugState.debugStop(it, postfix);
                 }
             }
         }

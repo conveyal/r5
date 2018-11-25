@@ -1,8 +1,7 @@
-package com.conveyal.r5.profile.entur.rangeraptor;
+package com.conveyal.r5.profile.entur.rangeraptor.transit;
 
 import com.conveyal.r5.profile.entur.api.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-
 
 import java.util.function.Function;
 

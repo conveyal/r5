@@ -3,16 +3,16 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.AccessLeg;
 import com.conveyal.r5.profile.entur.api.EgressLeg;
-import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.TransferLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
+import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransferStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.path.McPathBuilder;
+import com.conveyal.r5.profile.entur.rangeraptor.path.PathMapper;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.Debug;
-
 
 import java.util.Collection;
 import java.util.stream.Collectors;
@@ -24,27 +24,33 @@ import static java.util.Collections.emptyList;
  * This class serve as a thin wrapper around the stops array and the destination arrivals.
  */
 final class Stops<T extends TripScheduleInfo> {
-    private McPathBuilder<T> pathBuilder = new McPathBuilder<>();
-
     private final Stop<T>[] stops;
     private final Destination<T> destination = new Destination<>();
+    private final TransitCalculator calculator;
 
     /**
      * Set the time at a transit index iff it is optimal. This sets both the best time and the transfer time
      */
-    Stops(int nStops, Collection<EgressLeg> egressLegs) {
+    Stops(int nStops, Collection<EgressLeg> egressLegs, TransitCalculator calculator) {
         //noinspection unchecked
         this.stops = (Stop<T>[]) new Stop[nStops];
+        this.calculator = calculator;
 
         for (EgressLeg it : egressLegs) {
             this.stops[it.stop()] = new EgressStop<>(it, destination);
         }
     }
 
-    void setInitialTime(AccessLeg accessLeg, int fromTime, int boardSlackInSeconds) {
+    void setInitialTime(AccessLeg accessLeg, int fromTime) {
         final int stop = accessLeg.stop();
         findOrCreateSet(stop).add(
-                new AccessStopArrival<>(accessLeg, fromTime, boardSlackInSeconds)
+                new AccessStopArrival<>(
+                        accessLeg.stop(),
+                        fromTime,
+                        accessLeg.durationInSeconds(),
+                        accessLeg.cost(),
+                        calculator
+                )
         );
     }
 
@@ -57,13 +63,13 @@ final class Stops<T extends TripScheduleInfo> {
         return findOrCreateSet(transferLeg.stop()).add(new TransferStopArrival<>(previous, round, transferLeg, arrivalTime));
     }
 
-    Collection<Path2<T>> extractPaths() {
+    Collection<Path<T>> extractPaths() {
         debugStateInfo();
-        return destination.stream().map(pathBuilder::buildPath).collect(Collectors.toList());
+        return destination.stream().map(PathMapper::mapToPath).collect(Collectors.toList());
     }
 
     /**
-     * List all transfers arrived last round.
+     * List all transits arrived last round.
      * <p/>
      * <b>NOTE! This method can only be called once per round, after the call the flags are cleared automatically.</b>
      */

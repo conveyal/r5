@@ -3,8 +3,12 @@ package com.conveyal.r5.speed_test;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetPath;
-import com.conveyal.r5.profile.entur.api.Path2;
-import com.conveyal.r5.profile.entur.api.PathLeg;
+import com.conveyal.r5.profile.entur.api.path.AccessPathLeg;
+import com.conveyal.r5.profile.entur.api.path.EgressPathLeg;
+import com.conveyal.r5.profile.entur.api.path.Path;
+import com.conveyal.r5.profile.entur.api.path.PathLeg;
+import com.conveyal.r5.profile.entur.api.path.TransferPathLeg;
+import com.conveyal.r5.profile.entur.api.path.TransitPathLeg;
 import com.conveyal.r5.speed_test.api.model.AgencyAndId;
 import com.conveyal.r5.speed_test.api.model.Leg;
 import com.conveyal.r5.speed_test.api.model.Place;
@@ -25,14 +29,14 @@ import java.util.List;
 import java.util.TimeZone;
 import java.util.stream.Collectors;
 
-public class ItineraryMapper2 {
+class ItineraryMapper2 {
     private TransportNetwork transportNetwork;
 
     ItineraryMapper2(TransportNetwork transportNetwork) {
         this.transportNetwork = transportNetwork;
     }
 
-    SpeedTestItinerary createItinerary(ProfileRequest request, Path2<TripSchedule> path, StreetPath accessPath, StreetPath egressPath) {
+    SpeedTestItinerary createItinerary(ProfileRequest request, Path<TripSchedule> path, StreetPath accessPath, StreetPath egressPath) {
         SpeedTestItinerary itinerary = new SpeedTestItinerary();
         if (path == null) {
             return null;
@@ -55,7 +59,7 @@ public class ItineraryMapper2 {
 
         // Access leg
         Leg leg = new Leg();
-        PathLeg<TripSchedule> accessLeg = path.accessLeg();
+        AccessPathLeg<TripSchedule> accessLeg = path.accessLeg();
 
         Stop firstStop = transitLayer().stopForIndex.get(accessLeg.toStop());
 
@@ -72,23 +76,28 @@ public class ItineraryMapper2 {
 
         itinerary.addLeg(leg);
 
-        PathLeg prevPathLeg = accessLeg;
+        PathLeg<TripSchedule> pathLeg = accessLeg.nextLeg();
 
-        for (PathLeg<TripSchedule> pathLeg :  path.legs()) {
-            Stop fromStop = transitLayer().stopForIndex.get(pathLeg.fromStop());
-            Stop toStop = transitLayer().stopForIndex.get(pathLeg.toStop());
+        int previousArrivalTime = -1;
+
+        while (pathLeg.isTransitLeg() || pathLeg.isTransferLeg()) {
             leg = new Leg();
 
             // Transfer leg if present
-            if (pathLeg.isTransfer()) {
+            if (pathLeg.isTransferLeg()) {
+                TransferPathLeg it = pathLeg.asTransferLeg();
+                Stop fromStop = transitLayer().stopForIndex.get(it.fromStop());
+                Stop toStop = transitLayer().stopForIndex.get(it.toStop());
+                previousArrivalTime = it.toTime();
 
-                StreetPath transferPath = getWalkLegCoordinates(pathLeg.fromStop(), pathLeg.toStop());
+
+                StreetPath transferPath = getWalkLegCoordinates(it.fromStop(), it.toStop());
                 List<Coordinate> transferCoords = transferPath.getEdges().stream()
                         .map(t -> new Coordinate(transferPath.getEdge(t).getGeometry().getCoordinate().x, transferPath
                                 .getEdge(t).getGeometry().getCoordinate().y)).collect(Collectors.toList());
 
-                leg.startTime = createCalendar(request.date, pathLeg.fromTime());
-                leg.endTime = createCalendar(request.date, pathLeg.toTime());
+                leg.startTime = createCalendar(request.date, it.fromTime());
+                leg.endTime = createCalendar(request.date, previousArrivalTime);
                 leg.mode = "WALK";
                 leg.from = new Place(fromStop.stop_lat, fromStop.stop_lon, fromStop.stop_name);
                 leg.to = new Place(toStop.stop_lat, toStop.stop_lon, toStop.stop_name);
@@ -99,24 +108,29 @@ public class ItineraryMapper2 {
             }
             else {
                 // Transit leg
+                TransitPathLeg<TripSchedule> it = pathLeg.asTransitLeg();
+                Stop fromStop = transitLayer().stopForIndex.get(it.fromStop());
+                Stop toStop = transitLayer().stopForIndex.get(it.toStop());
+
+                itinerary.transitTime += it.toTime() - it.fromTime();
+                itinerary.waitingTime += it.fromTime() - previousArrivalTime;
+                previousArrivalTime = it.toTime();
+
                 ++numberOfTransits;
                 leg.distance = 0.0;
 
-                TripSchedule tripSchedule = pathLeg.trip();
+                TripSchedule tripSchedule = it.trip();
                 TripPattern tripPattern = tripSchedule.tripPattern();
                 RouteInfo routeInfo = transitLayer().routes.get(tripPattern.routeIndex);
 
-                itinerary.transitTime += pathLeg.toTime() - pathLeg.fromTime();
-
-                itinerary.waitingTime += pathLeg.fromTime() - prevPathLeg.toTime();
 
                 leg.from = new Place(fromStop.stop_lat, fromStop.stop_lon, fromStop.stop_name);
                 leg.from.stopId = new AgencyAndId("RB", fromStop.stop_id);
-                leg.from.stopIndex = pathLeg.fromStop();
+                leg.from.stopIndex = it.fromStop();
 
                 leg.to = new Place(toStop.stop_lat, toStop.stop_lon, toStop.stop_name);
                 leg.to.stopId = new AgencyAndId("RB", toStop.stop_id);
-                leg.to.stopIndex = pathLeg.toStop();
+                leg.to.stopIndex = it.toStop();
 
                 leg.route = routeInfo.route_short_name;
                 leg.agencyName = routeInfo.agency_name;
@@ -130,30 +144,30 @@ public class ItineraryMapper2 {
                 List<Coordinate> transitLegCoordinates = new ArrayList<>();
                 boolean boarded = false;
                 for (int j = 0; j < tripPattern.stops.length; j++) {
-                    if (!boarded && tripSchedule.departures[j] == pathLeg.fromTime()) {
+                    if (!boarded && tripSchedule.departures[j] == it.fromTime()) {
                         boarded = true;
                     }
                     if (boarded) {
                         transitLegCoordinates.add(new Coordinate(transitLayer().stopForIndex.get(tripPattern.stops[j]).stop_lon,
                                 transitLayer().stopForIndex.get(tripPattern.stops[j]).stop_lat));
                     }
-                    if (boarded && tripSchedule.arrivals[j] == pathLeg.toTime()) {
+                    if (boarded && tripSchedule.arrivals[j] == it.toTime()) {
                         break;
                     }
                 }
 
                 leg.legGeometry = PolylineEncoder.createEncodings(transitLegCoordinates);
 
-                leg.startTime = createCalendar(request.date, pathLeg.fromTime());
-                leg.endTime = createCalendar(request.date, pathLeg.toTime());
+                leg.startTime = createCalendar(request.date, it.fromTime());
+                leg.endTime = createCalendar(request.date, it.toTime());
             }
             itinerary.addLeg(leg);
-            prevPathLeg = pathLeg;
+            pathLeg = pathLeg.nextLeg();
         }
 
         // Egress leg
         leg = new Leg();
-        PathLeg<TripSchedule> egressLeg = path.egressLeg();
+        EgressPathLeg<TripSchedule> egressLeg = pathLeg.asEgressLeg();
 
         Stop lastStop = transitLayer().stopForIndex.get(egressLeg.fromStop());
         leg.startTime = createCalendar(request.date, egressLeg.fromTime());

@@ -3,20 +3,17 @@ package com.conveyal.r5.speed_test;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.profile.FastRaptorWorker;
-import com.conveyal.r5.profile.Path;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetPath;
-import com.conveyal.r5.profile.entur.Path2ParetoSortableWrapper;
 import com.conveyal.r5.profile.entur.RangeRaptorService;
-import com.conveyal.r5.profile.entur.api.RaptorProfiles;
-import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
+import com.conveyal.r5.profile.entur.api.RaptorProfiles;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.TuningParameters;
+import com.conveyal.r5.profile.entur.api.path.Path;
+import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 import com.conveyal.r5.profile.entur.transitadapter.TransitLayerRRDataProvider;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
-import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.Place;
 import com.conveyal.r5.speed_test.api.model.TripPlan;
@@ -43,7 +40,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 import static com.conveyal.r5.profile.entur.util.TimeUtils.midnightOf;
 
@@ -219,7 +215,7 @@ public class SpeedTest {
             int[][] transitTravelTimesToStops = TIMER_WORKER.timeAndReturn( worker::route );
 
             int bestKnownTime = Integer.MAX_VALUE; // Hack to bypass Java stupid "effectively final" requirement.
-            Path bestKnownPath = null;
+            com.conveyal.r5.profile.Path bestKnownPath = null;
             TIntIntIterator egressTimeIterator = streetRouter.egressTimesToStopsInSeconds.iterator();
             int egressTime = 0;
             int accessTime = 0;
@@ -284,7 +280,7 @@ public class SpeedTest {
 
             RangeRaptorService<TripSchedule> service = new RangeRaptorService<>(tuningParameters);
 
-            Collection<Path2<TripSchedule>> path2s = service.route(req, transitData);
+            Collection<Path<TripSchedule>> path2s = service.route(req, transitData);
 
             TIMER_WORKER.stop();
 
@@ -301,19 +297,19 @@ public class SpeedTest {
                 TODO TGR - we could probably do this with a HashSet instead, but the optimal solution is to fix the
                 TODO TGR - route iterator to only return new paths.
             */
-            if(req.profile.isPlainRangeRaptor()) {
-                ParetoSet<Path2ParetoSortableWrapper> paths = new ParetoSet<>(Path2ParetoSortableWrapper.paretoDominanceFunctions());
-                for (Path2<TripSchedule> p : path2s) {
-                    paths.add(new Path2ParetoSortableWrapper(p));
-                }
-                path2s = paths.stream().map(it -> it.path).collect(Collectors.toList());
-            }
+            //if(req.profile.isPlainRangeRaptor()) {
+                //ParetoSet<Path2ParetoSortableWrapper> paths = new ParetoSet<>(Path2ParetoSortableWrapper.paretoDominanceFunctions());
+                //for (Path<TripSchedule> p : path2s) {
+                //    paths.add(new Path2ParetoSortableWrapper(p));
+                //}
+                //path2s = paths.stream().map(it -> it.path).collect(Collectors.toList());
+            //}
 
             numOfPathsFound.add(path2s.size());
 
             TIMER_COLLECT_RESULTS_ITINERARIES.start();
 
-            for (Path2<TripSchedule> p : path2s) {
+            for (Path<TripSchedule> p : path2s) {
                 itineraries.add(createItinerary(request, streetRouter, p));
             }
 
@@ -358,14 +354,14 @@ public class SpeedTest {
         }
     }
 
-    private SpeedTestItinerary createItinerary(ProfileRequest request, EgressAccessRouter streetRouter, Path path) {
+    private SpeedTestItinerary createItinerary(ProfileRequest request, EgressAccessRouter streetRouter, com.conveyal.r5.profile.Path path) {
         StreetPath accessPath = streetRouter.accessPath(path.boardStops[0]);
         StreetPath egressPath = streetRouter.egressPath(path.alightStops[path.alightStops.length - 1]);
         return itineraryMapper.createItinerary(request, path, accessPath, egressPath);
     }
 
     private SpeedTestItinerary createItinerary(
-            ProfileRequest request, EgressAccessRouter streetRouter, Path2<TripSchedule> path
+            ProfileRequest request, EgressAccessRouter streetRouter, Path<TripSchedule> path
     ) {
         StreetPath accessPath = streetRouter.accessPath(path.accessLeg().toStop());
         StreetPath egressPath = streetRouter.egressPath(path.egressLeg().fromStop());

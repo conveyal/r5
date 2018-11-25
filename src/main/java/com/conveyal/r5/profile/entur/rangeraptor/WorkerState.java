@@ -9,7 +9,7 @@ import java.util.Iterator;
 public interface WorkerState {
     void initNewDepartureForMinute(int nextMinuteDepartureTime);
 
-    void setInitialTime(AccessLeg accessLeg, int nextMinuteDepartureTime, int boardSlackInSeconds);
+    void setInitialTime(AccessLeg accessLeg, int nextMinuteDepartureTime);
 
     void debugStopHeader(String header);
 

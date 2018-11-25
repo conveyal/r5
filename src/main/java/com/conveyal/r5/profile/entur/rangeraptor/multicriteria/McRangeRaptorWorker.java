@@ -1,15 +1,16 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
-import com.conveyal.r5.profile.entur.api.TripPatternInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
-import com.conveyal.r5.profile.entur.util.BitSetIterator;
-import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
-import com.conveyal.r5.profile.entur.rangeraptor.TripScheduleBoardSearch;
+import com.conveyal.r5.profile.entur.api.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.path.Path;
+import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleBoardSearch;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
+import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
 import java.util.Collection;
 import java.util.Iterator;
@@ -53,13 +54,14 @@ public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRan
                 new McRangeRaptorWorkerState<>(
                         nRounds,
                         transitData.numberOfStops(),
-                        request.egressLegs
+                        request.egressLegs,
+                        new TransitCalculator(request)
                 ),
                 request
         );
     }
 
-    @Override protected Collection<Path2<T>> paths() {
+    @Override protected Collection<Path<T>> paths() {
         return state.extractPaths();
     }
 
@@ -81,17 +83,17 @@ public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRan
             TripScheduleBoardSearch<T> search = new TripScheduleBoardSearch<>(pattern, this::skipTripSchedule);
 
             for (int boardStopPosInPtn = 0; boardStopPosInPtn < pattern.numberOfStopsInPattern(); boardStopPosInPtn++) {
-                int boardStopIndex = pattern.currentPatternStop(boardStopPosInPtn);
+                int boardStopIndex = pattern.stopIndex(boardStopPosInPtn);
 
-                for (AbstractStopArrival<T> boardStop : state.listStopStatesPreviousRound(boardStopIndex)) {
+                for (AbstractStopArrival<T> boardStop : state.listStopArrivalsPreviousRound(boardStopIndex)) {
 
-                    int earliestBoardTime = earliestBoardTime(boardStop.time());
+                    int earliestBoardTime = earliestBoardTime(boardStop.arrivalTime());
                     boolean found = search.search(earliestBoardTime, boardStopPosInPtn);
 
-                    for (int alightStopPosInPtn = boardStopPosInPtn + 1; alightStopPosInPtn < pattern.numberOfStopsInPattern(); alightStopPosInPtn++) {
-                        int alightStopIndex = pattern.currentPatternStop(alightStopPosInPtn);
+                    if (found) {
+                        for (int alightStopPosInPtn = boardStopPosInPtn + 1; alightStopPosInPtn < pattern.numberOfStopsInPattern(); alightStopPosInPtn++) {
+                            int alightStopIndex = pattern.stopIndex(alightStopPosInPtn);
 
-                        if (found) {
                             T trip = search.candidateTrip;
                             state.transitToStop(
                                     boardStop,

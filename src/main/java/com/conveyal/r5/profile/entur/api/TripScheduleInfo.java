@@ -4,10 +4,10 @@ package com.conveyal.r5.profile.entur.api;
 /**
  * The purpose of this interface is to provide information about the
  * trip schedule. The trip is a child of, and lives in the context
- * of a pattern.
+ * of a trip pattern.
  * <p/>
  * The purpose of hiding these attributes behind an interface is to
- * allow the implementation to chose the most efficent underlying
+ * allow the implementation to chose the most efficient underlying
  * implementation that suits its needs.
  */
 public interface TripScheduleInfo {
@@ -28,11 +28,11 @@ public interface TripScheduleInfo {
 
     /**
      * The implementation should provide a very short description with enough information to identify
-     * the the trip.
+     * the the trip. This is used for debugging and logging.
      * <p/>
      * In a GTFS world this would be <em>pattern index/id</em> and <em>trip index</em>. Use something like this:
      * <p/>
-     * {@code "ptn=5, trip=12"}
+     * {@code "P-5_T-12"}
      */
     String debugInfo();
 }

@@ -2,16 +2,19 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.TestLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransferStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.Arrays;
+import java.util.Collections;
 
 public class StopArrivalStateParetoSetTest {
+    private static final TransitCalculator CALCULATOR = new TransitCalculator(Collections.emptyList(), 60);
     // 08:35 in seconds
     private static final int A_TIME = ((8 * 60) + 35) * 60;
     private static final int ANY = 3;
@@ -91,12 +94,12 @@ public class StopArrivalStateParetoSetTest {
     }
 
     private void assertStopsInSet(int ... expStopIndexes) {
-        int[] result = subject.stream().mapToInt(AbstractStopArrival::stopIndex).sorted().toArray();
+        int[] result = subject.stream().mapToInt(AbstractStopArrival::stop).sorted().toArray();
         Assert.assertEquals("Stop indexes", Arrays.toString(expStopIndexes), Arrays.toString(result));
     }
 
     private static AccessStopArrival<TripScheduleInfo> newMcAccessStopState(int stop, int accessDurationInSeconds) {
-        return new AccessStopArrival<>(new TestLeg(stop, accessDurationInSeconds), A_TIME, ANY);
+        return new AccessStopArrival<>(stop, A_TIME, accessDurationInSeconds, ANY, CALCULATOR);
     }
 
     private static TransitStopArrival<TripScheduleInfo> newMcTransitStopState(AbstractStopArrival<TripScheduleInfo> prev, int round, int stop, int arrivalTime) {

@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
  * This {@link java.util.Collection} store all pareto-optimal elements. The
  * {@link #add(Object)} method returns {@code true} if and only if the element
  * was added successfully. When an element is added other elements witch are no
- * longer pareto-optimal are droped.
+ * longer pareto-optimal are dropped.
  * <p/>
  * Like the {@link java.util.ArrayList} the elements are stored internally in
  * an array for performance reasons, but the order is <em>not</em> guaranteed.
@@ -61,8 +61,8 @@ public class ParetoSet<T> extends AbstractCollection<T> {
         for (int i = 0; i < size; ++i) {
             T it = elements[i];
 
-            boolean leftDominance = comparator.leftDominanceExist(newValue, it);
-            boolean rightDominance = comparator.rightDominanceExist(newValue, it);
+            boolean leftDominance = leftDominanceExist(newValue, it);
+            boolean rightDominance = rightDominanceExist(newValue, it);
 
             if (leftDominance && rightDominance) {
                 mutualDominanceExist = true;
@@ -105,8 +105,8 @@ public class ParetoSet<T> extends AbstractCollection<T> {
         boolean equivalentVectorExist = false;
 
         for (int i = 0; i < size; ++i) {
-            boolean leftDominance = comparator.leftDominanceExist(newValue, elements[i]);
-            boolean rightDominance = comparator.rightDominanceExist(newValue, elements[i]);
+            boolean leftDominance = leftDominanceExist(newValue, elements[i]);
+            boolean rightDominance = rightDominanceExist(newValue, elements[i]);
 
 
             if (leftDominance && rightDominance) {
@@ -181,8 +181,7 @@ public class ParetoSet<T> extends AbstractCollection<T> {
     }
 
     private boolean leftVectorDominatesRightVector(T left, T right) {
-        return comparator.leftDominanceExist(left, right) &&
-                !comparator.rightDominanceExist(left, right);
+        return leftDominanceExist(left, right) && !rightDominanceExist(left, right);
     }
 
     private void appendValue(T newValue) {
@@ -193,5 +192,13 @@ public class ParetoSet<T> extends AbstractCollection<T> {
         if (size == elements.length) {
             elements = Arrays.copyOf(elements, elements.length * 2);
         }
+    }
+
+    private boolean leftDominanceExist(T left, T right) {
+        return comparator.leftDominanceExist(left, right);
+    }
+
+    private boolean rightDominanceExist(T left, T right) {
+        return comparator.leftDominanceExist(right, left);
     }
 }

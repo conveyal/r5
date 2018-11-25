@@ -1,10 +1,11 @@
 package com.conveyal.r5.profile.entur.rangeraptor;
 
 import com.conveyal.r5.profile.entur.api.AccessLeg;
-import com.conveyal.r5.profile.entur.api.Path2;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.path.Path;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
@@ -38,6 +39,9 @@ import java.util.Collection;
 @SuppressWarnings("Duplicates")
 public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends TripScheduleInfo> implements Worker<T> {
 
+    /** The request input used to customize the worker to the clients needs. */
+    private final RangeRaptorRequest request;
+
     /** the transit data role needed for routing */
     protected final TransitDataProvider<T> transit;
 
@@ -53,13 +57,15 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
      */
     protected final S state;
 
-    /** The request input used to customize the worker to the clients needs. */
-    protected final RangeRaptorRequest request;
+
+    private final TransitCalculator transitCalculator;
+
 
     public AbstractRangeRaptorWorker(TransitDataProvider<T> transitData, S state, RangeRaptorRequest request) {
         this.transit = transitData;
         this.state = state;
         this.request = request;
+        this.transitCalculator = new TransitCalculator(request);
     }
 
     // Track time spent, measure performance
@@ -70,7 +76,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
     protected abstract AvgTimer timerByMinuteScheduleSearch();
     protected abstract AvgTimer timerByMinuteTransfers();
 
-    protected abstract Collection<Path2<T>> paths();
+    protected abstract Collection<Path<T>> paths();
 
     /**
      * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
@@ -90,7 +96,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
      * @return a unique set of paths
      */
     @Override
-    public Collection<Path2<T>> route() {
+    public Collection<Path<T>> route() {
         timerRoute().time(() -> {
             timerSetup(transit::init);
 
@@ -110,7 +116,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
 
 
     protected final int earliestBoardTime(int time) {
-        return time + request.boardSlackInSeconds;
+        return transitCalculator.earliestBoardTime(time);
     }
 
     /** Skip trips NOT running on the day of the search and skip frequency trips */
@@ -162,7 +168,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
 
         // add initial stops
         for (AccessLeg it : request.accessLegs) {
-            state.setInitialTime(it, nextMinuteDepartureTime, request.boardSlackInSeconds);
+            state.setInitialTime(it, nextMinuteDepartureTime);
         }
     }
 

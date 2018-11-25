@@ -4,19 +4,20 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 
 public final class TransitStopArrival<T extends TripScheduleInfo> extends AbstractStopArrival<T> {
-    private final int boardTime;
     private final T trip;
     private boolean arrivedByTransitLastRound = true;
 
-    public TransitStopArrival(AbstractStopArrival<T> previousState, int round, int stopIndex, int time, int boardTime, T trip) {
-        super(previousState, round, round * 2, stopIndex, time, previousState.cost());
+    public TransitStopArrival(AbstractStopArrival<T> previousState, int round, int stopIndex, int arrivalTime, int boardTime, T trip) {
+        super(
+                timeShifted(previousState, boardTime),
+                round,
+                round * 2,
+                stopIndex,
+                boardTime,
+                arrivalTime,
+                previousState.cost()
+        );
         this.trip = trip;
-        this.boardTime = boardTime;
-    }
-
-    @Override
-    public int transitTime() {
-        return time();
     }
 
     @Override
@@ -34,26 +35,6 @@ public final class TransitStopArrival<T extends TripScheduleInfo> extends Abstra
         return previousStop();
     }
 
-    @Override
-    public int boardTime() {
-        return boardTime;
-    }
-
-    /**
-     * The 'origin from time' is when the journey started. The access leg is time-shifted
-     * towards the first transit leg.
-     */
-    @Override
-    int originFromTime() {
-        // An access leg is allways followed by an Transit leg; Hence the
-        // implementation is put here and not in the super class
-        if(previousArrival() instanceof AccessStopArrival) {
-            return ((AccessStopArrival) previousArrival()).originFromTime(boardTime);
-        }
-        // If this transit is not the first, propagate forward to previous leg
-        return previousArrival().originFromTime();
-    }
-
     /**
      * This method return true if we arrived at this stop in the last round.
      * <p/>
@@ -62,10 +43,18 @@ public final class TransitStopArrival<T extends TripScheduleInfo> extends Abstra
      * first time it is called.
      */
     public boolean arrivedByTransitLastRound() {
-        if(arrivedByTransitLastRound) {
+        if (arrivedByTransitLastRound) {
             arrivedByTransitLastRound = false;
             return true;
         }
         return false;
+    }
+
+    private static <T extends TripScheduleInfo> AbstractStopArrival<T> timeShifted(
+            AbstractStopArrival<T> previous, int boardTime
+    ) {
+        return previous.arrivedByAccessLeg()
+                ? ((AccessStopArrival<T>) previous).timeShifted(boardTime)
+                : previous;
     }
 }

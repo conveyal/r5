@@ -2,7 +2,8 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
-import com.conveyal.r5.profile.entur.rangeraptor.RRStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
+import com.conveyal.r5.profile.entur.util.TimeUtils;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparatorBuilder;
 
@@ -10,126 +11,93 @@ import java.util.LinkedList;
 import java.util.List;
 
 
-public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements RRStopArrival<T> {
+/**
+ * Abstract super class for multi-criteria stop arrival.
+ * <p/>
+ */
+public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements StopArrivalView<T> {
 
-    /**
-     * The pareto function MUST match the {@code ParetoSortable} implementation below
-     */
-    public static <T extends TripScheduleInfo> ParetoComparator<AbstractStopArrival<T>> paretoComperator() {
+    public static <T extends TripScheduleInfo> ParetoComparator<AbstractStopArrival<T>> paretoComparator() {
         return new ParetoComparatorBuilder<AbstractStopArrival<T>>()
-                .lessThen((v) -> v.time)
+                .lessThen((v) -> v.arrivalTime)
                 .lessThen((v) -> v.roundPareto)
                 .lessThen((v) -> v.cost)
                 .build();
     }
 
-    private final AbstractStopArrival<T> previousArrival;
+    private final AbstractStopArrival<T> previous;
     private final int round;
     private final int stop;
-    private final int time;
+    private final int departureTime;
+    private final int arrivalTime;
     private final int roundPareto;
     private final int cost;
-
 
     /**
      * Transit or transfer
      */
-    AbstractStopArrival(AbstractStopArrival<T> previousArrival, int round, int roundPareto, int stop, int arrivalTime, int cost) {
-        this.previousArrival = previousArrival;
+    AbstractStopArrival(AbstractStopArrival<T> previous, int round, int roundPareto, int stop, int departureTime, int arrivalTime, int cost) {
+        this.previous = previous;
         this.round = round;
         this.roundPareto = roundPareto;
         this.stop = stop;
-        this.time = arrivalTime;
+        this.departureTime = departureTime;
+        this.arrivalTime = arrivalTime;
         this.cost = cost;
     }
 
     /**
      * Initial state - first stop visited.
      */
-    AbstractStopArrival(int stop, int arrivalTime, int initialCost) {
-        this.previousArrival = null;
+    AbstractStopArrival(int stop, int departureTime, int arrivalTime, int initialCost) {
+        this.previous = null;
         this.round = 0;
         this.roundPareto = 0;
         this.stop = stop;
-        this.time = arrivalTime;
+        this.departureTime = departureTime;
+        this.arrivalTime = arrivalTime;
         this.cost = initialCost;
     }
 
+
+    @Override
+    public final int round() {
+        return round;
+    }
+
+    @Override
+    public final int stop() {
+        return stop;
+    }
+
+    @Override
+    public int departureTime() {
+        return departureTime;
+    }
+
+    @Override
+    public final int arrivalTime() {
+        return arrivalTime;
+    }
 
     /**
      * @return previous state or throw a NPE if no previousArrival exist.
      */
     @SuppressWarnings({"ConstantConditions"})
     final int previousStop() {
-        return previousArrival.stop;
+        return previous.stop;
     }
 
-    public final AbstractStopArrival<T> previousArrival() {
-        return previousArrival;
+    @Override
+    public final AbstractStopArrival<T> previous() {
+        return previous;
     }
 
     /**
-     * @see TransitStopArrival#originFromTime()
+     * This method is used to list all transits found in the last round. It is
+     * overridden in the {@link TransitStopArrival} class.
      */
-    int originFromTime() {
-        //noinspection ConstantConditions - NPE is not possible unless there is a programming error.
-        return previousArrival.originFromTime();
-    }
-
-    public final int stopIndex() {
-        return stop;
-    }
-
-    public final int round() {
-        return round;
-    }
-
-    @Override
-    public final int time() {
-        return time;
-    }
-
-    @Override
-    public int transitTime() {
-        return UNREACHED;
-    }
-
-    @Override
-    public boolean arrivedByTransit() {
-        return false;
-    }
-
     public boolean arrivedByTransitLastRound() {
-        return false;
-    }
-
-    @Override
-    public T trip() {
-        return null;
-    }
-
-    @Override
-    public int transferTime() {
-        return NOT_SET;
-    }
-
-    @Override
-    public int boardStop() {
-        return NOT_SET;
-    }
-
-    @Override
-    public int boardTime() {
-        return UNREACHED;
-    }
-
-    @Override
-    public int transferFromStop() {
-        return NOT_SET;
-    }
-
-    @Override
-    public boolean arrivedByTransfer() {
         return false;
     }
 
@@ -139,11 +107,28 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
 
     @Override
     public String toString() {
-        return asString(getClass().getSimpleName(), round(), stop);
+        return asString();
     }
 
+    private String asString() {
+        return String.format(
+                "%s [%d, %5d] Time: %s - %s, Cost: %d",
+                getClass().getSimpleName(),
+                round(),
+                stop(),
+                TimeUtils.timeToStrCompact(departureTime()),
+                TimeUtils.timeToStrCompact(arrivalTime()),
+                cost()
+        );
+    }
+
+    String asString(String details) {
+        return asString() + " - " + details;
+    }
+
+
     public void debug() {
-        DebugState.debugStop(round, stop, this);
+        DebugState.debugStop(this);
     }
 
     public List<AbstractStopArrival<T>> path() {
@@ -152,8 +137,9 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
 
         path.add(current);
 
-        while (current.previousArrival != null) {
-            current = current.previousArrival;
+        //noinspection ConstantConditions
+        while (!current.arrivedByAccessLeg()) {
+            current = current.previous;
             path.add(0, current);
         }
         return path;

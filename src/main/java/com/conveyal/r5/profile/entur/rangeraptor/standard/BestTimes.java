@@ -5,7 +5,7 @@ import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 import java.util.BitSet;
 
-import static com.conveyal.r5.profile.entur.rangeraptor.RRStopArrival.UNREACHED;
+import static com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView.UNREACHED;
 import static com.conveyal.r5.profile.entur.util.IntUtils.newIntArray;
 
 final class BestTimes {
@@ -37,9 +37,7 @@ final class BestTimes {
     final boolean isReached(final int stop) {
         return times[stop] != UNREACHED;
     }
-    final boolean isReachedCurrentRound(final int stop) {
-        return reachedCurrentRound.get(stop);
-    }
+
     final boolean isReachedLastRound(int stop) {
         return reachedLastRound.get(stop);
     }
@@ -68,10 +66,6 @@ final class BestTimes {
         return times[stop];
     }
 
-    final int timeLastRound(final int stop) {
-        return timesLastRound[stop];
-    }
-
     final BitSetIterator stopsReachedLastRound() {
         return new BitSetIterator(reachedLastRound);
     }
@@ -86,10 +80,7 @@ final class BestTimes {
         reachedCurrentRound = tmp;
         reachedCurrentRound.clear();
 
-        for (int i = 0; i < times.length; i++) {
-            timesLastRound[i] = times[i];
-
-        }
+        System.arraycopy(times, 0, timesLastRound, 0, times.length);
     }
 
     final void clearCurrent() {

@@ -31,8 +31,15 @@ public class ParetoSetTest {
 
     @Test
     public void addVector() {
+        ParetoSet<Vector> set = new ParetoSet<>((l,r) ->
+                l.values[0]     <  r.values[0] ||   // less than
+                l.values[1]     != r.values[1] ||   // different dominates
+                l.values[2] + 2 <  r.values[2]      // at least 2 less than
+        );
+
+
         // Given a empty set
-        ParetoSet<Vector> set = new ParetoSet<>(LESS_THEN);
+        ParetoSet<Vector> set1 = new ParetoSet<>(LESS_THEN);
 
         // When one element is added
         addOk(set, new Vector("V0", 5));

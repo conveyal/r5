@@ -13,9 +13,12 @@ import java.util.stream.Collectors;
  * longer pareto-optimal are dropped.
  * <p/>
  * Like the {@link java.util.ArrayList} the elements are stored internally in
- * an array for performance reasons, but the order is <em>not</em> guaranteed.
- * New elements can be added at any index - replacing the element at that index,
- * if the new element is dominates the old one.
+ * an array for performance reasons, and the order is guaranteed to be the same
+ * as the order the elements are added. New elements are added at the end, while
+ * dominated elements are removed. Elements in between are shifted towards the
+ * beginning of the list:
+ * <p/>
+ * {@code  [[1,7], [3,5], [5,3]] + [2,4] => [[1,7], [5,3], [2,4]]   -- less than dominates}
  * <p/>
  * No methods for removing elements like {@link #remove(Object)} are supported.
  *
@@ -68,8 +71,7 @@ public class ParetoSet<T> extends AbstractCollection<T> {
                 mutualDominanceExist = true;
             }
             else if (leftDominance) {
-                elements[i] = newValue;
-                removeDominatedElementsFromRestOfSet(newValue, i+1);
+                removeDominatedElementsFromRestOfSetAndAddNewElement(newValue, i);
                 return true;
             }
             else if (rightDominance) {
@@ -159,25 +161,25 @@ public class ParetoSet<T> extends AbstractCollection<T> {
 
     /**
      * Remove all elements dominated by the {@code newValue} starting from
-     * index {@code index}.
+     * {@code index + 1}. The element at {@code index} is dropped.
      */
-    private void removeDominatedElementsFromRestOfSet(final T newValue, final int index) {
-        // Let 'i' be the current element index
+    private void removeDominatedElementsFromRestOfSetAndAddNewElement(final T newValue, final int index) {
+        // Let 'i' be the current element index for removal
         int i = index;
-        // Be aware that the index method parameter is incremented
-        while (i < size) {
-            // Find an element to skip, and move the last element into its position
-            // Note! We can not advance the index `i`, because last element must also
-            // be checked.
-            if (leftVectorDominatesRightVector(newValue, elements[i])) {
-                --size;
-                elements[i] = elements[size];
-                elements[size] = null;
-            }
-            else {
+        // Let 'j' be the next element to compare
+        int j = index + 1;
+
+        while (j < size) {
+            // Move next element(j) forward if it is not dominated by the new value
+            if (!leftVectorDominatesRightVector(newValue, elements[j])) {
+                elements[i] = elements[j];
                 ++i;
             }
+            // Goto the next element
+            ++j;
         }
+        elements[i] = newValue;
+        size = i+1;
     }
 
     private boolean leftVectorDominatesRightVector(T left, T right) {

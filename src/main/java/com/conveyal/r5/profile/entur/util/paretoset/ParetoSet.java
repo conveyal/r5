@@ -4,6 +4,7 @@ import java.util.AbstractCollection;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 
 /**
@@ -47,8 +48,12 @@ public class ParetoSet<T> extends AbstractCollection<T> {
 
     @Override
     @SuppressWarnings("NullableProblems")
-    public Iterator<T> iterator() {
-        return Arrays.stream(elements, 0, size).iterator();
+    public final Iterator<T> iterator() {
+        return stream(0).iterator();
+    }
+
+    final Stream<T> stream(int startInclusive) {
+        return Arrays.stream(elements, startInclusive, size);
     }
 
     @Override
@@ -147,7 +152,7 @@ public class ParetoSet<T> extends AbstractCollection<T> {
      * This is used for logging and tuning purposes - by looking at the statistics we can decide
      * a good value for the initial size.
      */
-    public int elementArrayLen() {
+    public final int internalArrayLength() {
         return elements.length;
     }
 
@@ -155,9 +160,20 @@ public class ParetoSet<T> extends AbstractCollection<T> {
     public String toString() {
         return "{" + Arrays.stream(elements, 0, size)
                 .map(Object::toString)
-                .sorted()
                 .collect(Collectors.joining(", ")) + "}";
     }
+
+
+    /**
+     * Notify subclasses about reindexing. This method is empty,
+     * and only exist for subclasses to override it.
+     */
+    protected void notifyReindex(int fromIndex, int toIndex) {
+        // Noop
+    }
+
+
+    /* private methods */
 
     /**
      * Remove all elements dominated by the {@code newValue} starting from
@@ -170,6 +186,7 @@ public class ParetoSet<T> extends AbstractCollection<T> {
         int j = index + 1;
 
         while (j < size) {
+            notifyReindex(j, i);
             // Move next element(j) forward if it is not dominated by the new value
             if (!leftVectorDominatesRightVector(newValue, elements[j])) {
                 elements[i] = elements[j];
@@ -178,6 +195,7 @@ public class ParetoSet<T> extends AbstractCollection<T> {
             // Goto the next element
             ++j;
         }
+        notifyReindex(j, i);
         elements[i] = newValue;
         size = i+1;
     }

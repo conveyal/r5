@@ -102,7 +102,7 @@ final class Stops<T extends TripScheduleInfo> {
                 ++numOfStops;
                 total += stop.size();
                 max = Math.max(stop.size(), max);
-                arrayLen += stop.elementArrayLen();
+                arrayLen += stop.internalArrayLength();
             }
         }
         double avg = ((double)total) / numOfStops;

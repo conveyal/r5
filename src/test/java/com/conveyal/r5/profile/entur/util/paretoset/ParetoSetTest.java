@@ -37,15 +37,25 @@ public class ParetoSetTest {
                 l.values[2] + 2 <  r.values[2]      // at least 2 less than
         );
 
-
-        // Given a empty set
-        ParetoSet<Vector> set1 = new ParetoSet<>(LESS_THEN);
-
         // When one element is added
         addOk(set, new Vector("V0", 5));
 
         // Then the element should be the only element in the set
         assertEquals("{V0[5]}", set.toString());
+
+        // And we can retrieve it at index 0
+        assertEquals("V0[5]", set.get(0).toString());
+    }
+
+    @Test(expected = UnsupportedOperationException.class)
+    public void removeAVectorIsNotAllowed() {
+        // Given a set with a vector
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_THEN);
+        Vector vector = new Vector("V0", 5);
+        addOk(set, vector);
+
+        // When vector is removed, expect an exception
+        set.remove(vector);
     }
 
     @Test
@@ -84,14 +94,14 @@ public class ParetoSetTest {
         // When adding the a different value
         addOk(set, new Vector("D1", 6));
         // Then both values should be included
-        assertEquals("{D1[6], V0[5]}", set.toString());
+        assertEquals("{V0[5], D1[6]}", set.toString());
 
         // When adding the several more different values
         addOk(set, new Vector("D2", 3));
         addOk(set, new Vector("D3", 4));
         addOk(set, new Vector("D4", 8));
         // Then all values should be included
-        assertEquals("{D1[6], D2[3], D3[4], D4[8], V0[5]}", set.toString());
+        assertEquals("{V0[5], D1[6], D2[3], D3[4], D4[8]}", set.toString());
     }
 
     @Test
@@ -418,7 +428,7 @@ public class ParetoSetTest {
         TestCase(Vector v0, Vector v1, String description, Vector... expected) {
             this.v0 = v0;
             this.v1 = v1;
-            this.expected = "{" + Arrays.stream(expected).map(Objects::toString).sorted().collect(Collectors.joining(", ")) + "}";
+            this.expected = "{" + Arrays.stream(expected).map(Objects::toString).collect(Collectors.joining(", ")) + "}";
             this.description = description;
         }
 

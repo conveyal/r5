@@ -5,7 +5,6 @@ import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparatorBuilder;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -17,12 +16,16 @@ import java.util.List;
  */
 public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements StopArrivalView<T> {
 
-    public static <T extends TripScheduleInfo> ParetoComparator<AbstractStopArrival<T>> paretoComparator() {
-        return new ParetoComparatorBuilder<AbstractStopArrival<T>>()
-                .lessThen((v) -> v.arrivalTime)
-                .lessThen((v) -> v.round)
-                .lessThen((v) -> v.cost)
-                .build();
+    public static <T extends TripScheduleInfo> ParetoComparator<AbstractStopArrival<T>> compareArrivalTimeRoundAndCost() {
+        // This is important with respect to performance. Using logical OR(||) is faster than boolean OR(|)
+        // and we intentionally do NOT use the ParetoComparatorBuilder.
+        return (l, r) -> l.arrivalTime < r.arrivalTime || l.round < r.round || l.cost < r.cost;
+    }
+
+    public static <T extends TripScheduleInfo> ParetoComparator<AbstractStopArrival<T>> compareArrivalTimeAndRound() {
+        // This is important with respect to performance. Using logical OR(||) is faster than boolean OR(|)
+        // and we intentionally do NOT use the ParetoComparatorBuilder.
+        return (l, r) -> l.arrivalTime < r.arrivalTime || l.round < r.round;
     }
 
     private final AbstractStopArrival<T> previous;

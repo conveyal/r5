@@ -2,7 +2,8 @@ package com.conveyal.r5.profile.entur.util.paretoset;
 
 import org.junit.Test;
 
-import java.util.Iterator;
+import java.util.Objects;
+import java.util.stream.Stream;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -66,15 +67,15 @@ public class ParetoSetWithMarkerTest {
 
     @Test
     public void iteratorFromMark() {
-        assertFalse("Empty set have no elements after marker", subject.listFromMark().hasNext());
+        assertFalse("Empty set have no elements after marker", subject.streamFromMark().findAny().isPresent());
 
         subject.add(v(5,5));
         subject.markEndOfSet();
-        assertFalse("Still empty - no elements after marker", subject.listFromMark().hasNext());
+        assertFalse("Still empty - no elements after marker", subject.streamFromMark().findAny().isPresent());
 
         subject.markEndOfSet();
         subject.add(v(3,7));
-        assertEquals("Return one element after marker", "[3, 7]", toString(subject.listFromMark()));
+        assertEquals("Return one element after marker", "[3, 7]", toString(subject.streamFromMark()));
     }
 
     @Test
@@ -89,20 +90,13 @@ public class ParetoSetWithMarkerTest {
         subject.add(v(4,6));
 
         // Then all 3 elements exist
-        assertEquals("[6, 4], [5, 5], [4, 6]", toString(subject.listFromMark()));
+        assertEquals("[6, 4], [5, 5], [4, 6]", toString(subject.streamFromMark()));
         // and only one element has 5 as its last criteria
-        assertEquals("[5, 5]", toString(subject.listFromMark(it -> it.v == 5)));
+        assertEquals("[5, 5]", toString(subject.streamFromMark().filter(it -> it.v == 5)));
     }
 
-    private String toString(Iterator<Vector> list) {
-        if(!list.hasNext()) {
-            return "";
-        }
-        StringBuilder tmp = new StringBuilder(list.next().toString());
-        while (list.hasNext()) {
-            tmp.append(", ").append(list.next());
-        }
-        return tmp.toString();
+    private String toString(Stream<Vector> stream) {
+        return stream.map(Objects::toString).reduce((a,b) -> a + ", " + b).orElse("");
     }
 
     static private Vector v(int u, int v) {

@@ -4,10 +4,10 @@ import com.conveyal.r5.profile.entur.api.AccessLeg;
 import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.UnsignedIntIterator;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
-import com.conveyal.r5.profile.entur.util.BitSetIterator;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 import java.util.Collection;
@@ -174,7 +174,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
 
 
     private void doTransfers() {
-        BitSetIterator it = state.stopsTouchedByTransitCurrentRound();
+        UnsignedIntIterator it = state.stopsTouchedByTransitCurrentRound();
 
         for (int fromStop = it.next(); fromStop > -1; fromStop = it.next()) {
             // no need to consider loop transfers, since we don't mark patterns here any more

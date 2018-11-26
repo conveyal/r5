@@ -107,6 +107,7 @@ public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRan
                 }
             }
         }
+        state.commitTransits();
     }
 
     @Override protected AvgTimer timerRoute() { return TIMER_ROUTE; }

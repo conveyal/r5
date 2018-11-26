@@ -7,8 +7,6 @@ import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransferStopArrival;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.path.PathMapper;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.Debug;
@@ -53,12 +51,7 @@ final class Stops<T extends TripScheduleInfo> {
         );
     }
 
-    boolean transitToStop(AbstractStopArrival<T> previous, int round, int stop, int time, T trip, int boardTime) {
-        AbstractStopArrival<T> state = new TransitStopArrival<>(previous, round, stop, time, boardTime, trip);
-        return findOrCreateSet(stop).add(state);
-    }
-
-    boolean addTransfer(TransferStopArrival<T> arrival) {
+    boolean addStopArrival(AbstractStopArrival<T> arrival) {
         return findOrCreateSet(arrival.stop()).add(arrival);
     }
 
@@ -67,19 +60,29 @@ final class Stops<T extends TripScheduleInfo> {
         return destination.stream().map(PathMapper::mapToPath).collect(Collectors.toList());
     }
 
-    /**
-     * List all transits arrived last round.
-     * <p/>
-     * <b>NOTE! This method can only be called once per round, after the call the flags are cleared automatically.</b>
-     */
-    Iterable<? extends AbstractStopArrival<T>> listArrivedByTransitLastRound(int stop) {
+    /** List all transits arrived this round. */
+    Iterable<AbstractStopArrival<T>> listArrivalsAfterMark(final int stop) {
         Stop<T> it = stops[stop];
-        return it == null ? emptyList() : it.list(AbstractStopArrival::arrivedByTransitLastRound);
+        if(it==null) {
+            return emptyList();
+        }
+        return it.streamFromMark().collect(Collectors.toList());
     }
 
-    Iterable<? extends AbstractStopArrival<T>> list(final int round, int stop) {
+    Iterable<? extends AbstractStopArrival<T>> list(final int round, final int stop) {
         Stop<T> it = stops[stop];
-        return it == null ? emptyList() : it.list(s -> s.round() == round);
+        if(it==null) {
+            return emptyList();
+        }
+        return it.list(s -> s.round() == round);
+    }
+
+    void markAllStops() {
+        for (Stop<T> stop : stops) {
+            if (stop != null) {
+                stop.markEndOfSet();
+            }
+        }
     }
 
     private Stop<T> findOrCreateSet(final int stop) {

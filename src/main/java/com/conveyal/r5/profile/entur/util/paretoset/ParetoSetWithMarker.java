@@ -1,7 +1,6 @@
 package com.conveyal.r5.profile.entur.util.paretoset;
 
-import java.util.Iterator;
-import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 
 /**
@@ -25,12 +24,8 @@ public class ParetoSetWithMarker<T> extends ParetoSet<T> {
         marker = 0;
     }
 
-    public Iterator<T> listFromMark() {
-        return stream(marker).iterator();
-    }
-
-    public Iterator<T> listFromMark(Predicate<T> test) {
-        return stream(marker).filter(test).iterator();
+    public Stream<T> streamFromMark() {
+        return stream(marker);
     }
 
     public void markEndOfSet() {

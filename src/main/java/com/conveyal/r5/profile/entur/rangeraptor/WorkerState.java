@@ -2,7 +2,7 @@ package com.conveyal.r5.profile.entur.rangeraptor;
 
 import com.conveyal.r5.profile.entur.api.AccessLeg;
 import com.conveyal.r5.profile.entur.api.TransferLeg;
-import com.conveyal.r5.profile.entur.util.BitSetIterator;
+import com.conveyal.r5.profile.entur.api.UnsignedIntIterator;
 
 import java.util.Iterator;
 
@@ -17,7 +17,7 @@ public interface WorkerState {
 
     void gotoNextRound();
 
-    BitSetIterator stopsTouchedByTransitCurrentRound();
+    UnsignedIntIterator stopsTouchedByTransitCurrentRound();
 
     void transferToStops(int fromStop, Iterator<? extends TransferLeg> transfers);
 

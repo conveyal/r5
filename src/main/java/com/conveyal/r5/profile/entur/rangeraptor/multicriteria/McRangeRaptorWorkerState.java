@@ -4,6 +4,7 @@ import com.conveyal.r5.profile.entur.api.AccessLeg;
 import com.conveyal.r5.profile.entur.api.EgressLeg;
 import com.conveyal.r5.profile.entur.api.TransferLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.UnsignedIntIterator;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
@@ -37,7 +38,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     private int maxTimeLimit;
 
     private final Stops<T> stops;
-    private final List<TransferStopArrival<T>> transfersCache = new ArrayList<>();
+    private final List<AbstractStopArrival<T>> arrivalsCache = new ArrayList<>();
     private final int nRounds;
     private int round = Integer.MIN_VALUE;
 
@@ -61,6 +62,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         // clear all touched stops to avoid constant rexploration
         touchedCurrent.clear();
         touchedPrevious.clear();
+        stops.markAllStops();
         round = 0;
     }
 
@@ -79,18 +81,18 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         ++round;
     }
 
-    BitSetIterator stopsTouchedPreviousRound() {
+    UnsignedIntIterator stopsTouchedPreviousRound() {
         mergeAndSwapTouchedStops();
         return new BitSetIterator(touchedPrevious);
     }
 
-    @Override public BitSetIterator stopsTouchedByTransitCurrentRound() {
+    @Override public UnsignedIntIterator stopsTouchedByTransitCurrentRound() {
         swapTouchedStops();
         return new BitSetIterator(touchedPrevious);
     }
 
     Iterable<? extends AbstractStopArrival<T>> listStopArrivalsPreviousRound(int stop) {
-        return stops.list(round-1, stop);
+        return stops.listArrivalsAfterMark(stop);
     }
 
 
@@ -101,34 +103,41 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         if (alightTime > maxTimeLimit) {
             return;
         }
-
-        boolean added = stops.transitToStop(boardStop, round, stop, alightTime, trip, boardTime);
-
-        if (added) {
-            touchedCurrent.set(stop);
-            // skip: transferTimes
-            debugStops(TransitStopArrival.class, round, stop);
-        }
+        arrivalsCache.add(new TransitStopArrival<>(boardStop, round, stop, alightTime, boardTime, trip));
     }
 
     /**
      * Set the time at a transit stops iff it is optimal.
      */
     @Override public void transferToStops(int fromStop, Iterator<? extends TransferLeg> transfers) {
-        Iterable<? extends AbstractStopArrival<T>> fromArrivals = stops.listArrivedByTransitLastRound(fromStop);
+        Iterable<? extends AbstractStopArrival<T>> fromArrivals = stops.listArrivalsAfterMark(fromStop);
 
         while (transfers.hasNext()) {
             transferToStop(fromArrivals, transfers.next());
         }
     }
 
+    public void commitTransits() {
+        stops.markAllStops();
+        commitCachedArrivals(TransitStopArrival.class);
+    }
+
     @Override public void commitTransfers() {
-        for (TransferStopArrival<T> arrival : transfersCache) {
-            if(stops.addTransfer(arrival)) {
+        commitCachedArrivals(TransferStopArrival.class);
+    }
+
+    private void commitCachedArrivals(Class<? extends AbstractStopArrival> type) {
+        for (AbstractStopArrival<T> arrival : arrivalsCache) {
+            if(arrival.getClass() != type) {
+                throw new IllegalStateException();
+            }
+
+            if (stops.addStopArrival(arrival)) {
                 touchedCurrent.set(arrival.stop());
+                debugStops(type, round, arrival.stop());
             }
         }
-        transfersCache.clear();
+        arrivalsCache.clear();
     }
 
     Collection<Path<T>> extractPaths() {
@@ -143,17 +152,15 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     /* private methods */
 
     private void transferToStop(Iterable<? extends AbstractStopArrival<T>> fromArrivals, TransferLeg transfer) {
-        final int targetStop = transfer.stop();
         final int transferTimeInSeconds = transfer.durationInSeconds();
 
         for(AbstractStopArrival<T> it :  fromArrivals) {
             int arrivalTime = it.arrivalTime() + transferTimeInSeconds;
 
             if (arrivalTime < maxTimeLimit) {
-                transfersCache.add(new TransferStopArrival<>(it, round, transfer, arrivalTime));
+                arrivalsCache.add(new TransferStopArrival<>(it, round, transfer, arrivalTime));
             }
         }
-        debugStops(TransferStopArrival.class, round, targetStop);
     }
 
     private boolean isCurrentRoundUpdated() {

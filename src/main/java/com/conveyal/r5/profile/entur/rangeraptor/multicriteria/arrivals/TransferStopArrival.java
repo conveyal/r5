@@ -9,7 +9,6 @@ public final class TransferStopArrival<T extends TripScheduleInfo> extends Abstr
         super(
                 previousState,
                 round,
-                round*2+1,
                 transferLeg.stop(),
                 arrivalTime - transferLeg.durationInSeconds(),
                 arrivalTime,

@@ -11,7 +11,6 @@ public final class TransitStopArrival<T extends TripScheduleInfo> extends Abstra
         super(
                 previousState,
                 round,
-                round * 2,
                 stopIndex,
                 boardTime,
                 arrivalTime,

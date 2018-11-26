@@ -181,5 +181,6 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
             // loop transfers are already included by virtue of those stops having been reached
             state.transferToStops(fromStop, transit.getTransfers(fromStop));
         }
+        state.commitTransfers();
     }
 }

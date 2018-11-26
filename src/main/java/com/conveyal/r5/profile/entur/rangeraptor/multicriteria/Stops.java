@@ -3,7 +3,6 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.AccessLeg;
 import com.conveyal.r5.profile.entur.api.EgressLeg;
-import com.conveyal.r5.profile.entur.api.TransferLeg;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
@@ -59,8 +58,8 @@ final class Stops<T extends TripScheduleInfo> {
         return findOrCreateSet(stop).add(state);
     }
 
-    boolean transferToStop(AbstractStopArrival<T> previous, int round, TransferLeg transferLeg, int arrivalTime) {
-        return findOrCreateSet(transferLeg.stop()).add(new TransferStopArrival<>(previous, round, transferLeg, arrivalTime));
+    boolean addTransfer(TransferStopArrival<T> arrival) {
+        return findOrCreateSet(arrival.stop()).add(arrival);
     }
 
     Collection<Path<T>> extractPaths() {

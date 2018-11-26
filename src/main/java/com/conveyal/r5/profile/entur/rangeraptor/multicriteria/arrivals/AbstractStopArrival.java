@@ -20,7 +20,7 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
     public static <T extends TripScheduleInfo> ParetoComparator<AbstractStopArrival<T>> paretoComparator() {
         return new ParetoComparatorBuilder<AbstractStopArrival<T>>()
                 .lessThen((v) -> v.arrivalTime)
-                .lessThen((v) -> v.roundPareto)
+                .lessThen((v) -> v.round)
                 .lessThen((v) -> v.cost)
                 .build();
     }
@@ -30,16 +30,14 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
     private final int stop;
     private final int departureTime;
     private final int arrivalTime;
-    private final int roundPareto;
     private final int cost;
 
     /**
      * Transit or transfer
      */
-    AbstractStopArrival(AbstractStopArrival<T> previous, int round, int roundPareto, int stop, int departureTime, int arrivalTime, int cost) {
+    AbstractStopArrival(AbstractStopArrival<T> previous, int round, int stop, int departureTime, int arrivalTime, int cost) {
         this.previous = previous;
         this.round = round;
-        this.roundPareto = roundPareto;
         this.stop = stop;
         this.departureTime = departureTime;
         this.arrivalTime = arrivalTime;
@@ -52,7 +50,6 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
     AbstractStopArrival(int stop, int departureTime, int arrivalTime, int initialCost) {
         this.previous = null;
         this.round = 0;
-        this.roundPareto = 0;
         this.stop = stop;
         this.departureTime = departureTime;
         this.arrivalTime = arrivalTime;

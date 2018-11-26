@@ -14,9 +14,11 @@ import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitS
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
+import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 
 
 /**
@@ -35,6 +37,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     private int maxTimeLimit;
 
     private final Stops<T> stops;
+    private final List<TransferStopArrival<T>> transfersCache = new ArrayList<>();
     private final int nRounds;
     private int round = Integer.MIN_VALUE;
 
@@ -115,26 +118,17 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         Iterable<? extends AbstractStopArrival<T>> fromArrivals = stops.listArrivedByTransitLastRound(fromStop);
 
         while (transfers.hasNext()) {
-            TransferLeg toStop = transfers.next();
-            transferToStop(fromArrivals, toStop);
+            transferToStop(fromArrivals, transfers.next());
         }
     }
 
-    private void transferToStop(Iterable<? extends AbstractStopArrival<T>> fromArrivals, TransferLeg transfer) {
-
-        final int targetStop = transfer.stop();
-        final int transferTimeInSeconds = transfer.durationInSeconds();
-
-        for(AbstractStopArrival<T> it :  fromArrivals) {
-            int arrivalTime = it.arrivalTime() + transferTimeInSeconds;
-
-            if (arrivalTime < maxTimeLimit) {
-                if(stops.transferToStop(it, round, transfer, arrivalTime)) {
-                    touchedCurrent.set(targetStop);
-                }
+    @Override public void commitTransfers() {
+        for (TransferStopArrival<T> arrival : transfersCache) {
+            if(stops.addTransfer(arrival)) {
+                touchedCurrent.set(arrival.stop());
             }
         }
-        debugStops(TransferStopArrival.class, round, targetStop);
+        transfersCache.clear();
     }
 
     Collection<Path<T>> extractPaths() {
@@ -147,6 +141,20 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
 
 
     /* private methods */
+
+    private void transferToStop(Iterable<? extends AbstractStopArrival<T>> fromArrivals, TransferLeg transfer) {
+        final int targetStop = transfer.stop();
+        final int transferTimeInSeconds = transfer.durationInSeconds();
+
+        for(AbstractStopArrival<T> it :  fromArrivals) {
+            int arrivalTime = it.arrivalTime() + transferTimeInSeconds;
+
+            if (arrivalTime < maxTimeLimit) {
+                transfersCache.add(new TransferStopArrival<>(it, round, transfer, arrivalTime));
+            }
+        }
+        debugStops(TransferStopArrival.class, round, targetStop);
+    }
 
     private boolean isCurrentRoundUpdated() {
         return !touchedCurrent.isEmpty();

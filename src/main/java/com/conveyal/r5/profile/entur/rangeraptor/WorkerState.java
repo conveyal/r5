@@ -20,4 +20,6 @@ public interface WorkerState {
     BitSetIterator stopsTouchedByTransitCurrentRound();
 
     void transferToStops(int fromStop, Iterator<? extends TransferLeg> transfers);
+
+    default void commitTransfers() {}
 }

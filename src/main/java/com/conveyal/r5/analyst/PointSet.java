@@ -12,6 +12,8 @@ import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Point;
 import org.mapdb.Fun.Tuple2;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.HashMap;
@@ -30,12 +32,16 @@ import static com.conveyal.r5.streets.VertexStore.floatingDegreesToFixed;
  */
 public abstract class PointSet {
 
+    private static final Logger LOG = LoggerFactory.getLogger(PointSet.class);
+
     /**
      * Maximum number of street network linkages to cache per PointSet. This is a crude way of limiting memory
      * consumption, and should eventually be replaced with a WeighingCache. Since every Scenario has its own StreetLayer
-     * instance now, this means we can hold linkages for 5 scenario/mode combinations.
+     * instance now, this means we can hold e.g. walk and bike linkages (with distance tables) for 3 scenarios at once.
+     * Note that the baseline scenario also uses up slots in the cache, but is very quick to re-load because it's an
+     * exact copy of the pre-built base linkage saved with the network.
      */
-    public static int LINKAGE_CACHE_SIZE = 5;
+    public static int LINKAGE_CACHE_SIZE = 6;
 
     /**
      * When this PointSet is connected to the street network, the resulting data are cached in this Map to speed up
@@ -58,18 +64,16 @@ public abstract class PointSet {
      */
     protected Map<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> linkageMap = new HashMap<>();
 
-    // Here we are bypassing the GridPointSet's internal cache of linkages because we want this particular linkage
-    // to be serialized with the network. The internal Guava cache does not serialize its contents (by design).
+    /**
+     * Build a linkage and store it, bypassing the PointSet's internal cache of linkages because we want this particular
+     * linkage to be serialized with the network (the Guava cache does not serialize its contents) and never evicted.
+     */
     public void buildUnevictableLinkage(StreetLayer streetLayer, StreetMode mode) {
         Tuple2<StreetLayer, StreetMode> key = new Tuple2<>(streetLayer, mode);
-        // Seek existing linkage in the cache and unevictable map, bypassing loading cache behavior. Will often be null.
-        // I'm not sure why we're grabbing this as a base layer, I'm just preserving existing behavior.
-        // It seems to be relevant when applying scenarios.
-        LinkedPointSet existingLinkage = linkageMap.get(key);
-        if (existingLinkage == null) {
-            existingLinkage = linkageCache.getIfPresent(key);
+        if (linkageMap.containsKey(key) || linkageCache.getIfPresent(key) != null) {
+            LOG.error("Un-evictable linkage is being built more than once.");
         }
-        LinkedPointSet newLinkage = new LinkedPointSet(this, streetLayer, mode, existingLinkage);
+        LinkedPointSet newLinkage = new LinkedPointSet(this, streetLayer, mode, null);
         linkageMap.put(key, newLinkage);
     }
 
@@ -79,6 +83,7 @@ public abstract class PointSet {
     private class LinkageCacheLoader extends CacheLoader<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> implements Serializable {
         @Override
         public LinkedPointSet load(Tuple2<StreetLayer, StreetMode> key) {
+            LOG.info("Linkage for ({}, {}) was not found in cache, building it now.", key.a, key.b);
             // If this StreetLayer is a part of a scenario and is therefore wrapping a base StreetLayer we need
             // to recursively fetch / create a linkage for that base StreetLayer so we don't duplicate work.
             // PointSet.this accesses the instance of the outer class.
@@ -117,6 +122,7 @@ public abstract class PointSet {
     public LinkedPointSet getLinkage (StreetLayer streetLayer, StreetMode streetMode) {
         try {
             Tuple2<StreetLayer, StreetMode> key = new Tuple2<>(streetLayer, streetMode);
+            LOG.info("Seeking linkage for ({}, {}) in cache...", streetLayer, streetMode);
             LinkedPointSet value = linkageMap.get(key);
             if (value == null) {
                 value = linkageCache.get(new Tuple2<>(streetLayer, streetMode));

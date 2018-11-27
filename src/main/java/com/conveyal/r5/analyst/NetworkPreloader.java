@@ -117,7 +117,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         public final String networkId;
         public final String scenarioId;
         public final WebMercatorExtents webMercatorExtents; // rename to destination grid extents
-        public final EnumSet<StreetMode> modes; // Actually, looks like this should be StreetMode, why are requests using LegMode?
+        public final EnumSet<StreetMode> modes;
         // Final key element is the destination density grids? Those are relatively quick to load though.
 
         /**

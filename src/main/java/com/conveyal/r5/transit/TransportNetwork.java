@@ -20,6 +20,7 @@ import com.google.common.hash.Hashing;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.profile.StreetMode;
 import com.google.common.io.Files;
+import com.sun.xml.internal.ws.policy.spi.AssertionCreationException;
 import com.vividsolutions.jts.geom.Envelope;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
@@ -293,20 +294,18 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * Build an efficient implicit grid PointSet for this TransportNetwork if it doesn't already exist. Then, for any
-     * modes that are supplied, we also build a linkage that is held permanently in the GridPointSet. This method is
-     * called when a network is first built for analysis purposes, and also after a scenario is applied to rebuild a
-     * linked grid pointset for the scenario copy of the network.
-     * FIXME isn't this forcing WALK mode even when the scenario is not used for walk mode?
-     *
-     * This grid PointSet will cover the entire street network layer of this TransportNetwork, which should include
-     * every point we can route from or to. Any other destination grid (for the same mode, walking) can be made as a
-     * subset of this one since it includes every potentially accessible point.
+     * For Analysis purposes, build an efficient implicit grid PointSet for this TransportNetwork. Then, for any modes
+     * supplied, we also build a linkage that is held permanently in the GridPointSet. This method is called when a
+     * network is first built.
+     * The resulting grid PointSet will cover the entire street network layer of this TransportNetwork, which should
+     * include every point we can route from or to. Any other destination grid (for the same mode, walking) can be made
+     * as a subset of this one since it includes every potentially accessible point.
      */
     public void rebuildLinkedGridPointSet(StreetMode... modes) {
-        if (gridPointSet == null) {
-            gridPointSet = new WebMercatorGridPointSet(this);
+        if (gridPointSet != null) {
+            throw new RuntimeException("Linked grid pointset was built more than once.");
         }
+        gridPointSet = new WebMercatorGridPointSet(this);
         for (StreetMode mode : modes) {
             gridPointSet.buildUnevictableLinkage(streetLayer, mode);
         }

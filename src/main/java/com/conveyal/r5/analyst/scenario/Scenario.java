@@ -143,12 +143,10 @@ public class Scenario implements Serializable {
         // TODO also rebuild transfers which are near street network changes but which do not connect to new stops.
         new TransferFinder(copiedNetwork).findTransfers();
 
-        // Update the linkage between the grid and the streets, considering whether the scenario changed any streets.
-        // FIXME this seems unnecessary. It's forcing a walk linkage on the scenario.
-        // Instead we should just let the linkage cache perform the linkage for the correct mode on demand.
-        // FIXME New routes drawn outside the original bounds cannot have an effect.
-        // This is because the (unlinked) grid point set has been copied verbatim to the new network.
-        copiedNetwork.rebuildLinkedGridPointSet(StreetMode.WALK);
+        // Any linkages to the new scenario street network will be built as needed based on the incoming request.
+        // FIXME New routes drawn outside the original bounds cannot have an effect,
+        // because the (unlinked) grid point set has been copied verbatim to the new network.
+
         if (VERIFY_BASE_NETWORK_UNCHANGED) {
             if (originalNetwork.checksum() != baseNetworkChecksum) {
                 LOG.error("Applying a scenario mutated the base transportation network. THIS IS A BUG.");

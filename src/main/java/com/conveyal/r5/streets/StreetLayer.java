@@ -1527,4 +1527,17 @@ public class StreetLayer implements Serializable, Cloneable {
         return bikeRentalStations;
     }
 
+    /**
+     * Prototype method to estimate the number of bytes of memory consumed by holding a reference to this StreetLayer.
+     * Intended use is in WeighingCache to control worker memory usage.
+     * NOTE: This is currently very inaccurate and doesn't include any of the temporary indexes.
+     */
+    public long estimateMemoryConsumptionBytes() {
+        final int bytesPerEdge = 3 * Integer.BYTES + Long.BYTES + 2 * Byte.BYTES;
+        final int bytesPerVertex = 2 * Integer.BYTES + Byte.BYTES;
+        int nVertices = vertexStore.getVertexCount();
+        int nEdges = edgeStore.nEdges();
+        return nVertices * bytesPerVertex + nEdges * bytesPerEdge;
+    }
+
 }

@@ -8,6 +8,7 @@ import com.conveyal.r5.streets.StreetLayer;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.cache.Weigher;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Envelope;
 import com.vividsolutions.jts.geom.Point;
@@ -42,6 +43,9 @@ public abstract class PointSet {
      * exact copy of the pre-built base linkage saved with the network.
      */
     public static int LINKAGE_CACHE_SIZE = 6;
+
+    /** Experimental - for measuring cache memory consumption. Limit to 2GB. */
+    public static long LINKAGE_CACHE_SIZE_MB = 2 * 1024;
 
     /**
      * When this PointSet is connected to the street network, the resulting data are cached in this Map to speed up
@@ -98,6 +102,19 @@ public abstract class PointSet {
     }
 
     /**
+     * Calculates approximate size of linkages including distances tables and associated street layers in kB.
+     */
+    private static class LinkageCacheWeigher implements Weigher<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> {
+        @Override
+        public int weigh (Tuple2<StreetLayer, StreetMode> key, LinkedPointSet value) {
+            value.makePointToStopDistanceTablesIfNeeded();
+            long kBytes = value.estimateMemoryConsumptionBytes() / 1024L;
+            LOG.info("Linkage weight is {} kBytes", kBytes);
+            return (int) kBytes;
+        }
+    }
+
+    /**
      * Makes it fast to get a set of all points within a given rectangle.
      * This is useful when finding distances from transit stops to points.
      * FIXME we don't need a spatial index to do this on a gridded pointset. Make an abstract method and implement on subclasses.
@@ -111,9 +128,11 @@ public abstract class PointSet {
      * Constructor for a PointSet that initializes its cache of linkages upon deserialization.
      */
     public PointSet() {
-        this.linkageCache = CacheBuilder.newBuilder().maximumSize(LINKAGE_CACHE_SIZE)
-                .removalListener(notification -> LOG.warn("Linkage cache evicted {}, cause: {}",
-                        notification.getKey(), notification.getCause()))
+        this.linkageCache = CacheBuilder.newBuilder().maximumWeight(LINKAGE_CACHE_SIZE_MB * 1024)
+                .weigher(new LinkageCacheWeigher())
+                .removalListener(notification ->
+                        LOG.warn("Linkage cache evicted ({}, {}), cause: {}",
+                        notification.getKey().a, notification.getKey().b, notification.getCause()))
                 .build(new LinkageCacheLoader());
     }
 

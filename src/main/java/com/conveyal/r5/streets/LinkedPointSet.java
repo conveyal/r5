@@ -462,5 +462,20 @@ public class LinkedPointSet implements Serializable {
         }
     }
 
+    /**
+     * Prototype method to estimate the number of bytes of memory consumed by holding a reference to this linkage.
+     * Intended use is in WeighingCache to control worker memory usage.
+     */
+    public long estimateMemoryConsumptionBytes () {
+        long nPoints = this.size();
+        long bytesForEdges = nPoints * Integer.BYTES;
+        long bytesForDistances = 2 * nPoints * Integer.BYTES;
+        long bytesForDistanceTables = stopToPointDistanceTables.stream().filter(Objects::nonNull).mapToLong(
+                array -> array.length * (long)Integer.BYTES).sum();
+        long bytesForInverseTables = pointToStopDistanceTables.stream().filter(Objects::nonNull).mapToLong(
+                intMap -> ((TIntIntHashMap) intMap)._set.length * 2L * Integer.BYTES).sum();
+        long bytesForStreetLayer = streetLayer.estimateMemoryConsumptionBytes();
+        return bytesForEdges + bytesForDistances + bytesForDistanceTables + bytesForInverseTables + bytesForStreetLayer;
+    }
 
 }

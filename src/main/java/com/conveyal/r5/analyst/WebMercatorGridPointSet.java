@@ -54,19 +54,20 @@ public class WebMercatorGridPointSet extends PointSet implements Serializable {
         this.width = width;
         this.height = height;
         this.base = base;
-
-        // Copy base linkages to this point set, so that we won't rebuild them but rather can use the linkages already
-        // made for the full transport network.
-        // TODO don't copy, just have a cache that lazy loads and crops from base pointset
+        // Copy subsets of linkages already cached in the base linkage into to this point set. A walking linkage is
+        // pre-built for the full geographic extent transport network, and linkages for other modes may already exist.
+        // We can re-use the data in these linkages instead of re-computing them from scratch for the new extents.
+        // LinkedPointSet now handles the case where the new grid is not completely contained by the base grid.
+        // Since this generally happens when there are points beyond the transit network's extents, marking the points
+        // that are not contained by the base linkage as unlinked (and logging a warning if all points are beyond
+        // the network) is sufficient as you will not be able to reach these locations anyhow.
+        // TODO don't copy, just have a cache that wraps the base pointset and can read through to the original linkages
+        // TODO maybe put all the linkages into the cache (none in the map) when building upon a base
         if (base != null) {
-            base.linkageCache.asMap().forEach((key, baseLinkage) -> {
-                // LinkedPointSet now handles the case where the new grid is not completely contained by the base grid.
-                // Since this generally happens when there are points beyond the transit network's extents, marking the points
-                // that are not contained by the base linkage as unlinked (and logging a warning if all points are beyond
-                // the network) is sufficient as you will not be able to reach these locations anyhow.
-                LinkedPointSet croppedLinkage = new LinkedPointSet(baseLinkage, this);
-                this.linkageCache.put(key, croppedLinkage);
-            });
+            base.linkageMap.forEach(
+                    (key, baseLinkage) -> this.linkageMap.put(key, new LinkedPointSet(baseLinkage, this)));
+            base.linkageCache.asMap().forEach(
+                    (key, baseLinkage) -> this.linkageCache.put(key, new LinkedPointSet(baseLinkage, this)));
         }
     }
 

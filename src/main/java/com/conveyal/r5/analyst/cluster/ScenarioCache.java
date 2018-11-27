@@ -41,14 +41,10 @@ public class ScenarioCache {
 
     private Map<String, Scenario> scenariosById = new HashMap<>();
 
-    /**
-     * Return the ID of the scenario after storing it away.
-     */
     public synchronized void storeScenario (Scenario scenario) {
-        // First do some sanity checking.
         Scenario existingScenario = scenariosById.put(scenario.id, scenario);
         if (existingScenario != null) {
-            LOG.info("Scenario cache already contained a this scenario.");
+            LOG.debug("Scenario cache already contained a this scenario.");
         }
     }
 

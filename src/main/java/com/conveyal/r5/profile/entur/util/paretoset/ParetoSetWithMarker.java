@@ -13,9 +13,12 @@ import java.util.stream.Stream;
 public class ParetoSetWithMarker<T> extends ParetoSet<T> {
     private int marker = 0;
 
-
     public ParetoSetWithMarker(ParetoComparator<T> comparator) {
         super(comparator);
+    }
+
+    public ParetoSetWithMarker(ParetoComparator<T> comparator, DropEventListener<T> dropListener) {
+        super(comparator, dropListener);
     }
 
     @Override

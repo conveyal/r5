@@ -9,8 +9,6 @@ import java.util.stream.Stream;
 import static org.junit.Assert.assertEquals;
 
 public class ParetoSetWithMarkerTest {
-    private static final Vector OTHER_VECTOR = new Vector(999, 999);
-
     private ParetoSetWithMarker<Vector> subject = new ParetoSetWithMarker<>((l, r) -> l.u < r.u || l.v < r.v);
 
     @Test

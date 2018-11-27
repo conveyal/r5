@@ -26,14 +26,29 @@ import java.util.stream.Stream;
  * @param <T> the element type
  */
 public class ParetoSet<T> extends AbstractCollection<T> {
+    private final DropEventListener<T> dropEventListener;
     private final ParetoComparator<T> comparator;
     @SuppressWarnings("unchecked")
     private T[] elements = (T[])new Object[16];
     private int size = 0;
 
 
-    public ParetoSet(ParetoComparator<T> comparator) {
+    /**
+     * Create a new ParetoSet with a comparator and a drop event listener.
+     *
+     * @param comparator The comparator to use with this set
+     * @param dropEventListener At most one subscriber can be registered to listen for drop events.
+     */
+    public ParetoSet(ParetoComparator<T> comparator, DropEventListener<T> dropEventListener) {
         this.comparator = comparator;
+        this.dropEventListener = dropEventListener;
+    }
+
+    /**
+     * Create a new ParetoSet with a comparator.
+     */
+    public ParetoSet(ParetoComparator<T> comparator) {
+        this(comparator, (oe, ne) -> {/* NOOP */});
     }
 
     public T get(int index) {
@@ -185,6 +200,8 @@ public class ParetoSet<T> extends AbstractCollection<T> {
         // Let 'j' be the next element to compare
         int j = index + 1;
 
+        notifyElementDropped(elements[i], newValue);
+
         while (j < size) {
             notifyReindex(j, i);
             // Move next element(j) forward if it is not dominated by the new value
@@ -192,12 +209,19 @@ public class ParetoSet<T> extends AbstractCollection<T> {
                 elements[i] = elements[j];
                 ++i;
             }
+            else {
+                notifyElementDropped(elements[j], newValue);
+            }
             // Goto the next element
             ++j;
         }
         notifyReindex(j, i);
         elements[i] = newValue;
         size = i+1;
+    }
+
+    private void notifyElementDropped(T oldElement, T newElement) {
+        dropEventListener.elementDroppedFromParetoSet(oldElement, newElement);
     }
 
     private boolean leftVectorDominatesRightVector(T left, T right) {

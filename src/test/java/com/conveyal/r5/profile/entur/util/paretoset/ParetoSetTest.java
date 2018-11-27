@@ -1,15 +1,11 @@
 package com.conveyal.r5.profile.entur.util.paretoset;
 
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.Random;
-import java.util.Set;
-import java.util.TreeSet;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -19,6 +15,10 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class ParetoSetTest {
+
+    // Used to stored dropped vectors (callback from set)
+    private List<Vector> dropped = new ArrayList<>();
+
 
     @Test
     public void initiallyEmpty() {
@@ -65,17 +65,20 @@ public class ParetoSetTest {
         set.add(new Vector("V0", 5));
 
         // When adding the same value
-        //addRejected(set, new Vector("Not", 5));
+        addRejected(set, new Vector("Not", 5));
+
         // Then expect no change in the set
         assertEquals("{V0[5]}", set.toString());
 
         // When adding a greater value
-        //addRejected(set, new Vector("Not", 6));
+        addRejected(set, new Vector("Not", 6));
+
         // Then expect no change in the set
         assertEquals("{V0[5]}", set.toString());
 
         // When adding the a lesser value
         addOk(set, new Vector("V1", 4));
+
         // Then the lesser value should replace the bigger one
         assertEquals("{V1[4]}", set.toString());
     }
@@ -238,11 +241,11 @@ public class ParetoSetTest {
         Vector v22 = new Vector("v22", 2, 2);
 
         // A dominant vector should replace more than one other vector
-        //test(set, "v25", v25, v35);
-        //test(set, "v53 v25", v53, v25, v35);
+        test(set, "v25", v25, v35);
+        test(set, "v53 v25", v53, v25, v35);
 
         // A dominant vector should replace more than one other vector
-        //test(set, "v53 v25 v44", v53, v25, v44);
+        test(set, "v53 v25 v44", v53, v25, v44);
         test(set, "v22", v53, v25, v44, v22);
 
         // Mutually dominance
@@ -262,36 +265,59 @@ public class ParetoSetTest {
         test(set, "v53 v25", v53, v35, v25);
     }
 
-    /**
-     * This test is used to generate test cases. It have no
-     * asserts in it - therefor the @Ignore. Instead it prints
-     * a long list of tests with the results. Use it to
-     * manually inspect and find test examples.
-     */
     @Test
-    @Ignore
-    public void randomlyGenerateVectorsAndOutputResult() {
+    public void elementsAreNotDroppedWhenParetoOptimalElementsAreAdded() {
         // Given a set with 2 criteria: LT and LT
-        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN);
-        List<Vector> values = new ArrayList<>(Arrays.asList(
-                new Vector("0", 5, 5),
-                new Vector("1", 5, 3),
-                new Vector("2", 3, 5),
-                new Vector("3", 1, 5),
-                new Vector("4", 5, 1)
-        ));
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN, (old, newElement) -> dropped.add(newElement));
 
-        Random rnd = new Random(2);
-        Set<String> results = new TreeSet<>();
+        // Before any elements are added the list of dropped elements should be empty
+        assertTrue(dropped.isEmpty());
 
-        for (int i = 0; i < 200; i++) {
-            List<Integer> indexes = new ArrayList<>();
-            for (int j = 0; j < 4; j++) {
-                indexes.add(rnd.nextInt(values.size()));
-            }
-            results.add(log(set, values, indexes));
-        }
-        results.forEach(System.out::println);
+        // Add one element and verify nothing is dropped
+        set.add(vector(1,7));
+        assertTrue(dropped.isEmpty());
+
+        // Add another element and verify nothing is dropped
+        set.add(vector(2,6));
+        assertTrue(dropped.isEmpty());
+    }
+
+    @Test
+    public void firstElementIsDroppedWhenANewDominatingElementIsAdded() {
+        // Given a set with 2 criteria: LT and LT and a vector [7, 3]
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN, (old, newElement) -> dropped.add(newElement));
+        set.add(vector(7,3));
+        assertTrue(dropped.isEmpty());
+
+        // Add two elements and verify the second causes the first to be dropped
+        set.add(vector(6, 3));
+        assertEquals("[Test[7, 3]]", dropped.toString());
+
+        // Setup
+        dropped.clear();
+        set.clear();
+
+        // No try adding 2 elements, where the first is dominated later
+        set.add(vector(7,3));
+        set.add(vector(5,5));
+        assertTrue(dropped.isEmpty());
+
+        // Add another element and verify nothing is dropped
+        set.add(vector(6, 3));
+        assertEquals("[Test[7, 3]]", dropped.toString());
+    }
+
+    @Test
+    public void lastElementIsDroppedWhenANewDominatingElementIsAdded() {
+        // Given a set with 2 criteria: LT and LT and a vector [7, 3]
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN, (old, newElement) -> dropped.add(newElement));
+        set.add(vector(5,5));
+        set.add(vector(7,3));
+        assertTrue(dropped.isEmpty());
+
+        // Add two elements and verify the second causes the first to be dropped
+        set.add(vector(6, 3));
+        assertEquals("[Test[7, 3]]", dropped.toString());
     }
 
     /**

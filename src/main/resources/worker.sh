@@ -66,7 +66,7 @@ cat /etc/aws
 echo AWS Log agent logs:
 cat /var/log/awslogs.log
 
-# Set up aws cli
+# Create a config file to tell the AWS CLI which region to operate in
 mkdir ~/.aws
 cat > ~/.aws/config << EOF
 [default]

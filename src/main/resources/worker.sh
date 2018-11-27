@@ -21,6 +21,8 @@ yum -y install awslogs java-1.8.0-openjdk
 # first things first: set up logging
 LOGFILE=/var/log/analyst-worker.log
 
+INSTANCE_ID = '{instance_id}'
+
 echo Starting analyst worker at `date` > $LOGFILE
 
 # make it so that the worker can write to the logfile
@@ -36,7 +38,7 @@ state_file = /var/lib/awslogs/agent-state
 [logstream1]
 file = $LOGFILE
 log_group_name = {1}
-log_stream_name = '{instance_id}'
+log_stream_name = $INSTANCE_ID
 datetime_format = %Y-%m-%dT%H:%M:%S%z
 time_zone = UTC
 EOF
@@ -67,15 +69,15 @@ echo AWS Log agent logs:
 cat /var/log/awslogs.log
 
 # Create a config file to tell the AWS CLI which region to operate in
-mkdir ~/.aws
-cat > ~/.aws/config << EOF
+mkdir /home/ec2-user/.aws
+cat > /home/ec2-user/.aws/config << EOF
 [default]
 region = $REGION
 EOF
 
 # Tag the instance (so we can identify it in the EC2 console)
-aws ec2 create-tags --resources '{instance_id}' --tags Key=Name,Value=AnalysisWorker,Key=Project,Value=Analysis&&
-Key=group,Value={3},Key=user,Value={4},Key=networkId,Value={5},Key=workerVersion,Value={6}
+sudo -u ec2-user aws ec2 create-tags --resources $INSTANCE_ID --tags Key=Name,Value=AnalysisWorker \
+Key=Project,Value=Analysis Key=group,Value={3} Key=user,Value={4} Key=networkId,Value={5} Key=workerVersion,Value={6}
 
 # Download the worker
 sudo -u ec2-user wget -O ~ec2-user/r5.jar {0} >> $LOGFILE 2>&1

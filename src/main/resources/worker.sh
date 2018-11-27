@@ -11,9 +11,8 @@
 # 5: the UUID of the TransportNetwork the worker will start analyzing
 # 6: the worker version to use
 # If you are reading this comment inside the EC2 user data field, this variable substitution has already happened.
-# The string instance_id in curly brackets is substituted by EC2 at startup, not by our Java code. It and any shell
-# variable references that contain brackets are single-quoted to tell MessageFormat not to substitute them.
-# Be very careful not to put any stray single quotes in this file, even in comments!
+# Shell variable references that contain brackets are single-quoted to tell MessageFormat not to substitute them, and
+# are substituted by EC2 on startup. Be very careful not to put any stray single quotes in this file, even in comments!
 
 # prep the system: install log agent, java
 yum -y install awslogs java-1.8.0-openjdk
@@ -21,13 +20,13 @@ yum -y install awslogs java-1.8.0-openjdk
 # first things first: set up logging
 LOGFILE=/var/log/analyst-worker.log
 
-INSTANCE_ID = '{instance_id}'
-
 echo Starting analyst worker at `date` > $LOGFILE
 
 # make it so that the worker can write to the logfile
 chown ec2-user:ec2-user $LOGFILE
 chmod 664 $LOGFILE # Log agent needs to read log file
+
+INSTANCE=`curl http://169.254.169.254/latest/meta-data/instance-id`
 
 # using a shell "herefile" or "heredoc", pipe the data between <<EOF and EOF into the cat process which then writes
 # it to the appropriate location on the file system. Leave EOF unquoted so that variables are substituted.
@@ -38,7 +37,7 @@ state_file = /var/lib/awslogs/agent-state
 [logstream1]
 file = $LOGFILE
 log_group_name = {1}
-log_stream_name = $INSTANCE_ID
+log_stream_name = $INSTANCE
 datetime_format = %Y-%m-%dT%H:%M:%S%z
 time_zone = UTC
 EOF
@@ -76,7 +75,7 @@ region = $REGION
 EOF
 
 # Tag the instance (so we can identify it in the EC2 console)
-sudo -u ec2-user aws ec2 create-tags --resources $INSTANCE_ID --tags Key=Name,Value=AnalysisWorker \
+sudo -u ec2-user aws ec2 create-tags --resources $INSTANCE --tags Key=Name,Value=AnalysisWorker \
 Key=Project,Value=Analysis Key=group,Value={3} Key=user,Value={4} Key=networkId,Value={5} Key=workerVersion,Value={6}
 
 # Download the worker

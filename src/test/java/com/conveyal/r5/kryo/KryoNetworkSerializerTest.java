@@ -3,6 +3,7 @@ package com.conveyal.r5.kryo;
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.r5.analyst.scenario.FakeGraph;
 import com.conveyal.r5.diff.ObjectDiffer;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.IntHashGrid;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.esotericsoftware.kryo.Kryo;
@@ -28,9 +29,9 @@ public class KryoNetworkSerializerTest {
     @Test
     public void testRoundTrip () throws Exception {
 
-        // Build a network, including distance tables and a linked grid pointset for Analysis.
+        // Build a network, including distance tables and a linked grid point set for Analysis.
         TransportNetwork originalNetwork = buildNetwork(FakeGraph.TransitNetwork.MULTIPLE_LINES);
-        originalNetwork.rebuildLinkedGridPointSet();
+        originalNetwork.rebuildLinkedGridPointSet(StreetMode.WALK);
 
         // Test that the network is identical to itself. This is a test that the ObjectDiffer works and is configured
         // properly, and enables a special option of that class.

@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst.scenario;
 import com.beust.jcommander.internal.Lists;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransferFinder;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -143,7 +144,11 @@ public class Scenario implements Serializable {
         new TransferFinder(copiedNetwork).findTransfers();
 
         // Update the linkage between the grid and the streets, considering whether the scenario changed any streets.
-        copiedNetwork.rebuildLinkedGridPointSet();
+        // FIXME this seems unnecessary. It's forcing a walk linkage on the scenario.
+        // Instead we should just let the linkage cache perform the linkage for the correct mode on demand.
+        // FIXME New routes drawn outside the original bounds cannot have an effect.
+        // This is because the (unlinked) grid point set has been copied verbatim to the new network.
+        copiedNetwork.rebuildLinkedGridPointSet(StreetMode.WALK);
         if (VERIFY_BASE_NETWORK_UNCHANGED) {
             if (originalNetwork.checksum() != baseNetworkChecksum) {
                 LOG.error("Applying a scenario mutated the base transportation network. THIS IS A BUG.");

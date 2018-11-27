@@ -101,7 +101,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
         for (StreetMode mode : key.modes) {
             // Finer grained progress indicator:
             // int percentage = 50D/nModes * i / 50;
-            pointSet.link(scenarioNetwork.streetLayer, mode);
+            pointSet.getLinkage(scenarioNetwork.streetLayer, mode);
         }
 
         // Finished building all needed inputs for analysis, return the completed network to the AsyncLoader code.

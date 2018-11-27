@@ -64,22 +64,11 @@ public class TransportNetwork implements Serializable {
      * A grid point set that covers the full extent of this transport network. The PointSet itself then caches linkages
      * to street networks (the baseline street network, or ones with various scenarios applied). If they have been
      * created, this point set and its linkage to the street network are serialized along with the network, which makes
-     * startup much faster. Note that there's a linkage cache with references to streetlayers in this GridPointSet,
+     * startup much faster. Note that there's a linkage cache with references to StreetLayers in this GridPointSet,
      * so you should usually only serialize a TransportNetwork right after it's built, when that cache contains only
-     * the baseline linkage. This unlinked pointset is not specific to any mode of travel, it's just a set of points.
+     * the baseline linkage. This unlinked GridPointSet is not specific to any mode of travel, it's just a set of points.
      */
     public WebMercatorGridPointSet gridPointSet;
-
-    /**
-     * This is a WALK linkage for the above gridPointSet, connecting it to the street network for walking purposes.
-     * Linkages are cached within GridPointSets in a Guava cache. Guava caches serialize their configuration but not
-     * their contents, which is actually pretty sane behavior for a cache. So if we want a particular linkage to be
-     * available on reload, we have to store it in its own field rather than the cache. It would be possible to keep
-     * only this field, and access its unlinked gridPointSet via linkedGridPointSet.pointset, but less readable.
-     * TODO replace linkage cache with a manually managed, non-transient map outside the pointSets themselves.
-     * TODO rename so it's clear that this is a walk linkage, and that it's a default/base linkage for the network.
-     */
-    public LinkedPointSet linkedGridPointSet;
 
     /**
      * A string uniquely identifying the contents of this TransportNetwork in the space of TransportNetworks.
@@ -304,21 +293,23 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * Build an efficient implicit grid PointSet for this TransportNetwork if it doesn't already exist. Then link that
-     * grid pointset to the street layer using the WALK mode. This is called when a network is first built for analysis
-     * purposes, and also after a scenario is applied to rebuild a grid pointset for the scenario copy of the network.
+     * Build an efficient implicit grid PointSet for this TransportNetwork if it doesn't already exist. Then, for any
+     * modes that are supplied, we also build a linkage that is held permanently in the GridPointSet. This method is
+     * called when a network is first built for analysis purposes, and also after a scenario is applied to rebuild a
+     * linked grid pointset for the scenario copy of the network.
+     * FIXME isn't this forcing WALK mode even when the scenario is not used for walk mode?
      *
      * This grid PointSet will cover the entire street network layer of this TransportNetwork, which should include
      * every point we can route from or to. Any other destination grid (for the same mode, walking) can be made as a
      * subset of this one since it includes every potentially accessible point.
      */
-    public void rebuildLinkedGridPointSet() {
+    public void rebuildLinkedGridPointSet(StreetMode... modes) {
         if (gridPointSet == null) {
             gridPointSet = new WebMercatorGridPointSet(this);
         }
-        // Here we are bypassing the GridPointSet's internal cache of linkages because we want this particular linkage
-        // to be serialized with the network. The internal Guava cache does not serialize its contents (by design).
-        linkedGridPointSet = new LinkedPointSet(gridPointSet, streetLayer, StreetMode.WALK, linkedGridPointSet);
+        for (StreetMode mode : modes) {
+            gridPointSet.buildUnevictableLinkage(streetLayer, mode);
+        }
     }
 
     //TODO: add transit stops to envelope
@@ -379,7 +370,6 @@ public class TransportNetwork implements Serializable {
         // It is important to set this before making the clones of the street and transit layers below.
         copy.scenarioId = scenario.id;
         copy.gridPointSet = this.gridPointSet;
-        copy.linkedGridPointSet = this.linkedGridPointSet;
         copy.transitLayer = this.transitLayer.scenarioCopy(copy, scenario.affectsTransitLayer());
         copy.streetLayer = this.streetLayer.scenarioCopy(copy, scenario.affectsStreetLayer());
         copy.fareCalculator = this.fareCalculator;

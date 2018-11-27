@@ -22,9 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
-import java.util.List;
 import java.util.function.IntFunction;
-import java.util.function.Supplier;
 
 /**
  * This computes a surface representing travel time from one origin to all destination cells, and writes out a
@@ -110,7 +108,7 @@ public class TravelTimeComputer {
 
             int offstreetTravelSpeedMillimetersPerSecond = (int) (request.getSpeedForMode(directMode) * 1000);
 
-            LinkedPointSet directModeLinkedDestinations = destinations.link(network.streetLayer, directMode);
+            LinkedPointSet directModeLinkedDestinations = destinations.getLinkage(network.streetLayer, directMode);
             int[] travelTimesToTargets = directModeLinkedDestinations
                     .eval(sr::getTravelTimeToVertex, offstreetTravelSpeedMillimetersPerSecond).travelTimes;
 
@@ -127,8 +125,8 @@ public class TravelTimeComputer {
             // references to the same linkage.
             // TODO use directMode? Is that a resource limiting issue?
             // Also, gridcomputer uses accessMode to avoid running two street searches.
-            LinkedPointSet accessModeLinkedDestinations = destinations.link(network.streetLayer, accessMode);
-            LinkedPointSet egressModeLinkedDestinations = destinations.link(network.streetLayer, egressMode);
+            LinkedPointSet accessModeLinkedDestinations = destinations.getLinkage(network.streetLayer, accessMode);
+            LinkedPointSet egressModeLinkedDestinations = destinations.getLinkage(network.streetLayer, egressMode);
 
             if (!request.directModes.equals(request.accessModes)) {
                 LOG.error("Direct mode may not be different than access mode in analysis.");

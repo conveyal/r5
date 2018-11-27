@@ -24,16 +24,18 @@ public class ParetoSetWithMarker<T> extends ParetoSet<T> {
         marker = 0;
     }
 
-    public Stream<T> streamFromMark() {
+    /**
+     * Create a stream for all elements added after the marker.
+     */
+    public Stream<T> streamAfterMarker() {
         return stream(marker);
     }
 
-    public void markEndOfSet() {
+    /**
+     * Move the marker after the last element in the set.
+     */
+    public void markAtEndOfSet() {
         marker = size();
-    }
-
-    public int marker() {
-        return marker;
     }
 
     @Override

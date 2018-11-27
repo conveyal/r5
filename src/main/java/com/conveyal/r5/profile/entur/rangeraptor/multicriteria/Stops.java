@@ -39,8 +39,7 @@ final class Stops<T extends TripScheduleInfo> {
     }
 
     void setInitialTime(AccessLeg accessLeg, int fromTime) {
-        final int stop = accessLeg.stop();
-        findOrCreateSet(stop).add(
+        addStopArrival(
                 new AccessStopArrival<>(
                         accessLeg.stop(),
                         fromTime,
@@ -66,7 +65,7 @@ final class Stops<T extends TripScheduleInfo> {
         if(it==null) {
             return emptyList();
         }
-        return it.streamFromMark().collect(Collectors.toList());
+        return it.streamAfterMarker().collect(Collectors.toList());
     }
 
     Iterable<? extends AbstractStopArrival<T>> list(final int round, final int stop) {
@@ -80,7 +79,7 @@ final class Stops<T extends TripScheduleInfo> {
     void markAllStops() {
         for (Stop<T> stop : stops) {
             if (stop != null) {
-                stop.markEndOfSet();
+                stop.markAtEndOfSet();
             }
         }
     }

@@ -4,13 +4,13 @@ import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.UnsignedIntIterator;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleBoardSearch;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
-import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
 import java.util.Collection;
 import java.util.Iterator;
@@ -74,7 +74,7 @@ public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRan
      * Perform a scheduled search
      */
     @Override protected void scheduledSearchForRound() {
-        BitSetIterator stops = state.stopsTouchedPreviousRound();
+        UnsignedIntIterator stops = state.stopsTouchedPreviousRound();
         Iterator<? extends TripPatternInfo<T>> patternIterator = transit.patternIterator(stops);
 
         while (patternIterator.hasNext()) {

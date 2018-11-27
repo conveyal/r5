@@ -3,100 +3,139 @@ package com.conveyal.r5.profile.entur.util.paretoset;
 import org.junit.Test;
 
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 
 public class ParetoSetWithMarkerTest {
-    private ParetoSetWithMarker<Vector> subject = new ParetoSetWithMarker<>((l,r) -> l.u < r.u || l.v < r.v);
+    private static final Vector OTHER_VECTOR = new Vector(999, 999);
+
+    private ParetoSetWithMarker<Vector> subject = new ParetoSetWithMarker<>((l, r) -> l.u < r.u || l.v < r.v);
 
     @Test
     public void verifyMarkerIsInitializedToZero() {
-        assertEquals(0, subject.marker());
+        assertEquals("{}", toString(subject));
+    }
+
+    @Test
+    public void verifyMarkerExistAfterElementsIsAdded() {
+        subject.add(v(1,1));
+        assertEquals("<M>, [1, 1]", toString(subject));
     }
 
     @Test
     public void verifyMarkerStaysAtBeginningOfSetWhenElementsAreAdded() {
         subject.add(v(5,5));
-        assertEquals(0, subject.marker());
+        assertEquals("<M>, [5, 5]", toString(subject));
         subject.add(v(3,3));
-        assertEquals(0, subject.marker());
+        assertEquals("<M>, [3, 3]", toString(subject));
         subject.add(v(1,5));
-        assertEquals(0, subject.marker());
+        assertEquals("<M>, [3, 3], [1, 5]", toString(subject));
         subject.add(v(1,4));
-        assertEquals(0, subject.marker());
+        assertEquals("<M>, [3, 3], [1, 4]", toString(subject));
     }
 
     @Test
     public void verifyMarkerStaysInRightPlaceWhenNewElementsAreAdded() {
         subject.add(v(5,5));
 
-        subject.markEndOfSet();
-        assertEquals(1, subject.marker());
+        subject.markAtEndOfSet();
+        assertEquals("[5, 5], <M>", toString(subject));
 
         subject.add(v(8,8));
-        assertEquals("{[5, 5]}", subject.toString());
-        assertEquals(1, subject.marker());
+        assertEquals("[5, 5], <M>", toString(subject));
 
         subject.add(v(3,7));
-        assertEquals("{[5, 5], [3, 7]}", subject.toString());
-        assertEquals(1, subject.marker());
+        assertEquals("[5, 5], <M>, [3, 7]", toString(subject));
 
         subject.add(v(4,3));
-        assertEquals("{[3, 7], [4, 3]}", subject.toString());
-        assertEquals(0, subject.marker());
+        assertEquals("<M>, [3, 7], [4, 3]", toString(subject));
 
-        subject.markEndOfSet();
+        subject.markAtEndOfSet();
         subject.add(v(2,4));
-        assertEquals("{[4, 3], [2, 4]}", subject.toString());
-        assertEquals(1, subject.marker());
+        assertEquals("[4, 3], <M>, [2, 4]", toString(subject));
     }
 
     @Test
     public void clear() {
         subject.clear();
-        assertEquals(0, subject.marker());
+        assertEquals("{}", toString(subject));
 
+        // Add an element to make sure the marker is set to 0 when cleared (above)
         subject.add(v(5,5));
-        subject.markEndOfSet();
-        assertEquals(1, subject.marker());
+        assertEquals("<M>, [5, 5]", toString(subject));
+
+        subject.markAtEndOfSet();
+        assertEquals("[5, 5], <M>", toString(subject));
+
+        // Clear and add an element to make sure the marker is set back to 0
         subject.clear();
-        assertEquals(0, subject.marker());
+        subject.add(v(5,5));
+        assertEquals("<M>, [5, 5]", toString(subject));
     }
 
     @Test
     public void iteratorFromMark() {
-        assertFalse("Empty set have no elements after marker", subject.streamFromMark().findAny().isPresent());
+        assertEquals(
+                "Empty set have no elements after marker",
+                "{}",
+                toString(subject.streamAfterMarker())
+        );
 
         subject.add(v(5,5));
-        subject.markEndOfSet();
-        assertFalse("Still empty - no elements after marker", subject.streamFromMark().findAny().isPresent());
+        subject.markAtEndOfSet();
+        assertEquals(
+                "Still empty - no elements after marker",
+                "{}",
+                toString(subject.streamAfterMarker())
+        );
 
-        subject.markEndOfSet();
+        subject.markAtEndOfSet();
         subject.add(v(3,7));
-        assertEquals("Return one element after marker", "[3, 7]", toString(subject.streamFromMark()));
+        assertEquals(
+                "Return one element after marker",
+                "[3, 7]",
+                toString(subject.streamAfterMarker())
+        );
     }
 
     @Test
-    public void verifyListWith3ElementslistFromMark() {
+    public void verifyMultipleElementsAddedAfterMarker() {
         // Given an element before the mark
         subject.add(v(9,1));
         // When mark set
-        subject.markEndOfSet();
+        subject.markAtEndOfSet();
         // And 3 elements added
         subject.add(v(6,4));
         subject.add(v(5,5));
         subject.add(v(4,6));
 
-        // Then all 3 elements exist
-        assertEquals("[6, 4], [5, 5], [4, 6]", toString(subject.streamFromMark()));
-        // and only one element has 5 as its last criteria
-        assertEquals("[5, 5]", toString(subject.streamFromMark().filter(it -> it.v == 5)));
+        // Then all 3 elements exist AFTER marker
+        assertEquals("[9, 1], <M>, [6, 4], [5, 5], [4, 6]", toString(subject));
+        assertEquals("[6, 4], [5, 5], [4, 6]", toString(subject.streamAfterMarker()));
+    }
+
+    @SuppressWarnings("OptionalGetWithoutIsPresent")
+    private String toString(ParetoSetWithMarker<Vector> set) {
+        if(set.isEmpty()) {
+            return "{}";
+        }
+        Vector firstVectorAfterMarker = set.streamAfterMarker().findFirst().orElse(null);
+        if(firstVectorAfterMarker != null) {
+            return toString(set.stream(), it -> it == firstVectorAfterMarker ? "<M>, " + it : it.toString());
+        }
+        return toString(set.stream()) + ", <M>";
     }
 
     private String toString(Stream<Vector> stream) {
-        return stream.map(Objects::toString).reduce((a,b) -> a + ", " + b).orElse("");
+        return toString(stream, Objects::toString);
+    }
+
+    private String toString(Stream<Vector> stream, Function<Vector, String> mapper) {
+        return stream.map(mapper)
+                .reduce((a,b) -> a + ", " + b)
+                .orElse("{}");
     }
 
     static private Vector v(int u, int v) {

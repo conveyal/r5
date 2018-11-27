@@ -29,72 +29,72 @@ import java.util.List;
  * This is grouped into a separate class (rather than just having the fields in the raptor worker class) because we
  * want the Algorithm to be as clean as possible and to be able to swap the state implementation - try out and
  * experiment with different state implementations.
- * <p/>
- *
  */
 final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements WorkerState {
 
-    /** Stop the search when the time exceeds the max time limit. */
+    /**
+     * Stop the search when the time exceeds the max time limit.
+     */
     private int maxTimeLimit;
 
     private final Stops<T> stops;
     private final List<AbstractStopArrival<T>> arrivalsCache = new ArrayList<>();
     private final int nRounds;
     private int round = Integer.MIN_VALUE;
+    private boolean updatesExist = false;
+    private BitSet touchedStops;
 
-    private BitSet touchedCurrent;
-    private BitSet touchedPrevious;
-
-
-    /** create a RaptorState for a network with a particular number of stops, and a given maximum duration */
+    /**
+     * create a RaptorState for a network with a particular number of stops, and a given maximum duration
+     */
     McRangeRaptorWorkerState(int nRounds, int nStops, Collection<EgressLeg> egressLegs, TransitCalculator calculator) {
         this.nRounds = nRounds;
         this.stops = new Stops<>(nStops, egressLegs, calculator);
-
-        this.touchedCurrent = new BitSet(nStops);
-        this.touchedPrevious = new BitSet(nStops);
+        this.touchedStops = new BitSet(nStops);
     }
 
-    @Override public void initNewDepartureForMinute(int departureTime) {
+    @Override
+    public void initNewDepartureForMinute(int departureTime) {
         // TODO TGR - Set max limit to 5 days for now, replace this with a pareto check against the
         // TODO TGR - destination location values.
         maxTimeLimit = departureTime + 5 * 24 * 60 * 60;
-        // clear all touched stops to avoid constant rexploration
-        touchedCurrent.clear();
-        touchedPrevious.clear();
-        stops.markAllStops();
         round = 0;
+        arrivalsCache.clear();
+        // clear all touched stops to avoid constant rexploration
+        startRecordChangesToStopsForNextAndCurrentRound();
     }
 
-    @Override public void setInitialTime(AccessLeg accessLeg, int fromTime) {
+    @Override
+    public void setInitialTime(AccessLeg accessLeg, int fromTime) {
         stops.setInitialTime(accessLeg, fromTime);
-        touchedCurrent.set(accessLeg.stop());
+        touchedStops.set(accessLeg.stop());
+        updatesExist = true;
         debugStops(AccessStopArrival.class, round, accessLeg.stop());
     }
 
-    @Override public boolean isNewRoundAvailable() {
-        final boolean moreRoundsToGo = round < nRounds-1;
-        return moreRoundsToGo && isCurrentRoundUpdated();
+    @Override
+    public boolean isNewRoundAvailable() {
+        final boolean moreRoundsToGo = round < nRounds - 1;
+        return moreRoundsToGo && updatesExist;
     }
 
-    @Override public void gotoNextRound () {
+    @Override
+    public void gotoNextRound() {
         ++round;
     }
 
     UnsignedIntIterator stopsTouchedPreviousRound() {
-        mergeAndSwapTouchedStops();
-        return new BitSetIterator(touchedPrevious);
+        return new BitSetIterator(touchedStops);
     }
 
-    @Override public UnsignedIntIterator stopsTouchedByTransitCurrentRound() {
-        swapTouchedStops();
-        return new BitSetIterator(touchedPrevious);
+    @Override
+    public UnsignedIntIterator stopsTouchedByTransitCurrentRound() {
+        return new BitSetIterator(touchedStops);
     }
 
     Iterable<? extends AbstractStopArrival<T>> listStopArrivalsPreviousRound(int stop) {
         return stops.listArrivalsAfterMark(stop);
     }
-
 
     /**
      * Set the time at a transit stop iff it is optimal.
@@ -109,7 +109,8 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     /**
      * Set the time at a transit stops iff it is optimal.
      */
-    @Override public void transferToStops(int fromStop, Iterator<? extends TransferLeg> transfers) {
+    @Override
+    public void transferToStops(int fromStop, Iterator<? extends TransferLeg> transfers) {
         Iterable<? extends AbstractStopArrival<T>> fromArrivals = stops.listArrivalsAfterMark(fromStop);
 
         while (transfers.hasNext()) {
@@ -118,43 +119,38 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     }
 
     public void commitTransits() {
-        stops.markAllStops();
+        startRecordChangesToStopsForNextAndCurrentRound();
         commitCachedArrivals(TransitStopArrival.class);
     }
 
-    @Override public void commitTransfers() {
+    @Override
+    public void commitTransfers() {
         commitCachedArrivals(TransferStopArrival.class);
-    }
-
-    private void commitCachedArrivals(Class<? extends AbstractStopArrival> type) {
-        for (AbstractStopArrival<T> arrival : arrivalsCache) {
-            if(arrival.getClass() != type) {
-                throw new IllegalStateException();
-            }
-
-            if (stops.addStopArrival(arrival)) {
-                touchedCurrent.set(arrival.stop());
-                debugStops(type, round, arrival.stop());
-            }
-        }
-        arrivalsCache.clear();
     }
 
     Collection<Path<T>> extractPaths() {
         return stops.extractPaths();
     }
 
-    @Override public void debugStopHeader(String title) {
-        DebugState.debugStopHeader(title,"C P");
+    @Override
+    public void debugStopHeader(String title) {
+        DebugState.debugStopHeader(title, "C");
     }
 
 
     /* private methods */
 
+    private void startRecordChangesToStopsForNextAndCurrentRound() {
+        stops.markAllStops();
+        touchedStops.clear();
+        updatesExist = !arrivalsCache.isEmpty();
+    }
+
+
     private void transferToStop(Iterable<? extends AbstractStopArrival<T>> fromArrivals, TransferLeg transfer) {
         final int transferTimeInSeconds = transfer.durationInSeconds();
 
-        for(AbstractStopArrival<T> it :  fromArrivals) {
+        for (AbstractStopArrival<T> it : fromArrivals) {
             int arrivalTime = it.arrivalTime() + transferTimeInSeconds;
 
             if (arrivalTime < maxTimeLimit) {
@@ -163,27 +159,21 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         }
     }
 
-    private boolean isCurrentRoundUpdated() {
-        return !touchedCurrent.isEmpty();
-    }
-
-    private void mergeAndSwapTouchedStops() {
-        touchedCurrent.or(touchedPrevious);
-        swapTouchedStops();
-    }
-
-    private void swapTouchedStops() {
-        BitSet temp = touchedPrevious;
-        touchedPrevious = touchedCurrent;
-        touchedCurrent = temp;
-        touchedCurrent.clear();
+    private void commitCachedArrivals(Class<? extends AbstractStopArrival> type) {
+        for (AbstractStopArrival<T> arrival : arrivalsCache) {
+            if (stops.addStopArrival(arrival)) {
+                touchedStops.set(arrival.stop());
+                debugStops(type, round, arrival.stop());
+            }
+        }
+        arrivalsCache.clear();
     }
 
     private void debugStops(Class<?> type, int round, int stop) {
         if (DebugState.isDebug(stop)) {
-            String postfix = (touchedCurrent.get(stop) ? "x " : "  ") + (touchedPrevious.get(stop) ? "x" : " ");
+            String postfix = (touchedStops.get(stop) ? "x" : " ");
             for (AbstractStopArrival<T> it : stops.list(round, stop)) {
-                if(it.getClass() == type) {
+                if (it.getClass() == type) {
                     DebugState.debugStop(it, postfix);
                 }
             }

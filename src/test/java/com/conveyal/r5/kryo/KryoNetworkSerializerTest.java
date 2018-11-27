@@ -51,7 +51,6 @@ public class KryoNetworkSerializerTest {
         TransportNetwork copiedNetwork2 = KryoNetworkSerializer.read(tempFile);
         copiedNetwork2.rebuildTransientIndexes();
         assertNoDifferences(copiedNetwork1, copiedNetwork2);
-
     }
 
     /**
@@ -70,8 +69,9 @@ public class KryoNetworkSerializerTest {
         // Skip the somewhat unnecessary spatial index field on PointSets - these contain unordered lists
         // (and should probably be eliminated on gridded point sets).
         objectDiffer.ignoreFields("spatialIndex");
-        // Skip the linkage LoadingCache which has no comparison method defined and can have its values evicted.
-        objectDiffer.ignoreFields("linkageCache");
+        // Skip the linkage LoadingCache which can have its values evicted.
+        // It and the map are keyed on street layers, which have identity equality so don't compare properly here.
+        objectDiffer.ignoreFields("linkageCache", "linkageMap");
         objectDiffer.useEquals(BitSet.class);
         // IntHashGrid contains unordered lists of elements in each bin. Lists are compared as ordered.
         objectDiffer.ignoreClasses(IntHashGrid.class);

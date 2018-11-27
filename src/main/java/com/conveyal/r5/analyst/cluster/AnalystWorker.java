@@ -124,14 +124,19 @@ public class AnalystWorker implements Runnable {
     static final int REGIONAL_KEEPALIVE_MINUTES = 2;
     static final int SINGLE_KEEPALIVE_MINUTES = 60;
 
-    /** Clock time (milliseconds since epoch) at which the worker should be considered to have finished preloading */
-    long preloadActivityExpiration = 0;
+    /** Clock time (milliseconds since epoch) at which the worker should be considered idle */
+    long shutdownAfter;
+    boolean inPreloading;
 
-    /** Clock time (milliseconds since epoch) at which the worker should be considered idle on regional work */
-    long regionalActivityExpiration = 0;
-
-    /** Clock time (milliseconds since epoch) at which the worker should be considered idle on single-point work */
-    long singleActivityExpiration = 0;
+    void adjustShutdownClock (int keepAliveMinutes) {
+        long t = System.currentTimeMillis() + keepAliveMinutes * 60 * 1000;
+        if (inPreloading) {
+            inPreloading = false;
+            shutdownAfter = t;
+        } else {
+            shutdownAfter = Math.max(shutdownAfter, t);
+        }
+    }
 
     /** Whether this worker should shut down automatically when idle. */
     public final boolean autoShutdown;
@@ -252,7 +257,8 @@ public class AnalystWorker implements Runnable {
         this.autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown", "false"));
 
         // Keep the worker alive for an initial window to prepare for analysis
-        preloadActivityExpiration = System.currentTimeMillis() + PRELOAD_KEEPALIVE_MINUTES * 60 * 1000;
+        inPreloading = true;
+        shutdownAfter = System.currentTimeMillis() + PRELOAD_KEEPALIVE_MINUTES * 60 * 1000;
 
         // Discover information about what EC2 instance / region we're running on, if any.
         // If the worker isn't running in Amazon EC2, then region will be unknown so fall back on a default, because
@@ -275,13 +281,7 @@ public class AnalystWorker implements Runnable {
     public void considerShuttingDown() {
         long now = System.currentTimeMillis();
 
-        // Shutdown worker if it did any work and is now idle, or if it never successfully did work and it's now past
-        // the allowable time for preloading
-        boolean shutdown = ((singleActivityExpiration != 0 || regionalActivityExpiration != 0) &&
-                now > singleActivityExpiration && now > regionalActivityExpiration) ||
-                (singleActivityExpiration == 0 && regionalActivityExpiration == 0 && now > preloadActivityExpiration);
-
-        if (shutdown) {
+        if (now > shutdownAfter) {
             LOG.info("Machine has been idle for at least {} minutes (single point) and {} minutes (regional), " +
                     "shutting down.", SINGLE_KEEPALIVE_MINUTES , REGIONAL_KEEPALIVE_MINUTES);
             // Stop accepting any new single-point requests while shutdown is happening.
@@ -408,7 +408,7 @@ public class AnalystWorker implements Runnable {
 
         // After the AsyncLoader has reported all required data are ready for analysis, advance the shutdown clock to
         // reflect that the worker is performing single-point work.
-        singleActivityExpiration =  System.currentTimeMillis() + SINGLE_KEEPALIVE_MINUTES * 60 * 1000;
+        adjustShutdownClock(SINGLE_KEEPALIVE_MINUTES);
 
         // Perform the core travel time computations.
         TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork, gridCache);
@@ -484,7 +484,7 @@ public class AnalystWorker implements Runnable {
             }
 
             // Advance the shutdown clock to reflect that the worker is performing regional work.
-            regionalActivityExpiration = System.currentTimeMillis() + REGIONAL_KEEPALIVE_MINUTES * 60 * 1000;
+            adjustShutdownClock(REGIONAL_KEEPALIVE_MINUTES);
 
             // Perform the core travel time and accessibility computations.
             TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork, gridCache);

@@ -35,12 +35,12 @@ public class StopArrivalStateParetoSetTest {
 
     private AbstractStopArrival<TripScheduleInfo> A_STATE = newMcAccessStopState(999, 10);
 
-    private Stop<TripScheduleInfo> subject = new Stop<>();
+    private Stop<TripScheduleInfo> subject = new Stop<>(0);
 
     @Test
     public void addOneElementToSet() {
-        subject.add(newMcAccessStopState(1, 10));
-        assertStopsInSet(1);
+        subject.add(newMcAccessStopState(STOP_1, 10));
+        assertStopsInSet(STOP_1);
     }
 
     @Test
@@ -83,14 +83,17 @@ public class StopArrivalStateParetoSetTest {
         assertStopsInSet(STOP_2, STOP_4, STOP_5);
     }
 
+    /**
+     * During the same round transfers should not dominate transits, but this is handled
+     * by the worker state (2-phase transfer calculation), not by the pareto-set. Using
+     * the pareto-set for this would cause unnecessary exploration in the following round.
+     */
     @Test
-    public void testTransitAndTransferDoesAffectDominance() {
+    public void testTransitAndTransferDoesNotAffectDominance() {
         subject.add(newMcAccessStopState(STOP_1, 20));
         subject.add(newMcTransitStopState(A_STATE, ROUND_1, STOP_2, 10));
-        subject.add(newMcTransitStopState(A_STATE, ROUND_1, STOP_3, 11));
         subject.add(newMcTransferStopState(A_STATE, ROUND_1, STOP_4, 8));
-        subject.add(newMcTransferStopState(A_STATE, ROUND_1, STOP_4, 9));
-        assertStopsInSet(STOP_1, STOP_2, STOP_4);
+        assertStopsInSet(STOP_1, STOP_4);
     }
 
     private void assertStopsInSet(int ... expStopIndexes) {

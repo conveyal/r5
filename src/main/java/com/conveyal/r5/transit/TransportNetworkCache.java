@@ -16,6 +16,7 @@ import com.conveyal.r5.common.R5Version;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.OSMCache;
 import com.conveyal.r5.streets.StreetLayer;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -215,15 +216,15 @@ public class TransportNetworkCache {
         }
         network.scenarioId = networkId;
 
-        // Networks created in TransportNetworkCache are going to be used for analysis work.
-        // Pre-compute distance tables from stops to streets and pre-build a linked grid pointset for the whole region.
-        // They should be serialized along with the network, which avoids building them when an analysis worker starts.
-        // The pointset linkage will never be used directly, but serves as a basis for scenario linkages, making
+        // Networks created in TransportNetworkCache are going to be used for analysis work. Pre-compute distance tables
+        // from stops to street vertices, then pre-build a linked grid pointset for the whole region. These linkages
+        // should be serialized along with the network, which avoids building them when an analysis worker starts.
+        // The linkage we create here will never be used directly, but serves as a basis for scenario linkages, making
         // analysis much faster to start up.
         network.transitLayer.buildDistanceTables(null);
-        network.rebuildLinkedGridPointSet();
+        network.rebuildLinkedGridPointSet(StreetMode.WALK);
 
-        // Cache the network.
+        // Cache the serialized network on the local filesystem.
         File cacheLocation = new File(cacheDir, getR5NetworkFilename(networkId));
 
         try {

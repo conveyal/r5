@@ -34,8 +34,6 @@ public class AnalysisWorkerController {
     }
 
     public Object handleSinglePoint (Request request, Response response) throws IOException {
-        // Record the fact that this worker is busy so it will not shut down
-        analystWorker.lastSinglePointTime = System.currentTimeMillis();
         // This header will cause the Spark Framework to gzip the data automatically if requested by the client.
         // FIXME I'm not seeing this on the wire, is the client asking for gzipped responses?
         response.header("Content-Encoding", "gzip");

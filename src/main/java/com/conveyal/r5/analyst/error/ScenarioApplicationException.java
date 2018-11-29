@@ -1,11 +1,9 @@
 package com.conveyal.r5.analyst.error;
 
 import com.conveyal.r5.analyst.scenario.Modification;
-import com.sun.org.apache.xpath.internal.operations.Mod;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * This Exception is thrown when a Scenario does not apply cleanly to a TransportNetwork.

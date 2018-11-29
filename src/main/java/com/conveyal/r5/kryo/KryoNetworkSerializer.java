@@ -127,18 +127,6 @@ public abstract class KryoNetworkSerializer {
         if (result.fareCalculator != null) {
             result.fareCalculator.transitLayer = result.transitLayer;
         }
-        // The linkage cache is not serialized, so we need to put the pre-linked grid pointset back into the linkage
-        // cache. This decreases the time to first result after a prebuilt network has been loaded to just a few seconds
-        // even in the largest regions. However, currently only the linkage for walking is saved, so there will still
-        // be a long pause at the first request for driving or cycling.
-        // TODO just use a map for linkages? There should never be more than a handful per PointSet, one per mode.
-        // The PointSets themselves are in a cache, although it does not currently have an eviction method.
-        if (result.gridPointSet != null && result.linkedGridPointSet != null) {
-            result.gridPointSet.linkageCache.put(
-                new Fun.Tuple2<>(result.streetLayer, result.linkedGridPointSet.streetMode),
-                result.linkedGridPointSet
-            );
-        }
         result.rebuildTransientIndexes();
         return result;
     }

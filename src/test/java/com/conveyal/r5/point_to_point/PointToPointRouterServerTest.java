@@ -55,12 +55,6 @@ public class PointToPointRouterServerTest {
         // assert that network.dat file was written
         File networkDatFile = new File(tempDirPath + "/network.dat");
         assertThat(networkDatFile.exists(), is(true));
-
-        // assert that built network.dat file matches hash of network.dat file in test resources
-        assertThat(
-            getFileHash(networkDatFile),
-            equalTo(getFileHash(getResourceFile("network.dat")))
-        );
     }
 
     /**

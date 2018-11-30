@@ -1,0 +1,197 @@
+query requestPlan(
+  $accessModes: [AccessLegMode!]!,
+  $bikeSpeed: Float!,
+  $bikeTrafficStress: Int,
+  $directModes: [OtherLegMode!]!,
+  $egressModes: [OtherLegMode!]!,
+  $fromLat: Float!,
+  $fromLon: Float!,
+  $toLat: Float!,
+  $toLon: Float!,
+  $fromTime: ZonedDateTime!,
+  $toTime: ZonedDateTime!,
+  $transitModes: [TransitModes],
+  $walkSpeed: Float!
+) {
+  plan(
+    accessModes: $accessModes,
+    bikeSpeed: $bikeSpeed,
+    bikeTrafficStress: $bikeTrafficStress,
+    directModes: $directModes,
+    egressModes: $egressModes,
+    fromLat: $fromLat,
+    fromLon: $fromLon,
+    fromTime: $fromTime,
+    minBikeTime: 1,
+    toLat: $toLat,
+    toLon: $toLon,
+    toTime: $toTime,
+    transitModes: $transitModes,
+    walkSpeed: $walkSpeed
+  ) {
+    patterns {
+      tripPatternIdx
+      routeId
+      routeIdx
+      directionId
+      stops {
+        stopId
+        name
+        lat
+        lon
+      }
+      trips {
+        tripId
+        serviceId
+        bikesAllowed
+      }
+    }
+    options {
+      summary
+      itinerary {
+        waitingTime
+        walkTime
+        distance
+        transfers
+        duration
+        transitTime
+        startTime
+        endTime
+        connection {
+          access
+          egress
+          transit {
+            pattern
+            time
+          }
+        }
+      }
+      transit {
+        from {
+          name
+          stopId
+          lon
+          lat
+        }
+        to {
+          name
+          stopId
+          lon
+          lat
+        }
+        mode
+        routes {
+          id
+          description
+          routeIdx
+          shortName
+          mode
+          routeColor
+          textColor
+          url
+          agencyName
+        }
+        segmentPatterns {
+          patternId
+          patternIdx
+          routeIdx
+          fromIndex
+          toIndex
+          nTrips
+          fromArrivalTime
+          fromDepartureTime
+          toArrivalTime
+          toDepartureTime
+          tripId
+        }
+        middle {
+          mode
+          duration
+          distance
+          geometryPolyline
+        }
+        rideStats {
+          min
+          avg
+          max
+          num
+        }
+        waitStats {
+          min
+          avg
+          max
+          num
+        }
+      }
+      access {
+        mode
+        duration
+        distance
+        streetEdges {
+          edgeId
+          geometryPolyline
+          distance
+          mode
+          streetName
+          relativeDirection
+          absoluteDirection
+          stayOn
+          area
+          exit
+          bogusName
+          bikeRentalOnStation {
+            id
+            name
+            lat
+            lon
+          }
+          bikeRentalOffStation {
+            id
+            name
+            lat
+            lon
+          }
+          parkRide {
+            id
+            name
+            capacity
+            lon
+            lat
+          }
+        }
+      }
+      egress {
+        mode
+        duration
+        distance
+        streetEdges {
+          edgeId
+          distance
+          geometryPolyline
+          mode
+          streetName
+          relativeDirection
+          absoluteDirection
+          stayOn
+          area
+          exit
+          bogusName
+          bikeRentalOnStation {
+            id
+            name
+            lon
+            lat
+          }
+        }
+      }
+      fares {
+        type
+        low
+        peak
+        senior
+        transferReduction
+        currency
+      }
+    }
+  }
+}

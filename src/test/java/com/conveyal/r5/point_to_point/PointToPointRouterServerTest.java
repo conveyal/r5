@@ -1,6 +1,6 @@
 package com.conveyal.r5.point_to_point;
 
-import com.google.common.hash.Hashing;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.ReadContext;
 import net.minidev.json.JSONArray;
@@ -9,15 +9,19 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 
-import static com.google.common.io.Files.asByteSource;
+import static com.google.common.io.Files.asCharSource;
 import static io.restassured.RestAssured.given;
 import static io.restassured.module.jsv.JsonSchemaValidator.matchesJsonSchemaInClasspath;
+import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.number.OrderingComparison.greaterThan;
 import static org.hamcrest.number.OrderingComparison.greaterThanOrEqualTo;
@@ -31,12 +35,16 @@ public class PointToPointRouterServerTest {
     @BeforeClass
     public static void setUp() throws IOException {
         // create a temporary director and copy needed files there
-        String[] files = {"network.dat", "osm.mapdb", "osm.mapdb.p"};
+        String[] files = {"osm.pbf", "terre-haute-gtfs.zip"};
         String tempDirPath = createTempDirWithFiles("pointServer", files);
 
+        // build the network file
+        String[] buildArgs = {"--build", tempDirPath};
+        PointToPointRouterServer.main(buildArgs);
+
         // start the server
-        String[] args = {"--graphs", tempDirPath};
-        PointToPointRouterServer.main(args);
+        String[] runArgs = {"--graphs", tempDirPath};
+        PointToPointRouterServer.main(runArgs);
     }
 
     /**
@@ -158,237 +166,49 @@ public class PointToPointRouterServerTest {
      * Assert that a trip plan with walking can be dones
      */
     @Test
-    public void canMakeOTPGraphQLQuery() {
-        given()
+    public void canMakeOTPGraphQLQuery() throws IOException {
+        String resp = given()
             .port(8080)
             .body(makeGraphQLQuery())
             .post("/otp/routers/default/index/graphql")
         .then()
-            .body(matchesJsonSchemaInClasspath("com/conveyal/r5/point_to_point/otp-graphql-response.json"));
+            .body(matchesJsonSchemaInClasspath("com/conveyal/r5/point_to_point/otp-graphql-response.json"))
+            .extract()
+            .body()
+            .asString();
+
+        assertThat(resp, not(containsString("error")));
     }
 
     /**
      * Make a GraphQL query to use in the body of a post request to /otp/routers/default/index/graphql
      */
-    private String makeGraphQLQuery() {
-        String accessModes = "WALK,BICYCLE,BICYCLE_RENT,CAR_PARK";
-        String bikeSpeed = "8";
-        String bikeTrafficStress = "4";
-        String directModes = "CAR,WALK,BICYCLE,BICYCLE_RENT";
-        String egressModes = "WALK";
-        String fromLat = "39.465659";
-        String fromLon = "-87.410839";
-        String fromTime = "2017-09-18T12:00:00.000Z";
-        String toLat = "39.4767";
-        String toLon = "-87.4052";
-        String toTime = "2017-09-18T14:00:00.000Z";
-        String transitModes = "BUS,RAIL,SUBWAY,TRAM";
-        String walkSpeed = "3";
+    private String makeGraphQLQuery() throws IOException {
+        ObjectMapper mapper = new ObjectMapper();
 
-        return "{" +
-            "  \"query\": \"query requestPlan(\\n" +
-            "    $fromLat: Float!, \\n" +
-            "    $fromLon: Float!, \\n" +
-            "    $toLat: Float!, \\n" +
-            "    $toLon: Float!, \\n" +
-            "    $fromTime: ZonedDateTime!, \\n" +
-            "    $toTime: ZonedDateTime!, \\n" +
-            "    $bikeSpeed:Float!, \\n" +
-            "    $walkSpeed:Float!\\n" +
-            "  ) {\\n" +
-            "    plan(\\n" +
-            "      minBikeTime: 1, \\n" +
-            "      bikeTrafficStress: " + bikeTrafficStress + ", \\n" +
-            "      fromLat: $fromLat, \\n" +
-            "      fromLon: $fromLon, \\n" +
-            "      toLat: $toLat, \\n" +
-            "      toLon: $toLon, \\n" +
-            "      fromTime: $fromTime, \\n" +
-            "      toTime: $toTime, \\n" +
-            "      directModes: [" + directModes + "], \\n" +
-            "      accessModes: [" + accessModes + "], \\n" +
-            "      egressModes: [" + egressModes + "], \\n" +
-            "      transitModes: [" + transitModes + "], \\n" +
-            "      bikeSpeed: $bikeSpeed, \\n" +
-            "      walkSpeed: $walkSpeed\\n" +
-            "    ) {\\n" +
-            "      patterns {\\n" +
-            "        tripPatternIdx\\n" +
-            "        routeId\\n" +
-            "        routeIdx\\n" +
-            "        directionId\\n" +
-            "        stops {\\n" +
-            "          stopId\\n" +
-            "          name\\n" +
-            "          lat\\n" +
-            "          lon\\n" +
-            "        }\\n" +
-            "        trips {\\n" +
-            "          tripId\\n" +
-            "          serviceId\\n" +
-            "          bikesAllowed\\n" +
-            "        }\\n" +
-            "      }\\n" +
-            "      options {\\n" +
-            "        summary\\n" +
-            "        itinerary {\\n" +
-            "          waitingTime\\n" +
-            "          walkTime\\n" +
-            "          distance\\n" +
-            "          transfers\\n" +
-            "          duration\\n" +
-            "          transitTime\\n" +
-            "          startTime\\n" +
-            "          endTime\\n" +
-            "          connection {\\n" +
-            "            access\\n" +
-            "            egress\\n" +
-            "            transit {\\n" +
-            "              pattern\\n" +
-            "              time\\n" +
-            "            }\\n" +
-            "          }\\n" +
-            "        }\\n" +
-            "        transit {\\n" +
-            "          from {\\n" +
-            "            name\\n" +
-            "            stopId\\n" +
-            "            lon\\n" +
-            "            lat\\n" +
-            "          }\\n" +
-            "          to {\\n" +
-            "            name\\n" +
-            "            stopId\\n" +
-            "            lon\\n" +
-            "            lat\\n" +
-            "          }\\n" +
-            "          mode\\n" +
-            "          routes {\\n" +
-            "            id\\n" +
-            "            description\\n" +
-            "            routeIdx\\n" +
-            "            shortName\\n" +
-            "            mode\\n" +
-            "            routeColor\\n" +
-            "            textColor\\n" +
-            "            url\\n" +
-            "            agencyName\\n" +
-            "          }\\n" +
-            "          segmentPatterns {\\n" +
-            "            patternId\\n" +
-            "            patternIdx\\n" +
-            "            routeIdx\\n" +
-            "            fromIndex\\n" +
-            "            toIndex\\n" +
-            "            nTrips\\n" +
-            "            fromArrivalTime\\n" +
-            "            fromDepartureTime\\n" +
-            "            toArrivalTime\\n" +
-            "            toDepartureTime\\n" +
-            "            tripId\\n" +
-            "          }\\n" +
-            "          middle {\\n" +
-            "            mode\\n" +
-            "            duration\\n" +
-            "            distance\\n" +
-            "            geometryPolyline\\n" +
-            "          }\\n" +
-            "          rideStats {\\n" +
-            "            min\\n" +
-            "            avg\\n" +
-            "            max\\n" +
-            "            num\\n" +
-            "          }\\n" +
-            "          waitStats {\\n" +
-            "            min\\n" +
-            "            avg\\n" +
-            "            max\\n" +
-            "            num\\n" +
-            "          }\\n" +
-            "        }\\n" +
-            "        access {\\n" +
-            "          mode\\n" +
-            "          duration\\n" +
-            "          distance\\n" +
-            "          streetEdges {\\n" +
-            "            edgeId\\n" +
-            "            geometryPolyline\\n" +
-            "            distance\\n" +
-            "            mode\\n" +
-            "            streetName\\n" +
-            "            relativeDirection\\n" +
-            "            absoluteDirection\\n" +
-            "            stayOn\\n" +
-            "            area\\n" +
-            "            exit\\n" +
-            "            bogusName\\n" +
-            "            bikeRentalOnStation {\\n" +
-            "              id\\n" +
-            "              name\\n" +
-            "              lat\\n" +
-            "              lon\\n" +
-            "            }\\n" +
-            "            bikeRentalOffStation {\\n" +
-            "              id\\n" +
-            "              name\\n" +
-            "              lat\\n" +
-            "              lon\\n" +
-            "            }\\n" +
-            "            parkRide {\\n" +
-            "              id\\n" +
-            "              name\\n" +
-            "              capacity\\n" +
-            "              lon\\n" +
-            "              lat\\n" +
-            "            }\\n" +
-            "          }\\n" +
-            "        }\\n" +
-            "        egress {\\n" +
-            "          mode\\n" +
-            "          duration\\n" +
-            "          distance\\n" +
-            "          streetEdges {\\n" +
-            "            edgeId\\n" +
-            "            distance\\n" +
-            "            geometryPolyline\\n" +
-            "            mode\\n" +
-            "            streetName\\n" +
-            "            relativeDirection\\n" +
-            "            absoluteDirection\\n" +
-            "            stayOn\\n" +
-            "            area\\n" +
-            "            exit\\n" +
-            "            bogusName\\n" +
-            "            bikeRentalOnStation {\\n" +
-            "              id\\n" +
-            "              name\\n" +
-            "              lon\\n" +
-            "              lat\\n" +
-            "            }\\n" +
-            "          }\\n" +
-            "        }\\n" +
-            "        fares {\\n" +
-            "          type\\n" +
-            "          low\\n" +
-            "          peak\\n" +
-            "          senior\\n" +
-            "          transferReduction\\n" +
-            "          currency\\n" +
-            "        }\\n" +
-            "      }\\n" +
-            "    }\\n" +
-            "  }\"," +
-            "  \"variables\":\"{" +
-            "    \\\"bikeSpeed\\\":" + bikeSpeed + "," +
-            "    \\\"fromLat\\\":" + fromLat + "," +
-            "    \\\"fromLon\\\":" + fromLon + "," +
-            "    \\\"fromTime\\\": \\\"" + fromTime + "\\\"," +
-            "    \\\"toLat\\\":" + toLat + "," +
-            "    \\\"toLon\\\":" + toLon + "," +
-            "    \\\"toTime\\\":\\\"" + toTime + "\\\"," +
-            "    \\\"walkSpeed\\\":" + walkSpeed +
-            "    }\"" +
-            "}";
+        GraphQLQueryDTO query = new GraphQLQueryDTO();
+
+        query.query = asCharSource(getResourceFile("graphql-query.txt"), Charset.defaultCharset()).read();
+
+        VariablesDTO variables = new VariablesDTO();
+
+        variables.accessModes = Arrays.asList("WALK", "BICYCLE", "BICYCLE_RENT", "CAR_PARK");
+        variables.bikeSpeed = "8";
+        variables.bikeTrafficStress = "4";
+        variables.directModes = Arrays.asList("CAR", "WALK", "BICYCLE", "BICYCLE_RENT");
+        variables.egressModes = Arrays.asList("WALK");
+        variables.fromLat = "39.465659";
+        variables.fromLon = "-87.410839";
+        variables.fromTime = "2017-09-18T12:00:00.000Z";
+        variables.toLat = "39.4767";
+        variables.toLon = "-87.4052";
+        variables.toTime = "2017-09-18T14:00:00.000Z";
+        variables.transitModes = Arrays.asList("BUS", "RAIL", "SUBWAY", "TRAM");
+        variables.walkSpeed = "3";
+
+        query.variables = mapper.writeValueAsString(variables);
+
+        return mapper.writeValueAsString(query);
     }
 
     /**
@@ -415,9 +235,5 @@ public class PointToPointRouterServerTest {
 
     private File getResourceFile(String filename) {
         return new File(String.join(File.separator, resourcesDir, filename));
-    }
-
-    private String getFileHash(File file) throws IOException {
-        return asByteSource(file).hash(Hashing.sha256()).toString();
     }
 }

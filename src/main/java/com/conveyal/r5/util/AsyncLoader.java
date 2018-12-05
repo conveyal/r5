@@ -1,5 +1,8 @@
 package com.conveyal.r5.util;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Executor;
@@ -31,6 +34,8 @@ import java.util.concurrent.Executors;
  * Created by abyrd on 2018-09-14
  */
 public abstract class AsyncLoader<K,V> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(AsyncLoader.class);
 
     /**
      * This map holds a loading progress object for each key, which will contain the requested object when complete.
@@ -120,6 +125,7 @@ public abstract class AsyncLoader<K,V> {
                     }
                 } catch (Exception ex) {
                     setError(key, ex);
+                    LOG.error(ExceptionUtils.asString(ex));
                 }
             });
         }

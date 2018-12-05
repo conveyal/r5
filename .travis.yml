@@ -50,7 +50,7 @@ before_cache: rm -rf $HOME/.m2/repository/com/conveyal
 
 after_success:
   # Perform a release to maven central using maven-semantic-release if needed
-  - semantic-release --prepare @conveyal/maven-semantic-release --publish @semantic-release/github,@conveyal/maven-semantic-release --verify-conditions @semantic-release/github --verify-release @conveyal/maven-semantic-release
+  - semantic-release --prepare @conveyal/maven-semantic-release --publish @semantic-release/github,@conveyal/maven-semantic-release --verify-conditions @semantic-release/github,@conveyal/maven-semantic-release --verify-release @conveyal/maven-semantic-release --use-conveyal-workflow --dev-branch=dev
   # Upload shaded JAR to S3. The un-shaded jar was deployed to our Maven repo during the main build.
   # Ideally we'd use the Travis S3 deployer here instead of installing the AWS CLI software every time.
   # See the analyst-server travis.yml for how to copy specific files to a subdirectory and deploy those.

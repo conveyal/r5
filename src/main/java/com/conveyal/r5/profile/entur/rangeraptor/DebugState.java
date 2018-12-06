@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor;
 
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 import com.conveyal.r5.profile.entur.util.Debug;
 

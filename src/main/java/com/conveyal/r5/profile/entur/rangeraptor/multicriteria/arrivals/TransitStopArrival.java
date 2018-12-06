@@ -1,8 +1,12 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 
 
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 
+/**
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
+ */
 public final class TransitStopArrival<T extends TripScheduleInfo> extends AbstractStopArrival<T> {
     private final T trip;
     private boolean arrivedByTransitLastRound = true;

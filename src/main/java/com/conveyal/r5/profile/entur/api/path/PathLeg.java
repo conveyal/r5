@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile.entur.api.path;
 
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 
 /**
  * A leg in a path. The legs are linked together from the first leg {@link AccessPathLeg}, to the last leg

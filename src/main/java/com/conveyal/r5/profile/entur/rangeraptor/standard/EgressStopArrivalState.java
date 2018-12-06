@@ -1,10 +1,14 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
-import com.conveyal.r5.profile.entur.api.EgressLeg;
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 
 import java.util.function.Consumer;
 
+/**
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
+ */
 final class EgressStopArrivalState<T extends TripScheduleInfo> extends StopArrivalState<T> {
     private final int round;
     private final EgressLeg egressLeg;

@@ -1,7 +1,7 @@
 package com.conveyal.r5.speed_test;
 
-import com.conveyal.r5.profile.entur.api.AccessLeg;
-import com.conveyal.r5.profile.entur.api.EgressLeg;
+import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
+import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
 
 class AccessEgressLeg implements AccessLeg, EgressLeg {
     private final int stop, durationInSeconds;

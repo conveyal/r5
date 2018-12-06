@@ -3,9 +3,16 @@ package com.conveyal.r5.profile.entur.util;
 
 import java.util.Calendar;
 
+
+/**
+ * Time utility methods. See the unit test for examples on how to use this class.
+ */
 public class TimeUtils {
     private enum FormatType { COMPACT, LONG, SHORT }
     private static final boolean USE_RAW_TIME = false;
+
+    /** This is a utility class. Do not instantiate this class. It should have only static methods. */
+    private TimeUtils() { }
 
     public static String timeToStrCompact(int time) {
         return timeToStrCompact(time, -1);
@@ -29,6 +36,10 @@ public class TimeUtils {
 
     public static String timeToStrLong(Calendar time) {
         return timeStr(time, FormatType.LONG);
+    }
+
+    public static String timeToStrShort(int time) {
+        return timeStr(time, -1, FormatType.SHORT);
     }
 
     public static String timeToStrShort(Calendar time) {

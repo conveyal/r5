@@ -1,5 +1,8 @@
-package com.conveyal.r5.profile.entur.api;
+package com.conveyal.r5.profile.entur.api.request;
 
+import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
+import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
+import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 import java.util.ArrayList;

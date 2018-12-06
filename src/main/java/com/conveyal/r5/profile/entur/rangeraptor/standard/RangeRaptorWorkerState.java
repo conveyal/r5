@@ -1,11 +1,11 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 
-import com.conveyal.r5.profile.entur.api.AccessLeg;
-import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
-import com.conveyal.r5.profile.entur.api.TransferLeg;
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.path.Path;
+import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
+import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
+import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
@@ -26,6 +26,8 @@ import java.util.Iterator;
  * <p>
  * Note that this represents the entire state of the Range Raptor search for all rounds, rather than the state at
  * a particular transit stop.
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements WorkerState {
 

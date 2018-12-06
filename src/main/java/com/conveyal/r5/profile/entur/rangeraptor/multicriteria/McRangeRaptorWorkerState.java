@@ -1,11 +1,11 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
-import com.conveyal.r5.profile.entur.api.AccessLeg;
-import com.conveyal.r5.profile.entur.api.EgressLeg;
-import com.conveyal.r5.profile.entur.api.TransferLeg;
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.api.UnsignedIntIterator;
 import com.conveyal.r5.profile.entur.api.path.Path;
+import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
+import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
+import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.transit.UnsignedIntIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
@@ -29,6 +29,8 @@ import java.util.List;
  * This is grouped into a separate class (rather than just having the fields in the raptor worker class) because we
  * want the Algorithm to be as clean as possible and to be able to swap the state implementation - try out and
  * experiment with different state implementations.
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements WorkerState {
 
@@ -47,7 +49,12 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     /**
      * create a RaptorState for a network with a particular number of stops, and a given maximum duration
      */
-    McRangeRaptorWorkerState(int nRounds, int nStops, Collection<EgressLeg> egressLegs, TransitCalculator calculator) {
+    McRangeRaptorWorkerState(
+            int nRounds,
+            int nStops,
+            Collection<EgressLeg> egressLegs,
+            TransitCalculator calculator
+    ) {
         this.nRounds = nRounds;
         this.stops = new Stops<>(nStops, egressLegs, calculator);
         this.touchedStops = new BitSet(nStops);

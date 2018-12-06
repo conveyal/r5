@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
@@ -12,7 +12,8 @@ import java.util.List;
 
 /**
  * Abstract super class for multi-criteria stop arrival.
- * <p/>
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements StopArrivalView<T> {
 

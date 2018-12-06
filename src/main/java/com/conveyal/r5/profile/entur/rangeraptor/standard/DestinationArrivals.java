@@ -1,7 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.path.Path;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.path.PathMapper;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparatorBuilder;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
@@ -32,27 +32,33 @@ import java.util.Map;
  * found in the last Range Raptor iteration.
  * <li>converting egress states to paths after each iteration.
  * </ol>
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 class DestinationArrivals<T extends TripScheduleInfo> {
-    /** Use a BIG number as an upper bound for arrival times */
+    /**
+     * Use a BIG number as an upper bound for arrival times
+     */
     private static final int UNREACHED = Integer.MAX_VALUE;
 
-    /** Best arrival times at DESTINATION for each round (across all iterations) */
+    /**
+     * Best arrival times at DESTINATION for each round (across all iterations)
+     */
     private final int[] bestArrivalTimesAtDestination;
 
-    /** The best egress arrivals found in last iteration per round */
+    /**
+     * The best egress arrivals found in last iteration per round
+     */
     private final Map<Integer, EgressStopArrivalState<T>> egressArrivalsByRound = new HashMap<>();
 
-    /** Stop state cursor used to access the stop arrivals to construct paths. */
+    /**
+     * Stop state cursor used to access the stop arrivals to construct paths.
+     */
     private final StopsCursor<T> stopsCursor;
 
     /**
-     * Keep only paths that are pareto-optimal with the given criteria:
-     * <ul>
-     * <li> Lowest {@code endTime}
-     * <li> Lowest {@code numberOfTransfers}
-     * <li> Lowest {@code totalTravelDurationInSeconds}
-     * </ul>
+     * Keep only paths that are pareto-optimal with the given criteria.
+     * <p/>
      * The pareto set filter away suboptimal paths.
      */
     private final Collection<Path<T>> paths = new ParetoSet<>(
@@ -70,11 +76,11 @@ class DestinationArrivals<T extends TripScheduleInfo> {
         Arrays.fill(this.bestArrivalTimesAtDestination, UNREACHED);
     }
 
-    void add(EgressStopArrivalState<T> state) {
-        if (newStateHaveTheBestDestinationArrivalTimeForGivenTheRound(state)) {
-            int round = state.round();
-            egressArrivalsByRound.put(round, state);
-            bestArrivalTimesAtDestination[round] = state.destinationArrivalTime();
+    void add(EgressStopArrivalState<T> arrival) {
+        if (newStateHaveTheBestDestinationArrivalTimeForGivenTheRound(arrival)) {
+            int round = arrival.round();
+            egressArrivalsByRound.put(round, arrival);
+            bestArrivalTimesAtDestination[round] = arrival.destinationArrivalTime();
         }
     }
 
@@ -92,14 +98,14 @@ class DestinationArrivals<T extends TripScheduleInfo> {
 
     /* Private methods */
 
-    private Path<T> createPathFromEgressState(EgressStopArrivalState<T> state) {
+    private Path<T> createPathFromEgressState(EgressStopArrivalState<T> arrival) {
         // Initialize the cursor to point to the current arrival
-        stopsCursor.transit(state.round(), state.stop());
+        stopsCursor.transit(arrival.round(), arrival.stop());
         // Use the cursor and the PathMapper to create a new path
         return PathMapper.mapToPath(
                 new StopArrivalViewAdapter.DestinationArrivalViewAdapter<>(
-                        state.destinationDepartureTime(),
-                        state.destinationArrivalTime(),
+                        arrival.destinationDepartureTime(),
+                        arrival.destinationArrivalTime(),
                         stopsCursor::current
                 )
         );

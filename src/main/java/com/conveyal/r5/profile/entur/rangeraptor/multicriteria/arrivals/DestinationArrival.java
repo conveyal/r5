@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
@@ -26,6 +26,8 @@ import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
  * duration for each stop, because it does not need to.
  *
  * </ul>
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public final class DestinationArrival<T extends TripScheduleInfo> implements DestinationArrivalView<T> {
 
@@ -72,6 +74,7 @@ public final class DestinationArrival<T extends TripScheduleInfo> implements Des
         return travelDuration;
     }
 
+    @Override
     public int cost() {
         return cost;
     }

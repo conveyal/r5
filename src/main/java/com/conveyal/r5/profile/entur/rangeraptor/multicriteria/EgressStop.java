@@ -1,10 +1,14 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
-import com.conveyal.r5.profile.entur.api.EgressLeg;
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
 
+/**
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
+ */
 class EgressStop<T extends TripScheduleInfo> extends Stop<T> {
 
     private final EgressLeg egressLeg;

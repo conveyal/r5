@@ -1,11 +1,11 @@
 package com.conveyal.r5.profile.entur.rangeraptor;
 
-import com.conveyal.r5.profile.entur.api.AccessLeg;
-import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
-import com.conveyal.r5.profile.entur.api.TransitDataProvider;
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.api.UnsignedIntIterator;
 import com.conveyal.r5.profile.entur.api.path.Path;
+import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
+import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
+import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.transit.UnsignedIntIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
@@ -35,6 +35,8 @@ import java.util.Collection;
  * generic function-execution service like AWS Lambda. The gains in efficiency were significant enough that this is now
  * the way we do all analysis work. This system also accounts for pure-frequency routes by using Monte Carlo methods
  * (generating randomized schedules).
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 @SuppressWarnings("Duplicates")
 public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends TripScheduleInfo> implements Worker<T> {
@@ -161,9 +163,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
      * Set the departure time in the scheduled search to the given departure time,
      * and prepare for the scheduled search at the next-earlier minute
      */
-    private void advanceScheduledSearchToPreviousMinute(
-            int nextMinuteDepartureTime
-    ) {
+    private void advanceScheduledSearchToPreviousMinute(int nextMinuteDepartureTime) {
         state.initNewDepartureForMinute(nextMinuteDepartureTime);
 
         // add initial stops

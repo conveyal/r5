@@ -268,7 +268,7 @@ public class ParetoSetTest {
     @Test
     public void elementsAreNotDroppedWhenParetoOptimalElementsAreAdded() {
         // Given a set with 2 criteria: LT and LT
-        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN, (old, newElement) -> dropped.add(newElement));
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN, (old, newElement) -> dropped.add(old));
 
         // Before any elements are added the list of dropped elements should be empty
         assertTrue(dropped.isEmpty());
@@ -285,7 +285,7 @@ public class ParetoSetTest {
     @Test
     public void firstElementIsDroppedWhenANewDominatingElementIsAdded() {
         // Given a set with 2 criteria: LT and LT and a vector [7, 3]
-        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN, (old, newElement) -> dropped.add(newElement));
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN, (old, newElement) -> dropped.add(old));
         set.add(vector(7,3));
         assertTrue(dropped.isEmpty());
 
@@ -310,7 +310,7 @@ public class ParetoSetTest {
     @Test
     public void lastElementIsDroppedWhenANewDominatingElementIsAdded() {
         // Given a set with 2 criteria: LT and LT and a vector [7, 3]
-        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN, (old, newElement) -> dropped.add(newElement));
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN, (old, newElement) -> dropped.add(old));
         set.add(vector(5,5));
         set.add(vector(7,3));
         assertTrue(dropped.isEmpty());

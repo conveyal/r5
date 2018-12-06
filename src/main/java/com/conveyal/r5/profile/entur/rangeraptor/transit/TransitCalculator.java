@@ -1,7 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor.transit;
 
-import com.conveyal.r5.profile.entur.api.AccessLeg;
-import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
+import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
+import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
 
 import java.util.Collection;
 

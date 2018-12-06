@@ -2,6 +2,9 @@ package com.conveyal.r5.profile.entur.util;
 
 import java.util.Arrays;
 
+/**
+ * TODO TGR
+ */
 public final class IntUtils {
     /** protect this class from being instantiated. */
     private IntUtils() {};

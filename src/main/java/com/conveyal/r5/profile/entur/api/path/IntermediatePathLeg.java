@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile.entur.api.path;
 
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 
 /**
  * Abstract intermediate leg in a path. It is either a Transit or Transfer leg.

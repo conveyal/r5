@@ -1,11 +1,14 @@
 package com.conveyal.r5.profile.entur.rangeraptor;
 
-import com.conveyal.r5.profile.entur.api.AccessLeg;
-import com.conveyal.r5.profile.entur.api.TransferLeg;
-import com.conveyal.r5.profile.entur.api.UnsignedIntIterator;
+import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
+import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
+import com.conveyal.r5.profile.entur.api.transit.UnsignedIntIterator;
 
 import java.util.Iterator;
 
+/**
+ * TODO TGR
+ */
 public interface WorkerState {
     void initNewDepartureForMinute(int nextMinuteDepartureTime);
 

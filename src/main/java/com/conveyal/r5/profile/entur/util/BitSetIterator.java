@@ -1,9 +1,12 @@
 package com.conveyal.r5.profile.entur.util;
 
-import com.conveyal.r5.profile.entur.api.UnsignedIntIterator;
+import com.conveyal.r5.profile.entur.api.transit.UnsignedIntIterator;
 
 import java.util.BitSet;
 
+/**
+ * TODO TGR
+ */
 public class BitSetIterator implements UnsignedIntIterator {
 
     private final BitSet set;

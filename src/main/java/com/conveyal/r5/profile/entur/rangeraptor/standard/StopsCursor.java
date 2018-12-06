@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalViewAdapter.Access;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalViewAdapter.Transfer;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalViewAdapter.Transit;
@@ -12,6 +12,8 @@ import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 
 /**
  * TODO TGR
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 class StopsCursor<T extends TripScheduleInfo> {
     private Stops<T> stops;

@@ -1,17 +1,17 @@
-package com.conveyal.r5.profile.entur.api;
+package com.conveyal.r5.profile.entur.api.transit;
 
 
 import java.util.Iterator;
 
 
 /**
- *     This interface defines the data needed for the RangeRaptorWorker
- *     to do transit. {@link com.conveyal.r5.transit.TransitLayer} contains
- *     all that data - but not exactly in the flavour needed by the
- *     Worker, so creating this interface define that role, and make it
- *     possible to write small adapter in between. This also simplify
- *     the use of the Worker with other data sources, importing
- *     and adapting this code into other software like OTP.
+ * This interface defines the data needed for the RangeRaptorWorker
+ * to do transit. {@link com.conveyal.r5.transit.TransitLayer} contains
+ * all that data - but not exactly in the flavour needed by the
+ * Worker, so creating this interface define that role, and make it
+ * possible to write small adapter in between. This also simplify
+ * the use of the Worker with other data sources, importing
+ * and adapting this code into other software like OTP.
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */

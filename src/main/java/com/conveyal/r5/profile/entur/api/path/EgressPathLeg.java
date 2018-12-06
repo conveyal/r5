@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile.entur.api.path;
 
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 
 /**
  * Represent a egress leg in a path. The egress leg is the last leg arriving at the destination. The previous leg

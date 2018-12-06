@@ -183,12 +183,13 @@ public class ParetoSet<T> extends AbstractCollection<T> {
      * Notify subclasses about reindexing. This method is empty,
      * and only exist for subclasses to override it.
      */
-    protected void notifyReindex(int fromIndex, int toIndex) {
+    protected void notifyElementMoved(int fromIndex, int toIndex) {
         // Noop
     }
 
-
-    /* private methods */
+    private void notifyElementDropped(T oldElement, T newElement) {
+        dropEventListener.elementDroppedFromParetoSet(oldElement, newElement);
+    }
 
     /**
      * Remove all elements dominated by the {@code newValue} starting from
@@ -203,7 +204,7 @@ public class ParetoSet<T> extends AbstractCollection<T> {
         notifyElementDropped(elements[i], newValue);
 
         while (j < size) {
-            notifyReindex(j, i);
+            notifyElementMoved(j, i);
             // Move next element(j) forward if it is not dominated by the new value
             if (!leftVectorDominatesRightVector(newValue, elements[j])) {
                 elements[i] = elements[j];
@@ -215,13 +216,9 @@ public class ParetoSet<T> extends AbstractCollection<T> {
             // Goto the next element
             ++j;
         }
-        notifyReindex(j, i);
+        notifyElementMoved(j, i);
         elements[i] = newValue;
         size = i+1;
-    }
-
-    private void notifyElementDropped(T oldElement, T newElement) {
-        dropEventListener.elementDroppedFromParetoSet(oldElement, newElement);
     }
 
     private boolean leftVectorDominatesRightVector(T left, T right) {

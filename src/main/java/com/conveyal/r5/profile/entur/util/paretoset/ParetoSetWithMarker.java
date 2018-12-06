@@ -42,7 +42,7 @@ public class ParetoSetWithMarker<T> extends ParetoSet<T> {
     }
 
     @Override
-    protected void notifyReindex(int fromIndex, int toIndex) {
+    protected void notifyElementMoved(int fromIndex, int toIndex) {
         if(fromIndex == marker) {
             marker = toIndex;
         }

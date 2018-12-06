@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile.entur.transitadapter;
 
-import com.conveyal.r5.profile.entur.api.TransferLeg;
+import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 
 import java.util.Iterator;
 

@@ -1,10 +1,10 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 
-import com.conveyal.r5.profile.entur.api.AccessLeg;
-import com.conveyal.r5.profile.entur.api.EgressLeg;
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.path.Path;
+import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
+import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.path.PathMapper;
@@ -19,6 +19,8 @@ import static java.util.Collections.emptyList;
 
 /**
  * This class serve as a thin wrapper around the stops array and the destination arrivals.
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 final class Stops<T extends TripScheduleInfo> {
     private final Stop<T>[] stops;
@@ -110,7 +112,7 @@ final class Stops<T extends TripScheduleInfo> {
         double avg = ((double)total) / numOfStops;
         double arrayLenAvg = ((double)arrayLen) / numOfStops;
 
-        System.out.printf(
+        System.err.printf(
                 " => STOP ARRIVALS  %.1f / %d / %d'  Array Length: %.1f / %d'  Stops: %d' / %d'%n",
                 avg, max, total/1000, arrayLenAvg, arrayLen/1000, numOfStops/1000, stops.length/1000
         );

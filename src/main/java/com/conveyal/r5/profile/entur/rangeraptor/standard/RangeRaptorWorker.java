@@ -1,10 +1,10 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
-import com.conveyal.r5.profile.entur.api.RangeRaptorRequest;
-import com.conveyal.r5.profile.entur.api.TransitDataProvider;
-import com.conveyal.r5.profile.entur.api.TripPatternInfo;
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.path.Path;
+import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
+import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
+import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleBoardSearch;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
@@ -33,6 +33,8 @@ import java.util.Iterator;
  * generic function-execution service like AWS Lambda. The gains in efficiency were significant enough that this is now
  * the way we do all analysis work. This system also accounts for pure-frequency routes by using Monte Carlo methods
  * (generating randomized schedules).
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 @SuppressWarnings("Duplicates")
 public class RangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRangeRaptorWorker<RangeRaptorWorkerState<T>, T> {

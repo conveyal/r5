@@ -1,26 +1,31 @@
 package com.conveyal.r5.profile.entur.rangeraptor.path;
 
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.path.AccessPathLeg;
 import com.conveyal.r5.profile.entur.api.path.EgressPathLeg;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.path.PathLeg;
 import com.conveyal.r5.profile.entur.api.path.TransferPathLeg;
 import com.conveyal.r5.profile.entur.api.path.TransitPathLeg;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 
 
 /**
  * Build a path from a destination arrival - this maps between the domain of routing
- * to the domain of result paths. All values not needed for
- * routing is computed as part of this mapping.
+ * to the domain of result paths. All values not needed for routing is computed as part of this mapping.
  */
 public final class PathMapper {
 
     /** private to protect instantiation. */
     private PathMapper() { }
 
+    /**
+     * Build a path from a destination arrival - this maps between the domain of routing
+     * to the domain of result paths. All values not needed for routing is computed as part of this mapping.
+     *
+     * @param <T> The TripSchedule type defined by the user of the range raptor API.
+     */
     public static <T extends TripScheduleInfo> Path<T> mapToPath(final DestinationArrivalView<T> destinationArrival) {
         StopArrivalView<T> from;
         StopArrivalView<T> to;

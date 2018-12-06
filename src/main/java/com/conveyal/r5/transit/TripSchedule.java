@@ -2,7 +2,7 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -271,7 +271,7 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
 
     @Override
     public String debugInfo() {
-        return tripId;
+        return tripPattern.routeId;
     }
 
     public void setPattern(TripPattern tripPattern) {

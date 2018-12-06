@@ -1,4 +1,4 @@
-package com.conveyal.r5.profile.entur.api;
+package com.conveyal.r5.profile.entur.api.request;
 
 
 /**
@@ -16,21 +16,4 @@ public enum RaptorProfiles {
      */
     MULTI_CRITERIA_RANGE_RAPTOR
     ;
-
-
-    public boolean isMultiCriteria() {
-        return is(MULTI_CRITERIA_RANGE_RAPTOR);
-    }
-
-    public boolean isPlainRangeRaptor() {
-        return is(RANGE_RAPTOR);
-    }
-
-
-    /* private methods */
-
-    private boolean is(RaptorProfiles other) {
-        return this == other;
-    }
-
 }

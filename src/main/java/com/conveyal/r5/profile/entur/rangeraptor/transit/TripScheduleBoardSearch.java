@@ -1,7 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor.transit;
 
-import com.conveyal.r5.profile.entur.api.TripPatternInfo;
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 
 import java.util.function.Function;
 
@@ -16,6 +16,8 @@ import java.util.function.Function;
  * The search uses to a binary search if the number of trip schedules is above a
  * given threshold. A linear search is slow when the number of schedules is very
  * large, let say more than 300 trip schedules.
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class TripScheduleBoardSearch<T extends TripScheduleInfo> {
     /**

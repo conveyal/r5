@@ -1,8 +1,12 @@
 package com.conveyal.r5.profile.entur.rangeraptor.view;
 
 
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 
+/**
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
+ */
 public interface StopArrivalView<T extends TripScheduleInfo> {
 
 
@@ -25,6 +29,13 @@ public interface StopArrivalView<T extends TripScheduleInfo> {
      * The arrival time for when the stop is reached
      */
     int arrivalTime();
+
+    /**
+     * The accumulated cost
+     */
+    default int cost() {
+        return 0;
+    }
 
     /**
      * Departure time from origin, time-shifted towards the transit board time.

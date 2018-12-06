@@ -1,13 +1,17 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
-import com.conveyal.r5.profile.entur.api.EgressLeg;
-import com.conveyal.r5.profile.entur.api.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.DestinationArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
 
+/**
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
+ */
+class Destination<T extends TripScheduleInfo> extends ParetoSet<DestinationArrival<T>> {
 
-public class Destination<T extends TripScheduleInfo> extends ParetoSet<DestinationArrival<T>> {
 
     public Destination() {
         // The `travelDuration` is added as a criteria to the pareto comparator in addition to the parameters

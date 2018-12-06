@@ -15,5 +15,4 @@ public enum RaptorProfiles {
      * Multi criteria pareto state with McRangeRaptor.
      */
     MULTI_CRITERIA_RANGE_RAPTOR
-    ;
 }

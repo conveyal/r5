@@ -62,7 +62,6 @@ public class ParetoSet<T> extends AbstractCollection<T> {
 
 
     @Override
-    @SuppressWarnings("NullableProblems")
     public final Iterator<T> iterator() {
         return stream(0).iterator();
     }

@@ -29,6 +29,12 @@ public interface PathLeg<T extends TripScheduleInfo> {
      */
     int toTime();
 
+    /**
+     * Number of seconds to travel this leg. This does not include wait time.
+     */
+    default int duration() {
+        return toTime() - fromTime();
+    }
 
     /**
      * @return {@code true} if transit leg, if not {@code false}.

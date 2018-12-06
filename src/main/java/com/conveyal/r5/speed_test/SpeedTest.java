@@ -10,6 +10,7 @@ import com.conveyal.r5.profile.entur.api.TuningParameters;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.request.RaptorProfiles;
+import com.conveyal.r5.profile.entur.api.request.RequestBuilder;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 import com.conveyal.r5.profile.entur.transitadapter.TransitLayerRRDataProvider;
@@ -40,6 +41,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import static com.conveyal.r5.profile.entur.util.TimeUtils.midnightOf;
 
@@ -120,8 +122,11 @@ public class SpeedTest {
         // Force GC to avoid GC during the test
         forceGCToAvoidGCLater();
 
-        boolean limitTestCases = opts.testCases() != null;
-        List<String> testCasesToRun = limitTestCases ? opts.testCases() : null;
+        List<String> testCaseIds = opts.testCases();
+        boolean limitTestCases = !testCaseIds.isEmpty();
+        List<TestCase> testCasesToRun = limitTestCases
+                ? testCases.stream().filter(it -> testCaseIds.contains(it.id)).collect(Collectors.toList())
+                : testCases;
 
         if(!limitTestCases) {
             // Warm up JIT compiler
@@ -131,13 +136,11 @@ public class SpeedTest {
         LOG.info("\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [ START " + profile + " ]");
 
         AvgTimer.resetAll();
-        for (TestCase testCase : testCases) {
-            if(!limitTestCases || testCasesToRun.contains(testCase.id)) {
-                nSuccess += runSingleTestCase(tripPlans, testCase, opts, false) ? 1 : 0;
-            }
+        for (TestCase testCase : testCasesToRun) {
+            nSuccess += runSingleTestCase(tripPlans, testCase, opts, false) ? 1 : 0;
         }
 
-        int tcSize = limitTestCases ? testCasesToRun.size() : testCases.size();
+        int tcSize = testCasesToRun.size();
 
         LOG.info(
                 "\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [ SUMMARY " + profile + " ]" +
@@ -280,7 +283,7 @@ public class SpeedTest {
 
             RangeRaptorService<TripSchedule> service = new RangeRaptorService<>(tuningParameters);
 
-            Collection<Path<TripSchedule>> path2s = service.route(req, transitData);
+            Collection<Path<TripSchedule>> paths = service.route(req, transitData);
 
             TIMER_WORKER.stop();
 
@@ -288,28 +291,16 @@ public class SpeedTest {
 
             TIMER_COLLECT_RESULTS.start();
 
-            if (path2s.isEmpty()) {
+            if (paths.isEmpty()) {
                 numOfPathsFound.add(0);
                 throw new IllegalStateException("NO RESULT FOUND");
             }
-            /*
-                TODO TGR - We filter paths (ParetoSet) because the algorithm now return duplicates,
-                TODO TGR - we could probably do this with a HashSet instead, but the optimal solution is to fix the
-                TODO TGR - route iterator to only return new paths.
-            */
-            //if(req.profile.isPlainRangeRaptor()) {
-                //ParetoSet<Path2ParetoSortableWrapper> paths = new ParetoSet<>(Path2ParetoSortableWrapper.paretoDominanceFunctions());
-                //for (Path<TripSchedule> p : path2s) {
-                //    paths.add(new Path2ParetoSortableWrapper(p));
-                //}
-                //path2s = paths.stream().map(it -> it.path).collect(Collectors.toList());
-            //}
 
-            numOfPathsFound.add(path2s.size());
+            numOfPathsFound.add(paths.size());
 
             TIMER_COLLECT_RESULTS_ITINERARIES.start();
 
-            for (Path<TripSchedule> p : path2s) {
+            for (Path<TripSchedule> p : paths) {
                 itineraries.add(createItinerary(request, streetRouter, p));
             }
 
@@ -334,8 +325,11 @@ public class SpeedTest {
         }
     }
 
-    private RangeRaptorRequest createRequest(ProfileRequest request, EgressAccessRouter streetRouter) {
-        RangeRaptorRequest.Builder builder = new RangeRaptorRequest.Builder(request.fromTime, request.toTime)
+    private RangeRaptorRequest createRequest(
+            ProfileRequest request,
+            EgressAccessRouter streetRouter
+    ) {
+        RequestBuilder builder = new RequestBuilder(request.fromTime, request.toTime)
                 .boardSlackInSeconds(60)
                 .departureStepInSeconds(60);
 

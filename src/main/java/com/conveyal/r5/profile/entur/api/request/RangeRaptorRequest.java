@@ -5,10 +5,7 @@ import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
-import java.util.function.Supplier;
 
 
 /**
@@ -21,9 +18,9 @@ public class RangeRaptorRequest {
      * Default values
      * @see #RangeRaptorRequest() for property default values.
      */
-    private static final RangeRaptorRequest DEFAULTS = new RangeRaptorRequest();
+    static final RangeRaptorRequest DEFAULTS = new RangeRaptorRequest();
 
-    private static final int NOT_SET = -1;
+    static final int NOT_SET = -1;
 
 
     /** The profile/algorithm to use for this request. */
@@ -82,8 +79,8 @@ public class RangeRaptorRequest {
         // Required parameters
         this.fromTime = NOT_SET;
         this.toTime = NOT_SET;
-        this.accessLegs = Collections.emptyList();
-        this.egressLegs = Collections.emptyList();
+        this.accessLegs = null;
+        this.egressLegs = null;
 
         // Optional parameters with default values
         this.profile = RaptorProfiles.MULTI_CRITERIA_RANGE_RAPTOR;
@@ -92,7 +89,7 @@ public class RangeRaptorRequest {
         this.numberOfAdditionalTransfers = 3;
     }
 
-    private RangeRaptorRequest(Builder builder) {
+    RangeRaptorRequest(RequestBuilder builder) {
         this.profile = builder.profile;
         this.fromTime = builder.fromTime;
         this.toTime = builder.toTime;
@@ -123,79 +120,4 @@ public class RangeRaptorRequest {
                 '}';
     }
 
-    public static class Builder {
-        private int fromTime;
-        private int toTime;
-        private final Collection<AccessLeg> accessLegs = new ArrayList<>();
-        private final Collection<EgressLeg> egressLegs = new ArrayList<>();
-
-        private RaptorProfiles profile = DEFAULTS.profile;
-        private int departureStepInSeconds = DEFAULTS.departureStepInSeconds;
-        private int boardSlackInSeconds = DEFAULTS.boardSlackInSeconds;
-        private int numberOfAdditionalTransfers = DEFAULTS.numberOfAdditionalTransfers;
-
-        public Builder(int fromTime, int toTime) {
-            assertProperty(fromTime > 0, () -> "'fromTime' must be greater then 0. Value: " + fromTime);
-            assertProperty(toTime > fromTime, () -> "'toTime' must be greater than 'fromTime'. fromTime: "
-                    + fromTime + ", toTime: " + toTime);
-            this.fromTime = fromTime;
-            this.toTime = toTime;
-        }
-
-        public Builder profile(RaptorProfiles profile) {
-            this.profile = profile;
-            return this;
-        }
-
-        public Builder addAccessStop(AccessLeg accessLeg) {
-            this.accessLegs.add(accessLeg);
-            return this;
-        }
-
-        public Builder addAccessStops(Iterable<AccessLeg> accessLegs) {
-            for (AccessLeg it : accessLegs) {
-                addAccessStop(it);
-            }
-            return this;
-        }
-
-        public Builder addEgressStop(EgressLeg egressLeg) {
-            this.egressLegs.add(egressLeg);
-            return this;
-        }
-
-        public Builder addEgressStops(Iterable<EgressLeg> egressLegs) {
-            for (EgressLeg it : egressLegs) {
-                addEgressStop(it);
-            }
-            return this;
-        }
-
-        public Builder departureStepInSeconds(int departureStepInSeconds) {
-            this.departureStepInSeconds = departureStepInSeconds;
-            return this;
-        }
-
-        public Builder boardSlackInSeconds(int boardSlackInSeconds) {
-            this.boardSlackInSeconds = boardSlackInSeconds;
-            return this;
-        }
-
-        public Builder numberOfAdditionalTransfers(int numberOfAdditionalTransfers) {
-            this.numberOfAdditionalTransfers = numberOfAdditionalTransfers;
-            return this;
-        }
-
-        public RangeRaptorRequest build() {
-            assertProperty(!accessLegs.isEmpty(), () ->"At least one 'accessLegs' is required.");
-            assertProperty(!egressLegs.isEmpty(), () ->"At least one 'egressLegs' is required.");
-            return new RangeRaptorRequest(this);
-        }
-
-        private void assertProperty(boolean predicate, Supplier<String> errorMessageProvider) {
-            if(!predicate) {
-                throw new IllegalArgumentException(RangeRaptorRequest.class.getSimpleName()  + " error: " + errorMessageProvider.get());
-            }
-        }
-    }
 }

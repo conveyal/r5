@@ -1,6 +1,10 @@
 package com.conveyal.r5.profile.entur.api.path;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.util.PathStringBuilder;
+
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
@@ -13,6 +17,7 @@ public final class Path<T extends TripScheduleInfo> {
     private final int endTime;
     private final int numberOfTransfers;
     private final AccessPathLeg<T> accessLeg;
+    private EgressPathLeg<T> egressPathLeg = null;
 
     public Path(AccessPathLeg<T> accessLeg, int endTime, int numberOfTransfers) {
         this.accessLeg = accessLeg;
@@ -60,10 +65,56 @@ public final class Path<T extends TripScheduleInfo> {
      * The last leg of this journey.
      */
     public final EgressPathLeg<T> egressLeg() {
-        PathLeg<T> leg = accessLeg;
+        if(egressPathLeg == null) {
+            PathLeg<T> leg = accessLeg;
+            while (!leg.isEgressLeg()) {
+                leg = leg.nextLeg();
+            }
+            egressPathLeg = leg.asEgressLeg();
+        }
+        return egressPathLeg;
+    }
+
+    /**
+     * Utility method to list all visited stops.
+     */
+    public List<Integer> listStops() {
+        List<Integer> stops = new ArrayList<>();
+        PathLeg<?> leg = accessLeg.nextLeg();
+
         while (!leg.isEgressLeg()) {
+            if (leg.isTransitLeg()) {
+                stops.add(leg.asTransitLeg().fromStop());
+            }
+            if (leg.isTransferLeg()) {
+                stops.add(leg.asTransferLeg().fromStop());
+            }
             leg = leg.nextLeg();
         }
-        return leg.asEgressLeg();
+        stops.add(leg.asEgressLeg().fromStop());
+        return stops;
+    }
+
+    @Override
+    public String toString() {
+        PathStringBuilder buf = new PathStringBuilder();
+        PathLeg<T> leg = accessLeg.nextLeg();
+
+        buf.walk(accessLeg.duration());
+
+        while (!leg.isEgressLeg()) {
+            buf.sep();
+            if(leg.isTransitLeg()) {
+                buf.stop(leg.asTransitLeg().fromStop()).sep().transit(leg.fromTime(), leg.toTime());
+            }
+            // Transfer
+            else {
+                buf.stop(leg.asTransferLeg().fromStop()).sep().walk(leg.duration());
+            }
+            leg = leg.nextLeg();
+        }
+        buf.sep().stop(leg.asEgressLeg().fromStop()).sep().walk(leg.duration());
+
+        return buf.toString();
     }
 }

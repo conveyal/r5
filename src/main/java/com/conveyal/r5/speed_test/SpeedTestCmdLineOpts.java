@@ -2,9 +2,7 @@ package com.conveyal.r5.speed_test;
 
 import org.apache.commons.cli.Options;
 
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class SpeedTestCmdLineOpts extends CommandLineOpts {
 
@@ -23,8 +21,6 @@ public class SpeedTestCmdLineOpts extends CommandLineOpts {
         options.addOption(SAMPLE_TEST_N_TIMES_OPT, "sampleTestNTimes", true, "Repeat the test N times. Profiles are altered in a round robin fashion.");
         options.addOption(PROFILES_OPT, "profiles", true, "A coma separated list of configuration profiles:\n" + String.join("\n", SpeedTestProfiles.options()));
         options.addOption(TEST_CASES_OPT, "testCases", true, "A coma separated list of test case numbers to run.");
-        options.addOption(DEBUG_STOPS, "debugStops", true, "A coma separated list of stops to debug.");
-        options.addOption(DEBUG, "debug", false, "Enable debug info.");
         return options;
     }
 
@@ -52,26 +48,4 @@ public class SpeedTestCmdLineOpts extends CommandLineOpts {
         return parseCSVList(TEST_CASES_OPT);
     }
 
-    List<Integer> debugStops() {
-        return parseCSVToInt(DEBUG_STOPS);
-    }
-
-
-    /* private methods */
-
-    private List<Integer> parseCSVToInt(String opt) {
-        return cmd.hasOption(opt)
-                ? parseCSVList(opt).stream().map(Integer::valueOf).collect(Collectors.toList())
-                : null;
-    }
-
-    private List<String> parseCSVList(String opt) {
-        return cmd.hasOption(opt)
-                ? Arrays.asList(cmd.getOptionValue(opt).split("\\s*,\\s*"))
-                : null;
-    }
-
-    public boolean debug() {
-        return cmd.hasOption(DEBUG);
-    }
 }

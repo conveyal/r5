@@ -133,7 +133,7 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
         final int arrivalTime = fromTime + accessDurationInSeconds;
 
         stops.setInitialTime(round, stop, arrivalTime);
-        bestOverall.setTime(stop, accessDurationInSeconds);
+        bestOverall.setTime(stop, arrivalTime);
         debugStop(round, stop);
     }
 

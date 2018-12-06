@@ -4,7 +4,6 @@ import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalViewAdapter.Access;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalViewAdapter.Transfer;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalViewAdapter.Transit;
-import com.conveyal.r5.profile.entur.rangeraptor.transit.TimeInterval;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 
@@ -19,39 +18,21 @@ class StopsCursor<T extends TripScheduleInfo> {
     private Stops<T> stops;
     private final TransitCalculator transitCalculator;
 
-    private StopArrivalView<T> current = null;
-
     StopsCursor(Stops<T> stops, TransitCalculator transitCalculator) {
         this.stops = stops;
         this.transitCalculator = transitCalculator;
     }
 
-    public StopArrivalView<T> current() {
-        return current;
+    /**
+     *
+     * @param stop
+     * @param transitDepartureTime
+     * @return
+     */
+    StopArrivalView<T> access(int stop, int transitDepartureTime) {
+        return newAccessView(stop, transitDepartureTime);
     }
 
-    public StopArrivalView<T> previous() {
-        int round, stop;
-
-        if(current.arrivedByTransit()) {
-            round = current.round() - 1;
-            stop = current.boardStop();
-
-            if(round == 0) {
-                current = newAccessView(stop, current.departureTime());
-            }
-            else {
-                current = newTransitOrTransferView(round, stop);
-            }
-        }
-        else if(current.arrivedByTransfer()) {
-            round = current.round();
-            stop = current.transferFromStop();
-
-            current = new Transit<>(round, stop, stops.get(round, stop), this::previous);
-        }
-        return current;
-    }
 
     /**
      * Set cursor to the transit state at round and stop. Throws
@@ -61,50 +42,42 @@ class StopsCursor<T extends TripScheduleInfo> {
      * @param stop the stop index to use.
      * @return the current transit state, if found
      */
-    StopArrivalView<T> transit(int round, int stop) {
+    Transit<T> transit(int round, int stop) {
         if (round == 0) {
             throw new IllegalArgumentException("Transit legs are never the first leg...");
         }
-        else {
-            StopArrivalState<T> state = stops.get(round, stop);
-            current = new Transit<>(round, stop, state, this::previous);
-        }
-        return current;
+        StopArrivalState<T> state = stops.get(round, stop);
+        return new Transit<>(round, stop, state, this);
     }
 
     StopArrivalView<T> stop(int round, int stop) {
-        if (round == 0) {
-            current = newAccessView(stop);
-        }
-        else {
-            current = newTransitOrTransferView(round, stop);
-        }
-        return current;
+        return round == 0 ? newAccessView(stop) : newTransitOrTransferView(round, stop);
     }
 
     /**
      * Access with no known path - used to debug this state
      */
     private StopArrivalView<T> newAccessView(int stop) {
-        assert stop >= 0;
-        int arrivalTime = stops.get(0, stop).time();
-        int departureTime = transitCalculator.originDepartureTimeAtStop(stop, arrivalTime);
-        return new Access<>(stop, departureTime, arrivalTime);
+        StopArrivalState<T> arrival = stops.get(0, stop);
+        return new Access<>(stop, arrival.accessDepartureTime(), arrival.time());
     }
 
     /**
      * A access stop arrival, time-shifted according to the first transit boarding/departure time
      */
     private StopArrivalView<T> newAccessView(int stop, int transitDepartureTime) {
-        TimeInterval interval = transitCalculator.accessLegTimeIntervalAtStop(stop, transitDepartureTime);
-        return new Access<>(stop, interval);
+        StopArrivalState<T> state = stops.get(0, stop);
+        int departureTime = transitCalculator.originDepartureTime(transitDepartureTime, state.transferDuration());
+        int arrivalTime = transitCalculator.accessLegArrivalTime(transitDepartureTime);
+        return new Access<>(stop, departureTime, arrivalTime);
     }
 
     private StopArrivalView<T> newTransitOrTransferView(int round, int stop) {
         StopArrivalState<T> state = stops.get(round, stop);
 
         return state.arrivedByTransfer()
-                ? new Transfer<>(round, stop, state, this::previous)
-                : new Transit<>(round, stop, state, this::previous);
+                ? new Transfer<>(round, stop, state, this)
+                : new Transit<>(round, stop, state, this);
     }
+
 }

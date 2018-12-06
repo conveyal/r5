@@ -1,9 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.transit;
 
 import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
-import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
-
-import java.util.Collection;
 
 
 /**
@@ -15,34 +12,23 @@ import java.util.Collection;
  * request parameters ensure that this calculator is used.
  */
 public final class TransitCalculator {
-    private final Collection<AccessLeg> accessLegs;
     private final int boardSlackInSeconds;
 
     /**
      * Public calculator used fot unit-testing
      */
-    public TransitCalculator(Collection<AccessLeg> accessLegs, int boardSlackInSeconds) {
-        this.accessLegs = accessLegs;
+    public TransitCalculator(int boardSlackInSeconds) {
         this.boardSlackInSeconds = boardSlackInSeconds;
     }
 
     public TransitCalculator(RangeRaptorRequest request) {
-        this(request.accessLegs, request.boardSlackInSeconds);
+        this(request.boardSlackInSeconds);
     }
 
     public int earliestBoardTime(int arrivalTime) {
         return arrivalTime + boardSlackInSeconds;
     }
 
-    public TimeInterval accessLegTimeIntervalAtStop(int stop, int transitBoardTime) {
-        int arrivalTime = accessLegArrivalTime(transitBoardTime);
-        int departureTime = originDepartureTime(transitBoardTime, accessLeg(stop).durationInSeconds());
-        return new TimeInterval(departureTime, arrivalTime);
-    }
-
-    public int originDepartureTimeAtStop(int stop, int transitBoardTime) {
-        return originDepartureTime(transitBoardTime, accessLeg(stop).durationInSeconds());
-    }
 
     public int originDepartureTime(int firstTransitBoardTime, int accessLegDuration) {
         return accessLegArrivalTime(firstTransitBoardTime) - accessLegDuration;
@@ -52,12 +38,4 @@ public final class TransitCalculator {
         return firstTransitBoardTime - boardSlackInSeconds;
     }
 
-    private AccessLeg accessLeg(int stop) {
-        for (AccessLeg accessLeg : accessLegs) {
-            if(accessLeg.stop() == stop) {
-                return accessLeg;
-            }
-        }
-        throw new IndexOutOfBoundsException("No access leg found for stop: " + stop);
-    }
 }

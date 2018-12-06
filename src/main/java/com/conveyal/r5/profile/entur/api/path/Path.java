@@ -67,9 +67,7 @@ public final class Path<T extends TripScheduleInfo> {
     public final EgressPathLeg<T> egressLeg() {
         if(egressPathLeg == null) {
             PathLeg<T> leg = accessLeg;
-            while (!leg.isEgressLeg()) {
-                leg = leg.nextLeg();
-            }
+            while (!leg.isEgressLeg()) leg = leg.nextLeg();
             egressPathLeg = leg.asEgressLeg();
         }
         return egressPathLeg;

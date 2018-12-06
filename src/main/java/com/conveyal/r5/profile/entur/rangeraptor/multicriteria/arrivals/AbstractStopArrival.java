@@ -1,12 +1,12 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 
@@ -94,14 +94,6 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
         return previous;
     }
 
-    /**
-     * This method is used to list all transits found in the last round. It is
-     * overridden in the {@link TransitStopArrival} class.
-     */
-    public boolean arrivedByTransitLastRound() {
-        return false;
-    }
-
     public int cost() {
         return cost;
     }
@@ -123,26 +115,13 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
         );
     }
 
-    String asString(String details) {
-        return asString() + " - " + details;
-    }
-
-
-    public void debug() {
-        DebugState.debugStop(this);
-    }
-
-    public List<AbstractStopArrival<T>> path() {
-        List<AbstractStopArrival<T>> path = new LinkedList<>();
-        AbstractStopArrival<T> current = this;
-
-        path.add(current);
-
-        //noinspection ConstantConditions
-        while (!current.arrivedByAccessLeg()) {
-            current = current.previous;
-            path.add(0, current);
+    @Override
+    public List<Integer> listStops() {
+        List<Integer> stops = new ArrayList<>();
+        for(AbstractStopArrival<?> current = this; current != null; current = current.previous) {
+            stops.add(current.stop);
         }
-        return path;
+        Collections.reverse(stops);
+        return stops;
     }
 }

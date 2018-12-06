@@ -20,9 +20,4 @@ class Stop<T extends TripScheduleInfo> extends ParetoSetWithMarker<AbstractStopA
     public Iterable<? extends AbstractStopArrival<T>> list(Predicate<AbstractStopArrival<T>> test) {
         return stream().filter(test).collect(Collectors.toList());
     }
-
-    public Iterable<? extends AbstractStopArrival<T>> listCurrentAndLastRound(Predicate<AbstractStopArrival<T>> test) {
-        return streamAfterMarker().filter(test).collect(Collectors.toList());
-    }
-
 }

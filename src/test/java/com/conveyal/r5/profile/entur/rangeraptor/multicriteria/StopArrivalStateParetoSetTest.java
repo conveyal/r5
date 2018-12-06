@@ -11,10 +11,9 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.Arrays;
-import java.util.Collections;
 
 public class StopArrivalStateParetoSetTest {
-    private static final TransitCalculator CALCULATOR = new TransitCalculator(Collections.emptyList(), 60);
+    private static final TransitCalculator CALCULATOR = new TransitCalculator(60);
     // 08:35 in seconds
     private static final int A_TIME = ((8 * 60) + 35) * 60;
     private static final int ANY = 3;

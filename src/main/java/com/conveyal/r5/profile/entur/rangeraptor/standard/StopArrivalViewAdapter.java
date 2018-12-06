@@ -1,11 +1,8 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.transit.TimeInterval;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
-
-import java.util.function.Supplier;
 
 
 /**
@@ -43,10 +40,6 @@ abstract class StopArrivalViewAdapter<T extends TripScheduleInfo> implements Sto
             this.arrivalTime = arrivalTime;
         }
 
-        Access(int stop, TimeInterval interval) {
-            this(stop, interval.from, interval.to);
-        }
-
         @Override
         public int arrivalTime() {
             return arrivalTime;
@@ -71,16 +64,21 @@ abstract class StopArrivalViewAdapter<T extends TripScheduleInfo> implements Sto
         public boolean arrivedByAccessLeg() {
             return true;
         }
+
+        @Override
+        public StopArrivalView<T> previous() {
+            throw new UnsupportedOperationException("Access arrival is the first leg.");
+        }
     }
 
     static final class Transit<T extends TripScheduleInfo> extends StopArrivalViewAdapter<T> {
         private final StopArrivalState<T> arrival;
-        private final Supplier<StopArrivalView<T>> previousCallback;
+        private final StopsCursor<T> cursor;
 
-        Transit(int round, int stop, StopArrivalState<T> arrival, Supplier<StopArrivalView<T>> previousCallback) {
+        Transit(int round, int stop, StopArrivalState<T> arrival, StopsCursor<T> cursor) {
             super(round, stop);
             this.arrival = arrival;
-            this.previousCallback = previousCallback;
+            this.cursor = cursor;
         }
 
         @Override
@@ -110,18 +108,20 @@ abstract class StopArrivalViewAdapter<T extends TripScheduleInfo> implements Sto
 
         @Override
         public StopArrivalView<T> previous() {
-            return previousCallback.get();
+            return round() == 1
+                    ? cursor.access(boardStop(), departureTime())
+                    : cursor.stop(round()-1, boardStop());
         }
     }
 
     static final class Transfer<T extends TripScheduleInfo> extends StopArrivalViewAdapter<T> {
         private final StopArrivalState<T> arrival;
-        private final Supplier<StopArrivalView<T>> previousCallback;
+        private final StopsCursor<T> cursor;
 
-        Transfer(int round, int stop, StopArrivalState<T> arrival, Supplier<StopArrivalView<T>> previousCallback) {
+        Transfer(int round, int stop, StopArrivalState<T> arrival, StopsCursor<T> cursor) {
             super(round, stop);
             this.arrival = arrival;
-            this.previousCallback = previousCallback;
+            this.cursor = cursor;
         }
 
         @Override
@@ -146,19 +146,19 @@ abstract class StopArrivalViewAdapter<T extends TripScheduleInfo> implements Sto
 
         @Override
         public StopArrivalView<T> previous() {
-            return previousCallback.get();
+            return cursor.transit(round(), transferFromStop());
         }
     }
 
     static final class DestinationArrivalViewAdapter<T extends TripScheduleInfo> implements DestinationArrivalView<T> {
         private final int departureTime;
         private final int arrivalTime;
-        private final Supplier<StopArrivalView<T>> previousCallback;
+        private final Transit<T> previous;
 
-        DestinationArrivalViewAdapter(int departureTime, int arrivalTime, Supplier<StopArrivalView<T>> previousCallback) {
+        DestinationArrivalViewAdapter(int departureTime, int arrivalTime, Transit<T> previous) {
             this.arrivalTime = arrivalTime;
             this.departureTime = departureTime;
-            this.previousCallback = previousCallback;
+            this.previous = previous;
         }
 
         @Override
@@ -172,8 +172,8 @@ abstract class StopArrivalViewAdapter<T extends TripScheduleInfo> implements Sto
         }
 
         @Override
-        public StopArrivalView<T> previous() {
-            return previousCallback.get();
+        public Transit<T> previous() {
+            return previous;
         }
     }
 }

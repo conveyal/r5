@@ -54,7 +54,6 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
      */
     private int maxTimeLimit;
 
-
     /**
      * The best times to reach each stop, whether via a transfer or via transit directly.
      */
@@ -82,41 +81,6 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
     }
 
     @Override
-    public void gotoNextRound() {
-        bestOverall.gotoNextRound();
-        bestTransit.gotoNextRound();
-        ++round;
-        roundMax = Math.max(roundMax, round);
-    }
-
-    @Override
-    public boolean isNewRoundAvailable() {
-        final boolean moreRoundsToGo = round < nRounds - 1;
-        return moreRoundsToGo && isCurrentRoundUpdated();
-    }
-
-    public Collection<Path<T>> paths() {
-        return results.paths();
-    }
-
-    boolean isStopReachedInPreviousRound(int stop) {
-        return bestOverall.isReachedLastRound(stop);
-    }
-
-    BitSetIterator bestStopsTouchedLastRoundIterator() {
-        return bestOverall.stopsReachedLastRound();
-    }
-
-    @Override
-    public BitSetIterator stopsTouchedByTransitCurrentRound() {
-        return bestTransit.stopsReachedCurrentRound();
-    }
-
-    int bestTimePreviousRound(int stop) {
-        return stops.get(round - 1, stop).time();
-    }
-
-    @Override
     public void initNewDepartureForMinute(int departureTime) {
         // TODO TGR - Set max limit to 5 days for now, replace this with a pareto check against the
         // TODO TGR - destination location values.
@@ -134,9 +98,44 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
         final int stop = accessLeg.stop();
         final int arrivalTime = fromTime + accessDurationInSeconds;
 
-        stops.setInitialTime(round, stop, arrivalTime);
+        stops.setInitialTime(round, stop, arrivalTime, accessDurationInSeconds);
         bestOverall.setTime(stop, arrivalTime);
         debugStop(round, stop);
+    }
+
+    @Override
+    public boolean isNewRoundAvailable() {
+        final boolean moreRoundsToGo = round < nRounds - 1;
+        return moreRoundsToGo && isCurrentRoundUpdated();
+    }
+
+    @Override
+    public void gotoNextRound() {
+        bestOverall.gotoNextRound();
+        bestTransit.gotoNextRound();
+        ++round;
+        roundMax = Math.max(roundMax, round);
+    }
+
+    @Override
+    public BitSetIterator stopsTouchedByTransitCurrentRound() {
+        return bestTransit.stopsReachedCurrentRound();
+    }
+
+    BitSetIterator bestStopsTouchedLastRoundIterator() {
+        return bestOverall.stopsReachedLastRound();
+    }
+
+    boolean isStopReachedInPreviousRound(int stop) {
+        return bestOverall.isReachedLastRound(stop);
+    }
+
+    int bestTimePreviousRound(int stop) {
+        return stops.get(round - 1, stop).time();
+    }
+
+    public Collection<Path<T>> paths() {
+        return results.paths();
     }
 
     /**

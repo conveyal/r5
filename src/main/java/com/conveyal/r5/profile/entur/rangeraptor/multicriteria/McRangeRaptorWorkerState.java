@@ -67,7 +67,6 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         maxTimeLimit = departureTime + 5 * 24 * 60 * 60;
         round = 0;
         arrivalsCache.clear();
-        // clear all touched stops to avoid constant rexploration
         startRecordChangesToStopsForNextAndCurrentRound();
     }
 

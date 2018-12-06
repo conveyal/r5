@@ -54,6 +54,14 @@ class StopArrivalState<T extends TripScheduleInfo> {
         return bestArrivalTime;
     }
 
+    final int accessDuration() {
+        return accessOrTransferDuration;
+    }
+
+    final int accessDepartureTime() {
+        return bestArrivalTime - accessOrTransferDuration;
+    }
+
     final int transitTime() {
         return transitArrivalTime;
     }
@@ -90,8 +98,13 @@ class StopArrivalState<T extends TripScheduleInfo> {
         return transferFromStop != NOT_SET;
     }
 
-    final void setAccessTime(int time) {
+    final void setAccessTime(int time, int accessDuration) {
         this.bestArrivalTime = time;
+        this.accessOrTransferDuration = accessDuration;
+    }
+
+    final boolean reached() {
+        return bestArrivalTime != UNREACHED;
     }
 
     void arriveByTransit(int time, int boardStop, int boardTime, T trip) {
@@ -118,7 +131,13 @@ class StopArrivalState<T extends TripScheduleInfo> {
 
     @Override
     public String toString() {
-        return String.format("RR Arrival { time: %s, Transit { stop: %s, time: %s - %s, trip: %s }, Transfer { from stop: %s, duration: %s }",
+        if(arrivedByAccess()) {
+            return String.format("Access Arrival { time: %s, duration: %s }",
+                    TimeUtils.timeToStrLong(bestArrivalTime, UNREACHED),
+                    IntUtils.intToString(accessOrTransferDuration, NOT_SET)
+            );
+        }
+        return String.format("Arrival { time: %s, Transit: %s %s-%s, trip: %s, Transfer from: %s %s }",
                 TimeUtils.timeToStrLong(bestArrivalTime, UNREACHED),
                 IntUtils.intToString(boardStop, NOT_SET),
                 TimeUtils.timeToStrCompact(boardTime, UNREACHED),

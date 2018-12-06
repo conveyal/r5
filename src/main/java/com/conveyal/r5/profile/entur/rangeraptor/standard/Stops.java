@@ -21,8 +21,8 @@ final class Stops<T extends TripScheduleInfo> {
         createAndInsertEgressStopStates(nRounds, egressLegs, egressArrivalCallback);
     }
 
-    void setInitialTime(int round, int stop, int time) {
-        findOrCreateStopIndex(round, stop).setAccessTime(time);
+    void setInitialTime(int round, int stop, int time, int duration) {
+        findOrCreateStopIndex(round, stop).setAccessTime(time, duration);
     }
 
     void transitToStop(int round, int stop, int time, int boardStop, int boardTime, T trip, boolean bestTime) {
@@ -43,6 +43,11 @@ final class Stops<T extends TripScheduleInfo> {
         StopArrivalState<T> state = findOrCreateStopIndex(round, stop);
 
         state.transferToStop(fromStop, arrivalTime, transferLeg.durationInSeconds());
+    }
+
+    boolean exist(int round, int stop) {
+        StopArrivalState<T> s = get(round, stop);
+        return s != null && s.reached();
     }
 
     StopArrivalState<T> get(int round, int stop) {

@@ -9,7 +9,6 @@ import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
  */
 public final class TransitStopArrival<T extends TripScheduleInfo> extends AbstractStopArrival<T> {
     private final T trip;
-    private boolean arrivedByTransitLastRound = true;
 
     public TransitStopArrival(AbstractStopArrival<T> previousState, int round, int stopIndex, int arrivalTime, int boardTime, T trip) {
         super(
@@ -36,20 +35,5 @@ public final class TransitStopArrival<T extends TripScheduleInfo> extends Abstra
     @Override
     public int boardStop() {
         return previousStop();
-    }
-
-    /**
-     * This method return true if we arrived at this stop in the last round.
-     * <p/>
-     * NOTE! This method does not know about witch round it is, it just assume
-     * that is will be called ONCE pr round and that it can return 'true' the
-     * first time it is called.
-     */
-    public boolean arrivedByTransitLastRound() {
-        if (arrivedByTransitLastRound) {
-            arrivedByTransitLastRound = false;
-            return true;
-        }
-        return false;
     }
 }

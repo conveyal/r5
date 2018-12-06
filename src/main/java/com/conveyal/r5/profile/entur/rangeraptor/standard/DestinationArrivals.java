@@ -3,7 +3,8 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.path.PathMapper;
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparatorBuilder;
+import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
 
 import java.util.Arrays;
@@ -41,6 +42,13 @@ class DestinationArrivals<T extends TripScheduleInfo> {
      */
     private static final int UNREACHED = Integer.MAX_VALUE;
 
+    private static <T extends TripScheduleInfo> ParetoComparator<Path<T>> pathComparator() {
+        return (l, r) ->
+                l.endTime() < r.endTime() ||
+                l.numberOfTransfers() < r.numberOfTransfers() ||
+                l.totalTravelDurationInSeconds() < r.totalTravelDurationInSeconds();
+    }
+
     /**
      * Best arrival times at DESTINATION for each round (across all iterations)
      */
@@ -61,19 +69,15 @@ class DestinationArrivals<T extends TripScheduleInfo> {
      * <p/>
      * The pareto set filter away suboptimal paths.
      */
-    private final Collection<Path<T>> paths = new ParetoSet<>(
-            new ParetoComparatorBuilder<Path<T>>()
-                    .lessThen(Path::endTime)
-                    .lessThen(Path::numberOfTransfers)
-                    .lessThen(Path::totalTravelDurationInSeconds)
-                    .build()
-    );
+    private final Collection<Path<T>> paths;
 
 
     DestinationArrivals(int nRounds, StopsCursor<T> stopsCursor) {
         this.stopsCursor = stopsCursor;
         this.bestArrivalTimesAtDestination = new int[nRounds];
         Arrays.fill(this.bestArrivalTimesAtDestination, UNREACHED);
+
+        paths = new ParetoSet<>(pathComparator());
     }
 
     void add(EgressStopArrivalState<T> arrival) {
@@ -99,15 +103,16 @@ class DestinationArrivals<T extends TripScheduleInfo> {
     /* Private methods */
 
     private Path<T> createPathFromEgressState(EgressStopArrivalState<T> arrival) {
+        return PathMapper.mapToPath(destinationArrivalView(arrival));
+    }
+
+    private DestinationArrivalView<T> destinationArrivalView(EgressStopArrivalState<T> arrival) {
         // Initialize the cursor to point to the current arrival
-        stopsCursor.transit(arrival.round(), arrival.stop());
-        // Use the cursor and the PathMapper to create a new path
-        return PathMapper.mapToPath(
-                new StopArrivalViewAdapter.DestinationArrivalViewAdapter<>(
-                        arrival.destinationDepartureTime(),
-                        arrival.destinationArrivalTime(),
-                        stopsCursor::current
-                )
+
+        return new StopArrivalViewAdapter.DestinationArrivalViewAdapter<T>(
+                arrival.destinationDepartureTime(),
+                arrival.destinationArrivalTime(),
+                stopsCursor.transit(arrival.round(), arrival.stop())
         );
     }
 

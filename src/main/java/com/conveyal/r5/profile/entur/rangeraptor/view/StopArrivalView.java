@@ -3,6 +3,10 @@ package com.conveyal.r5.profile.entur.rangeraptor.view;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 /**
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
@@ -61,9 +65,7 @@ public interface StopArrivalView<T extends TripScheduleInfo> {
     /**
      * The previous stop arrival state
      */
-    default StopArrivalView<T> previous() {
-        throw new UnsupportedOperationException();
-    }
+    StopArrivalView<T> previous();
 
     /* Access stop arrival */
 
@@ -96,5 +98,43 @@ public interface StopArrivalView<T extends TripScheduleInfo> {
 
     default int transferFromStop() {
         throw new UnsupportedOperationException();
+    }
+
+
+    /**
+     * List all stops used to arrive at current stop arrival. This method is SLOW,
+     * should only be used in code that need to be fast, like debugging.
+     */
+    default List<Integer> listStops() {
+        List<Integer> stops = new ArrayList<>();
+
+        StopArrivalView<T> arrival = this;
+
+        while (!arrival.arrivedByAccessLeg()) {
+            stops.add(arrival.stop());
+            arrival = arrival.previous();
+        }
+        stops.add(arrival.stop());
+
+        Collections.reverse(stops);
+
+        return stops;
+    }
+
+    /**
+     * Describe type of leg/mode. This is used for logging/debugging.
+     */
+    default String legType() {
+        if (arrivedByAccessLeg()) {
+            return "Access";
+        }
+        if (arrivedByTransit()) {
+            return "Transit";
+        }
+        // We use Walk instead of Transfer so it is easier to distinguish from Transit
+        if (arrivedByTransfer()) {
+            return  "Walk";
+        }
+        throw new IllegalStateException("Unknown mode for: " + this);
     }
 }

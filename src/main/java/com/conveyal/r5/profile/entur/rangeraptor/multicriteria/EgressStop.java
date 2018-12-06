@@ -4,6 +4,8 @@ import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
+import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 
 /**
  *
@@ -14,7 +16,8 @@ class EgressStop<T extends TripScheduleInfo> extends Stop<T> {
     private final EgressLeg egressLeg;
     private final Destination<T> destination;
 
-    EgressStop(EgressLeg egressLeg, Destination<T> destination) {
+    EgressStop(EgressLeg egressLeg, Destination<T> destination, DebugHandler<StopArrivalView<T>> debugHandler) {
+        super(egressLeg.stop(), debugHandler);
         this.egressLeg = egressLeg;
         this.destination = destination;
     }

@@ -8,7 +8,6 @@ import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.transit.UnsignedIntIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
-import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 import java.util.Collection;
 
@@ -42,7 +41,7 @@ import java.util.Collection;
 public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends TripScheduleInfo> implements Worker<T> {
 
     /** The request input used to customize the worker to the clients needs. */
-    private final RangeRaptorRequest request;
+    private final RangeRaptorRequest<T> request;
 
     /** the transit data role needed for routing */
     protected final TransitDataProvider<T> transit;
@@ -63,7 +62,7 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
     private final TransitCalculator transitCalculator;
 
 
-    public AbstractRangeRaptorWorker(TransitDataProvider<T> transitData, S state, RangeRaptorRequest request) {
+    public AbstractRangeRaptorWorker(TransitDataProvider<T> transitData, S state, RangeRaptorRequest<T> request) {
         this.transit = transitData;
         this.state = state;
         this.request = request;
@@ -132,8 +131,6 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
      * @param departureTime When this search departs.
      */
     private void runRaptorForMinute(int departureTime) {
-        state.debugStopHeader("RUN RAPTOR FOR MINUTE: " + TimeUtils.timeToStrCompact(departureTime));
-
         advanceScheduledSearchToPreviousMinute(departureTime);
 
         // Run the scheduled search

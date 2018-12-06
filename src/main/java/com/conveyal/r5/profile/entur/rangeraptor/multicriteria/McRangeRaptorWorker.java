@@ -7,6 +7,7 @@ import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.transit.UnsignedIntIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
+import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleBoardSearch;
@@ -50,14 +51,15 @@ public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRan
     private static final AvgTimer TIMER_BY_MINUTE_TRANSFERS = AvgTimer.timerMicroSec("McRR:runRaptorForMinute Transfers");
 
 
-    public McRangeRaptorWorker(TransitDataProvider<T> transitData, RangeRaptorRequest request, int nRounds) {
+    public McRangeRaptorWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request, int nRounds) {
         super(
                 transitData,
                 new McRangeRaptorWorkerState<>(
                         nRounds,
                         transitData.numberOfStops(),
                         request.egressLegs,
-                        new TransitCalculator(request)
+                        new TransitCalculator(request),
+                        new DebugHandlerFactory<>(request.debug)
                 ),
                 request
         );

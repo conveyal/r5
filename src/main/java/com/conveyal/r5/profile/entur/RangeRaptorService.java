@@ -23,7 +23,7 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
         this.tuningParameters = tuningParameters;
     }
 
-    public Collection<Path<T>> route(RangeRaptorRequest request, TransitDataProvider<T> transitData) {
+    public Collection<Path<T>> route(RangeRaptorRequest<T> request, TransitDataProvider<T> transitData) {
         Worker<T> worker = createWorker(request, transitData);
         return worker.route();
     }
@@ -31,7 +31,7 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
 
     /* private methods */
 
-    private Worker<T> createWorker(RangeRaptorRequest request, TransitDataProvider<T> transitData) {
+    private Worker<T> createWorker(RangeRaptorRequest<T> request, TransitDataProvider<T> transitData) {
         switch (request.profile) {
             case MULTI_CRITERIA_RANGE_RAPTOR:
                 return createMcRRWorker(transitData, request);
@@ -42,12 +42,12 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
         }
     }
 
-    private Worker<T> createMcRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest request) {
+    private Worker<T> createMcRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
         return new McRangeRaptorWorker<>(transitData, request, nRounds(tuningParameters));
     }
 
-    private Worker<T> createRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest request) {
-        return new RangeRaptorWorker<T>(transitData, nRounds(tuningParameters), request);
+    private Worker<T> createRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
+        return new RangeRaptorWorker<>(transitData, nRounds(tuningParameters), request);
     }
 
     /**

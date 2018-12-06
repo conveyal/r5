@@ -2,7 +2,9 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.path.PathMapper;
+import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
@@ -71,26 +73,43 @@ class DestinationArrivals<T extends TripScheduleInfo> {
      */
     private final Collection<Path<T>> paths;
 
+    private final DebugHandler<Path<T>> debugPathHandler;
 
-    DestinationArrivals(int nRounds, StopsCursor<T> stopsCursor) {
+    private final DebugHandler<DestinationArrivalView<T>> debugDestinationArrivalHandler;
+
+
+    DestinationArrivals(int nRounds, StopsCursor<T> stopsCursor, DebugHandlerFactory<T> debugFactory) {
         this.stopsCursor = stopsCursor;
         this.bestArrivalTimesAtDestination = new int[nRounds];
         Arrays.fill(this.bestArrivalTimesAtDestination, UNREACHED);
 
-        paths = new ParetoSet<>(pathComparator());
+        this.debugPathHandler = debugFactory.debugPath();
+        this.debugDestinationArrivalHandler = debugFactory.debugDestinationArrival();
+
+        paths = new ParetoSet<>(
+                pathComparator(),
+                debugPathHandler::drop
+        );
     }
 
     void add(EgressStopArrivalState<T> arrival) {
+        boolean added = false;
         if (newStateHaveTheBestDestinationArrivalTimeForGivenTheRound(arrival)) {
+            debugDropDestinationArrival(arrival);
             int round = arrival.round();
             egressArrivalsByRound.put(round, arrival);
             bestArrivalTimesAtDestination[round] = arrival.destinationArrivalTime();
+            added = true;
         }
+
+        debugDestinationArrival(arrival, added);
     }
 
     void addPathsForCurrentIteration() {
         for (EgressStopArrivalState<T> it : egressArrivalsByRound.values()) {
-            paths.add(createPathFromEgressState(it));
+            Path<T> path = createPathFromEgressState(it);
+            boolean added = paths.add(path);
+            debugPath(path, added);
         }
         egressArrivalsByRound.clear();
     }
@@ -101,6 +120,10 @@ class DestinationArrivals<T extends TripScheduleInfo> {
 
 
     /* Private methods */
+
+    private boolean isDestinationReachedCurrentIteration(int round) {
+        return bestArrivalTimesAtDestination[round] != UNREACHED && egressArrivalsByRound.containsKey(round);
+    }
 
     private Path<T> createPathFromEgressState(EgressStopArrivalState<T> arrival) {
         return PathMapper.mapToPath(destinationArrivalView(arrival));
@@ -118,5 +141,35 @@ class DestinationArrivals<T extends TripScheduleInfo> {
 
     private boolean newStateHaveTheBestDestinationArrivalTimeForGivenTheRound(EgressStopArrivalState<T> newState) {
         return newState.destinationArrivalTime() < bestArrivalTimesAtDestination[newState.round()];
+    }
+
+    private void debugDropDestinationArrival(EgressStopArrivalState<T> arrival) {
+        if (isDestinationReachedCurrentIteration(arrival.round())) {
+            EgressStopArrivalState<T> dropped = egressArrivalsByRound.get(arrival.round());
+            if(debugDestinationArrivalHandler.isDebug(dropped.stop())) {
+                debugDestinationArrivalHandler.drop(
+                        destinationArrivalView(dropped),
+                        destinationArrivalView(arrival)
+                );
+            }
+        }
+    }
+
+    private void debugDestinationArrival(EgressStopArrivalState<T> arrival, boolean added) {
+        if (debugDestinationArrivalHandler.isDebug(arrival.stop())) {
+            if (added) {
+                debugDestinationArrivalHandler.accept(destinationArrivalView(arrival), null);
+            } else {
+                debugDestinationArrivalHandler.reject(destinationArrivalView(arrival), null);
+            }
+        }
+    }
+
+    private void debugPath(Path<T> path, boolean added) {
+        if (added) {
+            debugPathHandler.accept(path, paths);
+        } else {
+            debugPathHandler.reject(path, paths);
+        }
     }
 }

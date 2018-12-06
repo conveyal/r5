@@ -6,9 +6,11 @@ import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
+import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
+import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
+import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
 import java.util.Collection;
@@ -64,11 +66,14 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
      */
     private final BestTimes bestTransit;
 
+    private final DebugHandler<StopArrivalView<T>> debugHandlerStopArrivals;
+
+
 
     /**
      * create a RaptorState for a network with a particular number of stops, and a given maximum duration
      */
-    RangeRaptorWorkerState(int nRounds, int nStops, RangeRaptorRequest request) {
+    RangeRaptorWorkerState(int nRounds, int nStops, RangeRaptorRequest<T> request) {
         TransitCalculator calculator = new TransitCalculator(request);
 
         this.nRounds = nRounds;
@@ -77,7 +82,11 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
 
         this.bestOverall = new BestTimes(nStops);
         this.bestTransit = new BestTimes(nStops);
-        this.results = new DestinationArrivals<>(nRounds, new StopsCursor<>(stops, calculator));
+
+        DebugHandlerFactory<T> dFactory = new DebugHandlerFactory<>(request.debug);
+
+        this.results = new DestinationArrivals<>(nRounds, new StopsCursor<>(stops, calculator), dFactory);
+        this.debugHandlerStopArrivals = dFactory.debugStopArrival();
     }
 
     @Override
@@ -85,6 +94,8 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
         // TODO TGR - Set max limit to 5 days for now, replace this with a pareto check against the
         // TODO TGR - destination location values.
         maxTimeLimit = departureTime + MAX_TRIP_DURATION_SECONDS;
+
+        debugHandlerStopArrivals.setIterationDepartureTime(departureTime);
 
         // clear all touched stops to avoid constant reëxploration
         bestOverall.clearCurrent();
@@ -100,7 +111,7 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
 
         stops.setInitialTime(round, stop, arrivalTime, accessDurationInSeconds);
         bestOverall.setTime(stop, arrivalTime);
-        debugStop(round, stop);
+        debugAccept(stop);
     }
 
     @Override
@@ -151,10 +162,17 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
             // transitTimes upper bounds bestTimes
             final boolean newBestOverall = bestOverall.updateNewBestTime(stop, alightTime);
 
-            stops.transitToStop(round, stop, alightTime, boardStop, boardTime, trip, newBestOverall);
-
-            // skip: transferTimes
-            debugStop(round, stop);
+            if(isDebug(stop)) {
+                debugDrop(stop);
+                stops.transitToStop(round, stop, alightTime, boardStop, boardTime, trip, newBestOverall);
+                debugAccept(stop);
+            }
+            else {
+                stops.transitToStop(round, stop, alightTime, boardStop, boardTime, trip, newBestOverall);
+            }
+        }
+        else if(isDebug(stop)) {
+            debugRejectTransit(stop, alightTime, trip, boardStop, boardTime);
         }
     }
 
@@ -175,10 +193,6 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
         results.addPathsForCurrentIteration();
     }
 
-    public void debugStopHeader(String title) {
-        DebugState.debugStopHeader(title, "Best     C P | Transit  C P");
-    }
-
 
     /* private methods */
 
@@ -193,9 +207,18 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
         // transitTimes upper bounds bestTimes so we don't need to update wait time and in-vehicle time here, if we
         // enter this conditional it has already been updated.
         if (bestOverall.updateNewBestTime(toStop, arrivalTime)) {
-            stops.transferToStop(round, fromStop, transferLeg, arrivalTime);
 
-            debugStop(round, toStop);
+            if(isDebug(toStop)) {
+                debugDrop(toStop);
+                stops.transferToStop(round, fromStop, transferLeg, arrivalTime);
+                debugAccept(toStop);
+            }
+            else {
+                stops.transferToStop(round, fromStop, transferLeg, arrivalTime);
+            }
+        }
+        else if(isDebug(toStop)) {
+            debugRejectTransfer(fromStop, transferLeg, toStop, arrivalTime);
         }
     }
 
@@ -203,16 +226,37 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
         return !(bestOverall.isCurrentRoundEmpty() && bestTransit.isCurrentRoundEmpty());
     }
 
-    private void debugStop(int round, int stop) {
-        if (DebugState.isDebug(stop)) {
-            DebugState.debugStop(
-                    cursor.stop(round, stop),
-                    bestOverall.toString(stop) + " | " + bestTransit.toString(stop)
-            );
-        }
-    }
-
     private void handleEgressStopArrival(EgressStopArrivalState<T> arrival) {
         results.add(arrival);
+    }
+
+    private boolean isDebug(int stop) {
+        return debugHandlerStopArrivals.isDebug(stop);
+    }
+
+    private void debugAccept(int stop) {
+        debugHandlerStopArrivals.accept(cursor.stop(round, stop), null);
+    }
+
+    private void debugRejectTransit(int stop, int alightTime, T trip, int boardStop, int boardTime) {
+        StopArrivalState<T> arrival = new StopArrivalState<>();
+        arrival.arriveByTransit(alightTime, boardStop, boardTime, trip);
+        debugReject(new StopArrivalViewAdapter.Transit<>(round, stop, arrival, cursor));
+    }
+
+    private void debugRejectTransfer(int fromStop, TransferLeg transferLeg, int toStop, int arrivalTime) {
+        StopArrivalState<T> arrival = new StopArrivalState<>();
+        arrival.transferToStop(fromStop, arrivalTime, transferLeg.durationInSeconds());
+        debugReject(new StopArrivalViewAdapter.Transfer<>(round, toStop, arrival, cursor));
+    }
+
+    private void debugReject(StopArrivalView<T> arrival) {
+        debugHandlerStopArrivals.reject(arrival, null);
+    }
+
+    private void debugDrop(int stop) {
+        if(stops.exist(round, stop)) {
+            debugHandlerStopArrivals.drop(cursor.stop(round, stop), null);
+        }
     }
 }

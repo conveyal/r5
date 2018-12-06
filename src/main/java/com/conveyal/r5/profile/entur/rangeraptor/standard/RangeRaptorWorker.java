@@ -49,7 +49,7 @@ public class RangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRange
     public RangeRaptorWorker(
             TransitDataProvider<T> transitData,
             int nRounds,
-            RangeRaptorRequest request
+            RangeRaptorRequest<T> request
     ) {
         super(
                 transitData,

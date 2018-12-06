@@ -5,6 +5,7 @@ import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
 import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.path.PathMapper;
@@ -24,32 +25,43 @@ import static java.util.Collections.emptyList;
  */
 final class Stops<T extends TripScheduleInfo> {
     private final Stop<T>[] stops;
-    private final Destination<T> destination = new Destination<>();
+    private final Destination<T> destination;
     private final TransitCalculator calculator;
+    private final DebugHandlerFactory<T> debugHandlerFactory;
 
     /**
      * Set the time at a transit index iff it is optimal. This sets both the best time and the transfer time
      */
-    Stops(int nStops, Collection<EgressLeg> egressLegs, TransitCalculator calculator) {
+    Stops(
+            int nStops,
+            Collection<EgressLeg> egressLegs,
+            TransitCalculator calculator,
+            DebugHandlerFactory<T> debugHandlerFactory
+    ) {
         //noinspection unchecked
         this.stops = (Stop<T>[]) new Stop[nStops];
         this.calculator = calculator;
+        this.debugHandlerFactory = debugHandlerFactory;
+        this.destination = new Destination<>(debugHandlerFactory.debugDestinationArrival());
 
         for (EgressLeg it : egressLegs) {
-            this.stops[it.stop()] = new EgressStop<>(it, destination);
+            this.stops[it.stop()] = new EgressStop<T>(it, destination, debugHandlerFactory.debugStopArrival(it.stop()));
         }
     }
 
+    void startNewIteration(int departureTime) {
+        debugHandlerFactory.setIterationDepartureTime(departureTime);
+    }
+
     void setInitialTime(AccessLeg accessLeg, int fromTime) {
-        addStopArrival(
-                new AccessStopArrival<>(
-                        accessLeg.stop(),
-                        fromTime,
-                        accessLeg.durationInSeconds(),
-                        accessLeg.cost(),
-                        calculator
-                )
+        AccessStopArrival<T> newAccessArrival = new AccessStopArrival<>(
+                accessLeg.stop(),
+                fromTime,
+                accessLeg.durationInSeconds(),
+                accessLeg.cost(),
+                calculator
         );
+        addStopArrival(newAccessArrival);
     }
 
     boolean addStopArrival(AbstractStopArrival<T> arrival) {
@@ -70,14 +82,6 @@ final class Stops<T extends TripScheduleInfo> {
         return it.streamAfterMarker().collect(Collectors.toList());
     }
 
-    Iterable<? extends AbstractStopArrival<T>> list(final int round, final int stop) {
-        Stop<T> it = stops[stop];
-        if(it==null) {
-            return emptyList();
-        }
-        return it.list(s -> s.round() == round);
-    }
-
     void markAllStops() {
         for (Stop<T> stop : stops) {
             if (stop != null) {
@@ -88,7 +92,7 @@ final class Stops<T extends TripScheduleInfo> {
 
     private Stop<T> findOrCreateSet(final int stop) {
         if(stops[stop] == null) {
-            stops[stop] = new Stop<>();
+            stops[stop] = new Stop<T>(stop, debugHandlerFactory.debugStopArrival(stop));
         }
         return stops[stop];
     }

@@ -3,6 +3,7 @@ package com.conveyal.r5.profile.entur.api.request;
 import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
 import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 import java.util.Collection;
@@ -11,8 +12,10 @@ import java.util.Collection;
 /**
  * All input parameters to RangeRaptor that is spesific to a routing request.
  * See {@link TransitDataProvider} for transit data.
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-public class RangeRaptorRequest {
+public class RangeRaptorRequest<T extends TripScheduleInfo> {
 
     /**
      * Default values
@@ -70,6 +73,11 @@ public class RangeRaptorRequest {
      */
     public final int numberOfAdditionalTransfers;
 
+    /**
+     * Specify what to debug in the debug request.
+     * This feature is optonal.
+     */
+    public final DebugRequest<T> debug;
 
     /**
      * Intentionally private default constructor, which only serve as a place
@@ -87,9 +95,10 @@ public class RangeRaptorRequest {
         this.departureStepInSeconds = 60;
         this.boardSlackInSeconds = 60;
         this.numberOfAdditionalTransfers = 3;
+        this.debug = null;
     }
 
-    RangeRaptorRequest(RequestBuilder builder) {
+    RangeRaptorRequest(RequestBuilder<T> builder) {
         this.profile = builder.profile;
         this.fromTime = builder.fromTime;
         this.toTime = builder.toTime;
@@ -98,6 +107,7 @@ public class RangeRaptorRequest {
         this.departureStepInSeconds = builder.departureStepInSeconds;
         this.boardSlackInSeconds = builder.boardSlackInSeconds;
         this.numberOfAdditionalTransfers = builder.numberOfAdditionalTransfers;
+        this.debug = new DebugRequest<>(builder);
     }
 
 

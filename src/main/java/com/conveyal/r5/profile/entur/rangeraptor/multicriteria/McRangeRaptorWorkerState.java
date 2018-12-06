@@ -6,10 +6,9 @@ import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.transit.UnsignedIntIterator;
-import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
+import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransferStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
@@ -53,10 +52,12 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
             int nRounds,
             int nStops,
             Collection<EgressLeg> egressLegs,
-            TransitCalculator calculator
+            TransitCalculator calculator,
+            DebugHandlerFactory<T> debugHandlerFactory
+
     ) {
         this.nRounds = nRounds;
-        this.stops = new Stops<>(nStops, egressLegs, calculator);
+        this.stops = new Stops<>(nStops, egressLegs, calculator, debugHandlerFactory);
         this.touchedStops = new BitSet(nStops);
     }
 
@@ -67,6 +68,9 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         maxTimeLimit = departureTime + 5 * 24 * 60 * 60;
         round = 0;
         arrivalsCache.clear();
+        stops.startNewIteration(departureTime);
+
+        // clear all touched stops to avoid constant rexploration
         startRecordChangesToStopsForNextAndCurrentRound();
     }
 
@@ -75,7 +79,6 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         stops.setInitialTime(accessLeg, fromTime);
         touchedStops.set(accessLeg.stop());
         updatesExist = true;
-        debugStops(AccessStopArrival.class, round, accessLeg.stop());
     }
 
     @Override
@@ -138,11 +141,6 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         return stops.extractPaths();
     }
 
-    @Override
-    public void debugStopHeader(String title) {
-        DebugState.debugStopHeader(title, "C");
-    }
-
 
     /* private methods */
 
@@ -169,20 +167,8 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         for (AbstractStopArrival<T> arrival : arrivalsCache) {
             if (stops.addStopArrival(arrival)) {
                 touchedStops.set(arrival.stop());
-                debugStops(type, round, arrival.stop());
             }
         }
         arrivalsCache.clear();
-    }
-
-    private void debugStops(Class<?> type, int round, int stop) {
-        if (DebugState.isDebug(stop)) {
-            String postfix = (touchedStops.get(stop) ? "x" : " ");
-            for (AbstractStopArrival<T> it : stops.list(round, stop)) {
-                if (it.getClass() == type) {
-                    DebugState.debugStop(it, postfix);
-                }
-            }
-        }
     }
 }

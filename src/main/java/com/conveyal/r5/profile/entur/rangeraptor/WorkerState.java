@@ -14,8 +14,6 @@ public interface WorkerState {
 
     void setInitialTime(AccessLeg accessLeg, int nextMinuteDepartureTime);
 
-    void debugStopHeader(String header);
-
     boolean isNewRoundAvailable();
 
     void gotoNextRound();

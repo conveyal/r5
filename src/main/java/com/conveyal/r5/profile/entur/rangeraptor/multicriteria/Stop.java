@@ -2,22 +2,39 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
+import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSetWithMarker;
-
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
 
 /**
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 class Stop<T extends TripScheduleInfo> extends ParetoSetWithMarker<AbstractStopArrival<T>> {
+    private final DebugHandler<StopArrivalView<T>> debugHandler;
+    private boolean debug;
 
-    Stop() {
-        super(AbstractStopArrival.compareArrivalTimeRoundAndCost());
+    Stop(int stop, final DebugHandler<StopArrivalView<T>> debugHandler) {
+        super(
+                AbstractStopArrival.compareArrivalTimeRoundAndCost(),
+                debugHandler::drop
+        );
+        this.debugHandler = debugHandler;
+        this.debug = debugHandler.isDebug(stop);
     }
 
-    public Iterable<? extends AbstractStopArrival<T>> list(Predicate<AbstractStopArrival<T>> test) {
-        return stream().filter(test).collect(Collectors.toList());
+    @Override
+    public boolean add(AbstractStopArrival<T> newValue) {
+        boolean added = super.add(newValue);
+
+        if(debug) {
+            if(added ) {
+                debugHandler.accept(newValue, this);
+            }
+            else {
+                debugHandler.reject(newValue, this);
+            }
+        }
+        return added;
     }
 }

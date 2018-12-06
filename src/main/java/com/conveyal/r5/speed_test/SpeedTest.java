@@ -12,7 +12,6 @@ import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.request.RaptorProfiles;
 import com.conveyal.r5.profile.entur.api.request.RequestBuilder;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
-import com.conveyal.r5.profile.entur.rangeraptor.DebugState;
 import com.conveyal.r5.profile.entur.transitadapter.TransitLayerRRDataProvider;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
@@ -98,8 +97,6 @@ public class SpeedTest {
         final SpeedTestCmdLineOpts opts = (SpeedTestCmdLineOpts) this.opts;
         final SpeedTestProfiles[] strategies = opts.profiles();
         final int samples = opts.numberOfTestsSamplesToRun();
-
-        DebugState.init(opts.debug(), opts.debugStops());
 
         initProfileStatistics();
 
@@ -325,11 +322,11 @@ public class SpeedTest {
         }
     }
 
-    private RangeRaptorRequest createRequest(
+    private RangeRaptorRequest<TripSchedule> createRequest(
             ProfileRequest request,
             EgressAccessRouter streetRouter
     ) {
-        RequestBuilder builder = new RequestBuilder(request.fromTime, request.toTime)
+        RequestBuilder<TripSchedule> builder = new RequestBuilder<TripSchedule>(request.fromTime, request.toTime)
                 .boardSlackInSeconds(60)
                 .departureStepInSeconds(60);
 
@@ -338,7 +335,26 @@ public class SpeedTest {
         addStopTimes(streetRouter.accessTimesToStopsInSeconds, builder::addAccessStop);
         addStopTimes(streetRouter.egressTimesToStopsInSeconds, builder::addEgressStop);
 
+        addDebugOptions(builder);
+
         return builder.build();
+    }
+
+    private void addDebugOptions(RequestBuilder<TripSchedule> builder) {
+        List<Integer> stops = opts.debugStops();
+        List<Integer> trip = opts.debugTrip();
+
+        if(!opts.debug() && stops.isEmpty() && trip.isEmpty()) {
+            return;
+        }
+        DebugLogger logger = new DebugLogger();
+        builder
+                .stopArrivalListener(logger::stopArrivalLister)
+                .destinationArrivalListener(logger::destinationArrivalListener)
+                .pathFilteringListener(logger::pathFilteringListener)
+                .debugPath(trip)
+                .debugPathStartAtStopIndex(opts.debugTripAtStopIndex());
+        stops.forEach(builder::debugStop);
     }
 
     private static void addStopTimes(TIntIntMap timesToStopsInSeconds, Consumer<AccessEgressLeg> addStop) {

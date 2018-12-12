@@ -6,6 +6,7 @@ import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.transit.UnsignedIntIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
@@ -59,15 +60,9 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
     /**
      * The best times to reach each stop, whether via a transfer or via transit directly.
      */
-    private final BestTimes bestOverall;
-
-    /**
-     * Index to the best times for reaching stops via transit rather than via a transfer from another stop
-     */
-    private final BestTimes bestTransit;
+    private final BestTimes bestTimes;
 
     private final DebugHandler<StopArrivalView<T>> debugHandlerStopArrivals;
-
 
 
     /**
@@ -80,8 +75,7 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
         this.stops = new Stops<>(nRounds, nStops, request.egressLegs, this::handleEgressStopArrival);
         this.cursor = new StopsCursor<>(stops, calculator);
 
-        this.bestOverall = new BestTimes(nStops);
-        this.bestTransit = new BestTimes(nStops);
+        this.bestTimes = new BestTimes(nStops);
 
         DebugHandlerFactory<T> dFactory = new DebugHandlerFactory<>(request.debug);
 
@@ -98,8 +92,7 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
         debugHandlerStopArrivals.setIterationDepartureTime(departureTime);
 
         // clear all touched stops to avoid constant reëxploration
-        bestOverall.clearCurrent();
-        bestTransit.clearCurrent();
+        bestTimes.prepareForNewIteration();
         round = 0;
     }
 
@@ -110,35 +103,35 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
         final int arrivalTime = fromTime + accessDurationInSeconds;
 
         stops.setInitialTime(round, stop, arrivalTime, accessDurationInSeconds);
-        bestOverall.setTime(stop, arrivalTime);
+        bestTimes.setAccessStopTime(stop, arrivalTime);
         debugAccept(stop);
     }
 
     @Override
     public boolean isNewRoundAvailable() {
         final boolean moreRoundsToGo = round < nRounds - 1;
-        return moreRoundsToGo && isCurrentRoundUpdated();
+        return moreRoundsToGo && bestTimes.isCurrentRoundUpdated();
     }
 
     @Override
-    public void gotoNextRound() {
-        bestOverall.gotoNextRound();
-        bestTransit.gotoNextRound();
+    public void prepareForNextRound() {
+        bestTimes.prepareForNextRound();
         ++round;
         roundMax = Math.max(roundMax, round);
     }
 
     @Override
     public BitSetIterator stopsTouchedByTransitCurrentRound() {
-        return bestTransit.stopsReachedCurrentRound();
+        return bestTimes.transitStopsReachedCurrentRound();
     }
 
-    BitSetIterator bestStopsTouchedLastRoundIterator() {
-        return bestOverall.stopsReachedLastRound();
+    @Override
+    public UnsignedIntIterator stopsTouchedPreviousRound() {
+        return bestTimes.stopsReachedLastRound();
     }
 
     boolean isStopReachedInPreviousRound(int stop) {
-        return bestOverall.isReachedLastRound(stop);
+        return bestTimes.isStopReachedLastRound(stop);
     }
 
     int bestTimePreviousRound(int stop) {
@@ -157,10 +150,10 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
             return;
         }
 
-        if (bestTransit.updateNewBestTime(stop, alightTime)) {
+        if (bestTimes.transitUpdateNewBestTime(stop, alightTime)) {
 
             // transitTimes upper bounds bestTimes
-            final boolean newBestOverall = bestOverall.updateNewBestTime(stop, alightTime);
+            final boolean newBestOverall = bestTimes.updateNewBestTime(stop, alightTime);
 
             if(isDebug(stop)) {
                 debugDrop(stop);
@@ -181,8 +174,11 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
      */
     @Override
     public void transferToStops(int fromStop, Iterator<? extends TransferLeg> transfers) {
+
+        int arrivalTimeTransit = stops.get(round, fromStop).transitTime();
+
         while (transfers.hasNext()) {
-            transferToStop(fromStop, transfers.next());
+            transferToStop(arrivalTimeTransit, fromStop, transfers.next());
         }
     }
 
@@ -196,17 +192,18 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
 
     /* private methods */
 
-    private void transferToStop(int fromStop, TransferLeg transferLeg) {
-        final int toStop = transferLeg.stop();
-
-        int arrivalTime = bestTransit.time(fromStop) + transferLeg.durationInSeconds();
+    private void transferToStop(int arrivalTimeTransit, int fromStop, TransferLeg transferLeg) {
+        final int arrivalTime = arrivalTimeTransit + transferLeg.durationInSeconds();
 
         if (arrivalTime > maxTimeLimit) {
             return;
         }
+
+        final int toStop = transferLeg.stop();
+
         // transitTimes upper bounds bestTimes so we don't need to update wait time and in-vehicle time here, if we
         // enter this conditional it has already been updated.
-        if (bestOverall.updateNewBestTime(toStop, arrivalTime)) {
+        if (bestTimes.updateNewBestTime(toStop, arrivalTime)) {
 
             if(isDebug(toStop)) {
                 debugDrop(toStop);
@@ -220,10 +217,6 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
         else if(isDebug(toStop)) {
             debugRejectTransfer(fromStop, transferLeg, toStop, arrivalTime);
         }
-    }
-
-    private boolean isCurrentRoundUpdated() {
-        return !(bestOverall.isCurrentRoundEmpty() && bestTransit.isCurrentRoundEmpty());
     }
 
     private void handleEgressStopArrival(EgressStopArrivalState<T> arrival) {

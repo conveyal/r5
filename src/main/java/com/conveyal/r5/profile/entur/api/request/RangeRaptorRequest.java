@@ -7,6 +7,7 @@ import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 import java.util.Collection;
+import java.util.Collections;
 
 
 /**
@@ -23,7 +24,7 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
      */
     static final RangeRaptorRequest DEFAULTS = new RangeRaptorRequest();
 
-    static final int NOT_SET = -1;
+    private static final int NOT_SET = -1;
 
 
     /** The profile/algorithm to use for this request. */
@@ -87,8 +88,8 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
         // Required parameters
         this.fromTime = NOT_SET;
         this.toTime = NOT_SET;
-        this.accessLegs = null;
-        this.egressLegs = null;
+        this.accessLegs = Collections.emptyList();
+        this.egressLegs = Collections.emptyList();
 
         // Optional parameters with default values
         this.profile = RaptorProfiles.MULTI_CRITERIA_RANGE_RAPTOR;
@@ -110,14 +111,6 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
         this.debug = new DebugRequest<>(builder);
     }
 
-
-    /**
-     * Compute number of Range Raptor iterations for scheduled search
-     */
-    int nMinutes() {
-        return  (toTime - fromTime) / departureStepInSeconds;
-    }
-
     @Override
     public String toString() {
         return "RangeRaptorRequest{" +
@@ -129,5 +122,4 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
                 ", boardSlackInSeconds=" + boardSlackInSeconds +
                 '}';
     }
-
 }

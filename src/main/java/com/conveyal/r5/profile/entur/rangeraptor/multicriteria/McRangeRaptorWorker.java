@@ -5,53 +5,33 @@ import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.api.transit.UnsignedIntIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
+import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleBoardSearch;
-import com.conveyal.r5.profile.entur.util.AvgTimer;
 
 import java.util.Collection;
-import java.util.Iterator;
 
 
 /**
- * RaptorWorker is fast, but FastRaptorWorker is knock-your-socks-off fast, and also more maintainable.
- * It is also simpler, as it only focuses on the transit network; see the Propagater class for the methods that extend
- * the travel times from the final transit stop of a trip out to the individual targets.
+ * The purpose TODO
  * <p>
- * The algorithm used herein is described in
+ * The algorithm used herein is described in TODO
  * <p>
- * Conway, Matthew Wigginton, Andrew Byrd, and Marco van der Linden. “Evidence-Based Transit and Land Use Sketch Planning
- * Using Interactive Accessibility Methods on Combined Schedule and Headway-Based Networks.” Transportation Research
- * Record 2653 (2017). doi:10.3141/2653-06.
- * <p>
- * Delling, Daniel, Thomas Pajor, and Renato Werneck. “Round-Based Public Transit Routing,” January 1, 2012.
- * http://research.microsoft.com/pubs/156567/raptor_alenex.pdf.
- * <p>
- * There is currently no support for saving paths.
- * <p>
- * This class originated as a rewrite of our RAPTOR code that would use "thin workers", allowing computation by a
- * generic function-execution service like AWS Lambda. The gains in efficiency were significant enough that this is now
- * the way we do all analysis work. This system also accounts for pure-frequency routes by using Monte Carlo methods
- * (generating randomized schedules).
+ * This class originated as a rewrite of our RAPTOR code that TODO
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 @SuppressWarnings("Duplicates")
 public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRangeRaptorWorker<McRangeRaptorWorkerState<T>, T> {
 
-    // Variables to track time spent
-    private static final AvgTimer TIMER_ROUTE = AvgTimer.timerMilliSec("McRR:route");
-    private static final AvgTimer TIMER_ROUTE_SETUP = AvgTimer.timerMilliSec("McRR:route Init");
-    private static final AvgTimer TIMER_ROUTE_BY_MINUTE = AvgTimer.timerMilliSec("McRR:route Run Raptor For Minute");
-    private static final AvgTimer TIMER_BY_MINUTE_SCHEDULE_SEARCH = AvgTimer.timerMicroSec("McRR:runRaptorForMinute Schedule Search");
-    private static final AvgTimer TIMER_BY_MINUTE_TRANSFERS = AvgTimer.timerMicroSec("McRR:runRaptorForMinute Transfers");
+    private TripPatternInfo<T> pattern;
+    private TripScheduleBoardSearch<T> tripSearch;
 
 
-    public McRangeRaptorWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request, int nRounds) {
+    public McRangeRaptorWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request, int nRounds, WorkerPerformanceTimers timers) {
         super(
                 transitData,
                 new McRangeRaptorWorkerState<>(
@@ -61,11 +41,13 @@ public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRan
                         new TransitCalculator(request),
                         new DebugHandlerFactory<>(request.debug)
                 ),
-                request
+                request,
+                timers
         );
     }
 
-    @Override protected Collection<Path<T>> paths() {
+    @Override
+    protected Collection<Path<T>> paths() {
         return state.extractPaths();
     }
 
@@ -74,49 +56,39 @@ public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRan
         // NOOP
     }
 
+    @Override
+    protected void prepareTransitForRoundAndPattern(TripPatternInfo<T> pattern, TripScheduleBoardSearch<T> tripSearch) {
+        this.pattern = pattern;
+        this.tripSearch = tripSearch;
+    }
+
     /**
      * Perform a scheduled search
      */
-    @Override protected void scheduledSearchForRound() {
-        UnsignedIntIterator stops = state.stopsTouchedPreviousRound();
-        Iterator<? extends TripPatternInfo<T>> patternIterator = transit.patternIterator(stops);
+    protected void performTransitForRoundAndPatternAtStop(int boardStopPositionInPattern) {
+        final int nPatternStops = pattern.numberOfStopsInPattern();
+        int boardStopIndex = pattern.stopIndex(boardStopPositionInPattern);
 
-        while (patternIterator.hasNext()) {
-            TripPatternInfo<T> pattern = patternIterator.next();
+        for (AbstractStopArrival<T> boardStop : state.listStopArrivalsPreviousRound(boardStopIndex)) {
 
-            TripScheduleBoardSearch<T> search = new TripScheduleBoardSearch<>(pattern, this::skipTripSchedule);
+            int earliestBoardTime = earliestBoardTime(boardStop.arrivalTime());
+            boolean found = tripSearch.search(earliestBoardTime, boardStopPositionInPattern);
 
-            for (int boardStopPosInPtn = 0; boardStopPosInPtn < pattern.numberOfStopsInPattern(); boardStopPosInPtn++) {
-                int boardStopIndex = pattern.stopIndex(boardStopPosInPtn);
+            if (found) {
+                for (int alightStopPos = boardStopPositionInPattern + 1; alightStopPos < nPatternStops; alightStopPos++) {
+                    int alightStopIndex = pattern.stopIndex(alightStopPos);
 
-                for (AbstractStopArrival<T> boardStop : state.listStopArrivalsPreviousRound(boardStopIndex)) {
+                    T trip = tripSearch.candidateTrip;
 
-                    int earliestBoardTime = earliestBoardTime(boardStop.arrivalTime());
-                    boolean found = search.search(earliestBoardTime, boardStopPosInPtn);
-
-                    if (found) {
-                        for (int alightStopPosInPtn = boardStopPosInPtn + 1; alightStopPosInPtn < pattern.numberOfStopsInPattern(); alightStopPosInPtn++) {
-                            int alightStopIndex = pattern.stopIndex(alightStopPosInPtn);
-
-                            T trip = search.candidateTrip;
-                            state.transitToStop(
-                                    boardStop,
-                                    alightStopIndex,
-                                    trip.arrival(alightStopPosInPtn),
-                                    trip.departure(boardStopPosInPtn),
-                                    trip
-                            );
-                        }
-                    }
+                    state.transitToStop(
+                            boardStop,
+                            alightStopIndex,
+                            trip.arrival(alightStopPos),
+                            trip.departure(boardStopPositionInPattern),
+                            trip
+                    );
                 }
             }
         }
-        state.commitTransits();
     }
-
-    @Override protected AvgTimer timerRoute() { return TIMER_ROUTE; }
-    @Override protected void timerSetup(Runnable setup) { TIMER_ROUTE_SETUP.time(setup); }
-    @Override protected void timerRouteByMinute(Runnable routeByMinute) { TIMER_ROUTE_BY_MINUTE.time(routeByMinute); }
-    @Override protected AvgTimer timerByMinuteScheduleSearch(){ return TIMER_BY_MINUTE_SCHEDULE_SEARCH; }
-    @Override protected AvgTimer timerByMinuteTransfers(){ return TIMER_BY_MINUTE_TRANSFERS; }
 }

@@ -272,7 +272,7 @@ public class SpeedTest {
 
             ItinerarySet itineraries = new ItinerarySet();
 
-            RangeRaptorRequest req = createRequest(request, streetRouter);
+            RangeRaptorRequest<TripSchedule> req = createRequest(request, streetRouter);
 
             TuningParameters tuningParameters = new TuningParameters() {
                 @Override public int maxNumberOfTransfers() { return request.maxRides; }

@@ -16,11 +16,15 @@ public interface WorkerState {
 
     boolean isNewRoundAvailable();
 
-    void gotoNextRound();
+    void prepareForNextRound();
+
+    UnsignedIntIterator stopsTouchedPreviousRound();
 
     UnsignedIntIterator stopsTouchedByTransitCurrentRound();
 
     void transferToStops(int fromStop, Iterator<? extends TransferLeg> transfers);
 
-    default void commitTransfers() {}
+    default void transitsForRoundComplete() {}
+
+    default void transfersForRoundComplete() {}
 }

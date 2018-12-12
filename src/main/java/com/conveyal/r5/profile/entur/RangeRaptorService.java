@@ -6,6 +6,7 @@ import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.Worker;
+import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.RangeRaptorWorker;
 
@@ -17,6 +18,9 @@ import java.util.Collection;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class RangeRaptorService<T extends TripScheduleInfo> {
+    private static final WorkerPerformanceTimers MC_TIMERS = new WorkerPerformanceTimers("Mc");
+    private static final WorkerPerformanceTimers RR_TIMERS = new WorkerPerformanceTimers("Rr");
+
     private TuningParameters tuningParameters;
 
     public RangeRaptorService(TuningParameters tuningParameters) {
@@ -43,11 +47,11 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
     }
 
     private Worker<T> createMcRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
-        return new McRangeRaptorWorker<>(transitData, request, nRounds(tuningParameters));
+        return new McRangeRaptorWorker<>(transitData, request, nRounds(tuningParameters), MC_TIMERS);
     }
 
     private Worker<T> createRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
-        return new RangeRaptorWorker<>(transitData, nRounds(tuningParameters), request);
+        return new RangeRaptorWorker<>(transitData, nRounds(tuningParameters), request, RR_TIMERS);
     }
 
     /**

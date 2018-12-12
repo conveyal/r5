@@ -88,11 +88,12 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     }
 
     @Override
-    public void gotoNextRound() {
+    public void prepareForNextRound() {
         ++round;
     }
 
-    UnsignedIntIterator stopsTouchedPreviousRound() {
+    @Override
+    public UnsignedIntIterator stopsTouchedPreviousRound() {
         return new BitSetIterator(touchedStops);
     }
 
@@ -127,13 +128,14 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         }
     }
 
-    public void commitTransits() {
+    @Override
+    public void transitsForRoundComplete() {
         startRecordChangesToStopsForNextAndCurrentRound();
         commitCachedArrivals(TransitStopArrival.class);
     }
 
     @Override
-    public void commitTransfers() {
+    public void transfersForRoundComplete() {
         commitCachedArrivals(TransferStopArrival.class);
     }
 

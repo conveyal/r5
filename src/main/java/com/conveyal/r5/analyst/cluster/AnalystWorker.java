@@ -474,7 +474,8 @@ public class AnalystWorker implements Runnable {
             // Note we're completely bypassing the async loader here and relying on the older nested LoadingCaches.
             // If those are ever removed, the async loader will need a synchronous mode with per-key blocking (kind of
             // reinventing the wheel of LoadingCache) or we'll need to make preparation for regional tasks async.
-            TransportNetwork transportNetwork = networkPreloader.transportNetworkCache.getNetwork(task.graphId);
+            TransportNetwork transportNetwork = networkPreloader.transportNetworkCache.getNetworkForScenario(task
+                    .graphId, task.scenarioId);
 
             // If we are generating a static site, there must be a single metadata file for an entire batch of results.
             // Arbitrarily we create this metadata as part of the first task in the job.

@@ -424,7 +424,7 @@ public class TransportNetworkCache {
     /**
      * Given a network and scenario ID, retrieve that scenario from the local disk cache (falling back on S3).
      */
-    private Scenario resolveScenario (String networkId, String scenarioId) {
+    private synchronized Scenario resolveScenario (String networkId, String scenarioId) {
         // First try to get the scenario from the local memory cache. This should be sufficient for single point tasks.
         Scenario scenario = scenarioCache.getScenario(scenarioId);
         if (scenario != null) {

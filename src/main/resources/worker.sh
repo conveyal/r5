@@ -74,10 +74,6 @@ cat > /home/ec2-user/.aws/config << EOF
 region = $REGION
 EOF
 
-# Tag the instance (so we can identify it in the EC2 console)
-sudo -u ec2-user aws ec2 create-tags --resources $INSTANCE --tags Key=Name,Value=AnalysisWorker \
-Key=Project,Value=Analysis Key=group,Value={3} Key=user,Value={4} Key=networkId,Value={5} Key=workerVersion,Value={6}
-
 # Download the worker
 sudo -u ec2-user wget -O ~ec2-user/r5.jar {0} >> $LOGFILE 2>&1
 
@@ -86,7 +82,6 @@ sudo -u ec2-user wget -O ~ec2-user/r5.jar {0} >> $LOGFILE 2>&1
 TOTAL_MEM=`grep MemTotal /proc/meminfo | sed ''s/[^0-9]//g''`
 # 2097152 kb is 2GB, leave that much for the OS
 MEM=`echo $TOTAL_MEM - 2097152 | bc`
-
 
 # Start the worker
 # run in the home directory for ec2-user, in the subshell
@@ -102,3 +97,8 @@ MEM=`echo $TOTAL_MEM - 2097152 | bc`
     halt -p
 } &
 '
+
+# Tag the instance (so we can identify it in the EC2 console), with jitter up to 3 min. for AWS rate limits
+sleep $[$RANDOM % 360]s
+sudo -u ec2-user aws ec2 create-tags --resources $INSTANCE --tags Key=Name,Value=AnalysisWorker \
+Key=Project,Value=Analysis Key=group,Value={3} Key=user,Value={4} Key=networkId,Value={5} Key=workerVersion,Value={6}

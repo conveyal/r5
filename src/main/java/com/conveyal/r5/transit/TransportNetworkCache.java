@@ -441,7 +441,6 @@ public class TransportNetworkCache {
                 InputStream is = obj.getObjectContent();
                 OutputStream os = new BufferedOutputStream(new FileOutputStream(scenarioFile));
                 ByteStreams.copy(is, os);
-                Files.copy(is, scenarioFile.toPath());
                 is.close();
                 os.close();
             } catch (Exception e) {

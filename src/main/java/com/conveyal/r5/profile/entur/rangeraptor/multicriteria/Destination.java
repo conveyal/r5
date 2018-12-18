@@ -34,9 +34,7 @@ class Destination<T extends TripScheduleInfo> extends ParetoSet<DestinationArriv
     void transferToDestination(TransitStopArrival<T> lastTransitArrival, EgressLeg egressLeg) {
         DestinationArrival<T> newValue = new DestinationArrival<>(
                 lastTransitArrival,
-                lastTransitArrival.arrivalTime() + egressLeg.durationInSeconds(),
-                lastTransitArrival.round(),
-                lastTransitArrival.cost() + egressLeg.cost()
+                egressLeg
         );
         boolean added = add(newValue);
 

@@ -112,7 +112,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         if (alightTime > maxTimeLimit) {
             return;
         }
-        arrivalsCache.add(new TransitStopArrival<>(boardStop, round, stop, alightTime, boardTime, trip));
+        arrivalsCache.add(new TransitStopArrival<>(boardStop, stop, alightTime, boardTime, trip));
     }
 
     /**
@@ -158,7 +158,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
             int arrivalTime = it.arrivalTime() + transferTimeInSeconds;
 
             if (arrivalTime < maxTimeLimit) {
-                arrivalsCache.add(new TransferStopArrival<>(it, round, transfer, arrivalTime));
+                arrivalsCache.add(new TransferStopArrival<>(it, transfer, arrivalTime));
             }
         }
     }

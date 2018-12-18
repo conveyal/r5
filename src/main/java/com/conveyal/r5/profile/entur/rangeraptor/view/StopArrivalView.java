@@ -2,12 +2,14 @@ package com.conveyal.r5.profile.entur.rangeraptor.view;
 
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 /**
+ * TODO TGR
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
@@ -136,5 +138,18 @@ public interface StopArrivalView<T extends TripScheduleInfo> {
             return  "Walk";
         }
         throw new IllegalStateException("Unknown mode for: " + this);
+    }
+
+
+    default String asString() {
+        return String.format(
+                "%s { Rnd: %d, Stop: %d, Time: %s (%s), Cost: %d }",
+                getClass().getSimpleName(),
+                round(),
+                stop(),
+                TimeUtils.timeToStrCompact(arrivalTime()),
+                TimeUtils.timeToStrCompact(legDuration()),
+                cost()
+        );
     }
 }

@@ -1,9 +1,9 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 
+import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
 
 
 /**
@@ -39,21 +39,13 @@ public final class DestinationArrival<T extends TripScheduleInfo> implements Des
     private final int travelDuration;
 
 
-    public DestinationArrival(TransitStopArrival<T> previous, int arrivalTime, int round, int cost) {
+    public DestinationArrival(TransitStopArrival<T> previous, EgressLeg egressLeg) {
         this.previous = previous;
-        this.arrivalTime = arrivalTime;
-        this.numberOfTransfers = round - 1;
-        this.cost = cost;
+        this.arrivalTime = previous.arrivalTime() + egressLeg.durationInSeconds();
+        this.numberOfTransfers = previous.round() - 1;
+        this.cost = previous.cost() + egressLeg.cost();
         this.departureTime = previous.arrivalTime();
-        this.travelDuration = arrivalTime - accessStopArrival(previous).departureTime();
-    }
-
-    public static <T extends TripScheduleInfo> ParetoComparator<DestinationArrival<T>> compare_ArrivalTime_NumOfTransfers_Cost_And_TravelDuration() {
-        return (l, r) ->
-                l.arrivalTime < r.arrivalTime ||
-                l.numberOfTransfers < r.numberOfTransfers ||
-                l.cost < r.cost ||
-                l.travelDuration < r.travelDuration;
+        this.travelDuration = this.arrivalTime - tripDepartureTime(previous);
     }
 
     @Override
@@ -84,24 +76,17 @@ public final class DestinationArrival<T extends TripScheduleInfo> implements Des
         return previous;
     }
 
-
     @Override
     public String toString() {
-        return "DestinationArrival{" +
-                "previous arrival=" + previous +
-                ", arrival time=" + arrivalTime +
-                ", number of transfers=" + numberOfTransfers +
-                ", cost=" + cost +
-                ", travel duration=" + travelDuration +
-                '}';
+        return asString();
     }
 
-
-    private static <T extends TripScheduleInfo> AbstractStopArrival<T> accessStopArrival(AbstractStopArrival<T> arrival) {
+    private static <T extends TripScheduleInfo> int tripDepartureTime(AbstractStopArrival<T> arrival) {
         AbstractStopArrival<T> it = arrival;
-        while (!it.arrivedByAccessLeg()) {
+
+        while (!it.firstArrivedByTransit()) {
             it = it.previous();
         }
-        return it;
+        return it.previous().departureTimeAccess(it.departureTime());
     }
 }

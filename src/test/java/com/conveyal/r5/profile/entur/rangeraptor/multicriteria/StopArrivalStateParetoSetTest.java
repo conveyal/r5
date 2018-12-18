@@ -33,52 +33,62 @@ public class StopArrivalStateParetoSetTest {
     private static final int STOP_5 = 5;
     private static final int STOP_6 = 6;
 
-    private AbstractStopArrival<TripScheduleInfo> A_STATE = newMcAccessStopState(999, 10);
+    private static final AbstractStopArrival<TripScheduleInfo> ACCESS_ARRIVAL = newAccessStopState(999, 10);
+    private static final AbstractStopArrival<TripScheduleInfo> TRANSFER_R1 = newMcTransitStopState(ROUND_1,998, 10);
+    private static final AbstractStopArrival<TripScheduleInfo> TRANSFER_R2 = newMcTransitStopState(ROUND_2,997, 20);
 
     private Stop<TripScheduleInfo> subject = new Stop<>(0, DebugHandler.noop());
 
     @Test
     public void addOneElementToSet() {
-        subject.add(newMcAccessStopState(STOP_1, 10));
+        subject.add(newAccessStopState(STOP_1, 10));
         assertStopsInSet(STOP_1);
     }
 
     @Test
     public void testTimeDominance() {
-        subject.add(newMcAccessStopState(STOP_1, 10));
-        subject.add(newMcAccessStopState(STOP_2, 9));
-        subject.add(newMcAccessStopState(STOP_3, 9));
-        subject.add(newMcAccessStopState(STOP_4, 11));
+        subject.add(newAccessStopState(STOP_1, 10));
+        subject.add(newAccessStopState(STOP_2, 9));
+        subject.add(newAccessStopState(STOP_3, 9));
+        subject.add(newAccessStopState(STOP_4, 11));
         assertStopsInSet(STOP_2);
     }
 
     @Test
     public void testRoundDominance() {
-        subject.add(newMcTransferStopState(A_STATE, ROUND_1, STOP_1, 10));
-        subject.add(newMcTransferStopState(A_STATE, ROUND_2, STOP_2, 10));
+        subject.add(newTransferStopState(ROUND_1, STOP_1, 10, ANY));
+        subject.add(newTransferStopState(ROUND_2, STOP_2, 10, ANY));
         assertStopsInSet(STOP_1);
+    }
+
+
+    @Test
+    public void testCostDominance() {
+        subject.add(newTransferStopState(ROUND_1, STOP_1, ANY, 20));
+        subject.add(newTransferStopState(ROUND_1, STOP_2, ANY, 10));
+        assertStopsInSet(STOP_2);
     }
 
     @Test
     public void testRoundAndTimeDominance() {
-        subject.add(newMcTransferStopState(A_STATE, ROUND_1, STOP_1, 10));
-        subject.add(newMcTransferStopState(A_STATE, ROUND_1, STOP_2, 8));
+        subject.add(newTransferStopState(ROUND_1, STOP_1, 10, ANY));
+        subject.add(newTransferStopState(ROUND_1, STOP_2, 8, ANY));
 
         assertStopsInSet(STOP_2);
 
-        subject.add(newMcTransferStopState(A_STATE, ROUND_2, STOP_3, 8));
+        subject.add(newTransferStopState(ROUND_2, STOP_3, 8, ANY));
 
         assertStopsInSet(STOP_2);
 
-        subject.add(newMcTransferStopState(A_STATE, ROUND_2, STOP_4, 7));
+        subject.add(newTransferStopState(ROUND_2, STOP_4, 7, ANY));
 
         assertStopsInSet(STOP_2, STOP_4);
 
-        subject.add(newMcTransferStopState(A_STATE, ROUND_3, STOP_5, 6));
+        subject.add(newTransferStopState(ROUND_3, STOP_5, 6, ANY));
 
         assertStopsInSet(STOP_2, STOP_4, STOP_5);
 
-        subject.add(newMcTransferStopState(A_STATE, ROUND_3, STOP_6, 6));
+        subject.add(newTransferStopState(ROUND_3, STOP_6, 6, ANY));
 
         assertStopsInSet(STOP_2, STOP_4, STOP_5);
     }
@@ -90,9 +100,9 @@ public class StopArrivalStateParetoSetTest {
      */
     @Test
     public void testTransitAndTransferDoesNotAffectDominance() {
-        subject.add(newMcAccessStopState(STOP_1, 20));
-        subject.add(newMcTransitStopState(A_STATE, ROUND_1, STOP_2, 10));
-        subject.add(newMcTransferStopState(A_STATE, ROUND_1, STOP_4, 8));
+        subject.add(newAccessStopState(STOP_1, 20));
+        subject.add(newMcTransitStopState(ROUND_1, STOP_2, 10));
+        subject.add(newTransferStopState(ROUND_1, STOP_4, 8, 0));
         assertStopsInSet(STOP_1, STOP_4);
     }
 
@@ -101,15 +111,24 @@ public class StopArrivalStateParetoSetTest {
         Assert.assertEquals("Stop indexes", Arrays.toString(expStopIndexes), Arrays.toString(result));
     }
 
-    private static AccessStopArrival<TripScheduleInfo> newMcAccessStopState(int stop, int accessDurationInSeconds) {
+    private static AccessStopArrival<TripScheduleInfo> newAccessStopState(int stop, int accessDurationInSeconds) {
         return new AccessStopArrival<>(stop, A_TIME, accessDurationInSeconds, ANY, CALCULATOR);
     }
 
-    private static TransitStopArrival<TripScheduleInfo> newMcTransitStopState(AbstractStopArrival<TripScheduleInfo> prev, int round, int stop, int arrivalTime) {
-        return new TransitStopArrival<>(prev, round, stop, arrivalTime, ANY, ANY_TRIP);
+    private static TransitStopArrival<TripScheduleInfo> newMcTransitStopState(int round, int stop, int arrivalTime) {
+        return new TransitStopArrival<>(prev(round), stop, arrivalTime, ANY, ANY_TRIP);
     }
 
-    private static TransferStopArrival<TripScheduleInfo> newMcTransferStopState(AbstractStopArrival<TripScheduleInfo> prev, int round, int stop, int arrivalTime) {
-        return new TransferStopArrival<>(prev, round, new TestLeg(stop, ANY), arrivalTime);
+    private static TransferStopArrival<TripScheduleInfo> newTransferStopState(int round, int stop, int arrivalTime, int cost) {
+        return new TransferStopArrival<>(prev(round), new TestLeg(stop, ANY, cost), arrivalTime);
+    }
+
+    private static AbstractStopArrival<TripScheduleInfo> prev(int round) {
+        switch (round) {
+            case 1 : return ACCESS_ARRIVAL;
+            case 2 : return TRANSFER_R1;
+            case 3 : return TRANSFER_R2;
+            default: throw new IllegalArgumentException();
+        }
     }
 }

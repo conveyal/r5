@@ -2,7 +2,6 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
-import com.conveyal.r5.profile.entur.util.TimeUtils;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
 
 import java.util.ArrayList;
@@ -20,32 +19,49 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
     public static <T extends TripScheduleInfo> ParetoComparator<AbstractStopArrival<T>> compareArrivalTimeRoundAndCost() {
         // This is important with respect to performance. Using logical OR(||) is faster than boolean OR(|)
         // and we intentionally do NOT use the ParetoComparatorBuilder.
-        return (l, r) -> l.arrivalTime < r.arrivalTime || l.round < r.round || l.cost < r.cost;
+        return (l, r) -> l.arrivalTime < r.arrivalTime || l.paretoRound < r.paretoRound || l.cost < r.cost;
     }
 
     public static <T extends TripScheduleInfo> ParetoComparator<AbstractStopArrival<T>> compareArrivalTimeAndRound() {
         // This is important with respect to performance. Using logical OR(||) is faster than boolean OR(|)
         // and we intentionally do NOT use the ParetoComparatorBuilder.
-        return (l, r) -> l.arrivalTime < r.arrivalTime || l.round < r.round;
+        return (l, r) -> l.arrivalTime < r.arrivalTime || l.paretoRound < r.paretoRound;
     }
 
     private final AbstractStopArrival<T> previous;
-    private final int round;
+
+    /**
+     * We want transits to dominate transfers so we increment the round not only between RangeRaptor rounds,
+     * but for transits and transfers also. The access leg is paretoRound 0, the first transit leg is 1.
+     * The following transfer leg, if it exist, is paretoRound 2, and the next transit is 3, and so on.
+     * <p/>
+     * The relationship between Range Raptor round and paretoRound can be described by this formula:
+     * <pre>
+     *     Range Raptor round =  (paretoRound + 1) / 2  // The divide by 2 rounds down (integer calculation)
+     * </pre>
+     */
+    private final int paretoRound;
     private final int stop;
     private final int departureTime;
     private final int arrivalTime;
     private final int cost;
 
     /**
-     * Transit or transfer
+     * Transit or transfer.
+     *
+     * @param previous the previous arrival visited for the current trip
+     * @param stop stop index for this arrival
+     * @param departureTime the departure time from the previous stop
+     * @param arrivalTime the arrival time for this stop index
+     * @param additionalCost the accumulated cost at this stop arrival
      */
-    AbstractStopArrival(AbstractStopArrival<T> previous, int round, int stop, int departureTime, int arrivalTime, int cost) {
+    AbstractStopArrival(AbstractStopArrival<T> previous, int stop, int departureTime, int arrivalTime, int additionalCost) {
         this.previous = previous;
-        this.round = round;
+        this.paretoRound = previous.paretoRound + (isTransitFollowedByTransit() ? 2 : 1);
         this.stop = stop;
         this.departureTime = departureTime;
         this.arrivalTime = arrivalTime;
-        this.cost = cost;
+        this.cost = previous.cost + additionalCost;
     }
 
     /**
@@ -53,7 +69,7 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
      */
     AbstractStopArrival(int stop, int departureTime, int arrivalTime, int initialCost) {
         this.previous = null;
-        this.round = 0;
+        this.paretoRound = 0;
         this.stop = stop;
         this.departureTime = departureTime;
         this.arrivalTime = arrivalTime;
@@ -63,7 +79,7 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
 
     @Override
     public final int round() {
-        return round;
+        return (paretoRound + 1) / 2;
     }
 
     @Override
@@ -103,18 +119,6 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
         return asString();
     }
 
-    private String asString() {
-        return String.format(
-                "%s [%d, %5d] Time: %s - %s, Cost: %d",
-                getClass().getSimpleName(),
-                round(),
-                stop(),
-                TimeUtils.timeToStrCompact(departureTime()),
-                TimeUtils.timeToStrCompact(arrivalTime()),
-                cost()
-        );
-    }
-
     @Override
     public List<Integer> listStops() {
         List<Integer> stops = new ArrayList<>();
@@ -123,5 +127,20 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
         }
         Collections.reverse(stops);
         return stops;
+    }
+
+    /**
+     * This method is used to find the first transit arrival in a journey.
+     * The first leg after the access leg must be a transit leg, so
+     * the second leg is always the first transit leg/arrival.
+     */
+    boolean firstArrivedByTransit() {
+        // We can use the paretoRound for this, because the two first leags are always
+        // an access lag followed by a transit leg.
+        return paretoRound == 1;
+    }
+
+    private boolean isTransitFollowedByTransit() {
+        return arrivedByTransit() && previous.arrivedByTransit();
     }
 }

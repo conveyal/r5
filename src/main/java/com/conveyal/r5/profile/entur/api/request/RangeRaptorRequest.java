@@ -30,10 +30,10 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
     /** The profile/algorithm to use for this request. */
     public final RaptorProfiles profile;
 
-    /** The beginning of the departure window, in seconds since midnight. */
+    /** The beginning of the departure window, in seconds since midnight. Inclusive. */
     public final int fromTime;
 
-    /** The end of the departure window, in seconds since midnight. */
+    /** The end of the departure window, in seconds since midnight. Exclusive. */
     public final int toTime;
 
     /** Times to access each transit stop using the street network in seconds. */

@@ -34,11 +34,16 @@ class DebugLogger {
 
     void destinationArrivalListener(DebugEvent<DestinationArrivalView<TripSchedule>> e) {
         DestinationArrivalView<?> d = e.element();
+        int round = d.previous().round();
         int cost = d.cost();
         Path path = PathMapper.mapToPath(d);
+
+        printIterationHeader(e.iterationStartTime());
+        printRoundHeader(round);
+
         print(
                 e.action().toString(),
-                path.numberOfTransfers() + 1,
+                round,
                 "Egress",
                 path.egressLeg().fromStop(),
                 path.endTime(),
@@ -89,18 +94,19 @@ class DebugLogger {
 
     private PathStringBuilder path(StopArrivalView<?> a, PathStringBuilder buf) {
         if (a.arrivedByAccessLeg()) {
-            return buf.walk(a.legDuration());
+            return buf.walk(a.legDuration()).sep().stop(a.stop());
         }
         // Recursively call this method to insert arrival in front of this arrival
         path(a.previous(), buf);
 
-        buf.sep().stop(a.stop()).sep();
+        buf.sep();
 
         if (a.arrivedByTransit()) {
-            return buf.transit(a.departureTime(), a.arrivalTime());
+            buf.transit(a.departureTime(), a.arrivalTime());
         } else {
-            return buf.walk(a.legDuration());
+            buf.walk(a.legDuration());
         }
+        return buf.sep().stop(a.stop());
     }
 
     private void printRoundHeader(int round) {

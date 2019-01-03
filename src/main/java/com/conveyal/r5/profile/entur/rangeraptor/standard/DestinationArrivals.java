@@ -114,6 +114,11 @@ class DestinationArrivals<T extends TripScheduleInfo> {
         egressArrivalsByRound.clear();
     }
 
+    void setIterationDepartureTime(int departureTime) {
+        debugDestinationArrivalHandler.setIterationDepartureTime(departureTime);
+        debugPathHandler.setIterationDepartureTime(departureTime);
+    }
+
     Collection<Path<T>> paths() {
         return paths;
     }

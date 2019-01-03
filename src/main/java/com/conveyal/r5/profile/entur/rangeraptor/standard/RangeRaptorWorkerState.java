@@ -90,6 +90,7 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
         maxTimeLimit = departureTime + MAX_TRIP_DURATION_SECONDS;
 
         debugHandlerStopArrivals.setIterationDepartureTime(departureTime);
+        results.setIterationDepartureTime(departureTime);
 
         // clear all touched stops to avoid constant reëxploration
         bestTimes.prepareForNewIteration();

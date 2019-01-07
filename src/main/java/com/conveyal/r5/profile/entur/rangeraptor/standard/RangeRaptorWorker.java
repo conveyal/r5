@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
+import com.conveyal.r5.profile.entur.api.TuningParameters;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
@@ -36,7 +37,6 @@ import java.util.Collection;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-@SuppressWarnings("Duplicates")
 public class RangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRangeRaptorWorker<RangeRaptorWorkerState<T>, T> {
 
     private static final int NOT_SET = -1;
@@ -49,10 +49,21 @@ public class RangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRange
     private TripScheduleBoardSearch<T> tripSearch;
 
 
-    public RangeRaptorWorker(TransitDataProvider<T> transitData, int nRounds, RangeRaptorRequest<T> request, WorkerPerformanceTimers timers) {
+    public RangeRaptorWorker(
+            TuningParameters tuningParameters,
+            TransitDataProvider<T> transitData,
+            RangeRaptorRequest<T> request,
+            WorkerPerformanceTimers timers
+
+    ) {
         super(
+                tuningParameters,
                 transitData,
-                new RangeRaptorWorkerState<>(nRounds, transitData.numberOfStops(), request),
+                new RangeRaptorWorkerState<>(
+                        nRounds(tuningParameters),
+                        transitData.numberOfStops(),
+                        request
+                ),
                 request,
                 timers
         );
@@ -103,10 +114,10 @@ public class RangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRange
         // Allow to reboard the same pattern - a pattern may loop and visit the same stop twice
         if (state.isStopReachedInPreviousRound(stop)) {
             int earliestBoardTime = earliestBoardTime(state.bestTimePreviousRound(stop));
-            int tripIndexUpperBound = (onTrip == -1 ? pattern.numberOfTripSchedules() : onTrip);
+            //int tripIndexUpperBound = (onTrip == -1 ? pattern.numberOfTripSchedules() : onTrip);
 
             // check if we can back up to an earlier trip due to this stop being reached earlier
-            boolean found = tripSearch.search(tripIndexUpperBound, earliestBoardTime, stopPositionInPattern);
+            boolean found = tripSearch.search(onTrip, earliestBoardTime, stopPositionInPattern);
 
             if (found) {
                 onTrip = tripSearch.candidateTripIndex;

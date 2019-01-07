@@ -18,10 +18,10 @@ import java.util.Collection;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class RangeRaptorService<T extends TripScheduleInfo> {
-    private static final WorkerPerformanceTimers MC_TIMERS = new WorkerPerformanceTimers("Mc");
-    private static final WorkerPerformanceTimers RR_TIMERS = new WorkerPerformanceTimers("Rr");
+    private static final WorkerPerformanceTimers MC_TIMERS = new WorkerPerformanceTimers("MC");
+    private static final WorkerPerformanceTimers RR_TIMERS = new WorkerPerformanceTimers("RR");
 
-    private TuningParameters tuningParameters;
+    private final TuningParameters tuningParameters;
 
     public RangeRaptorService(TuningParameters tuningParameters) {
         this.tuningParameters = tuningParameters;
@@ -39,6 +39,7 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
         switch (request.profile) {
             case MULTI_CRITERIA_RANGE_RAPTOR:
                 return createMcRRWorker(transitData, request);
+            case RAPTOR_REVERSE:
             case RANGE_RAPTOR:
                 return createRRWorker(transitData, request);
             default:
@@ -47,17 +48,11 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
     }
 
     private Worker<T> createMcRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
-        return new McRangeRaptorWorker<>(transitData, request, nRounds(tuningParameters), MC_TIMERS);
+        return new McRangeRaptorWorker<>(tuningParameters, transitData, request, MC_TIMERS);
     }
 
     private Worker<T> createRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
-        return new RangeRaptorWorker<>(transitData, nRounds(tuningParameters), request, RR_TIMERS);
+        return new RangeRaptorWorker<>(tuningParameters, transitData, request, RR_TIMERS);
     }
 
-    /**
-     * Calculate the maximum number of rounds to perform.
-     */
-    private int nRounds(TuningParameters tuningParameters) {
-        return tuningParameters.maxNumberOfTransfers() + 1;
-    }
 }

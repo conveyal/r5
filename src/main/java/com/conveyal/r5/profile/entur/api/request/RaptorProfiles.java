@@ -11,8 +11,15 @@ public enum RaptorProfiles {
      * The cost is not used.
      */
     RANGE_RAPTOR,
+
     /**
      * Multi criteria pareto state with McRangeRaptor.
      */
-    MULTI_CRITERIA_RANGE_RAPTOR
+    MULTI_CRITERIA_RANGE_RAPTOR,
+
+    /**
+     * Perform a raptor search traversing the transit graph in reverse. Only one iteration is performed.
+     * Search from destination to origin traversing the transit graph backwards in time.
+     */
+    RAPTOR_REVERSE
 }

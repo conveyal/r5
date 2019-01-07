@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
+import com.conveyal.r5.profile.entur.api.TuningParameters;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
@@ -24,18 +25,23 @@ import java.util.Collection;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-@SuppressWarnings("Duplicates")
 public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRangeRaptorWorker<McRangeRaptorWorkerState<T>, T> {
 
     private TripPatternInfo<T> pattern;
     private TripScheduleBoardSearch<T> tripSearch;
 
 
-    public McRangeRaptorWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request, int nRounds, WorkerPerformanceTimers timers) {
+    public McRangeRaptorWorker(
+            TuningParameters tuningParameters,
+            TransitDataProvider<T> transitData,
+            RangeRaptorRequest<T> request,
+            WorkerPerformanceTimers timers
+    ) {
         super(
+                tuningParameters,
                 transitData,
                 new McRangeRaptorWorkerState<>(
-                        nRounds,
+                        nRounds(tuningParameters),
                         transitData.numberOfStops(),
                         request.egressLegs,
                         new TransitCalculator(request),

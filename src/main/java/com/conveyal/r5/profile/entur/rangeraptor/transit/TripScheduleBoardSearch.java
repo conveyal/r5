@@ -11,8 +11,8 @@ import java.util.function.Function;
  * a given pattern and stop. Normally the search scan from the upper bound index
  * and down, it can do so because the trips are ordered after the FIRST stop
  * boarding times. We also assume that trips do not pass each other; Hence
- * trips in service on a given day will be in order for all other stops too.
- *
+ * trips IN SERVICE on a given day will be in order for all other stops too.
+ * <p/>
  * The search use a binary search if the number of trip schedules is above a
  * given threshold. A linear search is slow when the number of schedules is very
  * large, let say more than 300 trip schedules.
@@ -20,69 +20,99 @@ import java.util.function.Function;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class TripScheduleBoardSearch<T extends TripScheduleInfo> {
-    /**
-     * The threshold is used to determine when to perform a binary search to reduce the
-     * range to search in. The value ´46´ is based on testing with data from Entur and
-     * all of Norway as a Graph. The performance curve is very flat, so choosing a value
-     * between 10 and 100 does not affect the performance much.
-     */
-    final static int BINARY_SEARCH_THRESHOLD = 46;
-
+    private final int nTripsBinarySearchThreshold;
     private final TripPatternInfo<T> pattern;
     private final Function<T, Boolean> skipTripScheduleCallback;
+
+    private int earliestBoardTime;
+    private int stopPositionInPattern;
 
     public T candidateTrip;
     public int candidateTripIndex;
 
-    public TripScheduleBoardSearch(TripPatternInfo<T> pattern, Function<T, Boolean> skipTripScheduleCallback) {
+    public TripScheduleBoardSearch(
+            int scheduledTripBinarySearchThreshold,
+            TripPatternInfo<T> pattern,
+            Function<T, Boolean> skipTripScheduleCallback
+    ) {
+        this.nTripsBinarySearchThreshold = scheduledTripBinarySearchThreshold;
         this.pattern = pattern;
         this.skipTripScheduleCallback = skipTripScheduleCallback;
     }
 
     /**
      * Find the first trip leaving from the given stop AFTER the given {@code earliestBoardTime}.
+     * This is the same as calling {@link #search(int, int, int)} with {@code tripIndexUpperBound: -1}.
      *
-     * @param earliestBoardTime     The earliest point in time a trip can be boarded, exclusive.
+     * @see #search(int, int, int)
      */
     public boolean search(int earliestBoardTime, int stopPositionInPattern) {
-        return search(pattern.numberOfTripSchedules(), earliestBoardTime, stopPositionInPattern);
+        return search(-1, earliestBoardTime, stopPositionInPattern);
     }
 
     /**
      * Find the first trip leaving from the given stop AFTER the given {@code earliestBoardTime}, but
      * before the given trip ({@code tripIndexUpperBound}).
      *
-     * @param tripIndexUpperBound   Upper bound for trip index to search for. Exclusive - search start at {@code tripIndexUpperBound - 1}
+     * @param tripIndexUpperBound   Upper bound for trip index to search for. Exclusive - search start
+     *                              at {@code tripIndexUpperBound - 1}. Use {@code -1} (negative value)
+     *                              for an unbounded search.
      * @param earliestBoardTime     The earliest point in time a trip can be boarded, exclusive.
+     * @param stopPositionInPattern The stop to board
      */
     public boolean search(int tripIndexUpperBound, int earliestBoardTime, int stopPositionInPattern) {
-        if(tripIndexUpperBound <= BINARY_SEARCH_THRESHOLD) {
-            return findFirstBoarding(tripIndexUpperBound, earliestBoardTime, stopPositionInPattern);
+        this.earliestBoardTime = earliestBoardTime;
+        this.stopPositionInPattern = stopPositionInPattern;
+        this.candidateTrip = null;
+        this.candidateTripIndex = -1;
+
+        // No previous trip is found
+        if(tripIndexUpperBound < 0) {
+            // Use number of schedules as upper bound
+            tripIndexUpperBound = pattern.numberOfTripSchedules();
+
+            if(tripIndexUpperBound > nTripsBinarySearchThreshold) {
+                return findFirstBoardingOptimizedForLargeSetOfTrips(tripIndexUpperBound);
+            }
+            // else perform default search
         }
-        else {
-            return findFirstBoardingOptimizedForLargeSetOfTrips(
-                    tripIndexUpperBound,
-                    earliestBoardTime,
-                    stopPositionInPattern
-            );
+
+        // We have a limited number of trips (no previous trip found) or already found a candidate
+        // in a previous search; Hence searching backwards from the upper bound is the fastest way to proceed.
+        return findBoardingSearchBackwards(tripIndexUpperBound);
+    }
+
+    private boolean findFirstBoardingOptimizedForLargeSetOfTrips(final int tripIndexUpperBound) {
+        int upper = binarySearchForTripIndexUpperBound(tripIndexUpperBound);
+
+        // Use the upper bound from the binary search to look for a candidate trip
+        // We can not use lower bound to exit the search. We need to continue
+        // until we find a valid trip in service.
+        boolean found = findBoardingSearchBackwards(upper);
+
+        // If a valid result is found and we can return
+        if(found) {
+            return true;
         }
+
+        // No trip schedule below the upper bound was found. This may happen if enough
+        // trips are not in service.
+        //
+        // So we have to search for the first valid trip schedule after that.
+        return findBoardingSearchForward(upper, tripIndexUpperBound);
     }
 
     /**
-     * This method search for the first scheduled trip boarding after the given {@code earliestBoardTime }
-     * considering only trips with a trip index below the given {@code tripIndexUpperBound}.
+     * This method search for the first scheduled trip boarding, after the given {@code earliestBoardTime}.
+     * Only trips with a trip index smaller than the given {@code tripIndexUpperBound} is considered.
+     * <p/>
+     * The search start with trip {@code tripIndexUpperBound - 1} and search down towards index 0 (inclusive).
      *
-     * It aborts if a trip schedule is found, or a trip in service is found but can not be boarded.
-     *
-     * @param tripIndexUpperBound Where the search start - exclusive.
-     * @param earliestBoardTime the trip schedule boarding time must be larger than this to board.
-     * @param stopPositionInPattern the boarding stop
+     * @param tripIndexUpperBound The trip index upper bound, where search start (exclusive).
      */
-    private boolean findFirstBoarding(int tripIndexUpperBound, int earliestBoardTime, int stopPositionInPattern) {
-        candidateTrip = null;
-
-        for(int index = tripIndexUpperBound-1; index >= 0;  --index) {
-            T trip = pattern.getTripSchedule(index);
+    private boolean findBoardingSearchBackwards(int tripIndexUpperBound) {
+        for(int i = tripIndexUpperBound-1; i >= 0;  --i) {
+            T trip = pattern.getTripSchedule(i);
 
             if (skipTripSchedule(trip)) {
                 continue;
@@ -92,7 +122,7 @@ public class TripScheduleBoardSearch<T extends TripScheduleInfo> {
 
             if (departure > earliestBoardTime) {
                 candidateTrip = trip;
-                candidateTripIndex = index;
+                candidateTripIndex = i;
             }
             else {
                 // this trip arrives too early. We can break out of the loop since
@@ -104,44 +134,16 @@ public class TripScheduleBoardSearch<T extends TripScheduleInfo> {
         return candidateTrip != null;
     }
 
-    private boolean findFirstBoardingOptimizedForLargeSetOfTrips(
-            int tripIndexUpperBound,
-            int earliestBoardTime,
-            int stopPositionInPattern
-    ) {
-        int lower = 0, upper = tripIndexUpperBound;
-
-        // Do a binary search to find where to start the search.
-        // We IGNORE if the trip schedule is in service.
-        while (upper - lower > BINARY_SEARCH_THRESHOLD) {
-            int m = (lower + upper) / 2;
-
-            TripScheduleInfo trip = pattern.getTripSchedule(m);
-
-            int departure = trip.departure(stopPositionInPattern);
-
-            if (departure > earliestBoardTime) {
-                upper = m+1;
-            }
-            else {
-                lower = m;
-            }
-        }
-
-        // Use the upper bound from the binary search to look for a candidate trip
-        // We can not use lower bound to exit the search. We need to continue
-        // until we find a valid trip in service.
-        boolean found = findFirstBoarding(upper, earliestBoardTime, stopPositionInPattern);
-
-        // If a valid result is found and we can return
-        if(found) { return true; }
-
-        // No trip schedule below the upper bound was found. This may happen if enough
-        // trips are not in service.
-        //
-        // So we have to search for the first valid trip schedule after that.
-        for(int index = upper; index < tripIndexUpperBound ; ++index) {
-            T trip = pattern.getTripSchedule(index);
+    /**
+     * This method search for the first scheduled trip boarding, after the given {@code earliestBoardTime}.
+     * Only trips with a trip index in the range: {@code [tripIndexLowerBound..tripIndexUpperBound-1]} is considered.
+     *
+     * @param tripIndexLowerBound The trip index lower bound, where search start (inclusive).
+     * @param tripIndexUpperBound The trip index upper bound, where search end (exclusive).
+     */
+    private boolean findBoardingSearchForward(final int tripIndexLowerBound, final int tripIndexUpperBound) {
+        for(int i = tripIndexLowerBound; i < tripIndexUpperBound; ++i) {
+            T trip = pattern.getTripSchedule(i);
 
             if (skipTripSchedule(trip)) {
                 continue;
@@ -149,18 +151,46 @@ public class TripScheduleBoardSearch<T extends TripScheduleInfo> {
 
             final int departure = trip.departure(stopPositionInPattern);
 
-            // It would be tempting to skip this check, but we can not.
-            // Trips schedules are only ordered for the first stop, not
-            // necessarily for the rest - only trips in schedule can be
-            // trusted to be in order - we ignored this when doing the
-            // binary search.
             if (departure > earliestBoardTime) {
                 candidateTrip = trip;
-                candidateTripIndex = index;
+                candidateTripIndex = i;
                 return true;
             }
         }
         return false;
+    }
+
+    /**
+     * Do a binary search to find the approximate upper bound index for where to start the search.
+     * We IGNORE if the trip schedule is in service.
+     * <p/>
+     * This is just a guess and we return when there is at least one trip with a departure
+     * time after the {@code earliestBoardTime} in the range.
+     *
+     * @return a better upper bound index (exclusive)
+     */
+    private int binarySearchForTripIndexUpperBound(final int absoluteUpperBound) {
+        int lower = 0, upper = absoluteUpperBound;
+
+        // Do a binary search to find where to start the search.
+        // We IGNORE if the trip schedule is in service.
+        while (upper - lower > nTripsBinarySearchThreshold) {
+            int m = (lower + upper) / 2;
+
+            TripScheduleInfo trip = pattern.getTripSchedule(m);
+
+            int departure = trip.departure(stopPositionInPattern);
+
+            if (departure > earliestBoardTime) {
+                upper = m;
+            }
+            else {
+                lower = m;
+            }
+        }
+        // Add one(+1) to upper bound to be sure at least one valid trip is
+        // within the binary search result window (exclusive).
+        return upper == absoluteUpperBound ? upper : upper + 1;
     }
 
     /** Skip trips not running on the day of the search and frequency trips  */

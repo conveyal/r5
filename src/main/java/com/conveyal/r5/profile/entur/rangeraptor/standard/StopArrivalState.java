@@ -132,11 +132,13 @@ class StopArrivalState<T extends TripScheduleInfo> {
     @Override
     public String toString() {
         if(arrivedByAccess()) {
+            // TODO TGR REVERSE ...
             return String.format("Access Arrival { time: %s, duration: %s }",
-                    TimeUtils.timeToStrLong(bestArrivalTime, UNREACHED),
-                    IntUtils.intToString(accessOrTransferDuration, NOT_SET)
+                    TimeUtils.timeToStrLong(bestArrivalTime),
+                    TimeUtils.timeToStrCompact(accessOrTransferDuration)
             );
         }
+        // TODO TGR REVERSE ...
         return String.format("Arrival { time: %s, Transit: %s %s-%s, trip: %s, Transfer from: %s %s }",
                 TimeUtils.timeToStrLong(bestArrivalTime, UNREACHED),
                 IntUtils.intToString(boardStop, NOT_SET),
@@ -144,7 +146,7 @@ class StopArrivalState<T extends TripScheduleInfo> {
                 TimeUtils.timeToStrCompact(transitArrivalTime, UNREACHED),
                 trip == null ? "" : trip.debugInfo(),
                 IntUtils.intToString(transferFromStop, NOT_SET),
-                IntUtils.intToString(accessOrTransferDuration, NOT_SET)
+                TimeUtils.timeToStrCompact(accessOrTransferDuration, NOT_SET)
         );
     }
 }

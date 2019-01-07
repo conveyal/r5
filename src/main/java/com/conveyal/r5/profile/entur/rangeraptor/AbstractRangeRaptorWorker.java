@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor;
 
+import com.conveyal.r5.profile.entur.api.TuningParameters;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
@@ -64,10 +65,18 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
 
 
     private final TransitCalculator transitCalculator;
+    private final TuningParameters tuningParameters;
 
     private final WorkerPerformanceTimers timers;
 
-    public AbstractRangeRaptorWorker(TransitDataProvider<T> transitData, S state, RangeRaptorRequest<T> request, WorkerPerformanceTimers timers) {
+    public AbstractRangeRaptorWorker(
+            TuningParameters tuningParameters,
+            TransitDataProvider<T> transitData,
+            S state,
+            RangeRaptorRequest<T> request,
+            WorkerPerformanceTimers timers
+    ) {
+        this.tuningParameters = tuningParameters;
         this.transit = transitData;
         this.state = state;
         this.request = request;
@@ -94,6 +103,17 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
 
     protected abstract void performTransitForRoundAndPatternAtStop(int stopPositionInPattern);
 
+    protected final int earliestBoardTime(int time) {
+        return transitCalculator.earliestBoardTime(time);
+    }
+
+    /**
+     * Calculate the maximum number of rounds to perform.
+     */
+    protected static int nRounds(TuningParameters tuningParameters) {
+        return tuningParameters.maxNumberOfTransfers() + 1;
+    }
+
     /**
      * For each iteration (minute + MC draw combination), return the minimum travel time to each transit stop in seconds.
      * Return value dimension order is [searchIteration][transitStopIndex]
@@ -117,11 +137,6 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
             }
         });
         return paths();
-    }
-
-
-    protected final int earliestBoardTime(int time) {
-        return transitCalculator.earliestBoardTime(time);
     }
 
     /** Skip trips NOT running on the day of the search and skip frequency trips */
@@ -182,12 +197,16 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
 
         while (patternIterator.hasNext()) {
             TripPatternInfo<T> pattern = patternIterator.next();
-            TripScheduleBoardSearch<T> tripSearch = new TripScheduleBoardSearch<>(pattern, this::skipTripSchedule);
+            TripScheduleBoardSearch<T> tripSearch = new TripScheduleBoardSearch<>(
+                    tuningParameters.scheduledTripBinarySearchThreshold(),
+                    pattern,
+                    this::skipTripSchedule
+            );
 
             prepareTransitForRoundAndPattern(pattern, tripSearch);
 
-            for (int stopPosition = 0; stopPosition < pattern.numberOfStopsInPattern(); stopPosition++) {
-                performTransitForRoundAndPatternAtStop(stopPosition);
+            for (int pos = 0; pos < pattern.numberOfStopsInPattern(); pos++) {
+                performTransitForRoundAndPatternAtStop(pos);
             }
         }
 

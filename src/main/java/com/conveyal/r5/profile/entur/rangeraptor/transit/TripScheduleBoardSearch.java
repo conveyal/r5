@@ -83,12 +83,12 @@ public class TripScheduleBoardSearch<T extends TripScheduleInfo> {
     }
 
     private boolean findFirstBoardingOptimizedForLargeSetOfTrips(final int tripIndexUpperBound) {
-        int upper = binarySearchForTripIndexUpperBound(tripIndexUpperBound);
+        int bestGuess = binarySearchForTripIndex(tripIndexUpperBound);
 
         // Use the upper bound from the binary search to look for a candidate trip
         // We can not use lower bound to exit the search. We need to continue
         // until we find a valid trip in service.
-        boolean found = findBoardingSearchBackwards(upper);
+        boolean found = findBoardingSearchBackwards(bestGuess);
 
         // If a valid result is found and we can return
         if(found) {
@@ -99,7 +99,7 @@ public class TripScheduleBoardSearch<T extends TripScheduleInfo> {
         // trips are not in service.
         //
         // So we have to search for the first valid trip schedule after that.
-        return findBoardingSearchForward(upper, tripIndexUpperBound);
+        return findBoardingSearchForward(bestGuess, tripIndexUpperBound);
     }
 
     /**
@@ -169,7 +169,7 @@ public class TripScheduleBoardSearch<T extends TripScheduleInfo> {
      *
      * @return a better upper bound index (exclusive)
      */
-    private int binarySearchForTripIndexUpperBound(final int absoluteUpperBound) {
+    private int binarySearchForTripIndex(final int absoluteUpperBound) {
         int lower = 0, upper = absoluteUpperBound;
 
         // Do a binary search to find where to start the search.

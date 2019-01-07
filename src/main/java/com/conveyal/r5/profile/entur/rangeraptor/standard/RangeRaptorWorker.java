@@ -114,7 +114,6 @@ public class RangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRange
         // Allow to reboard the same pattern - a pattern may loop and visit the same stop twice
         if (state.isStopReachedInPreviousRound(stop)) {
             int earliestBoardTime = earliestBoardTime(state.bestTimePreviousRound(stop));
-            //int tripIndexUpperBound = (onTrip == -1 ? pattern.numberOfTripSchedules() : onTrip);
 
             // check if we can back up to an earlier trip due to this stop being reached earlier
             boolean found = tripSearch.search(onTrip, earliestBoardTime, stopPositionInPattern);

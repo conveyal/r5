@@ -98,7 +98,8 @@ MEM=`echo $TOTAL_MEM - 2097152 | bc`
 } &
 '
 
-# Tag the instance (so we can identify it in the EC2 console), with jitter up to 3 min. for AWS rate limits
-sleep $[$RANDOM % 360]s
+# Tag the instance (so we can identify it in the EC2 console)
+# This has failed intermittently in the past, possibly due to AWS API rate limits on tagging resources, so add jitter up to 3 min.
+sleep $[$RANDOM % 180]s
 sudo -u ec2-user aws ec2 create-tags --resources $INSTANCE --tags Key=Name,Value=AnalysisWorker \
 Key=Project,Value=Analysis Key=group,Value={3} Key=user,Value={4} Key=networkId,Value={5} Key=workerVersion,Value={6}

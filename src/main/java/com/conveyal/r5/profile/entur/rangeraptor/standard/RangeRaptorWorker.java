@@ -8,7 +8,7 @@ import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
-import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleBoardSearch;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleSearch;
 
 import java.util.Collection;
 
@@ -46,7 +46,7 @@ public class RangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRange
     private int boardStop;
     private T boardTrip;
     private TripPatternInfo<T> pattern;
-    private TripScheduleBoardSearch<T> tripSearch;
+    private TripScheduleSearch<T> tripSearch;
 
 
     public RangeRaptorWorker(
@@ -84,7 +84,7 @@ public class RangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRange
 
 
     @Override
-    protected void prepareTransitForRoundAndPattern(TripPatternInfo<T> pattern, TripScheduleBoardSearch<T> tripSearch) {
+    protected void prepareTransitForRoundAndPattern(TripPatternInfo<T> pattern, TripScheduleSearch<T> tripSearch) {
         this.pattern = pattern;
         this.tripSearch = tripSearch;
         this.onTrip = NOT_SET;
@@ -116,11 +116,11 @@ public class RangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRange
             int earliestBoardTime = earliestBoardTime(state.bestTimePreviousRound(stop));
 
             // check if we can back up to an earlier trip due to this stop being reached earlier
-            boolean found = tripSearch.search(onTrip, earliestBoardTime, stopPositionInPattern);
+            boolean found = tripSearch.search(earliestBoardTime, stopPositionInPattern, onTrip);
 
             if (found) {
-                onTrip = tripSearch.candidateTripIndex;
-                boardTrip = tripSearch.candidateTrip;
+                onTrip = tripSearch.getCandidateTripIndex();
+                boardTrip = tripSearch.getCandidateTrip();
                 boardTime = boardTrip.departure(stopPositionInPattern);
                 boardStop = stop;
             }

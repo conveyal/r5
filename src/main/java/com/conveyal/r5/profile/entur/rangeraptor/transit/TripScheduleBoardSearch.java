@@ -19,7 +19,7 @@ import java.util.function.Function;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-public class TripScheduleBoardSearch<T extends TripScheduleInfo> {
+public class TripScheduleBoardSearch<T extends TripScheduleInfo> implements TripScheduleSearch<T> {
     private final int nTripsBinarySearchThreshold;
     private final TripPatternInfo<T> pattern;
     private final Function<T, Boolean> skipTripScheduleCallback;
@@ -27,8 +27,8 @@ public class TripScheduleBoardSearch<T extends TripScheduleInfo> {
     private int earliestBoardTime;
     private int stopPositionInPattern;
 
-    public T candidateTrip;
-    public int candidateTripIndex;
+    private T candidateTrip;
+    private int candidateTripIndex;
 
     public TripScheduleBoardSearch(
             int scheduledTripBinarySearchThreshold,
@@ -40,6 +40,16 @@ public class TripScheduleBoardSearch<T extends TripScheduleInfo> {
         this.skipTripScheduleCallback = skipTripScheduleCallback;
     }
 
+    @Override
+    public T getCandidateTrip() {
+        return candidateTrip;
+    }
+
+    @Override
+    public int getCandidateTripIndex() {
+        return candidateTripIndex;
+    }
+
     /**
      * Find the first trip leaving from the given stop AFTER the given {@code earliestBoardTime}.
      * This is the same as calling {@link #search(int, int, int)} with {@code tripIndexUpperBound: -1}.
@@ -47,7 +57,7 @@ public class TripScheduleBoardSearch<T extends TripScheduleInfo> {
      * @see #search(int, int, int)
      */
     public boolean search(int earliestBoardTime, int stopPositionInPattern) {
-        return search(-1, earliestBoardTime, stopPositionInPattern);
+        return search(earliestBoardTime, stopPositionInPattern, -1);
     }
 
     /**
@@ -60,7 +70,7 @@ public class TripScheduleBoardSearch<T extends TripScheduleInfo> {
      * @param earliestBoardTime     The earliest point in time a trip can be boarded, exclusive.
      * @param stopPositionInPattern The stop to board
      */
-    public boolean search(int tripIndexUpperBound, int earliestBoardTime, int stopPositionInPattern) {
+    public boolean search(int earliestBoardTime, int stopPositionInPattern, int tripIndexUpperBound) {
         this.earliestBoardTime = earliestBoardTime;
         this.stopPositionInPattern = stopPositionInPattern;
         this.candidateTrip = null;

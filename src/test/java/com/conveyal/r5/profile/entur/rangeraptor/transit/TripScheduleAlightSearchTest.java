@@ -186,14 +186,14 @@ public class TripScheduleAlightSearchTest {
 
     private void assertTrip(int expectedTripIndex, int expectedArrivalTime, int latestAlightTime, int stopPosition) {
         Assert.assertTrue("Trip found", subject.search(latestAlightTime, stopPosition));
-        Assert.assertEquals("Trip index", expectedTripIndex, subject.candidateTripIndex);
-        Assert.assertEquals("Board time", expectedArrivalTime, subject.candidateTrip.arrival(stopPosition));
+        Assert.assertEquals("Trip index", expectedTripIndex, subject.getCandidateTripIndex());
+        Assert.assertEquals("Board time", expectedArrivalTime, subject.getCandidateTrip().arrival(stopPosition));
     }
 
     private void assertTrip(int expectedTripIndex, int expectedArrivalTime, int latestAlightTime, int stopPosition, int tripIndexLowerBound) {
-        Assert.assertTrue("Trip found", subject.search(tripIndexLowerBound, latestAlightTime, stopPosition));
-        Assert.assertEquals("Trip index", expectedTripIndex, subject.candidateTripIndex);
-        Assert.assertEquals("Board time", expectedArrivalTime, subject.candidateTrip.arrival(stopPosition));
+        Assert.assertTrue("Trip found", subject.search(latestAlightTime, stopPosition, tripIndexLowerBound));
+        Assert.assertEquals("Trip index", expectedTripIndex, subject.getCandidateTripIndex());
+        Assert.assertEquals("Board time", expectedArrivalTime, subject.getCandidateTrip().arrival(stopPosition));
     }
 
     private void assertNoTrip(int latestAlightTime, int stopPosition) {
@@ -201,7 +201,7 @@ public class TripScheduleAlightSearchTest {
     }
 
     private void assertNoTrip(int latestAlightTime, int stopPosition, int tripIndexLowerBound) {
-        Assert.assertFalse(subject.search(tripIndexLowerBound, latestAlightTime, stopPosition));
+        Assert.assertFalse(subject.search(latestAlightTime, stopPosition, tripIndexLowerBound));
     }
     private static void addNTimes(List<TestTripSchedule> trips, TestTripSchedule tripS, int n) {
         for (int i = 0; i < n; i++) {

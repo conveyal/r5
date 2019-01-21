@@ -19,7 +19,7 @@ import java.util.function.Function;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-public class TripScheduleAlightSearch<T extends TripScheduleInfo> {
+public class TripScheduleAlightSearch<T extends TripScheduleInfo> implements TripScheduleSearch<T> {
     private final int nTripsBinarySearchThreshold;
     private final TripPatternInfo<T> pattern;
     private final Function<T, Boolean> skipTripScheduleCallback;
@@ -27,8 +27,8 @@ public class TripScheduleAlightSearch<T extends TripScheduleInfo> {
     private int latestAlightTime;
     private int stopPositionInPattern;
 
-    public T candidateTrip;
-    public int candidateTripIndex;
+    private T candidateTrip;
+    private int candidateTripIndex;
 
     public TripScheduleAlightSearch(
             int scheduledTripBinarySearchThreshold,
@@ -40,14 +40,24 @@ public class TripScheduleAlightSearch<T extends TripScheduleInfo> {
         this.skipTripScheduleCallback = skipTripScheduleCallback;
     }
 
+    @Override
+    public T getCandidateTrip() {
+        return candidateTrip;
+    }
+
+    @Override
+    public int getCandidateTripIndex() {
+        return candidateTripIndex;
+    }
+
     /**
      * Find the last trip arriving at the given stop BEFORE the given {@code latestAlightTime}.
-     * This is the same as calling {@link #search(int, int, int)} with {@code tripIndexUpperBound: -1}.
+     * This is the same as calling {@link #search(int, int, int)} with {@code tripIndexLowerBound: -1}.
      *
      * @see #search(int, int, int)
      */
     public boolean search(int latestAlightTime, int stopPositionInPattern) {
-        return search(0, latestAlightTime, stopPositionInPattern);
+        return search(latestAlightTime, stopPositionInPattern, -1);
     }
 
     /**
@@ -59,18 +69,20 @@ public class TripScheduleAlightSearch<T extends TripScheduleInfo> {
      * @param latestAlightTime     The latest point in time a trip can arrive, exclusive.
      * @param stopPositionInPattern The stop to board
      */
-    public boolean search(int tripIndexLowerBound, int latestAlightTime, int stopPositionInPattern) {
+    public boolean search(int latestAlightTime, int stopPositionInPattern, int tripIndexLowerBound) {
         this.latestAlightTime = latestAlightTime;
         this.stopPositionInPattern = stopPositionInPattern;
         this.candidateTrip = null;
         this.candidateTripIndex = -1;
 
         // No previous trip is found
-        if(tripIndexLowerBound == 0) {
+        if(tripIndexLowerBound < 0) {
             if(pattern.numberOfTripSchedules() > nTripsBinarySearchThreshold) {
                 return findFirstBoardingOptimizedForLargeSetOfTrips();
             }
-            // else perform default search
+            else {
+                return findBoardingSearchForward(0);
+            }
         }
 
         // We have a limited number of trips (no previous trip found) or already found a candidate

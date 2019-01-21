@@ -29,6 +29,9 @@ public final class TransitCalculator {
         return arrivalTime + boardSlackInSeconds;
     }
 
+    public int latestArrivalTime(int departureTime) {
+        return departureTime - boardSlackInSeconds;
+    }
 
     public int originDepartureTime(int firstTransitBoardTime, int accessLegDuration) {
         return accessLegArrivalTime(firstTransitBoardTime) - accessLegDuration;
@@ -37,5 +40,4 @@ public final class TransitCalculator {
     public int accessLegArrivalTime(int firstTransitBoardTime) {
         return firstTransitBoardTime - boardSlackInSeconds;
     }
-
 }

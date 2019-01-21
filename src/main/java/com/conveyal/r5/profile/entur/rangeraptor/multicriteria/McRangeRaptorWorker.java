@@ -11,7 +11,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
-import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleBoardSearch;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleSearch;
 
 import java.util.Collection;
 
@@ -28,7 +28,7 @@ import java.util.Collection;
 public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRangeRaptorWorker<McRangeRaptorWorkerState<T>, T> {
 
     private TripPatternInfo<T> pattern;
-    private TripScheduleBoardSearch<T> tripSearch;
+    private TripScheduleSearch<T> tripSearch;
 
 
     public McRangeRaptorWorker(
@@ -63,7 +63,7 @@ public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRan
     }
 
     @Override
-    protected void prepareTransitForRoundAndPattern(TripPatternInfo<T> pattern, TripScheduleBoardSearch<T> tripSearch) {
+    protected void prepareTransitForRoundAndPattern(TripPatternInfo<T> pattern, TripScheduleSearch<T> tripSearch) {
         this.pattern = pattern;
         this.tripSearch = tripSearch;
     }
@@ -84,7 +84,7 @@ public class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRan
                 for (int alightStopPos = boardStopPositionInPattern + 1; alightStopPos < nPatternStops; alightStopPos++) {
                     int alightStopIndex = pattern.stopIndex(alightStopPos);
 
-                    T trip = tripSearch.candidateTrip;
+                    T trip = tripSearch.getCandidateTrip();
 
                     state.transitToStop(
                             boardStop,

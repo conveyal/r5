@@ -11,6 +11,7 @@ import com.conveyal.r5.profile.entur.api.transit.UnsignedIntIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleBoardSearch;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleSearch;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
 
 import java.util.Collection;
@@ -19,7 +20,7 @@ import java.util.Iterator;
 
 /**
  * TODO TGR - Clean up
- *
+ * <p>
  * RaptorWorker is fast, but FastRaptorWorker is knock-your-socks-off fast, and also more maintainable.
  * It is also simpler, as it only focuses on the transit network; see the Propagater class for the methods that extend
  * the travel times from the final transit stop of a trip out to the individual targets.
@@ -45,10 +46,14 @@ import java.util.Iterator;
 @SuppressWarnings("Duplicates")
 public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends TripScheduleInfo> implements Worker<T> {
 
-    /** The request input used to customize the worker to the clients needs. */
+    /**
+     * The request input used to customize the worker to the clients needs.
+     */
     private final RangeRaptorRequest<T> request;
 
-    /** the transit data role needed for routing */
+    /**
+     * the transit data role needed for routing
+     */
     protected final TransitDataProvider<T> transit;
 
     /**
@@ -84,39 +89,8 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
         this.timers = timers;
     }
 
-    // Track time spent, measure performance
-    // TODO TGR - Replace by performance tests
-    private void timerSetup(Runnable setup) { timers.timerSetup(setup); }
-    private AvgTimer timerRoute() { return timers.timerRoute(); }
-    private void timerRouteByMinute(Runnable routeByMinute) { timers.timerRouteByMinute(routeByMinute); }
-    private AvgTimer timerByMinuteScheduleSearch() { return timers.timerByMinuteScheduleSearch(); }
-    private AvgTimer timerByMinuteTransfers() { return timers.timerByMinuteTransfers(); }
-
-    protected abstract Collection<Path<T>> paths();
-
     /**
-     * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
-     */
-    protected abstract void addPathsForCurrentIteration();
-
-    protected abstract void prepareTransitForRoundAndPattern(TripPatternInfo<T> pattern, TripScheduleBoardSearch<T> tripSearch);
-
-    protected abstract void performTransitForRoundAndPatternAtStop(int stopPositionInPattern);
-
-    protected final int earliestBoardTime(int time) {
-        return transitCalculator.earliestBoardTime(time);
-    }
-
-    /**
-     * Calculate the maximum number of rounds to perform.
-     */
-    protected static int nRounds(TuningParameters tuningParameters) {
-        return tuningParameters.maxNumberOfTransfers() + 1;
-    }
-
-    /**
-     * For each iteration (minute + MC draw combination), return the minimum travel time to each transit stop in seconds.
-     * Return value dimension order is [searchIteration][transitStopIndex]
+     * For each iteration (minute), calculate the minimum travel time to each transit stop in seconds.
      *
      * @return a unique set of paths
      */
@@ -139,7 +113,69 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
         return paths();
     }
 
-    /** Skip trips NOT running on the day of the search and skip frequency trips */
+    protected abstract Collection<Path<T>> paths();
+
+    /**
+     * Create the optimal path to each stop in the transit network, based on the given McRaptorState.
+     */
+    protected abstract void addPathsForCurrentIteration();
+
+    protected abstract void prepareTransitForRoundAndPattern(TripPatternInfo<T> pattern, TripScheduleSearch<T> tripSearch);
+
+    protected abstract void performTransitForRoundAndPatternAtStop(int stopPositionInPattern);
+
+    protected final int earliestBoardTime(int time) {
+        return transitCalculator.earliestBoardTime(time);
+    }
+
+    /**
+     * Calculate the maximum number of rounds to perform.
+     */
+    protected static int nRounds(TuningParameters tuningParameters) {
+        return tuningParameters.maxNumberOfTransfers() + 1;
+    }
+
+    /**
+     * Set the departure time in the scheduled search to the given departure time,
+     * and prepare for the scheduled search at the next-earlier minute.
+     * <p/>
+     * This method is protected to allow reverce search to override it.
+     */
+    protected void previousMinuteSetup(int nextMinuteDepartureTime) {
+        state.initNewDepartureForMinute(nextMinuteDepartureTime);
+
+        // add initial stops
+        for (AccessLeg it : request.accessLegs) {
+            state.setInitialTime(it, nextMinuteDepartureTime);
+        }
+    }
+    /**
+     * Iterate over given pattern and calculate transit for each stop.
+     * <p/>
+     * This is protected to allow reverse search to override and step backwards.
+     */
+    protected void performTransitForRoundAndEachStopInPattern(final TripPatternInfo<T> pattern) {
+        for (int pos = 0; pos < pattern.numberOfStopsInPattern(); pos++) {
+            performTransitForRoundAndPatternAtStop(pos);
+        }
+    }
+
+    /**
+     * Create a trip search using {@link TripScheduleBoardSearch}.
+     * <p/>
+     * This is protected to allow reverse search to override and create a alight search instead.
+     */
+    protected TripScheduleSearch<T> createTripSearch(TripPatternInfo<T> pattern) {
+        return new TripScheduleBoardSearch<>(
+                tuningParameters.scheduledTripBinarySearchThreshold(),
+                pattern,
+                this::skipTripSchedule
+        );
+    }
+
+    /**
+     * Skip trips NOT running on the day of the search and skip frequency trips
+     */
     private boolean skipTripSchedule(T trip) {
         return !transit.isTripScheduleInService(trip);
     }
@@ -163,8 +199,8 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
             state.prepareForNextRound();
 
             // NB since we have transfer limiting not bothering to cut off search when there are no more transfers
-            // as that will be rare and complicates the code grabbing the results
-            timerByMinuteScheduleSearch().time(this::transitForRound);
+            // as that will be rare and complicates the code
+            timerByMinuteScheduleSearch().time(this::calculateTransitForRound);
 
             timerByMinuteTransfers().time(this::transfersForRound);
         }
@@ -175,43 +211,25 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
         addPathsForCurrentIteration();
     }
 
-    /**
-     * Set the departure time in the scheduled search to the given departure time,
-     * and prepare for the scheduled search at the next-earlier minute
-     */
-    private void previousMinuteSetup(int nextMinuteDepartureTime) {
-        state.initNewDepartureForMinute(nextMinuteDepartureTime);
-
-        // add initial stops
-        for (AccessLeg it : request.accessLegs) {
-            state.setInitialTime(it, nextMinuteDepartureTime);
-        }
-    }
 
     /**
      * Perform a scheduled search
      */
-    private void transitForRound() {
+    private void calculateTransitForRound() {
         UnsignedIntIterator stops = state.stopsTouchedPreviousRound();
         Iterator<? extends TripPatternInfo<T>> patternIterator = transit.patternIterator(stops);
 
         while (patternIterator.hasNext()) {
             TripPatternInfo<T> pattern = patternIterator.next();
-            TripScheduleBoardSearch<T> tripSearch = new TripScheduleBoardSearch<>(
-                    tuningParameters.scheduledTripBinarySearchThreshold(),
-                    pattern,
-                    this::skipTripSchedule
-            );
+            TripScheduleSearch<T> tripSearch = createTripSearch(pattern);
 
             prepareTransitForRoundAndPattern(pattern, tripSearch);
 
-            for (int pos = 0; pos < pattern.numberOfStopsInPattern(); pos++) {
-                performTransitForRoundAndPatternAtStop(pos);
-            }
+            performTransitForRoundAndEachStopInPattern(pattern);
         }
-
         state.transitsForRoundComplete();
     }
+
 
     private void transfersForRound() {
         UnsignedIntIterator it = state.stopsTouchedByTransitCurrentRound();
@@ -223,4 +241,12 @@ public abstract class AbstractRangeRaptorWorker<S extends WorkerState, T extends
         }
         state.transfersForRoundComplete();
     }
+
+    // Track time spent, measure performance
+    // TODO TGR - Replace by performance tests
+    private void timerSetup(Runnable setup) { timers.timerSetup(setup); }
+    private AvgTimer timerRoute() { return timers.timerRoute(); }
+    private void timerRouteByMinute(Runnable routeByMinute) { timers.timerRouteByMinute(routeByMinute); }
+    private AvgTimer timerByMinuteScheduleSearch() { return timers.timerByMinuteScheduleSearch(); }
+    private AvgTimer timerByMinuteTransfers() { return timers.timerByMinuteTransfers(); }
 }

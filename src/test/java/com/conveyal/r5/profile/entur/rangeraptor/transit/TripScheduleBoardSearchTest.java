@@ -177,14 +177,14 @@ public class TripScheduleBoardSearchTest {
 
     private void assertTrip(int expectedTripIndex, int expectedBoardTime, int earliestBoardTime, int stopPosition) {
         Assert.assertTrue("Trip found", subject.search(earliestBoardTime, stopPosition));
-        Assert.assertEquals("Trip index", expectedTripIndex, subject.candidateTripIndex);
-        Assert.assertEquals("Board time", expectedBoardTime, subject.candidateTrip.departure(stopPosition));
+        Assert.assertEquals("Trip index", expectedTripIndex, subject.getCandidateTripIndex());
+        Assert.assertEquals("Board time", expectedBoardTime, subject.getCandidateTrip().departure(stopPosition));
     }
 
     private void assertTrip(int expectedTripIndex, int expectedBoardTime, int earliestBoardTime, int stopPosition, int tripIndexUpperBound) {
-        Assert.assertTrue("Trip found", subject.search(tripIndexUpperBound, earliestBoardTime, stopPosition));
-        Assert.assertEquals("Trip index", expectedTripIndex, subject.candidateTripIndex);
-        Assert.assertEquals("Board time", expectedBoardTime, subject.candidateTrip.departure(stopPosition));
+        Assert.assertTrue("Trip found", subject.search(earliestBoardTime, stopPosition, tripIndexUpperBound));
+        Assert.assertEquals("Trip index", expectedTripIndex, subject.getCandidateTripIndex());
+        Assert.assertEquals("Board time", expectedBoardTime, subject.getCandidateTrip().departure(stopPosition));
     }
 
     private void assertNoTrip(int earliestBoardTime, int stopPosition) {
@@ -192,7 +192,7 @@ public class TripScheduleBoardSearchTest {
     }
 
     private void assertNoTrip(int earliestBoardTime, int stopPosition, int tripIndexUpperBound) {
-        Assert.assertFalse(subject.search(tripIndexUpperBound, earliestBoardTime, stopPosition));
+        Assert.assertFalse(subject.search(earliestBoardTime, stopPosition, tripIndexUpperBound));
     }
     private static void addNTimes(List<TestTripSchedule> trips, TestTripSchedule tripS, int n) {
         for (int i = 0; i < n; i++) {

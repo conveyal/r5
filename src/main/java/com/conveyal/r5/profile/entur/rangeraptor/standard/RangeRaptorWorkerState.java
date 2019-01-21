@@ -64,7 +64,6 @@ public final class RangeRaptorWorkerState<T extends TripScheduleInfo> implements
 
     private final DebugHandler<StopArrivalView<T>> debugHandlerStopArrivals;
 
-
     /**
      * create a RaptorState for a network with a particular number of stops, and a given maximum duration
      */

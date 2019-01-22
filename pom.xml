@@ -401,7 +401,7 @@
         <dependency>
             <groupId>com.conveyal</groupId>
             <artifactId>kryo-tools</artifactId>
-            <version>1.2.0-SNAPSHOT</version>
+            <version>1.2.0</version>
         </dependency>
         <dependency>
             <groupId>com.graphql-java</groupId>

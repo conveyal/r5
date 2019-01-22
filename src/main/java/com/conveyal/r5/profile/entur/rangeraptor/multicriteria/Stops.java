@@ -2,8 +2,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 
 import com.conveyal.r5.profile.entur.api.path.Path;
-import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
-import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
+import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
@@ -34,7 +33,7 @@ final class Stops<T extends TripScheduleInfo> {
      */
     Stops(
             int nStops,
-            Collection<EgressLeg> egressLegs,
+            Collection<TransferLeg> egressLegs,
             TransitCalculator calculator,
             DebugHandlerFactory<T> debugHandlerFactory
     ) {
@@ -44,7 +43,7 @@ final class Stops<T extends TripScheduleInfo> {
         this.debugHandlerFactory = debugHandlerFactory;
         this.destination = new Destination<>(debugHandlerFactory.debugDestinationArrival());
 
-        for (EgressLeg it : egressLegs) {
+        for (TransferLeg it : egressLegs) {
             this.stops[it.stop()] = new EgressStop<T>(it, destination, debugHandlerFactory.debugStopArrival(it.stop()));
         }
     }
@@ -53,7 +52,7 @@ final class Stops<T extends TripScheduleInfo> {
         debugHandlerFactory.setIterationDepartureTime(departureTime);
     }
 
-    void setInitialTime(AccessLeg accessLeg, int fromTime) {
+    void setInitialTime(TransferLeg accessLeg, int fromTime) {
         AccessStopArrival<T> newAccessArrival = new AccessStopArrival<>(
                 accessLeg.stop(),
                 fromTime,

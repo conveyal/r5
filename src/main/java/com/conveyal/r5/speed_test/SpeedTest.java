@@ -327,8 +327,7 @@ public class SpeedTest {
             EgressAccessRouter streetRouter
     ) {
         RequestBuilder<TripSchedule> builder = new RequestBuilder<TripSchedule>(request.fromTime, request.toTime)
-                .boardSlackInSeconds(60)
-                .departureStepInSeconds(60);
+                .boardSlackInSeconds(60);
 
         builder.profile(mapAlgorithm(profile));
 
@@ -457,6 +456,7 @@ public class SpeedTest {
         switch (profile) {
             case mc_range_raptor: return RaptorProfiles.MULTI_CRITERIA_RANGE_RAPTOR;
             case range_raptor: return RaptorProfiles.RANGE_RAPTOR;
+            case raptor_reverse: return RaptorProfiles.RAPTOR_REVERSE;
         }
         throw new IllegalArgumentException("Unable to map algorithm: " + profile);
     }

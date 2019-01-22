@@ -13,8 +13,9 @@ import org.junit.Test;
 
 import java.util.Arrays;
 
+import static com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator.testDummy;
+
 public class StopArrivalStateParetoSetTest {
-    private static final TransitCalculator CALCULATOR = new TransitCalculator(60);
     // 08:35 in seconds
     private static final int A_TIME = ((8 * 60) + 35) * 60;
     private static final int ANY = 3;
@@ -22,6 +23,7 @@ public class StopArrivalStateParetoSetTest {
     private static final int ROUND_2 = 2;
     private static final int ROUND_3 = 3;
     private static final TripScheduleInfo ANY_TRIP = null;
+    private static final TransitCalculator CALCULATOR = testDummy(60);
 
     // In this test each stop is used to identify the pareto vector - it is just one
     // ParetoSet "subject" with multiple "stops" in it. The stop have no effect on

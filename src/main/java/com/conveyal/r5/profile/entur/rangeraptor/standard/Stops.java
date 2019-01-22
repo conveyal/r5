@@ -1,7 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 
-import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 
@@ -15,7 +14,7 @@ final class Stops<T extends TripScheduleInfo> {
 
     private final StopArrivalState<T>[][] stops;
 
-    Stops(int nRounds, int nStops, Iterable<EgressLeg> egressLegs, Consumer<EgressStopArrivalState<T>> egressArrivalCallback) {
+    Stops(int nRounds, int nStops, Iterable<TransferLeg> egressLegs, Consumer<EgressStopArrivalState<T>> egressArrivalCallback) {
         //noinspection unchecked
         this.stops = (StopArrivalState<T>[][]) new StopArrivalState[nRounds][nStops];
         createAndInsertEgressStopStates(nRounds, egressLegs, egressArrivalCallback);
@@ -57,9 +56,9 @@ final class Stops<T extends TripScheduleInfo> {
 
     /* private methods */
 
-    private void createAndInsertEgressStopStates(int nRounds, Iterable<EgressLeg> egressLegs, Consumer<EgressStopArrivalState<T>> egressArrivalCallback) {
+    private void createAndInsertEgressStopStates(int nRounds, Iterable<TransferLeg> egressLegs, Consumer<EgressStopArrivalState<T>> egressArrivalCallback) {
         for (int round = 1; round < nRounds; round++) {
-            for (EgressLeg leg : egressLegs) {
+            for (TransferLeg leg : egressLegs) {
                 EgressStopArrivalState<T> state = new EgressStopArrivalState<>(round, leg, egressArrivalCallback);
                 stops[round][leg.stop()] = state;
             }

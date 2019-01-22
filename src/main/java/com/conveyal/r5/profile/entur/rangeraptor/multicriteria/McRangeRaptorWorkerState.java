@@ -1,11 +1,9 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.path.Path;
-import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
-import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
+import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.api.transit.UnsignedIntIterator;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
@@ -31,7 +29,7 @@ import java.util.List;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements WorkerState {
+final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements WorkerState<T> {
 
     /**
      * Stop the search when the time exceeds the max time limit.
@@ -51,7 +49,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     McRangeRaptorWorkerState(
             int nRounds,
             int nStops,
-            Collection<EgressLeg> egressLegs,
+            Collection<TransferLeg> egressLegs,
             TransitCalculator calculator,
             DebugHandlerFactory<T> debugHandlerFactory
 
@@ -62,21 +60,21 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     }
 
     @Override
-    public void initNewDepartureForMinute(int departureTime) {
+    public void iterationSetup(int iterationDepartureTime) {
         // TODO TGR - Set max limit to 5 days for now, replace this with a pareto check against the
         // TODO TGR - destination location values.
-        maxTimeLimit = departureTime + 5 * 24 * 60 * 60;
+        maxTimeLimit = iterationDepartureTime + 5 * 24 * 60 * 60;
         round = 0;
         arrivalsCache.clear();
-        stops.startNewIteration(departureTime);
+        stops.startNewIteration(iterationDepartureTime);
 
         // clear all touched stops to avoid constant rexploration
         startRecordChangesToStopsForNextAndCurrentRound();
     }
 
     @Override
-    public void setInitialTime(AccessLeg accessLeg, int fromTime) {
-        stops.setInitialTime(accessLeg, fromTime);
+    public void setInitialTime(TransferLeg accessLeg, int iterationDepartureTime) {
+        stops.setInitialTime(accessLeg, iterationDepartureTime);
         touchedStops.set(accessLeg.stop());
         updatesExist = true;
     }
@@ -93,12 +91,12 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     }
 
     @Override
-    public UnsignedIntIterator stopsTouchedPreviousRound() {
+    public IntIterator stopsTouchedPreviousRound() {
         return new BitSetIterator(touchedStops);
     }
 
     @Override
-    public UnsignedIntIterator stopsTouchedByTransitCurrentRound() {
+    public IntIterator stopsTouchedByTransitCurrentRound() {
         return new BitSetIterator(touchedStops);
     }
 
@@ -139,7 +137,8 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         commitCachedArrivals(TransferStopArrival.class);
     }
 
-    Collection<Path<T>> extractPaths() {
+    @Override
+    public Collection<Path<T>> extractPaths() {
         return stops.extractPaths();
     }
 

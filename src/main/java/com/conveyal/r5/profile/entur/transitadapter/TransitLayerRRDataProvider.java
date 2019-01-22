@@ -1,10 +1,10 @@
 package com.conveyal.r5.profile.entur.transitadapter;
 
 import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
-import com.conveyal.r5.profile.entur.api.transit.UnsignedIntIterator;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
@@ -143,21 +143,20 @@ public class TransitLayerRRDataProvider implements TransitDataProvider<TripSched
 
     }
 
-    @Override public Iterator<TripPatternInfo<TripSchedule>> patternIterator(UnsignedIntIterator stops) {
+    @Override public Iterator<TripPatternInfo<TripSchedule>> patternIterator(IntIterator stops) {
         return new InternalPatternIterator(getPatternsTouchedForStops(stops));
     }
 
     /**
-     * TODO TGR - Verify JavaDoc make sence
-     * Get a list of the internal IDs of the patterns "touched" using the given index (frequency or scheduled)
-     * "touched" means they were reached in the last round, and the index maps from the original pattern index to the
-     * local index of the filtered patterns.
+     * Get a list of the internal IDs of the patterns "touched" using the given list of stop indexes.
+     * "touched" means they were reached in the last round, and the index maps from the original pattern
+     * index to the local index of the filtered patterns.
      */
-    private BitSet getPatternsTouchedForStops(UnsignedIntIterator stops) {
+    private BitSet getPatternsTouchedForStops(IntIterator stops) {
         BitSet patternsTouched = new BitSet();
 
-        for (int stop = stops.next(); stop >= 0; stop = stops.next()) {
-            getPatternsForStop(stop).forEach(originalPattern -> {
+        while (stops.hasNext()) {
+            getPatternsForStop(stops.next()).forEach(originalPattern -> {
                 int filteredPattern = scheduledIndexForOriginalPatternIndex[originalPattern];
 
                 if (filteredPattern < 0) {

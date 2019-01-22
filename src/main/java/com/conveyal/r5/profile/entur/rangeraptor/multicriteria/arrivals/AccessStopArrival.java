@@ -31,6 +31,6 @@ public final class AccessStopArrival<T extends TripScheduleInfo> extends Abstrac
 
     @Override
     public int arrivalTimeAccess(int transitBoardTime) {
-        return calculator.accessLegArrivalTime(transitBoardTime);
+        return calculator.subBoardSlack(transitBoardTime);
     }
 }

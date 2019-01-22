@@ -18,7 +18,7 @@ public class AccessStopArrivalTest {
     private static final int BOARD_TIME = DEPATURE_TIME + 30 * 60;
     private static final int COST = 500;
 
-    private static final TransitCalculator TRANSIT_CALCULATOR = new TransitCalculator(BOARD_SLACK);
+    private static final TransitCalculator TRANSIT_CALCULATOR = TransitCalculator.testDummy(BOARD_SLACK);
     private AccessStopArrival<TripScheduleInfo> subject = new AccessStopArrival<>(ALIGHT_STOP, DEPATURE_TIME, LEG_DURATION, COST, TRANSIT_CALCULATOR);
 
 

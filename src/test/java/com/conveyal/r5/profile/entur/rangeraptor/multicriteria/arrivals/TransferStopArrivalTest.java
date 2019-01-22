@@ -22,7 +22,7 @@ public class TransferStopArrivalTest {
     private static final int A_TIME = 99;
     private static final TripScheduleInfo A_TRIP = null;
 
-    private static final TransitCalculator TRANSIT_CALCULATOR = new TransitCalculator(A_TIME);
+    private static final TransitCalculator TRANSIT_CALCULATOR = TransitCalculator.testDummy(60);
     private static final AccessStopArrival<TripScheduleInfo> ACCESS_ARRIVAL = new AccessStopArrival<>(A_STOP, A_TIME, A_TIME, COST, TRANSIT_CALCULATOR);
     private static final TransitStopArrival<TripScheduleInfo> TRANSIT_ARRIVAL = new TransitStopArrival<>(ACCESS_ARRIVAL, TRANSFER_FROM_STOP, A_TIME, A_TIME, A_TRIP);
 

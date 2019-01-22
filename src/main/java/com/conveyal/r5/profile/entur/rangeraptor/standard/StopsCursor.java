@@ -24,7 +24,7 @@ class StopsCursor<T extends TripScheduleInfo> {
     }
 
     /**
-     *
+     * TODO TGR
      * @param stop
      * @param transitDepartureTime
      * @return
@@ -60,6 +60,8 @@ class StopsCursor<T extends TripScheduleInfo> {
     private StopArrivalView<T> newAccessView(int stop) {
         StopArrivalState<T> arrival = stops.get(0, stop);
         return new Access<>(stop, arrival.accessDepartureTime(), arrival.time());
+        // TODO TGR Use:
+        //return new Access<>(stop, transitCalculator.originDepartureTime(arrival.time(), arrival.accessDuration()), arrival.time());
     }
 
     /**
@@ -68,7 +70,7 @@ class StopsCursor<T extends TripScheduleInfo> {
     private StopArrivalView<T> newAccessView(int stop, int transitDepartureTime) {
         StopArrivalState<T> state = stops.get(0, stop);
         int departureTime = transitCalculator.originDepartureTime(transitDepartureTime, state.transferDuration());
-        int arrivalTime = transitCalculator.accessLegArrivalTime(transitDepartureTime);
+        int arrivalTime = transitCalculator.subBoardSlack(transitDepartureTime);
         return new Access<>(stop, departureTime, arrivalTime);
     }
 
@@ -79,5 +81,4 @@ class StopsCursor<T extends TripScheduleInfo> {
                 ? new Transfer<>(round, stop, state, this)
                 : new Transit<>(round, stop, state, this);
     }
-
 }

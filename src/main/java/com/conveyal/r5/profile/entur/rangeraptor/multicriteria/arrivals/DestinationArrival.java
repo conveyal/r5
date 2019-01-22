@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 
-import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
+import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
@@ -39,7 +39,7 @@ public final class DestinationArrival<T extends TripScheduleInfo> implements Des
     private final int travelDuration;
 
 
-    public DestinationArrival(TransitStopArrival<T> previous, EgressLeg egressLeg) {
+    public DestinationArrival(TransitStopArrival<T> previous, TransferLeg egressLeg) {
         this.previous = previous;
         this.arrivalTime = previous.arrivalTime() + egressLeg.durationInSeconds();
         this.numberOfTransfers = previous.round() - 1;

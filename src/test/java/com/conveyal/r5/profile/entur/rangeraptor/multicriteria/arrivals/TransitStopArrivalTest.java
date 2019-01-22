@@ -4,6 +4,7 @@ import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import org.junit.Test;
 
+import static com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator.testDummy;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -24,7 +25,7 @@ public class TransitStopArrivalTest {
         @Override public String debugInfo() { return null; }
     };
 
-    private static final TransitCalculator TRANSIT_CALCULATOR = new TransitCalculator(A_TIME);
+    private static final TransitCalculator TRANSIT_CALCULATOR = testDummy(60);
     private static final AccessStopArrival<TripScheduleInfo> ACCESS_ARRIVAL = new AccessStopArrival<>(BOARD_STOP, A_TIME, A_TIME, COST, TRANSIT_CALCULATOR);
 
     private TransitStopArrival<TripScheduleInfo> subject = new TransitStopArrival<>(ACCESS_ARRIVAL, ALIGHT_STOP, ALIGHT_TIME,  BOARD_TIME, A_TRIP);

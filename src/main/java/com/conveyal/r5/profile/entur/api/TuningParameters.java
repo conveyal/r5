@@ -17,7 +17,6 @@ public interface TuningParameters {
         return 12;
     }
 
-
     /**
      * This threshold is used to determine when to perform a binary trip schedule search
      * to reduce the number of trips departure time lookups and comparisons. When testing
@@ -25,8 +24,26 @@ public interface TuningParameters {
      * <p/>
      * If you calculate the departure time every time or want to fine tune the performance,
      * changing this may improve the performance a few percent.
+     * <p/>
+     * Default value is 50.
      */
     default int scheduledTripBinarySearchThreshold() {
         return 50;
+    }
+
+    /**
+     * Step for departure times between each RangeRaptor iterations.
+     * This is a performance optimization parameter.
+     * A transit network usually uses minute resolution for the its timetable,
+     * so to match that set this variable to 60 seconds. Setting it
+     * to less then 60 will not give better result, but degrade performance.
+     * Setting it to 120 seconds will improve performance, but you might get a
+     * slack of 60 seconds somewhere in the result - most likely in the first
+     * walking leg.
+     * <p/>
+     * Default value is 60.
+     */
+    default int departureStepInSeconds() {
+        return 60;
     }
 }

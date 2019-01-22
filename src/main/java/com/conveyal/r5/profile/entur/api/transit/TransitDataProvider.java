@@ -65,11 +65,11 @@ public interface TransitDataProvider<T extends TripScheduleInfo> {
      *
      * @param stops set of stops for find all patterns for.
      */
-    Iterator<? extends TripPatternInfo<T>> patternIterator(UnsignedIntIterator stops);
+    Iterator<? extends TripPatternInfo<T>> patternIterator(IntIterator stops);
 
     /**
      * The provider needs to know based on the request input (date) if a service is available or not.
-     * The provider can chose to do the filtering int the {@link #patternIterator(UnsignedIntIterator)}, if so
+     * The provider can chose to do the filtering int the {@link #patternIterator(IntIterator)}, if so
      * there is no need to implement this method.
      *
      * @param trip The trip to check.

@@ -29,7 +29,7 @@ class StopArrivalState<T extends TripScheduleInfo> {
      * This value essentially serves as Infinity for ints - it's bigger than every other number.
      * It is the travel time to a transit stop or a target before that stop or target is ever reached.
      */
-    static final int UNREACHED = Integer.MAX_VALUE;
+    private static final int UNREACHED = Integer.MAX_VALUE;
 
     /**
      * Used to initialize all none time based attributes.

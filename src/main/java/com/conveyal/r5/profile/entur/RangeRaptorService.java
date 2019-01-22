@@ -9,6 +9,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.Worker;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.RangeRaptorWorker;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 
 import java.util.Collection;
 
@@ -18,6 +19,8 @@ import java.util.Collection;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class RangeRaptorService<T extends TripScheduleInfo> {
+    private static final boolean FORWARD = true;
+    private static final boolean BACKWARD = false;
     private static final WorkerPerformanceTimers MC_TIMERS = new WorkerPerformanceTimers("MC");
     private static final WorkerPerformanceTimers RR_TIMERS = new WorkerPerformanceTimers("RR");
 
@@ -36,10 +39,11 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
     /* private methods */
 
     private Worker<T> createWorker(RangeRaptorRequest<T> request, TransitDataProvider<T> transitData) {
-        switch (request.profile) {
+        switch (request.profile()) {
             case MULTI_CRITERIA_RANGE_RAPTOR:
                 return createMcRRWorker(transitData, request);
             case RAPTOR_REVERSE:
+                return createReversWorker(transitData, request);
             case RANGE_RAPTOR:
                 return createRRWorker(transitData, request);
             default:
@@ -48,11 +52,18 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
     }
 
     private Worker<T> createMcRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
-        return new McRangeRaptorWorker<>(tuningParameters, transitData, request, MC_TIMERS);
+        return new McRangeRaptorWorker<>(context(transitData, request, MC_TIMERS, FORWARD));
     }
 
     private Worker<T> createRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
-        return new RangeRaptorWorker<>(tuningParameters, transitData, request, RR_TIMERS);
+        return new RangeRaptorWorker<>(context(transitData, request, RR_TIMERS, FORWARD));
     }
 
+    private Worker<T> createReversWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
+        return new RangeRaptorWorker<>(context(transitData, request, RR_TIMERS, BACKWARD));
+    }
+
+    private SearchContext<T> context(TransitDataProvider<T> transit, RangeRaptorRequest<T> request, WorkerPerformanceTimers timers, boolean forward) {
+        return new SearchContext<>(request, tuningParameters, transit, timers, forward);
+    }
 }

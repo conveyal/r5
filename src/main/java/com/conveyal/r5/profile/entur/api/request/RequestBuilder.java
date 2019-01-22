@@ -2,8 +2,7 @@ package com.conveyal.r5.profile.entur.api.request;
 
 import com.conveyal.r5.profile.entur.api.debug.DebugEvent;
 import com.conveyal.r5.profile.entur.api.path.Path;
-import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
-import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
+import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
@@ -20,19 +19,21 @@ import java.util.function.Supplier;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class RequestBuilder<T extends TripScheduleInfo> {
+    // Search
     int fromTime;
     int toTime;
-    final Collection<AccessLeg> accessLegs = new ArrayList<>();
-    final Collection<EgressLeg> egressLegs = new ArrayList<>();
+    final Collection<TransferLeg> accessLegs;
+    final Collection<TransferLeg> egressLegs;
+    int boardSlackInSeconds;
+    int numberOfAdditionalTransfers;
 
-    RaptorProfiles profile = RangeRaptorRequest.DEFAULTS.profile;
-    int departureStepInSeconds = RangeRaptorRequest.DEFAULTS.departureStepInSeconds;
-    int boardSlackInSeconds = RangeRaptorRequest.DEFAULTS.boardSlackInSeconds;
-    int numberOfAdditionalTransfers = RangeRaptorRequest.DEFAULTS.numberOfAdditionalTransfers;
+    // Algorithm
+    RaptorProfiles profile;
 
-    final List<Integer> debugStops = new ArrayList<>();
-    final List<Integer> debugPath = new ArrayList<>();
-    int debugPathStartAtStopIndex = 0;
+    // Debug
+    final List<Integer> debugStops;
+    final List<Integer> debugPath;
+    int debugPathStartAtStopIndex;
     Consumer<DebugEvent<StopArrivalView<T>>> stopArrivalListener;
     Consumer<DebugEvent<DestinationArrivalView<T>>> destinationArrivalListener;
     Consumer<DebugEvent<Path<T>>> pathFilteringListener;
@@ -42,11 +43,30 @@ public class RequestBuilder<T extends TripScheduleInfo> {
      * @param toTime See {@link RangeRaptorRequest#toTime}
      */
     public RequestBuilder(int fromTime, int toTime) {
+        this(fromTime, toTime, createDefaults());
+    }
+
+    public RequestBuilder(int fromTime, int toTime, RangeRaptorRequest<T> defaults) {
         assertProperty(fromTime > 0, () -> "'fromTime' must be greater then 0. Value: " + fromTime);
         assertProperty(toTime > fromTime, () -> "'toTime' must be greater than 'fromTime'. fromTime: "
                 + fromTime + ", toTime: " + toTime);
         this.fromTime = fromTime;
         this.toTime = toTime;
+        this.accessLegs = new ArrayList<>();
+        this.egressLegs = new ArrayList<>();
+        this.boardSlackInSeconds = defaults.boardSlackInSeconds();
+        this.numberOfAdditionalTransfers = defaults.numberOfAdditionalTransfers();
+
+        // Algorithm
+        this.profile = defaults.profile();
+
+        // Debug
+        this.debugStops = new ArrayList<>();
+        this.debugPath = new ArrayList<>();
+        this.debugPathStartAtStopIndex = 0;
+        this.stopArrivalListener = null;
+        destinationArrivalListener = null;
+        pathFilteringListener = null;
     }
 
     /** @see RangeRaptorRequest#profile */
@@ -58,14 +78,14 @@ public class RequestBuilder<T extends TripScheduleInfo> {
     /**
      * Add a single access leg to the list of access legs.
      * @see RangeRaptorRequest#accessLegs */
-    public RequestBuilder<T> addAccessStop(AccessLeg accessLeg) {
+    public RequestBuilder<T> addAccessStop(TransferLeg accessLeg) {
         this.accessLegs.add(accessLeg);
         return this;
     }
 
     /** @see RangeRaptorRequest#accessLegs */
-    public RequestBuilder<T> addAccessStops(Iterable<AccessLeg> accessLegs) {
-        for (AccessLeg it : accessLegs) {
+    public RequestBuilder<T> addAccessStops(Iterable<TransferLeg> accessLegs) {
+        for (TransferLeg it : accessLegs) {
             addAccessStop(it);
         }
         return this;
@@ -75,22 +95,16 @@ public class RequestBuilder<T extends TripScheduleInfo> {
      * Add a single egress leg to the list of egress legs.
      * @see RangeRaptorRequest#egressLegs
      */
-    public RequestBuilder<T> addEgressStop(EgressLeg egressLeg) {
+    public RequestBuilder<T> addEgressStop(TransferLeg egressLeg) {
         this.egressLegs.add(egressLeg);
         return this;
     }
 
     /** @see RangeRaptorRequest#egressLegs */
-    public RequestBuilder<T> addEgressStops(Iterable<EgressLeg> egressLegs) {
-        for (EgressLeg it : egressLegs) {
+    public RequestBuilder<T> addEgressStops(Iterable<TransferLeg> egressLegs) {
+        for (TransferLeg it : egressLegs) {
             addEgressStop(it);
         }
-        return this;
-    }
-
-    /** @see RangeRaptorRequest#departureStepInSeconds */
-    public RequestBuilder<T> departureStepInSeconds(int departureStepInSeconds) {
-        this.departureStepInSeconds = departureStepInSeconds;
         return this;
     }
 
@@ -149,12 +163,23 @@ public class RequestBuilder<T extends TripScheduleInfo> {
     public RangeRaptorRequest<T> build() {
         assertProperty(!accessLegs.isEmpty(), () ->"At least one 'accessLegs' is required.");
         assertProperty(!egressLegs.isEmpty(), () ->"At least one 'egressLegs' is required.");
-        return new RangeRaptorRequest<>(this);
+        return new RequestObject<>(this);
     }
 
     private void assertProperty(boolean predicate, Supplier<String> errorMessageProvider) {
         if(!predicate) {
             throw new IllegalArgumentException(RangeRaptorRequest.class.getSimpleName()  + " error: " + errorMessageProvider.get());
         }
+    }
+
+    public DebugRequest<T> debug() {
+        return new DebugRequest<>(this);
+    }
+
+    private static<T extends TripScheduleInfo> RangeRaptorRequest<T> createDefaults() {
+        return new RangeRaptorRequest<T>() {
+            @Override public int fromTime() { return -1; }
+            @Override public int toTime() { return -1; }
+        };
     }
 }

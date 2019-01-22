@@ -1,25 +1,31 @@
 package com.conveyal.r5.profile.entur.util;
 
-import com.conveyal.r5.profile.entur.api.transit.UnsignedIntIterator;
+import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 
 import java.util.BitSet;
 
 /**
  * TODO TGR
  */
-public class BitSetIterator implements UnsignedIntIterator {
+public final class BitSetIterator implements IntIterator {
 
     private final BitSet set;
-    private int nextIndex = 0;
+    private int nextIndex;
 
     public BitSetIterator(BitSet set) {
         this.set = set;
+        this.nextIndex = set.nextSetBit(nextIndex);
     }
 
     @Override
-    public int next() {
-        int index = set.nextSetBit(nextIndex);
-        nextIndex = index + 1;
+    public final int next() {
+        int index = nextIndex;
+        nextIndex = set.nextSetBit(index + 1);
         return index;
+    }
+
+    @Override
+    public final boolean hasNext() {
+        return nextIndex != -1;
     }
 }

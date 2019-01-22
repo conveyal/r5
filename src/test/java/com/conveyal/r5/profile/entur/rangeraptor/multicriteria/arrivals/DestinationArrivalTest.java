@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 
-import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
+import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import org.junit.Test;
@@ -23,7 +23,7 @@ public class DestinationArrivalTest {
     private static final int DESTINATION_DURATION_TIME = 50;
     private static final int DESTINATION_COST = 500;
 
-    private static final EgressLeg EGRESS_LEG = new EgressLeg() {
+    private static final TransferLeg EGRESS_LEG = new TransferLeg() {
         @Override public int stop() { return TRANSIT_1_STOP; }
         @Override public int durationInSeconds() { return DESTINATION_DURATION_TIME; }
         @Override public int cost()  { return DESTINATION_COST; }
@@ -34,7 +34,7 @@ public class DestinationArrivalTest {
     private static final int EXPECTED_TOTAL_DURATION = ACCESS_DURATION_TIME + BOARD_SLACK
             + (TRANSIT_1_ALIGHT_TIME - TRANSIT_1_BOARD_TIME) + DESTINATION_DURATION_TIME;
 
-    private static final TransitCalculator TRANSIT_CALCULATOR = new TransitCalculator(BOARD_SLACK);
+    private static final TransitCalculator TRANSIT_CALCULATOR = TransitCalculator.testDummy(BOARD_SLACK);
     private static final AccessStopArrival<TripScheduleInfo> ACCESS_ARRIVAL = new AccessStopArrival<>(
             ACCESS_STOP, ACCESS_DEPARTURE_TIME, ACCESS_DURATION_TIME, ACCESS_COST, TRANSIT_CALCULATOR
     );

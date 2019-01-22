@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
-import com.conveyal.r5.profile.entur.api.transit.EgressLeg;
+import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 
 import java.util.function.Consumer;
@@ -11,10 +11,10 @@ import java.util.function.Consumer;
  */
 final class EgressStopArrivalState<T extends TripScheduleInfo> extends StopArrivalState<T> {
     private final int round;
-    private final EgressLeg egressLeg;
+    private final TransferLeg egressLeg;
     private final Consumer<EgressStopArrivalState<T>> transitCallback;
 
-    EgressStopArrivalState(int round, EgressLeg egressLeg, Consumer<EgressStopArrivalState<T>> transitCallback) {
+    EgressStopArrivalState(int round, TransferLeg egressLeg, Consumer<EgressStopArrivalState<T>> transitCallback) {
         this.round = round;
         this.egressLeg = egressLeg;
         this.transitCallback = transitCallback;
@@ -29,7 +29,7 @@ final class EgressStopArrivalState<T extends TripScheduleInfo> extends StopArriv
     }
 
 
-    final EgressLeg egressLeg() {
+    final TransferLeg egressLeg() {
         return egressLeg;
     }
 

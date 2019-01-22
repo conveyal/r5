@@ -1,30 +1,44 @@
 package com.conveyal.r5.profile.entur.rangeraptor;
 
-import com.conveyal.r5.profile.entur.api.transit.AccessLeg;
+import com.conveyal.r5.profile.entur.api.path.Path;
+import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
-import com.conveyal.r5.profile.entur.api.transit.UnsignedIntIterator;
+import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 
 /**
  * TODO TGR
  */
-public interface WorkerState {
-    void initNewDepartureForMinute(int nextMinuteDepartureTime);
+public interface WorkerState<T extends TripScheduleInfo> {
 
-    void setInitialTime(AccessLeg accessLeg, int nextMinuteDepartureTime);
+    void iterationSetup(int iterationDepartureTime);
+
+    void setInitialTime(TransferLeg accessEgressLeg, int iterationDepartureTime);
 
     boolean isNewRoundAvailable();
 
     void prepareForNextRound();
 
-    UnsignedIntIterator stopsTouchedPreviousRound();
+    IntIterator stopsTouchedPreviousRound();
 
-    UnsignedIntIterator stopsTouchedByTransitCurrentRound();
+    IntIterator stopsTouchedByTransitCurrentRound();
 
     void transferToStops(int fromStop, Iterator<? extends TransferLeg> transfers);
 
     default void transitsForRoundComplete() {}
 
     default void transfersForRoundComplete() {}
+
+    default void iterationComplete() {}
+
+    /**
+     * Extract paths after the search is complete. This method is optional,
+     * returning an empty set by default.
+     *
+     * @return return all paths found in the search.
+     */
+    default Collection<Path<T>> extractPaths() { return Collections.emptyList(); }
 }

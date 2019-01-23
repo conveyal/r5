@@ -151,6 +151,11 @@ class DestinationArrivals<T extends TripScheduleInfo> {
     private void debugDropDestinationArrival(EgressStopArrivalState<T> arrival) {
         if (isDestinationReachedCurrentIteration(arrival.round())) {
             EgressStopArrivalState<T> dropped = egressArrivalsByRound.get(arrival.round());
+            if(dropped == null) {
+                // TODO TGR - Find out why this is happening?
+                System.err.println("ERROR! Dropped egress stop arrival is missing: " + arrival);
+                return;
+            }
             if(debugDestinationArrivalHandler.isDebug(dropped.stop())) {
                 debugDestinationArrivalHandler.drop(
                         destinationArrivalView(dropped),

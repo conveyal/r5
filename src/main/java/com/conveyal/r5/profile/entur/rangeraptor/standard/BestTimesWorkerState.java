@@ -33,13 +33,14 @@ public final class BestTimesWorkerState<T extends TripScheduleInfo> implements S
     @Deprecated
     private static final int MAX_TRIP_DURATION_SECONDS = 20 * 60 * 60; // 20 hours
 
-
     private final int nRounds;
+    private final TransitCalculator calculator;
+
     private int round = 0;
     private int roundMax = -1;
 
     /**
-     * Stop the search when the time excids the max time limit.
+     * Stop the search when the time exceeds the max time limit.
      */
     private int timeLimit;
 
@@ -58,6 +59,7 @@ public final class BestTimesWorkerState<T extends TripScheduleInfo> implements S
 
     private BestTimesWorkerState(int nRounds, int nStops, TransitCalculator calculator) {
         this.nRounds = nRounds;
+        this.calculator = calculator;
         this.bestTimes = new BestTimes(nStops, calculator);
     }
 
@@ -73,10 +75,10 @@ public final class BestTimesWorkerState<T extends TripScheduleInfo> implements S
     }
 
     @Override
-    public void setInitialTime(TransferLeg accessLeg, int iterationDepartureTime) {
-        final int accessDurationInSeconds = accessLeg.durationInSeconds();
-        final int stop = accessLeg.stop();
-        final int arrivalTime = iterationDepartureTime + accessDurationInSeconds;
+    public void setInitialTime(TransferLeg accessEgressLeg, int iterationDepartureTime) {
+        final int durationInSeconds = accessEgressLeg.durationInSeconds();
+        final int stop = accessEgressLeg.stop();
+        final int arrivalTime = calculator.add(iterationDepartureTime, durationInSeconds);
 
         bestTimes.setAccessStopTime(stop, arrivalTime);
     }
@@ -132,12 +134,11 @@ public final class BestTimesWorkerState<T extends TripScheduleInfo> implements S
      */
     @Override
     public void transitToStop(int stop, int alightTime, T trip, int boardStop, int boardTime) {
-        if (alightTime > timeLimit) {
+        if (exceedsTimeLimit(alightTime)) {
             return;
         }
 
         if (bestTimes.transitUpdateNewBestTime(stop, alightTime)) {
-
             // transitTimes upper bounds bestTimes
             bestTimes.updateNewBestTime(stop, alightTime);
         }
@@ -149,7 +150,7 @@ public final class BestTimesWorkerState<T extends TripScheduleInfo> implements S
     private void transferToStop(int arrivalTimeTransit, int fromStop, TransferLeg transferLeg) {
         final int arrivalTime = arrivalTimeTransit + transferLeg.durationInSeconds();
 
-        if (arrivalTime > timeLimit) {
+        if (exceedsTimeLimit(arrivalTime)) {
             return;
         }
 
@@ -158,5 +159,9 @@ public final class BestTimesWorkerState<T extends TripScheduleInfo> implements S
         // transitTimes upper bounds bestTimes so we don't need to update wait time and in-vehicle time here, if we
         // enter this conditional it has already been updated.
         bestTimes.updateNewBestTime(toStop, arrivalTime);
+    }
+
+    private boolean exceedsTimeLimit(int alightTime) {
+        return calculator.isBest(timeLimit, alightTime);
     }
 }

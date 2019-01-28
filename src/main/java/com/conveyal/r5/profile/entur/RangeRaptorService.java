@@ -66,7 +66,7 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
 
     private Worker<T> createReversWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
         SearchContext<T> context = context(transitData, request, BT_TIMERS, BACKWARD);
-        return new StdRangeRaptorWorker<>(context, bestTimeState(context));
+        return new StdRangeRaptorWorker<>(context, stdState(context));
     }
 
     private SearchContext<T> context(TransitDataProvider<T> transit, RangeRaptorRequest<T> request, WorkerPerformanceTimers timers, boolean forward) {

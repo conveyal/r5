@@ -55,8 +55,8 @@ final class BackwardSearchTransitCalculator extends AbstractTransitCalculator {
     }
 
     @Override
-    public IntIterator patternStopIterator(int numberOfStopsInPattern) {
-        return IntIterators.intDecIterator(numberOfStopsInPattern-1, -1);
+    public IntIterator patternStopIterator(TripPatternInfo<?> pattern) {
+        return IntIterators.intDecIterator(pattern.numberOfStopsInPattern()-1, -1);
     }
 
     @Override

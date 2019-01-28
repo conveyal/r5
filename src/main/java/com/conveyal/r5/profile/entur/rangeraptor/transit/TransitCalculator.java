@@ -54,7 +54,7 @@ public interface TransitCalculator {
      * Iterate from 0 to N-1 in a forward search and from
      * N-1 to 0 in a backwards search.
      */
-    IntIterator patternStopIterator(int numberOfStopsInPattern);
+    IntIterator patternStopIterator(TripPatternInfo<?> pattern);
 
 
     /**

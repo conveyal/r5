@@ -128,8 +128,8 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
      * <p/>
      * This is protected to allow reverse search to override and step backwards.
      */
-    protected void performTransitForRoundAndEachStopInPattern(final TripPatternInfo<T> pattern) {
-        IntIterator it = calculator().patternStopIterator(pattern.numberOfStopsInPattern());
+    private void performTransitForRoundAndEachStopInPattern(final TripPatternInfo<T> pattern) {
+        IntIterator it = calculator().patternStopIterator(pattern);
         while (it.hasNext()) {
             performTransitForRoundAndPatternAtStop(it.next());
         }
@@ -141,17 +141,14 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
      * This is protected to allow reverse search to override and create a alight search instead.
      */
     private TripScheduleSearch<T> createTripSearch(TripPatternInfo<T> pattern) {
-        return calculator().createTripSearch(
-                pattern,
-                tuningParameters().scheduledTripBinarySearchThreshold(),
-                this::skipTripSchedule
-        );
+        final int binarySearchThreshold = tuningParameters().scheduledTripBinarySearchThreshold();
+        return calculator().createTripSearch(pattern, binarySearchThreshold, this::skipTripSchedule);
     }
 
     /**
      * Skip trips NOT running on the day of the search and skip frequency trips
      */
-    protected final boolean skipTripSchedule(T trip) {
+    private boolean skipTripSchedule(T trip) {
         return !transit().isTripScheduleInService(trip);
     }
 

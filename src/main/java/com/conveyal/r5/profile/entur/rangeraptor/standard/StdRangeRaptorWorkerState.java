@@ -53,7 +53,7 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> impleme
     /**
      * Stop the search when the time exceeds the max time limit.
      */
-    private final int maxTimeLimit;
+    private final int timeLimit;
 
     /**
      * The best times to reach each stop, whether via a transfer or via transit directly.
@@ -72,7 +72,7 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> impleme
     private StdRangeRaptorWorkerState(int nRounds, int nStops, TransitCalculator calculator, RangeRaptorRequest<T> request) {
         this.nRounds = nRounds;
         this.calculator = calculator;
-        this.maxTimeLimit =  calculator.add(request.toTime(), MAX_TRIP_DURATION_SECONDS);
+        this.timeLimit =  calculator.add(request.toTime(), MAX_TRIP_DURATION_SECONDS);
         this.stops = new Stops<>(nRounds, nStops, request.egressLegs(), this::handleEgressStopArrival);
         this.cursor = new StopsCursor<>(stops, calculator);
         this.bestTimes = new BestTimes(nStops, calculator);
@@ -222,7 +222,7 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> impleme
     }
 
     private boolean exceedsTimeLimit(int alightTime) {
-        return calculator.isBest(maxTimeLimit, alightTime);
+        return calculator.isBest(timeLimit, alightTime);
     }
 
     private void handleEgressStopArrival(EgressStopArrivalState<T> arrival) {

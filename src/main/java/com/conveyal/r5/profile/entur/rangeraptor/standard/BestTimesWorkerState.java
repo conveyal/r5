@@ -1,11 +1,10 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 
-import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
@@ -26,7 +25,7 @@ import java.util.Iterator;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-public final class BestTimesWorkerState<T extends TripScheduleInfo> implements WorkerState<T> {
+public final class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWorkerState<T> {
 
     /**
      * @deprecated TODO TGR - Replace with pareto destination check
@@ -51,9 +50,13 @@ public final class BestTimesWorkerState<T extends TripScheduleInfo> implements W
 
 
     /**
-     * create a RaptorState for a network with a particular number of stops, and a given maximum duration
+     * create a BestTimes Range Raptor State for given context.
      */
-    BestTimesWorkerState(int nRounds, int nStops, TransitCalculator calculator, RangeRaptorRequest<T> request) {
+    public BestTimesWorkerState(SearchContext<T> ctx) {
+        this(ctx.nRounds(), ctx.transit().numberOfStops(), ctx.calculator());
+    }
+
+    private BestTimesWorkerState(int nRounds, int nStops, TransitCalculator calculator) {
         this.nRounds = nRounds;
         this.bestTimes = new BestTimes(nStops, calculator);
     }
@@ -101,29 +104,6 @@ public final class BestTimesWorkerState<T extends TripScheduleInfo> implements W
         return bestTimes.stopsReachedLastRound();
     }
 
-    boolean isStopReachedInPreviousRound(int stop) {
-        return bestTimes.isStopReachedLastRound(stop);
-    }
-
-    int bestTimePreviousRound(int stop) {
-        return bestTimes.time(stop);
-    }
-
-    /**
-     * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the transitTime
-     */
-    void transitToStop(int stop, int alightTime, T trip, int boardStop, int boardTime) {
-        if (alightTime > timeLimit) {
-            return;
-        }
-
-        if (bestTimes.transitUpdateNewBestTime(stop, alightTime)) {
-
-            // transitTimes upper bounds bestTimes
-            bestTimes.updateNewBestTime(stop, alightTime);
-        }
-    }
-
     /**
      * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the nonTransferTime
      */
@@ -134,6 +114,32 @@ public final class BestTimesWorkerState<T extends TripScheduleInfo> implements W
 
         while (transfers.hasNext()) {
             transferToStop(arrivalTimeTransit, fromStop, transfers.next());
+        }
+    }
+
+    @Override
+    public boolean isStopReachedInPreviousRound(int stop) {
+        return bestTimes.isStopReachedLastRound(stop);
+    }
+
+    @Override
+    public int bestTimePreviousRound(int stop) {
+        return bestTimes.time(stop);
+    }
+
+    /**
+     * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the transitTime
+     */
+    @Override
+    public void transitToStop(int stop, int alightTime, T trip, int boardStop, int boardTime) {
+        if (alightTime > timeLimit) {
+            return;
+        }
+
+        if (bestTimes.transitUpdateNewBestTime(stop, alightTime)) {
+
+            // transitTimes upper bounds bestTimes
+            bestTimes.updateNewBestTime(stop, alightTime);
         }
     }
 

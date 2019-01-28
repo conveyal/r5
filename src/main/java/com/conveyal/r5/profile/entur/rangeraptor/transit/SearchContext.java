@@ -57,6 +57,16 @@ public class SearchContext<T extends TripScheduleInfo> {
         return timers;
     }
 
+    /** Number of stops in transit graph. */
+    public int nStops() {
+        return transit.numberOfStops();
+    }
+
+    /** Calculate the maximum number of rounds to perform. */
+    public int nRounds() {
+        return tuningParameters.maxNumberOfTransfers() + 1;
+    }
+
     /**
      * Create a new calculator depending on the desired search direction.
      */

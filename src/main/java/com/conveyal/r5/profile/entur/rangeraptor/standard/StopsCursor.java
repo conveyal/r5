@@ -81,4 +81,8 @@ class StopsCursor<T extends TripScheduleInfo> {
                 ? new Transfer<>(round, stop, state, this)
                 : new Transit<>(round, stop, state, this);
     }
+
+    public boolean exist(int round, int stop) {
+        return stops.exist(round, stop);
+    }
 }

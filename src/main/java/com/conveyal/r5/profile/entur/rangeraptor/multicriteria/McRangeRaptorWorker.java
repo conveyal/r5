@@ -3,7 +3,6 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
-import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleSearch;
@@ -31,7 +30,7 @@ public final class McRangeRaptorWorker<T extends TripScheduleInfo> extends Abstr
                         context.transit().numberOfStops(),
                         context.request().egressLegs(),
                         context.calculator(),
-                        new DebugHandlerFactory<>(context.request().debug())
+                        context.debugFactory()
                 )
         );
     }

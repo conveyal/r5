@@ -126,10 +126,6 @@ class DestinationArrivals<T extends TripScheduleInfo> {
 
     /* Private methods */
 
-    private boolean isDestinationReachedCurrentIteration(int round) {
-        return bestArrivalTimesAtDestination[round] != UNREACHED && egressArrivalsByRound.containsKey(round);
-    }
-
     private Path<T> createPathFromEgressState(EgressStopArrivalState<T> arrival) {
         return PathMapper.mapToPath(destinationArrivalView(arrival));
     }
@@ -149,13 +145,8 @@ class DestinationArrivals<T extends TripScheduleInfo> {
     }
 
     private void debugDropDestinationArrival(EgressStopArrivalState<T> arrival) {
-        if (isDestinationReachedCurrentIteration(arrival.round())) {
-            EgressStopArrivalState<T> dropped = egressArrivalsByRound.get(arrival.round());
-            if(dropped == null) {
-                // TODO TGR - Find out why this is happening?
-                System.err.println("ERROR! Dropped egress stop arrival is missing: " + arrival);
-                return;
-            }
+        EgressStopArrivalState<T> dropped = egressArrivalsByRound.get(arrival.round());
+        if(dropped != null) {
             if(debugDestinationArrivalHandler.isDebug(dropped.stop())) {
                 debugDestinationArrivalHandler.drop(
                         destinationArrivalView(dropped),

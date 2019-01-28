@@ -31,7 +31,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleSearch;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-public final class RangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRangeRaptorWorker<T, RangeRaptorWorkerState<T>> {
+public final class StdRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRangeRaptorWorker<T, StdWorkerState<T>> {
 
     private static final int NOT_SET = -1;
 
@@ -43,18 +43,8 @@ public final class RangeRaptorWorker<T extends TripScheduleInfo> extends Abstrac
     private TripScheduleSearch<T> tripSearch;
 
 
-    public RangeRaptorWorker(
-            SearchContext<T> context
-    ) {
-        super(
-                context,
-                new RangeRaptorWorkerState<>(
-                        nRounds(context.tuningParameters()),
-                        context.transit().numberOfStops(),
-                        context.calculator(),
-                        context.request()
-                )
-        );
+    public StdRangeRaptorWorker(SearchContext<T> context, StdWorkerState<T> state) {
+        super(context, state);
     }
 
     @Override

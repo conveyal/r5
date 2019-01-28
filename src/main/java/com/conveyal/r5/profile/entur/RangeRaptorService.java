@@ -8,7 +8,10 @@ import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.Worker;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McRangeRaptorWorker;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.RangeRaptorWorker;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.BestTimesWorkerState;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.StdRangeRaptorWorker;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.StdRangeRaptorWorkerState;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.StdWorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 
 import java.util.Collection;
@@ -23,6 +26,7 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
     private static final boolean BACKWARD = false;
     private static final WorkerPerformanceTimers MC_TIMERS = new WorkerPerformanceTimers("MC");
     private static final WorkerPerformanceTimers RR_TIMERS = new WorkerPerformanceTimers("RR");
+    private static final WorkerPerformanceTimers BT_TIMERS = new WorkerPerformanceTimers("BT");
 
     private final TuningParameters tuningParameters;
 
@@ -56,14 +60,24 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
     }
 
     private Worker<T> createRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
-        return new RangeRaptorWorker<>(context(transitData, request, RR_TIMERS, FORWARD));
+        SearchContext<T> context = context(transitData, request, RR_TIMERS, FORWARD);
+        return new StdRangeRaptorWorker<>(context, stdState(context));
     }
 
     private Worker<T> createReversWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
-        return new RangeRaptorWorker<>(context(transitData, request, RR_TIMERS, BACKWARD));
+        SearchContext<T> context = context(transitData, request, BT_TIMERS, BACKWARD);
+        return new StdRangeRaptorWorker<>(context, bestTimeState(context));
     }
 
     private SearchContext<T> context(TransitDataProvider<T> transit, RangeRaptorRequest<T> request, WorkerPerformanceTimers timers, boolean forward) {
         return new SearchContext<>(request, tuningParameters, transit, timers, forward);
+    }
+
+    private StdWorkerState<T> stdState(SearchContext<T> context) {
+        return new StdRangeRaptorWorkerState<>(context);
+    }
+
+    private StdWorkerState<T> bestTimeState(SearchContext<T> context) {
+        return new BestTimesWorkerState<>(context);
     }
 }

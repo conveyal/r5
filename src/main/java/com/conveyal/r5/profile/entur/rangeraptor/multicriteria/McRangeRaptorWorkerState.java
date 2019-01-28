@@ -60,7 +60,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     }
 
     @Override
-    public void iterationSetup(int iterationDepartureTime) {
+    public void setupIteration(int iterationDepartureTime) {
         // TODO TGR - Set max limit to 5 days for now, replace this with a pareto check against the
         // TODO TGR - destination location values.
         maxTimeLimit = iterationDepartureTime + 5 * 24 * 60 * 60;
@@ -73,7 +73,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     }
 
     @Override
-    public void setInitialTime(TransferLeg accessLeg, int iterationDepartureTime) {
+    public void setInitialTimeForIteration(TransferLeg accessLeg, int iterationDepartureTime) {
         stops.setInitialTime(accessLeg, iterationDepartureTime);
         touchedStops.set(accessLeg.stop());
         updatesExist = true;

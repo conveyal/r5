@@ -14,9 +14,9 @@ import java.util.Iterator;
  */
 public interface WorkerState<T extends TripScheduleInfo> {
 
-    void iterationSetup(int iterationDepartureTime);
+    void setupIteration(int iterationDepartureTime);
 
-    void setInitialTime(TransferLeg accessEgressLeg, int iterationDepartureTime);
+    void setInitialTimeForIteration(TransferLeg accessEgressLeg, int iterationDepartureTime);
 
     boolean isNewRoundAvailable();
 

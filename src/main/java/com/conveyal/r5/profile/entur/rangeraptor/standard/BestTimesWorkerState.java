@@ -25,7 +25,7 @@ import java.util.Iterator;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-public final class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWorkerState<T> {
+public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWorkerState<T> {
 
     /**
      * @deprecated TODO TGR - Replace with pareto destination check
@@ -57,80 +57,96 @@ public final class BestTimesWorkerState<T extends TripScheduleInfo> implements S
         this(ctx.nRounds(), ctx.transit().numberOfStops(), ctx.calculator());
     }
 
-    private BestTimesWorkerState(int nRounds, int nStops, TransitCalculator calculator) {
+    BestTimesWorkerState(int nRounds, int nStops, TransitCalculator calculator) {
         this.nRounds = nRounds;
         this.calculator = calculator;
         this.bestTimes = new BestTimes(nStops, calculator);
     }
 
     @Override
-    public void iterationSetup(int iterationDepartureTime) {
+    public final void setupIteration(int iterationDepartureTime) {
         // TODO TGR - Set max limit to 5 days for now, replace this with a pareto check against the
         // TODO TGR - destination location values.
-        timeLimit = iterationDepartureTime + MAX_TRIP_DURATION_SECONDS;
-
+        timeLimit = calculator.add(iterationDepartureTime, MAX_TRIP_DURATION_SECONDS);
         // clear all touched stops to avoid constant reëxploration
         bestTimes.prepareForNewIteration();
         round = 0;
+        setupIteration2(iterationDepartureTime);
     }
 
+    /** Allow subclasses to setup initial iteration state by overriding this method. */
+    void setupIteration2(int iterationDepartureTime) {}
+
     @Override
-    public void setInitialTime(TransferLeg accessEgressLeg, int iterationDepartureTime) {
-        final int durationInSeconds = accessEgressLeg.durationInSeconds();
-        final int stop = accessEgressLeg.stop();
-        final int arrivalTime = calculator.add(iterationDepartureTime, durationInSeconds);
+    public final void setInitialTimeForIteration(TransferLeg accessEgressLeg, int iterationDepartureTime) {
+        int durationInSeconds = accessEgressLeg.durationInSeconds();
+        int stop = accessEgressLeg.stop();
+        // The time of arrival at the given stop for the current iteration
+        // (or departure time at the last stop if we search backwards).
+        int arrivalTime = calculator.add(iterationDepartureTime, durationInSeconds);
 
         bestTimes.setAccessStopTime(stop, arrivalTime);
+        setInitialTime(stop, arrivalTime, durationInSeconds);
     }
 
+    /** Allow subclasses to setup initial access/egress time  by overriding this method. */
+    void setInitialTime(final int stop, final int arrivalTime, int durationInSeconds) { }
+
     @Override
-    public boolean isNewRoundAvailable() {
+    public final boolean isNewRoundAvailable() {
         final boolean moreRoundsToGo = round < nRounds - 1;
         return moreRoundsToGo && bestTimes.isCurrentRoundUpdated();
     }
 
     @Override
-    public void prepareForNextRound() {
+    public final void prepareForNextRound() {
         bestTimes.prepareForNextRound();
         ++round;
         roundMax = Math.max(roundMax, round);
     }
 
     @Override
-    public BitSetIterator stopsTouchedByTransitCurrentRound() {
+    public final BitSetIterator stopsTouchedByTransitCurrentRound() {
         return bestTimes.transitStopsReachedCurrentRound();
     }
 
     @Override
-    public IntIterator stopsTouchedPreviousRound() {
+    public final IntIterator stopsTouchedPreviousRound() {
         return bestTimes.stopsReachedLastRound();
     }
 
-    /**
-     * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the nonTransferTime
-     */
-    @Override
-    public void transferToStops(int fromStop, Iterator<? extends TransferLeg> transfers) {
-
-        int arrivalTimeTransit = bestTimes.transitTime(fromStop);
-
-        while (transfers.hasNext()) {
-            transferToStop(arrivalTimeTransit, fromStop, transfers.next());
-        }
-    }
 
     @Override
-    public boolean isStopReachedInPreviousRound(int stop) {
+    public final boolean isStopReachedInPreviousRound(int stop) {
         return bestTimes.isStopReachedLastRound(stop);
     }
 
+    /**
+     * Return the "best time" found in the previous round. This is used to calculate the board/alight
+     * time in the next round.
+     * <p/>
+     * PLEASE OVERRIDE!
+     * <p/>
+     * The implementation here is not correct - please override if you plan to use any result paths
+     * or "rounds" as "number of transfers". The implementation is OK if the only thing you care
+     * about is the "arrival time".
+     */
     @Override
     public int bestTimePreviousRound(int stop) {
+        // This is a simplification, *bestTimes* might get updated during the current round;
+        // Hence leading to a new boarding from the same stop in the same round.
+        // If we do not count rounds or track paths, this is OK. But be sure to override this
+        // method with the best time from the previous round if you care about number of
+        // transfers and results paths.
         return bestTimes.time(stop);
     }
 
     /**
-     * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the transitTime
+     * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the transitTime.
+     * <p/>
+     * PLEASE OVERRIDE FOR MORE SPECIFIC BEHAVIOR!
+     * <p/>
+     * The implementation can be copied and alterd into a sub classe
      */
     @Override
     public void transitToStop(int stop, int alightTime, T trip, int boardStop, int boardTime) {
@@ -138,16 +154,29 @@ public final class BestTimesWorkerState<T extends TripScheduleInfo> implements S
             return;
         }
 
-        if (bestTimes.transitUpdateNewBestTime(stop, alightTime)) {
+        if (newTransitBestTime(stop, alightTime)) {
             // transitTimes upper bounds bestTimes
-            bestTimes.updateNewBestTime(stop, alightTime);
+            newOverallBestTime(stop, alightTime);
         }
     }
 
+    /**
+     * Set the arrival time at all transit stop if time is optimal for the given list of transfers.
+     */
+    @Override
+    public final void transferToStops(int fromStop, Iterator<? extends TransferLeg> transfers) {
+        int arrivalTimeTransit = bestTimes.transitTime(fromStop);
+        while (transfers.hasNext()) {
+            transferToStop(arrivalTimeTransit, fromStop, transfers.next());
+        }
+    }
 
-    /* private methods */
-
-    private void transferToStop(int arrivalTimeTransit, int fromStop, TransferLeg transferLeg) {
+    /**
+     * PLEASE OVERRIDE FOR MORE SPECIFIC BEHAVIOR!
+     * <p/>
+     * The implementation can be copied and altered into a sub-class.
+     */
+    void transferToStop(int arrivalTimeTransit, int fromStop, TransferLeg transferLeg) {
         final int arrivalTime = arrivalTimeTransit + transferLeg.durationInSeconds();
 
         if (exceedsTimeLimit(arrivalTime)) {
@@ -158,10 +187,22 @@ public final class BestTimesWorkerState<T extends TripScheduleInfo> implements S
 
         // transitTimes upper bounds bestTimes so we don't need to update wait time and in-vehicle time here, if we
         // enter this conditional it has already been updated.
-        bestTimes.updateNewBestTime(toStop, arrivalTime);
+        newOverallBestTime(toStop, arrivalTime);
     }
 
-    private boolean exceedsTimeLimit(int alightTime) {
+    final int round() {
+        return round;
+    }
+
+    final boolean newTransitBestTime(int stop, int alightTime) {
+        return bestTimes.transitUpdateNewBestTime(stop, alightTime);
+    }
+
+    final boolean newOverallBestTime(int stop, int alightTime) {
+        return bestTimes.updateNewBestTime(stop, alightTime);
+    }
+
+    final boolean exceedsTimeLimit(int alightTime) {
         return calculator.isBest(timeLimit, alightTime);
     }
 }

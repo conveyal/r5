@@ -190,11 +190,11 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
      * This method is protected to allow reverce search to override it.
      */
     private void iterationSetup(int iterationDepartureTime) {
-        state.iterationSetup(iterationDepartureTime);
+        state.setupIteration(iterationDepartureTime);
 
         // add initial stops
         for (TransferLeg it : request().accessLegs()) {
-            state.setInitialTime(it, iterationDepartureTime);
+            state.setInitialTimeForIteration(it, iterationDepartureTime);
         }
     }
 

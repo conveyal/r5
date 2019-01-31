@@ -5,3 +5,5 @@ hs_err_pid*
 cache
 *.iml
 src/main/resources/git.properties
+
+testdata/norway/*.xxx

@@ -15,9 +15,9 @@ public class SpeedTestCmdLineOpts extends CommandLineOpts {
     @Override
     Options speedTestOptions() {
         Options options = super.speedTestOptions();
-        options.addOption(NUM_OF_ITINERARIES_OPT, "numOfItineraries", true, "Number of itineraries to return");
-        options.addOption(VERBOSE_OPT, "verbose", false, "Verbose output: Print itineraries");
-        options.addOption(SEARCH_WINDOW_IN_MINUTES_OPT, "searchTimeWindowInMinutes", true, "The time in minutes to add to from to time");
+        options.addOption(NUM_OF_ITINERARIES_OPT, "numOfItineraries", true, "Number of itineraries to return.");
+        options.addOption(VERBOSE_OPT, "verbose", false, "Verbose output, print itineraries.");
+        options.addOption(SEARCH_WINDOW_IN_MINUTES_OPT, "searchTimeWindowInMinutes", true, "The time in minutes to add to from to time.");
         options.addOption(SAMPLE_TEST_N_TIMES_OPT, "sampleTestNTimes", true, "Repeat the test N times. Profiles are altered in a round robin fashion.");
         options.addOption(PROFILES_OPT, "profiles", true, "A coma separated list of configuration profiles:\n" + String.join("\n", SpeedTestProfiles.options()));
         options.addOption(TEST_CASES_OPT, "testCases", true, "A coma separated list of test case numbers to run.");

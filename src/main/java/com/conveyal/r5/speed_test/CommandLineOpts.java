@@ -63,7 +63,9 @@ class CommandLineOpts {
         options.addOption(ROOT_DIR_OPT, "dir", true, "The directory where network and input files are located. (Optional)");
         options.addOption(HELP_OPT, "help", false, "Print all command line options, then exit. (Optional)");
         options.addOption(DEBUG_STOPS, "debugStops", true, "A coma separated list of stops to debug.");
-        options.addOption(DEBUG_TRIP, "debugTrip", true, "A coma separated list of stops representing a trip/path to debug.");
+        options.addOption(DEBUG_TRIP, "debugTrip", true, "A coma separated list of stops representing a trip/path to debug. " +
+                "Use a '*' to indicate where to start debugging. For example '1,*2,3' will print event at stop 2 and 3, " +
+                "but not stop 1 for all trips starting with the given stop sequence.");
         options.addOption(DEBUG, "debug", false, "Enable debug info.");
         return options;
     }

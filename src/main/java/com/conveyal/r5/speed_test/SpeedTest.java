@@ -403,7 +403,7 @@ public class SpeedTest {
         request.toLon = testCase.toLon;
         request.fromTime = 8 * 60 * 60; // 8AM in seconds since midnight
         request.toTime = request.fromTime + 60 * opts.searchWindowInMinutes();
-        request.date = LocalDate.of(2018, 5, 25);
+        request.date = LocalDate.of(2019, 1, 28);
         request.numberOfItineraries = opts.numOfItineraries();
         return request;
     }

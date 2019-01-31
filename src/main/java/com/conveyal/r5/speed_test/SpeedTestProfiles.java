@@ -5,9 +5,9 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 enum SpeedTestProfiles {
-    original("original", "The original code with FastRaptorWorker"),
-    range_raptor("rr", "Standard Range Raptor"),
-    mc_range_raptor("mc", "Multi criteria pareto optimal Range Raptor");
+    original("or", "The original R5 FastRaptorWorker by Conveyal"),
+    range_raptor("rr", "Standard Range Raptor, super fast [ transfers, arrival time, travel time ]."),
+    mc_range_raptor("mc", "Multi-Criteria pareto optimal Range Raptor [ transfers, arrival time, travel time, walking ].");
 
     final String shortName;
     final String description;

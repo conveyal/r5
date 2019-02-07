@@ -111,6 +111,6 @@ do
     # Attempt to tag (with jitter to avoid exceeding (presumed) AWS rate limits)
     echo Instance ${INSTANCE} attempting to tag itself using aws ec2 create-tags. >> $LOGFILE
     sudo -u ec2-user aws ec2 create-tags --resources ${INSTANCE} --tags Key=Name,Value=AnalysisWorker \
-    Key=Project,Value=Analysis Key=group,Value=conveyal #{3} Key=user,Value={4} Key=networkId,Value={5} Key=workerVersion,Value={6}
+    Key=Project,Value=Analysis Key=group,Value={3} Key=user,Value={4} Key=networkId,Value={5} Key=workerVersion,Value={6}
     sleep $[$RANDOM % 8 + 15]s
 done

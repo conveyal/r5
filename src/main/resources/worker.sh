@@ -98,8 +98,19 @@ MEM=`echo $TOTAL_MEM - 2097152 | bc`
 } &
 '
 
-# Tag the instance (so we can identify it in the EC2 console)
-# This has failed intermittently in the past, possibly due to AWS API rate limits on tagging resources, so add jitter up to 3 min.
-sleep $[$RANDOM % 180]s
-sudo -u ec2-user aws ec2 create-tags --resources $INSTANCE --tags Key=Name,Value=AnalysisWorker \
-Key=Project,Value=Analysis Key=group,Value={3} Key=user,Value={4} Key=networkId,Value={5} Key=workerVersion,Value={6}
+# Attempt to create AWS tags for the instance (so we can identify it in the EC2 console etc.)
+while :
+do
+    # Check whether this instance is tagged with a group (should be Auth0 accessGroup, for billing) TODO use jq
+    TAGGED=`sudo -u ec2-user aws ec2 describe-tags --filters Name=resource-id,Values=${INSTANCE} | grep "group" | wc -l`
+    if [ $TAGGED -gt 0 ]
+    then
+        echo Instance ${INSTANCE} has been successfully tagged with a group. >> $LOGFILE
+        break
+    fi
+    # Attempt to tag (with jitter to avoid exceeding (presumed) AWS rate limits)
+    echo Instance ${INSTANCE} attempting to tag itself using aws ec2 create-tags. >> $LOGFILE
+    sudo -u ec2-user aws ec2 create-tags --resources ${INSTANCE} --tags Key=Name,Value=AnalysisWorker \
+    Key=Project,Value=Analysis Key=group,Value=conveyal #{3} Key=user,Value={4} Key=networkId,Value={5} Key=workerVersion,Value={6}
+    sleep $[$RANDOM % 8 + 15]s
+done

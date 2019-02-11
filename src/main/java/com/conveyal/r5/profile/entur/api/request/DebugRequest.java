@@ -12,25 +12,84 @@ import java.util.function.Consumer;
 
 
 /**
- * This interface configure the amount of debugging you want for your request.
+ * This class configure the amount of debugging you want for your request.
  * Debugging is supported by an event model and event listeners must be provided to
  * receive any debug info.
+ * <p/>
+ * To debug unexpected results is sometimes very time consuming. This class make it possible
+ * to list all stop arrival events during the search for a given list of stops and/or a path.
+ * <p/>
+ * The debug events are not returned as part of the result, instead they are posted
+ * to registered listeners. The events are temporary objects; hence you should not
+ * hold a reference to the event elements or to any part of it after the listener callback
+ * completes.
+ * <p/>
+ * One of the benefits of the event based return strategy is that the events are returned
+ * even in the case of an exception or entering a endless loop. You don´t need to wait
+ * for the result to start analyze the results.
+ *
+ * <h3>Debugging stops</h3>
+ * By providing a small set of stops to debug, a list of all events for those stops
+ * are returned. This can be useful both to understand the algorithm and to debug events
+ * at a particular stop.
+ *
+ * <h3>Debugging path</h3>
+ * To debug a path(or trip), provide the list of stops and a index. You will then only get
+ * events for that particular sequence of stops starting with the stop at the given index.
+ * This is very effect if you expect a trip and don´t get it. Most likely you will get a
+ * REJECT or DROP event for your trip in return. You will also get a list of tips dominating
+ * the particular trip.
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-public interface DebugRequest<T extends TripScheduleInfo> {
+public class DebugRequest<T extends TripScheduleInfo> {
+    static final DebugRequest<?> DEFUALTS = new DebugRequest<>();
+
+    private final List<Integer> stops;
+    private final List<Integer> path;
+    private final int pathStartAtStopIndex;
+    private final Consumer<DebugEvent<StopArrivalView<T>>> stopArrivalListener;
+    private final Consumer<DebugEvent<DestinationArrivalView<T>>> destinationArrivalListener;
+    private final Consumer<DebugEvent<Path<T>>> pathFilteringListener;
+
+    private DebugRequest() {
+        stops = Collections.emptyList();
+        path = Collections.emptyList();
+        pathStartAtStopIndex = 0;
+        stopArrivalListener = null;
+        destinationArrivalListener = null;
+        pathFilteringListener = null;
+    }
+
+    DebugRequest(RequestBuilder<T> builder) {
+        this.stops = Collections.unmodifiableList(builder.debugStops());
+        this.path = Collections.unmodifiableList(builder.debugPath());
+        this.pathStartAtStopIndex = builder.debugPathStartAtStopIndex();
+        this.stopArrivalListener = builder.stopArrivalListener();
+        this.destinationArrivalListener = builder.destinationArrivalListener();
+        this.pathFilteringListener = builder.pathFilteringListener();
+    }
+
+    protected DebugRequest(DebugRequest<T> other) {
+        this.stops = other.stops();
+        this.path = other.path();
+        this.pathStartAtStopIndex = other.pathStartAtStopIndex();
+        this.stopArrivalListener = other.stopArrivalListener();
+        this.destinationArrivalListener = other.destinationArrivalListener();
+        this.pathFilteringListener = other.pathFilteringListener();
+    }
 
     /**
      * List of stops to debug.
      */
-    default List<Integer> stops() {
+    public List<Integer> stops() {
         return Collections.emptyList();
     }
 
     /**
      * List of stops in a particular path to debug. Only one path can be debugged per request.
      */
-    default List<Integer> path() {
+    public List<Integer> path() {
         return Collections.emptyList();
     }
 
@@ -39,35 +98,35 @@ public interface DebugRequest<T extends TripScheduleInfo> {
      * This will filter away all events in the beginning of the path reducing the number of events significantly;
      * hence make it easier to inspect events towards the end of the trip.
      */
-    default int pathStartAtStopIndex() {
-        return 0;
+    public int pathStartAtStopIndex() {
+        return pathStartAtStopIndex;
     }
 
     /**
      * Stop arrival debug event listener
      */
-    default Consumer<DebugEvent<StopArrivalView<T>>> stopArrivalListener() {
-        return null;
+    public Consumer<DebugEvent<StopArrivalView<T>>> stopArrivalListener() {
+        return stopArrivalListener;
     }
 
     /**
      * Destination arrival debug event listener
      */
-    default Consumer<DebugEvent<DestinationArrivalView<T>>> destinationArrivalListener() {
-        return null;
+    public Consumer<DebugEvent<DestinationArrivalView<T>>> destinationArrivalListener() {
+        return destinationArrivalListener;
     }
 
     /**
      * Path debug event listener
      */
-    default Consumer<DebugEvent<Path<T>>> pathFilteringListener() {
-        return null;
+    public Consumer<DebugEvent<Path<T>>> pathFilteringListener() {
+        return pathFilteringListener;
     }
 
     /**
-     * Is any debugging enabled.
+     * Is any debugging enabled. Either stops or path exist.
      */
-    default boolean isDebug() {
-        return true;
+    public boolean isDebug() {
+        return !stops.isEmpty() || !path.isEmpty();
     }
 }

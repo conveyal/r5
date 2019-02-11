@@ -14,44 +14,51 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * This is a Request builder to help construct valid requests.
+ * This is a Request builder to help construct valid requests. Se the
+ * request classes for documentation on each parameter.
+ * <p/>
+ * <ul>
+ *     <li>{@link RangeRaptorRequest}
+ *     <li>{@link MultiCriteriaCostFactors}
+ *     <li>{@link DebugRequest}
+ * </ul>
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class RequestBuilder<T extends TripScheduleInfo> {
     // Search
-    int fromTime;
-    int toTime;
-    final Collection<TransferLeg> accessLegs;
-    final Collection<TransferLeg> egressLegs;
-    int boardSlackInSeconds;
-    int numberOfAdditionalTransfers;
+    private int earliestDepartureTime;
+    private int latestArrivalTime;
+    private int searchWindowInSeconds;
+    private boolean arrivedBy;
+    private final Collection<TransferLeg> accessLegs;
+    private final Collection<TransferLeg> egressLegs;
+    private int boardSlackInSeconds;
+    private int numberOfAdditionalTransfers;
 
     // Algorithm
-    RaptorProfile profile;
+    private RaptorProfile profile;
+    private int multiCriteriaBoardCost;
+    private int multiCriteriaWalkReluctanceFactor;
+    private int multiCriteriaWaitReluctanceFactor;
 
     // Debug
-    final List<Integer> debugStops;
-    final List<Integer> debugPath;
-    int debugPathStartAtStopIndex;
-    Consumer<DebugEvent<StopArrivalView<T>>> stopArrivalListener;
-    Consumer<DebugEvent<DestinationArrivalView<T>>> destinationArrivalListener;
-    Consumer<DebugEvent<Path<T>>> pathFilteringListener;
+    private final List<Integer> debugStops;
+    private final List<Integer> debugPath;
+    private int debugPathStartAtStopIndex;
+    private Consumer<DebugEvent<StopArrivalView<T>>> stopArrivalListener;
+    private Consumer<DebugEvent<DestinationArrivalView<T>>> destinationArrivalListener;
+    private Consumer<DebugEvent<Path<T>>> pathFilteringListener;
 
-    /**
-     * @param fromTime See {@link RangeRaptorRequest#fromTime}
-     * @param toTime See {@link RangeRaptorRequest#toTime}
-     */
-    public RequestBuilder(int fromTime, int toTime) {
-        this(fromTime, toTime, createDefaults());
+
+
+    public RequestBuilder() {
+        this(RangeRaptorRequest.defaults(), MultiCriteriaCostFactors.DEFAULTS);
     }
 
-    public RequestBuilder(int fromTime, int toTime, RangeRaptorRequest<T> defaults) {
-        assertProperty(fromTime > 0, () -> "'fromTime' must be greater then 0. Value: " + fromTime);
-        assertProperty(toTime > fromTime, () -> "'toTime' must be greater than 'fromTime'. fromTime: "
-                + fromTime + ", toTime: " + toTime);
-        this.fromTime = fromTime;
-        this.toTime = toTime;
+    public RequestBuilder(RangeRaptorRequest<T> defaults, MultiCriteriaCostFactors mcDefaults) {
+        this.earliestDepartureTime = defaults.earliestDepartureTime();
+        this.latestArrivalTime = defaults.latestArrivalTime();
         this.accessLegs = new ArrayList<>();
         this.egressLegs = new ArrayList<>();
         this.boardSlackInSeconds = defaults.boardSlackInSeconds();
@@ -59,6 +66,9 @@ public class RequestBuilder<T extends TripScheduleInfo> {
 
         // Algorithm
         this.profile = defaults.profile();
+        this.multiCriteriaBoardCost = mcDefaults.boardCost();
+        this.multiCriteriaWalkReluctanceFactor = mcDefaults.walkReluctanceFactor();
+        this.multiCriteriaWaitReluctanceFactor = mcDefaults.waitReluctanceFactor();
 
         // Debug
         this.debugStops = new ArrayList<>();
@@ -69,21 +79,24 @@ public class RequestBuilder<T extends TripScheduleInfo> {
         this.pathFilteringListener = null;
     }
 
-    /** @see RangeRaptorRequest#profile */
+    public RaptorProfile profile() {
+        return profile;
+    }
+
     public RequestBuilder<T> profile(RaptorProfile profile) {
         this.profile = profile;
         return this;
     }
 
-    /**
-     * Add a single access leg to the list of access legs.
-     * @see RangeRaptorRequest#accessLegs */
+    public Collection<TransferLeg> accessLegs() {
+        return accessLegs;
+    }
+
     public RequestBuilder<T> addAccessStop(TransferLeg accessLeg) {
         this.accessLegs.add(accessLeg);
         return this;
     }
 
-    /** @see RangeRaptorRequest#accessLegs */
     public RequestBuilder<T> addAccessStops(Iterable<TransferLeg> accessLegs) {
         for (TransferLeg it : accessLegs) {
             addAccessStop(it);
@@ -91,16 +104,15 @@ public class RequestBuilder<T extends TripScheduleInfo> {
         return this;
     }
 
-    /**
-     * Add a single egress leg to the list of egress legs.
-     * @see RangeRaptorRequest#egressLegs
-     */
+    public Collection<TransferLeg> egressLegs() {
+        return egressLegs;
+    }
+
     public RequestBuilder<T> addEgressStop(TransferLeg egressLeg) {
         this.egressLegs.add(egressLeg);
         return this;
     }
 
-    /** @see RangeRaptorRequest#egressLegs */
     public RequestBuilder<T> addEgressStops(Iterable<TransferLeg> egressLegs) {
         for (TransferLeg it : egressLegs) {
             addEgressStop(it);
@@ -108,53 +120,138 @@ public class RequestBuilder<T extends TripScheduleInfo> {
         return this;
     }
 
-    /** @see RangeRaptorRequest#boardSlackInSeconds */
+    public int earliestDepartureTime() {
+        return earliestDepartureTime;
+    }
+
+    public RequestBuilder<T> earliestDepartureTime(int earliestDepartureTime) {
+        this.earliestDepartureTime = earliestDepartureTime;
+        return this;
+    }
+
+    public int latestArrivalTime() {
+        return latestArrivalTime;
+    }
+
+    public RequestBuilder<T> latestArrivalTime(int latestArrivalTime) {
+        this.latestArrivalTime = latestArrivalTime;
+        return this;
+    }
+
+    public int searchWindowInSeconds() {
+        return searchWindowInSeconds;
+    }
+
+    public RequestBuilder<T> searchWindowInSeconds(int searchWindowInSeconds) {
+        this.searchWindowInSeconds = searchWindowInSeconds;
+        return this;
+    }
+
+    public boolean arrivedBy() {
+        return arrivedBy;
+    }
+
+    public RequestBuilder<T> arrivedBy(boolean arrivedBy) {
+        this.arrivedBy = arrivedBy;
+        return this;
+    }
+
+    public int boardSlackInSeconds() {
+        return boardSlackInSeconds;
+    }
+
     public RequestBuilder<T> boardSlackInSeconds(int boardSlackInSeconds) {
         this.boardSlackInSeconds = boardSlackInSeconds;
         return this;
     }
 
-    /** @see RangeRaptorRequest#numberOfAdditionalTransfers */
+
+    public int numberOfAdditionalTransfers() {
+        return numberOfAdditionalTransfers;
+    }
+
     public RequestBuilder<T> numberOfAdditionalTransfers(int numberOfAdditionalTransfers) {
         this.numberOfAdditionalTransfers = numberOfAdditionalTransfers;
         return this;
     }
 
-    /**
-     * Add a stop the stops list.
-     * @see DebugRequest#stops()
-     */
+    public int multiCriteriaBoardCost() {
+        return multiCriteriaBoardCost;
+    }
+
+    public RequestBuilder<T> multiCriteriaBoardCost(int boardCost) {
+        this.multiCriteriaBoardCost = boardCost;
+        return this;
+    }
+
+    public int multiCriteriaWalkReluctanceFactor() {
+        return multiCriteriaWalkReluctanceFactor;
+    }
+
+    public RequestBuilder<T> multiCriteriaWalkReluctanceFactor(int walkReluctanceFactor) {
+        this.multiCriteriaWalkReluctanceFactor = walkReluctanceFactor;
+        return this;
+    }
+
+    public int multiCriteriaWaitReluctanceFactor() {
+        return multiCriteriaWaitReluctanceFactor;
+    }
+
+    public RequestBuilder<T> multiCriteriaWaitReluctanceFactor(int waitReluctanceFactor) {
+        this.multiCriteriaWaitReluctanceFactor = waitReluctanceFactor;
+        return this;
+    }
+
+    public List<Integer> debugStops() {
+        return debugStops;
+    }
+
     public RequestBuilder<T> debugStop(int stop) {
         this.debugStops.add(stop);
         return this;
     }
 
-    /** @see DebugRequest#path() */
+    public List<Integer> debugPath() {
+        return debugPath;
+    }
+
     public RequestBuilder<T> debugPath(List<Integer> path) {
         this.debugPath.clear();
         this.debugPath.addAll(path);
         return this;
     }
 
-    /** @see DebugRequest#pathStartAtStopIndex() */
+    public int debugPathStartAtStopIndex() {
+        return debugPathStartAtStopIndex;
+    }
+
     public RequestBuilder<T> debugPathStartAtStopIndex(Integer debugPathStartAtStopIndex) {
         this.debugPathStartAtStopIndex = debugPathStartAtStopIndex;
         return this;
     }
 
-    /** @see DebugRequest#stopArrivalListener() */
+    public Consumer<DebugEvent<StopArrivalView<T>>> stopArrivalListener() {
+        return stopArrivalListener;
+    }
+
     public RequestBuilder<T> stopArrivalListener(Consumer<DebugEvent<StopArrivalView<T>>> stopArrivalListener) {
         this.stopArrivalListener = stopArrivalListener;
         return this;
     }
 
-    /** @see DebugRequest#destinationArrivalListener() */
+    public Consumer<DebugEvent<DestinationArrivalView<T>>> destinationArrivalListener() {
+        return destinationArrivalListener;
+    }
+
     public RequestBuilder<T> destinationArrivalListener(Consumer<DebugEvent<DestinationArrivalView<T>>> destinationArrivalListener) {
         this.destinationArrivalListener = destinationArrivalListener;
         return this;
     }
 
-    /** @see DebugRequest#pathFilteringListener()  */
+    public Consumer<DebugEvent<Path<T>>> pathFilteringListener() {
+        return pathFilteringListener;
+    }
+
     public RequestBuilder<T> pathFilteringListener(Consumer<DebugEvent<Path<T>>> pathFilteringListener) {
         this.pathFilteringListener = pathFilteringListener;
         return this;
@@ -163,27 +260,16 @@ public class RequestBuilder<T extends TripScheduleInfo> {
     public RangeRaptorRequest<T> build() {
         assertProperty(!accessLegs.isEmpty(), () ->"At least one 'accessLegs' is required.");
         assertProperty(!egressLegs.isEmpty(), () ->"At least one 'egressLegs' is required.");
-        return new RequestObject<>(this);
+        return new RangeRaptorRequest<>(this);
     }
 
     public DebugRequest<T> debug() {
-        return new DebugRequestObject<>(this);
-    }
-
-    public RaptorProfile profile() {
-        return profile;
+        return new DebugRequest<>(this);
     }
 
     private void assertProperty(boolean predicate, Supplier<String> errorMessageProvider) {
         if(!predicate) {
             throw new IllegalArgumentException(RangeRaptorRequest.class.getSimpleName()  + " error: " + errorMessageProvider.get());
         }
-    }
-
-    private static<T extends TripScheduleInfo> RangeRaptorRequest<T> createDefaults() {
-        return new RangeRaptorRequest<T>() {
-            @Override public int fromTime() { return -1; }
-            @Override public int toTime() { return -1; }
-        };
     }
 }

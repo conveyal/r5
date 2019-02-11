@@ -18,20 +18,20 @@ import java.util.function.Function;
 final class ReverseSearchTransitCalculator implements TransitCalculator {
     private final int tripSearchBinarySearchThreshold;
     private final int boardSlackInSeconds;
-    private final int fromTime;
-    private final int toTime;
+    private final int latestDepartureTime;
+    private final int earliestArrivalTime;
     private final int iterationStep;
 
 
 
     ReverseSearchTransitCalculator(RangeRaptorRequest<?> r, TuningParameters t) {
-        // The request is already modified to search backwards, so 'fromTime()'
-        // goes with destination and 'toTime()' match origin.
+        // The request is already modified to search backwards, so 'earliestDepartureTime()'
+        // goes with destination and 'latestArrivalTime()' match origin.
         this(
             t.scheduledTripBinarySearchThreshold(),
             r.boardSlackInSeconds(),
-            r.fromTime(),
-            r.toTime(),
+            r.earliestDepartureTime(),
+            r.latestArrivalTime(),
             t.iterationDepartureStepInSeconds()
         );
     }
@@ -39,14 +39,14 @@ final class ReverseSearchTransitCalculator implements TransitCalculator {
     private ReverseSearchTransitCalculator(
             int binaryTripSearchThreshold,
             int boardSlackInSeconds,
-            int fromTime,
-            int toTime,
+            int latestDepartureTime,
+            int earliestArrivalTime,
             int iterationStep
     ) {
         this.tripSearchBinarySearchThreshold = binaryTripSearchThreshold;
         this.boardSlackInSeconds = boardSlackInSeconds;
-        this.fromTime = fromTime;
-        this.toTime = toTime;
+        this.latestDepartureTime = latestDepartureTime;
+        this.earliestArrivalTime = earliestArrivalTime;
         this.iterationStep = iterationStep;
     }
 
@@ -95,12 +95,17 @@ final class ReverseSearchTransitCalculator implements TransitCalculator {
 
     @Override
     public final IntIterator rangeRaptorMinutes() {
-        return IntIterators.intIncIterator(toTime, fromTime, iterationStep);
+        return IntIterators.intIncIterator(earliestArrivalTime, latestDepartureTime, iterationStep);
     }
 
     @Override
-    public IntIterator patternStopIterator(int nStopsInPattern, int startStopPos) {
-        return IntIterators.intDecIterator(startStopPos, -1);
+    public IntIterator patternStopIterator(int nStopsInPattern) {
+        return IntIterators.intDecIterator(nStopsInPattern-1, 0);
+    }
+
+    @Override
+    public IntIterator patternStopIterator(int onTripStopPos, int nStopsInPattern) {
+        return IntIterators.intDecIterator(onTripStopPos-1, 0);
     }
 
     @Override

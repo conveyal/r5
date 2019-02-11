@@ -54,7 +54,7 @@ public final class McRangeRaptorWorker<T extends TripScheduleInfo> extends Abstr
 
             if (found) {
                 T trip = tripSearch.getCandidateTrip();
-                IntIterator patternStops = calculator().patternStopIterator(boardStopPos + 1, nPatternStops);
+                IntIterator patternStops = calculator().patternStopIterator(boardStopPos, nPatternStops);
 
                 while (patternStops.hasNext()) {
                     int alightStopPos = patternStops.next();

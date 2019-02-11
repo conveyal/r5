@@ -18,7 +18,7 @@ public final class TransitStopArrival<T extends TripScheduleInfo> extends Abstra
                 stopIndex,
                 boardTime,
                 arrivalTime,
-                arrivalTime - previousState.arrivalTime() + BOARD_COST
+                0
         );
         this.trip = trip;
     }

@@ -30,7 +30,7 @@ public class SearchContext<T extends TripScheduleInfo> {
             WorkerPerformanceTimers timers,
             boolean forward
     ) {
-        this.request = forward ? request : new ReverseRequestObject<>(request);
+        this.request = forward ? request : new ReverseRequest<>(request);
         this.tuningParameters = tuningParameters;
         this.transit = transit;
         // Note that it is the "new" request that is passed in.

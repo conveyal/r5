@@ -14,16 +14,16 @@ import java.util.function.Function;
 final class ForwardSearchTransitCalculator implements TransitCalculator {
     private final int tripSearchBinarySearchThreshold;
     private final int boardSlackInSeconds;
-    private final int maxTimeLimit;
-    private final int fromTime;
+    private final int latestArrivalTime;
+    private final int earliestDepartureTime;
     private final int iterationStep;
 
     ForwardSearchTransitCalculator(RangeRaptorRequest<?> r, TuningParameters t) {
         this(
                 t.scheduledTripBinarySearchThreshold(),
                 r.boardSlackInSeconds(),
-                r.fromTime(),
-                r.toTime(),
+                r.earliestDepartureTime(),
+                r.latestArrivalTime(),
                 t.iterationDepartureStepInSeconds()
         );
     }
@@ -31,14 +31,14 @@ final class ForwardSearchTransitCalculator implements TransitCalculator {
     ForwardSearchTransitCalculator(
             int tripSearchBinarySearchThreshold,
             int boardSlackInSeconds,
-            int fromTime,
-            int toTime,
+            int earliestDepartureTime,
+            int latestArrivalTime,
             int iterationStep
     ) {
         this.tripSearchBinarySearchThreshold = tripSearchBinarySearchThreshold;
         this.boardSlackInSeconds = boardSlackInSeconds;
-        this.fromTime = fromTime;
-        this.maxTimeLimit = toTime;
+        this.earliestDepartureTime = earliestDepartureTime;
+        this.latestArrivalTime = latestArrivalTime;
         this.iterationStep = iterationStep;
     }
 
@@ -80,12 +80,18 @@ final class ForwardSearchTransitCalculator implements TransitCalculator {
 
     @Override
     public final IntIterator rangeRaptorMinutes() {
-        return IntIterators.intDecIterator(maxTimeLimit-iterationStep, fromTime-1, iterationStep);
+        return IntIterators.intDecIterator(latestArrivalTime, earliestDepartureTime, iterationStep);
     }
 
     @Override
-    public IntIterator patternStopIterator(int startStopPos, int nStopsInPattern) {
-        return IntIterators.intIncIterator(startStopPos, nStopsInPattern);
+    public IntIterator patternStopIterator(int nStopsInPattern) {
+        return IntIterators.intIncIterator(0, nStopsInPattern);
+    }
+
+    @Override
+    public IntIterator patternStopIterator(int onTripStopPos, int nStopsInPattern) {
+        // We need to add one, because the input trip is the boarded stop position
+        return IntIterators.intIncIterator(onTripStopPos + 1, nStopsInPattern);
     }
 
     @Override

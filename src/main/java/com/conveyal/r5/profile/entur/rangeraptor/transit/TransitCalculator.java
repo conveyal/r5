@@ -46,10 +46,10 @@ public interface TransitCalculator {
     /**
      * For a normal search return the trip arrival time at stop position.
      * For a reverse search return the next trips departure time at stop position with the boardSlack added.
-     * @param onTrip
-     * @param stopPositionInPattern
-     * @param <T>
-     * @return
+     *
+     * @param onTrip the current boarded trip
+     * @param stopPositionInPattern the stop position/index
+     * @param <T> The TripSchedule type defined by the user of the range raptor API.
      */
     <T extends TripScheduleInfo> int latestArrivalTime(T onTrip, int stopPositionInPattern);
 
@@ -60,8 +60,6 @@ public interface TransitCalculator {
      * In a normal forward search "best" is considered BEFORE in time, while AFTER in time
      * is considered best in a reverse seach.
      *
-     * @param subject
-     * @param candidate
      * @return true is subject is better then the candidate; if not false.
      */
     boolean isBest(int subject, int candidate);
@@ -89,13 +87,22 @@ public interface TransitCalculator {
 
     /**
      * Return an iterator, iterating over the stop positions in a pattern.
-     * Iterate from startPos to nStopsInPattern-1 in a forward search and from
-     * startPos to 0 in a reverse search.
+     * Iterate from '0' to 'nStopsInPattern - 1' in a forward search and from
+     * 'nStopsInPattern - 1' to '0' in a reverse search.
      *
-     * @param startStopPos the iterator will start here(inclusive)
      * @param nStopsInPattern the number of stops in the trip pattern
      */
-    IntIterator patternStopIterator(int startStopPos, int nStopsInPattern);
+    IntIterator patternStopIterator(int nStopsInPattern);
+
+    /**
+     * Return an iterator, iterating over the stop positions in a pattern.
+     * Iterate from 'onTripStopPos + 1' to 'nStopsInPattern-1' in a forward search
+     * and from 'onTripStopPos - 1' to 0 in a reverse search.
+     *
+     * @param onTripStopPos the iterator will start here(exclusive)
+     * @param nStopsInPattern the number of stops in the trip pattern
+     */
+    IntIterator patternStopIterator(int onTripStopPos, int nStopsInPattern);
 
     /**
      * Create a trip search, to use to find the correct trip to board/alight for
@@ -123,8 +130,8 @@ public interface TransitCalculator {
      * Return a calculator for test purpose. The following parameters are fixed:
      * <ul>
      *     <li>'binaryTripSearchThreshold' = 10
-     *     <li>'fromTime' = 08:00:00
-     *     <li>'toTime',  = 10:00:00
+     *     <li>'earliestDepartureTime' = 08:00:00
+     *     <li>'latestArrivalTime',  = 10:00:00
      *     <li>'iterationStep' = 60 seconds
      * </ul>
      */

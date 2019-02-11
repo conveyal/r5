@@ -2,6 +2,8 @@ package com.conveyal.r5.profile.entur.api.path;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 
+import java.util.Objects;
+
 /**
  * Represent a egress leg in a path. The egress leg is the last leg arriving at the destination. The previous leg
  * must be a transit leg - no other legs are allowed.
@@ -49,5 +51,20 @@ public final class EgressPathLeg<T extends TripScheduleInfo> implements PathLeg<
     @Override
     public final boolean isEgressLeg() {
         return true;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        EgressPathLeg<?> that = (EgressPathLeg<?>) o;
+        return fromStop == that.fromStop &&
+                fromTime == that.fromTime &&
+                toTime == that.toTime;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(fromStop, fromTime, toTime);
     }
 }

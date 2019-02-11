@@ -43,7 +43,7 @@ public interface TuningParameters {
      * <p/>
      * Default value is 60.
      */
-    default int departureStepInSeconds() {
+    default int iterationDepartureStepInSeconds() {
         return 60;
     }
 }

@@ -34,7 +34,7 @@ public class DestinationArrivalTest {
     private static final int EXPECTED_TOTAL_DURATION = ACCESS_DURATION_TIME + BOARD_SLACK
             + (TRANSIT_1_ALIGHT_TIME - TRANSIT_1_BOARD_TIME) + DESTINATION_DURATION_TIME;
 
-    private static final TransitCalculator TRANSIT_CALCULATOR = TransitCalculator.testDummy(BOARD_SLACK);
+    private static final TransitCalculator TRANSIT_CALCULATOR = TransitCalculator.testDummyCalculator(BOARD_SLACK);
     private static final AccessStopArrival<TripScheduleInfo> ACCESS_ARRIVAL = new AccessStopArrival<>(
             ACCESS_STOP, ACCESS_DEPARTURE_TIME, ACCESS_DURATION_TIME, ACCESS_COST, TRANSIT_CALCULATOR
     );
@@ -77,6 +77,6 @@ public class DestinationArrivalTest {
 
     @Test
     public void testToString() {
-        assertEquals("DestinationArrival { Time: 8:14:50 (0:50), Cost: 920 }", subject.toString());
+        assertEquals("DestinationArrival { Time: 8:14:50 (8:14:00), Cost: 920 }", subject.toString());
     }
 }

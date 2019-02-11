@@ -20,12 +20,6 @@ import java.util.Iterator;
 
 
 /**
- * TODO TGR - Clean up
- * <p>
- * RaptorWorker is fast, but FastRaptorWorker is knock-your-socks-off fast, and also more maintainable.
- * It is also simpler, as it only focuses on the transit network; see the Propagater class for the methods that extend
- * the travel times from the final transit stop of a trip out to the individual targets.
- * <p>
  * The algorithm used herein is described in
  * <p>
  * Conway, Matthew Wigginton, Andrew Byrd, and Marco van der Linden. “Evidence-Based Transit and Land Use Sketch Planning
@@ -35,12 +29,19 @@ import java.util.Iterator;
  * Delling, Daniel, Thomas Pajor, and Renato Werneck. “Round-Based Public Transit Routing,” January 1, 2012.
  * http://research.microsoft.com/pubs/156567/raptor_alenex.pdf.
  * <p>
- * There is currently no support for saving paths.
+ * This version do support the following features:
+ * <ul>
+ *     <li>Raptor (R)
+ *     <li>Range Raptor (RR)
+ *     <li>Multi-criteria pareto optimal Range Raptor (McRR)
+ *     <li>Reverse search in combination with R and RR
+ * </ul>
+ * This version do NOT support the following features:
+ * <ul>
+ *     <li>Frequency routes, supported by the original code using Monte Carlo methods (generating randomized schedules)
+ * </ul>
  * <p>
- * This class originated as a rewrite of our RAPTOR code that would use "thin workers", allowing computation by a
- * generic function-execution service like AWS Lambda. The gains in efficiency were significant enough that this is now
- * the way we do all analysis work. This system also accounts for pure-frequency routes by using Monte Carlo methods
- * (generating randomized schedules).
+ * This class originated as a rewrite of Conveyals RAPTOR code: https://github.com/conveyal/r5.
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
@@ -129,7 +130,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
      * This is protected to allow reverse search to override and step backwards.
      */
     private void performTransitForRoundAndEachStopInPattern(final TripPatternInfo<T> pattern) {
-        IntIterator it = calculator().patternStopIterator(pattern);
+        IntIterator it = calculator().patternStopIterator(0, pattern.numberOfStopsInPattern());
         while (it.hasNext()) {
             performTransitForRoundAndPatternAtStop(it.next());
         }
@@ -141,8 +142,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
      * This is protected to allow reverse search to override and create a alight search instead.
      */
     private TripScheduleSearch<T> createTripSearch(TripPatternInfo<T> pattern) {
-        final int binarySearchThreshold = tuningParameters().scheduledTripBinarySearchThreshold();
-        return calculator().createTripSearch(pattern, binarySearchThreshold, this::skipTripSchedule);
+        return calculator().createTripSearch(pattern, this::skipTripSchedule);
     }
 
     /**

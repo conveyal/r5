@@ -24,6 +24,22 @@ public class IntIterators {
     }
 
     /**
+     * Create an int iterator incrementing by 1.
+     *
+     * @param startValue the start value (inclusive)
+     * @param endValue the end value (exclusive)
+     * @param increment the value to add for each iteration
+     * @return the iterator
+     */
+    public static IntIterator intIncIterator(final int startValue, final int endValue, final int increment) {
+        return new IntIterator() {
+            private int i = startValue;
+            @Override public int next() { return i+= increment; }
+            @Override public boolean hasNext() { return i < endValue; }
+        };
+    }
+
+    /**
      * Create an int iterator decrementing by 1.
      *
      * @param startValue the start value (inclusive)

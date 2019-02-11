@@ -77,9 +77,7 @@ public class SearchContext<T extends TripScheduleInfo> {
      */
     private static TransitCalculator createCalculator(RangeRaptorRequest<?> r, TuningParameters t, boolean forward) {
         return forward
-                ? new ForwardSearchTransitCalculator(r, t.departureStepInSeconds())
-                // The request is already modified to search backwards,
-                // therefor use 'toTime()' as 'latestAcceptableDepartureTime'
-                : new BackwardSearchTransitCalculator(r.boardSlackInSeconds(), r.fromTime(), r.toTime());
+                ? new ForwardSearchTransitCalculator(r, t)
+                : new ReverseSearchTransitCalculator(r, t);
     }
 }

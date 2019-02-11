@@ -4,6 +4,7 @@ import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.path.PathMapper;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
@@ -39,11 +40,6 @@ import java.util.Map;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 class DestinationArrivals<T extends TripScheduleInfo> {
-    /**
-     * Use a BIG number as an upper bound for arrival times
-     */
-    private static final int UNREACHED = Integer.MAX_VALUE;
-
     private static <T extends TripScheduleInfo> ParetoComparator<Path<T>> pathComparator() {
         return (l, r) ->
                 l.endTime() < r.endTime() ||
@@ -73,21 +69,28 @@ class DestinationArrivals<T extends TripScheduleInfo> {
      */
     private final Collection<Path<T>> paths;
 
+    private final TransitCalculator calculator;
+
+    private final PathMapper<T> pathMapper;
+
     private final DebugHandler<Path<T>> debugPathHandler;
 
     private final DebugHandler<DestinationArrivalView<T>> debugDestinationArrivalHandler;
 
 
-    DestinationArrivals(int nRounds, StopsCursor<T> stopsCursor, DebugHandlerFactory<T> debugFactory) {
+
+    DestinationArrivals(int nRounds, TransitCalculator calculator, StopsCursor<T> stopsCursor, DebugHandlerFactory<T> debugFactory) {
         this.stopsCursor = stopsCursor;
+        this.calculator = calculator;
         this.bestArrivalTimesAtDestination = new int[nRounds];
-        Arrays.fill(this.bestArrivalTimesAtDestination, UNREACHED);
+        Arrays.fill(this.bestArrivalTimesAtDestination, calculator.unreachedTime());
 
         this.debugPathHandler = debugFactory.debugPath();
         this.debugDestinationArrivalHandler = debugFactory.debugDestinationArrival();
 
-        paths = new ParetoSet<>(
-                pathComparator(),
+        this.pathMapper = calculator.createPathMapper();
+        this.paths = new ParetoSet<>(
+                 pathComparator(),
                 debugPathHandler::drop
         );
     }
@@ -98,7 +101,7 @@ class DestinationArrivals<T extends TripScheduleInfo> {
             debugDropDestinationArrival(arrival);
             int round = arrival.round();
             egressArrivalsByRound.put(round, arrival);
-            bestArrivalTimesAtDestination[round] = arrival.destinationArrivalTime();
+            bestArrivalTimesAtDestination[round] = destinationArrivalTime(arrival);
             added = true;
         }
 
@@ -126,22 +129,30 @@ class DestinationArrivals<T extends TripScheduleInfo> {
 
     /* Private methods */
 
+    private int destinationDepartureTime(EgressStopArrivalState<T> arrival) {
+        return arrival.transitTime();
+    }
+
+    private int destinationArrivalTime(EgressStopArrivalState<T> arrival) {
+        return calculator.add(arrival.transitTime(), arrival.egressLeg().durationInSeconds());
+    }
+
     private Path<T> createPathFromEgressState(EgressStopArrivalState<T> arrival) {
-        return PathMapper.mapToPath(destinationArrivalView(arrival));
+        return pathMapper.mapToPath(destinationArrivalView(arrival));
     }
 
     private DestinationArrivalView<T> destinationArrivalView(EgressStopArrivalState<T> arrival) {
         // Initialize the cursor to point to the current arrival
 
         return new StopArrivalViewAdapter.DestinationArrivalViewAdapter<T>(
-                arrival.destinationDepartureTime(),
-                arrival.destinationArrivalTime(),
+                destinationDepartureTime(arrival),
+                destinationArrivalTime(arrival),
                 stopsCursor.transit(arrival.round(), arrival.stop())
         );
     }
 
     private boolean newStateHaveTheBestDestinationArrivalTimeForGivenTheRound(EgressStopArrivalState<T> newState) {
-        return newState.destinationArrivalTime() < bestArrivalTimesAtDestination[newState.round()];
+        return calculator.isBest(destinationArrivalTime(newState), bestArrivalTimesAtDestination[newState.round()]);
     }
 
     private void debugDropDestinationArrival(EgressStopArrivalState<T> arrival) {

@@ -4,12 +4,18 @@ package com.conveyal.r5.profile.entur.rangeraptor.view;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.LinkedList;
 
 /**
- * TODO TGR
+ * The purpose of the stop arrival view is to provide a simplified uniform normalized
+ * interface for the internal Raptor specific models. The models are optimized for
+ * speed and memory consumtion, while the view provide one interface for mapping back
+ * to the users domain. The view is used by the debugging functionality and mapping to
+ * paths.
+ * <p/>
+ * The view are only created for objects part of a path to be returned or a stop arrival
+ * part of some debug operations. This is just a fraction of all stop arrivals so there
+ * is no need to optimize performance nor memory consumption fo view objects.
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
@@ -58,13 +64,6 @@ public interface StopArrivalView<T extends TripScheduleInfo> {
     }
 
     /**
-     * The duration of the last leg
-     */
-    default int legDuration() {
-        return arrivalTime() - departureTime();
-    }
-
-    /**
      * The previous stop arrival state
      */
     StopArrivalView<T> previous();
@@ -105,20 +104,18 @@ public interface StopArrivalView<T extends TripScheduleInfo> {
 
     /**
      * List all stops used to arrive at current stop arrival. This method is SLOW,
-     * should only be used in code that need to be fast, like debugging.
+     * should only be used in code that does not need to be fast, like debugging.
      */
-    default List<Integer> listStops() {
-        List<Integer> stops = new ArrayList<>();
+    default Iterable<Integer> listStopsForDebugging() {
+        LinkedList<Integer> stops = new LinkedList<>();
 
-        StopArrivalView<T> arrival = this;
+        StopArrivalView<T> it = this;
 
-        while (!arrival.arrivedByAccessLeg()) {
-            stops.add(arrival.stop());
-            arrival = arrival.previous();
+        while (!it.arrivedByAccessLeg()) {
+            stops.addFirst(it.stop());
+            it = it.previous();
         }
-        stops.add(arrival.stop());
-
-        Collections.reverse(stops);
+        stops.addFirst(it.stop());
 
         return stops;
     }
@@ -148,7 +145,7 @@ public interface StopArrivalView<T extends TripScheduleInfo> {
                 round(),
                 stop(),
                 TimeUtils.timeToStrCompact(arrivalTime()),
-                TimeUtils.timeToStrCompact(legDuration()),
+                TimeUtils.timeToStrCompact(departureTime()),
                 cost()
         );
     }

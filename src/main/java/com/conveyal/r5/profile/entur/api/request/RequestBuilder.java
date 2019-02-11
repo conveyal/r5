@@ -28,7 +28,7 @@ public class RequestBuilder<T extends TripScheduleInfo> {
     int numberOfAdditionalTransfers;
 
     // Algorithm
-    RaptorProfiles profile;
+    RaptorProfile profile;
 
     // Debug
     final List<Integer> debugStops;
@@ -65,12 +65,12 @@ public class RequestBuilder<T extends TripScheduleInfo> {
         this.debugPath = new ArrayList<>();
         this.debugPathStartAtStopIndex = 0;
         this.stopArrivalListener = null;
-        destinationArrivalListener = null;
-        pathFilteringListener = null;
+        this.destinationArrivalListener = null;
+        this.pathFilteringListener = null;
     }
 
     /** @see RangeRaptorRequest#profile */
-    public RequestBuilder<T> profile(RaptorProfiles profile) {
+    public RequestBuilder<T> profile(RaptorProfile profile) {
         this.profile = profile;
         return this;
     }
@@ -166,14 +166,18 @@ public class RequestBuilder<T extends TripScheduleInfo> {
         return new RequestObject<>(this);
     }
 
+    public DebugRequest<T> debug() {
+        return new DebugRequestObject<>(this);
+    }
+
+    public RaptorProfile profile() {
+        return profile;
+    }
+
     private void assertProperty(boolean predicate, Supplier<String> errorMessageProvider) {
         if(!predicate) {
             throw new IllegalArgumentException(RangeRaptorRequest.class.getSimpleName()  + " error: " + errorMessageProvider.get());
         }
-    }
-
-    public DebugRequest<T> debug() {
-        return new DebugRequest<>(this);
     }
 
     private static<T extends TripScheduleInfo> RangeRaptorRequest<T> createDefaults() {

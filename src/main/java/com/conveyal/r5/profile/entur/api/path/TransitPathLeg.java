@@ -2,6 +2,8 @@ package com.conveyal.r5.profile.entur.api.path;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 
+import java.util.Objects;
+
 /**
  * Represent a transit leg in a path.
  *
@@ -33,5 +35,19 @@ public final class TransitPathLeg<T extends TripScheduleInfo> extends Intermedia
     @Override
     public final PathLeg<T> nextLeg() {
         return next;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!super.equals(o)) return false;
+        TransitPathLeg<?> that = (TransitPathLeg<?>) o;
+        return next.equals(that.next) &&
+                trip.equals(that.trip);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), next, trip);
     }
 }

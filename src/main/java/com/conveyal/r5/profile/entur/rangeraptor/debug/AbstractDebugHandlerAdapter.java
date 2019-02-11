@@ -5,6 +5,7 @@ import com.conveyal.r5.profile.entur.api.request.DebugRequest;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
 
 import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.function.Consumer;
 
@@ -62,7 +63,7 @@ abstract class AbstractDebugHandlerAdapter<T> implements DebugHandler<T> {
 
     abstract protected int stop(T arrival);
 
-    abstract protected List<Integer> stopsVisited(T arrival);
+    abstract protected Iterable<Integer> stopsVisited(T arrival);
 
 
     /* private members */
@@ -76,14 +77,17 @@ abstract class AbstractDebugHandlerAdapter<T> implements DebugHandler<T> {
             return false;
         }
 
-        List<Integer> stopsVisited = stopsVisited(arrival);
+        Iterator<Integer> stopsVisited = stopsVisited(arrival).iterator();
+        Iterator<Integer> pathStops = path.iterator();
 
-        if(stopsVisited.size() > path.size()) {
-            return false;
-        }
+        while (stopsVisited.hasNext()) {
+            if(!pathStops.hasNext()) {
+                return false;
+            }
+            Integer visitedStop = stopsVisited.next();
+            Integer pathStop = pathStops.next();
 
-        for (int i = 0; i < stopsVisited.size(); i++) {
-            if(!stopsVisited.get(i).equals(path.get(i))) {
+            if(!visitedStop.equals(pathStop)) {
                 return false;
             }
         }

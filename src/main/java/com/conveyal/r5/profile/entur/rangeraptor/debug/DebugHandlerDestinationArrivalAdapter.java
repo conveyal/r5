@@ -4,8 +4,6 @@ import com.conveyal.r5.profile.entur.api.request.DebugRequest;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 
-import java.util.List;
-
 /**
  * DestinationArrival adapter.
  *
@@ -24,7 +22,7 @@ final class DebugHandlerDestinationArrivalAdapter<T extends TripScheduleInfo>
     }
 
     @Override
-    protected List<Integer> stopsVisited(DestinationArrivalView<T> arrival) {
-        return arrival.previous().listStops();
+    protected Iterable<Integer> stopsVisited(DestinationArrivalView<T> arrival) {
+        return arrival.previous().listStopsForDebugging();
     }
 }

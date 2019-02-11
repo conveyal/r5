@@ -3,15 +3,44 @@ package com.conveyal.r5.profile.entur.rangeraptor.transit;
 import com.conveyal.r5.profile.entur.api.TestTripPattern;
 import com.conveyal.r5.profile.entur.api.TestTripSchedule;
 import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
-import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import org.junit.Assert;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
+import static com.conveyal.r5.profile.entur.api.TestTripSchedule.createTripScheduleUseingArrivalTimes;
+
+
 public class TripScheduleAlightSearchTest {
-    private static final int TRIPS_THRESHOLD = 9;
+
+    /*
+     * To test alight search we need a trip pattern, we will create
+     * a trip pattern with 4 trips and 2 stops. This will cover most
+     * of the simple cases:
+     *
+     * Trip:  |  S   |  A   |  T   |  B
+     * Stop 1 |  900 | 1000 | 1100 | 2000
+     * Stop 2 | 2500 | 1500 | 1400 | 2500
+     *
+     * Note:
+     * - All times are alight times, we do not care about the board times in this test.
+     * - Trip S and T is not in service
+     * - Trip S depart from stop 1 before trip B, but depart from stop 2 after trip B.
+     * - Trip T depart from stop 1 after trip B, but depart from stop 2 before trip B.
+     *
+     * The TripScheduleAlightSearch should handle the above trip variations. The point here
+     * is that trip B, S and T is in order at stop 1, but not at stop 2.
+     */
+
+    /**
+     * We use a relatively small prime number as the binary search threshold. This make it simpler to
+     * construct a good test.
+     */
+    private static final int TRIPS_BINARY_SEARCH_THRESHOLD = 7;
+
+    /** A time before all other times */
+    private static final int TIME_LATE = 9999;
 
     private static final int TIME_A0 = 1000;
     private static final int TIME_A1 = 1500;
@@ -19,193 +48,259 @@ public class TripScheduleAlightSearchTest {
     private static final int TIME_B0 = 2000;
     private static final int TIME_B1 = 2500;
 
-    private static final int TIME_S0 =  900;
-    private static final int TIME_S1 = 1600; // Arrives after A, but index is before (not in service)
+    private static final int TIME_S0 = 900;
+    private static final int TIME_S1 = 1600;
 
     private static final int TIME_T0 = 1100;
-    private static final int TIME_T1 = 1400; // Arrives before B, but index is after (not in service)
+    private static final int TIME_T1 = 1400;
 
-    private static final int TIME_LATE = 5000;
-
-    private static final int POS_0 = 0;
-    private static final int POS_1 = 1;
+    /* Stop position in pattern */
+    private static final int STOP_1 = 0;
+    private static final int STOP_2 = 1;
 
     private static final int TRIP_A_INDEX = 1;
     private static final int TRIP_B_INDEX = 3;
 
     // Trips in service
-    private TestTripSchedule tripA = new TestTripSchedule(TIME_A0, TIME_A1);
-    private TestTripSchedule tripB = new TestTripSchedule(TIME_B0, TIME_B1);
+    private TestTripSchedule tripA = createTripScheduleUseingArrivalTimes(TIME_A0, TIME_A1);
+    private TestTripSchedule tripB = createTripScheduleUseingArrivalTimes(TIME_B0, TIME_B1);
 
     // Trips not in service
-    private TestTripSchedule tripS = new TestTripSchedule(TIME_S0, TIME_S1);
-    private TestTripSchedule tripT = new TestTripSchedule(TIME_T0, TIME_T1);
+    private TestTripSchedule tripS = createTripScheduleUseingArrivalTimes(TIME_S0, TIME_S1);
+    private TestTripSchedule tripT = createTripScheduleUseingArrivalTimes(TIME_T0, TIME_T1);
 
-    // Pattern with 2 trips (A, B) in service and 2 trips not in service (S, T)
-    // The board times for the first stop is ordered, while the last stop is not.
+    // Trip pattern with trip S, A, T, and B.
     private TripPatternInfo<TestTripSchedule> pattern = new TestTripPattern(tripS, tripA, tripT, tripB);
 
-    private TripScheduleAlightSearch<TestTripSchedule> subject = new TripScheduleAlightSearch<>(TRIPS_THRESHOLD, pattern, this::skip);
+    // The service under test - the subject
+    private TripScheduleAlightSearch<TestTripSchedule> subject = new TripScheduleAlightSearch<>(
+            TRIPS_BINARY_SEARCH_THRESHOLD, pattern, this::skip
+    );
 
     @Test
-    public void noTripFoundBeforeFirstTripHasArrived() {
-        assertNoTrip( TIME_A0, POS_0);
-        assertNoTrip( TIME_A1, POS_1);
+    public void noTripFoundBeforeFirstTripInServiceArrival() {
+        // When:
+        //   Searching for a trip that alight before A (first trip i service)
+        // Then:
+        //   No trips are expected as a result
+        // Stop 1:
+        searchForTrip(TIME_A0, STOP_1)
+                .assertNoTripFound();
+        // Stop 2:
+        searchForTrip(TIME_A1, STOP_2)
+                .assertNoTripFound();
     }
 
     @Test
-    public void boardLatestTrip() {
-        assertTrip(TRIP_B_INDEX, TIME_B0, TIME_LATE, POS_0);
-        assertTrip(TRIP_B_INDEX, TIME_B1, TIME_LATE, POS_1);
+    public void alightFirstTrip() {
+        searchForTrip(TIME_LATE, STOP_1)
+                .assertTripFound()
+                .withIndex(TRIP_B_INDEX)
+                .withAlightTime(TIME_B0);
+
+        searchForTrip(TIME_LATE, STOP_2)
+                .assertTripFound()
+                .withIndex(TRIP_B_INDEX)
+                .withAlightTime(TIME_B1);
     }
 
     @Test
-    public void boardLatestAvailableTripBeforeGivenArrivalTime() {
-        assertTrip(TRIP_A_INDEX, TIME_A0, TIME_A0+1, POS_0);
-        assertTrip(TRIP_A_INDEX, TIME_A1, TIME_A1+1, POS_1);
+    public void findLastTripWithTheMinimumPossibleSlack() {
+        searchForTrip(TIME_B0 + 1, STOP_1)
+                .assertTripFound()
+                .withIndex(TRIP_B_INDEX)
+                .withAlightTime(TIME_B0);
+
+        searchForTrip(TIME_B1 + 1, STOP_2)
+                .assertTripFound()
+                .withIndex(TRIP_B_INDEX)
+                .withAlightTime(TIME_B1);
     }
 
     @Test
-    public void boardFirstAvailableTripButNotSkippedTrips() {
-        assertTrip(TRIP_A_INDEX, TIME_A0, TIME_B0, POS_0);
-        assertTrip(TRIP_A_INDEX, TIME_A1, TIME_B1, POS_1);
+    public void findLastAvailableTripButNotSkippedTrips() {
+        // At stop 1
+        // Search for the last trip before trip B; expect Trip A
+        searchForTrip(TIME_B0, STOP_1)
+                .assertTripFound()
+                .withIndex(TRIP_A_INDEX)
+                .withAlightTime(TIME_A0);
+
+        // At stop 2
+        // Search for the last trip before trip B; expect Trip A
+        searchForTrip(TIME_B1, STOP_2)
+                .assertTripFound()
+                .withIndex(TRIP_A_INDEX)
+                .withAlightTime(TIME_A1);
     }
 
     @Test
-    public void noTripsToBoardInEmptyPattern() {
-        pattern = new TestTripPattern();
-        subject = new TripScheduleAlightSearch<>(TRIPS_THRESHOLD, pattern, this::skip);
-        assertNoTrip(0, 0);
+    public void noTripsToAlightInEmptyPattern() {
+        // The TripScheduleAlightSearch should handle an empty pattern without failing
+        // and return no result found (false)
+        withTrips(Collections.emptyList());
+        searchForTrip(TIME_LATE, STOP_1)
+                .assertNoTripFound();
     }
 
     @Test
     public void findTripWithGivenTripIndexLowerBound() {
+        // Given a pattern with the following trips: A, B
+        int TRIP_INDEX_A = 0;
+        int TRIP_INDEX_B = 1;
+        withTrips(tripA, tripB);
 
-        // Given the default pattern with the following trips: A and B
-        pattern = new TestTripPattern(tripA, tripB);
-        subject = new TripScheduleAlightSearch<>(TRIPS_THRESHOLD, pattern, this::skip);
+        // Then we expect to find trip B when 'tripIndexLowerBound' is A´s index
+        searchForTrip(TIME_LATE, STOP_1, TRIP_INDEX_A)
+                .assertTripFound()
+                .withAlightTime(TIME_B0)
+                .withIndex(TRIP_INDEX_B);
 
-        // Then we expect to find trip B when `tripIndexLowerBound` is A´s index
-        assertTrip(1, TIME_B0, TIME_LATE, POS_0, 0);
-
-        // An then no trip if `tripIndexLowerBound` equals last trip index
-        assertNoTrip(TIME_LATE, POS_0, 2);
+        // An then no trip if 'tripIndexLowerBound' equals the last trip index (B´s index)
+        searchForTrip(TIME_LATE, STOP_1, TRIP_INDEX_B)
+                .assertNoTripFound();
     }
 
     @Test
-    public void findTripWithGivenTripIndexLowerBoundMixedWithSkippedTrips() {
+    public void findTripWithGivenTripIndexLowerBoundButNotSkipedTrips() {
         // Given the default pattern with the following trips: S, A, T, B
 
-        // Then we expect to find trip A when `tripIndexLowerBound` is small enough
-        assertTrip(TRIP_A_INDEX, TIME_A0, TIME_B0, POS_0, TRIP_A_INDEX);
-        assertTrip(TRIP_A_INDEX, TIME_A1, TIME_B0, POS_1, TRIP_A_INDEX);
+        // STOP 1
+        // Then we expect to find trip A when `tripIndexLowerBound` is smaller than A´s index
+        searchForTrip(TIME_B0, STOP_1, TRIP_A_INDEX - 1)
+                .assertTripFound()
+                .withAlightTime(TIME_A0)
+                .withIndex(TRIP_A_INDEX);
 
-        // But NOT when `tripIndexLowerBound` equals trip B´s index + 1
-        assertNoTrip(TIME_LATE, POS_0, TRIP_B_INDEX+1);
-        assertNoTrip(TIME_LATE, POS_1, TRIP_B_INDEX+1);
+        // But NOT when `tripIndexLowerBound` equals trip A´s index
+        searchForTrip(TIME_B0, STOP_1, TRIP_A_INDEX)
+                .assertNoTripFound();
+
+        // STOP 2
+        // Then we expect to find trip A when `tripIndexLowerBound` is smaller than A´s index
+        searchForTrip(TIME_B1, STOP_2, TRIP_A_INDEX - 1)
+                .assertTripFound()
+                .withAlightTime(TIME_A1)
+                .withIndex(TRIP_A_INDEX);
+
+        // But NOT when `tripIndexLowerBound` equals trip A´s index
+        searchForTrip(TIME_B1, STOP_2, TRIP_A_INDEX)
+                .assertNoTripFound();
     }
 
     @Test
-    public void boardFirstAvailableTripForABigNumberOfTrips() {
-        // For a pattern with N trip schedules, where the first trip departure is at time 100
-        int n = TRIPS_THRESHOLD;
-        int N = 3 * n + 7;
+    public void alightFirstAvailableTripForABigNumberOfTrips() {
+        // For a pattern with N trip schedules,
+        // where the first trip departure is at time 1000 and incremented by 1000.
+        // We use 1 stop (we search for alighting, we do not care if we can board)
+        final int firstArrivalTime = 1000;
+        final int n = TRIPS_BINARY_SEARCH_THRESHOLD;
+        final int N = 7 * n + 3;
+        final int dT = 1000;
 
         List<TestTripSchedule> tripSchedules = new ArrayList<>();
-        int arrivalTime = 0;
+        int arrivalTime = firstArrivalTime;
 
-        for (int i = 0; i < N; i++) {
-            arrivalTime += 100;
-            tripSchedules.add(new TestTripSchedule(arrivalTime));
+        for (int i = 0; i < N; ++i, arrivalTime += dT) {
+            tripSchedules.add(createTripScheduleUseingArrivalTimes(arrivalTime));
         }
-        pattern = new TestTripPattern(tripSchedules);
-        subject = new TripScheduleAlightSearch<>(TRIPS_THRESHOLD, pattern, this::skip);
+        useTripPattern(new TestTripPattern(tripSchedules));
 
 
-        // Test some random boardings
-        assertNoTrip(100, POS_0);
-        int step = n/2 - 1;
+        // Search for a trip that alight before the first trip, expect no trip in return
+        searchForTrip(firstArrivalTime, STOP_1)
+                .assertNoTripFound();
 
-        for (int i = 0; i < N; i += step) {
-            int expArrivalTime = 100 * (i + 1);
-            int latestAlightTime = expArrivalTime + 1;
+        for (int i = 0; i < N; ++i) {
+            int tripAlightTime = dT * (i + 1);
+            int okSearchTime = tripAlightTime + 1;
 
-            //assertTrip(i, expArrivalTime, latestAlightTime, POS_0);
-            assertNoTrip(expArrivalTime, POS_0, i);
+            // Search and find trip 'i'
+            searchForTrip(okSearchTime, STOP_1)
+                    .assertTripFound()
+                    .withAlightTime(tripAlightTime)
+                    .withIndex(i);
+
+            // Search and find trip 'i' using the previous trip index
+            searchForTrip(okSearchTime, STOP_1, i-1)
+                    .assertTripFound()
+                    .withIndex(i);
+
+            // Search with a time and index that together exclude trip 'i'
+            searchForTrip(tripAlightTime, STOP_1, i)
+                    .assertNoTripFound();
         }
     }
 
+    /**
+     * If there is a large number of trips not in service, the binary search may return
+     * a best guess index witch is above the correct trip index. This test make sure
+     * such trips are found.
+     */
     @Test
-    public void assertTripIsFoundEvenIfItIsAfterTheBinarySearchUpperBound() {
-        final int N = TRIPS_THRESHOLD;
+    public void assertTripIsFoundEvenIfItIsBeforeTheBinarySearchUpperAndLowerBound() {
+        final int N = TRIPS_BINARY_SEARCH_THRESHOLD;
 
-        // Given a pattern with n+1 trip schedules
+        // Given a pattern with N + 1 trip schedules
         List<TestTripSchedule> tripSchedules = new ArrayList<>();
 
-
-        // Where the N following trips are NOT in service, but with acceptable arrival times
-        addNTimes(tripSchedules, tripS, N);
-
-        // And where the last trip is in service
+        // Where the first trip is in service
         tripSchedules.add(tripA);
+        final int indexA = 0;
 
-
-        pattern = new TestTripPattern(tripSchedules);
-        subject = new TripScheduleAlightSearch<>(TRIPS_THRESHOLD, pattern, this::skip);
-
-        // Then we expect to find trip A, even if it is after the binary search window
-        assertTrip(N, TIME_A0, TIME_A0 + 1, POS_0);
-        assertTrip(N, TIME_A1, TIME_A1 + 1, POS_1);
-    }
-
-    @Test
-    public void assertTripIsFoundEvenIfItIsBeforeTheBinarySearchLowerBound() {
-        final int N = TRIPS_THRESHOLD;
-
-        // Given a pattern with n+1 trip schedules
-        List<TestTripSchedule> tripSchedules = new ArrayList<>();
-
-        // Where the following trip is in service
-        tripSchedules.add(tripA);
-
-        // And here the N first trips are NOT in service, but with acceptable boarding times
+        // And where the N next trips are NOT in service, but with acceptable boarding times
         addNTimes(tripSchedules, tripT, N);
 
-        pattern = new TestTripPattern(tripSchedules);
-        subject = new TripScheduleAlightSearch<>(TRIPS_THRESHOLD, pattern, this::skip);
+        useTripPattern(new TestTripPattern(tripSchedules));
 
-        // Then we expect to find trip A, even if it is after the binary search window
-        assertTrip(0, TIME_A0, TIME_A0+1, POS_0);
-        assertTrip(0, TIME_A1, TIME_A1+1, POS_1);
-        assertNoTrip(TIME_A1, POS_1);
+        // Then we expect to find A for both stop 1 and 2
+        // Stop 1
+        searchForTrip(TIME_A0 + 1, STOP_1)
+                .assertTripFound()
+                .withIndex(indexA)
+                .withAlightTime(TIME_A0);
+
+        // Stop 2
+        searchForTrip(TIME_A1 + 1, STOP_2)
+                .assertTripFound()
+                .withIndex(indexA)
+                .withAlightTime(TIME_A1);
     }
 
-    private <T extends TripScheduleInfo> boolean skip(T trip) {
+    private boolean skip(Object trip) {
         return trip == tripS || trip == tripT;
     }
 
-    private void assertTrip(int expectedTripIndex, int expectedArrivalTime, int latestAlightTime, int stopPosition) {
-        Assert.assertTrue("Trip found", subject.search(latestAlightTime, stopPosition));
-        Assert.assertEquals("Trip index", expectedTripIndex, subject.getCandidateTripIndex());
-        Assert.assertEquals("Board time", expectedArrivalTime, subject.getCandidateTrip().arrival(stopPosition));
+    private void withTrips(TestTripSchedule... schedules) {
+        useTripPattern(new TestTripPattern(schedules));
     }
 
-    private void assertTrip(int expectedTripIndex, int expectedArrivalTime, int latestAlightTime, int stopPosition, int tripIndexLowerBound) {
-        Assert.assertTrue("Trip found", subject.search(latestAlightTime, stopPosition, tripIndexLowerBound));
-        Assert.assertEquals("Trip index", expectedTripIndex, subject.getCandidateTripIndex());
-        Assert.assertEquals("Board time", expectedArrivalTime, subject.getCandidateTrip().arrival(stopPosition));
+    private void withTrips(List<TestTripSchedule> schedules) {
+        useTripPattern(new TestTripPattern(schedules));
     }
 
-    private void assertNoTrip(int latestAlightTime, int stopPosition) {
-        Assert.assertFalse(subject.search(latestAlightTime, stopPosition));
+    private void useTripPattern(TestTripPattern pattern) {
+        this.pattern = pattern;
+        this.subject = new TripScheduleAlightSearch<>(
+                TRIPS_BINARY_SEARCH_THRESHOLD,
+                this.pattern,
+                this::skip
+        );
     }
 
-    private void assertNoTrip(int latestAlightTime, int stopPosition, int tripIndexLowerBound) {
-        Assert.assertFalse(subject.search(latestAlightTime, stopPosition, tripIndexLowerBound));
-    }
     private static void addNTimes(List<TestTripSchedule> trips, TestTripSchedule tripS, int n) {
         for (int i = 0; i < n; i++) {
             trips.add(tripS);
         }
+    }
+
+    private TripAssert searchForTrip(int arrivalTime, int stopPosition) {
+        return new TripAssert(subject)
+                .search(arrivalTime, stopPosition);
+    }
+
+    private TripAssert searchForTrip(int arrivalTime, int stopPosition, int tripIndexLowerBound) {
+        return new TripAssert(subject)
+                .search(arrivalTime, stopPosition, tripIndexLowerBound);
     }
 }

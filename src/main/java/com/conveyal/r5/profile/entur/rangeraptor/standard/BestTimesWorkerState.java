@@ -63,6 +63,10 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
         this.bestTimes = new BestTimes(nStops, calculator);
     }
 
+    TransitCalculator calculator() {
+        return calculator;
+    }
+
     @Override
     public final void setupIteration(int iterationDepartureTime) {
         // TODO TGR - Set max limit to 5 days for now, replace this with a pareto check against the
@@ -177,7 +181,9 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
      * The implementation can be copied and altered into a sub-class.
      */
     void transferToStop(int arrivalTimeTransit, int fromStop, TransferLeg transferLeg) {
-        final int arrivalTime = arrivalTimeTransit + transferLeg.durationInSeconds();
+        // Use the calculator to make sure the calculation is done correct for a normal
+        // forward search and a reverse search.
+        final int arrivalTime = calculator.add(arrivalTimeTransit, transferLeg.durationInSeconds());
 
         if (exceedsTimeLimit(arrivalTime)) {
             return;

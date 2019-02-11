@@ -5,7 +5,7 @@ package com.conveyal.r5.profile.entur.api.request;
  * Several implementation are implemented - with different behaviour. Use the one
  * that suites your need best.
  */
-public enum RaptorProfiles {
+public enum RaptorProfile {
     /**
      * Range Raptor finding the earliest arrival time, shortest travel duration and fewest transfers.
      * The cost is not used.

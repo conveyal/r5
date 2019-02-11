@@ -14,13 +14,6 @@ public interface DestinationArrivalView<T extends TripScheduleInfo> {
 
     int arrivalTime();
 
-    /**
-     * The duration of the last leg
-     */
-    default int legDuration() {
-        return arrivalTime() - departureTime();
-    }
-
     StopArrivalView<T> previous();
 
     default int cost() {
@@ -32,7 +25,7 @@ public interface DestinationArrivalView<T extends TripScheduleInfo> {
                 "%s { Time: %s (%s), Cost: %d }",
                 getClass().getSimpleName(),
                 TimeUtils.timeToStrCompact(arrivalTime()),
-                TimeUtils.timeToStrCompact(legDuration()),
+                TimeUtils.timeToStrCompact(departureTime()),
                 cost()
         );
     }

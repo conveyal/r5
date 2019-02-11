@@ -11,12 +11,12 @@ import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-class EgressStop<T extends TripScheduleInfo> extends Stop<T> {
+class EgressStopArrivals<T extends TripScheduleInfo> extends StopArrivals<T> {
 
     private final TransferLeg egressLeg;
     private final Destination<T> destination;
 
-    EgressStop(TransferLeg egressLeg, Destination<T> destination, DebugHandler<StopArrivalView<T>> debugHandler) {
+    EgressStopArrivals(TransferLeg egressLeg, Destination<T> destination, DebugHandler<StopArrivalView<T>> debugHandler) {
         super(egressLeg.stop(), debugHandler);
         this.egressLeg = egressLeg;
         this.destination = destination;

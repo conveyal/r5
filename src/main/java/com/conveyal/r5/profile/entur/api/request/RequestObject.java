@@ -7,7 +7,7 @@ import com.conveyal.r5.profile.entur.util.TimeUtils;
 import java.util.Collection;
 
 class RequestObject<T extends TripScheduleInfo> implements RangeRaptorRequest<T> {
-        private final RaptorProfiles profile;
+        private final RaptorProfile profile;
         private final int fromTime;
         private final int toTime;
         private final Collection<TransferLeg> accessLegs;
@@ -28,7 +28,7 @@ class RequestObject<T extends TripScheduleInfo> implements RangeRaptorRequest<T>
         }
 
     @Override
-    public RaptorProfiles profile() {
+    public RaptorProfile profile() {
         return profile;
     }
 

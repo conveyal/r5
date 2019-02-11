@@ -55,7 +55,6 @@ public final class StdRangeRaptorWorker<T extends TripScheduleInfo> extends Abst
         this.onTripBoardTime = 0;
         this.onTripBoardStop = -1;
         this.onTrip = null;
-
     }
 
     @Override
@@ -67,7 +66,9 @@ public final class StdRangeRaptorWorker<T extends TripScheduleInfo> extends Abst
         if (onTripIndex != -1) {
             state.transitToStop(
                     stop,
-                    onTrip.arrival(stopPositionInPattern),
+                    // In the normal case the arrivalTime is used,
+                    // but in reverse search the board slack is added; hence the calculator delegation
+                    calculator().latestArrivalTime(onTrip, stopPositionInPattern),
                     onTrip,
                     onTripBoardStop,
                     onTripBoardTime
@@ -77,7 +78,7 @@ public final class StdRangeRaptorWorker<T extends TripScheduleInfo> extends Abst
         // Don't attempt to board if this stop was not reached in the last round.
         // Allow to reboard the same pattern - a pattern may loop and visit the same stop twice
         if (state.isStopReachedInPreviousRound(stop)) {
-            int earliestBoardTime = calculator().addBoardSlack(state.bestTimePreviousRound(stop));
+            int earliestBoardTime = calculator().earliestBoardTime(state.bestTimePreviousRound(stop));
 
             // check if we can back up to an earlier trip due to this stop being reached earlier
             boolean found = tripSearch.search(earliestBoardTime, stopPositionInPattern, onTripIndex);
@@ -85,7 +86,7 @@ public final class StdRangeRaptorWorker<T extends TripScheduleInfo> extends Abst
             if (found) {
                 onTripIndex = tripSearch.getCandidateTripIndex();
                 onTrip = tripSearch.getCandidateTrip();
-                onTripBoardTime = onTrip.departure(stopPositionInPattern);
+                onTripBoardTime = tripSearch.getCandidateTripTime();
                 onTripBoardStop = stop;
             }
         }

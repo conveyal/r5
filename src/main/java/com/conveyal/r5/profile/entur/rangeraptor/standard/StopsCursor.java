@@ -10,7 +10,12 @@ import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 
 
 /**
- * TODO TGR
+ * Used to create a view to the interanl StdRangeRaptor model and to navigate
+ * between stop arrivals. Since view objects are only used for path and debuging
+ * operations, the view can create temporary objects for each StopArrival - but
+ * there is no garantee - it might get changed in the future.
+ * <p/>
+ * The design was originally done to support the FLyweight design pattern.
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
@@ -21,6 +26,10 @@ class StopsCursor<T extends TripScheduleInfo> {
     StopsCursor(Stops<T> stops, TransitCalculator transitCalculator) {
         this.stops = stops;
         this.transitCalculator = transitCalculator;
+    }
+
+    boolean exist(int round, int stop) {
+        return stops.exist(round, stop);
     }
 
     /**
@@ -59,9 +68,8 @@ class StopsCursor<T extends TripScheduleInfo> {
      */
     private StopArrivalView<T> newAccessView(int stop) {
         StopArrivalState<T> arrival = stops.get(0, stop);
-        return new Access<>(stop, arrival.accessDepartureTime(), arrival.time());
-        // TODO TGR Use:
-        //return new Access<>(stop, transitCalculator.originDepartureTime(arrival.time(), arrival.accessDuration()), arrival.time());
+        int departureTime = transitCalculator.sub(arrival.time(), arrival.accessDuration());
+        return new Access<>(stop, departureTime, arrival.time());
     }
 
     /**
@@ -69,8 +77,8 @@ class StopsCursor<T extends TripScheduleInfo> {
      */
     private StopArrivalView<T> newAccessView(int stop, int transitDepartureTime) {
         StopArrivalState<T> state = stops.get(0, stop);
-        int departureTime = transitCalculator.originDepartureTime(transitDepartureTime, state.transferDuration());
-        int arrivalTime = transitCalculator.subBoardSlack(transitDepartureTime);
+        int departureTime = transitCalculator.originDepartureTime(transitDepartureTime, state.accessDuration());
+        int arrivalTime = transitCalculator.add(departureTime, state.accessDuration());
         return new Access<>(stop, departureTime, arrivalTime);
     }
 
@@ -82,7 +90,7 @@ class StopsCursor<T extends TripScheduleInfo> {
                 : new Transit<>(round, stop, state, this);
     }
 
-    public boolean exist(int round, int stop) {
-        return stops.exist(round, stop);
+    int departureTime(int arrivalTime, int legDuration) {
+        return transitCalculator.sub(arrivalTime, legDuration);
     }
 }

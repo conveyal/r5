@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
+import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
@@ -9,11 +10,8 @@ import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleSearch;
 
 
 /**
- * The purpose TODO
- * <p>
- * The algorithm used herein is described in TODO
- * <p>
- * This class originated as a rewrite of our RAPTOR code that TODO
+ * The purpose of this class is to implement the multi-criteria specific functonallity of
+ * the worker.
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
@@ -45,26 +43,26 @@ public final class McRangeRaptorWorker<T extends TripScheduleInfo> extends Abstr
      * Perform a scheduled search
      */
     @Override
-    protected final void performTransitForRoundAndPatternAtStop(int boardStopPositionInPattern) {
+    protected final void performTransitForRoundAndPatternAtStop(int boardStopPos) {
         final int nPatternStops = pattern.numberOfStopsInPattern();
-        int boardStopIndex = pattern.stopIndex(boardStopPositionInPattern);
+        int boardStopIndex = pattern.stopIndex(boardStopPos);
 
         for (AbstractStopArrival<T> boardStop : state.listStopArrivalsPreviousRound(boardStopIndex)) {
 
-            int earliestBoardTime = calculator().addBoardSlack(boardStop.arrivalTime());
-            boolean found = tripSearch.search(earliestBoardTime, boardStopPositionInPattern);
+            int earliestBoardTime = calculator().earliestBoardTime(boardStop.arrivalTime());
+            boolean found = tripSearch.search(earliestBoardTime, boardStopPos);
 
             if (found) {
-                for (int alightStopPos = boardStopPositionInPattern + 1; alightStopPos < nPatternStops; alightStopPos++) {
-                    int alightStopIndex = pattern.stopIndex(alightStopPos);
+                T trip = tripSearch.getCandidateTrip();
+                IntIterator patternStops = calculator().patternStopIterator(boardStopPos + 1, nPatternStops);
 
-                    T trip = tripSearch.getCandidateTrip();
-
+                while (patternStops.hasNext()) {
+                    int alightStopPos = patternStops.next();
                     state.transitToStop(
                             boardStop,
-                            alightStopIndex,
+                            pattern.stopIndex(alightStopPos),
                             trip.arrival(alightStopPos),
-                            trip.departure(boardStopPositionInPattern),
+                            trip.departure(boardStopPos),
                             trip
                     );
                 }

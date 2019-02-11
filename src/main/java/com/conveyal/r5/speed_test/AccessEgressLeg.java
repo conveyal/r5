@@ -20,8 +20,4 @@ class AccessEgressLeg implements TransferLeg {
         return durationInSeconds;
     }
 
-    @Override
-    public int cost() {
-        return durationInSeconds;
-    }
 }

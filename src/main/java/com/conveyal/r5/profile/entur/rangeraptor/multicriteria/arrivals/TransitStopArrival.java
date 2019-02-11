@@ -12,13 +12,13 @@ public final class TransitStopArrival<T extends TripScheduleInfo> extends Abstra
     private static final int BOARD_COST = 300;
     private final T trip;
 
-    public TransitStopArrival(AbstractStopArrival<T> previousState, int stopIndex, int arrivalTime, int boardTime, T trip) {
+    public TransitStopArrival(AbstractStopArrival<T> previousState, int stopIndex, int arrivalTime, int boardTime, T trip, int additionalCost) {
         super(
                 previousState,
                 stopIndex,
                 boardTime,
                 arrivalTime,
-                0
+                additionalCost
         );
         this.trip = trip;
     }

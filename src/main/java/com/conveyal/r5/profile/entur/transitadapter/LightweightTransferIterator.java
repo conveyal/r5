@@ -47,9 +47,6 @@ class LightweightTransferIterator implements Iterator<TransferLeg>, TransferLeg 
         return durationToStops[index + 1];
     }
 
-    @Override
-    public int cost() { return durationInSeconds(); }
-
     /**
      * Used to reset the iterator, to start at the beginning again. This
      * enables the iterator to be reused, but be careful to not use it in a multi

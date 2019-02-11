@@ -39,11 +39,11 @@ public final class DestinationArrival<T extends TripScheduleInfo> implements Des
     private final int travelDuration;
 
 
-    public DestinationArrival(TransitStopArrival<T> previous, TransferLeg egressLeg) {
+    public DestinationArrival(TransitStopArrival<T> previous, TransferLeg egressLeg, int additionalCost) {
         this.previous = previous;
         this.arrivalTime = previous.arrivalTime() + egressLeg.durationInSeconds();
         this.numberOfTransfers = previous.round() - 1;
-        this.cost = previous.cost() + egressLeg.cost();
+        this.cost = previous.cost() + additionalCost;
         this.departureTime = previous.arrivalTime();
         this.travelDuration = this.arrivalTime - tripDepartureTime(previous);
     }

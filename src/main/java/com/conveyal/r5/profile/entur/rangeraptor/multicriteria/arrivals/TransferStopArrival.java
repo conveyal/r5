@@ -9,13 +9,13 @@ import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
  */
 public final class TransferStopArrival<T extends TripScheduleInfo> extends AbstractStopArrival<T> {
 
-    public TransferStopArrival(AbstractStopArrival<T> previousState, TransferLeg transferLeg, int arrivalTime) {
+    public TransferStopArrival(AbstractStopArrival<T> previousState, TransferLeg transferLeg, int arrivalTime, int additionalCost) {
         super(
                 previousState,
                 transferLeg.stop(),
                 arrivalTime - transferLeg.durationInSeconds(),
                 arrivalTime,
-                transferLeg.cost()
+                additionalCost
         );
     }
 

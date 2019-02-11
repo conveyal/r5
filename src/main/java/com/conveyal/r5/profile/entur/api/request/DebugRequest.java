@@ -8,6 +8,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 
@@ -128,5 +129,36 @@ public class DebugRequest<T extends TripScheduleInfo> {
      */
     public boolean isDebug() {
         return !stops.isEmpty() || !path.isEmpty();
+    }
+
+    @Override
+    public String toString() {
+        return "DebugRequest{" +
+                "stops=" + stops +
+                ", path=" + path +
+                ", pathStartAtStopIndex=" + pathStartAtStopIndex +
+                ", stopArrivalListener=" + enabled(stopArrivalListener) +
+                ", destinationArrivalListener=" + enabled(destinationArrivalListener) +
+                ", pathFilteringListener=" + enabled(pathFilteringListener) +
+                '}';
+    }
+
+    private static String enabled(Object obj) {
+        return obj == null ? "null" : "enabled";
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        DebugRequest<?> that = (DebugRequest<?>) o;
+        return pathStartAtStopIndex == that.pathStartAtStopIndex &&
+                Objects.equals(stops, that.stops) &&
+                Objects.equals(path, that.path);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(stops, path, pathStartAtStopIndex);
     }
 }

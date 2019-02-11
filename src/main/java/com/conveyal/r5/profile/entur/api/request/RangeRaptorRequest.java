@@ -64,7 +64,7 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
         this.egressLegs = new ArrayList<>(builder.egressLegs());
         this.boardSlackInSeconds = builder.boardSlackInSeconds();
         this.numberOfAdditionalTransfers = builder.numberOfAdditionalTransfers();
-        this.multiCriteriaCostFactors = new MultiCriteriaCostFactors(builder);
+        this.multiCriteriaCostFactors = builder.buildMcCostFactors();
         this.debug = builder.debug();
     }
 

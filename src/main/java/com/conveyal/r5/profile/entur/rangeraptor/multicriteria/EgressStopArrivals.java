@@ -15,11 +15,13 @@ class EgressStopArrivals<T extends TripScheduleInfo> extends StopArrivals<T> {
 
     private final TransferLeg egressLeg;
     private final Destination<T> destination;
+    private final CostCalculator costCalculator;
 
-    EgressStopArrivals(TransferLeg egressLeg, Destination<T> destination, DebugHandler<StopArrivalView<T>> debugHandler) {
+    EgressStopArrivals(TransferLeg egressLeg, Destination<T> destination, CostCalculator costCalculator, DebugHandler<StopArrivalView<T>> debugHandler) {
         super(egressLeg.stop(), debugHandler);
         this.egressLeg = egressLeg;
         this.destination = destination;
+        this.costCalculator = costCalculator;
     }
 
     @Override
@@ -30,7 +32,8 @@ class EgressStopArrivals<T extends TripScheduleInfo> extends StopArrivals<T> {
         if(super.add(arrival)) {
             destination.transferToDestination(
                     (TransitStopArrival<T>) arrival,
-                    egressLeg
+                    egressLeg,
+                    costCalculator.walkCost(egressLeg.durationInSeconds())
             );
             return true;
         }

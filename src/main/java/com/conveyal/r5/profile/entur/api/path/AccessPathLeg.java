@@ -2,6 +2,8 @@ package com.conveyal.r5.profile.entur.api.path;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 
+import java.util.Objects;
+
 /**
  * Represent an access leg in a path. The access leg is the first leg from origin to the
  * first transit leg. The next leg must be a transit leg - no other legs are allowed.
@@ -42,5 +44,21 @@ public final class AccessPathLeg<T extends TripScheduleInfo> implements PathLeg<
     @Override
     public TransitPathLeg<T> nextLeg() {
         return next;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        AccessPathLeg<?> that = (AccessPathLeg<?>) o;
+        return fromTime == that.fromTime &&
+                toStop == that.toStop &&
+                toTime == that.toTime &&
+                next.equals(that.next);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(fromTime, toStop, toTime, next);
     }
 }

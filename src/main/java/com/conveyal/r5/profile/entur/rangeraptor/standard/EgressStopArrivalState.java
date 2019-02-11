@@ -38,13 +38,4 @@ final class EgressStopArrivalState<T extends TripScheduleInfo> extends StopArriv
         super.arriveByTransit(time, boardStop, boardTime, trip);
         transitCallback.accept(this);
     }
-
-    int destinationDepartureTime() {
-        return transitTime();
-    }
-
-    int destinationArrivalTime() {
-        return destinationDepartureTime() + egressLeg.durationInSeconds();
-    }
-
 }

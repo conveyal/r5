@@ -21,15 +21,6 @@ import com.conveyal.r5.profile.entur.util.TimeUtils;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 class StopArrivalState<T extends TripScheduleInfo> {
-    /**
-     * Uninitialized time values is set to this value to mark them as not set, and to mark the
-     * arrival as unreached. A big value is used to simplify the comparisons to see if a new
-     * arrival time is better (less).
-     * <p/>
-     * This value essentially serves as Infinity for ints - it's bigger than every other number.
-     * It is the travel time to a transit stop or a target before that stop or target is ever reached.
-     */
-    private static final int UNREACHED = Integer.MAX_VALUE;
 
     /**
      * Used to initialize all none time based attributes.
@@ -38,15 +29,15 @@ class StopArrivalState<T extends TripScheduleInfo> {
 
 
     // Best time - access, transit or transfer
-    private int bestArrivalTime = UNREACHED;
+    private int bestArrivalTime = NOT_SET;
 
     // Transit
-    private int transitArrivalTime = UNREACHED;
+    private int transitArrivalTime = NOT_SET;
     private T trip = null;
-    private int boardTime = UNREACHED;
+    private int boardTime = NOT_SET;
     private int boardStop = NOT_SET;
 
-    // Transfer
+    // Transfer (and access)
     private int transferFromStop = NOT_SET;
     private int accessOrTransferDuration = NOT_SET;
 
@@ -56,10 +47,6 @@ class StopArrivalState<T extends TripScheduleInfo> {
 
     final int accessDuration() {
         return accessOrTransferDuration;
-    }
-
-    final int accessDepartureTime() {
-        return bestArrivalTime - accessOrTransferDuration;
     }
 
     final int transitTime() {
@@ -91,7 +78,7 @@ class StopArrivalState<T extends TripScheduleInfo> {
     }
 
     final boolean arrivedByTransit() {
-        return transitArrivalTime != UNREACHED;
+        return transitArrivalTime != NOT_SET;
     }
 
     final boolean arrivedByTransfer() {
@@ -104,7 +91,7 @@ class StopArrivalState<T extends TripScheduleInfo> {
     }
 
     final boolean reached() {
-        return bestArrivalTime != UNREACHED;
+        return bestArrivalTime != NOT_SET;
     }
 
     void arriveByTransit(int time, int boardStop, int boardTime, T trip) {
@@ -132,18 +119,16 @@ class StopArrivalState<T extends TripScheduleInfo> {
     @Override
     public String toString() {
         if(arrivedByAccess()) {
-            // TODO TGR REVERSE ...
             return String.format("Access Arrival { time: %s, duration: %s }",
                     TimeUtils.timeToStrLong(bestArrivalTime),
                     TimeUtils.timeToStrCompact(accessOrTransferDuration)
             );
         }
-        // TODO TGR REVERSE ...
         return String.format("Arrival { time: %s, Transit: %s %s-%s, trip: %s, Transfer from: %s %s }",
-                TimeUtils.timeToStrLong(bestArrivalTime, UNREACHED),
+                TimeUtils.timeToStrLong(bestArrivalTime, NOT_SET),
                 IntUtils.intToString(boardStop, NOT_SET),
-                TimeUtils.timeToStrCompact(boardTime, UNREACHED),
-                TimeUtils.timeToStrCompact(transitArrivalTime, UNREACHED),
+                TimeUtils.timeToStrCompact(boardTime, NOT_SET),
+                TimeUtils.timeToStrCompact(transitArrivalTime, NOT_SET),
                 trip == null ? "" : trip.debugInfo(),
                 IntUtils.intToString(transferFromStop, NOT_SET),
                 TimeUtils.timeToStrCompact(accessOrTransferDuration, NOT_SET)

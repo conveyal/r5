@@ -8,6 +8,13 @@ import java.util.Calendar;
  * Time utility methods. See the unit test for examples on how to use this class.
  */
 public class TimeUtils {
+    public static int hms2time(int hour, int minute, int second) {
+        return second + 60 * (minute + (60 * hour));
+    }
+    public static int hm2time(int hour, int minute) {
+        return hms2time(hour, minute, 0);
+    }
+
     private enum FormatType { COMPACT, LONG, SHORT }
     private static final boolean USE_RAW_TIME = false;
 

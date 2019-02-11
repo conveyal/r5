@@ -10,8 +10,10 @@ import java.util.function.Function;
  * The purpose of this class is to optimize the search for a trip schedule for
  * a given pattern and stop. Normally the search scan from the upper bound index
  * and down, it can do so because the trips are ordered after the FIRST stop
- * alight/board times. We also assume that trips do not pass each other; Hence
- * trips in service on a given day will be in order for all other stops too.
+ * alight times. We also assume that trips do not pass each other; Hence
+ * trips in service on a given day will also be in order for all other stops.
+ * For trips operating on different service days (no overlapping) this assumption
+ * is not necessary true.
  * <p>
  * The search use a binary search if the number of trip schedules is above a
  * given threshold. A linear search is slow when the number of schedules is very
@@ -22,6 +24,7 @@ import java.util.function.Function;
 public class TripScheduleAlightSearch<T extends TripScheduleInfo> implements TripScheduleSearch<T> {
     private final int nTripsBinarySearchThreshold;
     private final TripPatternInfo<T> pattern;
+    private final int nTrips;
     private final Function<T, Boolean> skipTripScheduleCallback;
 
     private int latestAlightTime;
@@ -37,6 +40,7 @@ public class TripScheduleAlightSearch<T extends TripScheduleInfo> implements Tri
     ) {
         this.nTripsBinarySearchThreshold = scheduledTripBinarySearchThreshold;
         this.pattern = pattern;
+        this.nTrips = pattern.numberOfTripSchedules();
         this.skipTripScheduleCallback = skipTripScheduleCallback;
     }
 
@@ -50,6 +54,11 @@ public class TripScheduleAlightSearch<T extends TripScheduleInfo> implements Tri
         return candidateTripIndex;
     }
 
+    @Override
+    public int getCandidateTripTime() {
+        return candidateTrip.arrival(stopPositionInPattern);
+    }
+
     /**
      * Find the last trip arriving at the given stop BEFORE the given {@code latestAlightTime}.
      * This is the same as calling {@link #search(int, int, int)} with {@code tripIndexLowerBound: -1}.
@@ -61,13 +70,12 @@ public class TripScheduleAlightSearch<T extends TripScheduleInfo> implements Tri
     }
 
     /**
-     * Find the last trip arriving at the given stop BEFORE the given {@code latestAlightTime}, but
-     * before the given trip ({@code tripIndexUpperBound}).
+     * Find the last trip leaving from the given stop BEFORE the the {@code latestAlightTime}, but after the
+     * given trip ({@code tripIndexLowerBound}).
      *
-     * @param tripIndexLowerBound   Lower bound for trip index to search for. Inclusive. Use {@code 0}
-     *                              for an unbounded search.
-     * @param latestAlightTime     The latest point in time a trip can arrive, exclusive.
-     * @param stopPositionInPattern The stop to board
+     * @param latestAlightTime      The latest acceptable alight time (exclusive).
+     * @param stopPositionInPattern The stop to board.
+     * @param tripIndexLowerBound   Upper bound for trip index to search for (exclusive).
      */
     public boolean search(int latestAlightTime, int stopPositionInPattern, int tripIndexLowerBound) {
         this.latestAlightTime = latestAlightTime;
@@ -76,18 +84,18 @@ public class TripScheduleAlightSearch<T extends TripScheduleInfo> implements Tri
         this.candidateTripIndex = -1;
 
         // No previous trip is found
-        if(tripIndexLowerBound < 0) {
-            if(pattern.numberOfTripSchedules() > nTripsBinarySearchThreshold) {
+        if (tripIndexLowerBound < 0) {
+            if(nTrips > nTripsBinarySearchThreshold) {
                 return findFirstBoardingOptimizedForLargeSetOfTrips();
             }
             else {
-                return findBoardingSearchForward(0);
+                return findBoardingSearchForwardInTime(0);
             }
         }
-
-        // We have a limited number of trips (no previous trip found) or already found a candidate
-        // in a previous search; Hence searching forward from the lower bound is the fastest way to proceed.
-        return findBoardingSearchForward(tripIndexLowerBound);
+        // We have already found a candidate in a previous search;
+        // Hence searching forward from the lower bound is the fastest way to proceed.
+        // We have to add 1 to the lower bound for go from exclusive to inclusive
+        return findBoardingSearchForwardInTime(tripIndexLowerBound + 1);
     }
 
     private boolean findFirstBoardingOptimizedForLargeSetOfTrips() {
@@ -95,19 +103,19 @@ public class TripScheduleAlightSearch<T extends TripScheduleInfo> implements Tri
 
         // Use the best guess from the binary search to look for a candidate trip
         // We can not use upper bound to exit the search. We need to continue
-        // until we find a trip in service.
-        boolean found = findBoardingSearchForward(indexBestGuess);
+        // until we find a valid trip in service.
+        boolean found = findBoardingSearchForwardInTime(indexBestGuess);
 
         // If a valid result is found and we can return
-        if(found) {
+        if (found) {
             return true;
         }
 
         // No trip schedule above the best guess was found. This may happen if enough
         // trips are not in service.
         //
-        // So we have to search for the first valid trip schedule after that.
-        return findBoardingSearchBackward(indexBestGuess);
+        // So we have to search for the first valid trip schedule before that.
+        return findBoardingSearchBackwardsInTime(indexBestGuess);
     }
 
     /**
@@ -116,10 +124,8 @@ public class TripScheduleAlightSearch<T extends TripScheduleInfo> implements Tri
      *
      * @param tripIndexLowerBound The trip index lower bound, where search start (inclusive).
      */
-    private boolean findBoardingSearchForward(int tripIndexLowerBound) {
-        final int N = pattern.numberOfTripSchedules();
-
-        for(int i = tripIndexLowerBound; i < N;  ++i) {
+    private boolean findBoardingSearchForwardInTime(int tripIndexLowerBound) {
+        for (int i = tripIndexLowerBound; i < nTrips;  ++i) {
             T trip = pattern.getTripSchedule(i);
 
             if (skipTripSchedule(trip)) {
@@ -131,11 +137,10 @@ public class TripScheduleAlightSearch<T extends TripScheduleInfo> implements Tri
             if (arrival < latestAlightTime) {
                 candidateTrip = trip;
                 candidateTripIndex = i;
-            }
-            else {
+            } else {
                 // this trip arrives too early. We can break out of the loop since
                 // trips are sorted by departure time (trips in given schedule)
-                // Trips passing another trip is not accounted for
+                // Trips passing another trip is not accounted for if both are in service.
                 return candidateTrip != null;
             }
         }
@@ -148,8 +153,8 @@ public class TripScheduleAlightSearch<T extends TripScheduleInfo> implements Tri
      *
      * @param tripIndexUpperBound The trip index upper bound, where search end (exclusive).
      */
-    private boolean findBoardingSearchBackward(final int tripIndexUpperBound) {
-        for(int i = tripIndexUpperBound-1; i >=0; --i) {
+    private boolean findBoardingSearchBackwardsInTime(final int tripIndexUpperBound) {
+        for (int i = tripIndexUpperBound-1; i >=0; --i) {
             T trip = pattern.getTripSchedule(i);
 
             if (skipTripSchedule(trip)) {
@@ -170,11 +175,14 @@ public class TripScheduleAlightSearch<T extends TripScheduleInfo> implements Tri
     /**
      * Do a binary search to find the approximate lower bound index for where to start the search.
      * We IGNORE if the trip schedule is in service.
+     * <p/>
+     * This is just a guess and we return when the trip with a best valid arrival is in the range of
+     * the next {@link #nTripsBinarySearchThreshold}.
      *
-     * @return a better upper bound index (exclusive)
+     * @return a better lower bound index (inclusive)
      */
     private int binarySearchForTripIndex() {
-        int lower = 0, upper = pattern.numberOfTripSchedules();
+        int lower = 0, upper = nTrips;
 
         // Do a binary search to find where to start the search.
         // We IGNORE if the trip schedule is in service.
@@ -195,7 +203,9 @@ public class TripScheduleAlightSearch<T extends TripScheduleInfo> implements Tri
         return lower;
     }
 
-    /** Skip trips not running on the day of the search and frequency trips  */
+    /**
+     * Skip trips not running on the day of the search and frequency trips
+     */
     private boolean skipTripSchedule(T trip) {
         return skipTripScheduleCallback.apply(trip);
     }

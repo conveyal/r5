@@ -5,6 +5,7 @@ import com.conveyal.r5.profile.entur.util.PathStringBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 
 /**
@@ -114,5 +115,21 @@ public final class Path<T extends TripScheduleInfo> {
         buf.sep().stop(leg.asEgressLeg().fromStop()).sep().walk(leg.duration());
 
         return buf.toString();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Path<?> path = (Path<?>) o;
+        return startTime == path.startTime &&
+                endTime == path.endTime &&
+                numberOfTransfers == path.numberOfTransfers &&
+                Objects.equals(accessLeg, path.accessLeg);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(startTime, endTime, numberOfTransfers, accessLeg);
     }
 }

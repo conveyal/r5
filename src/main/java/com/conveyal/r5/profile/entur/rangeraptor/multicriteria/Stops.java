@@ -23,8 +23,9 @@ import static java.util.Collections.emptyList;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 final class Stops<T extends TripScheduleInfo> {
-    private final Stop<T>[] stops;
+    private final StopArrivals<T>[] stops;
     private final Destination<T> destination;
+    private final PathMapper<T> pathMapper;
     private final TransitCalculator calculator;
     private final DebugHandlerFactory<T> debugHandlerFactory;
 
@@ -38,13 +39,14 @@ final class Stops<T extends TripScheduleInfo> {
             DebugHandlerFactory<T> debugHandlerFactory
     ) {
         //noinspection unchecked
-        this.stops = (Stop<T>[]) new Stop[nStops];
+        this.stops = (StopArrivals<T>[]) new StopArrivals[nStops];
         this.calculator = calculator;
+        this.pathMapper = calculator.createPathMapper();
         this.debugHandlerFactory = debugHandlerFactory;
         this.destination = new Destination<>(debugHandlerFactory.debugDestinationArrival());
 
         for (TransferLeg it : egressLegs) {
-            this.stops[it.stop()] = new EgressStop<T>(it, destination, debugHandlerFactory.debugStopArrival(it.stop()));
+            this.stops[it.stop()] = new EgressStopArrivals<T>(it, destination, debugHandlerFactory.debugStopArrival(it.stop()));
         }
     }
 
@@ -69,12 +71,12 @@ final class Stops<T extends TripScheduleInfo> {
 
     Collection<Path<T>> extractPaths() {
         debugStateInfo();
-        return destination.stream().map(PathMapper::mapToPath).collect(Collectors.toList());
+        return destination.stream().map(pathMapper::mapToPath).collect(Collectors.toList());
     }
 
     /** List all transits arrived this round. */
     Iterable<AbstractStopArrival<T>> listArrivalsAfterMark(final int stop) {
-        Stop<T> it = stops[stop];
+        StopArrivals<T> it = stops[stop];
         if(it==null) {
             return emptyList();
         }
@@ -82,16 +84,16 @@ final class Stops<T extends TripScheduleInfo> {
     }
 
     void markAllStops() {
-        for (Stop<T> stop : stops) {
+        for (StopArrivals<T> stop : stops) {
             if (stop != null) {
                 stop.markAtEndOfSet();
             }
         }
     }
 
-    private Stop<T> findOrCreateSet(final int stop) {
+    private StopArrivals<T> findOrCreateSet(final int stop) {
         if(stops[stop] == null) {
-            stops[stop] = new Stop<T>(stop, debugHandlerFactory.debugStopArrival(stop));
+            stops[stop] = new StopArrivals<T>(stop, debugHandlerFactory.debugStopArrival(stop));
         }
         return stops[stop];
     }
@@ -104,7 +106,7 @@ final class Stops<T extends TripScheduleInfo> {
         long numOfStops = 0;
         int max = 0;
 
-        for (Stop stop : stops) {
+        for (StopArrivals stop : stops) {
             if(stop != null) {
                 ++numOfStops;
                 total += stop.size();

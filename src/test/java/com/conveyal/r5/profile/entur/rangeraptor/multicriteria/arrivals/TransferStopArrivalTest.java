@@ -22,7 +22,7 @@ public class TransferStopArrivalTest {
     private static final int A_TIME = 99;
     private static final TripScheduleInfo A_TRIP = null;
 
-    private static final TransitCalculator TRANSIT_CALCULATOR = TransitCalculator.testDummy(60);
+    private static final TransitCalculator TRANSIT_CALCULATOR = TransitCalculator.testDummyCalculator(60);
     private static final AccessStopArrival<TripScheduleInfo> ACCESS_ARRIVAL = new AccessStopArrival<>(A_STOP, A_TIME, A_TIME, COST, TRANSIT_CALCULATOR);
     private static final TransitStopArrival<TripScheduleInfo> TRANSIT_ARRIVAL = new TransitStopArrival<>(ACCESS_ARRIVAL, TRANSFER_FROM_STOP, A_TIME, A_TIME, A_TRIP);
 
@@ -73,19 +73,14 @@ public class TransferStopArrivalTest {
     }
 
     @Test
-    public void legDuration() {
-        assertEquals(LEG_DURATION, subject.legDuration());
-    }
-
-    @Test
     public void listStops() {
-        assertEquals("[100, 101, 102]", subject.listStops().toString());
+        assertEquals("[100, 101, 102]", subject.listStopsForDebugging().toString());
     }
 
     @Test
     public void testToString() {
         assertEquals(
-                "TransferStopArrival { Rnd: 1, Stop: 102, Time: 8:10:00 (10:00), Cost: 1000 }",
+                "TransferStopArrival { Rnd: 1, Stop: 102, Time: 8:10:00 (8:00:00), Cost: 1000 }",
                 subject.toString()
         );
     }

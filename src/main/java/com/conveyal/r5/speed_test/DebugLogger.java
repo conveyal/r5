@@ -20,6 +20,11 @@ class DebugLogger {
     private int lastRound = NOT_SET;
 
     private boolean pathHeader = true;
+    private final PathMapper<TripSchedule> pathMapper;
+
+    DebugLogger(PathMapper<TripSchedule>pathMapper) {
+        this.pathMapper = pathMapper;
+    }
 
     void stopArrivalLister(DebugEvent<StopArrivalView<TripSchedule>> e) {
 
@@ -33,10 +38,10 @@ class DebugLogger {
     }
 
     void destinationArrivalListener(DebugEvent<DestinationArrivalView<TripSchedule>> e) {
-        DestinationArrivalView<?> d = e.element();
+        DestinationArrivalView<TripSchedule> d = e.element();
         int round = d.previous().round();
         int cost = d.cost();
-        Path path = PathMapper.mapToPath(d);
+        Path<TripSchedule> path = pathMapper.mapToPath(d);
 
         printIterationHeader(e.iterationStartTime());
         printRoundHeader(round);
@@ -94,7 +99,7 @@ class DebugLogger {
 
     private PathStringBuilder path(StopArrivalView<?> a, PathStringBuilder buf) {
         if (a.arrivedByAccessLeg()) {
-            return buf.walk(a.legDuration()).sep().stop(a.stop());
+            return buf.walk(legDuration(a)).sep().stop(a.stop());
         }
         // Recursively call this method to insert arrival in front of this arrival
         path(a.previous(), buf);
@@ -104,9 +109,19 @@ class DebugLogger {
         if (a.arrivedByTransit()) {
             buf.transit(a.departureTime(), a.arrivalTime());
         } else {
-            buf.walk(a.legDuration());
+            buf.walk(legDuration(a));
         }
         return buf.sep().stop(a.stop());
+    }
+
+    /**
+     * The absolute time duration in seconds of a trip.
+     */
+    private int legDuration(StopArrivalView<?> a) {
+        // Depending on the search direction this may or may not be negative, if we
+        // search backwards in time then we arrive before we depart ;-) Hence
+        // we need to use the absolute value.
+        return Math.abs(a.arrivalTime() - a.departureTime());
     }
 
     private void printRoundHeader(int round) {

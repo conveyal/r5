@@ -9,9 +9,11 @@ import com.conveyal.r5.profile.entur.RangeRaptorService;
 import com.conveyal.r5.profile.entur.api.TuningParameters;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
-import com.conveyal.r5.profile.entur.api.request.RaptorProfiles;
+import com.conveyal.r5.profile.entur.api.request.RaptorProfile;
 import com.conveyal.r5.profile.entur.api.request.RequestBuilder;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
+import com.conveyal.r5.profile.entur.rangeraptor.path.ForwardPathMapper;
+import com.conveyal.r5.profile.entur.rangeraptor.path.ReversePathMapper;
 import com.conveyal.r5.profile.entur.transitadapter.TransitLayerRRDataProvider;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
@@ -42,6 +44,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import static com.conveyal.r5.profile.entur.api.request.RaptorProfile.RAPTOR_REVERSE;
 import static com.conveyal.r5.profile.entur.util.TimeUtils.midnightOf;
 
 /**
@@ -326,27 +329,35 @@ public class SpeedTest {
             ProfileRequest request,
             EgressAccessRouter streetRouter
     ) {
+        final int boardSlackInSeconds = 60;
         RequestBuilder<TripSchedule> builder = new RequestBuilder<TripSchedule>(request.fromTime, request.toTime)
-                .boardSlackInSeconds(60);
+                .boardSlackInSeconds(boardSlackInSeconds);
 
         builder.profile(mapAlgorithm(profile));
 
         addStopTimes(streetRouter.accessTimesToStopsInSeconds, builder::addAccessStop);
         addStopTimes(streetRouter.egressTimesToStopsInSeconds, builder::addEgressStop);
 
-        addDebugOptions(builder);
+        addDebugOptions(builder, boardSlackInSeconds);
 
         return builder.build();
     }
 
-    private void addDebugOptions(RequestBuilder<TripSchedule> builder) {
+    private void addDebugOptions(RequestBuilder<TripSchedule> builder, int boardSlackInSeconds) {
         List<Integer> stops = opts.debugStops();
         List<Integer> trip = opts.debugTrip();
 
         if(!opts.debug() && stops.isEmpty() && trip.isEmpty()) {
             return;
         }
-        DebugLogger logger = new DebugLogger();
+
+        DebugLogger logger = new DebugLogger(
+                builder.profile() == RAPTOR_REVERSE
+                        ? new ReversePathMapper<>(boardSlackInSeconds)
+                        : new ForwardPathMapper<>()
+
+
+        );
         builder
                 .stopArrivalListener(logger::stopArrivalLister)
                 .destinationArrivalListener(logger::destinationArrivalListener)
@@ -452,11 +463,11 @@ public class SpeedTest {
         }
     }
 
-    private static RaptorProfiles mapAlgorithm(SpeedTestProfiles profile) {
+    private static RaptorProfile mapAlgorithm(SpeedTestProfiles profile) {
         switch (profile) {
-            case mc_range_raptor: return RaptorProfiles.MULTI_CRITERIA_RANGE_RAPTOR;
-            case range_raptor: return RaptorProfiles.RANGE_RAPTOR;
-            case raptor_reverse: return RaptorProfiles.RAPTOR_REVERSE;
+            case mc_range_raptor: return RaptorProfile.MULTI_CRITERIA_RANGE_RAPTOR;
+            case range_raptor: return RaptorProfile.RANGE_RAPTOR;
+            case raptor_reverse: return RAPTOR_REVERSE;
         }
         throw new IllegalArgumentException("Unable to map algorithm: " + profile);
     }

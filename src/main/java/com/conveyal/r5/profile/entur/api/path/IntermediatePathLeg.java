@@ -2,6 +2,8 @@ package com.conveyal.r5.profile.entur.api.path;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 
+import java.util.Objects;
+
 /**
  * Abstract intermediate leg in a path. It is either a Transit or Transfer leg.
  *
@@ -42,5 +44,21 @@ public abstract class IntermediatePathLeg<T extends TripScheduleInfo> implements
     @Override
     public final int toTime(){
         return toTime;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        IntermediatePathLeg<?> that = (IntermediatePathLeg<?>) o;
+        return fromStop == that.fromStop &&
+                fromTime == that.fromTime &&
+                toStop == that.toStop &&
+                toTime == that.toTime;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(fromStop, fromTime, toStop, toTime);
     }
 }

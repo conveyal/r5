@@ -6,18 +6,22 @@ import java.util.Arrays;
 
 public class TestTripSchedule implements TripScheduleInfo {
     public static final int DEPARTURE_DELAY = 10;
-    private int[] arrivalTimes;
+    private final int[] arrivalTimes;
 
-    public TestTripSchedule(int ... arrivalTimes) {
-        this.arrivalTimes = arrivalTimes;
+    public static TestTripSchedule createTripScheduleUseingArrivalTimes(int ... arrivalTimes) {
+        return new TestTripSchedule(arrivalTimes);
     }
 
-    public static TestTripSchedule tripScheduleByDepartures(int ... departureTimes) {
+    public static TestTripSchedule createTripScheduleUseingDepartureTimes(int ... departureTimes) {
         int[] arrivalTimes = Arrays.copyOf(departureTimes, departureTimes.length);
         for (int i = 0; i < arrivalTimes.length; i++) {
             arrivalTimes[i] -= TestTripSchedule.DEPARTURE_DELAY;
         }
         return new TestTripSchedule(arrivalTimes);
+    }
+
+    private TestTripSchedule(int ... arrivalTimes) {
+        this.arrivalTimes = arrivalTimes;
     }
 
     @Override

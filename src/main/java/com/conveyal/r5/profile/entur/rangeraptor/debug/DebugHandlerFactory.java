@@ -23,15 +23,15 @@ public class DebugHandlerFactory<T extends TripScheduleInfo> {
 
     public DebugHandlerFactory(DebugRequest<T> request) {
         this.noopStopHandler = DebugHandler.noop();
-        this.stopHandler = request.isDebugStopArrivalsEnabled()
+        this.stopHandler = debug(request, request.stopArrivalListener())
                 ? new DebugHandlerStopArrivalAdapter<>(request)
                 : noopStopHandler;
 
-        this.destinationHandler = request.isDebugDestinationArrivalsEnabled()
+        this.destinationHandler = debug(request, request.destinationArrivalListener())
                 ? new DebugHandlerDestinationArrivalAdapter<>(request)
                 : DebugHandler.noop();
 
-        this.pathHandler = request.isDebugPathFiltering()
+        this.pathHandler = debug(request, request.pathFilteringListener())
                 ? new DebugHandlerPathAdapter<>(request)
                 : DebugHandler.noop();
     }
@@ -56,5 +56,9 @@ public class DebugHandlerFactory<T extends TripScheduleInfo> {
         stopHandler.setIterationDepartureTime(departureTime);
         destinationHandler.setIterationDepartureTime(departureTime);
         pathHandler.setIterationDepartureTime(departureTime);
+    }
+
+    private boolean debug(DebugRequest<T> request, Object handler) {
+        return request.isDebug() && handler != null;
     }
 }

@@ -47,7 +47,7 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> extends
     ) {
         super(nRounds, nStops, calculator);
         this.stops = new Stops<>(nRounds, nStops, request.egressLegs(), this::handleEgressStopArrival);
-        this.results = new DestinationArrivals<>(nRounds, new StopsCursor<>(stops, calculator), dFactory);
+        this.results = new DestinationArrivals<>(nRounds, calculator, new StopsCursor<>(stops, calculator), dFactory);
         this.debug = request.debug().isDebug()
                 ? new StateDebugger<>(new StopsCursor<>(stops, calculator), dFactory.debugStopArrival())
                 : DebugState.noop();
@@ -109,7 +109,7 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> extends
 
     @Override
     final void transferToStop(int arrivalTimeTransit, int fromStop, TransferLeg transferLeg) {
-        final int arrivalTime = arrivalTimeTransit + transferLeg.durationInSeconds();
+        final int arrivalTime = calculator().add(arrivalTimeTransit, transferLeg.durationInSeconds());
 
         if (exceedsTimeLimit(arrivalTime)) {
             return;

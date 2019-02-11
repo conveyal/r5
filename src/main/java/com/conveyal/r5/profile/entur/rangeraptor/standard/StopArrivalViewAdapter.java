@@ -136,7 +136,7 @@ abstract class StopArrivalViewAdapter<T extends TripScheduleInfo> implements Sto
 
         @Override
         public int departureTime() {
-            return arrivalTime() - arrival.transferDuration();
+            return cursor.departureTime(arrivalTime(), arrival.transferDuration());
         }
 
         @Override

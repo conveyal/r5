@@ -39,6 +39,8 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     private final Stops<T> stops;
     private final List<AbstractStopArrival<T>> arrivalsCache = new ArrayList<>();
     private final int nRounds;
+    private final TransitCalculator calculator;
+
     private int round = Integer.MIN_VALUE;
     private boolean updatesExist = false;
     private BitSet touchedStops;
@@ -57,6 +59,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         this.nRounds = nRounds;
         this.stops = new Stops<>(nStops, egressLegs, calculator, debugHandlerFactory);
         this.touchedStops = new BitSet(nStops);
+        this.calculator = calculator;
     }
 
     @Override
@@ -108,7 +111,8 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
      * Set the time at a transit stop iff it is optimal.
      */
     void transitToStop(AbstractStopArrival<T> boardStop, int stop, int alightTime, int boardTime, T trip) {
-        if (alightTime > maxTimeLimit) {
+
+        if (exceedsTimeLimit(alightTime)) {
             return;
         }
         arrivalsCache.add(new TransitStopArrival<>(boardStop, stop, alightTime, boardTime, trip));
@@ -158,7 +162,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         for (AbstractStopArrival<T> it : fromArrivals) {
             int arrivalTime = it.arrivalTime() + transferTimeInSeconds;
 
-            if (arrivalTime < maxTimeLimit) {
+            if (!exceedsTimeLimit(arrivalTime)) {
                 arrivalsCache.add(new TransferStopArrival<>(it, transfer, arrivalTime));
             }
         }
@@ -171,5 +175,9 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
             }
         }
         arrivalsCache.clear();
+    }
+
+    private boolean exceedsTimeLimit(int alightTime) {
+        return calculator.isBest(maxTimeLimit, alightTime);
     }
 }

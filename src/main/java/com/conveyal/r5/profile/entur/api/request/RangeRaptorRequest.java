@@ -18,10 +18,10 @@ public interface RangeRaptorRequest<T extends TripScheduleInfo> {
     /**
      * The profile/algorithm to use for this request.
      * <p/>
-     * The default value is {@link RaptorProfiles#MULTI_CRITERIA_RANGE_RAPTOR}
+     * The default value is {@link RaptorProfile#MULTI_CRITERIA_RANGE_RAPTOR}
      */
-    default RaptorProfiles profile() {
-        return RaptorProfiles.MULTI_CRITERIA_RANGE_RAPTOR;
+    default RaptorProfile profile() {
+        return RaptorProfile.MULTI_CRITERIA_RANGE_RAPTOR;
     }
 
     /**

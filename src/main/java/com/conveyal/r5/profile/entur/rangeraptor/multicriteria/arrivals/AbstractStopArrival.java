@@ -4,9 +4,7 @@ import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.LinkedList;
 
 
 /**
@@ -120,12 +118,11 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
     }
 
     @Override
-    public List<Integer> listStops() {
-        List<Integer> stops = new ArrayList<>();
-        for(AbstractStopArrival<?> current = this; current != null; current = current.previous) {
-            stops.add(current.stop);
+    public Iterable<Integer> listStopsForDebugging() {
+        LinkedList<Integer> stops = new LinkedList<>();
+        for(AbstractStopArrival<?> it = this; it != null; it = it.previous) {
+            stops.addFirst(it.stop);
         }
-        Collections.reverse(stops);
         return stops;
     }
 

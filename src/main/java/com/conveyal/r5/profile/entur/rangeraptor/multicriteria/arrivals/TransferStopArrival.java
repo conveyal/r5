@@ -15,7 +15,7 @@ public final class TransferStopArrival<T extends TripScheduleInfo> extends Abstr
                 transferLeg.stop(),
                 arrivalTime - transferLeg.durationInSeconds(),
                 arrivalTime,
-                transferLeg.cost()
+                4 * transferLeg.cost()
         );
     }
 

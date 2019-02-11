@@ -39,8 +39,8 @@ public class RequestBuilder<T extends TripScheduleInfo> {
     // Algorithm
     private RaptorProfile profile;
     private int multiCriteriaBoardCost;
-    private int multiCriteriaWalkReluctanceFactor;
-    private int multiCriteriaWaitReluctanceFactor;
+    private double multiCriteriaWalkReluctanceFactor;
+    private double multiCriteriaWaitReluctanceFactor;
 
     // Debug
     private final List<Integer> debugStops;
@@ -184,20 +184,20 @@ public class RequestBuilder<T extends TripScheduleInfo> {
         return this;
     }
 
-    public int multiCriteriaWalkReluctanceFactor() {
+    public double multiCriteriaWalkReluctanceFactor() {
         return multiCriteriaWalkReluctanceFactor;
     }
 
-    public RequestBuilder<T> multiCriteriaWalkReluctanceFactor(int walkReluctanceFactor) {
+    public RequestBuilder<T> multiCriteriaWalkReluctanceFactor(double walkReluctanceFactor) {
         this.multiCriteriaWalkReluctanceFactor = walkReluctanceFactor;
         return this;
     }
 
-    public int multiCriteriaWaitReluctanceFactor() {
+    public double multiCriteriaWaitReluctanceFactor() {
         return multiCriteriaWaitReluctanceFactor;
     }
 
-    public RequestBuilder<T> multiCriteriaWaitReluctanceFactor(int waitReluctanceFactor) {
+    public RequestBuilder<T> multiCriteriaWaitReluctanceFactor(double waitReluctanceFactor) {
         this.multiCriteriaWaitReluctanceFactor = waitReluctanceFactor;
         return this;
     }
@@ -255,6 +255,10 @@ public class RequestBuilder<T extends TripScheduleInfo> {
     public RequestBuilder<T> pathFilteringListener(Consumer<DebugEvent<Path<T>>> pathFilteringListener) {
         this.pathFilteringListener = pathFilteringListener;
         return this;
+    }
+
+    public MultiCriteriaCostFactors buildMcCostFactors() {
+        return new MultiCriteriaCostFactors(this);
     }
 
     public RangeRaptorRequest<T> build() {

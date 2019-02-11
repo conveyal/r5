@@ -17,6 +17,7 @@ public class TransitStopArrivalTest {
     private static final int LEG_DURATION = 10 * 60;
     private static final int ALIGHT_TIME = BOARD_TIME + LEG_DURATION;
     private static final int COST = 500;
+    private static final int TRANSIT_COST = 200;
     private static final int ROUND = 1;
     private static final int A_TIME = 99;
     private static final TripScheduleInfo A_TRIP = new TripScheduleInfo() {
@@ -28,7 +29,7 @@ public class TransitStopArrivalTest {
     private static final TransitCalculator TRANSIT_CALCULATOR = testDummyCalculator(60);
     private static final AccessStopArrival<TripScheduleInfo> ACCESS_ARRIVAL = new AccessStopArrival<>(BOARD_STOP, A_TIME, A_TIME, COST, TRANSIT_CALCULATOR);
 
-    private TransitStopArrival<TripScheduleInfo> subject = new TransitStopArrival<>(ACCESS_ARRIVAL, ALIGHT_STOP, ALIGHT_TIME,  BOARD_TIME, A_TRIP);
+    private TransitStopArrival<TripScheduleInfo> subject = new TransitStopArrival<>(ACCESS_ARRIVAL, ALIGHT_STOP, ALIGHT_TIME,  BOARD_TIME, A_TRIP, TRANSIT_COST);
 
 
     @Test
@@ -65,7 +66,7 @@ public class TransitStopArrivalTest {
 
     @Test
     public void cost() {
-        assertEquals(COST, subject.cost());
+        assertEquals(TRANSIT_COST + COST, subject.cost());
     }
 
     @Test
@@ -87,7 +88,7 @@ public class TransitStopArrivalTest {
     @Test
     public void testToString() {
         assertEquals(
-                "TransitStopArrival { Rnd: 1, Stop: 101, Time: 8:10:00 (8:00:00), Cost: 500 }",
+                "TransitStopArrival { Rnd: 1, Stop: 101, Time: 8:10:00 (8:00:00), Cost: 700 }",
                 subject.toString()
         );
     }

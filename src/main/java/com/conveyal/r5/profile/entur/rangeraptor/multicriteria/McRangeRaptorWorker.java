@@ -27,6 +27,7 @@ public final class McRangeRaptorWorker<T extends TripScheduleInfo> extends Abstr
                         nRounds(context.tuningParameters()),
                         context.transit().numberOfStops(),
                         context.request().egressLegs(),
+                        new CostCalculator(context.request().multiCriteriaCostFactors()),
                         context.calculator(),
                         context.debugFactory()
                 )

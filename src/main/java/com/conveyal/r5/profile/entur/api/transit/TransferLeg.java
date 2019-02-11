@@ -30,11 +30,4 @@ public interface TransferLeg {
      */
     int durationInSeconds();
 
-    /**
-     * The additional cost to be added to the pareto vector.
-     * Optional - this method is only needed if the the cost is part of the pareto set.
-     */
-    default int cost() {
-        return 0;
-    }
 }

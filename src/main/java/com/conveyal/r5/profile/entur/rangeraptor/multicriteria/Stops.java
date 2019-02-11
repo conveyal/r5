@@ -35,18 +35,24 @@ final class Stops<T extends TripScheduleInfo> {
     Stops(
             int nStops,
             Collection<TransferLeg> egressLegs,
-            TransitCalculator calculator,
+            CostCalculator costCalculator,
+            TransitCalculator transitCalculator,
             DebugHandlerFactory<T> debugHandlerFactory
     ) {
         //noinspection unchecked
         this.stops = (StopArrivals<T>[]) new StopArrivals[nStops];
-        this.calculator = calculator;
+        this.calculator = transitCalculator;
         this.pathMapper = calculator.createPathMapper();
         this.debugHandlerFactory = debugHandlerFactory;
         this.destination = new Destination<>(debugHandlerFactory.debugDestinationArrival());
 
         for (TransferLeg it : egressLegs) {
-            this.stops[it.stop()] = new EgressStopArrivals<T>(it, destination, debugHandlerFactory.debugStopArrival(it.stop()));
+            this.stops[it.stop()] = new EgressStopArrivals<T>(
+                    it,
+                    destination,
+                    costCalculator,
+                    debugHandlerFactory.debugStopArrival(it.stop())
+            );
         }
     }
 
@@ -54,12 +60,12 @@ final class Stops<T extends TripScheduleInfo> {
         debugHandlerFactory.setIterationDepartureTime(departureTime);
     }
 
-    void setInitialTime(TransferLeg accessLeg, int fromTime) {
+    void setInitialTime(int fromTime, TransferLeg accessLeg, int cost) {
         AccessStopArrival<T> newAccessArrival = new AccessStopArrival<>(
                 accessLeg.stop(),
                 fromTime,
                 accessLeg.durationInSeconds(),
-                accessLeg.cost(),
+                cost,
                 calculator
         );
         addStopArrival(newAccessArrival);

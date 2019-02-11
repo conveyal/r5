@@ -31,10 +31,11 @@ class Destination<T extends TripScheduleInfo> extends ParetoSet<DestinationArriv
         this.debugHandler = debugHandler;
     }
 
-    void transferToDestination(TransitStopArrival<T> lastTransitArrival, TransferLeg egressLeg) {
+    void transferToDestination(TransitStopArrival<T> lastTransitArrival, TransferLeg egressLeg, int cost) {
         DestinationArrival<T> newValue = new DestinationArrival<>(
                 lastTransitArrival,
-                egressLeg
+                egressLeg,
+                cost
         );
         boolean added = add(newValue);
 

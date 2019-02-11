@@ -330,7 +330,9 @@ public class SpeedTest {
             EgressAccessRouter streetRouter
     ) {
         final int boardSlackInSeconds = 60;
-        RequestBuilder<TripSchedule> builder = new RequestBuilder<TripSchedule>(request.fromTime, request.toTime)
+        RequestBuilder<TripSchedule> builder = new RequestBuilder<TripSchedule>()
+                .earliestDepartureTime(request.fromTime)
+                .latestArrivalTime(request.toTime)
                 .boardSlackInSeconds(boardSlackInSeconds);
 
         builder.profile(mapAlgorithm(profile));

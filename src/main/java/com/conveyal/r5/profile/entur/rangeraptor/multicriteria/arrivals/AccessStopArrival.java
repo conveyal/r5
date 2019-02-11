@@ -15,7 +15,7 @@ public final class AccessStopArrival<T extends TripScheduleInfo> extends Abstrac
     private final TransitCalculator calculator;
 
     public AccessStopArrival(int stop, int departureTime, int accessDurationInSeconds, int cost, TransitCalculator calculator) {
-        super(stop, departureTime, departureTime + accessDurationInSeconds, 4 * cost);
+        super(stop, departureTime, departureTime + accessDurationInSeconds, cost);
         this.calculator = calculator;
         this.accessDurationInSeconds = accessDurationInSeconds;
     }

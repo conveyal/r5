@@ -130,7 +130,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
      * This is protected to allow reverse search to override and step backwards.
      */
     private void performTransitForRoundAndEachStopInPattern(final TripPatternInfo<T> pattern) {
-        IntIterator it = calculator().patternStopIterator(0, pattern.numberOfStopsInPattern());
+        IntIterator it = calculator().patternStopIterator(pattern.numberOfStopsInPattern());
         while (it.hasNext()) {
             performTransitForRoundAndPatternAtStop(it.next());
         }

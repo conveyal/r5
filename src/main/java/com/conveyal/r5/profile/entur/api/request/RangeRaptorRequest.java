@@ -3,6 +3,7 @@ package com.conveyal.r5.profile.entur.api.request;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -209,9 +210,9 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
     public String toString() {
         return "RangeRaptorRequest{" +
                 "profile=" + profile +
-                ", earliestDepartureTime=" + earliestDepartureTime +
-                ", latestArrivalTime=" + latestArrivalTime +
-                ", searchWindowInSeconds=" + searchWindowInSeconds +
+                ", earliestDepartureTime=" + TimeUtils.timeToStrCompact(earliestDepartureTime, -1) +
+                ", latestArrivalTime=" + TimeUtils.timeToStrCompact(latestArrivalTime, -1) +
+                ", searchWindowInSeconds=" + TimeUtils.timeToStrCompact(searchWindowInSeconds) +
                 ", arrivedBy=" + arrivedBy +
                 ", accessLegs=" + accessLegs +
                 ", egressLegs=" + egressLegs +

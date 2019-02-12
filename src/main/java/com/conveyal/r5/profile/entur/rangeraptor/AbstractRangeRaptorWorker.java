@@ -2,7 +2,6 @@ package com.conveyal.r5.profile.entur.rangeraptor;
 
 import com.conveyal.r5.profile.entur.api.TuningParameters;
 import com.conveyal.r5.profile.entur.api.path.Path;
-import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
@@ -91,14 +90,6 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
             }
         });
         return state.extractPaths();
-    }
-
-    protected RangeRaptorRequest<T> request() {
-        return context.request();
-    }
-
-    protected TuningParameters tuningParameters() {
-        return context.tuningParameters();
     }
 
     protected TransitDataProvider<T> transit() {
@@ -193,7 +184,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
         state.setupIteration(iterationDepartureTime);
 
         // add initial stops
-        for (TransferLeg it : request().accessLegs()) {
+        for (TransferLeg it : context.accessLegs()) {
             state.setInitialTimeForIteration(it, iterationDepartureTime);
         }
     }

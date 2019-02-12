@@ -4,6 +4,7 @@ import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.DestinationArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
@@ -15,9 +16,10 @@ import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
 class Destination<T extends TripScheduleInfo> extends ParetoSet<DestinationArrival<T>> {
 
     private final DebugHandler<DestinationArrivalView<T>> debugHandler;
+    private final TransitCalculator calculator;
 
 
-    Destination(DebugHandler<DestinationArrivalView<T>> debugHandler) {
+    Destination(TransitCalculator calculator, DebugHandler<DestinationArrivalView<T>> debugHandler) {
         // The `travelDuration` is added as a criteria to the pareto comparator in addition to the parameters
         // used for each stop arrivals. The `travelDuration` is only needed at the destination because Range Raptor
         // works in iterations backwards in time.
@@ -28,6 +30,7 @@ class Destination<T extends TripScheduleInfo> extends ParetoSet<DestinationArriv
                 l.travelDuration() < r.travelDuration(),
                 debugHandler::drop
         );
+        this.calculator = calculator;
         this.debugHandler = debugHandler;
     }
 
@@ -37,7 +40,11 @@ class Destination<T extends TripScheduleInfo> extends ParetoSet<DestinationArriv
                 egressLeg,
                 cost
         );
-        boolean added = add(newValue);
+        boolean added = false;
+
+        if(!calculator.exceedsTimeLimit(newValue.arrivalTime())) {
+            added = add(newValue);
+        }
 
         if(added) {
             debugHandler.accept(newValue, this);

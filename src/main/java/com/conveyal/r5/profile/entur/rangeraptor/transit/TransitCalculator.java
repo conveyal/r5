@@ -53,6 +53,25 @@ public interface TransitCalculator {
      */
     <T extends TripScheduleInfo> int latestArrivalTime(T onTrip, int stopPositionInPattern);
 
+
+    /**
+     * Stop the search when the time exceeds the latest-acceptable-arrival-time.
+     * In a reverse search this is the earliest acceptable departure time.
+     *
+     * @return true if time exceeds limit, false means good to go.
+     */
+    boolean exceedsTimeLimit(int time);
+
+    /**
+     * Use the {@link #exceedsTimeLimit(int)} to check for searching beyond the time limit,
+     * only use this if you need to fill an array, which serve as an upper bound for arrival time.
+     * <p/>
+     * {@link #unreachedTime()} is returned if not provided in the request.
+     *
+     * @return the latest acceptable arrival time.
+     */
+    int latestAcceptableArrivalTime();
+
     /**
      * Return true is the first argument (subject) is the best time, and false if not. If both
      * are equal false is retuned.
@@ -140,7 +159,8 @@ public interface TransitCalculator {
                 10,
                 boardSlackInSeconds,
                 hm2time(8,0),
-                hm2time(10, 0),
+                2 * 60 * 60, // 2 hours
+                -1,
                 60
         );
     }

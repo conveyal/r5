@@ -14,10 +14,10 @@ package com.conveyal.r5.speed_test.api;
 
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.speed_test.SpeedTest;
+import com.conveyal.r5.speed_test.api.model.TripPlan;
 import org.glassfish.grizzly.http.server.Request;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.conveyal.r5.speed_test.api.model.*;
 
 import javax.inject.Inject;
 import javax.ws.rs.GET;
@@ -54,12 +54,11 @@ public class PlannerResource extends RoutingResource {
         Response response = new Response(uriInfo);
         try {
             ProfileRequest request = buildRequest();
-            TripPlan plan = speedTest.route(request);
+            TripPlan plan = speedTest.route(request, -1);
             response.setPlan(plan);
         } catch (Exception e) {
             LOG.error(e.getMessage(), e);
         }
         return response;
     }
-
 }

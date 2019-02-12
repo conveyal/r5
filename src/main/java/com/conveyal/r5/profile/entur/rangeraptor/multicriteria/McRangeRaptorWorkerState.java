@@ -31,11 +31,6 @@ import java.util.List;
  */
 final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements WorkerState<T> {
 
-    /**
-     * Stop the search when the time exceeds the max time limit.
-     */
-    private int maxTimeLimit;
-
     private final Stops<T> stops;
     private final List<AbstractStopArrival<T>> arrivalsCache = new ArrayList<>();
     private final int nRounds;
@@ -67,9 +62,6 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
 
     @Override
     public void setupIteration(int iterationDepartureTime) {
-        // TODO TGR - Set max limit to 5 days for now, replace this with a pareto check against the
-        // TODO TGR - destination location values.
-        maxTimeLimit = iterationDepartureTime + 5 * 24 * 60 * 60;
         round = 0;
         arrivalsCache.clear();
         stops.startNewIteration(iterationDepartureTime);
@@ -182,7 +174,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         arrivalsCache.clear();
     }
 
-    private boolean exceedsTimeLimit(int alightTime) {
-        return transitCalculator.isBest(maxTimeLimit, alightTime);
+    private boolean exceedsTimeLimit(int time) {
+        return transitCalculator.exceedsTimeLimit(time);
     }
 }

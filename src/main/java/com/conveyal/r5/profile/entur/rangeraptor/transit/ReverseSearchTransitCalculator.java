@@ -18,11 +18,10 @@ import java.util.function.Function;
 final class ReverseSearchTransitCalculator implements TransitCalculator {
     private final int tripSearchBinarySearchThreshold;
     private final int boardSlackInSeconds;
-    private final int latestDepartureTime;
-    private final int earliestArrivalTime;
+    private final int latestArrivalTime;
+    private final int searchWindowInSeconds;
+    private final int earliestAcceptableDepartureTime;
     private final int iterationStep;
-
-
 
     ReverseSearchTransitCalculator(RangeRaptorRequest<?> r, TuningParameters t) {
         // The request is already modified to search backwards, so 'earliestDepartureTime()'
@@ -30,8 +29,9 @@ final class ReverseSearchTransitCalculator implements TransitCalculator {
         this(
             t.scheduledTripBinarySearchThreshold(),
             r.boardSlackInSeconds(),
-            r.earliestDepartureTime(),
             r.latestArrivalTime(),
+            r.searchWindowInSeconds(),
+            r.earliestDepartureTime(),
             t.iterationDepartureStepInSeconds()
         );
     }
@@ -39,14 +39,18 @@ final class ReverseSearchTransitCalculator implements TransitCalculator {
     private ReverseSearchTransitCalculator(
             int binaryTripSearchThreshold,
             int boardSlackInSeconds,
-            int latestDepartureTime,
-            int earliestArrivalTime,
+            int latestArrivalTime,
+            int searchWindowInSeconds,
+            int earliestAcceptableDepartureTime,
             int iterationStep
     ) {
         this.tripSearchBinarySearchThreshold = binaryTripSearchThreshold;
         this.boardSlackInSeconds = boardSlackInSeconds;
-        this.latestDepartureTime = latestDepartureTime;
-        this.earliestArrivalTime = earliestArrivalTime;
+        this.latestArrivalTime = latestArrivalTime;
+        this.searchWindowInSeconds = searchWindowInSeconds;
+        this.earliestAcceptableDepartureTime = earliestAcceptableDepartureTime < 0
+                ? unreachedTime()
+                : earliestAcceptableDepartureTime;
         this.iterationStep = iterationStep;
     }
 
@@ -78,6 +82,16 @@ final class ReverseSearchTransitCalculator implements TransitCalculator {
     }
 
     @Override
+    public boolean exceedsTimeLimit(int time) {
+        return isBest(earliestAcceptableDepartureTime, time);
+    }
+
+    @Override
+    public int latestAcceptableArrivalTime() {
+        return earliestAcceptableDepartureTime;
+    }
+
+    @Override
     public final boolean isBest(final int subject, final int candidate) {
         // The latest time is the best when searching in reverse
         return subject > candidate;
@@ -95,17 +109,21 @@ final class ReverseSearchTransitCalculator implements TransitCalculator {
 
     @Override
     public final IntIterator rangeRaptorMinutes() {
-        return IntIterators.intIncIterator(earliestArrivalTime, latestDepartureTime, iterationStep);
+        return IntIterators.intIncIterator(
+                latestArrivalTime - searchWindowInSeconds,
+                latestArrivalTime,
+                iterationStep
+        );
     }
 
     @Override
     public IntIterator patternStopIterator(int nStopsInPattern) {
-        return IntIterators.intDecIterator(nStopsInPattern-1, 0);
+        return IntIterators.intDecIterator(nStopsInPattern, 0);
     }
 
     @Override
     public IntIterator patternStopIterator(int onTripStopPos, int nStopsInPattern) {
-        return IntIterators.intDecIterator(onTripStopPos-1, 0);
+        return IntIterators.intDecIterator(onTripStopPos, 0);
     }
 
     @Override
@@ -115,7 +133,6 @@ final class ReverseSearchTransitCalculator implements TransitCalculator {
     ) {
         return new TripScheduleAlightSearch<>(tripSearchBinarySearchThreshold, pattern, skipTripScheduleCallback);
     }
-
 
     @Override
     public <T extends TripScheduleInfo> PathMapper<T> createPathMapper() {

@@ -14,8 +14,9 @@ import java.util.function.Function;
 final class ForwardSearchTransitCalculator implements TransitCalculator {
     private final int tripSearchBinarySearchThreshold;
     private final int boardSlackInSeconds;
-    private final int latestArrivalTime;
     private final int earliestDepartureTime;
+    private final int searchWindowSizeInSeconds;
+    private final int latestAcceptableArrivalTime;
     private final int iterationStep;
 
     ForwardSearchTransitCalculator(RangeRaptorRequest<?> r, TuningParameters t) {
@@ -23,6 +24,7 @@ final class ForwardSearchTransitCalculator implements TransitCalculator {
                 t.scheduledTripBinarySearchThreshold(),
                 r.boardSlackInSeconds(),
                 r.earliestDepartureTime(),
+                r.searchWindowInSeconds(),
                 r.latestArrivalTime(),
                 t.iterationDepartureStepInSeconds()
         );
@@ -32,13 +34,17 @@ final class ForwardSearchTransitCalculator implements TransitCalculator {
             int tripSearchBinarySearchThreshold,
             int boardSlackInSeconds,
             int earliestDepartureTime,
-            int latestArrivalTime,
+            int searchWindowSizeInSeconds,
+            int latestAcceptableArrivalTime,
             int iterationStep
     ) {
         this.tripSearchBinarySearchThreshold = tripSearchBinarySearchThreshold;
         this.boardSlackInSeconds = boardSlackInSeconds;
         this.earliestDepartureTime = earliestDepartureTime;
-        this.latestArrivalTime = latestArrivalTime;
+        this.searchWindowSizeInSeconds = searchWindowSizeInSeconds;
+        this.latestAcceptableArrivalTime = latestAcceptableArrivalTime < 0
+                ? unreachedTime()
+                : latestAcceptableArrivalTime;
         this.iterationStep = iterationStep;
     }
 
@@ -64,6 +70,16 @@ final class ForwardSearchTransitCalculator implements TransitCalculator {
     }
 
     @Override
+    public boolean exceedsTimeLimit(int time) {
+        return isBest(latestAcceptableArrivalTime, time);
+    }
+
+    @Override
+    public int latestAcceptableArrivalTime() {
+        return latestAcceptableArrivalTime;
+    }
+
+    @Override
     public final boolean isBest(final int subject, final int candidate) {
         return subject < candidate;
     }
@@ -80,7 +96,11 @@ final class ForwardSearchTransitCalculator implements TransitCalculator {
 
     @Override
     public final IntIterator rangeRaptorMinutes() {
-        return IntIterators.intDecIterator(latestArrivalTime, earliestDepartureTime, iterationStep);
+        return IntIterators.intDecIterator(
+                earliestDepartureTime + searchWindowSizeInSeconds,
+                earliestDepartureTime,
+                iterationStep
+        );
     }
 
     @Override

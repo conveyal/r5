@@ -174,7 +174,7 @@ public class SpeedTest {
             final ProfileRequest request = buildDefaultRequest(testCase, opts);
 
             // Perform routing
-            TripPlan route = TOT_TIMER.timeAndReturn(() -> route(request) );
+            TripPlan route = TOT_TIMER.timeAndReturn(() -> route(request, testCase.arrivalTime) );
 
             if(!ignoreResults) {
                 tripPlans.add(route);
@@ -191,13 +191,13 @@ public class SpeedTest {
         }
     }
 
-    public TripPlan route(ProfileRequest request) {
+    public TripPlan route(ProfileRequest request, int latestArrivalTime) {
 
         if(profile.isOriginal()) {
             return routeUsingOriginalRRaptor(request);
         }
         else {
-            return routeUsingNewRRaptor(request);
+            return routeUsingNewRRaptor(request, latestArrivalTime);
         }
     }
 
@@ -256,7 +256,7 @@ public class SpeedTest {
         return tripPlan;
     }
 
-    private TripPlan routeUsingNewRRaptor(ProfileRequest request) {
+    private TripPlan routeUsingNewRRaptor(ProfileRequest request, int latestArrivalTime) {
         try {
             EgressAccessRouter streetRouter = new EgressAccessRouter(transportNetwork, request);
             streetRouter.route();
@@ -275,7 +275,7 @@ public class SpeedTest {
 
             ItinerarySet itineraries = new ItinerarySet();
 
-            RangeRaptorRequest<TripSchedule> req = createRequest(request, streetRouter);
+            RangeRaptorRequest<TripSchedule> req = createRequest(request, latestArrivalTime, streetRouter);
 
             TuningParameters tuningParameters = new TuningParameters() {
                 @Override public int maxNumberOfTransfers() { return request.maxRides; }
@@ -327,12 +327,14 @@ public class SpeedTest {
 
     private RangeRaptorRequest<TripSchedule> createRequest(
             ProfileRequest request,
+            int latestArrivalTime,
             EgressAccessRouter streetRouter
     ) {
         final int boardSlackInSeconds = 60;
         RequestBuilder<TripSchedule> builder = new RequestBuilder<TripSchedule>()
                 .earliestDepartureTime(request.fromTime)
-                .latestArrivalTime(request.toTime)
+                .latestArrivalTime(latestArrivalTime)
+                .searchWindowInSeconds(request.toTime - request.fromTime)
                 .boardSlackInSeconds(boardSlackInSeconds);
 
         builder.profile(mapAlgorithm(profile));
@@ -413,8 +415,8 @@ public class SpeedTest {
         request.fromLon = testCase.fromLon;
         request.toLat = testCase.toLat;
         request.toLon = testCase.toLon;
-        request.fromTime = 8 * 60 * 60; // 8AM in seconds since midnight
-        request.toTime = request.fromTime + 60 * opts.searchWindowInMinutes();
+        request.fromTime = testCase.departureTime;
+        request.toTime = request.fromTime + testCase.window;
         request.date = LocalDate.of(2019, 1, 28);
         request.numberOfItineraries = opts.numOfItineraries();
         return request;

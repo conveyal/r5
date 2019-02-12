@@ -8,18 +8,32 @@ import java.util.Calendar;
  * Time utility methods. See the unit test for examples on how to use this class.
  */
 public class TimeUtils {
+    private enum FormatType { COMPACT, LONG, SHORT }
+    private static final boolean USE_RAW_TIME = false;
+
+
+    /** This is a utility class. Do not instantiate this class. It should have only static methods. */
+    private TimeUtils() { }
+
     public static int hms2time(int hour, int minute, int second) {
         return second + 60 * (minute + (60 * hour));
     }
+
     public static int hm2time(int hour, int minute) {
         return hms2time(hour, minute, 0);
     }
 
-    private enum FormatType { COMPACT, LONG, SHORT }
-    private static final boolean USE_RAW_TIME = false;
+    public static int parseHHMM(String hhmm, int defaultValue) {
+        String[] tokens = hhmm.split(":");
+        if(tokens.length != 2) {
+            return defaultValue;
+        }
 
-    /** This is a utility class. Do not instantiate this class. It should have only static methods. */
-    private TimeUtils() { }
+        int hh = Integer.parseInt(tokens[0]);
+        int mm = Integer.parseInt(tokens[1]);
+
+        return hm2time(hh, mm);
+    }
 
     public static String timeToStrCompact(int time) {
         return timeToStrCompact(time, -1);

@@ -83,7 +83,7 @@ class DestinationArrivals<T extends TripScheduleInfo> {
         this.stopsCursor = stopsCursor;
         this.calculator = calculator;
         this.bestArrivalTimesAtDestination = new int[nRounds];
-        Arrays.fill(this.bestArrivalTimesAtDestination, calculator.unreachedTime());
+        Arrays.fill(this.bestArrivalTimesAtDestination, calculator.latestAcceptableArrivalTime());
 
         this.debugPathHandler = debugFactory.debugPath();
         this.debugDestinationArrivalHandler = debugFactory.debugDestinationArrival();

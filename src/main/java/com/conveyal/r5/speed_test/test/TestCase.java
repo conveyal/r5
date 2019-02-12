@@ -5,6 +5,8 @@ import com.conveyal.r5.speed_test.api.model.Itinerary;
 import java.util.Collection;
 import java.util.List;
 
+import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrShort;
+
 
 /**
  * Hold all information about a test case and its results.
@@ -12,6 +14,9 @@ import java.util.List;
 public class TestCase {
     public final String id;
     public final String description;
+    public final int departureTime;
+    public final int arrivalTime;
+    public final int window;
     public final String origin;
     public final String fromPlace;
     public final double fromLat;
@@ -20,17 +25,18 @@ public class TestCase {
     public final double toLat;
     public final double toLon;
     public final String destination;
-    final String transportType;
     final TestCaseResults results;
 
     TestCase(
-            String id, String description, String fromPlace,
-            double fromLat, double fromLon, String origin,
-            String toPlace, double toLat, double toLon, String destination,
-            String transportType,
+            String id, int departureTime, int arrivalTime, int window, String description,
+            String origin, String fromPlace, double fromLat, double fromLon,
+            String destination, String toPlace, double toLat, double toLon,
             TestCaseResults testCaseResults
     ) {
         this.id = id;
+        this.departureTime = departureTime;
+        this.arrivalTime = arrivalTime;
+        this.window = window;
         this.description = description;
         this.origin = origin;
         this.fromPlace = fromPlace;
@@ -40,16 +46,18 @@ public class TestCase {
         this.toPlace = toPlace;
         this.toLat = toLat;
         this.toLon = toLon;
-        this.transportType = transportType;
         this.results = testCaseResults == null ? new TestCaseResults(id) : testCaseResults;
     }
 
-
-
-
     @Override
     public String toString() {
-        return String.format("#%s %s - %s, (%.3f, %.3f) - (%.3f, %.3f)", id, origin, destination, fromLat, fromLon, toLat, toLon);
+        return String.format(
+                "#%s %s - %s, (%.3f, %.3f) - (%.3f, %.3f), %s-%s(%s)",
+                id, origin, destination,
+                fromLat, fromLon,
+                toLat, toLon,
+                timeToStrShort(departureTime), timeToStrShort(arrivalTime), timeToStrShort(window)
+        );
     }
 
     /**

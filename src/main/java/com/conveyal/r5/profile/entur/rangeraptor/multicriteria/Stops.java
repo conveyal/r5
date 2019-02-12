@@ -44,7 +44,10 @@ final class Stops<T extends TripScheduleInfo> {
         this.calculator = transitCalculator;
         this.pathMapper = calculator.createPathMapper();
         this.debugHandlerFactory = debugHandlerFactory;
-        this.destination = new Destination<>(debugHandlerFactory.debugDestinationArrival());
+        this.destination = new Destination<>(
+                calculator,
+                debugHandlerFactory.debugDestinationArrival()
+        );
 
         for (TransferLeg it : egressLegs) {
             this.stops[it.stop()] = new EgressStopArrivals<T>(

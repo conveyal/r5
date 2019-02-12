@@ -2,7 +2,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 
 import com.conveyal.r5.profile.entur.api.path.Path;
-import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
+import com.conveyal.r5.profile.entur.api.request.DebugRequest;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
@@ -36,19 +36,20 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> extends
      * Create a Standard range raptor state for the given context
      */
     public StdRangeRaptorWorkerState(SearchContext<T> c) {
-        this(c.nRounds(), c.nStops(), c.calculator(), c.debugFactory(), c.request());
+        this(c.nRounds(), c.nStops(), c.calculator(), c.debugFactory(), c.egressLegs(), c.debugRequest());
     }
 
     private StdRangeRaptorWorkerState(
             int nRounds, int nStops,
             TransitCalculator calculator,
             DebugHandlerFactory<T> dFactory,
-            RangeRaptorRequest<T> request
+            Collection<TransferLeg> egressLegs,
+            DebugRequest<T> debugRequest
     ) {
         super(nRounds, nStops, calculator);
-        this.stops = new Stops<>(nRounds, nStops, request.egressLegs(), this::handleEgressStopArrival);
+        this.stops = new Stops<>(nRounds, nStops, egressLegs, this::handleEgressStopArrival);
         this.results = new DestinationArrivals<>(nRounds, calculator, new StopsCursor<>(stops, calculator), dFactory);
-        this.debug = request.debug().isDebug()
+        this.debug = debugRequest.isDebug()
                 ? new StateDebugger<>(new StopsCursor<>(stops, calculator), dFactory.debugStopArrival())
                 : DebugState.noop();
     }

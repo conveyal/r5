@@ -26,23 +26,11 @@ import java.util.Iterator;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWorkerState<T> {
-
-    /**
-     * @deprecated TODO TGR - Replace with pareto destination check
-     */
-    @Deprecated
-    private static final int MAX_TRIP_DURATION_SECONDS = 20 * 60 * 60; // 20 hours
-
     private final int nRounds;
     private final TransitCalculator calculator;
 
     private int round = 0;
     private int roundMax = -1;
-
-    /**
-     * Stop the search when the time exceeds the max time limit.
-     */
-    private int timeLimit;
 
     /**
      * The best times to reach each stop, whether via a transfer or via transit directly.
@@ -69,9 +57,6 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
 
     @Override
     public final void setupIteration(int iterationDepartureTime) {
-        // TODO TGR - Set max limit to 5 days for now, replace this with a pareto check against the
-        // TODO TGR - destination location values.
-        timeLimit = calculator.add(iterationDepartureTime, MAX_TRIP_DURATION_SECONDS);
         // clear all touched stops to avoid constant reëxploration
         bestTimes.prepareForNewIteration();
         round = 0;
@@ -208,7 +193,7 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
         return bestTimes.updateNewBestTime(stop, alightTime);
     }
 
-    final boolean exceedsTimeLimit(int alightTime) {
-        return calculator.isBest(timeLimit, alightTime);
+    final boolean exceedsTimeLimit(int time) {
+        return calculator.exceedsTimeLimit(time);
     }
 }

@@ -47,6 +47,9 @@ public class CsvFileIO {
         csvReader.readHeaders(); // Skip header
 
         while (csvReader.readRecord()) {
+            if(isCommentOrEmpty(csvReader.getRawRecord())) {
+                continue;
+            }
             String id = csvReader.get("testCaseId");
             TestCase tc = new TestCase(
                     id,
@@ -135,5 +138,9 @@ public class CsvFileIO {
                     csvReader.get(5),
                     csvReader.get(6)
             );
+    }
+
+    private boolean isCommentOrEmpty(String line) {
+        return line.startsWith("#") || line.matches("[\\s,;]*");
     }
 }

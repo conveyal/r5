@@ -23,7 +23,7 @@ class EgressStopArrivals<T extends TripScheduleInfo> extends StopArrivals<T> {
             CostCalculator costCalculator,
             DebugHandler<StopArrivalView<T>> debugHandler
     ) {
-        super(egressLeg.stop(), debugHandler);
+        super(debugHandler);
         this.egressLeg = egressLeg;
         this.destination = destination;
         this.costCalculator = costCalculator;

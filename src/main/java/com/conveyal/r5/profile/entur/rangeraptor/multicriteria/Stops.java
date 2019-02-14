@@ -102,7 +102,7 @@ final class Stops<T extends TripScheduleInfo> {
 
     private StopArrivals<T> findOrCreateSet(final int stop) {
         if(stops[stop] == null) {
-            stops[stop] = new StopArrivals<T>(stop, debugHandlerFactory.debugStopArrival(stop));
+            stops[stop] = new StopArrivals<T>(debugHandlerFactory.debugStopArrival(stop));
         }
         return stops[stop];
     }

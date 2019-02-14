@@ -14,12 +14,12 @@ import com.conveyal.r5.profile.entur.util.paretoset.ParetoSetWithMarker;
 class StopArrivals<T extends TripScheduleInfo> extends ParetoSetWithMarker<AbstractStopArrival<T>> {
     private final DebugHandler<StopArrivalView<T>> debugHandler;
 
-    StopArrivals(int stop, final DebugHandler<StopArrivalView<T>> debugHandler) {
+    StopArrivals(final DebugHandler<StopArrivalView<T>> debugHandler) {
         super(
                 AbstractStopArrival.compareArrivalTimeRoundAndCost(),
                 debugHandler::drop
         );
-        this.debugHandler = debugHandler.isDebug(stop) ? debugHandler : null;
+        this.debugHandler = debugHandler;
     }
 
     @Override
@@ -29,14 +29,12 @@ class StopArrivals<T extends TripScheduleInfo> extends ParetoSetWithMarker<Abstr
         return added;
     }
 
-    void debugAddNewValue(AbstractStopArrival<T> newValue, boolean added) {
-        if(debugHandler != null) {
-            if(added ) {
-                debugHandler.accept(newValue, this);
-            }
-            else {
-                debugHandler.reject(newValue, this);
-            }
+    private void debugAddNewValue(AbstractStopArrival<T> newValue, boolean added) {
+        if(added ) {
+            debugHandler.accept(newValue, this);
+        }
+        else {
+            debugHandler.reject(newValue, this);
         }
     }
 }

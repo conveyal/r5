@@ -80,7 +80,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
     @Override
     final public Collection<Path<T>> route() {
         timerRoute().time(() -> {
-            timerSetup(() -> context.transit().init());
+            timerSetup(() -> context.transit().setup());
 
             // The main outer loop iterates backward over all minutes in the departure times window.
             final IntIterator it = context.calculator().rangeRaptorMinutes();

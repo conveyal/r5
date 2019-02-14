@@ -23,7 +23,7 @@ public interface TransitDataProvider<T extends TripScheduleInfo> {
      * Strictly not needed, logic can be moved to constructor, but is separated out
      * to be able to measure performance as part of the route method.
      */
-    default void init() {}
+    default void setup() {}
 
     /**
      * This method is responsible for providing all transfers from a given stop to all

@@ -26,7 +26,7 @@ import java.util.stream.IntStream;
 
 public class TransitLayerRRDataProvider implements TransitDataProvider<TripSchedule> {
 
-    private static AvgTimer TIMER_INIT_STOP_TIMES = AvgTimer.timerMilliSec("TransitLayerRRDataProvider:init stops");
+    private static AvgTimer TIMER_INIT_STOP_TIMES = AvgTimer.timerMilliSec("TransitLayerRRDataProvider:setup stops");
 
     private static final Logger LOG = LoggerFactory.getLogger(TransitLayerRRDataProvider.class);
     private static boolean PRINT_REFILTERING_PATTERNS_INFO = true;
@@ -108,7 +108,7 @@ public class TransitLayerRRDataProvider implements TransitDataProvider<TripSched
     }
 
     /** Prefilter the patterns to only ones that are running */
-    public void init() {
+    public void setup() {
         TIntList scheduledPatterns = new TIntArrayList();
         scheduledIndexForOriginalPatternIndex = new int[transitLayer.tripPatterns.size()];
         Arrays.fill(scheduledIndexForOriginalPatternIndex, -1);

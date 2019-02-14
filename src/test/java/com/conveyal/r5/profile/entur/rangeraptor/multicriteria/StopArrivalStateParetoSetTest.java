@@ -39,7 +39,7 @@ public class StopArrivalStateParetoSetTest {
     private static final AbstractStopArrival<TripScheduleInfo> TRANSFER_R1 = newMcTransitStopState(ROUND_1,998, 10);
     private static final AbstractStopArrival<TripScheduleInfo> TRANSFER_R2 = newMcTransitStopState(ROUND_2,997, 20);
 
-    private StopArrivals<TripScheduleInfo> subject = new StopArrivals<>(0, DebugHandler.noop());
+    private StopArrivals<TripScheduleInfo> subject = new StopArrivals<>(DebugHandler.noop());
 
     @Test
     public void addOneElementToSet() {

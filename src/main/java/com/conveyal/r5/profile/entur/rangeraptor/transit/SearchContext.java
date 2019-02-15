@@ -57,10 +57,6 @@ public class SearchContext<T extends TripScheduleInfo> {
         return searchForward ? request.egressLegs() : request.accessLegs();
     }
 
-    public MultiCriteriaCostFactors multiCriteriaCostFactors() {
-        return request.multiCriteriaCostFactors();
-    }
-
     public DebugRequest<T> debugRequest() {
         return debugRequest;
     }
@@ -75,6 +71,16 @@ public class SearchContext<T extends TripScheduleInfo> {
 
     public TransitCalculator calculator() {
         return calculator;
+    }
+
+    public CostCalculator costCalculator() {
+        MultiCriteriaCostFactors f = request.multiCriteriaCostFactors();
+        return new CostCalculator(
+                f.boardCost(),
+                request.boardSlackInSeconds(),
+                f.walkReluctanceFactor(),
+                f.waitReluctanceFactor()
+        );
     }
 
     public WorkerPerformanceTimers timers() {

@@ -5,13 +5,17 @@ import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
+import com.conveyal.r5.profile.entur.rangeraptor.heuristic.DestinationHeuristic;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.DestinationArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.path.PathMapper;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.CostCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.Debug;
 
 import java.util.Collection;
+import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -24,6 +28,7 @@ import static java.util.Collections.emptyList;
  */
 final class Stops<T extends TripScheduleInfo> {
     private final StopArrivals<T>[] stops;
+    private final IntFunction<DestinationHeuristic> heuristics;
     private final Destination<T> destination;
     private final PathMapper<T> pathMapper;
     private final TransitCalculator calculator;
@@ -35,12 +40,14 @@ final class Stops<T extends TripScheduleInfo> {
     Stops(
             int nStops,
             Collection<TransferLeg> egressLegs,
+            IntFunction<DestinationHeuristic> heuristics,
             CostCalculator costCalculator,
             TransitCalculator transitCalculator,
             DebugHandlerFactory<T> debugHandlerFactory
     ) {
         //noinspection unchecked
         this.stops = (StopArrivals<T>[]) new StopArrivals[nStops];
+        this.heuristics = heuristics;
         this.calculator = transitCalculator;
         this.pathMapper = calculator.createPathMapper();
         this.debugHandlerFactory = debugHandlerFactory;
@@ -75,6 +82,10 @@ final class Stops<T extends TripScheduleInfo> {
     }
 
     boolean addStopArrival(AbstractStopArrival<T> arrival) {
+        if(vetoHeuristicDestinationArrival(arrival)) {
+            // TODO TGR - Notify debugger about rejected as a final solution
+            return false;
+        }
         return findOrCreateSet(arrival.stop()).add(arrival);
     }
 
@@ -130,5 +141,13 @@ final class Stops<T extends TripScheduleInfo> {
                 " => STOP ARRIVALS  %.1f / %d / %d'  Array Length: %.1f / %d'  Stops: %d' / %d'%n",
                 avg, max, total/1000, arrayLenAvg, arrayLen/1000, numOfStops/1000, stops.length/1000
         );
+    }
+
+    private boolean vetoHeuristicDestinationArrival(AbstractStopArrival<T> arrival) {
+        if(heuristics == null) {
+            return false;
+        }
+        DestinationArrival<T> d = new DestinationArrival<>(arrival, heuristics.apply(arrival.stop()));
+        return !destination.qualify(d);
     }
 }

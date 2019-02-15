@@ -56,7 +56,19 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
     }
 
     private Worker<T> createMcRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
-        return new McRangeRaptorWorker<>(context(transitData, request, MC_TIMERS, FORWARD));
+        return new McRangeRaptorWorker<>(context(transitData, request, MC_TIMERS, FORWARD), null);
+
+        /*
+        SearchContext<T> contextHeuristic = context(transitData, request, RR_TIMERS, BACKWARD);
+        SearchContext<T> mcContext = context(transitData, request, MC_TIMERS, FORWARD);
+        StdWorkerState<T> stateHeuristic = stdState(contextHeuristic);
+
+        return () -> {
+            new StdRangeRaptorWorker<>(contextHeuristic, stateHeuristic).route();
+            return new McRangeRaptorWorker<>(mcContext, null).route();
+        };
+        */
+
     }
 
     private Worker<T> createRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {

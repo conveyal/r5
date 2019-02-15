@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 
+import com.conveyal.r5.profile.entur.api.TestTripSchedule;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import org.junit.Test;
@@ -7,29 +8,47 @@ import org.junit.Test;
 import static com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator.testDummyCalculator;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 public class TransitStopArrivalTest {
 
-    private static final int BOARD_STOP = 100;
-    private static final int ALIGHT_STOP = 101;
-    private static final int BOARD_TIME = 8 * 60 * 60;
-    private static final int LEG_DURATION = 10 * 60;
-    private static final int ALIGHT_TIME = BOARD_TIME + LEG_DURATION;
-    private static final int COST = 500;
+    private static final int BOARD_SLACK = 80;
+
+    private static final int ACCESS_TO_STOP = 100;
+    private static final int ACCESS_DEPARTURE_TIME = 8 * 60 * 60;
+    private static final int ACCESS_DURATION = 300;
+    private static final int ACCESS_COST = 500;
+
+
+    private static final int TRANSIT_TO_STOP = 101;
+    private static final int TRANSIT_BOARD_TIME = 9 * 60 * 60;
+    private static final int TRANSIT_LEG_DURATION = 1200;
+    private static final int TRANSIT_ALIGHT_TIME = TRANSIT_BOARD_TIME + TRANSIT_LEG_DURATION;
+    private static final int TRANSIT_TRAVEL_DURATION = ACCESS_DURATION + BOARD_SLACK + TRANSIT_LEG_DURATION;
     private static final int TRANSIT_COST = 200;
+    private static final TripScheduleInfo TRANSIT_TRIP = TestTripSchedule.createTripScheduleUseingArrivalTimes(TRANSIT_ALIGHT_TIME);
     private static final int ROUND = 1;
-    private static final int A_TIME = 99;
-    private static final TripScheduleInfo A_TRIP = new TripScheduleInfo() {
-        @Override public int arrival(int stopPosInPattern) { return 0; }
-        @Override public int departure(int stopPosInPattern) { return 0; }
-        @Override public String debugInfo() { return null; }
-    };
 
-    private static final TransitCalculator TRANSIT_CALCULATOR = testDummyCalculator(60);
-    private static final AccessStopArrival<TripScheduleInfo> ACCESS_ARRIVAL = new AccessStopArrival<>(BOARD_STOP, A_TIME, A_TIME, COST, TRANSIT_CALCULATOR);
+    private static final TransitCalculator TRANSIT_CALCULATOR = testDummyCalculator(BOARD_SLACK);
 
-    private TransitStopArrival<TripScheduleInfo> subject = new TransitStopArrival<>(ACCESS_ARRIVAL, ALIGHT_STOP, ALIGHT_TIME,  BOARD_TIME, A_TRIP, TRANSIT_COST);
+    private static final AccessStopArrival<TripScheduleInfo> ACCESS_ARRIVAL = new AccessStopArrival<>(
+            ACCESS_TO_STOP,
+            ACCESS_DEPARTURE_TIME,
+            ACCESS_DURATION,
+            ACCESS_COST,
+            TRANSIT_CALCULATOR
+    );
+
+    private TransitStopArrival<TripScheduleInfo> subject = new TransitStopArrival<>(
+            ACCESS_ARRIVAL,
+            TRANSIT_TO_STOP,
+            TRANSIT_ALIGHT_TIME,
+            TRANSIT_BOARD_TIME,
+            TRANSIT_TRIP,
+            TRANSIT_TRAVEL_DURATION,
+            TRANSIT_COST
+    );
 
 
     @Test
@@ -39,7 +58,7 @@ public class TransitStopArrivalTest {
 
     @Test
     public void stop() {
-        assertEquals(ALIGHT_STOP, subject.stop());
+        assertEquals(TRANSIT_TO_STOP, subject.stop());
     }
 
     @Test
@@ -51,33 +70,40 @@ public class TransitStopArrivalTest {
 
     @Test
     public void boardStop() {
-        assertEquals(BOARD_STOP, subject.boardStop());
+        assertEquals(ACCESS_TO_STOP, subject.boardStop());
     }
 
     @Test
     public void arrivalTime() {
-        assertEquals(ALIGHT_TIME, subject.arrivalTime());
+        assertEquals(TRANSIT_ALIGHT_TIME, subject.arrivalTime());
     }
 
     @Test
     public void departureTime() {
-        assertEquals(BOARD_TIME, subject.departureTime());
+        assertEquals(TRANSIT_BOARD_TIME, subject.departureTime());
     }
 
     @Test
     public void cost() {
-        assertEquals(TRANSIT_COST + COST, subject.cost());
+        assertEquals(ACCESS_COST + TRANSIT_COST, subject.cost());
     }
 
     @Test
     public void trip() {
-        assertEquals(A_TRIP, subject.trip());
+        assertSame(TRANSIT_TRIP, subject.trip());
     }
 
+    @Test
+    public void travelDuration() {
+        assertEquals(
+                TRANSIT_TRAVEL_DURATION,
+                subject.travelDuration()
+        );
+    }
 
     @Test
     public void previous() {
-        assertEquals(ACCESS_ARRIVAL, subject.previous());
+        assertSame(ACCESS_ARRIVAL, subject.previous());
     }
 
     @Test
@@ -88,7 +114,7 @@ public class TransitStopArrivalTest {
     @Test
     public void testToString() {
         assertEquals(
-                "TransitStopArrival { Rnd: 1, Stop: 101, Time: 8:10:00 (8:00:00), Cost: 700 }",
+                "TransitStopArrival { Rnd: 1, Stop: 101, Time: 9:20:00 (9:00:00), Cost: 700 }",
                 subject.toString()
         );
     }

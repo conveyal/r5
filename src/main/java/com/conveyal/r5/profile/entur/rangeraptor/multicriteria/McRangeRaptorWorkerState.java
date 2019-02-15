@@ -6,9 +6,11 @@ import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
+import com.conveyal.r5.profile.entur.rangeraptor.heuristic.DestinationHeuristic;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransferStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.CostCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
@@ -17,6 +19,7 @@ import java.util.BitSet;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
+import java.util.function.IntFunction;
 
 
 /**
@@ -48,13 +51,14 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
             int nRounds,
             int nStops,
             Collection<TransferLeg> egressLegs,
+            IntFunction<DestinationHeuristic> heuristics,
             CostCalculator costCalculator,
             TransitCalculator transitCalculator,
             DebugHandlerFactory<T> debugHandlerFactory
 
     ) {
         this.nRounds = nRounds;
-        this.stops = new Stops<>(nStops, egressLegs, costCalculator, transitCalculator, debugHandlerFactory);
+        this.stops = new Stops<>(nStops, egressLegs, heuristics, costCalculator, transitCalculator, debugHandlerFactory);
         this.touchedStops = new BitSet(nStops);
         this.costCalculator = costCalculator;
         this.transitCalculator = transitCalculator;
@@ -111,7 +115,8 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
             return;
         }
         int cost = costCalculator.transitArrivalCost(previousStopArrival.arrivalTime(), boardTime, alightTime);
-        arrivalsCache.add(new TransitStopArrival<>(previousStopArrival, stop, alightTime, boardTime, trip, cost));
+        int duration = travelDuration(previousStopArrival, boardTime, alightTime);
+        arrivalsCache.add(new TransitStopArrival<>(previousStopArrival, stop, alightTime, boardTime, trip, duration, cost));
     }
 
     /**
@@ -176,5 +181,14 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
 
     private boolean exceedsTimeLimit(int time) {
         return transitCalculator.exceedsTimeLimit(time);
+    }
+
+    private int travelDuration(AbstractStopArrival<T> prev, int boardTime, int alightTime) {
+        if(prev.arrivedByAccessLeg()) {
+            return transitCalculator.addBoardSlack(prev.travelDuration()) + alightTime - boardTime;
+        }
+        else {
+            return prev.travelDuration() + alightTime - prev.arrivalTime();
+        }
     }
 }

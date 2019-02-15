@@ -25,11 +25,11 @@ class StopArrivals<T extends TripScheduleInfo> extends ParetoSetWithMarker<Abstr
     @Override
     public boolean add(AbstractStopArrival<T> newValue) {
         boolean added = super.add(newValue);
-        debugAddNewValue(newValue, added);
+        notifyDebuggerOfNewArrival(newValue, added);
         return added;
     }
 
-    private void debugAddNewValue(AbstractStopArrival<T> newValue, boolean added) {
+    private void notifyDebuggerOfNewArrival(AbstractStopArrival<T> newValue, boolean added) {
         if(added ) {
             debugHandler.accept(newValue, this);
         }

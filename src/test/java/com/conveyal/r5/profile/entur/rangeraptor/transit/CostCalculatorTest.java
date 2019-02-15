@@ -1,9 +1,5 @@
-package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
+package com.conveyal.r5.profile.entur.rangeraptor.transit;
 
-import com.conveyal.r5.profile.entur.api.TestTripSchedule;
-import com.conveyal.r5.profile.entur.api.request.MultiCriteriaCostFactors;
-import com.conveyal.r5.profile.entur.api.request.RequestBuilder;
-import org.junit.Before;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -11,6 +7,7 @@ import static org.junit.Assert.assertEquals;
 public class CostCalculatorTest {
 
     private static final int BOARD_COST = 5;
+    private static final int BOARD_SLACK_IN_SECONDS = 3;
     private static final double WALK_RELUCTANCE_FACTOR = 2.0;
     private static final double WAIT_RELUCTANCE_FACTOR = 0.5;
 
@@ -19,18 +16,12 @@ public class CostCalculatorTest {
     private static final int T3 = 3;
     private static final int T4 = 4;
 
-    private CostCalculator subject = new CostCalculator(MultiCriteriaCostFactors.DEFAULTS);
-
-    @Before
-    public void setup() {
-        RequestBuilder<TestTripSchedule> builder = new RequestBuilder<>();
-
-        builder.multiCriteriaBoardCost(BOARD_COST);
-        builder.multiCriteriaWalkReluctanceFactor(WALK_RELUCTANCE_FACTOR);
-        builder.multiCriteriaWaitReluctanceFactor(WAIT_RELUCTANCE_FACTOR);
-
-        subject = new CostCalculator(builder.buildMcCostFactors());
-    }
+    private CostCalculator subject = new CostCalculator(
+            BOARD_COST,
+            BOARD_SLACK_IN_SECONDS,
+            WALK_RELUCTANCE_FACTOR,
+            WAIT_RELUCTANCE_FACTOR
+    );
 
     @Test
     public void transitArrivalCost() {
@@ -44,5 +35,16 @@ public class CostCalculatorTest {
     public void walkCost() {
         assertEquals(200, subject.walkCost(T1));
         assertEquals(600, subject.walkCost(T3));
+    }
+
+    @Test
+    public void calculateMinCost() {
+        assertEquals(0, subject.calculateMinCost(0, 0));
+        assertEquals(100, subject.calculateMinCost(1, 0));
+        assertEquals(650, subject.calculateMinCost(0, 1));
+
+        // Expect:  precision * (minTravelTime + minNumTransfers * (boardCost + boardSlack * waitReluctance)
+        // =>  100 * ( 200 + 3 * (5 + 3 * 0.5))
+        assertEquals(21_950, subject.calculateMinCost(200, 3));
     }
 }

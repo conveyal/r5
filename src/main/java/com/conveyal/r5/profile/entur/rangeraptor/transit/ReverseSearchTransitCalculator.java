@@ -77,6 +77,11 @@ final class ReverseSearchTransitCalculator implements TransitCalculator {
     }
 
     @Override
+    public int addBoardSlack(int time) {
+        return earliestBoardTime(time);
+    }
+
+    @Override
     public <T extends TripScheduleInfo> int latestArrivalTime(T onTrip, int stopPositionInPattern) {
         return add(onTrip.departure(stopPositionInPattern), boardSlackInSeconds);
     }

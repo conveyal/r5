@@ -6,6 +6,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
 
 public class DestinationArrivalTest {
 
@@ -15,9 +16,9 @@ public class DestinationArrivalTest {
     private static final int ACCESS_DURATION_TIME =  72;
     private static final int ACCESS_COST = 420;
 
-    private static final int TRANSIT_1_STOP = 101;
-    private static final int TRANSIT_1_BOARD_TIME = ACCESS_DEPARTURE_TIME + 10 * 60;
-    private static final int TRANSIT_1_ALIGHT_TIME = TRANSIT_1_BOARD_TIME + 4 * 60;
+    private static final int TRANSIT_STOP = 101;
+    private static final int TRANSIT_BOARD_TIME = ACCESS_DEPARTURE_TIME + 10 * 60;
+    private static final int TRANSIT_ALIGHT_TIME = TRANSIT_BOARD_TIME + 4 * 60;
     private static final TripScheduleInfo A_TRIP = null;
     private static final int TRANSIT_COST = 200;
 
@@ -25,25 +26,43 @@ public class DestinationArrivalTest {
     private static final int DESTINATION_COST = 500;
 
     private static final TransferLeg EGRESS_LEG = new TransferLeg() {
-        @Override public int stop() { return TRANSIT_1_STOP; }
+        @Override public int stop() { return TRANSIT_STOP; }
         @Override public int durationInSeconds() { return DESTINATION_DURATION_TIME; }
     };
 
-    private static final int EXPECTED_ARRIVAL_TIME = TRANSIT_1_ALIGHT_TIME + DESTINATION_DURATION_TIME;
+    private static final int EXPECTED_ARRIVAL_TIME = TRANSIT_ALIGHT_TIME + DESTINATION_DURATION_TIME;
     private static final int EXPECTED_TOTAL_COST = ACCESS_COST + TRANSIT_COST + DESTINATION_COST;
     private static final int EXPECTED_TOTAL_DURATION = ACCESS_DURATION_TIME + BOARD_SLACK
-            + (TRANSIT_1_ALIGHT_TIME - TRANSIT_1_BOARD_TIME) + DESTINATION_DURATION_TIME;
+            + (TRANSIT_ALIGHT_TIME - TRANSIT_BOARD_TIME) + DESTINATION_DURATION_TIME;
 
     private static final TransitCalculator TRANSIT_CALCULATOR = TransitCalculator.testDummyCalculator(BOARD_SLACK);
+
+    /**
+     * Setup a simple journey with an access leg, one transit and a egress leg.
+     */
     private static final AccessStopArrival<TripScheduleInfo> ACCESS_ARRIVAL = new AccessStopArrival<>(
-            ACCESS_STOP, ACCESS_DEPARTURE_TIME, ACCESS_DURATION_TIME, ACCESS_COST, TRANSIT_CALCULATOR
+            ACCESS_STOP,
+            ACCESS_DEPARTURE_TIME,
+            ACCESS_DURATION_TIME,
+            ACCESS_COST,
+            TRANSIT_CALCULATOR
     );
 
     private static final TransitStopArrival<TripScheduleInfo> TRANSIT_ARRIVAL = new TransitStopArrival<>(
-            ACCESS_ARRIVAL, TRANSIT_1_STOP, TRANSIT_1_ALIGHT_TIME, TRANSIT_1_BOARD_TIME, A_TRIP, TRANSIT_COST
+            ACCESS_ARRIVAL,
+            TRANSIT_STOP,
+            TRANSIT_ALIGHT_TIME,
+            TRANSIT_BOARD_TIME,
+            A_TRIP,
+            ACCESS_DURATION_TIME + BOARD_SLACK + TRANSIT_ALIGHT_TIME - TRANSIT_BOARD_TIME,
+            TRANSIT_COST
     );
 
-    private DestinationArrival<TripScheduleInfo> subject = new DestinationArrival<>(TRANSIT_ARRIVAL, EGRESS_LEG, DESTINATION_COST);
+    private DestinationArrival<TripScheduleInfo> subject = new DestinationArrival<>(
+            TRANSIT_ARRIVAL,
+            EGRESS_LEG,
+            DESTINATION_COST
+    );
 
     @Test
     public void departureTime() {
@@ -72,7 +91,7 @@ public class DestinationArrivalTest {
 
     @Test
     public void previous() {
-        assertEquals(TRANSIT_ARRIVAL, subject.previous());
+        assertSame(TRANSIT_ARRIVAL, subject.previous());
     }
 
     @Test

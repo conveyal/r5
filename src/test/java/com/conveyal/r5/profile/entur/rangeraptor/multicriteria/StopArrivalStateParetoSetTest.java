@@ -118,7 +118,7 @@ public class StopArrivalStateParetoSetTest {
     }
 
     private static TransitStopArrival<TripScheduleInfo> newMcTransitStopState(int round, int stop, int arrivalTime) {
-        return new TransitStopArrival<>(prev(round), stop, arrivalTime, ANY, ANY_TRIP, 0);
+        return new TransitStopArrival<>(prev(round), stop, arrivalTime, ANY, ANY_TRIP, ANY, ANY);
     }
 
     private static TransferStopArrival<TripScheduleInfo> newTransferStopState(int round, int stop, int arrivalTime, int cost) {

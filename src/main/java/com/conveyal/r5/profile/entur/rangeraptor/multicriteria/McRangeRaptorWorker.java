@@ -4,9 +4,12 @@ import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
+import com.conveyal.r5.profile.entur.rangeraptor.heuristic.DestinationHeuristic;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleSearch;
+
+import java.util.function.IntFunction;
 
 
 /**
@@ -20,14 +23,15 @@ public final class McRangeRaptorWorker<T extends TripScheduleInfo> extends Abstr
     private TripPatternInfo<T> pattern;
     private TripScheduleSearch<T> tripSearch;
 
-    public McRangeRaptorWorker(SearchContext<T> context) {
+    public McRangeRaptorWorker(SearchContext<T> context, IntFunction<DestinationHeuristic> heuristics) {
         super(
                 context,
                 new McRangeRaptorWorkerState<>(
                         nRounds(context.tuningParameters()),
                         context.transit().numberOfStops(),
                         context.egressLegs(),
-                        new CostCalculator(context.multiCriteriaCostFactors()),
+                        heuristics,
+                        context.costCalculator(),
                         context.calculator(),
                         context.debugFactory()
                 )

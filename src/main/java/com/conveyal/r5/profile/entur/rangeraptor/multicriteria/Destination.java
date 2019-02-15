@@ -45,7 +45,10 @@ class Destination<T extends TripScheduleInfo> extends ParetoSet<DestinationArriv
         if(!calculator.exceedsTimeLimit(newValue.arrivalTime())) {
             added = add(newValue);
         }
+        notifyDebuggerOfNewArrival(newValue, added);
+    }
 
+    private void notifyDebuggerOfNewArrival(DestinationArrival<T> newValue, boolean added) {
         if(added) {
             debugHandler.accept(newValue, this);
         }

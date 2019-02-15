@@ -63,6 +63,23 @@ public class AccessStopArrivalTest {
     }
 
     @Test
+    public void travelDuration() {
+        assertEquals(LEG_DURATION, subject.travelDuration());
+    }
+
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    @Test(expected = IllegalStateException.class)
+    public void equalsThrowsExceptionByDesign() {
+        subject.equals(null);
+    }
+
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    @Test(expected = IllegalStateException.class)
+    public void hashCodeThrowsExceptionByDesign() {
+        subject.hashCode();
+    }
+
+    @Test
     public void testToString() {
         assertEquals(
                 "AccessStopArrival { Rnd: 0, Stop: 100, Time: 8:10:00 (8:00:00), Cost: 500 }",

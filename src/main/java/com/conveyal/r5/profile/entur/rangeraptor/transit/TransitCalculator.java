@@ -44,6 +44,14 @@ public interface TransitCalculator {
     int earliestBoardTime(int time);
 
     /**
+     * Add boardSlack to time, this is in effect the same as {@link #exceedsTimeLimit(int)}.
+     *
+     * @param time - any time
+     * @return the time plus boardSlack
+     */
+    int addBoardSlack(int time);
+
+    /**
      * For a normal search return the trip arrival time at stop position.
      * For a reverse search return the next trips departure time at stop position with the boardSlack added.
      *

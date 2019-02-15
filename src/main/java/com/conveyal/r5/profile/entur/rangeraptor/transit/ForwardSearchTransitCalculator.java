@@ -65,6 +65,11 @@ final class ForwardSearchTransitCalculator implements TransitCalculator {
     }
 
     @Override
+    public int addBoardSlack(int time) {
+        return earliestBoardTime(time);
+    }
+
+    @Override
     public <T extends TripScheduleInfo> int latestArrivalTime(T onTrip, int stopPositionInPattern) {
         return onTrip.arrival(stopPositionInPattern);
     }

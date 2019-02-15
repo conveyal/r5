@@ -7,27 +7,59 @@ import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 public class TransferStopArrivalTest {
 
-    private static final int A_STOP = 100;
-    private static final int TRANSFER_FROM_STOP = 101;
-    private static final int ALIGHT_STOP = 102;
-    private static final int DEPATURE_TIME = 8 * 60 * 60;
-    private static final int LEG_DURATION = 10 * 60;
-    private static final int ALIGHT_TIME = DEPATURE_TIME + LEG_DURATION;
-    private static final int COST = 500;
+    private static final int BOARD_SLACK = 80;
+
+    private static final int ACCESS_TO_STOP = 100;
+    private static final int ACCESS_DEPARTURE_TIME = 8 * 60 * 60;
+    private static final int ACCESS_DURATION = 300;
+    private static final int ACCESS_COST = 500;
+
+
+    private static final int TRANSIT_TO_STOP = 101;
+    private static final int TRANSIT_BOARD_TIME = 9 * 60 * 60;
+    private static final int TRANSIT_LEG_DURATION = 1200;
+    private static final int TRANSIT_ALIGHT_TIME = TRANSIT_BOARD_TIME + TRANSIT_LEG_DURATION;
     private static final int TRANSIT_COST = 200;
+    private static final TripScheduleInfo TRANSIT_TRIP = null;
     private static final int ROUND = 1;
-    private static final int A_TIME = 99;
-    private static final TripScheduleInfo A_TRIP = null;
 
-    private static final TransitCalculator TRANSIT_CALCULATOR = TransitCalculator.testDummyCalculator(60);
-    private static final AccessStopArrival<TripScheduleInfo> ACCESS_ARRIVAL = new AccessStopArrival<>(A_STOP, A_TIME, A_TIME, COST, TRANSIT_CALCULATOR);
-    private static final TransitStopArrival<TripScheduleInfo> TRANSIT_ARRIVAL = new TransitStopArrival<>(ACCESS_ARRIVAL, TRANSFER_FROM_STOP, A_TIME, A_TIME, A_TRIP, TRANSIT_COST);
 
-    private TransferStopArrival<TripScheduleInfo> subject = new TransferStopArrival<>(TRANSIT_ARRIVAL, new TestLeg(ALIGHT_STOP, LEG_DURATION), ALIGHT_TIME, COST);
+    private static final int TRANSFER_TO_STOP = 102;
+    private static final int TRANSFER_LEG_DURATION = 360;
+    private static final int TRANSFER_ALIGHT_TIME = TRANSIT_ALIGHT_TIME + TRANSFER_LEG_DURATION;
+    private static final int TRANSFER_COST = 400;
+
+
+    private static final TransitCalculator TRANSIT_CALCULATOR = TransitCalculator.testDummyCalculator(BOARD_SLACK);
+    private static final AccessStopArrival<TripScheduleInfo> ACCESS_ARRIVAL = new AccessStopArrival<>(
+            ACCESS_TO_STOP,
+            ACCESS_DEPARTURE_TIME,
+            ACCESS_DURATION,
+            ACCESS_COST,
+            TRANSIT_CALCULATOR
+    );
+
+    private static final TransitStopArrival<TripScheduleInfo> TRANSIT_ARRIVAL = new TransitStopArrival<>(
+            ACCESS_ARRIVAL,
+            TRANSIT_TO_STOP,
+            TRANSIT_ALIGHT_TIME,
+            TRANSIT_BOARD_TIME,
+            TRANSIT_TRIP,
+            ACCESS_DURATION + BOARD_SLACK + TRANSIT_LEG_DURATION,
+            TRANSIT_COST
+    );
+
+    private TransferStopArrival<TripScheduleInfo> subject = new TransferStopArrival<>(
+            TRANSIT_ARRIVAL,
+            new TestLeg(TRANSFER_TO_STOP,TRANSFER_LEG_DURATION),
+            TRANSFER_ALIGHT_TIME,
+            TRANSFER_COST
+    );
 
 
 
@@ -40,27 +72,35 @@ public class TransferStopArrivalTest {
 
     @Test
     public void transferFromStop() {
-        assertEquals(TRANSFER_FROM_STOP, subject.transferFromStop());
+        assertEquals(TRANSIT_TO_STOP, subject.transferFromStop());
     }
 
     @Test
     public void stop() {
-        assertEquals(ALIGHT_STOP, subject.stop());
+        assertEquals(TRANSFER_TO_STOP, subject.stop());
     }
 
     @Test
     public void arrivalTime() {
-        assertEquals(ALIGHT_TIME, subject.arrivalTime());
+        assertEquals(TRANSFER_ALIGHT_TIME, subject.arrivalTime());
     }
 
     @Test
     public void departureTime() {
-        assertEquals(DEPATURE_TIME, subject.departureTime());
+        assertEquals(TRANSIT_ALIGHT_TIME, subject.departureTime());
     }
 
     @Test
     public void cost() {
-        assertEquals(2 * COST + TRANSIT_COST, subject.cost());
+        assertEquals(ACCESS_COST + TRANSIT_COST + TRANSFER_COST, subject.cost());
+    }
+
+    @Test
+    public void travelDuration() {
+        assertEquals(
+                ACCESS_DURATION + BOARD_SLACK + TRANSIT_LEG_DURATION + TRANSFER_LEG_DURATION,
+                subject.travelDuration()
+        );
     }
 
     @Test
@@ -70,7 +110,7 @@ public class TransferStopArrivalTest {
 
     @Test
     public void previous() {
-        assertEquals(TRANSIT_ARRIVAL, subject.previous());
+        assertSame(TRANSIT_ARRIVAL, subject.previous());
     }
 
     @Test
@@ -81,7 +121,7 @@ public class TransferStopArrivalTest {
     @Test
     public void testToString() {
         assertEquals(
-                "TransferStopArrival { Rnd: 1, Stop: 102, Time: 8:10:00 (8:00:00), Cost: 1200 }",
+                "TransferStopArrival { Rnd: 1, Stop: 102, Time: 9:26:00 (9:20:00), Cost: 1100 }",
                 subject.toString()
         );
     }

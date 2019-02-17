@@ -12,6 +12,7 @@ public interface DebugHandler<T> {
     boolean isDebug(int stop);
     void accept(T element, Collection<? extends T> result);
     void reject(T element, Collection<? extends T> result);
+    void rejectByOptimization(T element);
     void drop(T element, T droppedByElement);
 
     static <S> DebugHandler<S> noop() {
@@ -20,6 +21,7 @@ public interface DebugHandler<T> {
             @Override public boolean isDebug(int stop) { return false; }
             @Override public void accept(S element, Collection<? extends S> result) {}
             @Override public void reject(S element, Collection<? extends S> result) {}
+            @Override public void rejectByOptimization(S element) {}
             @Override public void drop(S element, S droppedByElement) {}
         };
     }

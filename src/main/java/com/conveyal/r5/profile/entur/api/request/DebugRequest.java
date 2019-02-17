@@ -44,7 +44,9 @@ import java.util.function.Consumer;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class DebugRequest<T extends TripScheduleInfo> {
-    static final DebugRequest<?> DEFUALTS = new DebugRequest<>();
+    static <T extends TripScheduleInfo> DebugRequest<T> defaults() {
+        return new DebugRequest<>();
+    }
 
     private final List<Integer> stops;
     private final List<Integer> path;

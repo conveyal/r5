@@ -50,6 +50,13 @@ abstract class AbstractDebugHandlerAdapter<T> implements DebugHandler<T> {
     }
 
     @Override
+    public void rejectByOptimization(T element) {
+        if(isDebug(element)) {
+            eventListener.accept(DebugEvent.rejectByOptimization(iterationDepartureTime, element));
+        }
+    }
+
+    @Override
     public void drop(T element, T droppedByElement) {
         if(isDebug(element)) {
             eventListener.accept(DebugEvent.drop(iterationDepartureTime, element, droppedByElement));

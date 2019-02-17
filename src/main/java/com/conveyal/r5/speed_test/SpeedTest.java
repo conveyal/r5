@@ -330,24 +330,23 @@ public class SpeedTest {
             int latestArrivalTime,
             EgressAccessRouter streetRouter
     ) {
-        final int boardSlackInSeconds = 60;
         RequestBuilder<TripSchedule> builder = new RequestBuilder<TripSchedule>()
                 .earliestDepartureTime(request.fromTime)
                 .latestArrivalTime(latestArrivalTime)
                 .searchWindowInSeconds(request.toTime - request.fromTime)
-                .boardSlackInSeconds(boardSlackInSeconds);
+                ;
 
         builder.profile(mapAlgorithm(profile));
 
         addStopTimes(streetRouter.accessTimesToStopsInSeconds, builder::addAccessStop);
         addStopTimes(streetRouter.egressTimesToStopsInSeconds, builder::addEgressStop);
 
-        addDebugOptions(builder, boardSlackInSeconds);
+        addDebugOptions(builder);
 
         return builder.build();
     }
 
-    private void addDebugOptions(RequestBuilder<TripSchedule> builder, int boardSlackInSeconds) {
+    private void addDebugOptions(RequestBuilder<TripSchedule> builder) {
         List<Integer> stops = opts.debugStops();
         List<Integer> trip = opts.debugTrip();
 
@@ -357,9 +356,8 @@ public class SpeedTest {
 
         DebugLogger logger = new DebugLogger(
                 builder.profile() == RAPTOR_REVERSE
-                        ? new ReversePathMapper<>(boardSlackInSeconds)
+                        ? new ReversePathMapper<>(builder.boardSlackInSeconds())
                         : new ForwardPathMapper<>()
-
 
         );
         builder
@@ -470,6 +468,7 @@ public class SpeedTest {
     private static RaptorProfile mapAlgorithm(SpeedTestProfiles profile) {
         switch (profile) {
             case mc_range_raptor: return RaptorProfile.MULTI_CRITERIA_RANGE_RAPTOR;
+            case mc_range_raptor_heuristic: return RaptorProfile.MULTI_CRITERIA_RANGE_RAPTOR_WITH_HEURISTICS;
             case range_raptor: return RaptorProfile.RANGE_RAPTOR;
             case raptor_reverse: return RAPTOR_REVERSE;
         }

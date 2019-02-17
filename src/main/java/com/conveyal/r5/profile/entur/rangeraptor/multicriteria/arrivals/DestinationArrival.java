@@ -2,7 +2,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.heuristic.DestinationHeuristic;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.DestinationHeuristic;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 

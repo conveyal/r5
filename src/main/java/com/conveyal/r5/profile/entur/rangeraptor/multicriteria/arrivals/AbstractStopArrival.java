@@ -106,7 +106,6 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
     /**
      * @return previous state or throw a NPE if no previousArrival exist.
      */
-    @SuppressWarnings({"ConstantConditions"})
     final int previousStop() {
         return previous.stop;
     }

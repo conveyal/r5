@@ -5,7 +5,6 @@ import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
-import com.conveyal.r5.profile.entur.rangeraptor.heuristic.DestinationHeuristic;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.DestinationArrival;
@@ -15,7 +14,6 @@ import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.Debug;
 
 import java.util.Collection;
-import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -28,7 +26,7 @@ import static java.util.Collections.emptyList;
  */
 final class Stops<T extends TripScheduleInfo> {
     private final StopArrivals<T>[] stops;
-    private final IntFunction<DestinationHeuristic> heuristics;
+    private final DestinationHeuristic[] heuristics;
     private final Destination<T> destination;
     private final PathMapper<T> pathMapper;
     private final TransitCalculator calculator;
@@ -40,7 +38,7 @@ final class Stops<T extends TripScheduleInfo> {
     Stops(
             int nStops,
             Collection<TransferLeg> egressLegs,
-            IntFunction<DestinationHeuristic> heuristics,
+            DestinationHeuristic[] heuristics,
             CostCalculator costCalculator,
             TransitCalculator transitCalculator,
             DebugHandlerFactory<T> debugHandlerFactory
@@ -57,7 +55,7 @@ final class Stops<T extends TripScheduleInfo> {
         );
 
         for (TransferLeg it : egressLegs) {
-            this.stops[it.stop()] = new EgressStopArrivals<T>(
+            this.stops[it.stop()] = new EgressStopArrivals<>(
                     it,
                     destination,
                     costCalculator,
@@ -83,7 +81,7 @@ final class Stops<T extends TripScheduleInfo> {
 
     boolean addStopArrival(AbstractStopArrival<T> arrival) {
         if(vetoHeuristicDestinationArrival(arrival)) {
-            // TODO TGR - Notify debugger about rejected as a final solution
+            debugHandlerFactory.debugStopArrival(arrival.stop()).rejectByOptimization(arrival);
             return false;
         }
         return findOrCreateSet(arrival.stop()).add(arrival);
@@ -113,7 +111,7 @@ final class Stops<T extends TripScheduleInfo> {
 
     private StopArrivals<T> findOrCreateSet(final int stop) {
         if(stops[stop] == null) {
-            stops[stop] = new StopArrivals<T>(debugHandlerFactory.debugStopArrival(stop));
+            stops[stop] = new StopArrivals<>(debugHandlerFactory.debugStopArrival(stop));
         }
         return stops[stop];
     }
@@ -144,10 +142,14 @@ final class Stops<T extends TripScheduleInfo> {
     }
 
     private boolean vetoHeuristicDestinationArrival(AbstractStopArrival<T> arrival) {
-        if(heuristics == null) {
+        if(heuristics == null || destination.isEmpty()) {
             return false;
         }
-        DestinationArrival<T> d = new DestinationArrival<>(arrival, heuristics.apply(arrival.stop()));
-        return !destination.qualify(d);
+        DestinationHeuristic heuristic = heuristics[arrival.stop()];
+
+        if(heuristic == null) {
+            return true;
+        }
+        return !destination.qualify(new DestinationArrival<>(arrival, heuristic));
     }
 }

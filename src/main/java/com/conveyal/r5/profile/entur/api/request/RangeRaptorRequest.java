@@ -52,7 +52,7 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
         boardSlackInSeconds = 60;
         numberOfAdditionalTransfers = 3;
         multiCriteriaCostFactors = MultiCriteriaCostFactors.DEFAULTS;
-        debug = null;
+        debug = DebugRequest.defaults();
     }
 
     RangeRaptorRequest(RequestBuilder<T> builder) {
@@ -69,18 +69,8 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
         this.debug = builder.debug();
     }
 
-    protected RangeRaptorRequest(RangeRaptorRequest<T> original) {
-        this.profile = original.profile();
-        this.earliestDepartureTime = original.earliestDepartureTime();
-        this.latestArrivalTime = original.latestArrivalTime();
-        this.searchWindowInSeconds = original.searchWindowInSeconds();
-        this.arrivedBy = original.arrivedBy();
-        this.accessLegs = new ArrayList<>(original.accessLegs());
-        this.egressLegs = new ArrayList<>(original.egressLegs());
-        this.boardSlackInSeconds = original.boardSlackInSeconds();
-        this.numberOfAdditionalTransfers = original.numberOfAdditionalTransfers();
-        this.multiCriteriaCostFactors = original.multiCriteriaCostFactors();
-        this.debug = original.debug();
+    public RequestBuilder<T> mutate() {
+        return new RequestBuilder<T>(this);
     }
 
     /**

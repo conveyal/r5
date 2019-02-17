@@ -1,4 +1,4 @@
-package com.conveyal.r5.profile.entur.rangeraptor.heuristic;
+package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 
 public interface DestinationHeuristic {

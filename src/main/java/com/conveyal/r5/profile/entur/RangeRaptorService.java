@@ -3,11 +3,14 @@ package com.conveyal.r5.profile.entur;
 import com.conveyal.r5.profile.entur.api.TuningParameters;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
+import com.conveyal.r5.profile.entur.api.request.RequestBuilder;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.Worker;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McRangeRaptorWorker;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic.CalculateHeuristicWorkerState;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic.NoWaitRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.BestTimesWorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StdRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StdRangeRaptorWorkerState;
@@ -23,10 +26,12 @@ import java.util.Collection;
  */
 public class RangeRaptorService<T extends TripScheduleInfo> {
     private static final boolean FORWARD = true;
-    private static final boolean BACKWARD = false;
+    private static final boolean REVERSE = false;
     private static final WorkerPerformanceTimers MC_TIMERS = new WorkerPerformanceTimers("MC");
+    private static final WorkerPerformanceTimers MV_TIMERS = new WorkerPerformanceTimers("MV");
     private static final WorkerPerformanceTimers RR_TIMERS = new WorkerPerformanceTimers("RR");
-    private static final WorkerPerformanceTimers BT_TIMERS = new WorkerPerformanceTimers("BT");
+    private static final WorkerPerformanceTimers RV_TIMERS = new WorkerPerformanceTimers("RV");
+    private static final WorkerPerformanceTimers HV_TIMERS = new WorkerPerformanceTimers("HV");
 
     private final TuningParameters tuningParameters;
 
@@ -46,6 +51,8 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
         switch (request.profile()) {
             case MULTI_CRITERIA_RANGE_RAPTOR:
                 return createMcRRWorker(transitData, request);
+            case MULTI_CRITERIA_RANGE_RAPTOR_WITH_HEURISTICS:
+                return createMcRRHeuristicWorker(transitData, request);
             case RAPTOR_REVERSE:
                 return createReversWorker(transitData, request);
             case RANGE_RAPTOR:
@@ -57,18 +64,22 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
 
     private Worker<T> createMcRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
         return new McRangeRaptorWorker<>(context(transitData, request, MC_TIMERS, FORWARD), null);
+    }
 
-        /*
-        SearchContext<T> contextHeuristic = context(transitData, request, RR_TIMERS, BACKWARD);
-        SearchContext<T> mcContext = context(transitData, request, MC_TIMERS, FORWARD);
-        StdWorkerState<T> stateHeuristic = stdState(contextHeuristic);
+    private Worker<T> createMcRRHeuristicWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
+        RequestBuilder<T> hBuilder = request.mutate();
+        hBuilder.searchWindowInSeconds(tuningParameters.iterationDepartureStepInSeconds());
+        SearchContext<T> heuristicContext = context(transitData, hBuilder.build(), HV_TIMERS, REVERSE);
+
+
+        CalculateHeuristicWorkerState<T> heuristicState = heuristicState(heuristicContext);
+
+        SearchContext<T> mcContext = context(transitData, request, MV_TIMERS, FORWARD);
 
         return () -> {
-            new StdRangeRaptorWorker<>(contextHeuristic, stateHeuristic).route();
-            return new McRangeRaptorWorker<>(mcContext, null).route();
+            new NoWaitRangeRaptorWorker<>(heuristicContext, heuristicState).route();
+            return new McRangeRaptorWorker<>(mcContext, heuristicState.heuristic()).route();
         };
-        */
-
     }
 
     private Worker<T> createRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
@@ -77,11 +88,16 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
     }
 
     private Worker<T> createReversWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
-        SearchContext<T> context = context(transitData, request, BT_TIMERS, BACKWARD);
+        SearchContext<T> context = context(transitData, request, RV_TIMERS, REVERSE);
         return new StdRangeRaptorWorker<>(context, stdState(context));
     }
 
-    private SearchContext<T> context(TransitDataProvider<T> transit, RangeRaptorRequest<T> request, WorkerPerformanceTimers timers, boolean forward) {
+    private SearchContext<T> context(
+            TransitDataProvider<T> transit,
+            RangeRaptorRequest<T> request,
+            WorkerPerformanceTimers timers,
+            boolean forward
+    ) {
         return new SearchContext<>(request, tuningParameters, transit, timers, forward);
     }
 
@@ -91,5 +107,9 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
 
     private StdWorkerState<T> bestTimeState(SearchContext<T> context) {
         return new BestTimesWorkerState<>(context);
+    }
+
+    private CalculateHeuristicWorkerState<T> heuristicState(SearchContext<T> context) {
+        return new CalculateHeuristicWorkerState<>(context);
     }
 }

@@ -6,7 +6,6 @@ import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
-import com.conveyal.r5.profile.entur.rangeraptor.heuristic.DestinationHeuristic;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransferStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
@@ -19,7 +18,6 @@ import java.util.BitSet;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
-import java.util.function.IntFunction;
 
 
 /**
@@ -51,7 +49,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
             int nRounds,
             int nStops,
             Collection<TransferLeg> egressLegs,
-            IntFunction<DestinationHeuristic> heuristics,
+            DestinationHeuristic[] heuristics,
             CostCalculator costCalculator,
             TransitCalculator transitCalculator,
             DebugHandlerFactory<T> debugHandlerFactory

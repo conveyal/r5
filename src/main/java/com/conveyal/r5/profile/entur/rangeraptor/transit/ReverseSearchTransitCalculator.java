@@ -27,12 +27,12 @@ final class ReverseSearchTransitCalculator implements TransitCalculator {
         // The request is already modified to search backwards, so 'earliestDepartureTime()'
         // goes with destination and 'latestArrivalTime()' match origin.
         this(
-            t.scheduledTripBinarySearchThreshold(),
-            r.boardSlackInSeconds(),
-            r.latestArrivalTime(),
-            r.searchWindowInSeconds(),
-            r.earliestDepartureTime(),
-            t.iterationDepartureStepInSeconds()
+                t.scheduledTripBinarySearchThreshold(),
+                r.boardSlackInSeconds(),
+                r.latestArrivalTime(),
+                r.searchWindowInSeconds(),
+                r.earliestDepartureTime(),
+                t.iterationDepartureStepInSeconds()
         );
     }
 

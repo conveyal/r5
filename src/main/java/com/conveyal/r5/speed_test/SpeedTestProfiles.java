@@ -8,7 +8,9 @@ enum SpeedTestProfiles {
     original("or", "The original R5 FastRaptorWorker by Conveyal"),
     range_raptor("rr", "Standard Range Raptor, super fast [ transfers, arrival time, travel time ]."),
     raptor_reverse("rv", "Reverse Raptor"),
-    mc_range_raptor("mc", "Multi-Criteria pareto optimal Range Raptor [ transfers, arrival time, travel time, walking ].");
+    mc_range_raptor("mc", "Multi-Criteria pareto optimal Range Raptor [ transfers, arrival time, travel time, cost ]."),
+    mc_range_raptor_heuristic("mh", "Multi-Criteria pareto optimal Range Raptor with heuristics [ transfers, arrival time, travel time, cost ]."),
+    ;
 
     final String shortName;
     final String description;

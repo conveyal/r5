@@ -31,8 +31,8 @@ public class RequestBuilder<T extends TripScheduleInfo> {
     private int latestArrivalTime;
     private int searchWindowInSeconds;
     private boolean arrivedBy;
-    private final Collection<TransferLeg> accessLegs;
-    private final Collection<TransferLeg> egressLegs;
+    private final Collection<TransferLeg> accessLegs = new ArrayList<>();
+    private final Collection<TransferLeg> egressLegs = new ArrayList<>();
     private int boardSlackInSeconds;
     private int numberOfAdditionalTransfers;
 
@@ -43,8 +43,8 @@ public class RequestBuilder<T extends TripScheduleInfo> {
     private double multiCriteriaWaitReluctanceFactor;
 
     // Debug
-    private final List<Integer> debugStops;
-    private final List<Integer> debugPath;
+    private final List<Integer> debugStops = new ArrayList<>();
+    private final List<Integer> debugPath = new ArrayList<>();
     private int debugPathStartAtStopIndex;
     private Consumer<DebugEvent<StopArrivalView<T>>> stopArrivalListener;
     private Consumer<DebugEvent<DestinationArrivalView<T>>> destinationArrivalListener;
@@ -53,30 +53,32 @@ public class RequestBuilder<T extends TripScheduleInfo> {
 
 
     public RequestBuilder() {
-        this(RangeRaptorRequest.defaults(), MultiCriteriaCostFactors.DEFAULTS);
+        this(RangeRaptorRequest.defaults());
     }
 
-    public RequestBuilder(RangeRaptorRequest<T> defaults, MultiCriteriaCostFactors mcDefaults) {
+    public RequestBuilder(RangeRaptorRequest<T> defaults) {
         this.earliestDepartureTime = defaults.earliestDepartureTime();
         this.latestArrivalTime = defaults.latestArrivalTime();
-        this.accessLegs = new ArrayList<>();
-        this.egressLegs = new ArrayList<>();
+        this.accessLegs.addAll(defaults.accessLegs());
+        this.egressLegs.addAll(defaults.egressLegs());
         this.boardSlackInSeconds = defaults.boardSlackInSeconds();
         this.numberOfAdditionalTransfers = defaults.numberOfAdditionalTransfers();
 
         // Algorithm
+        MultiCriteriaCostFactors mcDefaults = defaults.multiCriteriaCostFactors();
         this.profile = defaults.profile();
         this.multiCriteriaBoardCost = mcDefaults.boardCost();
         this.multiCriteriaWalkReluctanceFactor = mcDefaults.walkReluctanceFactor();
         this.multiCriteriaWaitReluctanceFactor = mcDefaults.waitReluctanceFactor();
 
         // Debug
-        this.debugStops = new ArrayList<>();
-        this.debugPath = new ArrayList<>();
-        this.debugPathStartAtStopIndex = 0;
-        this.stopArrivalListener = null;
-        this.destinationArrivalListener = null;
-        this.pathFilteringListener = null;
+        DebugRequest<T> debug = defaults.debug();
+        this.debugStops.addAll(debug.stops());
+        this.debugPath.addAll(debug.path());
+        this.debugPathStartAtStopIndex = debug.pathStartAtStopIndex();
+        this.stopArrivalListener = debug.stopArrivalListener();
+        this.destinationArrivalListener = debug.destinationArrivalListener();
+        this.pathFilteringListener = debug.pathFilteringListener();
     }
 
     public RaptorProfile profile() {

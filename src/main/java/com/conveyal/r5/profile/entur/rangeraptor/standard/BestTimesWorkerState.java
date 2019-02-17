@@ -45,7 +45,7 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
         this(ctx.nRounds(), ctx.transit().numberOfStops(), ctx.calculator());
     }
 
-    BestTimesWorkerState(int nRounds, int nStops, TransitCalculator calculator) {
+    protected BestTimesWorkerState(int nRounds, int nStops, TransitCalculator calculator) {
         this.nRounds = nRounds;
         this.calculator = calculator;
         this.bestTimes = new BestTimes(nStops, calculator);
@@ -53,6 +53,10 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
 
     TransitCalculator calculator() {
         return calculator;
+    }
+
+    protected int bestTime(int stop) {
+        return bestTimes.time(stop);
     }
 
     @Override
@@ -64,7 +68,7 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
     }
 
     /** Allow subclasses to setup initial iteration state by overriding this method. */
-    void setupIteration2(int iterationDepartureTime) {}
+    protected void setupIteration2(int iterationDepartureTime) {}
 
     @Override
     public final void setInitialTimeForIteration(TransferLeg accessEgressLeg, int iterationDepartureTime) {
@@ -79,7 +83,7 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
     }
 
     /** Allow subclasses to setup initial access/egress time  by overriding this method. */
-    void setInitialTime(final int stop, final int arrivalTime, int durationInSeconds) { }
+    protected void setInitialTime(final int stop, final int arrivalTime, int durationInSeconds) { }
 
     @Override
     public final boolean isNewRoundAvailable() {
@@ -132,22 +136,36 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
 
     /**
      * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the transitTime.
-     * <p/>
-     * PLEASE OVERRIDE FOR MORE SPECIFIC BEHAVIOR!
-     * <p/>
-     * The implementation can be copied and alterd into a sub classe
      */
     @Override
-    public void transitToStop(int stop, int alightTime, T trip, int boardStop, int boardTime) {
+    public final void transitToStop(int stop, int alightTime, T trip, int boardStop, int boardTime) {
         if (exceedsTimeLimit(alightTime)) {
             return;
         }
 
         if (newTransitBestTime(stop, alightTime)) {
             // transitTimes upper bounds bestTimes
-            newOverallBestTime(stop, alightTime);
+            final boolean newBestOverall = newOverallBestTime(stop, alightTime);
+            setNewBestTransitTime(stop, alightTime, trip, boardStop, boardTime, newBestOverall);
+        }
+        else {
+            rejectNewBestTransitTime(stop, alightTime, trip, boardStop, boardTime);
         }
     }
+
+    /**
+     * Override this to set the best transit state.
+     * <p/>
+     * PLEASE OVERRIDE!
+     */
+    protected void setNewBestTransitTime(int stop, int alightTime, T trip, int boardStop, int boardTime, boolean newBestOverall) { }
+
+    /**
+     * Transit is rejected, better time exist. Override to handle transit rejection.
+     * <p/>
+     * PLEASE OVERRIDE!
+     */
+    protected void rejectNewBestTransitTime(int stop, int alightTime, T trip, int boardStop, int boardTime) {}
 
     /**
      * Set the arrival time at all transit stop if time is optimal for the given list of transfers.
@@ -160,12 +178,7 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
         }
     }
 
-    /**
-     * PLEASE OVERRIDE FOR MORE SPECIFIC BEHAVIOR!
-     * <p/>
-     * The implementation can be copied and altered into a sub-class.
-     */
-    void transferToStop(int arrivalTimeTransit, int fromStop, TransferLeg transferLeg) {
+    private void transferToStop(int arrivalTimeTransit, int fromStop, TransferLeg transferLeg) {
         // Use the calculator to make sure the calculation is done correct for a normal
         // forward search and a reverse search.
         final int arrivalTime = calculator.add(arrivalTimeTransit, transferLeg.durationInSeconds());
@@ -178,22 +191,42 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
 
         // transitTimes upper bounds bestTimes so we don't need to update wait time and in-vehicle time here, if we
         // enter this conditional it has already been updated.
-        newOverallBestTime(toStop, arrivalTime);
+        if (newOverallBestTime(toStop, arrivalTime)) {
+            setNewBestTransferTime(fromStop, arrivalTime, transferLeg);
+        }
+        else {
+            rejectNewBestTransferTime(fromStop, arrivalTime, transferLeg);
+        }
     }
 
-    final int round() {
+    /**
+     * Override this to set the best transfer state.
+     * <p/>
+     * PLEASE OVERRIDE!
+     */
+
+    protected void setNewBestTransferTime(int fromStop, int arrivalTime, TransferLeg transferLeg) { }
+
+    /**
+     * Transfer is rejected, better time exist. Override to handle transit rejection.
+     * <p/>
+     * PLEASE OVERRIDE!
+     */
+    protected void rejectNewBestTransferTime(int fromStop, int arrivalTime, TransferLeg transferLeg) { }
+
+    protected final int round() {
         return round;
     }
 
-    final boolean newTransitBestTime(int stop, int alightTime) {
+    private final boolean newTransitBestTime(int stop, int alightTime) {
         return bestTimes.transitUpdateNewBestTime(stop, alightTime);
     }
 
-    final boolean newOverallBestTime(int stop, int alightTime) {
+    private final boolean newOverallBestTime(int stop, int alightTime) {
         return bestTimes.updateNewBestTime(stop, alightTime);
     }
 
-    final boolean exceedsTimeLimit(int time) {
+    private final boolean exceedsTimeLimit(int time) {
         return calculator.exceedsTimeLimit(time);
     }
 }

@@ -13,8 +13,6 @@ import java.util.Collections;
  * @param <E> the element type.
  */
 public class DebugEvent<E> {
-    private static final int NOT_SET = -1;
-
     private final Action action;
     private final int iterationStartTime;
     private final E element;
@@ -45,6 +43,10 @@ public class DebugEvent<E> {
 
     public static <E> DebugEvent<E> reject(int iterationStartTime, E element, Collection<? extends E> result) {
         return new DebugEvent<>(Action.REJECT, iterationStartTime, element, null, result);
+    }
+
+    public static <E> DebugEvent<E> rejectByOptimization(int iterationStartTime, E element) {
+        return new DebugEvent<>(Action.REJECT_OPTIMIZED, iterationStartTime, element, null, null);
     }
 
     public static <E> DebugEvent<E> drop(int iterationStartTime, E element, E droppedByElement) {
@@ -104,6 +106,8 @@ public class DebugEvent<E> {
         ACCEPT("Accept"),
         /** Element is rejected */
         REJECT("Reject"),
+        /** Element is rejected as part of an optimization. */
+        REJECT_OPTIMIZED("Optimized"),
         /**
          * Element is dropped from the algorithm state. Since Range Raptor works in rounds and iterations, an element
          * dropped in a later round/iteration might still make it to the optimal solution. This only means that the

@@ -36,17 +36,29 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> extends
      * Create a Standard range raptor state for the given context
      */
     public StdRangeRaptorWorkerState(SearchContext<T> c) {
-        this(c.nRounds(), c.nStops(), c.calculator(),c.debugFactory(), c.egressLegs(), c.debugRequest());
+        this(
+                c.nRounds(),
+                c.nStops(),
+                c.numberOfAdditionalTransfers(),
+                c.egressStops(),
+                c.calculator(),
+                c.debugFactory(),
+                c.egressLegs(),
+                c.debugRequest()
+        );
     }
 
     private StdRangeRaptorWorkerState(
-            int nRounds, int nStops,
+            int nRounds,
+            int nStops,
+            int numberOfAdditionalTransfers,
+            int[] destinationStops,
             TransitCalculator calculator,
             DebugHandlerFactory<T> dFactory,
             Collection<TransferLeg> egressLegs,
             DebugRequest<T> debugRequest
     ) {
-        super(nRounds, nStops, calculator);
+        super(nRounds, nStops, numberOfAdditionalTransfers, destinationStops, calculator);
         this.stops = new Stops<>(nRounds, nStops, egressLegs, this::handleEgressStopArrival);
         this.results = new DestinationArrivals<>(nRounds, calculator, new StopsCursor<>(stops, calculator), dFactory);
         this.debug = debugRequest.isDebug()

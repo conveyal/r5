@@ -57,6 +57,10 @@ public class SearchContext<T extends TripScheduleInfo> {
         return searchForward ? request.egressLegs() : request.accessLegs();
     }
 
+    public int[] egressStops() {
+        return egressLegs().stream().mapToInt(TransferLeg::stop).toArray();
+    }
+
     public DebugRequest<T> debugRequest() {
         return debugRequest;
     }
@@ -112,5 +116,9 @@ public class SearchContext<T extends TripScheduleInfo> {
 
     private DebugRequest<T> debugRequest(RangeRaptorRequest<T> request, boolean forward) {
         return forward ? request.debug() : new ReverseDebugRequest<>(request.debug());
+    }
+
+    public int numberOfAdditionalTransfers() {
+        return request.numberOfAdditionalTransfers();
     }
 }

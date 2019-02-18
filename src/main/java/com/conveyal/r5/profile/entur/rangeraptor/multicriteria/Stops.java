@@ -79,6 +79,20 @@ final class Stops<T extends TripScheduleInfo> {
         addStopArrival(newAccessArrival);
     }
 
+    /**
+     * Delegates to {@link Destination#reachedCurrentRound()}
+     */
+    boolean reachedCurrentRound() {
+        return destination.reachedCurrentRound();
+    }
+
+    /**
+     * Delegates to {@link Destination#clearReachedCurrentRoundFlag()}
+     */
+    void clearReachedCurrentRoundFlag() {
+        destination.clearReachedCurrentRoundFlag();
+    }
+
     boolean addStopArrival(AbstractStopArrival<T> arrival) {
         if(vetoHeuristicDestinationArrival(arrival)) {
             debugHandlerFactory.debugStopArrival(arrival.stop()).rejectByOptimization(arrival);

@@ -6,6 +6,7 @@ import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
+import com.conveyal.r5.profile.entur.util.AvgTimer;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
 import java.util.Iterator;
@@ -26,11 +27,14 @@ import java.util.Iterator;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWorkerState<T> {
-    private final int nRounds;
     private final TransitCalculator calculator;
 
     private int round = 0;
     private int roundMax = -1;
+    private int roundMaxLimit;
+    private final int numberOfAdditionalTransfers;
+
+    static AvgTimer timer = AvgTimer.timerMicroSec("Jalla");
 
     /**
      * The best times to reach each stop, whether via a transfer or via transit directly.
@@ -39,20 +43,35 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
 
 
     /**
+     * The list of egress stops, can be used to terminate the search when the stops are reached.
+     */
+    private final int[] egressStops;
+
+    /**
      * create a BestTimes Range Raptor State for given context.
      */
     public BestTimesWorkerState(SearchContext<T> ctx) {
-        this(ctx.nRounds(), ctx.transit().numberOfStops(), ctx.calculator());
+        this(
+                ctx.nRounds(),
+                ctx.transit().numberOfStops(),
+                ctx.numberOfAdditionalTransfers(),
+                ctx.egressStops(),
+                ctx.calculator()
+        );
     }
 
-    protected BestTimesWorkerState(int nRounds, int nStops, TransitCalculator calculator) {
-        this.nRounds = nRounds;
+    protected BestTimesWorkerState(
+            int nRounds,
+            int nStops,
+            int numberOfAdditionalTransfers,
+            int[] egressStops,
+            TransitCalculator calculator
+    ) {
+        this.roundMaxLimit = nRounds - 1;
+        this.numberOfAdditionalTransfers = numberOfAdditionalTransfers;
         this.calculator = calculator;
         this.bestTimes = new BestTimes(nStops, calculator);
-    }
-
-    TransitCalculator calculator() {
-        return calculator;
+        this.egressStops = egressStops;
     }
 
     protected int bestTime(int stop) {
@@ -87,8 +106,8 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
 
     @Override
     public final boolean isNewRoundAvailable() {
-        final boolean moreRoundsToGo = round < nRounds - 1;
-        return moreRoundsToGo && bestTimes.isCurrentRoundUpdated();
+        updateRoundMaxLimitBasedOnDestinationArrival();
+        return round < roundMaxLimit && bestTimes.isCurrentRoundUpdated();
     }
 
     @Override
@@ -218,15 +237,34 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
         return round;
     }
 
-    private final boolean newTransitBestTime(int stop, int alightTime) {
+    private boolean newTransitBestTime(int stop, int alightTime) {
         return bestTimes.transitUpdateNewBestTime(stop, alightTime);
     }
 
-    private final boolean newOverallBestTime(int stop, int alightTime) {
+    private boolean newOverallBestTime(int stop, int alightTime) {
         return bestTimes.updateNewBestTime(stop, alightTime);
     }
 
-    private final boolean exceedsTimeLimit(int time) {
+    private boolean exceedsTimeLimit(int time) {
         return calculator.exceedsTimeLimit(time);
+    }
+
+    private void updateRoundMaxLimitBasedOnDestinationArrival() {
+        if(destinationReachedLastRound()) {
+            roundMaxLimit = Math.min(roundMaxLimit, round + numberOfAdditionalTransfers);
+        }
+    }
+
+    private boolean destinationReachedLastRound() {
+        // This is fast enough, we could use a BitSet for egressStops, but it takes up more
+        // memory and the performance is the same.
+        timer.start();
+        for (int i = 0; i < egressStops.length; i++) {
+            if(bestTimes.isStopReachedByTransitCurrentRound(i)) {
+                return true;
+            }
+        }
+        timer.stop();
+        return false;
     }
 }

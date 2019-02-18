@@ -17,6 +17,7 @@ class Destination<T extends TripScheduleInfo> extends ParetoSet<DestinationArriv
 
     private final DebugHandler<DestinationArrivalView<T>> debugHandler;
     private final TransitCalculator calculator;
+    private boolean reachedCurrentRound = false;
 
 
     Destination(TransitCalculator calculator, DebugHandler<DestinationArrivalView<T>> debugHandler) {
@@ -44,8 +45,29 @@ class Destination<T extends TripScheduleInfo> extends ParetoSet<DestinationArriv
 
         if(!calculator.exceedsTimeLimit(newValue.arrivalTime())) {
             added = add(newValue);
+
+            if(added) {
+                reachedCurrentRound = true;
+            }
         }
         notifyDebuggerOfNewArrival(newValue, added);
+    }
+
+    /**
+     * Check if destination was reached in the current round.
+     * <p/>
+     * NOTE! Remember to clear flag before or after each round:
+     * {@link #clearReachedCurrentRoundFlag()}.
+     */
+    boolean reachedCurrentRound() {
+        return reachedCurrentRound;
+    }
+
+    /**
+     * Use this method to clear the flag for destination arrivals in the current round.
+     */
+    void clearReachedCurrentRoundFlag() {
+        reachedCurrentRound = false;
     }
 
     private void notifyDebuggerOfNewArrival(DestinationArrival<T> newValue, boolean added) {

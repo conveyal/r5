@@ -34,11 +34,12 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
 
     private final Stops<T> stops;
     private final List<AbstractStopArrival<T>> arrivalsCache = new ArrayList<>();
-    private final int nRounds;
     private final CostCalculator costCalculator;
     private final TransitCalculator transitCalculator;
+    private final int numberOfAdditionalTransfers;
 
     private int round = Integer.MIN_VALUE;
+    private int roundMaxLimit;
     private boolean updatesExist = false;
     private BitSet touchedStops;
 
@@ -48,6 +49,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     McRangeRaptorWorkerState(
             int nRounds,
             int nStops,
+            int numberOfAdditionalTransfers,
             Collection<TransferLeg> egressLegs,
             DestinationHeuristic[] heuristics,
             CostCalculator costCalculator,
@@ -55,7 +57,8 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
             DebugHandlerFactory<T> debugHandlerFactory
 
     ) {
-        this.nRounds = nRounds;
+        this.roundMaxLimit = nRounds - 1;
+        this.numberOfAdditionalTransfers = numberOfAdditionalTransfers;
         this.stops = new Stops<>(nStops, egressLegs, heuristics, costCalculator, transitCalculator, debugHandlerFactory);
         this.touchedStops = new BitSet(nStops);
         this.costCalculator = costCalculator;
@@ -82,12 +85,13 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
 
     @Override
     public boolean isNewRoundAvailable() {
-        final boolean moreRoundsToGo = round < nRounds - 1;
-        return moreRoundsToGo && updatesExist;
+        updateRoundMaxLimitOnDestinationArrival();
+        return round < roundMaxLimit && updatesExist;
     }
 
     @Override
     public void prepareForNextRound() {
+        stops.clearReachedCurrentRoundFlag();
         ++round;
     }
 
@@ -147,6 +151,12 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
 
 
     /* private methods */
+
+    private void updateRoundMaxLimitOnDestinationArrival() {
+        if(stops.reachedCurrentRound()) {
+            roundMaxLimit = Math.min(roundMaxLimit, round + numberOfAdditionalTransfers);
+        }
+    }
 
     private void startRecordChangesToStopsForNextAndCurrentRound() {
         stops.markAllStops();

@@ -59,6 +59,7 @@ public class RequestBuilder<T extends TripScheduleInfo> {
     public RequestBuilder(RangeRaptorRequest<T> defaults) {
         this.earliestDepartureTime = defaults.earliestDepartureTime();
         this.latestArrivalTime = defaults.latestArrivalTime();
+        this.searchWindowInSeconds = defaults.searchWindowInSeconds();
         this.accessLegs.addAll(defaults.accessLegs());
         this.egressLegs.addAll(defaults.egressLegs());
         this.boardSlackInSeconds = defaults.boardSlackInSeconds();

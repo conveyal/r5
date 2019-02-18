@@ -50,7 +50,7 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
         accessLegs = Collections.emptyList();
         egressLegs = Collections.emptyList();
         boardSlackInSeconds = 60;
-        numberOfAdditionalTransfers = 3;
+        numberOfAdditionalTransfers = 12;
         multiCriteriaCostFactors = MultiCriteriaCostFactors.DEFAULTS;
         debug = DebugRequest.defaults();
     }
@@ -173,7 +173,7 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
      * RangeRaptor is designed to search until the destination is reached and then
      * {@code numberOfAdditionalTransfers} more rounds.
      * <p/>
-     * The default value is 3.
+     * The default value is 5.
      */
     public int numberOfAdditionalTransfers() {
         return numberOfAdditionalTransfers;

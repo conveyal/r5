@@ -24,7 +24,7 @@ import java.util.BitSet;
  * next stop, the new arrival may become the best time at that stop. Two transfers
  * are after each other is not legal.
  */
-public final class BestTimes {
+final class BestTimes {
 
     /** The best times to reach a stop, across rounds and iterations. */
     private final int[] times;
@@ -42,7 +42,7 @@ public final class BestTimes {
     private final TransitCalculator calculator;
 
 
-    public BestTimes(int nStops, TransitCalculator calculator) {
+    BestTimes(int nStops, TransitCalculator calculator) {
         this.calculator = calculator;
         this.times = newTimeArray(nStops, calculator.unreachedTime());
         this.reachedCurrentRound = new BitSet(nStops);
@@ -52,11 +52,11 @@ public final class BestTimes {
         this.transitReachedCurrentRound = new BitSet(nStops);
     }
 
-    public int time(int stop) {
+    int time(int stop) {
         return times[stop];
     }
 
-    public int transitTime(int stop) {
+    int transitTime(int stop) {
         return transitTimes[stop];
     }
 
@@ -66,7 +66,7 @@ public final class BestTimes {
      * iteration in the last round does not "overflow" into
      * the next iteration.
      */
-    public final void prepareForNewIteration() {
+    final void prepareForNewIteration() {
         reachedCurrentRound.clear();
         transitReachedCurrentRound.clear();
     }
@@ -74,14 +74,14 @@ public final class BestTimes {
     /**
      * @return true if at least one stop arrival was reached last round (best overall).
      */
-    public final boolean isCurrentRoundUpdated() {
+    final boolean isCurrentRoundUpdated() {
         return !reachedCurrentRound.isEmpty();
     }
 
     /**
      * Prepare this class for the next round updating reached flags.
      */
-    public final void prepareForNextRound() {
+    final void prepareForNextRound() {
         swapReachedCurrentAndLastRound();
         reachedCurrentRound.clear();
         transitReachedCurrentRound.clear();
@@ -90,21 +90,28 @@ public final class BestTimes {
     /**
      * @return an iterator for all stops reached (overall best) in the last round.
      */
-    public final BitSetIterator stopsReachedLastRound() {
+    final BitSetIterator stopsReachedLastRound() {
         return new BitSetIterator(reachedLastRound);
     }
 
     /**
      * @return an iterator of all stops reached by transit in the current round.
      */
-    public final BitSetIterator transitStopsReachedCurrentRound() {
+    final BitSetIterator transitStopsReachedCurrentRound() {
         return new BitSetIterator(transitReachedCurrentRound);
+    }
+
+    /**
+     * @return true if the given stop was reached by transit in the current round.
+     */
+    final boolean isStopReachedByTransitCurrentRound(int stop) {
+        return transitReachedCurrentRound.get(stop);
     }
 
     /**
      * @return true if the given stop was reached in the previous/last round.
      */
-    public final boolean isStopReachedLastRound(int stop) {
+    final boolean isStopReachedLastRound(int stop) {
         return reachedLastRound.get(stop);
     }
 
@@ -114,14 +121,14 @@ public final class BestTimes {
      * <p/>
      * This is equivalent to calling {@link #updateNewBestTime(int, int)}
      */
-    public final void setAccessStopTime(final int stop, final int time) {
+    final void setAccessStopTime(final int stop, final int time) {
         updateNewBestTime(stop, time);
     }
 
     /**
      * @return true iff new best time is updated
      */
-    public final boolean transitUpdateNewBestTime(final int stop, int time) {
+    final boolean transitUpdateNewBestTime(final int stop, int time) {
         if(isBestTransitTime(stop, time)) {
             setTransitTime(stop, time);
             return true;
@@ -132,7 +139,7 @@ public final class BestTimes {
     /**
      * @return true iff new best time is updated
      */
-    public final boolean updateNewBestTime(final int stop, int time) {
+    final boolean updateNewBestTime(final int stop, int time) {
         if(isBestTime(stop, time)) {
             setTime(stop, time);
             return true;

@@ -24,11 +24,25 @@ public class CalculateHeuristicWorkerState<T extends TripScheduleInfo> extends B
      * create a BestTimes Range Raptor State for given context.
      */
     public CalculateHeuristicWorkerState(SearchContext<T> ctx) {
-        this(ctx.nRounds(), ctx.transit().numberOfStops(), ctx.calculator(), ctx.costCalculator());
+        this(
+                ctx.nRounds(),
+                ctx.transit().numberOfStops(),
+                ctx.numberOfAdditionalTransfers(),
+                ctx.egressStops(),
+                ctx.calculator(),
+                ctx.costCalculator()
+        );
     }
 
-    private CalculateHeuristicWorkerState(int nRounds, int nStops, TransitCalculator calculator, CostCalculator costCalculator) {
-        super(nRounds, nStops, calculator);
+    private CalculateHeuristicWorkerState(
+            int nRounds,
+            int nStops,
+            int numberOfAdditionalTransfers,
+            int[] destinationStops,
+            TransitCalculator calculator,
+            CostCalculator costCalculator
+    ) {
+        super(nRounds, nStops, numberOfAdditionalTransfers, destinationStops, calculator);
         this.costCalculator = costCalculator;
         this.heuristics = new Heuristic[nStops];
     }

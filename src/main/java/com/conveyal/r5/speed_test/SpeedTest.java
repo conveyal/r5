@@ -54,7 +54,6 @@ import static com.conveyal.r5.profile.entur.util.TimeUtils.midnightOf;
 public class SpeedTest {
     private static final Logger LOG = LoggerFactory.getLogger(SpeedTest.class);
 
-
     private static final String TRAVEL_SEARCH_FILENAME = "travelSearch";
     private static final String NETWORK_DATA_FILE = "network.dat";
 
@@ -279,6 +278,8 @@ public class SpeedTest {
 
             TuningParameters tuningParameters = new TuningParameters() {
                 @Override public int maxNumberOfTransfers() { return request.maxRides; }
+                // We don´t want to relax the results in the test, because it make it much harder to verify the result
+                @Override public double relaxCostAtDestinationArrival() { return 1.0; }
             };
 
             RangeRaptorService<TripSchedule> service = new RangeRaptorService<>(tuningParameters);
@@ -304,7 +305,8 @@ public class SpeedTest {
                 itineraries.add(createItinerary(request, streetRouter, p));
             }
 
-            itineraries.filter();
+            // Filter away similar itineraries for easier reading
+            // itineraries.filter();
 
             TIMER_COLLECT_RESULTS_ITINERARIES.stop();
 

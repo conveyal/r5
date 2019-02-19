@@ -35,7 +35,7 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
      * <p/>
      * The relationship between Range Raptor round and paretoRound can be described by this formula:
      * <pre>
-     *     Range Raptor round =  (paretoRound + 1) / 2  // The divide by 2 rounds down (integer calculation)
+     *     Range Raptor round =  (paretoRound + 1) / 2
      * </pre>
      */
     private final int paretoRound;

@@ -50,6 +50,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
             int nRounds,
             int nStops,
             int numberOfAdditionalTransfers,
+            final double relaxCostAtDestinationArrival,
             Collection<TransferLeg> egressLegs,
             DestinationHeuristic[] heuristics,
             CostCalculator costCalculator,
@@ -59,7 +60,15 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     ) {
         this.roundMaxLimit = nRounds - 1;
         this.numberOfAdditionalTransfers = numberOfAdditionalTransfers;
-        this.stops = new Stops<>(nStops, egressLegs, heuristics, costCalculator, transitCalculator, debugHandlerFactory);
+        this.stops = new Stops<>(
+                nStops,
+                egressLegs,
+                relaxCostAtDestinationArrival,
+                heuristics,
+                costCalculator,
+                transitCalculator,
+                debugHandlerFactory
+        );
         this.touchedStops = new BitSet(nStops);
         this.costCalculator = costCalculator;
         this.transitCalculator = transitCalculator;

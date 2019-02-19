@@ -20,15 +20,19 @@ class Destination<T extends TripScheduleInfo> extends ParetoSet<DestinationArriv
     private boolean reachedCurrentRound = false;
 
 
-    Destination(TransitCalculator calculator, DebugHandler<DestinationArrivalView<T>> debugHandler) {
+    Destination(
+            double relaxCostAtDestinationArrival,
+            TransitCalculator calculator,
+            DebugHandler<DestinationArrivalView<T>> debugHandler
+    ) {
         // The `travelDuration` is added as a criteria to the pareto comparator in addition to the parameters
         // used for each stop arrivals. The `travelDuration` is only needed at the destination because Range Raptor
         // works in iterations backwards in time.
         super((l, r) ->
                 l.arrivalTime() < r.arrivalTime() ||
                 l.numberOfTransfers() < r.numberOfTransfers() ||
-                l.cost() < r.cost() ||
-                l.travelDuration() < r.travelDuration(),
+                l.cost() <= Math.round(r.cost() * relaxCostAtDestinationArrival)  ||
+                l.travelDuration() <= r.travelDuration(),
                 debugHandler::drop
         );
         this.calculator = calculator;

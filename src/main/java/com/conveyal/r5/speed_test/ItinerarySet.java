@@ -15,6 +15,7 @@ import static com.conveyal.r5.speed_test.SpeedTestItinerary.paretoDominanceFunct
 public class ItinerarySet implements Iterable<SpeedTestItinerary> {
     private List<SpeedTestItinerary> itineraries = new ArrayList<>();
     private ParetoSet<SpeedTestItinerary> itinerariesParetoOptimized = new ParetoSet<>(paretoDominanceFunctions());
+    private boolean filtered = false;
 
 
     void add(SpeedTestItinerary it) {
@@ -22,11 +23,13 @@ public class ItinerarySet implements Iterable<SpeedTestItinerary> {
     }
 
     void filter() {
-        itineraries.forEach(itinerariesParetoOptimized::add);
+        itinerariesParetoOptimized.addAll(itineraries);
+        filtered = true;
     }
 
+    @SuppressWarnings("NullableProblems")
     @Override
     public Iterator<SpeedTestItinerary> iterator() {
-        return itinerariesParetoOptimized.iterator();
+        return filtered ? itinerariesParetoOptimized.iterator() :  itineraries.iterator();
     }
 }

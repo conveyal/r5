@@ -15,10 +15,14 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class ParetoSetTest {
+    private static final int NOT_SET = -999;
+    private static final ParetoComparator<Vector> DIFFERENT = (l, r) -> l.v1 != r.v1;
+    private static final ParetoComparator<Vector> LESS_THEN = (l, r) -> l.v1 < r.v1;
+    private static final ParetoComparator<Vector> LESS_LESS_THEN = (l, r) -> l.v1 < r.v1 || l.v2 < r.v2;
+    private static final ParetoComparator<Vector> LESS_DIFFERENT_THEN = (l, r) -> l.v1 < r.v1 || l.v2 != r.v2;
 
     // Used to stored dropped vectors (callback from set)
     private List<Vector> dropped = new ArrayList<>();
-
 
     @Test
     public void initiallyEmpty() {
@@ -32,19 +36,19 @@ public class ParetoSetTest {
     @Test
     public void addVector() {
         ParetoSet<Vector> set = new ParetoSet<>((l,r) ->
-                l.values[0]     <  r.values[0] ||   // less than
-                l.values[1]     != r.values[1] ||   // different dominates
-                l.values[2] + 2 <  r.values[2]      // at least 2 less than
+                l.v1     <  r.v1 ||   // less than
+                l.v2     != r.v2 ||   // different dominates
+                l.v3 + 2 <  r.v3      // at least 2 less than
         );
 
         // When one element is added
-        addOk(set, new Vector("V0", 5));
+        addOk(set, new Vector("V0", 5,5,5));
 
         // Then the element should be the only element in the set
-        assertEquals("{V0[5]}", set.toString());
+        assertEquals("{V0[5, 5, 5]}", set.toString());
 
         // And we can retrieve it at index 0
-        assertEquals("V0[5]", set.get(0).toString());
+        assertEquals("V0[5, 5, 5]", set.get(0).toString());
     }
 
     @Test(expected = UnsupportedOperationException.class)
@@ -152,56 +156,78 @@ public class ParetoSetTest {
     @Test
     public void testTwoCriteria_lessThen_and_lessThenValue() {
         // Given a set with one element with 2 criteria: [5, 5]
-        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_2_THEN);
+        ParetoSet<Vector> set = new ParetoSet<>((l, r) -> l.v1 < r.v1 || l.v2 < r.v2 + 1);
         Vector v0 = new Vector("V0", 5, 5);
 
         // Cases that does NOT make it into the set
-        testNotAdded(set, v0, vector(6, 5), "1st value disqualifies it");
-        testNotAdded(set, v0, vector(5, 3), "regarded as the same value");
-        testNotAdded(set, v0, vector(5, 7), "regarded as the same value");
-        testNotAdded(set, v0, vector(5, 8), "2nd value disqualifies it");
-
-        // Cases that replaces the initial V0 vector
-        testReplace(set, v0, vector(4, 7), "1st value qualifies it");
-        testReplace(set, v0, vector(5, 2), "2nd value qualifies it");
+        testNotAdded(set, v0, vector(6, 6), "1st value is to big");
+        testNotAdded(set, v0, vector(5, 7), "2nd value disqualifies it");
+        testNotAdded(set, v0, vector(5, 6), "regarded as the same value");
 
         // Cases that both vectors are kept
         keepBoth(set, v0, vector(4, 8), "1st value qualifies it, 2nd does not");
-        keepBoth(set, v0, vector(6, 2), "2nd value qualifies it, 1st does not");
+        keepBoth(set, v0, vector(6, 5), "2nd value qualifies it, 1st does not");
+        keepBoth(set, v0, vector(5, 5), "2nd value qualifies it, 1st does not");
+
+        // Cases that replaces the initial V0 vector
+        testReplace(set, v0, vector(4, 4), "1st and 2nd value qualifies it");
+        testReplace(set, v0, vector(5, 4), "2nd value qualifies it, first is equivalent");
+    }
+
+    @Test
+    public void testRelaxedCriteriaAcceptingTheTwoSmallestValues() {
+        // Given a set and function
+        ParetoSet<Vector> set = new ParetoSet<>((l, r) -> l.v1 < r.v1 || l.v2 < r.v2 + 2);
+
+        // Add some values
+        set.add(new Vector("V0", 5, 5));
+        set.add(new Vector("V1", 4, 4));
+        set.add(new Vector("V2", 5, 4));
+        set.add(new Vector("V3", 5, 3));
+        set.add(new Vector("V4", 5, 2));
+        set.add(new Vector("V5", 5, 1));
+        set.add(new Vector("V6", 5, 2));
+        set.add(new Vector("V7", 5, 3));
+        set.add(new Vector("V8", 5, 4));
+        set.add(new Vector("V9", 5, 5));
+
+        // Independently of order expect all vectors with v1=4 or v2 in [1,2]
+        assertEquals("{V1[4, 4], V4[5, 2], V5[5, 1], V6[5, 2]}", set.toString());
     }
 
     @Test
     public void testFourCriteria() {
         // Given a set with one element with 2 criteria: [5, 5]
         // and the pareto function is: <, !=, >, <+2
-        ParetoSet<Vector> set = new ParetoSet<>(LESS_DIFFERENT_GREATER_LESS_2_THEN);
+        ParetoSet<Vector> set = new ParetoSet<>(
+                (l, r) -> l.v1 < r.v1
+                       || l.v2 != r.v2
+                       || l.v3 > r.v3
+                       || l.v4 < r.v4 + 2
+        );
         Vector v0 = new Vector("V0", 5, 5, 5, 5);
 
 
         // Cases that does NOT make it into the set
-        testNotAdded(set, v0, vector(6, 5, 5, 5), "1st value disqualifies it");
-        testNotAdded(set, v0, vector(5, 5, 5, 5), "same as v0");
-        testNotAdded(set, v0, vector(5, 5, 4, 5), "3rd value disqualifies it");
-        testNotAdded(set, v0, vector(5, 5, 5, 3), "4th value disqualifies it");
+        testNotAdded(set, v0, vector(5, 5, 5, 7), "same as v0");
+        testNotAdded(set, v0, vector(6, 5, 5, 7), "1st and 4th value disqualifies it");
+        testNotAdded(set, v0, vector(5, 5, 4, 7), "3rd and 4th value disqualifies it");
+        testNotAdded(set, v0, vector(5, 5, 5, 7), "4th value disqualifies it");
 
         // Cases that replaces the initial V0 vector
-        testReplace(set, v0, vector(4, 5, 5, 5), "1st value qualifies it");
-        testReplace(set, v0, vector(5, 5, 6, 5), "3rd value qualifies it");
-        testReplace(set, v0, vector(5, 5, 5, 2), "4th value qualifies it");
+        testReplace(set, v0, vector(4, 5, 5, 3), "1st and 4th value qualifies it");
+        testReplace(set, v0, vector(5, 5, 6, 3), "3rd and 4th value qualifies it");
+        testReplace(set, v0, vector(5, 5, 5, 3), "4th value qualifies it");
 
         // 2nd value is mutually dominant - other values does not matter
-        keepBoth(set, v0, vector(5, 4, 5, 5), "2nd value mutually dominates - other values are equal");
-        keepBoth(set, v0, vector(9, 4, 1, 9), "2nd value mutually dominates - other values disqualifies");
+        keepBoth(set, v0, vector(5, 4, 5, 6), "2nd value mutually dominates - other values are equal");
+        keepBoth(set, v0, vector(9, 6, 1, 9), "2nd value mutually dominates - other values disqualifies");
         keepBoth(set, v0, vector(1, 4, 9, 1), "2nd value mutually dominates - other values qualify");
 
         // Cases that both vectors are kept
-        keepBoth(set, v0, vector(4, 5, 4, 5), "1st value dominates, 3rd value does not");
-        keepBoth(set, v0, vector(4, 5, 5, 8), "1st value dominates, 4th value does not");
-        keepBoth(set, v0, vector(4, 5, 4, 8), "1st value dominates, 3rd and 4th value do not");
-
-        keepBoth(set, v0, vector(6, 5, 6, 5), "3rd value dominates, 1st value does not");
-        keepBoth(set, v0, vector(5, 5, 6, 8), "3rd value dominates, 4th value does not");
-        keepBoth(set, v0, vector(6, 5, 6, 8), "3rd value dominates, 1st and 4th value does not");
+        keepBoth(set, v0, vector(4, 5, 4, 7), "1st value dominates, 3rd and 4th value do not");
+        keepBoth(set, v0, vector(6, 5, 6, 7), "3rd value dominates, 1st and 4th value does not");
+        keepBoth(set, v0, vector(5, 5, 6, 7), "3rd value dominates, 4th value does not");
 
         keepBoth(set, v0, vector(6, 5, 5, 2), "4th value dominates, 1st value does not");
         keepBoth(set, v0, vector(5, 5, 4, 2), "4th value dominates, 3rd value does not");
@@ -373,7 +399,7 @@ public class ParetoSetTest {
     }
 
     private static Vector vector(int a, int b) {
-        return new Vector("Test", a, b);
+        return new Vector("Test", a, b, NOT_SET, NOT_SET);
     }
 
     private static Vector vector(int a, int b, int c, int d) {
@@ -398,50 +424,48 @@ public class ParetoSetTest {
 
     private static class Vector {
         final String name;
-        final int[] values;
-
-        Vector(String name, int... values) {
-            this.name = name;
-            this.values = Arrays.copyOf(values, values.length);
-        }
+        final int v1, v2, v3, v4;
 
         Vector(Vector o) {
-            this.name = o.name;
-            values = Arrays.copyOf(o.values, o.values.length);
+            this(o.name, o.v1, o.v2, o.v3, o.v4);
+        }
+        Vector(String name, int v1) {
+            this(name, v1, NOT_SET, NOT_SET, NOT_SET);
+        }
+        Vector(String name, int v1, int v2) {
+            this(name, v1, v2, NOT_SET, NOT_SET);
+        }
+        Vector(String name, int v1, int v2, int v3) {
+            this(name, v1, v2, v3, NOT_SET);
         }
 
-        int v1() {
-            return values[0];
-        }
-
-        int v2() {
-            return values[1];
-        }
-
-        int v3() {
-            return values[2];
-        }
-
-        int v4() {
-            return values[3];
+        Vector(String name, int v1, int v2, int v3, int v4) {
+            this.name = name;
+            this.v1 = v1;
+            this.v2 = v2;
+            this.v3 = v3;
+            this.v4 = v4;
         }
 
         @Override
         public String toString() {
-            return name + Arrays.toString(values);
+            if(v2 == NOT_SET) return name + "[" + v1 + "]";
+            if(v3 == NOT_SET) return name + "[" + v1 + ", " + v2 + "]";
+            if(v4 == NOT_SET) return name + "[" + v1 + ", " + v2 + ", " + v3 + "]";
+            return name + "[" + v1 + ", " + v2 + ", " + v3 + ", " + v4 + "]";
         }
 
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
-            Vector vector = (Vector) o;
-            return Arrays.equals(values, vector.values);
+            Vector v = (Vector) o;
+            return v1 == v.v1 && v2 == v.v2 && v3 == v.v3 && v4 == v.v4 && name.equals(v.name);
         }
 
         @Override
         public int hashCode() {
-            return Arrays.hashCode(values);
+            return Objects.hash(name, v1, v2, v3, v4);
         }
     }
 
@@ -469,39 +493,4 @@ public class ParetoSetTest {
         }
     }
 
-    private static final ParetoComparator<Vector> DIFFERENT =
-            new ParetoComparatorBuilder<Vector>()
-                    .different(Vector::v1)
-                    .build();
-
-    private static final ParetoComparator<Vector> LESS_THEN =
-            new ParetoComparatorBuilder<Vector>()
-                    .lessThen(Vector::v1)
-                    .build();
-
-    private static final ParetoComparator<Vector> LESS_LESS_THEN =
-            new ParetoComparatorBuilder<Vector>()
-                    .lessThen(Vector::v1)
-                    .lessThen(Vector::v2)
-                    .build();
-
-    private static final ParetoComparator<Vector> LESS_DIFFERENT_THEN =
-            new ParetoComparatorBuilder<Vector>()
-                    .lessThen(Vector::v1)
-                    .different(Vector::v2)
-                    .build();
-
-    private static final ParetoComparator<Vector> LESS_LESS_2_THEN =
-            new ParetoComparatorBuilder<Vector>()
-                    .lessThen(Vector::v1)
-                    .lessThenDelta(Vector::v2, 2)
-                    .build();
-
-    private static final ParetoComparator<Vector> LESS_DIFFERENT_GREATER_LESS_2_THEN =
-            new ParetoComparatorBuilder<Vector>()
-                    .lessThen(Vector::v1)
-                    .different(Vector::v2)
-                    .greaterThen(Vector::v3)
-                    .lessThenDelta(Vector::v4, 2)
-                    .build();
 }

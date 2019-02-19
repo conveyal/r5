@@ -38,6 +38,7 @@ final class Stops<T extends TripScheduleInfo> {
     Stops(
             int nStops,
             Collection<TransferLeg> egressLegs,
+            double relaxCostAtDestinationArrival,
             DestinationHeuristic[] heuristics,
             CostCalculator costCalculator,
             TransitCalculator transitCalculator,
@@ -50,6 +51,7 @@ final class Stops<T extends TripScheduleInfo> {
         this.pathMapper = calculator.createPathMapper();
         this.debugHandlerFactory = debugHandlerFactory;
         this.destination = new Destination<>(
+                relaxCostAtDestinationArrival,
                 calculator,
                 debugHandlerFactory.debugDestinationArrival()
         );

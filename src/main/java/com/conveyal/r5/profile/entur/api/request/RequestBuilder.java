@@ -9,6 +9,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -272,6 +273,11 @@ public class RequestBuilder<T extends TripScheduleInfo> {
 
     public DebugRequest<T> debug() {
         return new DebugRequest<>(this);
+    }
+
+    public RequestBuilder<T> reverseDebugRequest() {
+        Collections.reverse(this.debugPath);
+        return this;
     }
 
     private void assertProperty(boolean predicate, Supplier<String> errorMessageProvider) {

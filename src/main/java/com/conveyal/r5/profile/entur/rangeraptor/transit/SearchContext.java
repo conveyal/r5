@@ -1,9 +1,9 @@
 package com.conveyal.r5.profile.entur.rangeraptor.transit;
 
-import com.conveyal.r5.profile.entur.api.TuningParameters;
 import com.conveyal.r5.profile.entur.api.request.DebugRequest;
 import com.conveyal.r5.profile.entur.api.request.MultiCriteriaCostFactors;
 import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
+import com.conveyal.r5.profile.entur.api.request.TuningParameters;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
@@ -115,7 +115,7 @@ public class SearchContext<T extends TripScheduleInfo> {
     }
 
     private DebugRequest<T> debugRequest(RangeRaptorRequest<T> request, boolean forward) {
-        return forward ? request.debug() : new ReverseDebugRequest<>(request.debug());
+        return forward ? request.debug() : request.mutate().reverseDebugRequest().debug();
     }
 
     public int numberOfAdditionalTransfers() {

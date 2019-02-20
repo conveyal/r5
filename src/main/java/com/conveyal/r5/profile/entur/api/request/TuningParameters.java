@@ -1,4 +1,4 @@
-package com.conveyal.r5.profile.entur.api;
+package com.conveyal.r5.profile.entur.api.request;
 
 
 /**

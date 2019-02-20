@@ -1,9 +1,9 @@
 package com.conveyal.r5.profile.entur;
 
-import com.conveyal.r5.profile.entur.api.TuningParameters;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.request.RequestBuilder;
+import com.conveyal.r5.profile.entur.api.request.TuningParameters;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.Worker;

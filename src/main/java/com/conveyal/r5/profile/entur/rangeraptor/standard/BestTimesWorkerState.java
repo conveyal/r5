@@ -6,7 +6,6 @@ import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
-import com.conveyal.r5.profile.entur.util.AvgTimer;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
 import java.util.Iterator;
@@ -33,8 +32,6 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
     private int roundMax = -1;
     private int roundMaxLimit;
     private final int numberOfAdditionalTransfers;
-
-    static AvgTimer timer = AvgTimer.timerMicroSec("Jalla");
 
     /**
      * The best times to reach each stop, whether via a transfer or via transit directly.
@@ -258,13 +255,11 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
     private boolean destinationReachedLastRound() {
         // This is fast enough, we could use a BitSet for egressStops, but it takes up more
         // memory and the performance is the same.
-        timer.start();
         for (int i = 0; i < egressStops.length; i++) {
             if(bestTimes.isStopReachedByTransitCurrentRound(i)) {
                 return true;
             }
         }
-        timer.stop();
         return false;
     }
 }

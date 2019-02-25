@@ -28,10 +28,10 @@ import java.util.Iterator;
 public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWorkerState<T> {
     private final TransitCalculator calculator;
 
-    private int round = 0;
-    private int roundMax = -1;
-    private int roundMaxLimit;
-    private final int numberOfAdditionalTransfers;
+    /**
+     * Keep track of current round and when to quit rounds iteration.
+     */
+    private final RoundTracker round;
 
     /**
      * The best times to reach each stop, whether via a transfer or via transit directly.
@@ -64,8 +64,7 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
             int[] egressStops,
             TransitCalculator calculator
     ) {
-        this.roundMaxLimit = nRounds - 1;
-        this.numberOfAdditionalTransfers = numberOfAdditionalTransfers;
+        this.round = new RoundTracker(nRounds, numberOfAdditionalTransfers);
         this.calculator = calculator;
         this.bestTimes = new BestTimes(nStops, calculator);
         this.egressStops = egressStops;
@@ -79,7 +78,7 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
     public final void setupIteration(int iterationDepartureTime) {
         // clear all touched stops to avoid constant reëxploration
         bestTimes.prepareForNewIteration();
-        round = 0;
+        round.setupIteration();
         setupIteration2(iterationDepartureTime);
     }
 
@@ -104,14 +103,13 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
     @Override
     public final boolean isNewRoundAvailable() {
         updateRoundMaxLimitBasedOnDestinationArrival();
-        return round < roundMaxLimit && bestTimes.isCurrentRoundUpdated();
+        return round.hasMoreRounds() && bestTimes.isCurrentRoundUpdated();
     }
 
     @Override
     public final void prepareForNextRound() {
         bestTimes.prepareForNextRound();
-        ++round;
-        roundMax = Math.max(roundMax, round);
+        round.prepareForNextRound();
     }
 
     @Override
@@ -231,7 +229,7 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
     protected void rejectNewBestTransferTime(int fromStop, int arrivalTime, TransferLeg transferLeg) { }
 
     protected final int round() {
-        return round;
+        return round.round();
     }
 
     private boolean newTransitBestTime(int stop, int alightTime) {
@@ -248,7 +246,7 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
 
     private void updateRoundMaxLimitBasedOnDestinationArrival() {
         if(destinationReachedLastRound()) {
-            roundMaxLimit = Math.min(roundMaxLimit, round + numberOfAdditionalTransfers);
+            round.notifyDestinationReached();
         }
     }
 

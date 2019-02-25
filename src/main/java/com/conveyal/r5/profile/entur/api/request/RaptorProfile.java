@@ -13,6 +13,11 @@ public enum RaptorProfile {
     RANGE_RAPTOR,
 
     /**
+     * Range Raptor finding the earliest arrival times - only. No paths are returned.
+     */
+    RANGE_RAPTOR_BEST_TIME,
+
+    /**
      * Multi criteria pareto state with McRangeRaptor.
      */
     MULTI_CRITERIA_RANGE_RAPTOR,

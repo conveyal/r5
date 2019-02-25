@@ -30,6 +30,7 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
     private static final WorkerPerformanceTimers MC_TIMERS = new WorkerPerformanceTimers("MC");
     private static final WorkerPerformanceTimers MV_TIMERS = new WorkerPerformanceTimers("MV");
     private static final WorkerPerformanceTimers RR_TIMERS = new WorkerPerformanceTimers("RR");
+    private static final WorkerPerformanceTimers RBT_TIMERS = new WorkerPerformanceTimers("RBT");
     private static final WorkerPerformanceTimers RV_TIMERS = new WorkerPerformanceTimers("RV");
     private static final WorkerPerformanceTimers HV_TIMERS = new WorkerPerformanceTimers("HV");
 
@@ -57,6 +58,8 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
                 return createReversWorker(transitData, request);
             case RANGE_RAPTOR:
                 return createRRWorker(transitData, request);
+            case RANGE_RAPTOR_BEST_TIME:
+                return createRBTWorker(transitData, request);
             default:
                 throw new IllegalStateException("Unknown profile: " + this);
         }
@@ -85,6 +88,11 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
     private Worker<T> createRRWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
         SearchContext<T> context = context(transitData, request, RR_TIMERS, FORWARD);
         return new StdRangeRaptorWorker<>(context, stdState(context));
+    }
+
+    private Worker<T> createRBTWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
+        SearchContext<T> context = context(transitData, request, RBT_TIMERS, FORWARD);
+        return new StdRangeRaptorWorker<>(context, bestTimeState(context));
     }
 
     private Worker<T> createReversWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {

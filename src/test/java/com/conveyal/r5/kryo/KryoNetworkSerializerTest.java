@@ -1,20 +1,16 @@
 package com.conveyal.r5.kryo;
 
-import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.r5.analyst.scenario.FakeGraph;
-import com.conveyal.r5.diff.ObjectDiffer;
+import com.conveyal.object_differ.ObjectDiffer;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.IntHashGrid;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.esotericsoftware.kryo.Kryo;
-import com.google.common.cache.LoadingCache;
 import org.junit.Test;
 
 import java.io.File;
 import java.util.BitSet;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
 /**

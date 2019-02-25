@@ -6,7 +6,6 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
-import com.conveyal.r5.kryo.InstanceCountingClassResolver;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.google.common.hash.HashCode;

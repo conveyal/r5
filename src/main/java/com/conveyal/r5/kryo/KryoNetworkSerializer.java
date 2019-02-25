@@ -1,5 +1,8 @@
 package com.conveyal.r5.kryo;
 
+import com.conveyal.kryo.InstanceCountingClassResolver;
+import com.conveyal.kryo.TIntArrayListSerializer;
+import com.conveyal.kryo.TIntIntHashMapSerializer;
 import com.conveyal.r5.common.R5Version;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.esotericsoftware.kryo.Kryo;
@@ -9,11 +12,9 @@ import com.esotericsoftware.kryo.serializers.ExternalizableSerializer;
 import com.esotericsoftware.kryo.serializers.JavaSerializer;
 import com.esotericsoftware.kryo.util.DefaultStreamFactory;
 import com.esotericsoftware.kryo.util.MapReferenceResolver;
-import com.google.common.primitives.Ints;
 import gnu.trove.impl.hash.TPrimitiveHash;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.hash.TIntIntHashMap;
-import org.mapdb.Fun;
 import org.objenesis.strategy.SerializingInstantiatorStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

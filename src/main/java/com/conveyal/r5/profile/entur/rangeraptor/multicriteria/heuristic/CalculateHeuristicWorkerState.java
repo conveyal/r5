@@ -3,6 +3,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic;
 
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.DestinationHeuristic;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.BestTimesWorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.CostCalculator;
@@ -29,6 +30,7 @@ public class CalculateHeuristicWorkerState<T extends TripScheduleInfo> extends B
                 ctx.transit().numberOfStops(),
                 ctx.numberOfAdditionalTransfers(),
                 ctx.egressStops(),
+                ctx.roundProvider(),
                 ctx.calculator(),
                 ctx.costCalculator()
         );
@@ -39,10 +41,11 @@ public class CalculateHeuristicWorkerState<T extends TripScheduleInfo> extends B
             int nStops,
             int numberOfAdditionalTransfers,
             int[] destinationStops,
+            RoundProvider roundProvider,
             TransitCalculator calculator,
             CostCalculator costCalculator
     ) {
-        super(nRounds, nStops, numberOfAdditionalTransfers, destinationStops, calculator);
+        super(nRounds, nStops, numberOfAdditionalTransfers, destinationStops, roundProvider, calculator);
         this.costCalculator = costCalculator;
         this.heuristics = new Heuristic[nStops];
     }

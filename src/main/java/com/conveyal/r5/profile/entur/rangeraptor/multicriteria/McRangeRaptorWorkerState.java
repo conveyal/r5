@@ -36,10 +36,6 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     private final List<AbstractStopArrival<T>> arrivalsCache = new ArrayList<>();
     private final CostCalculator costCalculator;
     private final TransitCalculator transitCalculator;
-    private final int numberOfAdditionalTransfers;
-
-    private int round = Integer.MIN_VALUE;
-    private int roundMaxLimit;
     private boolean updatesExist = false;
     private BitSet touchedStops;
 
@@ -47,10 +43,8 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
      * create a RaptorState for a network with a particular number of stops, and a given maximum duration
      */
     McRangeRaptorWorkerState(
-            int nRounds,
             int nStops,
-            int numberOfAdditionalTransfers,
-            final double relaxCostAtDestinationArrival,
+            double relaxCostAtDestinationArrival,
             Collection<TransferLeg> egressLegs,
             DestinationHeuristic[] heuristics,
             CostCalculator costCalculator,
@@ -58,8 +52,6 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
             DebugHandlerFactory<T> debugHandlerFactory
 
     ) {
-        this.roundMaxLimit = nRounds - 1;
-        this.numberOfAdditionalTransfers = numberOfAdditionalTransfers;
         this.stops = new Stops<>(
                 nStops,
                 egressLegs,
@@ -76,7 +68,6 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
 
     @Override
     public void setupIteration(int iterationDepartureTime) {
-        round = 0;
         arrivalsCache.clear();
         stops.startNewIteration(iterationDepartureTime);
 
@@ -94,14 +85,12 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
 
     @Override
     public boolean isNewRoundAvailable() {
-        updateRoundMaxLimitOnDestinationArrival();
-        return round < roundMaxLimit && updatesExist;
+        return updatesExist;
     }
 
     @Override
     public void prepareForNextRound() {
         stops.clearReachedCurrentRoundFlag();
-        ++round;
     }
 
     @Override
@@ -145,12 +134,12 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     @Override
     public void transitsForRoundComplete() {
         startRecordChangesToStopsForNextAndCurrentRound();
-        commitCachedArrivals(TransitStopArrival.class);
+        commitCachedArrivals();
     }
 
     @Override
     public void transfersForRoundComplete() {
-        commitCachedArrivals(TransferStopArrival.class);
+        commitCachedArrivals();
     }
 
     @Override
@@ -158,21 +147,13 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         return stops.extractPaths();
     }
 
+    @Override
+    public boolean isDestinationReachedInCurrentRound() {
+        return stops.isDestinationReachedInCurrentRound();
+    }
+
 
     /* private methods */
-
-    private void updateRoundMaxLimitOnDestinationArrival() {
-        if(stops.reachedCurrentRound()) {
-            roundMaxLimit = Math.min(roundMaxLimit, round + numberOfAdditionalTransfers);
-        }
-    }
-
-    private void startRecordChangesToStopsForNextAndCurrentRound() {
-        stops.markAllStops();
-        touchedStops.clear();
-        updatesExist = !arrivalsCache.isEmpty();
-    }
-
 
     private void transferToStop(Iterable<? extends AbstractStopArrival<T>> fromArrivals, TransferLeg transfer) {
         final int transferTimeInSeconds = transfer.durationInSeconds();
@@ -187,7 +168,13 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         }
     }
 
-    private void commitCachedArrivals(Class<? extends AbstractStopArrival> type) {
+    private void startRecordChangesToStopsForNextAndCurrentRound() {
+        stops.markAllStops();
+        touchedStops.clear();
+        updatesExist = !arrivalsCache.isEmpty();
+    }
+
+    private void commitCachedArrivals() {
         for (AbstractStopArrival<T> arrival : arrivalsCache) {
             if (stops.addStopArrival(arrival)) {
                 touchedStops.set(arrival.stop());

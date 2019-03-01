@@ -84,7 +84,7 @@ final class Stops<T extends TripScheduleInfo> {
     /**
      * Delegates to {@link DestinationArrivals#reachedCurrentRound()}
      */
-    boolean reachedCurrentRound() {
+    boolean isDestinationReachedInCurrentRound() {
         return destinationArrivals.reachedCurrentRound();
     }
 

@@ -1,12 +1,14 @@
-package com.conveyal.r5.profile.entur.rangeraptor.standard;
+package com.conveyal.r5.profile.entur.rangeraptor.transit;
 
+
+import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 
 /**
  * Round tracker to keep track of round index and when to stop exploring new rounds.
  * <p/>
  *
  */
-class RoundTracker {
+public class RoundTracker implements RoundProvider {
 
     /**
      * The extra number of rounds/transfers we accept compared to the trip with
@@ -31,7 +33,7 @@ class RoundTracker {
      */
     private int roundMaxLimit;
 
-    RoundTracker(int nRounds, int numberOfAdditionalTransfers) {
+    public RoundTracker(int nRounds, int numberOfAdditionalTransfers) {
         // The 'roundMaxLimit' is inclusive, while the 'nRounds' is exclusive; Hence subtract 1.
         this.roundMaxLimit = nRounds - 1;
         this.numberOfAdditionalTransfers = numberOfAdditionalTransfers;
@@ -40,21 +42,21 @@ class RoundTracker {
     /**
      * Before each iteration, initialize the round to 0.
      */
-    void setupIteration() {
+    public void setupIteration() {
         round = 0;
     }
 
     /**
      * Is there more rounds to process (or is the upper limit reached).
      */
-    boolean hasMoreRounds() {
+    public boolean hasMoreRounds() {
         return round < roundMaxLimit;
     }
 
     /**
      * Prepare for next round by incrementing round index.
      */
-    void prepareForNextRound() {
+    public void prepareForNextRound() {
         ++round;
     }
 
@@ -65,10 +67,7 @@ class RoundTracker {
         return round;
     }
 
-    /**
-     * The destination is reached in the current round.
-     */
-    void notifyDestinationReached() {
+    public void notifyArrivedAtDestinationInCurrentRound() {
         roundMaxLimit = Math.min(roundMaxLimit, round + numberOfAdditionalTransfers);
     }
 }

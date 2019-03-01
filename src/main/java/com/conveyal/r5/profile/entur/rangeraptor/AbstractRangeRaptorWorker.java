@@ -8,6 +8,7 @@ import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.RoundTracker;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleBoardSearch;
@@ -60,6 +61,13 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
     protected final S state;
 
     /**
+     * The round tracker keep track for the current Raptor round, and abort the search if the
+     * round max limit is reached.
+     */
+    private final RoundTracker roundTracker;
+
+
+    /**
      * The trip search context.
      */
     private final SearchContext<T> context;
@@ -70,6 +78,8 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
     ) {
         this.context = context;
         this.state = state;
+        // We do a cast here to avoid exposing the round tracker to "everyone" by providing access to it in the context.
+        this.roundTracker = (RoundTracker) context.roundProvider();
     }
 
     /**
@@ -158,20 +168,38 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
         // ergo, we re-use the arrival times found in searches that have already occurred that depart later, because
         // the arrival time given departure at time t is upper-bounded by the arrival time given departure at minute t + 1.
 
-        while (state.isNewRoundAvailable()) {
-            state.prepareForNextRound();
+        while (hasMoreRounds()) {
+            prepareForNextRound();
 
             // NB since we have transfer limiting not bothering to cut off search when there are no more transfers
             // as that will be rare and complicates the code
             timerByMinuteScheduleSearch().time(this::calculateTransitForRound);
 
             timerByMinuteTransfers().time(this::transfersForRound);
+
+            roundComplete();
         }
 
         // This state is repeatedly modified as the outer loop progresses over departure minutes.
         // We have to be careful here, the next iteration will modify the state, so we need to make
         // protective copies of any information we want to retain.
         state.iterationComplete();
+    }
+
+
+    /**
+     * Check if the RangeRaptor should continue with a new round.
+     */
+    private boolean hasMoreRounds() {
+        return roundTracker.hasMoreRounds() && state.isNewRoundAvailable();
+    }
+
+    /**
+     * Initiate a new round
+     */
+    private void prepareForNextRound() {
+        roundTracker.prepareForNextRound();
+        state.prepareForNextRound();
     }
 
     /**
@@ -182,6 +210,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
      */
     private void iterationSetup(int iterationDepartureTime) {
         state.setupIteration(iterationDepartureTime);
+        roundTracker.setupIteration();
 
         // add initial stops
         for (TransferLeg it : context.accessLegs()) {
@@ -218,6 +247,12 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
             state.transferToStops(fromStop, transit().getTransfers(fromStop));
         }
         state.transfersForRoundComplete();
+    }
+
+    private void roundComplete() {
+        if(state.isDestinationReachedInCurrentRound()) {
+            roundTracker.notifyArrivedAtDestinationInCurrentRound();
+        }
     }
 
     // Track time spent, measure performance

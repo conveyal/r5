@@ -17,9 +17,12 @@ import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class CalculateHeuristicWorkerState<T extends TripScheduleInfo> extends BestTimesWorkerState<T> {
-    private int earliestDepartureTime;
+    private final RoundProvider roundProvider;
     private final Heuristic[] heuristics;
     private final CostCalculator costCalculator;
+
+
+    private int earliestDepartureTime;
 
     /**
      * create a BestTimes Range Raptor State for given context.
@@ -41,7 +44,8 @@ public class CalculateHeuristicWorkerState<T extends TripScheduleInfo> extends B
             TransitCalculator calculator,
             CostCalculator costCalculator
     ) {
-        super(nStops, destinationStops, roundProvider, calculator);
+        super(nStops, destinationStops, calculator);
+        this.roundProvider = roundProvider;
         this.costCalculator = costCalculator;
         this.heuristics = new Heuristic[nStops];
     }
@@ -83,6 +87,11 @@ public class CalculateHeuristicWorkerState<T extends TripScheduleInfo> extends B
             heuristics[stop] = new Heuristic(round);
         }
     }
+
+    private int round() {
+        return roundProvider.round();
+    }
+
 
     public DestinationHeuristic[] heuristic() {
         for (int i = 0; i < heuristics.length; i++) {

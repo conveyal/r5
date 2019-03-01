@@ -59,7 +59,7 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> extends
             Collection<TransferLeg> egressLegs,
             DebugRequest<T> debugRequest
     ) {
-        super(nStops, destinationStops, roundProvider, calculator);
+        super(nStops, destinationStops, calculator);
         this.stops = new Stops<>(nRounds, nStops, egressLegs, roundProvider, this::handleEgressStopArrival);
         this.results = new DestinationArrivals<>(nRounds, calculator, new StopsCursor<>(stops, calculator), dFactory);
         this.debug = debugRequest.isDebug()

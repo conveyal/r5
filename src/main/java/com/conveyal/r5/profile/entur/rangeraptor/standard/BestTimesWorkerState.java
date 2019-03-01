@@ -4,7 +4,6 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
@@ -29,11 +28,6 @@ import java.util.Iterator;
 public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWorkerState<T> {
 
     /**
-     * Keep track of current round and when to quit rounds iteration.
-     */
-    private final RoundProvider round;
-
-    /**
      * The best times to reach each stop, whether via a transfer or via transit directly.
      */
     private final BestTimes bestTimes;
@@ -42,7 +36,7 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
     /**
      * The list of egress stops, can be used to terminate the search when the stops are reached.
      */
-    private final int[] egressStops;
+    private final ArrivedAtDestinationCheck arrivedAtDestinationCheck;
 
 
     private final TransitCalculator calculator;
@@ -54,7 +48,6 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
         this(
                 ctx.transit().numberOfStops(),
                 ctx.egressStops(),
-                ctx.roundProvider(),
                 ctx.calculator()
         );
     }
@@ -62,13 +55,11 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
     protected BestTimesWorkerState(
             int nStops,
             int[] egressStops,
-            RoundProvider roundProvider,
             TransitCalculator calculator
     ) {
-        this.round = roundProvider;
         this.calculator = calculator;
         this.bestTimes = new BestTimes(nStops, calculator);
-        this.egressStops = egressStops;
+        this.arrivedAtDestinationCheck = new SimpleArrivedAtDestinationCheck(egressStops, bestTimes);
     }
 
     protected int bestTime(int stop) {
@@ -234,22 +225,9 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
     protected void rejectNewBestTransferTime(int fromStop, int arrivalTime, TransferLeg transferLeg) {
     }
 
-    protected final int round() {
-        return round.round();
-    }
-
-
     @Override
     public boolean isDestinationReachedInCurrentRound() {
-        // TODO - Extract this into Simple...
-        // This is fast enough, we could use a BitSet for egressStops, but it takes up more
-        // memory and the performance is the same.
-        for (int i = 0; i < egressStops.length; i++) {
-            if(bestTimes.isStopReachedByTransitCurrentRound(i)) {
-                return true;
-            }
-        }
-        return false;
+        return arrivedAtDestinationCheck.arrivedAtDestinationCurrentRound();
     }
 
     private boolean newTransitBestTime(int stop, int alightTime) {

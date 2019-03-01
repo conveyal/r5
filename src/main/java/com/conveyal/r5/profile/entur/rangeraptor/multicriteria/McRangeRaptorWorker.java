@@ -24,9 +24,7 @@ public final class McRangeRaptorWorker<T extends TripScheduleInfo> extends Abstr
         super(
                 context,
                 new McRangeRaptorWorkerState<>(
-                        nRounds(context.tuningParameters()),
-                        context.transit().numberOfStops(),
-                        context.numberOfAdditionalTransfers(),
+                        context.nStops(),
                         context.tuningParameters().relaxCostAtDestinationArrival(),
                         context.egressLegs(),
                         heuristics,

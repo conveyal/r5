@@ -4,6 +4,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
@@ -30,7 +31,7 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
     /**
      * Keep track of current round and when to quit rounds iteration.
      */
-    private final RoundTracker round;
+    private final RoundProvider round;
 
     /**
      * The best times to reach each stop, whether via a transfer or via transit directly.
@@ -55,6 +56,7 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
                 ctx.transit().numberOfStops(),
                 ctx.numberOfAdditionalTransfers(),
                 ctx.egressStops(),
+                ctx.roundProvider(),
                 ctx.calculator()
         );
     }
@@ -64,9 +66,10 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
             int nStops,
             int numberOfAdditionalTransfers,
             int[] egressStops,
+            RoundProvider roundProvider,
             TransitCalculator calculator
     ) {
-        this.round = new RoundTracker(nRounds, numberOfAdditionalTransfers);
+        this.round = roundProvider;
         this.calculator = calculator;
         this.bestTimes = new BestTimes(nStops, calculator);
         this.egressStops = egressStops;
@@ -80,12 +83,14 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
     public final void setupIteration(int iterationDepartureTime) {
         // clear all touched stops to avoid constant reëxploration
         bestTimes.prepareForNewIteration();
-        round.setupIteration();
         setupIteration2(iterationDepartureTime);
     }
 
-    /** Allow subclasses to setup initial iteration state by overriding this method. */
-    protected void setupIteration2(int iterationDepartureTime) {}
+    /**
+     * Allow subclasses to setup initial iteration state by overriding this method.
+     */
+    protected void setupIteration2(int iterationDepartureTime) {
+    }
 
     @Override
     public final void setInitialTimeForIteration(TransferLeg accessEgressLeg, int iterationDepartureTime) {
@@ -99,19 +104,20 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
         setInitialTime(stop, arrivalTime, durationInSeconds);
     }
 
-    /** Allow subclasses to setup initial access/egress time  by overriding this method. */
-    protected void setInitialTime(final int stop, final int arrivalTime, int durationInSeconds) { }
+    /**
+     * Allow subclasses to setup initial access/egress time  by overriding this method.
+     */
+    protected void setInitialTime(final int stop, final int arrivalTime, int durationInSeconds) {
+    }
 
     @Override
     public final boolean isNewRoundAvailable() {
-        updateRoundMaxLimitBasedOnDestinationArrival();
-        return round.hasMoreRounds() && bestTimes.isCurrentRoundUpdated();
+        return bestTimes.isCurrentRoundUpdated();
     }
 
     @Override
     public final void prepareForNextRound() {
         bestTimes.prepareForNextRound();
-        round.prepareForNextRound();
     }
 
     @Override
@@ -163,8 +169,7 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
             // transitTimes upper bounds bestTimes
             final boolean newBestOverall = newOverallBestTime(stop, alightTime);
             setNewBestTransitTime(stop, alightTime, trip, boardStop, boardTime, newBestOverall);
-        }
-        else {
+        } else {
             rejectNewBestTransitTime(stop, alightTime, trip, boardStop, boardTime);
         }
     }
@@ -174,14 +179,16 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
      * <p/>
      * PLEASE OVERRIDE!
      */
-    protected void setNewBestTransitTime(int stop, int alightTime, T trip, int boardStop, int boardTime, boolean newBestOverall) { }
+    protected void setNewBestTransitTime(int stop, int alightTime, T trip, int boardStop, int boardTime, boolean newBestOverall) {
+    }
 
     /**
      * Transit is rejected, better time exist. Override to handle transit rejection.
      * <p/>
      * PLEASE OVERRIDE!
      */
-    protected void rejectNewBestTransitTime(int stop, int alightTime, T trip, int boardStop, int boardTime) {}
+    protected void rejectNewBestTransitTime(int stop, int alightTime, T trip, int boardStop, int boardTime) {
+    }
 
     /**
      * Set the arrival time at all transit stop if time is optimal for the given list of transfers.
@@ -209,8 +216,7 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
         // enter this conditional it has already been updated.
         if (newOverallBestTime(toStop, arrivalTime)) {
             setNewBestTransferTime(fromStop, arrivalTime, transferLeg);
-        }
-        else {
+        } else {
             rejectNewBestTransferTime(fromStop, arrivalTime, transferLeg);
         }
     }
@@ -221,17 +227,33 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
      * PLEASE OVERRIDE!
      */
 
-    protected void setNewBestTransferTime(int fromStop, int arrivalTime, TransferLeg transferLeg) { }
+    protected void setNewBestTransferTime(int fromStop, int arrivalTime, TransferLeg transferLeg) {
+    }
 
     /**
      * Transfer is rejected, better time exist. Override to handle transit rejection.
      * <p/>
      * PLEASE OVERRIDE!
      */
-    protected void rejectNewBestTransferTime(int fromStop, int arrivalTime, TransferLeg transferLeg) { }
+    protected void rejectNewBestTransferTime(int fromStop, int arrivalTime, TransferLeg transferLeg) {
+    }
 
     protected final int round() {
         return round.round();
+    }
+
+
+    @Override
+    public boolean isDestinationReachedInCurrentRound() {
+        // TODO - Extract this into Simple...
+        // This is fast enough, we could use a BitSet for egressStops, but it takes up more
+        // memory and the performance is the same.
+        for (int i = 0; i < egressStops.length; i++) {
+            if(bestTimes.isStopReachedByTransitCurrentRound(i)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean newTransitBestTime(int stop, int alightTime) {
@@ -246,20 +268,4 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
         return calculator.exceedsTimeLimit(time);
     }
 
-    private void updateRoundMaxLimitBasedOnDestinationArrival() {
-        if(destinationReachedLastRound()) {
-            round.notifyDestinationReached();
-        }
-    }
-
-    private boolean destinationReachedLastRound() {
-        // This is fast enough, we could use a BitSet for egressStops, but it takes up more
-        // memory and the performance is the same.
-        for (int i = 0; i < egressStops.length; i++) {
-            if(bestTimes.isStopReachedByTransitCurrentRound(i)) {
-                return true;
-            }
-        }
-        return false;
-    }
 }

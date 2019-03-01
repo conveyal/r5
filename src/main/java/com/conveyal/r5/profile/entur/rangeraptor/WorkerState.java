@@ -41,4 +41,14 @@ public interface WorkerState<T extends TripScheduleInfo> {
      * @return return all paths found in the search.
      */
     default Collection<Path<T>> extractPaths() { return Collections.emptyList(); }
+
+    /**
+     * Return TRUE if at least one new destination arrival is accepted at the destination in
+     * the current round. If no paths to the destination is found in the current round, FALSE
+     * is returned. And last, if a new path is found in the current round - reaching the
+     * destination - but the path is NOT accepted(not pareto-optimal), then FALSE is returned.
+     * <p/>
+     * This method is called at the end of each round.
+     */
+    boolean isDestinationReachedInCurrentRound();
 }

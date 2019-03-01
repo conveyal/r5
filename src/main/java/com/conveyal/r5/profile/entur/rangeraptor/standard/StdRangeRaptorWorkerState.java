@@ -5,6 +5,7 @@ import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.request.DebugRequest;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
@@ -41,6 +42,7 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> extends
                 c.nStops(),
                 c.numberOfAdditionalTransfers(),
                 c.egressStops(),
+                c.roundProvider(),
                 c.calculator(),
                 c.debugFactory(),
                 c.egressLegs(),
@@ -53,12 +55,13 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> extends
             int nStops,
             int numberOfAdditionalTransfers,
             int[] destinationStops,
+            RoundProvider roundProvider,
             TransitCalculator calculator,
             DebugHandlerFactory<T> dFactory,
             Collection<TransferLeg> egressLegs,
             DebugRequest<T> debugRequest
     ) {
-        super(nRounds, nStops, numberOfAdditionalTransfers, destinationStops, calculator);
+        super(nRounds, nStops, numberOfAdditionalTransfers, destinationStops, roundProvider, calculator);
         this.stops = new Stops<>(nRounds, nStops, egressLegs, this::handleEgressStopArrival);
         this.results = new DestinationArrivals<>(nRounds, calculator, new StopsCursor<>(stops, calculator), dFactory);
         this.debug = debugRequest.isDebug()

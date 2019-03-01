@@ -7,6 +7,7 @@ import com.conveyal.r5.profile.entur.api.request.TuningParameters;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
 
@@ -25,6 +26,7 @@ public class SearchContext<T extends TripScheduleInfo> {
 
     private final TransitCalculator calculator;
     private final TuningParameters tuningParameters;
+    private final RoundTracker roundTracker;
     private final WorkerPerformanceTimers timers;
     private final boolean searchForward;
     private final DebugRequest<T> debugRequest;
@@ -44,6 +46,7 @@ public class SearchContext<T extends TripScheduleInfo> {
         this.searchForward = forward;
         // Note that it is the "new" request that is passed in.
         this.calculator = createCalculator(this.request, tuningParameters, forward);
+        this.roundTracker = new RoundTracker(nRounds(), request.numberOfAdditionalTransfers());
         this.timers = timers;
         this.debugRequest = debugRequest(request, forward);
         this.debugFactory = new DebugHandlerFactory<>(this.debugRequest);
@@ -120,5 +123,9 @@ public class SearchContext<T extends TripScheduleInfo> {
 
     public int numberOfAdditionalTransfers() {
         return request.numberOfAdditionalTransfers();
+    }
+
+    public RoundProvider roundProvider() {
+        return roundTracker;
     }
 }

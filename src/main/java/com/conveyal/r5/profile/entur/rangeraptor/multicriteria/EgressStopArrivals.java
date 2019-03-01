@@ -15,18 +15,18 @@ import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 class EgressStopArrivals<T extends TripScheduleInfo> extends StopArrivals<T> {
 
     private final TransferLeg egressLeg;
-    private final Destination<T> destination;
+    private final DestinationArrivals<T> destinationArrivals;
     private final CostCalculator costCalculator;
 
     EgressStopArrivals(
             TransferLeg egressLeg,
-            Destination<T> destination,
+            DestinationArrivals<T> destinationArrivals,
             CostCalculator costCalculator,
             DebugHandler<StopArrivalView<T>> debugHandler
     ) {
         super(debugHandler);
         this.egressLeg = egressLeg;
-        this.destination = destination;
+        this.destinationArrivals = destinationArrivals;
         this.costCalculator = costCalculator;
     }
 
@@ -36,7 +36,7 @@ class EgressStopArrivals<T extends TripScheduleInfo> extends StopArrivals<T> {
             return super.add(arrival);
         }
         if(super.add(arrival)) {
-            destination.transferToDestination(
+            destinationArrivals.transferToDestination(
                     (TransitStopArrival<T>) arrival,
                     egressLeg,
                     costCalculator.walkCost(egressLeg.durationInSeconds())

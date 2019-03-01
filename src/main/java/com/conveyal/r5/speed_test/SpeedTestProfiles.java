@@ -7,10 +7,10 @@ import java.util.stream.Collectors;
 enum SpeedTestProfiles {
     original("or", "The original R5 FastRaptorWorker by Conveyal"),
     range_raptor("rr", "Standard Range Raptor, super fast [ transfers, arrival time, travel time ]."),
-    range_raptor_best_time("rb", "Range Raptor Best Time, super fast. Arrival time only, no path."),
+    best_time("bt", "Range Raptor Best Time, super fast. Arrival time only, no path."),
     raptor_reverse("rv", "Reverse Raptor"),
     mc_range_raptor("mc", "Multi-Criteria pareto optimal Range Raptor [ transfers, arrival time, travel time, cost ]."),
-    mc_range_raptor_heuristic("mh", "Multi-Criteria pareto optimal Range Raptor with heuristics [ transfers, arrival time, travel time, cost ]."),
+    mc_rr_heuristic("mh", "Multi-Criteria pareto optimal Range Raptor with heuristics [ transfers, arrival time, travel time, cost ]."),
     ;
 
     final String shortName;

@@ -26,7 +26,6 @@ import java.util.Iterator;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWorkerState<T> {
-    private final TransitCalculator calculator;
 
     /**
      * Keep track of current round and when to quit rounds iteration.
@@ -43,6 +42,9 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
      * The list of egress stops, can be used to terminate the search when the stops are reached.
      */
     private final int[] egressStops;
+
+
+    private final TransitCalculator calculator;
 
     /**
      * create a BestTimes Range Raptor State for given context.

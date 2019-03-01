@@ -45,7 +45,7 @@ class ItineraryMapper2 {
         itinerary.walkDistance = 0.0;
         itinerary.transitTime = 0;
         itinerary.waitingTime = 0;
-        itinerary.weight = 0;
+        itinerary.weight = path.cost();
 
         int numberOfTransits = 0;
         int accessTime = accessPath.getDuration();

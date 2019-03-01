@@ -13,14 +13,14 @@ import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-class Destination<T extends TripScheduleInfo> extends ParetoSet<DestinationArrival<T>> {
+class DestinationArrivals<T extends TripScheduleInfo> extends ParetoSet<DestinationArrival<T>> {
 
     private final DebugHandler<DestinationArrivalView<T>> debugHandler;
     private final TransitCalculator calculator;
     private boolean reachedCurrentRound = false;
 
 
-    Destination(
+    DestinationArrivals(
             double relaxCostAtDestinationArrival,
             TransitCalculator calculator,
             DebugHandler<DestinationArrivalView<T>> debugHandler
@@ -31,8 +31,8 @@ class Destination<T extends TripScheduleInfo> extends ParetoSet<DestinationArriv
         super((l, r) ->
                 l.arrivalTime() < r.arrivalTime() ||
                 l.numberOfTransfers() < r.numberOfTransfers() ||
-                l.cost() <= Math.round(r.cost() * relaxCostAtDestinationArrival)  ||
-                l.travelDuration() <= r.travelDuration(),
+                l.travelDuration() < r.travelDuration() ||
+                l.cost() < Math.round(r.cost() * relaxCostAtDestinationArrival),
                 debugHandler::drop
         );
         this.calculator = calculator;

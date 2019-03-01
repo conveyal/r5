@@ -48,6 +48,7 @@ class ItineraryResultMapper {
                 testCaseId,
                 itinerary.transfers,
                 itinerary.duration.intValue(),
+                (int)itinerary.weight,
                 itinerary.walkDistance.intValue(),
                 TimeUtils.timeToStrLong(itinerary.startTime),
                 TimeUtils.timeToStrLong(itinerary.endTime),

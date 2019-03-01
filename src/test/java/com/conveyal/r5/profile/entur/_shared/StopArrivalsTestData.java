@@ -136,7 +136,7 @@ public class StopArrivalsTestData {
         PathLeg<TestTripSchedule> leg2 = new TransitPathLeg<>(STOP_1, T1000, STOP_2, T1035, TRIP_1, leg3);
         AccessPathLeg<TestTripSchedule> leg1 = new AccessPathLeg<>(T0953, STOP_1, T0958, leg2.asTransitLeg());
 
-        return new Path<>(leg1, T1200, 2);
+        return new Path<>(leg1, T1200, 2, 600);
     }
 
     public static List<Integer> basicTripStops() {
@@ -164,7 +164,7 @@ public class StopArrivalsTestData {
         @Override public int round() { return round; }
         @Override public int departureTime() { return departureTime; }
         @Override public int arrivalTime() { return arrivalTime; }
-        @Override public int cost() { return 3; }
+        @Override public int cost() { return 100; }
         @Override public StopArrivalView<TestTripSchedule> previous() { return previous; }
         @Override public String toString() { return asString(); }
     }

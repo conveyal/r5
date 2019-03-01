@@ -57,7 +57,8 @@ public final class ReversePathMapper<T extends TripScheduleInfo> implements Path
         return new Path<>(
                 accessLeg,
                 leg.toTime(),
-                numberOfTransits - 1
+                numberOfTransits - 1,
+                to.cost()
         );
     }
 

@@ -3,8 +3,9 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
-import java.util.Arrays;
 import java.util.BitSet;
+
+import static com.conveyal.r5.profile.entur.util.IntUtils.intArray;
 
 
 /**
@@ -44,11 +45,11 @@ final class BestTimes {
 
     BestTimes(int nStops, TransitCalculator calculator) {
         this.calculator = calculator;
-        this.times = newTimeArray(nStops, calculator.unreachedTime());
+        this.times = intArray(nStops, calculator.unreachedTime());
         this.reachedCurrentRound = new BitSet(nStops);
         this.reachedLastRound = new BitSet(nStops);
 
-        this.transitTimes = newTimeArray(nStops, calculator.unreachedTime());
+        this.transitTimes = intArray(nStops, calculator.unreachedTime());
         this.transitReachedCurrentRound = new BitSet(nStops);
     }
 
@@ -172,11 +173,5 @@ final class BestTimes {
         BitSet tmp = reachedLastRound;
         reachedLastRound = reachedCurrentRound;
         reachedCurrentRound = tmp;
-    }
-
-    private static int[] newTimeArray(int size, int unreached) {
-        int [] array = new int[size];
-        Arrays.fill(array, unreached);
-        return array;
     }
 }

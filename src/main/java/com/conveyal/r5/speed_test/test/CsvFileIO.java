@@ -31,7 +31,7 @@ public class CsvFileIO {
     public CsvFileIO(File dir, String testSetName) {
         testCasesFile = new File(dir, testSetName + ".csv");
         expectedResultsFile = new File(dir, testSetName + "-expected-results.csv");
-        expectedResultsOutputFile = new File(dir, testSetName + "-expected-results-out.csv");
+        expectedResultsOutputFile = new File(dir, testSetName + "-results.csv");
     }
 
     /**
@@ -47,7 +47,7 @@ public class CsvFileIO {
         csvReader.readHeaders(); // Skip header
 
         while (csvReader.readRecord()) {
-            if(isCommentOrEmpty(csvReader.getRawRecord())) {
+            if (isCommentOrEmpty(csvReader.getRawRecord())) {
                 continue;
             }
             String id = csvReader.get("testCaseId");
@@ -82,7 +82,7 @@ public class CsvFileIO {
         printResultsForFirstStrategyRun = false;
 
         try (PrintWriter out = new PrintWriter(expectedResultsOutputFile, CHARSET_UTF_8.name())) {
-            out.println("tcId,transfers,duration,walkDistance,startTime,endTime,details");
+            out.println("tcId,transfers,duration,cost,walkDistance,startTime,endTime,details");
 
             for (TestCase tc : testCases) {
                 for (Result result : tc.actualResults()) {
@@ -92,6 +92,8 @@ public class CsvFileIO {
                     out.print(CSV_DELIMITER);
                     out.print(result.duration);
                     out.print(CSV_DELIMITER);
+                    out.print(result.cost);
+                    out.print(CSV_DELIMITER);
                     out.print(result.walkDistance);
                     out.print(CSV_DELIMITER);
                     out.print(result.startTime);
@@ -99,7 +101,7 @@ public class CsvFileIO {
                     out.print(result.endTime);
                     out.print(CSV_DELIMITER);
                     out.print(result.details);
-                    out.print('\n');
+                    out.println();
                 }
             }
             out.flush();
@@ -113,15 +115,16 @@ public class CsvFileIO {
     /* private methods */
 
     private Map<String, TestCaseResults> readExpectedResultsFromFile() throws IOException {
-        if(!expectedResultsFile.exists()) {
+        if (!expectedResultsFile.exists()) {
             return Collections.emptyMap();
         }
 
         Map<String, TestCaseResults> results = new HashMap<>();
         CsvReader csvReader = new CsvReader(expectedResultsFile.getAbsolutePath(), CSV_DELIMITER, CHARSET_UTF_8);
-        csvReader.readRecord(); // Skip header
+        csvReader.readHeaders();
 
         while (csvReader.readRecord()) {
+            if (isCommentOrEmpty(csvReader.getRawRecord())) { continue; }
             Result expRes = readExpectedResult(csvReader);
             results.computeIfAbsent(expRes.testCaseId, TestCaseResults::new).addExpectedResult(expRes);
         }
@@ -129,15 +132,16 @@ public class CsvFileIO {
     }
 
     private Result readExpectedResult(CsvReader csvReader) throws IOException {
-            return new Result(
-                    csvReader.get(0),
-                    Integer.parseInt(csvReader.get(1)),
-                    Integer.parseInt(csvReader.get(2)),
-                    Integer.parseInt(csvReader.get(3)),
-                    csvReader.get(4),
-                    csvReader.get(5),
-                    csvReader.get(6)
-            );
+        return new Result(
+                csvReader.get("tcId"),
+                Integer.parseInt(csvReader.get("transfers")),
+                Integer.parseInt(csvReader.get("duration")),
+                Integer.parseInt(csvReader.get("cost")),
+                Integer.parseInt(csvReader.get("walkDistance")),
+                csvReader.get("startTime"),
+                csvReader.get("endTime"),
+                csvReader.get("details")
+        );
     }
 
     private boolean isCommentOrEmpty(String line) {

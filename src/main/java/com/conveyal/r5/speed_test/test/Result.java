@@ -22,6 +22,7 @@ class Result implements Comparable<Result> {
     final String testCaseId;
     final Integer transfers;
     final Integer duration;
+    final Integer cost;
     final Integer walkDistance;
     final String startTime;
     final String endTime;
@@ -31,10 +32,11 @@ class Result implements Comparable<Result> {
     final List<Integer> stops = new ArrayList<>();
     final String details;
 
-    Result(String testCaseId, Integer transfers, Integer duration, Integer walkDistance, String startTime, String endTime, String details) {
+    Result(String testCaseId, Integer transfers, Integer duration, Integer cost, Integer walkDistance, String startTime, String endTime, String details) {
         this.testCaseId = testCaseId;
         this.transfers = transfers;
         this.duration = duration;
+        this.cost = cost;
         this.walkDistance = walkDistance;
         this.startTime = startTime;
         this.endTime = endTime;
@@ -70,30 +72,32 @@ class Result implements Comparable<Result> {
         Result result = (Result) o;
         return Objects.equals(startTime, result.startTime) &&
                 Objects.equals(endTime, result.endTime) &&
+                Objects.equals(cost, result.cost) &&
                 Objects.equals(details, result.details);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(startTime, endTime, details);
+        return Objects.hash(startTime, endTime, cost, details);
     }
 
     /**
      * Create a compact representation of an itinerary.
      * Example:
      * <pre>
-     * 2 1:21:00 953 09:22:00 10:43:10 -- WALK 7:12 - 37358 - NW180 09:30 10:20 - 3551 - WALK 3:10
+     * 2 1:21:00 953m 09:22:00 10:43:10 -- WALK 7:12 - 37358 - NW180 09:30 10:20 - 3551 - WALK 3:10
      * </pre>
      * Format:
      * <pre>
-     * [Transfers] [Duration] [walk distance meters] [start time] [end time] -- [details]
+     * [Transfers] [Duration] [cost] [walk distance meters] [start time] [end time] -- [details]
      * </pre>
      */
     @Override public String toString() {
         return String.format(
-                "%d %s %d %s %s -- %s",
+                "%d %s %d %dm %s %s -- %s",
                 transfers,
                 TimeUtils.timeToStrCompact(duration),
+                cost,
                 walkDistance,
                 startTime,
                 endTime,

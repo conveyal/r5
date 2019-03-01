@@ -27,7 +27,7 @@ import static java.util.Collections.emptyList;
 final class Stops<T extends TripScheduleInfo> {
     private final StopArrivals<T>[] stops;
     private final DestinationHeuristic[] heuristics;
-    private final Destination<T> destination;
+    private final DestinationArrivals<T> destinationArrivals;
     private final PathMapper<T> pathMapper;
     private final TransitCalculator calculator;
     private final DebugHandlerFactory<T> debugHandlerFactory;
@@ -50,7 +50,7 @@ final class Stops<T extends TripScheduleInfo> {
         this.calculator = transitCalculator;
         this.pathMapper = calculator.createPathMapper();
         this.debugHandlerFactory = debugHandlerFactory;
-        this.destination = new Destination<>(
+        this.destinationArrivals = new DestinationArrivals<>(
                 relaxCostAtDestinationArrival,
                 calculator,
                 debugHandlerFactory.debugDestinationArrival()
@@ -59,7 +59,7 @@ final class Stops<T extends TripScheduleInfo> {
         for (TransferLeg it : egressLegs) {
             this.stops[it.stop()] = new EgressStopArrivals<>(
                     it,
-                    destination,
+                    destinationArrivals,
                     costCalculator,
                     debugHandlerFactory.debugStopArrival(it.stop())
             );
@@ -82,17 +82,17 @@ final class Stops<T extends TripScheduleInfo> {
     }
 
     /**
-     * Delegates to {@link Destination#reachedCurrentRound()}
+     * Delegates to {@link DestinationArrivals#reachedCurrentRound()}
      */
     boolean reachedCurrentRound() {
-        return destination.reachedCurrentRound();
+        return destinationArrivals.reachedCurrentRound();
     }
 
     /**
-     * Delegates to {@link Destination#clearReachedCurrentRoundFlag()}
+     * Delegates to {@link DestinationArrivals#clearReachedCurrentRoundFlag()}
      */
     void clearReachedCurrentRoundFlag() {
-        destination.clearReachedCurrentRoundFlag();
+        destinationArrivals.clearReachedCurrentRoundFlag();
     }
 
     boolean addStopArrival(AbstractStopArrival<T> arrival) {
@@ -105,7 +105,7 @@ final class Stops<T extends TripScheduleInfo> {
 
     Collection<Path<T>> extractPaths() {
         debugStateInfo();
-        return destination.stream().map(pathMapper::mapToPath).collect(Collectors.toList());
+        return destinationArrivals.stream().map(pathMapper::mapToPath).collect(Collectors.toList());
     }
 
     /** List all transits arrived this round. */
@@ -158,7 +158,7 @@ final class Stops<T extends TripScheduleInfo> {
     }
 
     private boolean vetoHeuristicDestinationArrival(AbstractStopArrival<T> arrival) {
-        if(heuristics == null || destination.isEmpty()) {
+        if(heuristics == null || destinationArrivals.isEmpty()) {
             return false;
         }
         DestinationHeuristic heuristic = heuristics[arrival.stop()];
@@ -166,6 +166,6 @@ final class Stops<T extends TripScheduleInfo> {
         if(heuristic == null) {
             return true;
         }
-        return !destination.qualify(new DestinationArrival<>(arrival, heuristic));
+        return !destinationArrivals.qualify(new DestinationArrival<>(arrival, heuristic));
     }
 }

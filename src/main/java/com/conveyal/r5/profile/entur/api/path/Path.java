@@ -17,14 +17,16 @@ public final class Path<T extends TripScheduleInfo> {
     private final int startTime;
     private final int endTime;
     private final int numberOfTransfers;
+    private final int cost;
     private final AccessPathLeg<T> accessLeg;
     private EgressPathLeg<T> egressPathLeg = null;
 
-    public Path(AccessPathLeg<T> accessLeg, int endTime, int numberOfTransfers) {
+    public Path(AccessPathLeg<T> accessLeg, int endTime, int numberOfTransfers, int cost) {
         this.accessLeg = accessLeg;
         this.startTime = accessLeg.fromTime();
         this.endTime = endTime;
         this.numberOfTransfers = numberOfTransfers;
+        this.cost = cost;
     }
 
     /**
@@ -53,6 +55,13 @@ public final class Path<T extends TripScheduleInfo> {
      */
     public final int numberOfTransfers() {
         return numberOfTransfers;
+    }
+
+    /**
+     * The total cost computed for this path. This is for debugging and filtering purposes.
+     */
+    public int cost() {
+        return cost;
     }
 
     /**

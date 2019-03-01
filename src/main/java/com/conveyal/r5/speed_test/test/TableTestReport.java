@@ -21,7 +21,7 @@ import static com.conveyal.r5.speed_test.test.OutputTable.Align.Right;
 public class TableTestReport {
 
     public static String report(List<Result> results) {
-        if(results.isEmpty()) {
+        if (results.isEmpty()) {
             return "NO RESULTS FOUND FOR TEST CASE!";
         }
 
@@ -39,9 +39,9 @@ public class TableTestReport {
 
     private static OutputTable newTable() {
         return new OutputTable(
-                Arrays.asList(Center, Right, Right, Right, Right, Right, Center, Center, Left, Left, Left),
-                Arrays.asList("STATUS", "TF", "Duration", "Walk", "Start", "End", "Modes", "Agencies", "Routes", "Stops", "Legs")
-        );
+                        Arrays.asList(Center, Right, Right, Right, Right, Right, Center, Center, Left, Left, Left),
+                        Arrays.asList("STATUS", "TF", "Duration", "Cost",  "Start", "End", "Modes", "Agencies", "Routes", "Stops", "Legs")
+                );
     }
 
     private static void addTo(OutputTable table, Result result) {
@@ -49,7 +49,7 @@ public class TableTestReport {
                 result.status.label,
                 result.transfers,
                 TimeUtils.timeToStrCompact(result.duration),
-                result.walkDistance,
+                result.cost,
                 // Strip of seconds for faster reading - most service schedules are by the minute not seconds
                 Debug.isDebug() ? result.startTime : result.startTime.substring(0, 5),
                 // Strip of seconds for faster reading - most service schedules are by the minute not seconds
@@ -65,6 +65,7 @@ public class TableTestReport {
     private static String intsToStr(Collection<Integer> list) {
         return list.isEmpty() ? "-" : list.stream().map(Object::toString).collect(Collectors.joining(" "));
     }
+
     private static String toStr(Collection<String> list) {
         return list.isEmpty() ? "-" : String.join(" ", list);
     }

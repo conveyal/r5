@@ -75,7 +75,8 @@ public final class ForwardPathMapper<T extends TripScheduleInfo> implements Path
         return new Path<>(
                 accessLeg,
                 destinationArrival.arrivalTime(),
-                numberOfTransits - 1
+                numberOfTransits - 1,
+                destinationArrival.cost()
         );
     }
 }

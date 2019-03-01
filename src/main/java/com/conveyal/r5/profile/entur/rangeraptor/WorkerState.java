@@ -26,9 +26,9 @@ public interface WorkerState<T extends TripScheduleInfo> {
 
     IntIterator stopsTouchedByTransitCurrentRound();
 
-    void transferToStops(int fromStop, Iterator<? extends TransferLeg> transfers);
-
     default void transitsForRoundComplete() {}
+
+    void transferToStops(int fromStop, Iterator<? extends TransferLeg> transfers);
 
     default void transfersForRoundComplete() {}
 

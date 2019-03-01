@@ -470,9 +470,9 @@ public class SpeedTest {
     private static RaptorProfile mapAlgorithm(SpeedTestProfiles profile) {
         switch (profile) {
             case mc_range_raptor: return RaptorProfile.MULTI_CRITERIA_RANGE_RAPTOR;
-            case mc_range_raptor_heuristic: return RaptorProfile.MULTI_CRITERIA_RANGE_RAPTOR_WITH_HEURISTICS;
+            case mc_rr_heuristic: return RaptorProfile.MULTI_CRITERIA_RANGE_RAPTOR_WITH_HEURISTICS;
             case range_raptor: return RaptorProfile.RANGE_RAPTOR;
-            case range_raptor_best_time: return RaptorProfile.RANGE_RAPTOR;
+            case best_time: return RaptorProfile.RANGE_RAPTOR_BEST_TIME;
             case raptor_reverse: return RAPTOR_REVERSE;
         }
         throw new IllegalArgumentException("Unable to map algorithm: " + profile);

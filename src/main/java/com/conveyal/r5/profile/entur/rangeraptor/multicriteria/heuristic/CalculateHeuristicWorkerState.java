@@ -26,9 +26,7 @@ public class CalculateHeuristicWorkerState<T extends TripScheduleInfo> extends B
      */
     public CalculateHeuristicWorkerState(SearchContext<T> ctx) {
         this(
-                ctx.nRounds(),
                 ctx.transit().numberOfStops(),
-                ctx.numberOfAdditionalTransfers(),
                 ctx.egressStops(),
                 ctx.roundProvider(),
                 ctx.calculator(),
@@ -37,15 +35,13 @@ public class CalculateHeuristicWorkerState<T extends TripScheduleInfo> extends B
     }
 
     private CalculateHeuristicWorkerState(
-            int nRounds,
             int nStops,
-            int numberOfAdditionalTransfers,
             int[] destinationStops,
             RoundProvider roundProvider,
             TransitCalculator calculator,
             CostCalculator costCalculator
     ) {
-        super(nRounds, nStops, numberOfAdditionalTransfers, destinationStops, roundProvider, calculator);
+        super(nStops, destinationStops, roundProvider, calculator);
         this.costCalculator = costCalculator;
         this.heuristics = new Heuristic[nStops];
     }

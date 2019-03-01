@@ -21,15 +21,15 @@ interface DebugState<T extends TripScheduleInfo> {
         return false;
     }
 
-    default void accept(int round, int stop) { }
+    default void accept(int stop) { }
 
-    default void rejectTransit(int round, int stop, int alightTime, T trip, int boardStop, int boardTime) { }
+    default void rejectTransit(int stop, int alightTime, T trip, int boardStop, int boardTime) { }
 
-    default void rejectTransfer(int round, int fromStop, TransferLeg transferLeg, int toStop, int arrivalTime) { }
+    default void rejectTransfer(int fromStop, TransferLeg transferLeg, int toStop, int arrivalTime) { }
 
-    default void drop(int round, int stop) { }
+    default void drop(int stop) { }
 
-    default void dropOldStateAndAcceptNewState(int round, int stop, Runnable body) {
+    default void dropOldStateAndAcceptNewState(int stop, Runnable body) {
         body.run();
     }
 }

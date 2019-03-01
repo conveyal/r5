@@ -52,9 +52,7 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
      */
     public BestTimesWorkerState(SearchContext<T> ctx) {
         this(
-                ctx.nRounds(),
                 ctx.transit().numberOfStops(),
-                ctx.numberOfAdditionalTransfers(),
                 ctx.egressStops(),
                 ctx.roundProvider(),
                 ctx.calculator()
@@ -62,9 +60,7 @@ public class BestTimesWorkerState<T extends TripScheduleInfo> implements StdWork
     }
 
     protected BestTimesWorkerState(
-            int nRounds,
             int nStops,
-            int numberOfAdditionalTransfers,
             int[] egressStops,
             RoundProvider roundProvider,
             TransitCalculator calculator

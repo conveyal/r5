@@ -40,7 +40,6 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> extends
         this(
                 c.nRounds(),
                 c.nStops(),
-                c.numberOfAdditionalTransfers(),
                 c.egressStops(),
                 c.roundProvider(),
                 c.calculator(),
@@ -53,7 +52,6 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> extends
     private StdRangeRaptorWorkerState(
             int nRounds,
             int nStops,
-            int numberOfAdditionalTransfers,
             int[] destinationStops,
             RoundProvider roundProvider,
             TransitCalculator calculator,
@@ -61,11 +59,11 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> extends
             Collection<TransferLeg> egressLegs,
             DebugRequest<T> debugRequest
     ) {
-        super(nRounds, nStops, numberOfAdditionalTransfers, destinationStops, roundProvider, calculator);
-        this.stops = new Stops<>(nRounds, nStops, egressLegs, this::handleEgressStopArrival);
+        super(nStops, destinationStops, roundProvider, calculator);
+        this.stops = new Stops<>(nRounds, nStops, egressLegs, roundProvider, this::handleEgressStopArrival);
         this.results = new DestinationArrivals<>(nRounds, calculator, new StopsCursor<>(stops, calculator), dFactory);
         this.debug = debugRequest.isDebug()
-                ? new StateDebugger<>(new StopsCursor<>(stops, calculator), dFactory.debugStopArrival())
+                ? new StateDebugger<>(new StopsCursor<>(stops, calculator), roundProvider, dFactory.debugStopArrival())
                 : DebugState.noop();
     }
 
@@ -77,8 +75,8 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> extends
 
     @Override
     protected final void setInitialTime(final int stop, final int arrivalTime, int durationInSeconds) {
-        stops.setInitialTime(round(), stop, arrivalTime, durationInSeconds);
-        debug.accept(round(), stop);
+        stops.setInitialTime(stop, arrivalTime, durationInSeconds);
+        debug.accept(stop);
     }
 
     @Override
@@ -88,23 +86,22 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> extends
 
     @Override
     public final int bestTimePreviousRound(int stop) {
-        return stops.get(round() - 1, stop).time();
+        return stops.bestTimePreviousRound(stop);
     }
 
 
     @Override
     protected void setNewBestTransitTime(int stop, int alightTime, T trip, int boardStop, int boardTime, boolean newBestOverall) {
         debug.dropOldStateAndAcceptNewState(
-                round(),
                 stop,
-                () -> stops.transitToStop(round(), stop, alightTime, boardStop, boardTime, trip, newBestOverall)
+                () -> stops.transitToStop(stop, alightTime, boardStop, boardTime, trip, newBestOverall)
         );
     }
 
     @Override
     protected void rejectNewBestTransitTime(int stop, int alightTime, T trip, int boardStop, int boardTime) {
         if(debug.isDebug(stop)) {
-            debug.rejectTransit(round(), stop, alightTime, trip, boardStop, boardTime);
+            debug.rejectTransit(stop, alightTime, trip, boardStop, boardTime);
         }
     }
 
@@ -119,16 +116,15 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> extends
     @Override
     protected void setNewBestTransferTime(int fromStop, int arrivalTime, TransferLeg transferLeg) {
         debug.dropOldStateAndAcceptNewState(
-                round(),
                 transferLeg.stop(),
-                () -> stops.transferToStop(round(), fromStop, transferLeg, arrivalTime)
+                () -> stops.transferToStop(fromStop, transferLeg, arrivalTime)
         );
     }
 
     @Override
     protected void rejectNewBestTransferTime(int fromStop, int arrivalTime, TransferLeg transferLeg) {
         if(debug.isDebug(transferLeg.stop())) {
-            debug.rejectTransfer(round(), fromStop, transferLeg, transferLeg.stop(), arrivalTime);
+            debug.rejectTransfer(fromStop, transferLeg, transferLeg.stop(), arrivalTime);
         }
     }
 

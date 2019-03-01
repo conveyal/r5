@@ -3,6 +3,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 
 import java.util.function.Consumer;
 
@@ -13,19 +14,27 @@ import java.util.function.Consumer;
 final class Stops<T extends TripScheduleInfo> {
 
     private final StopArrivalState<T>[][] stops;
+    private final RoundProvider roundProvider;
 
-    Stops(int nRounds, int nStops, Iterable<TransferLeg> egressLegs, Consumer<EgressStopArrivalState<T>> egressArrivalCallback) {
+    Stops(
+            int nRounds,
+            int nStops,
+            Iterable<TransferLeg> egressLegs,
+            RoundProvider roundProvider,
+            Consumer<EgressStopArrivalState<T>> egressArrivalCallback
+    ) {
         //noinspection unchecked
         this.stops = (StopArrivalState<T>[][]) new StopArrivalState[nRounds][nStops];
+        this.roundProvider = roundProvider;
         createAndInsertEgressStopStates(nRounds, egressLegs, egressArrivalCallback);
     }
 
-    void setInitialTime(int round, int stop, int time, int duration) {
-        findOrCreateStopIndex(round, stop).setAccessTime(time, duration);
+    void setInitialTime(int stop, int time, int duration) {
+        findOrCreateStopIndex(round(), stop).setAccessTime(time, duration);
     }
 
-    void transitToStop(int round, int stop, int time, int boardStop, int boardTime, T trip, boolean bestTime) {
-        StopArrivalState<T> state = findOrCreateStopIndex(round, stop);
+    void transitToStop(int stop, int time, int boardStop, int boardTime, T trip, boolean bestTime) {
+        StopArrivalState<T> state = findOrCreateStopIndex(round(), stop);
 
         state.arriveByTransit(time, boardStop, boardTime, trip);
 
@@ -37,11 +46,15 @@ final class Stops<T extends TripScheduleInfo> {
     /**
      * Set the time at a transit index iff it is optimal. This sets both the best time and the transfer time
      */
-    void transferToStop(int round, int fromStop, TransferLeg transferLeg, int arrivalTime) {
+    void transferToStop(int fromStop, TransferLeg transferLeg, int arrivalTime) {
         int stop = transferLeg.stop();
-        StopArrivalState<T> state = findOrCreateStopIndex(round, stop);
+        StopArrivalState<T> state = findOrCreateStopIndex(round(), stop);
 
         state.transferToStop(fromStop, arrivalTime, transferLeg.durationInSeconds());
+    }
+
+    int bestTimePreviousRound(int stop) {
+        return get(round() - 1, stop).time();
     }
 
     boolean exist(int round, int stop) {
@@ -70,5 +83,9 @@ final class Stops<T extends TripScheduleInfo> {
             stops[round][stop] = new StopArrivalState<>();
         }
         return get(round, stop);
+    }
+
+    private int round() {
+        return roundProvider.round();
     }
 }

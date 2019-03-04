@@ -7,11 +7,11 @@ import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 
 /**
- *  Encapsulate state debug operations. The default implementation is to do nothing.
+ * Send debug events to the {@link DebugHandler} using the {@link StopsCursor}.
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-class StateDebugger<T extends TripScheduleInfo> implements DebugState<T> {
+class StateDebugger<T extends TripScheduleInfo> {
     private final StopsCursor<T> cursor;
     private final RoundProvider roundProvider;
     private final DebugHandler<StopArrivalView<T>> debugHandlerStopArrivals;
@@ -26,30 +26,19 @@ class StateDebugger<T extends TripScheduleInfo> implements DebugState<T> {
         this.debugHandlerStopArrivals = debugHandlerStopArrivals;
     }
 
-    @Override
-    public void setIterationDepartureTime(int iterationDepartureTime) {
+    void setIterationDepartureTime(int iterationDepartureTime) {
         debugHandlerStopArrivals.setIterationDepartureTime(iterationDepartureTime);
     }
 
-    @Override
-    public boolean isDebug(int stop) {
+    boolean isDebug(int stop) {
         return debugHandlerStopArrivals.isDebug(stop);
     }
 
-    @Override
-    public void accept(int stop) {
+    void accept(int stop) {
         debugHandlerStopArrivals.accept(cursor.stop(round(), stop), null);
     }
 
-    @Override
-    public void drop(int stop) {
-        if(cursor.exist(round(), stop)) {
-            debugHandlerStopArrivals.drop(cursor.stop(round(), stop), null);
-        }
-    }
-
-    @Override
-    public void dropOldStateAndAcceptNewState(int stop, Runnable body) {
+    void dropOldStateAndAcceptNewState(int stop, Runnable body) {
         if (isDebug(stop)) {
             drop(stop);
             body.run();
@@ -59,15 +48,13 @@ class StateDebugger<T extends TripScheduleInfo> implements DebugState<T> {
         }
     }
 
-    @Override
-    public void rejectTransit(int stop, int alightTime, T trip, int boardStop, int boardTime) {
+    void rejectTransit(int stop, int alightTime, T trip, int boardStop, int boardTime) {
         StopArrivalState<T> arrival = new StopArrivalState<>();
         arrival.arriveByTransit(alightTime, boardStop, boardTime, trip);
         reject(new StopArrivalViewAdapter.Transit<>(round(), stop, arrival, cursor));
     }
 
-    @Override
-    public void rejectTransfer(int fromStop, TransferLeg transferLeg, int toStop, int arrivalTime) {
+    void rejectTransfer(int fromStop, TransferLeg transferLeg, int toStop, int arrivalTime) {
         StopArrivalState<T> arrival = new StopArrivalState<>();
         arrival.transferToStop(fromStop, arrivalTime, transferLeg.durationInSeconds());
         reject(new StopArrivalViewAdapter.Transfer<>(round(), toStop, arrival, cursor));
@@ -75,6 +62,12 @@ class StateDebugger<T extends TripScheduleInfo> implements DebugState<T> {
 
 
     /* Private methods */
+
+    private void drop(int stop) {
+        if(cursor.exist(round(), stop)) {
+            debugHandlerStopArrivals.drop(cursor.stop(round(), stop), null);
+        }
+    }
 
     private void reject(StopArrivalView<T> arrival) {
         debugHandlerStopArrivals.reject(arrival, null);

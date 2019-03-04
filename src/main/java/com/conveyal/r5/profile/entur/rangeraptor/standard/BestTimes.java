@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
+import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
@@ -25,7 +26,7 @@ import static com.conveyal.r5.profile.entur.util.IntUtils.intArray;
  * next stop, the new arrival may become the best time at that stop. Two transfers
  * are after each other is not legal.
  */
-final class BestTimes {
+public final class BestTimes {
 
     /** The best times to reach a stop, across rounds and iterations. */
     private final int[] times;
@@ -43,7 +44,11 @@ final class BestTimes {
     private final TransitCalculator calculator;
 
 
-    BestTimes(int nStops, TransitCalculator calculator) {
+    public BestTimes(SearchContext<?> c) {
+        this(c.nStops(), c.calculator());
+    }
+
+    private BestTimes(int nStops, TransitCalculator calculator) {
         this.calculator = calculator;
         this.times = intArray(nStops, calculator.unreachedTime());
         this.reachedCurrentRound = new BitSet(nStops);
@@ -53,11 +58,11 @@ final class BestTimes {
         this.transitReachedCurrentRound = new BitSet(nStops);
     }
 
-    int time(int stop) {
+    public int time(int stop) {
         return times[stop];
     }
 
-    int transitTime(int stop) {
+    public int transitTime(int stop) {
         return transitTimes[stop];
     }
 

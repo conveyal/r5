@@ -23,10 +23,10 @@ abstract class AbstractDebugHandlerAdapter<T> implements DebugHandler<T> {
     private final Consumer<DebugEvent<T>> eventListener;
     private int iterationDepartureTime = -1;
 
-    AbstractDebugHandlerAdapter(DebugRequest<?> debug, Consumer<DebugEvent<T>> eventListener) {
-        this.stops = debug.stops();
-        this.path = debug.path();
-        this.pathStartAtStopIndex = debug.pathStartAtStopIndex();
+    AbstractDebugHandlerAdapter(DebugRequest<?> debugRequest, Consumer<DebugEvent<T>> eventListener) {
+        this.stops = debugRequest.stops();
+        this.path = debugRequest.path();
+        this.pathStartAtStopIndex = debugRequest.pathStartAtStopIndex();
         this.eventListener = eventListener;
     }
 

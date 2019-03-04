@@ -6,7 +6,6 @@ import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Iterator;
 
 /**
@@ -40,7 +39,7 @@ public interface WorkerState<T extends TripScheduleInfo> {
      *
      * @return return all paths found in the search.
      */
-    default Collection<Path<T>> extractPaths() { return Collections.emptyList(); }
+    Collection<Path<T>> extractPaths();
 
     /**
      * Return TRUE if at least one new destination arrival is accepted at the destination in

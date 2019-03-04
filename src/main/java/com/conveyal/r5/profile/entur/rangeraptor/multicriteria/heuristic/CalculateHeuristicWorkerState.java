@@ -4,6 +4,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
 import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.DestinationHeuristic;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.BestTimes;
@@ -25,8 +26,6 @@ public class CalculateHeuristicWorkerState<T extends TripScheduleInfo> implement
     private final RoundProvider roundProvider;
     private final Heuristic[] heuristics;
     private final CostCalculator costCalculator;
-
-
     private int earliestDepartureTime;
 
     /**
@@ -37,7 +36,8 @@ public class CalculateHeuristicWorkerState<T extends TripScheduleInfo> implement
                 ctx.transit().numberOfStops(),
                 ctx.roundProvider(),
                 bestTimes,
-                ctx.costCalculator()
+                ctx.costCalculator(),
+                ctx.lifeCycle()
         );
     }
 
@@ -45,26 +45,20 @@ public class CalculateHeuristicWorkerState<T extends TripScheduleInfo> implement
             int nStops,
             RoundProvider roundProvider,
             BestTimes bestTimes,
-            CostCalculator costCalculator
+            CostCalculator costCalculator,
+            LifeCyclePublisher lifeCycle
     ) {
         this.roundProvider = roundProvider;
         this.bestTimes = bestTimes;
         this.costCalculator = costCalculator;
         this.heuristics = new Heuristic[nStops];
-    }
-
-    @Override
-    public void setupIteration(int iterationDepartureTime) {
-        earliestDepartureTime = iterationDepartureTime;
+        lifeCycle.onSetupIteration(this::setupIteration);
     }
 
     @Override
     public void setInitialTime(final int stop, final int arrivalTime, int durationInSeconds) {
         setMinRoundNumber(stop, 0);
     }
-
-    @Override
-    public void iterationComplete() { /* NOOP */ }
 
     @Override
     public Collection<Path<T>> extractPaths() {
@@ -114,6 +108,9 @@ public class CalculateHeuristicWorkerState<T extends TripScheduleInfo> implement
 
     /* Private methods */
 
+    private void setupIteration(int iterationDepartureTime) {
+        earliestDepartureTime = iterationDepartureTime;
+    }
 
     private void setMinRoundNumber(int stop, int round) {
         Heuristic h = heuristics[stop];

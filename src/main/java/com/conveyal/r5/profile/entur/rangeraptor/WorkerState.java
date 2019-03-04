@@ -13,13 +13,9 @@ import java.util.Iterator;
  */
 public interface WorkerState<T extends TripScheduleInfo> {
 
-    void setupIteration(int iterationDepartureTime);
-
     void setInitialTimeForIteration(TransferLeg accessEgressLeg, int iterationDepartureTime);
 
     boolean isNewRoundAvailable();
-
-    void prepareForNextRound();
 
     IntIterator stopsTouchedPreviousRound();
 
@@ -30,8 +26,6 @@ public interface WorkerState<T extends TripScheduleInfo> {
     void transferToStops(int fromStop, Iterator<? extends TransferLeg> transfers);
 
     default void transfersForRoundComplete() {}
-
-    default void iterationComplete() {}
 
     /**
      * Extract paths after the search is complete. This method is optional,

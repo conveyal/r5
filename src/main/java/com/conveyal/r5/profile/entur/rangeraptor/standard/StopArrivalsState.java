@@ -22,12 +22,7 @@ import java.util.Collection;
 */
 public interface StopArrivalsState<T extends TripScheduleInfo> {
 
-
-    void setupIteration(int iterationDepartureTime);
-
     void setInitialTime(final int stop, final int arrivalTime, int durationInSeconds);
-
-    void iterationComplete();
 
     Collection<Path<T>> extractPaths();
 

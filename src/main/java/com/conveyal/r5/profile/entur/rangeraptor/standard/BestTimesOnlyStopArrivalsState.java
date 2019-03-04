@@ -33,13 +33,7 @@ public class BestTimesOnlyStopArrivalsState<T extends TripScheduleInfo> implemen
     }
 
     @Override
-    public void setupIteration(int iterationDepartureTime) { /* NOOP */ }
-
-    @Override
     public void setInitialTime(int stop, int arrivalTime, int durationInSeconds) { }
-
-    @Override
-    public void iterationComplete() { /* NOOP */ }
 
     @Override
     public Collection<Path<T>> extractPaths() { return Collections.emptyList(); }

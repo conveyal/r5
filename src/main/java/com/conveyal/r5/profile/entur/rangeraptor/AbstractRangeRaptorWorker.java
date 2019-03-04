@@ -1,13 +1,13 @@
 package com.conveyal.r5.profile.entur.rangeraptor;
 
 import com.conveyal.r5.profile.entur.api.path.Path;
-import com.conveyal.r5.profile.entur.api.request.TuningParameters;
 import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.RangeRaptorLifeCyclePublisher;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.RoundTracker;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
@@ -67,19 +67,34 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
     private final RoundTracker roundTracker;
 
 
+    private final TransitDataProvider<T> transit;
+
+    private final TransitCalculator calculator;
+
+    private final WorkerPerformanceTimers timers;
+
+    private final Collection<TransferLeg> accessLegs;
+
     /**
-     * The trip search context.
+     * The life cycle is used to publish life cycle events to everyone who
+     * listen.
      */
-    private final SearchContext<T> context;
+    private final RangeRaptorLifeCyclePublisher lifeCycle;
+
 
     public AbstractRangeRaptorWorker(
             SearchContext<T> context,
             S state
     ) {
-        this.context = context;
         this.state = state;
-        // We do a cast here to avoid exposing the round tracker to "everyone" by providing access to it in the context.
+        this.transit = context.transit();
+        this.calculator = context.calculator();
+        this.timers = context.timers();
+        this.accessLegs = context.accessLegs();
+        // We do a cast here to avoid exposing the round tracker  and the life cycle publisher to "everyone"
+        // by providing access to it in the context.
         this.roundTracker = (RoundTracker) context.roundProvider();
+        this.lifeCycle = (RangeRaptorLifeCyclePublisher) context.lifeCycle();
     }
 
     /**
@@ -90,10 +105,10 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
     @Override
     final public Collection<Path<T>> route() {
         timerRoute().time(() -> {
-            timerSetup(() -> context.transit().setup());
+            timerSetup(transit::setup);
 
             // The main outer loop iterates backward over all minutes in the departure times window.
-            final IntIterator it = context.calculator().rangeRaptorMinutes();
+            final IntIterator it = calculator.rangeRaptorMinutes();
             while (it.hasNext()) {
                 // Run the raptor search for this particular departure time
                 timerRouteByMinute(() -> runRaptorForMinute(it.next()));
@@ -102,16 +117,8 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
         return state.extractPaths();
     }
 
-    protected TransitDataProvider<T> transit() {
-        return context.transit();
-    }
-
     protected TransitCalculator calculator() {
-        return context.calculator();
-    }
-
-    private WorkerPerformanceTimers timers() {
-        return context.timers();
+        return calculator;
     }
 
     protected abstract void prepareTransitForRoundAndPattern(TripPatternInfo<T> pattern, TripScheduleSearch<T> tripSearch);
@@ -119,19 +126,12 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
     protected abstract void performTransitForRoundAndPatternAtStop(int stopPositionInPattern);
 
     /**
-     * Calculate the maximum number of rounds to perform.
-     */
-    protected static int nRounds(TuningParameters tuningParameters) {
-        return tuningParameters.maxNumberOfTransfers() + 1;
-    }
-
-    /**
      * Iterate over given pattern and calculate transit for each stop.
      * <p/>
      * This is protected to allow reverse search to override and step backwards.
      */
     private void performTransitForRoundAndEachStopInPattern(final TripPatternInfo<T> pattern) {
-        IntIterator it = calculator().patternStopIterator(pattern.numberOfStopsInPattern());
+        IntIterator it = calculator.patternStopIterator(pattern.numberOfStopsInPattern());
         while (it.hasNext()) {
             performTransitForRoundAndPatternAtStop(it.next());
         }
@@ -143,14 +143,14 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
      * This is protected to allow reverse search to override and create a alight search instead.
      */
     private TripScheduleSearch<T> createTripSearch(TripPatternInfo<T> pattern) {
-        return calculator().createTripSearch(pattern, this::skipTripSchedule);
+        return calculator.createTripSearch(pattern, this::skipTripSchedule);
     }
 
     /**
      * Skip trips NOT running on the day of the search and skip frequency trips
      */
     private boolean skipTripSchedule(T trip) {
-        return !transit().isTripScheduleInService(trip);
+        return !transit.isTripScheduleInService(trip);
     }
 
     /**
@@ -169,7 +169,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
         // the arrival time given departure at time t is upper-bounded by the arrival time given departure at minute t + 1.
 
         while (hasMoreRounds()) {
-            prepareForNextRound();
+            lifeCycle.prepareForNextRound();
 
             // NB since we have transfer limiting not bothering to cut off search when there are no more transfers
             // as that will be rare and complicates the code
@@ -183,7 +183,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
         // This state is repeatedly modified as the outer loop progresses over departure minutes.
         // We have to be careful here, the next iteration will modify the state, so we need to make
         // protective copies of any information we want to retain.
-        state.iterationComplete();
+        lifeCycle.iterationComplete();
     }
 
 
@@ -195,25 +195,16 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
     }
 
     /**
-     * Initiate a new round
-     */
-    private void prepareForNextRound() {
-        roundTracker.prepareForNextRound();
-        state.prepareForNextRound();
-    }
-
-    /**
      * Set the departure time in the scheduled search to the given departure time,
      * and prepare for the scheduled search at the next-earlier minute.
      * <p/>
      * This method is protected to allow reverce search to override it.
      */
     private void iterationSetup(int iterationDepartureTime) {
-        state.setupIteration(iterationDepartureTime);
-        roundTracker.setupIteration();
+        lifeCycle.setupIteration(iterationDepartureTime);
 
         // add initial stops
-        for (TransferLeg it : context.accessLegs()) {
+        for (TransferLeg it : accessLegs) {
             state.setInitialTimeForIteration(it, iterationDepartureTime);
         }
     }
@@ -223,7 +214,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
      */
     private void calculateTransitForRound() {
         IntIterator stops = state.stopsTouchedPreviousRound();
-        Iterator<? extends TripPatternInfo<T>> patternIterator = transit().patternIterator(stops);
+        Iterator<? extends TripPatternInfo<T>> patternIterator = transit.patternIterator(stops);
 
         while (patternIterator.hasNext()) {
             TripPatternInfo<T> pattern = patternIterator.next();
@@ -244,22 +235,20 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
             final int fromStop = it.next();
             // no need to consider loop transfers, since we don't mark patterns here any more
             // loop transfers are already included by virtue of those stops having been reached
-            state.transferToStops(fromStop, transit().getTransfers(fromStop));
+            state.transferToStops(fromStop, transit.getTransfers(fromStop));
         }
         state.transfersForRoundComplete();
     }
 
     private void roundComplete() {
-        if(state.isDestinationReachedInCurrentRound()) {
-            roundTracker.notifyArrivedAtDestinationInCurrentRound();
-        }
+        lifeCycle.roundComplete(state.isDestinationReachedInCurrentRound());
     }
 
     // Track time spent, measure performance
     // TODO TGR - Replace by performance tests
-    private void timerSetup(Runnable setup) { timers().timerSetup(setup); }
-    private AvgTimer timerRoute() { return timers().timerRoute(); }
-    private void timerRouteByMinute(Runnable routeByMinute) { timers().timerRouteByMinute(routeByMinute); }
-    private AvgTimer timerByMinuteScheduleSearch() { return timers().timerByMinuteScheduleSearch(); }
-    private AvgTimer timerByMinuteTransfers() { return timers().timerByMinuteTransfers(); }
+    private void timerSetup(Runnable setup) { timers.timerSetup(setup); }
+    private AvgTimer timerRoute() { return timers.timerRoute(); }
+    private void timerRouteByMinute(Runnable routeByMinute) { timers.timerRouteByMinute(routeByMinute); }
+    private AvgTimer timerByMinuteScheduleSearch() { return timers.timerByMinuteScheduleSearch(); }
+    private AvgTimer timerByMinuteTransfers() { return timers.timerByMinuteTransfers(); }
 }

@@ -2,6 +2,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.path.PathMapper;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
@@ -78,8 +79,13 @@ class DestinationArrivals<T extends TripScheduleInfo> {
     private final DebugHandler<DestinationArrivalView<T>> debugDestinationArrivalHandler;
 
 
-
-    DestinationArrivals(int nRounds, TransitCalculator calculator, StopsCursor<T> stopsCursor, DebugHandlerFactory<T> debugFactory) {
+    DestinationArrivals(
+            int nRounds,
+            TransitCalculator calculator,
+            StopsCursor<T> stopsCursor,
+            DebugHandlerFactory<T> debugFactory,
+            LifeCyclePublisher lifeCycle
+    ) {
         this.stopsCursor = stopsCursor;
         this.calculator = calculator;
         this.bestArrivalTimesAtDestination = new int[nRounds];
@@ -90,9 +96,10 @@ class DestinationArrivals<T extends TripScheduleInfo> {
 
         this.pathMapper = calculator.createPathMapper();
         this.paths = new ParetoSet<>(
-                 pathComparator(),
+                pathComparator(),
                 debugPathHandler::drop
         );
+        lifeCycle.onIterationComplete(this::addPathsForCurrentIteration);
     }
 
     void add(EgressStopArrivalState<T> arrival) {
@@ -108,7 +115,19 @@ class DestinationArrivals<T extends TripScheduleInfo> {
         debugDestinationArrival(arrival, added);
     }
 
-    void addPathsForCurrentIteration() {
+    Collection<Path<T>> paths() {
+        return paths;
+    }
+
+
+    /* Private methods */
+
+    /**
+     * Create paths at the end of each iteration. This is necessary to avoid stop arrivals
+     * part of a path found in the current itteration to be overwritten by a new
+     * stop arrival found in a later iteration.
+     */
+    private void addPathsForCurrentIteration() {
         for (EgressStopArrivalState<T> it : egressArrivalsByRound.values()) {
             Path<T> path = createPathFromEgressState(it);
             boolean added = paths.add(path);
@@ -116,18 +135,6 @@ class DestinationArrivals<T extends TripScheduleInfo> {
         }
         egressArrivalsByRound.clear();
     }
-
-    void setIterationDepartureTime(int departureTime) {
-        debugDestinationArrivalHandler.setIterationDepartureTime(departureTime);
-        debugPathHandler.setIterationDepartureTime(departureTime);
-    }
-
-    Collection<Path<T>> paths() {
-        return paths;
-    }
-
-
-    /* Private methods */
 
     private int destinationDepartureTime(EgressStopArrivalState<T> arrival) {
         return arrival.transitTime();
@@ -157,8 +164,8 @@ class DestinationArrivals<T extends TripScheduleInfo> {
 
     private void debugDropDestinationArrival(EgressStopArrivalState<T> arrival) {
         EgressStopArrivalState<T> dropped = egressArrivalsByRound.get(arrival.round());
-        if(dropped != null) {
-            if(debugDestinationArrivalHandler.isDebug(dropped.stop())) {
+        if (dropped != null) {
+            if (debugDestinationArrivalHandler.isDebug(dropped.stop())) {
                 debugDestinationArrivalHandler.drop(
                         destinationArrivalView(dropped),
                         destinationArrivalView(arrival)

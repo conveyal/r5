@@ -3,6 +3,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.debug;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.request.DebugRequest;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
@@ -20,18 +21,18 @@ public class DebugHandlerFactory<T extends TripScheduleInfo> {
     private DebugHandler<DestinationArrivalView<T>> destinationHandler;
     private DebugHandler<Path<T>> pathHandler;
 
-    public DebugHandlerFactory(DebugRequest<T> request) {
+    public DebugHandlerFactory(DebugRequest<T> request, LifeCyclePublisher lifeCycle) {
         this.noopStopHandler = DebugHandler.noop();
         this.stopHandler = isDebug(request, request.stopArrivalListener())
-                ? new DebugHandlerStopArrivalAdapter<>(request)
+                ? new DebugHandlerStopArrivalAdapter<>(request, lifeCycle)
                 : noopStopHandler;
 
         this.destinationHandler = isDebug(request, request.destinationArrivalListener())
-                ? new DebugHandlerDestinationArrivalAdapter<>(request)
+                ? new DebugHandlerDestinationArrivalAdapter<>(request, lifeCycle)
                 : DebugHandler.noop();
 
         this.pathHandler = isDebug(request, request.pathFilteringListener())
-                ? new DebugHandlerPathAdapter<>(request)
+                ? new DebugHandlerPathAdapter<>(request, lifeCycle)
                 : DebugHandler.noop();
     }
 
@@ -51,11 +52,8 @@ public class DebugHandlerFactory<T extends TripScheduleInfo> {
         return pathHandler;
     }
 
-    public void setIterationDepartureTime(int departureTime) {
-        stopHandler.setIterationDepartureTime(departureTime);
-        destinationHandler.setIterationDepartureTime(departureTime);
-        pathHandler.setIterationDepartureTime(departureTime);
-    }
+
+    /* private methods */
 
     private boolean isDebug(DebugRequest<T> request, Object handler) {
         return request.isDebug() && handler != null;

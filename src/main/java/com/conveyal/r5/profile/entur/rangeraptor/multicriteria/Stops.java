@@ -66,10 +66,6 @@ final class Stops<T extends TripScheduleInfo> {
         }
     }
 
-    void startNewIteration(int departureTime) {
-        debugHandlerFactory.setIterationDepartureTime(departureTime);
-    }
-
     void setInitialTime(int fromTime, TransferLeg accessLeg, int cost) {
         AccessStopArrival<T> newAccessArrival = new AccessStopArrival<>(
                 accessLeg.stop(),

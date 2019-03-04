@@ -10,8 +10,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 
 /**
  * Use this factory to create debug handlers. If a routing request has not enabled debugging
- * NOOP debug handlers are returned - these are designed for optimal performance so the
- * JIT compiler can remove any debugging code.
+ * NOOP debug handlers are returned.
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
@@ -23,15 +22,15 @@ public class DebugHandlerFactory<T extends TripScheduleInfo> {
 
     public DebugHandlerFactory(DebugRequest<T> request) {
         this.noopStopHandler = DebugHandler.noop();
-        this.stopHandler = debug(request, request.stopArrivalListener())
+        this.stopHandler = isDebug(request, request.stopArrivalListener())
                 ? new DebugHandlerStopArrivalAdapter<>(request)
                 : noopStopHandler;
 
-        this.destinationHandler = debug(request, request.destinationArrivalListener())
+        this.destinationHandler = isDebug(request, request.destinationArrivalListener())
                 ? new DebugHandlerDestinationArrivalAdapter<>(request)
                 : DebugHandler.noop();
 
-        this.pathHandler = debug(request, request.pathFilteringListener())
+        this.pathHandler = isDebug(request, request.pathFilteringListener())
                 ? new DebugHandlerPathAdapter<>(request)
                 : DebugHandler.noop();
     }
@@ -58,7 +57,7 @@ public class DebugHandlerFactory<T extends TripScheduleInfo> {
         pathHandler.setIterationDepartureTime(departureTime);
     }
 
-    private boolean debug(DebugRequest<T> request, Object handler) {
+    private boolean isDebug(DebugRequest<T> request, Object handler) {
         return request.isDebug() && handler != null;
     }
 }

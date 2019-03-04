@@ -2,133 +2,222 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 
 import com.conveyal.r5.profile.entur.api.path.Path;
-import com.conveyal.r5.profile.entur.api.request.DebugRequest;
+import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
-import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
+import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
 import java.util.Collection;
+import java.util.Iterator;
 
 
 /**
- * Tracks the state of a Range Raptor search, specifically the best arrival times at each transit stop at the end of a
- * particular round, along with associated data to reconstruct paths etc.
+ * Tracks the state of a standard Range Raptor search, specifically the best arrival times at each transit stop
+ * at the end of a particular round, along with associated data to reconstruct paths etc.
  * <p>
  * This is grouped into a separate class (rather than just having the fields in the raptor worker class) because we
  * want to separate the logic of maintaining stop arrival state and performing the steps of the algorithm. This
  * also make it possible to have more than one state implementation, which have ben used in the past to test different
  * memory optimizations.
  * <p>
- * Note that this represents the entire state of the Range Raptor search for all rounds, rather than the state at
- * a particular transit stop.
+ * Note that this represents the entire state of the Range Raptor search for all rounds. The {@code stopArrivalsState}
+ * implementation can be swapped to achieve different results.
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> extends BestTimesWorkerState<T> {
-
-    private final Stops<T> stops;
-    private final DestinationArrivals<T> results;
-    private final DebugState<T> debug;
+public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> implements StdWorkerState<T> {
 
     /**
-     * Create a Standard range raptor state for the given context
+     * The best times to reach each stop, whether via a transfer or via transit directly.
+     * This is the bare minimum to execute the algorithm.
      */
-    public StdRangeRaptorWorkerState(SearchContext<T> c) {
+    private final BestTimes bestTimes;
+
+    /**
+     * Track the stop arrivals to be able to return some kind of result. Depending on the
+     * desired result, different implementation is injected.
+     */
+    private final StopArrivalsState<T> stopArrivalsState;
+
+    /**
+     * The list of egress stops, can be used to terminate the search when the stops are reached.
+     */
+    private final ArrivedAtDestinationCheck arrivedAtDestinationCheck;
+
+
+    /**
+     * The calculator is used to calculate transit related times/events like access arrival time.
+     */
+    private final TransitCalculator calculator;
+
+    /**
+     * create a BestTimes Range Raptor State for given context.
+     */
+    public StdRangeRaptorWorkerState(SearchContext<T> ctx, BestTimes bestTimes, StopArrivalsState<T> stopArrivalsState) {
         this(
-                c.nRounds(),
-                c.nStops(),
-                c.egressStops(),
-                c.roundProvider(),
-                c.calculator(),
-                c.debugFactory(),
-                c.egressLegs(),
-                c.debugRequest()
+                ctx.egressStops(),
+                bestTimes,
+                stopArrivalsState,
+                ctx.calculator()
         );
     }
 
-    private StdRangeRaptorWorkerState(
-            int nRounds,
-            int nStops,
-            int[] destinationStops,
-            RoundProvider roundProvider,
-            TransitCalculator calculator,
-            DebugHandlerFactory<T> dFactory,
-            Collection<TransferLeg> egressLegs,
-            DebugRequest<T> debugRequest
+    protected StdRangeRaptorWorkerState(
+            int[] egressStops,
+            BestTimes bestTimes,
+            StopArrivalsState<T> stopArrivalsState,
+            TransitCalculator calculator
     ) {
-        super(nStops, destinationStops, calculator);
-        this.stops = new Stops<>(nRounds, nStops, egressLegs, roundProvider, this::handleEgressStopArrival);
-        this.results = new DestinationArrivals<>(nRounds, calculator, new StopsCursor<>(stops, calculator), dFactory);
-        this.debug = debugRequest.isDebug()
-                ? new StateDebugger<>(new StopsCursor<>(stops, calculator), roundProvider, dFactory.debugStopArrival())
-                : DebugState.noop();
+        this.calculator = calculator;
+        this.bestTimes = bestTimes;
+        this.stopArrivalsState = stopArrivalsState;
+        this.arrivedAtDestinationCheck = new SimpleArrivedAtDestinationCheck(egressStops, bestTimes);
     }
 
     @Override
-    final public void setupIteration2(int iterationDepartureTime) {
-        debug.setIterationDepartureTime(iterationDepartureTime);
-        results.setIterationDepartureTime(iterationDepartureTime);
+    public final void setupIteration(int iterationDepartureTime) {
+        // clear all touched stops to avoid constant reëxploration
+        bestTimes.prepareForNewIteration();
+        stopArrivalsState.setupIteration(iterationDepartureTime);
     }
 
     @Override
-    protected final void setInitialTime(final int stop, final int arrivalTime, int durationInSeconds) {
-        stops.setInitialTime(stop, arrivalTime, durationInSeconds);
-        debug.accept(stop);
+    public final void setInitialTimeForIteration(TransferLeg accessEgressLeg, int iterationDepartureTime) {
+        int durationInSeconds = accessEgressLeg.durationInSeconds();
+        int stop = accessEgressLeg.stop();
+        // The time of arrival at the given stop for the current iteration
+        // (or departure time at the last stop if we search backwards).
+        int arrivalTime = calculator.add(iterationDepartureTime, durationInSeconds);
+
+        bestTimes.setAccessStopTime(stop, arrivalTime);
+        stopArrivalsState.setInitialTime(stop, arrivalTime, durationInSeconds);
     }
 
     @Override
-    public final Collection<Path<T>> extractPaths() {
-        return results.paths();
+    public void iterationComplete() {
+        stopArrivalsState.iterationComplete();
     }
 
     @Override
-    public final int bestTimePreviousRound(int stop) {
-        return stops.bestTimePreviousRound(stop);
+    public final boolean isNewRoundAvailable() {
+        return bestTimes.isCurrentRoundUpdated();
+    }
+
+    @Override
+    public final void prepareForNextRound() {
+        bestTimes.prepareForNextRound();
+    }
+
+    @Override
+    public final BitSetIterator stopsTouchedByTransitCurrentRound() {
+        return bestTimes.transitStopsReachedCurrentRound();
+    }
+
+    @Override
+    public final IntIterator stopsTouchedPreviousRound() {
+        return bestTimes.stopsReachedLastRound();
     }
 
 
     @Override
-    protected void setNewBestTransitTime(int stop, int alightTime, T trip, int boardStop, int boardTime, boolean newBestOverall) {
-        debug.dropOldStateAndAcceptNewState(
-                stop,
-                () -> stops.transitToStop(stop, alightTime, boardStop, boardTime, trip, newBestOverall)
-        );
+    public final boolean isStopReachedInPreviousRound(int stop) {
+        return bestTimes.isStopReachedLastRound(stop);
     }
 
+    /**
+     * Return the "best time" found in the previous round. This is used to calculate the board/alight
+     * time in the next round.
+     * <p/>
+     * PLEASE OVERRIDE!
+     * <p/>
+     * The implementation here is not correct - please override if you plan to use any result paths
+     * or "rounds" as "number of transfers". The implementation is OK if the only thing you care
+     * about is the "arrival time".
+     */
     @Override
-    protected void rejectNewBestTransitTime(int stop, int alightTime, T trip, int boardStop, int boardTime) {
-        if(debug.isDebug(stop)) {
-            debug.rejectTransit(stop, alightTime, trip, boardStop, boardTime);
+    public int bestTimePreviousRound(int stop) {
+        // This is a simplification, *bestTimes* might get updated during the current round;
+        // Hence leading to a new boarding from the same stop in the same round.
+        // If we do not count rounds or track paths, this is OK. But be sure to override this
+        // method with the best time from the previous round if you care about number of
+        // transfers and results paths.
+
+        return stopArrivalsState.bestTimePreviousRound(stop);
+    }
+
+    /**
+     * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the transitTime.
+     */
+    @Override
+    public final void transitToStop(int stop, int alightTime, T trip, int boardStop, int boardTime) {
+        if (exceedsTimeLimit(alightTime)) {
+            return;
+        }
+
+        if (newTransitBestTime(stop, alightTime)) {
+            // transitTimes upper bounds bestTimes
+            final boolean newBestOverall = newOverallBestTime(stop, alightTime);
+            stopArrivalsState.setNewBestTransitTime(stop, alightTime, trip, boardStop, boardTime, newBestOverall);
+        } else {
+            stopArrivalsState.rejectNewBestTransitTime(stop, alightTime, trip, boardStop, boardTime);
         }
     }
 
     /**
-     * Create paths for current iteration.
+     * Set the arrival time at all transit stop if time is optimal for the given list of transfers.
      */
     @Override
-    public final void iterationComplete() {
-        results.addPathsForCurrentIteration();
-    }
-
-    @Override
-    protected void setNewBestTransferTime(int fromStop, int arrivalTime, TransferLeg transferLeg) {
-        debug.dropOldStateAndAcceptNewState(
-                transferLeg.stop(),
-                () -> stops.transferToStop(fromStop, transferLeg, arrivalTime)
-        );
-    }
-
-    @Override
-    protected void rejectNewBestTransferTime(int fromStop, int arrivalTime, TransferLeg transferLeg) {
-        if(debug.isDebug(transferLeg.stop())) {
-            debug.rejectTransfer(fromStop, transferLeg, transferLeg.stop(), arrivalTime);
+    public final void transferToStops(int fromStop, Iterator<? extends TransferLeg> transfers) {
+        int arrivalTimeTransit = bestTimes.transitTime(fromStop);
+        while (transfers.hasNext()) {
+            transferToStop(arrivalTimeTransit, fromStop, transfers.next());
         }
     }
 
-    private void handleEgressStopArrival(EgressStopArrivalState<T> arrival) {
-        results.add(arrival);
+    @Override
+    public Collection<Path<T>> extractPaths() {
+        return stopArrivalsState.extractPaths();
+    }
+
+    private void transferToStop(int arrivalTimeTransit, int fromStop, TransferLeg transferLeg) {
+        // Use the calculator to make sure the calculation is done correct for a normal
+        // forward search and a reverse search.
+        final int arrivalTime = calculator.add(arrivalTimeTransit, transferLeg.durationInSeconds());
+
+        if (exceedsTimeLimit(arrivalTime)) {
+            return;
+        }
+
+        final int toStop = transferLeg.stop();
+
+        // transitTimes upper bounds bestTimes so we don't need to update wait time and in-vehicle time here, if we
+        // enter this conditional it has already been updated.
+        if (newOverallBestTime(toStop, arrivalTime)) {
+            stopArrivalsState.setNewBestTransferTime(fromStop, arrivalTime, transferLeg);
+        } else {
+            stopArrivalsState.rejectNewBestTransferTime(fromStop, arrivalTime, transferLeg);
+        }
+    }
+
+    @Override
+    public boolean isDestinationReachedInCurrentRound() {
+        return arrivedAtDestinationCheck.arrivedAtDestinationCurrentRound();
+    }
+
+
+    /* private methods */
+
+    private boolean newTransitBestTime(int stop, int alightTime) {
+        return bestTimes.transitUpdateNewBestTime(stop, alightTime);
+    }
+
+    private boolean newOverallBestTime(int stop, int alightTime) {
+        return bestTimes.updateNewBestTime(stop, alightTime);
+    }
+
+    private boolean exceedsTimeLimit(int time) {
+        return calculator.exceedsTimeLimit(time);
     }
 }

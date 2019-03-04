@@ -10,13 +10,17 @@ import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic.CalculateHeuristicWorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic.NoWaitRangeRaptorWorker;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.BestTimesWorkerState;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.BestTimes;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.BestTimesOnlyStopArrivalsState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StdRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StdRangeRaptorWorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StdWorkerState;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalsState;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 
 import java.util.Collection;
+
+import static com.conveyal.r5.profile.entur.rangeraptor.standard.StdStopArrivalsState.createStdWorkerState;
 
 /**
  * A service for performing Range Raptor routing request. 
@@ -87,8 +91,11 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
 
     private Worker<T> createMcRRHeuristicWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
         SearchContext<T> heurCtx = context(transitData, asOnePass(request), ServiceType.Heur);
-        CalculateHeuristicWorkerState<T> heuristic = (CalculateHeuristicWorkerState<T>) createState(heurCtx, ServiceType.Heur);
-        Worker<T> heurWorker = createWorker(ServiceType.Heur, heurCtx);
+
+        BestTimes bt2 = new BestTimes(heurCtx);
+        CalculateHeuristicWorkerState<T> heuristic = new CalculateHeuristicWorkerState<>(heurCtx, bt2);
+        StdWorkerState<T> state = new StdRangeRaptorWorkerState<>(heurCtx, bt2, heuristic);
+        Worker<T> heurWorker = new StdRangeRaptorWorker<>(context(transitData, request, ServiceType.Heur), state);
 
         SearchContext<T> ctx = context(transitData, request, ServiceType.multiCriteria);
 
@@ -121,14 +128,20 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
         switch (type) {
             case stdRR:
             case stdRRRev:
-                return new StdRangeRaptorWorkerState<>(context);
+                BestTimes bt0 = new BestTimes(context);
+                StopArrivalsState<T> s0 = createStdWorkerState(context);
+                return new StdRangeRaptorWorkerState<>(context, bt0, s0);
             case BT:
             case BTRev:
-                return new BestTimesWorkerState<>(context);
+                BestTimes bt1 = new BestTimes(context);
+                StopArrivalsState<T> s1 = new BestTimesOnlyStopArrivalsState<>(bt1);
+                return new StdRangeRaptorWorkerState<>(context, bt1, s1);
             case Heur:
-                return new CalculateHeuristicWorkerState<>(context);
+                BestTimes bt2 = new BestTimes(context);
+                StopArrivalsState<T> s2 = new CalculateHeuristicWorkerState<>(context, bt2);
+                return new StdRangeRaptorWorkerState<>(context, bt2, s2);
             default:
-                return null;
+                throw new IllegalStateException();
         }
     }
 }

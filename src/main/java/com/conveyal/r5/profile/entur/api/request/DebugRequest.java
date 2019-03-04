@@ -44,6 +44,10 @@ import java.util.function.Consumer;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class DebugRequest<T extends TripScheduleInfo> {
+
+    /**
+     * Return a debug request with defaults values.
+     */
     static <T extends TripScheduleInfo> DebugRequest<T> defaults() {
         return new DebugRequest<>();
     }
@@ -73,27 +77,19 @@ public class DebugRequest<T extends TripScheduleInfo> {
         this.pathFilteringListener = builder.pathFilteringListener();
     }
 
-    protected DebugRequest(DebugRequest<T> other) {
-        this.stops = other.stops();
-        this.path = other.path();
-        this.pathStartAtStopIndex = other.pathStartAtStopIndex();
-        this.stopArrivalListener = other.stopArrivalListener();
-        this.destinationArrivalListener = other.destinationArrivalListener();
-        this.pathFilteringListener = other.pathFilteringListener();
-    }
 
     /**
      * List of stops to debug.
      */
     public List<Integer> stops() {
-        return Collections.emptyList();
+        return stops;
     }
 
     /**
      * List of stops in a particular path to debug. Only one path can be debugged per request.
      */
     public List<Integer> path() {
-        return Collections.emptyList();
+        return path;
     }
 
     /**

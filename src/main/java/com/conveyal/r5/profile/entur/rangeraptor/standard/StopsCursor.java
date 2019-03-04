@@ -52,9 +52,6 @@ class StopsCursor<T extends TripScheduleInfo> {
      * @return the current transit state, if found
      */
     Transit<T> transit(int round, int stop) {
-        if (round == 0) {
-            throw new IllegalArgumentException("Transit legs are never the first leg...");
-        }
         StopArrivalState<T> state = stops.get(round, stop);
         return new Transit<>(round, stop, state, this);
     }

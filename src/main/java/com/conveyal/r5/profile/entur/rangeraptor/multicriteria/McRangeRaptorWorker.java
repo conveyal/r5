@@ -30,7 +30,8 @@ public final class McRangeRaptorWorker<T extends TripScheduleInfo> extends Abstr
                         heuristics,
                         context.costCalculator(),
                         context.calculator(),
-                        context.debugFactory()
+                        context.debugFactory(),
+                        context.lifeCycle()
                 )
         );
     }

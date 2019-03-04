@@ -27,7 +27,10 @@ import java.util.Iterator;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> implements StdWorkerState<T> {
+public final class StdRangeRaptorWorkerState<T
+        extends TripScheduleInfo>
+        implements StdWorkerState<T>
+{
 
     /**
      * The best times to reach each stop, whether via a transfer or via transit directly.
@@ -56,31 +59,10 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> impleme
      * create a BestTimes Range Raptor State for given context.
      */
     public StdRangeRaptorWorkerState(SearchContext<T> ctx, BestTimes bestTimes, StopArrivalsState<T> stopArrivalsState) {
-        this(
-                ctx.egressStops(),
-                bestTimes,
-                stopArrivalsState,
-                ctx.calculator()
-        );
-    }
-
-    protected StdRangeRaptorWorkerState(
-            int[] egressStops,
-            BestTimes bestTimes,
-            StopArrivalsState<T> stopArrivalsState,
-            TransitCalculator calculator
-    ) {
-        this.calculator = calculator;
+        this.calculator = ctx.calculator();
         this.bestTimes = bestTimes;
         this.stopArrivalsState = stopArrivalsState;
-        this.arrivedAtDestinationCheck = new SimpleArrivedAtDestinationCheck(egressStops, bestTimes);
-    }
-
-    @Override
-    public final void setupIteration(int iterationDepartureTime) {
-        // clear all touched stops to avoid constant reëxploration
-        bestTimes.prepareForNewIteration();
-        stopArrivalsState.setupIteration(iterationDepartureTime);
+        this.arrivedAtDestinationCheck = new SimpleArrivedAtDestinationCheck(ctx.egressStops(), bestTimes);
     }
 
     @Override
@@ -96,18 +78,8 @@ public final class StdRangeRaptorWorkerState<T extends TripScheduleInfo> impleme
     }
 
     @Override
-    public void iterationComplete() {
-        stopArrivalsState.iterationComplete();
-    }
-
-    @Override
     public final boolean isNewRoundAvailable() {
         return bestTimes.isCurrentRoundUpdated();
-    }
-
-    @Override
-    public final void prepareForNextRound() {
-        bestTimes.prepareForNextRound();
     }
 
     @Override

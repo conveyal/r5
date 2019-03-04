@@ -4,6 +4,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
 import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
@@ -35,7 +36,8 @@ public final class StdStopArrivalsState<T extends TripScheduleInfo> implements S
                 c.roundProvider(),
                 c.calculator(),
                 c.debugFactory(),
-                c.egressLegs()
+                c.egressLegs(),
+                c.lifeCycle()
         );
 
         if (c.debugRequest().isDebug()) {
@@ -56,15 +58,11 @@ public final class StdStopArrivalsState<T extends TripScheduleInfo> implements S
             RoundProvider roundProvider,
             TransitCalculator calculator,
             DebugHandlerFactory<T> dFactory,
-            Collection<TransferLeg> egressLegs
+            Collection<TransferLeg> egressLegs,
+            LifeCyclePublisher lifeCycle
     ) {
         this.stops = new Stops<>(nRounds, nStops, egressLegs, roundProvider, this::handleEgressStopArrival);
-        this.results = new DestinationArrivals<>(nRounds, calculator, cursor(calculator), dFactory);
-    }
-
-    @Override
-    final public void setupIteration(int iterationDepartureTime) {
-        results.setIterationDepartureTime(iterationDepartureTime);
+        this.results = new DestinationArrivals<>(nRounds, calculator, cursor(calculator), dFactory, lifeCycle);
     }
 
     @Override
@@ -90,14 +88,6 @@ public final class StdStopArrivalsState<T extends TripScheduleInfo> implements S
 
     @Override
     public void rejectNewBestTransitTime(int stop, int alightTime, T trip, int boardStop, int boardTime) {
-    }
-
-    /**
-     * Create paths for current iteration.
-     */
-    @Override
-    public final void iterationComplete() {
-        results.addPathsForCurrentIteration();
     }
 
     @Override

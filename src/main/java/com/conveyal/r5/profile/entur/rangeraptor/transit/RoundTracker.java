@@ -1,12 +1,11 @@
 package com.conveyal.r5.profile.entur.rangeraptor.transit;
 
 
+import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
 import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 
 /**
  * Round tracker to keep track of round index and when to stop exploring new rounds.
- * <p/>
- *
  */
 public class RoundTracker implements RoundProvider {
 
@@ -33,17 +32,27 @@ public class RoundTracker implements RoundProvider {
      */
     private int roundMaxLimit;
 
-    public RoundTracker(int nRounds, int numberOfAdditionalTransfers) {
+
+    RoundTracker(int nRounds, int numberOfAdditionalTransfers, LifeCyclePublisher lifeCycle) {
         // The 'roundMaxLimit' is inclusive, while the 'nRounds' is exclusive; Hence subtract 1.
         this.roundMaxLimit = nRounds - 1;
         this.numberOfAdditionalTransfers = numberOfAdditionalTransfers;
+        lifeCycle.onSetupIteration(this::setupIteration);
+        lifeCycle.onPrepareForNextRound(this::prepareForNextRound);
+        lifeCycle.onRoundComplete(this::roundComplete);
     }
 
     /**
      * Before each iteration, initialize the round to 0.
      */
-    public void setupIteration() {
+    private void setupIteration(int ignoreIterationDepartureTime) {
         round = 0;
+    }
+
+    private void roundComplete(boolean destinationReached) {
+        if(destinationReached) {
+            recalculateMaxLimitBasedOnDestinationReachedinCurrentRound();
+        }
     }
 
     /**
@@ -56,7 +65,7 @@ public class RoundTracker implements RoundProvider {
     /**
      * Prepare for next round by incrementing round index.
      */
-    public void prepareForNextRound() {
+    private void prepareForNextRound() {
         ++round;
     }
 
@@ -67,7 +76,10 @@ public class RoundTracker implements RoundProvider {
         return round;
     }
 
-    public void notifyArrivedAtDestinationInCurrentRound() {
+
+    /* private methods */
+
+    private void recalculateMaxLimitBasedOnDestinationReachedinCurrentRound() {
         roundMaxLimit = Math.min(roundMaxLimit, round + numberOfAdditionalTransfers);
     }
 }

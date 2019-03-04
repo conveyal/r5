@@ -7,6 +7,7 @@ import com.conveyal.r5.profile.entur.api.request.TuningParameters;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
 import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
@@ -31,7 +32,7 @@ public class SearchContext<T extends TripScheduleInfo> {
     private final boolean searchForward;
     private final DebugRequest<T> debugRequest;
     private final DebugHandlerFactory<T> debugFactory;
-
+    private final RangeRaptorLifeCyclePublisher lifeCyclePublisher = new RangeRaptorLifeCyclePublisher();
 
     public SearchContext(
             RangeRaptorRequest<T> request,
@@ -46,10 +47,10 @@ public class SearchContext<T extends TripScheduleInfo> {
         this.searchForward = forward;
         // Note that it is the "new" request that is passed in.
         this.calculator = createCalculator(this.request, tuningParameters, forward);
-        this.roundTracker = new RoundTracker(nRounds(), request.numberOfAdditionalTransfers());
+        this.roundTracker = new RoundTracker(nRounds(), request.numberOfAdditionalTransfers(), lifeCycle());
         this.timers = timers;
         this.debugRequest = debugRequest(request, forward);
-        this.debugFactory = new DebugHandlerFactory<>(this.debugRequest);
+        this.debugFactory = new DebugHandlerFactory<>(this.debugRequest, lifeCycle());
     }
 
     public Collection<TransferLeg> accessLegs() {
@@ -127,5 +128,9 @@ public class SearchContext<T extends TripScheduleInfo> {
 
     public RoundProvider roundProvider() {
         return roundTracker;
+    }
+
+    public LifeCyclePublisher lifeCycle() {
+        return lifeCyclePublisher;
     }
 }

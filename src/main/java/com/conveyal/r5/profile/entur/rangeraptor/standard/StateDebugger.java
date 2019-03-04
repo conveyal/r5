@@ -26,10 +26,6 @@ class StateDebugger<T extends TripScheduleInfo> {
         this.debugHandlerStopArrivals = debugHandlerStopArrivals;
     }
 
-    void setIterationDepartureTime(int iterationDepartureTime) {
-        debugHandlerStopArrivals.setIterationDepartureTime(iterationDepartureTime);
-    }
-
     boolean isDebug(int stop) {
         return debugHandlerStopArrivals.isDebug(stop);
     }

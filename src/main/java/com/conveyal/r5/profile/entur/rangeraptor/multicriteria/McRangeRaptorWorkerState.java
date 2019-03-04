@@ -4,6 +4,7 @@ import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
@@ -49,7 +50,8 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
             DestinationHeuristic[] heuristics,
             CostCalculator costCalculator,
             TransitCalculator transitCalculator,
-            DebugHandlerFactory<T> debugHandlerFactory
+            DebugHandlerFactory<T> debugHandlerFactory,
+            LifeCyclePublisher lifeCycle
 
     ) {
         this.stops = new Stops<>(
@@ -64,15 +66,10 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         this.touchedStops = new BitSet(nStops);
         this.costCalculator = costCalculator;
         this.transitCalculator = transitCalculator;
-    }
 
-    @Override
-    public void setupIteration(int iterationDepartureTime) {
-        arrivalsCache.clear();
-        stops.startNewIteration(iterationDepartureTime);
-
-        // clear all touched stops to avoid constant rexploration
-        startRecordChangesToStopsForNextAndCurrentRound();
+        // Attach this to the RR life cycle
+        lifeCycle.onSetupIteration(this::setupIteration);
+        lifeCycle.onPrepareForNextRound(this::prepareForNextRound);
     }
 
     @Override
@@ -86,11 +83,6 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     @Override
     public boolean isNewRoundAvailable() {
         return updatesExist;
-    }
-
-    @Override
-    public void prepareForNextRound() {
-        stops.clearReachedCurrentRoundFlag();
     }
 
     @Override
@@ -133,7 +125,9 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
 
     @Override
     public void transitsForRoundComplete() {
-        startRecordChangesToStopsForNextAndCurrentRound();
+        updatesExist = !arrivalsCache.isEmpty();
+        stops.markAllStops();
+        touchedStops.clear();
         commitCachedArrivals();
     }
 
@@ -155,6 +149,19 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
 
     /* private methods */
 
+    private void setupIteration(int ignoredIterationDepartureTime) {
+        arrivalsCache.clear();
+        // clear all touched stops to avoid constant rexploration
+        touchedStops.clear();
+        stops.markAllStops();
+        updatesExist = false;
+    }
+
+    private void prepareForNextRound() {
+        stops.clearReachedCurrentRoundFlag();
+    }
+
+
     private void transferToStop(Iterable<? extends AbstractStopArrival<T>> fromArrivals, TransferLeg transfer) {
         final int transferTimeInSeconds = transfer.durationInSeconds();
 
@@ -166,12 +173,6 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
                 arrivalsCache.add(new TransferStopArrival<>(it, transfer, arrivalTime, cost));
             }
         }
-    }
-
-    private void startRecordChangesToStopsForNextAndCurrentRound() {
-        stops.markAllStops();
-        touchedStops.clear();
-        updatesExist = !arrivalsCache.isEmpty();
     }
 
     private void commitCachedArrivals() {

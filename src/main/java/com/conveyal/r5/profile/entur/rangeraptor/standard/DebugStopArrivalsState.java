@@ -35,12 +35,6 @@ public final class DebugStopArrivalsState<T extends TripScheduleInfo> implements
     }
 
     @Override
-    final public void setupIteration(int iterationDepartureTime) {
-        debug.setIterationDepartureTime(iterationDepartureTime);
-        delegate.setupIteration(iterationDepartureTime);
-    }
-
-    @Override
     public final void setInitialTime(final int stop, final int arrivalTime, int durationInSeconds) {
         delegate.setInitialTime(stop, arrivalTime, durationInSeconds);
         debug.accept(stop);
@@ -56,7 +50,6 @@ public final class DebugStopArrivalsState<T extends TripScheduleInfo> implements
         return delegate.bestTimePreviousRound(stop);
     }
 
-
     @Override
     public void setNewBestTransitTime(int stop, int alightTime, T trip, int boardStop, int boardTime, boolean newBestOverall) {
         debug.dropOldStateAndAcceptNewState(
@@ -71,14 +64,6 @@ public final class DebugStopArrivalsState<T extends TripScheduleInfo> implements
             debug.rejectTransit(stop, alightTime, trip, boardStop, boardTime);
         }
         delegate.rejectNewBestTransitTime(stop, alightTime, trip, boardStop, boardTime);
-    }
-
-    /**
-     * Create paths for current iteration.
-     */
-    @Override
-    public final void iterationComplete() {
-        delegate.iterationComplete();
     }
 
     @Override

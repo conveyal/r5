@@ -2,6 +2,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.debug;
 
 import com.conveyal.r5.profile.entur.api.debug.DebugEvent;
 import com.conveyal.r5.profile.entur.api.request.DebugRequest;
+import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
 
 import java.util.Collection;
@@ -23,11 +24,18 @@ abstract class AbstractDebugHandlerAdapter<T> implements DebugHandler<T> {
     private final Consumer<DebugEvent<T>> eventListener;
     private int iterationDepartureTime = -1;
 
-    AbstractDebugHandlerAdapter(DebugRequest<?> debugRequest, Consumer<DebugEvent<T>> eventListener) {
+    AbstractDebugHandlerAdapter(
+            DebugRequest<?> debugRequest,
+            Consumer<DebugEvent<T>> eventListener,
+            LifeCyclePublisher lifeCycle
+    ) {
         this.stops = debugRequest.stops();
         this.path = debugRequest.path();
         this.pathStartAtStopIndex = debugRequest.pathStartAtStopIndex();
         this.eventListener = eventListener;
+
+        // Attach debugger to RR life cycle to receive iteration setup events
+        lifeCycle.onSetupIteration(this::setupIteration);
     }
 
     @Override
@@ -37,35 +45,30 @@ abstract class AbstractDebugHandlerAdapter<T> implements DebugHandler<T> {
 
     @Override
     public void accept(T element, Collection<? extends T> result) {
-        if(isDebug(element)) {
+        if (isDebug(element)) {
             eventListener.accept(DebugEvent.accept(iterationDepartureTime, element, result));
         }
     }
 
     @Override
     public void reject(T element, Collection<? extends T> result) {
-        if(isDebug(element)) {
+        if (isDebug(element)) {
             eventListener.accept(DebugEvent.reject(iterationDepartureTime, element, result));
         }
     }
 
     @Override
     public void rejectByOptimization(T element) {
-        if(isDebug(element)) {
+        if (isDebug(element)) {
             eventListener.accept(DebugEvent.rejectByOptimization(iterationDepartureTime, element));
         }
     }
 
     @Override
     public void drop(T element, T droppedByElement) {
-        if(isDebug(element)) {
+        if (isDebug(element)) {
             eventListener.accept(DebugEvent.drop(iterationDepartureTime, element, droppedByElement));
         }
-    }
-
-    @Override
-    public void setIterationDepartureTime(int iterationDepartureTime) {
-        this.iterationDepartureTime = iterationDepartureTime;
     }
 
     abstract protected int stop(T arrival);
@@ -74,6 +77,10 @@ abstract class AbstractDebugHandlerAdapter<T> implements DebugHandler<T> {
 
 
     /* private members */
+
+    private void setupIteration ( int iterationDepartureTime){
+        this.iterationDepartureTime = iterationDepartureTime;
+    }
 
     private boolean isDebug(T arrival) {
         return stops.contains(stop(arrival)) || isDebugTrip(arrival);
@@ -88,13 +95,13 @@ abstract class AbstractDebugHandlerAdapter<T> implements DebugHandler<T> {
         Iterator<Integer> pathStops = path.iterator();
 
         while (stopsVisited.hasNext()) {
-            if(!pathStops.hasNext()) {
+            if (!pathStops.hasNext()) {
                 return false;
             }
             Integer visitedStop = stopsVisited.next();
             Integer pathStop = pathStops.next();
 
-            if(!visitedStop.equals(pathStop)) {
+            if (!visitedStop.equals(pathStop)) {
                 return false;
             }
         }

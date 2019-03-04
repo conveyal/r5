@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
+import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
@@ -45,10 +46,10 @@ public final class BestTimes {
 
 
     public BestTimes(SearchContext<?> c) {
-        this(c.nStops(), c.calculator());
+        this(c.nStops(), c.calculator(), c.lifeCycle());
     }
 
-    private BestTimes(int nStops, TransitCalculator calculator) {
+    private BestTimes(int nStops, TransitCalculator calculator, LifeCyclePublisher lifeCycle) {
         this.calculator = calculator;
         this.times = intArray(nStops, calculator.unreachedTime());
         this.reachedCurrentRound = new BitSet(nStops);
@@ -56,6 +57,8 @@ public final class BestTimes {
 
         this.transitTimes = intArray(nStops, calculator.unreachedTime());
         this.transitReachedCurrentRound = new BitSet(nStops);
+
+        glueToLifeCycle(lifeCycle);
     }
 
     public int time(int stop) {
@@ -72,7 +75,8 @@ public final class BestTimes {
      * iteration in the last round does not "overflow" into
      * the next iteration.
      */
-    final void prepareForNewIteration() {
+    private void setupIteration() {
+        // clear all touched stops to avoid constant reëxploration
         reachedCurrentRound.clear();
         transitReachedCurrentRound.clear();
     }
@@ -87,7 +91,7 @@ public final class BestTimes {
     /**
      * Prepare this class for the next round updating reached flags.
      */
-    final void prepareForNextRound() {
+    private void prepareForNextRound() {
         swapReachedCurrentAndLastRound();
         reachedCurrentRound.clear();
         transitReachedCurrentRound.clear();
@@ -178,5 +182,10 @@ public final class BestTimes {
         BitSet tmp = reachedLastRound;
         reachedLastRound = reachedCurrentRound;
         reachedCurrentRound = tmp;
+    }
+
+    private void glueToLifeCycle(LifeCyclePublisher lifeCycle) {
+        lifeCycle.onSetupIteration((dt) -> setupIteration());
+        lifeCycle.onPrepareForNextRound(this::prepareForNextRound);
     }
 }

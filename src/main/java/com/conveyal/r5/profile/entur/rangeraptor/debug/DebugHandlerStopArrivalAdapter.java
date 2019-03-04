@@ -2,6 +2,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.debug;
 
 import com.conveyal.r5.profile.entur.api.request.DebugRequest;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 
 /**
@@ -12,8 +13,8 @@ import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 final class DebugHandlerStopArrivalAdapter<T extends TripScheduleInfo>
         extends AbstractDebugHandlerAdapter<StopArrivalView<T>> {
 
-    DebugHandlerStopArrivalAdapter(DebugRequest<T> debug) {
-        super(debug, debug.stopArrivalListener());
+    DebugHandlerStopArrivalAdapter(DebugRequest<T> debug, LifeCyclePublisher lifeCycle) {
+        super(debug, debug.stopArrivalListener(), lifeCycle);
     }
 
     @Override

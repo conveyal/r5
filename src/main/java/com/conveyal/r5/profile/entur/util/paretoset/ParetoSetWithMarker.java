@@ -17,8 +17,8 @@ public class ParetoSetWithMarker<T> extends ParetoSet<T> {
         super(comparator);
     }
 
-    public ParetoSetWithMarker(ParetoComparator<T> comparator, DropEventListener<T> dropListener) {
-        super(comparator, dropListener);
+    public ParetoSetWithMarker(ParetoComparator<T> comparator, ParetoSetEventListener<? super T> eventListener) {
+        super(comparator, eventListener);
     }
 
     @Override

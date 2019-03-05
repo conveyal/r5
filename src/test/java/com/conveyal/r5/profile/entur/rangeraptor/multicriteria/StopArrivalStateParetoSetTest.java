@@ -7,7 +7,6 @@ import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessSt
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransferStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
-import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -39,7 +38,7 @@ public class StopArrivalStateParetoSetTest {
     private static final AbstractStopArrival<TripScheduleInfo> TRANSFER_R1 = newMcTransitStopState(ROUND_1,998, 10);
     private static final AbstractStopArrival<TripScheduleInfo> TRANSFER_R2 = newMcTransitStopState(ROUND_2,997, 20);
 
-    private StopArrivals<TripScheduleInfo> subject = new StopArrivals<>(DebugHandler.noop());
+    private StopArrivalParetoSet<TripScheduleInfo> subject = new StopArrivalParetoSet<>(null);
 
     @Test
     public void addOneElementToSet() {

@@ -99,6 +99,11 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
 
     /**
      * For each iteration (minute), calculate the minimum travel time to each transit stop in seconds.
+     * <p/>
+     * Run the scheduled search, round 0 is the street search
+     * <p/>
+     * We are using the Range-RAPTOR extension described in Delling, Daniel, Thomas Pajor, and Renato Werneck.
+     * “Round-Based Public Transit Routing,” January 1, 2012. http://research.microsoft.com/pubs/156567/raptor_alenex.pdf.
      *
      * @return a unique set of paths
      */
@@ -108,9 +113,12 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
             timerSetup(transit::setup);
 
             // The main outer loop iterates backward over all minutes in the departure times window.
+            // Ergo, we re-use the arrival times found in searches that have already occurred that
+            // depart later, because the arrival time given departure at time t is upper-bounded by
+            // the arrival time given departure at minute t + 1.
             final IntIterator it = calculator.rangeRaptorMinutes();
             while (it.hasNext()) {
-                // Run the raptor search for this particular departure time
+                // Run the raptor search for this particular iteration departure time
                 timerRouteByMinute(() -> runRaptorForMinute(it.next()));
             }
         });
@@ -156,17 +164,12 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
     /**
      * Perform one minute of a RAPTOR search.
      *
-     * @param departureTime When this search departs.
+     * @param iterationDepartureTime When this search departs.
      */
-    private void runRaptorForMinute(int departureTime) {
-        iterationSetup(departureTime);
+    private void runRaptorForMinute(int iterationDepartureTime) {
+        lifeCycle.setupIteration(iterationDepartureTime);
 
-        // Run the scheduled search
-        // round 0 is the street search
-        // We are using the Range-RAPTOR extension described in Delling, Daniel, Thomas Pajor, and Renato Werneck.
-        // “Round-Based Public Transit Routing,” January 1, 2012. http://research.microsoft.com/pubs/156567/raptor_alenex.pdf.
-        // ergo, we re-use the arrival times found in searches that have already occurred that depart later, because
-        // the arrival time given departure at time t is upper-bounded by the arrival time given departure at minute t + 1.
+        doTransfersForAccessLegs(iterationDepartureTime);
 
         while (hasMoreRounds()) {
             lifeCycle.prepareForNextRound();
@@ -177,7 +180,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
 
             timerByMinuteTransfers().time(this::transfersForRound);
 
-            roundComplete();
+            lifeCycle.roundComplete(state.isDestinationReachedInCurrentRound());
         }
 
         // This state is repeatedly modified as the outer loop progresses over departure minutes.
@@ -200,10 +203,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
      * <p/>
      * This method is protected to allow reverce search to override it.
      */
-    private void iterationSetup(int iterationDepartureTime) {
-        lifeCycle.setupIteration(iterationDepartureTime);
-
-        // add initial stops
+    private void doTransfersForAccessLegs(int iterationDepartureTime) {
         for (TransferLeg it : accessLegs) {
             state.setInitialTimeForIteration(it, iterationDepartureTime);
         }
@@ -238,10 +238,6 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
             state.transferToStops(fromStop, transit.getTransfers(fromStop));
         }
         state.transfersForRoundComplete();
-    }
-
-    private void roundComplete() {
-        lifeCycle.roundComplete(state.isDestinationReachedInCurrentRound());
     }
 
     // Track time spent, measure performance

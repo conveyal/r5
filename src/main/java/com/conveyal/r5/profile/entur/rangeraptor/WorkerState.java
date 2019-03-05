@@ -10,6 +10,7 @@ import java.util.Iterator;
 
 /**
  * TODO TGR
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public interface WorkerState<T extends TripScheduleInfo> {
 

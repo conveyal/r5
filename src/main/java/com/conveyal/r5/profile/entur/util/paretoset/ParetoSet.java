@@ -45,15 +45,11 @@ public class ParetoSet<T> extends AbstractCollection<T> {
         this.eventListener = eventListener;
     }
 
-    public ParetoSet(ParetoComparator<T> comparator, DropEventListener<T> dropEventListener) {
-        this(comparator, new DropEventAdapter<>(dropEventListener));
-    }
-
     /**
      * Create a new ParetoSet with a comparator.
      */
     public ParetoSet(ParetoComparator<T> comparator) {
-        this(comparator, (ParetoSetEventListener<? super T>) null);
+        this(comparator, null);
     }
 
     public T get(int index) {

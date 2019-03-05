@@ -3,24 +3,53 @@ package com.conveyal.r5.profile.entur.rangeraptor.view;
 import java.util.Collection;
 
 /**
- * TODO TGR
+ * This interface serve as a debug handler for the Worker and State classes.
+ * They ues this interface to report stop arrival events and destination arrival
+ * events, but are not limited to those two.
+ * <p/>
+ * The implementation of this interface will take these events and report them
+ * back to the API listeners, passed in as part of the debug request.
  *
- * @param <T> The TripSchedule type defined by the user of the range raptor API.
+ * @param <T> The element type reported to the handler
  */
 public interface DebugHandler<T> {
+    /**
+     * Retuns TRUE if a listener exist and there the given stop index is in the stops or path list.
+     */
     boolean isDebug(int stop);
-    void accept(T element, Collection<? extends T> result);
-    void reject(T element, Collection<? extends T> result);
-    void rejectByOptimization(T element);
-    void drop(T element, T droppedByElement);
 
-    static <S> DebugHandler<S> noop() {
-        return new DebugHandler<S>() {
-            @Override public boolean isDebug(int stop) { return false; }
-            @Override public void accept(S element, Collection<? extends S> result) {}
-            @Override public void reject(S element, Collection<? extends S> result) {}
-            @Override public void rejectByOptimization(S element) {}
-            @Override public void drop(S element, S droppedByElement) {}
-        };
-    }
+    /**
+     * Callback to notify that the given element is accepted into the given collection.
+     * For example this happens when a new stop arrival is accepted at a particular stop.
+     * <p/>
+     * The handler will do the last check to see if this stop is in the request stop list
+     * or in represent a path. To do this it traverses the path.
+     */
+    void accept(T element, Collection<? extends T> result);
+
+    /**
+     * Callback to notify that the given element is rejected by the given collection.
+     * <p/>
+     * The same check as in {@link #accept(Object, Collection)} is performed before reppoting
+     * back to the API listeners.
+     */
+    void reject(T element, Collection<? extends T> result);
+
+    /**
+     * Callback to notify that the given element is rejected as part of an optimization.
+     * An optimization might be that the arrivalTime or numberOfTransfer exceeds it limits.
+     * <p/>
+     * The same check as in {@link #accept(Object, Collection)} is performed before reppoting
+     * back to the API listeners.
+     */
+    void rejectByOptimization(T element);
+
+    /**
+     * Callback to notify that the given element is dropped, because a new and even more
+     * shiny element is found.
+     * <p/>
+     * The same check as in {@link #accept(Object, Collection)} is performed before reppoting
+     * back to the API listeners.
+     */
+    void drop(T element, T droppedByElement);
 }

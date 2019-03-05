@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile.entur.util.paretoset;
 
+import javax.annotation.Nullable;
 import java.util.AbstractCollection;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -26,8 +27,8 @@ import java.util.stream.Stream;
  * @param <T> the element type
  */
 public class ParetoSet<T> extends AbstractCollection<T> {
-    private final DropEventListener<T> dropEventListener;
     private final ParetoComparator<T> comparator;
+    private final ParetoSetEventListener<? super T> eventListener;
     @SuppressWarnings("unchecked")
     private T[] elements = (T[])new Object[16];
     private int size = 0;
@@ -37,18 +38,22 @@ public class ParetoSet<T> extends AbstractCollection<T> {
      * Create a new ParetoSet with a comparator and a drop event listener.
      *
      * @param comparator The comparator to use with this set
-     * @param dropEventListener At most one subscriber can be registered to listen for drop events.
+     * @param eventListener At most one listener can be registered to listen for drop events.
      */
-    public ParetoSet(ParetoComparator<T> comparator, DropEventListener<T> dropEventListener) {
+    public ParetoSet(ParetoComparator<T> comparator, @Nullable ParetoSetEventListener<? super T> eventListener) {
         this.comparator = comparator;
-        this.dropEventListener = dropEventListener;
+        this.eventListener = eventListener;
+    }
+
+    public ParetoSet(ParetoComparator<T> comparator, DropEventListener<T> dropEventListener) {
+        this(comparator, new DropEventAdapter<>(dropEventListener));
     }
 
     /**
      * Create a new ParetoSet with a comparator.
      */
     public ParetoSet(ParetoComparator<T> comparator) {
-        this(comparator, (oe, ne) -> {/* NOOP */});
+        this(comparator, (ParetoSetEventListener<? super T>) null);
     }
 
     public T get(int index) {
@@ -73,7 +78,7 @@ public class ParetoSet<T> extends AbstractCollection<T> {
     @Override
     public boolean add(T  newValue) {
         if (size == 0) {
-            appendValue(newValue);
+            acceptAndAppendValue(newValue);
             return true;
         }
 
@@ -94,6 +99,7 @@ public class ParetoSet<T> extends AbstractCollection<T> {
                 return true;
             }
             else if (rightDominance) {
+                notifyElementRejected(newValue);
                 return false;
             }
             else {
@@ -103,11 +109,12 @@ public class ParetoSet<T> extends AbstractCollection<T> {
 
         if (mutualDominanceExist && !equivalentVectorExist) {
             assertEnoughSpaceInSet();
-            appendValue(newValue);
+            acceptAndAppendValue(newValue);
             return true;
         }
 
         // No dominance found, newValue is equivalent with all values in the set
+        notifyElementRejected(newValue);
         return false;
     }
 
@@ -177,17 +184,12 @@ public class ParetoSet<T> extends AbstractCollection<T> {
                 .collect(Collectors.joining(", ")) + "}";
     }
 
-
     /**
      * Notify subclasses about reindexing. This method is empty,
      * and only exist for subclasses to override it.
      */
     protected void notifyElementMoved(int fromIndex, int toIndex) {
         // Noop
-    }
-
-    private void notifyElementDropped(T oldElement, T newElement) {
-        dropEventListener.elementDroppedFromParetoSet(oldElement, newElement);
     }
 
     /**
@@ -216,6 +218,7 @@ public class ParetoSet<T> extends AbstractCollection<T> {
             ++j;
         }
         notifyElementMoved(j, i);
+        notifyElementAccepted(newValue);
         elements[i] = newValue;
         size = i+1;
     }
@@ -224,7 +227,8 @@ public class ParetoSet<T> extends AbstractCollection<T> {
         return leftDominanceExist(left, right) && !rightDominanceExist(left, right);
     }
 
-    private void appendValue(T newValue) {
+    private void acceptAndAppendValue(T newValue) {
+        notifyElementAccepted(newValue);
         elements[size++] = newValue;
     }
 
@@ -240,5 +244,23 @@ public class ParetoSet<T> extends AbstractCollection<T> {
 
     private boolean rightDominanceExist(T left, T right) {
         return comparator.leftDominanceExist(right, left);
+    }
+
+    private void notifyElementAccepted(T newElement) {
+        if(eventListener != null) {
+            eventListener.notifyElementAccepted(newElement, this);
+        }
+    }
+
+    private void notifyElementDropped(T element, T droppedByElement) {
+        if(eventListener != null) {
+            eventListener.notifyElementDropped(element, droppedByElement);
+        }
+    }
+
+    private void notifyElementRejected(T element) {
+        if(eventListener != null) {
+            eventListener.notifyElementRejected(element, this);
+        }
     }
 }

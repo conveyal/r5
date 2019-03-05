@@ -4,10 +4,10 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static org.junit.Assert.assertEquals;
@@ -15,7 +15,6 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class ParetoSetTest {
-    private static final int NOT_SET = -999;
     private static final ParetoComparator<Vector> DIFFERENT = (l, r) -> l.v1 != r.v1;
     private static final ParetoComparator<Vector> LESS_THEN = (l, r) -> l.v1 < r.v1;
     private static final ParetoComparator<Vector> LESS_LESS_THEN = (l, r) -> l.v1 < r.v1 || l.v2 < r.v2;
@@ -23,6 +22,15 @@ public class ParetoSetTest {
 
     // Used to stored dropped vectors (callback from set)
     private List<Vector> dropped = new ArrayList<>();
+
+    private ParetoSetEventListener<Vector> listener = new ParetoSetEventListener<Vector>() {
+        @Override public void notifyElementAccepted(Vector newElement, Collection resultSet) { /* NOOP */ }
+        @Override public void notifyElementDropped(Vector element, Vector droppedByElement) {
+            dropped.add(element);
+        }
+        @Override public void notifyElementRejected(Vector element, Collection existingSet) { /* NOOP */ }
+    };
+
 
     @Test
     public void initiallyEmpty() {
@@ -175,6 +183,33 @@ public class ParetoSetTest {
     }
 
     @Test
+    public void testOneVectorDominatesMany() {
+        // Given a set and function
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN);
+
+        // Add some values - all pareto optimal
+        set.add(new Vector("V0", 5, 1));
+        set.add(new Vector("V1", 3, 3));
+        set.add(new Vector("V2", 0, 7));
+        set.add(new Vector("V3", 1, 5));
+
+        // Assert all vectors is there
+        assertEquals("{V0[5, 1], V1[3, 3], V2[0, 7], V3[1, 5]}", set.toString());
+
+        // Add a vector witch dominates all vectors in set, except [0, 7]
+        set.add(new Vector("V", 1, 1));
+
+        // Expect just 2 vectors
+        assertEquals("{V2[0, 7], V[1, 1]}", set.toString());
+
+        // Add a vector witch dominates all vectors in set
+        set.add(new Vector("X", 0, 1));
+
+        // Expect just 1 vector - the last
+        assertEquals("{X[0, 1]}", set.toString());
+    }
+
+    @Test
     public void testRelaxedCriteriaAcceptingTheTwoSmallestValues() {
         // Given a set and function
         ParetoSet<Vector> set = new ParetoSet<>((l, r) -> l.v1 < r.v1 || l.v2 < r.v2 + 2);
@@ -191,7 +226,7 @@ public class ParetoSetTest {
         set.add(new Vector("V8", 5, 4));
         set.add(new Vector("V9", 5, 5));
 
-        // Independently of order expect all vectors with v1=4 or v2 in [1,2]
+        // Expect all vectors with v1=4 or v2 in [1,2]
         assertEquals("{V1[4, 4], V4[5, 2], V5[5, 1], V6[5, 2]}", set.toString());
     }
 
@@ -294,7 +329,7 @@ public class ParetoSetTest {
     @Test
     public void elementsAreNotDroppedWhenParetoOptimalElementsAreAdded() {
         // Given a set with 2 criteria: LT and LT
-        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN, (old, newElement) -> dropped.add(old));
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN, listener);
 
         // Before any elements are added the list of dropped elements should be empty
         assertTrue(dropped.isEmpty());
@@ -311,7 +346,7 @@ public class ParetoSetTest {
     @Test
     public void firstElementIsDroppedWhenANewDominatingElementIsAdded() {
         // Given a set with 2 criteria: LT and LT and a vector [7, 3]
-        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN, (old, newElement) -> dropped.add(old));
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN, listener);
         set.add(vector(7,3));
         assertTrue(dropped.isEmpty());
 
@@ -336,7 +371,7 @@ public class ParetoSetTest {
     @Test
     public void lastElementIsDroppedWhenANewDominatingElementIsAdded() {
         // Given a set with 2 criteria: LT and LT and a vector [7, 3]
-        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN, (old, newElement) -> dropped.add(old));
+        ParetoSet<Vector> set = new ParetoSet<>(LESS_LESS_THEN, listener);
         set.add(vector(5,5));
         set.add(vector(7,3));
         assertTrue(dropped.isEmpty());
@@ -374,32 +409,18 @@ public class ParetoSetTest {
             boolean qualify = set.qualify(vector);
             assertEquals("Qualify and add should return the same value.", qualify, set.add(vector));
         }
-        assertEquals(expected, names(set, false));
+        assertEquals(expected, names(set));
     }
 
-    private String log(ParetoSet<Vector> set, List<Vector> values, List<Integer> indexes) {
-        set.clear();
-        for (int index : indexes) {
-            set.add(new Vector(values.get(index)));
-        }
-        String result = names(set, true);
-        System.out.println("  " + indexes + " => " + result);
-        return result;
-    }
-
-    private static String names(Iterable<Vector> set, boolean sort) {
-        Stream<String> stream = StreamSupport
+    private static String names(Iterable<Vector> set) {
+        return StreamSupport
                 .stream(set.spliterator(), false)
-                .map(it -> it == null ? "null" : it.name);
-        if (sort) {
-            stream = stream.sorted();
-        }
-
-        return stream.collect(Collectors.joining(" "));
+                .map(it -> it == null ? "null" : it.name)
+                .collect(Collectors.joining(" "));
     }
 
     private static Vector vector(int a, int b) {
-        return new Vector("Test", a, b, NOT_SET, NOT_SET);
+        return new Vector("Test", a, b);
     }
 
     private static Vector vector(int a, int b, int c, int d) {
@@ -420,53 +441,6 @@ public class ParetoSetTest {
 
     private static void test(ParetoSet<Vector> set, Vector v0, Vector v1, String description, Vector... expected) {
         new TestCase(v0, v1, description, expected).run(set);
-    }
-
-    private static class Vector {
-        final String name;
-        final int v1, v2, v3, v4;
-
-        Vector(Vector o) {
-            this(o.name, o.v1, o.v2, o.v3, o.v4);
-        }
-        Vector(String name, int v1) {
-            this(name, v1, NOT_SET, NOT_SET, NOT_SET);
-        }
-        Vector(String name, int v1, int v2) {
-            this(name, v1, v2, NOT_SET, NOT_SET);
-        }
-        Vector(String name, int v1, int v2, int v3) {
-            this(name, v1, v2, v3, NOT_SET);
-        }
-
-        Vector(String name, int v1, int v2, int v3, int v4) {
-            this.name = name;
-            this.v1 = v1;
-            this.v2 = v2;
-            this.v3 = v3;
-            this.v4 = v4;
-        }
-
-        @Override
-        public String toString() {
-            if(v2 == NOT_SET) return name + "[" + v1 + "]";
-            if(v3 == NOT_SET) return name + "[" + v1 + ", " + v2 + "]";
-            if(v4 == NOT_SET) return name + "[" + v1 + ", " + v2 + ", " + v3 + "]";
-            return name + "[" + v1 + ", " + v2 + ", " + v3 + ", " + v4 + "]";
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Vector v = (Vector) o;
-            return v1 == v.v1 && v2 == v.v2 && v3 == v.v3 && v4 == v.v4 && name.equals(v.name);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(name, v1, v2, v3, v4);
-        }
     }
 
     static class TestCase {

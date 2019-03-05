@@ -10,7 +10,9 @@ package com.conveyal.r5.profile.entur.util.paretoset;
  * a listener of this type.
  *
  * @param <T> Pareto Set element type
+ * @deprecated Replaced by {@link ParetoSetEventListener}
  */
+@Deprecated
 @FunctionalInterface
 public interface DropEventListener<T> {
 

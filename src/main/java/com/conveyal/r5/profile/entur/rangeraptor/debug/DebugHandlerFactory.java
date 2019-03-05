@@ -7,51 +7,80 @@ import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
+import com.conveyal.r5.profile.entur.util.paretoset.ParetoSetEventListener;
 
 
 /**
  * Use this factory to create debug handlers. If a routing request has not enabled debugging
- * NOOP debug handlers are returned.
+ * {@code null} is returned. Use the {@link #isDebugStopArrival(int)} like methods before
+ * retrieving a handler.
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class DebugHandlerFactory<T extends TripScheduleInfo> {
-    private DebugHandler<StopArrivalView<T>> noopStopHandler;
     private DebugHandler<StopArrivalView<T>> stopHandler;
     private DebugHandler<DestinationArrivalView<T>> destinationHandler;
     private DebugHandler<Path<T>> pathHandler;
 
     public DebugHandlerFactory(DebugRequest<T> request, LifeCyclePublisher lifeCycle) {
-        this.noopStopHandler = DebugHandler.noop();
         this.stopHandler = isDebug(request, request.stopArrivalListener())
                 ? new DebugHandlerStopArrivalAdapter<>(request, lifeCycle)
-                : noopStopHandler;
+                : null;
 
         this.destinationHandler = isDebug(request, request.destinationArrivalListener())
                 ? new DebugHandlerDestinationArrivalAdapter<>(request, lifeCycle)
-                : DebugHandler.noop();
+                : null;
 
         this.pathHandler = isDebug(request, request.pathFilteringListener())
                 ? new DebugHandlerPathAdapter<>(request, lifeCycle)
-                : DebugHandler.noop();
+                : null;
+    }
+
+    /* Stop Arrival */
+
+    public boolean isDebugStopArrival() {
+        return stopHandler != null;
+    }
+
+    public boolean isDebugStopArrival(int stop) {
+        return stopHandler != null && stopHandler.isDebug(stop);
     }
 
     public DebugHandler<StopArrivalView<T>> debugStopArrival() {
         return stopHandler;
     }
 
-    public DebugHandler<StopArrivalView<T>> debugStopArrival(int stop) {
-        return stopHandler.isDebug(stop) ? stopHandler : noopStopHandler;
+    public ParetoSetEventListener<StopArrivalView<T>> paretoSetStopArrivalListener(int stop) {
+        return isDebugStopArrival(stop) ? new ParetoSetDebugHandlerAdapter<>(stopHandler) : null;
+    }
+
+
+    /* destination arrival */
+
+    @SuppressWarnings("WeakerAccess")
+    public boolean isDebugDestinationArrival() {
+        return destinationHandler != null;
     }
 
     public DebugHandler<DestinationArrivalView<T>> debugDestinationArrival() {
         return destinationHandler;
     }
 
-    public DebugHandler<Path<T>> debugPath() {
-        return pathHandler;
+    public ParetoSetEventListener<DestinationArrivalView<T>> paretoSetDestinationArrivalListener() {
+        return isDebugDestinationArrival() ? new ParetoSetDebugHandlerAdapter<>(destinationHandler) : null;
     }
 
+
+    /* path */
+
+    @SuppressWarnings("WeakerAccess")
+    public boolean isDebugPath() {
+        return pathHandler != null;
+    }
+
+    public ParetoSetDebugHandlerAdapter<Path<T>> paretoSetDebugPathListener() {
+        return isDebugPath() ? new ParetoSetDebugHandlerAdapter<>(pathHandler) : null;
+    }
 
     /* private methods */
 

@@ -25,12 +25,12 @@ import static java.util.Collections.emptyList;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 final class Stops<T extends TripScheduleInfo> {
-    private final StopArrivals<T>[] stops;
+    private final StopArrivalParetoSet<T>[] stops;
     private final DestinationHeuristic[] heuristics;
     private final DestinationArrivals<T> destinationArrivals;
+    private final DebugHandlerFactory<T> debugHandlerFactory;
     private final PathMapper<T> pathMapper;
     private final TransitCalculator calculator;
-    private final DebugHandlerFactory<T> debugHandlerFactory;
 
     /**
      * Set the time at a transit index iff it is optimal. This sets both the best time and the transfer time
@@ -45,7 +45,7 @@ final class Stops<T extends TripScheduleInfo> {
             DebugHandlerFactory<T> debugHandlerFactory
     ) {
         //noinspection unchecked
-        this.stops = (StopArrivals<T>[]) new StopArrivals[nStops];
+        this.stops = (StopArrivalParetoSet<T>[]) new StopArrivalParetoSet[nStops];
         this.heuristics = heuristics;
         this.calculator = transitCalculator;
         this.pathMapper = calculator.createPathMapper();
@@ -53,16 +53,10 @@ final class Stops<T extends TripScheduleInfo> {
         this.destinationArrivals = new DestinationArrivals<>(
                 relaxCostAtDestinationArrival,
                 calculator,
-                debugHandlerFactory.debugDestinationArrival()
+                debugHandlerFactory
         );
-
         for (TransferLeg it : egressLegs) {
-            this.stops[it.stop()] = new EgressStopArrivals<>(
-                    it,
-                    destinationArrivals,
-                    costCalculator,
-                    debugHandlerFactory.debugStopArrival(it.stop())
-            );
+            glueTogetherEgressStopWithDestinationArrivals(it, costCalculator);
         }
     }
 
@@ -93,7 +87,7 @@ final class Stops<T extends TripScheduleInfo> {
 
     boolean addStopArrival(AbstractStopArrival<T> arrival) {
         if(vetoHeuristicDestinationArrival(arrival)) {
-            debugHandlerFactory.debugStopArrival(arrival.stop()).rejectByOptimization(arrival);
+            rejectByOptimization(arrival);
             return false;
         }
         return findOrCreateSet(arrival.stop()).add(arrival);
@@ -101,12 +95,12 @@ final class Stops<T extends TripScheduleInfo> {
 
     Collection<Path<T>> extractPaths() {
         debugStateInfo();
-        return destinationArrivals.stream().map(pathMapper::mapToPath).collect(Collectors.toList());
+        return destinationArrivals.mapToList(pathMapper::mapToPath);
     }
 
     /** List all transits arrived this round. */
     Iterable<AbstractStopArrival<T>> listArrivalsAfterMark(final int stop) {
-        StopArrivals<T> it = stops[stop];
+        StopArrivalParetoSet<T> it = stops[stop];
         if(it==null) {
             return emptyList();
         }
@@ -114,18 +108,54 @@ final class Stops<T extends TripScheduleInfo> {
     }
 
     void markAllStops() {
-        for (StopArrivals<T> stop : stops) {
+        for (StopArrivalParetoSet<T> stop : stops) {
             if (stop != null) {
                 stop.markAtEndOfSet();
             }
         }
     }
 
-    private StopArrivals<T> findOrCreateSet(final int stop) {
+    private StopArrivalParetoSet<T> findOrCreateSet(final int stop) {
         if(stops[stop] == null) {
-            stops[stop] = new StopArrivals<>(debugHandlerFactory.debugStopArrival(stop));
+            stops[stop] = StopArrivalParetoSet.createStopArrivalSet(stop, debugHandlerFactory);
         }
         return stops[stop];
+    }
+
+    /**
+     * This method creates a ParetoSet for the given egress stop. When arrivals are added to the
+     * stop, the "glue" make sure new destination arrivals is added to the destination arrivals.
+     */
+    private void glueTogetherEgressStopWithDestinationArrivals(
+            TransferLeg egressLeg,
+            CostCalculator costCalculator
+    ) {
+        int stop = egressLeg.stop();
+        // The factory is creating the actual "glue"
+        this.stops[stop] = StopArrivalParetoSet.createEgressStopArrivalSet(
+                egressLeg,
+                costCalculator,
+                destinationArrivals,
+                debugHandlerFactory
+        );
+    }
+
+    private boolean vetoHeuristicDestinationArrival(AbstractStopArrival<T> arrival) {
+        if(heuristics == null || destinationArrivals.isEmpty()) {
+            return false;
+        }
+        DestinationHeuristic heuristic = heuristics[arrival.stop()];
+
+        if(heuristic == null) {
+            return true;
+        }
+        return !destinationArrivals.qualify(new DestinationArrival<>(arrival, heuristic));
+    }
+
+    private void rejectByOptimization(AbstractStopArrival<T> arrival) {
+        if (debugHandlerFactory.isDebugStopArrival(arrival.stop())) {
+            debugHandlerFactory.debugStopArrival().rejectByOptimization(arrival);
+        }
     }
 
     private void debugStateInfo() {
@@ -136,7 +166,7 @@ final class Stops<T extends TripScheduleInfo> {
         long numOfStops = 0;
         int max = 0;
 
-        for (StopArrivals stop : stops) {
+        for (StopArrivalParetoSet stop : stops) {
             if(stop != null) {
                 ++numOfStops;
                 total += stop.size();
@@ -151,17 +181,5 @@ final class Stops<T extends TripScheduleInfo> {
                 " => STOP ARRIVALS  %.1f / %d / %d'  Array Length: %.1f / %d'  Stops: %d' / %d'%n",
                 avg, max, total/1000, arrayLenAvg, arrayLen/1000, numOfStops/1000, stops.length/1000
         );
-    }
-
-    private boolean vetoHeuristicDestinationArrival(AbstractStopArrival<T> arrival) {
-        if(heuristics == null || destinationArrivals.isEmpty()) {
-            return false;
-        }
-        DestinationHeuristic heuristic = heuristics[arrival.stop()];
-
-        if(heuristic == null) {
-            return true;
-        }
-        return !destinationArrivals.qualify(new DestinationArrival<>(arrival, heuristic));
     }
 }

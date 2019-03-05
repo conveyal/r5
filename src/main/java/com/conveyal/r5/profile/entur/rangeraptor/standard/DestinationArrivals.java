@@ -74,8 +74,6 @@ class DestinationArrivals<T extends TripScheduleInfo> {
 
     private final PathMapper<T> pathMapper;
 
-    private final DebugHandler<Path<T>> debugPathHandler;
-
     private final DebugHandler<DestinationArrivalView<T>> debugDestinationArrivalHandler;
 
 
@@ -91,28 +89,23 @@ class DestinationArrivals<T extends TripScheduleInfo> {
         this.bestArrivalTimesAtDestination = new int[nRounds];
         Arrays.fill(this.bestArrivalTimesAtDestination, calculator.latestAcceptableArrivalTime());
 
-        this.debugPathHandler = debugFactory.debugPath();
         this.debugDestinationArrivalHandler = debugFactory.debugDestinationArrival();
 
         this.pathMapper = calculator.createPathMapper();
-        this.paths = new ParetoSet<>(
-                pathComparator(),
-                debugPathHandler::drop
-        );
+        this.paths = new ParetoSet<>(pathComparator(), debugFactory.paretoSetDebugPathListener());
         lifeCycle.onIterationComplete(this::addPathsForCurrentIteration);
     }
 
     void add(EgressStopArrivalState<T> arrival) {
-        boolean added = false;
         if (newStateHaveTheBestDestinationArrivalTimeForGivenTheRound(arrival)) {
             debugDropDestinationArrival(arrival);
             int round = arrival.round();
             egressArrivalsByRound.put(round, arrival);
             bestArrivalTimesAtDestination[round] = destinationArrivalTime(arrival);
-            added = true;
+            debugAcceptArrival(arrival);
+        } else {
+            debugRejectArrival(arrival);
         }
-
-        debugDestinationArrival(arrival, added);
     }
 
     Collection<Path<T>> paths() {
@@ -129,9 +122,7 @@ class DestinationArrivals<T extends TripScheduleInfo> {
      */
     private void addPathsForCurrentIteration() {
         for (EgressStopArrivalState<T> it : egressArrivalsByRound.values()) {
-            Path<T> path = createPathFromEgressState(it);
-            boolean added = paths.add(path);
-            debugPath(path, added);
+            paths.add(createPathFromEgressState(it));
         }
         egressArrivalsByRound.clear();
     }
@@ -164,31 +155,27 @@ class DestinationArrivals<T extends TripScheduleInfo> {
 
     private void debugDropDestinationArrival(EgressStopArrivalState<T> arrival) {
         EgressStopArrivalState<T> dropped = egressArrivalsByRound.get(arrival.round());
-        if (dropped != null) {
-            if (debugDestinationArrivalHandler.isDebug(dropped.stop())) {
-                debugDestinationArrivalHandler.drop(
-                        destinationArrivalView(dropped),
-                        destinationArrivalView(arrival)
-                );
-            }
+        if (dropped != null && isDebugArrival(dropped.stop())) {
+            debugDestinationArrivalHandler.drop(
+                    destinationArrivalView(dropped),
+                    destinationArrivalView(arrival)
+            );
         }
     }
 
-    private void debugDestinationArrival(EgressStopArrivalState<T> arrival, boolean added) {
-        if (debugDestinationArrivalHandler.isDebug(arrival.stop())) {
-            if (added) {
-                debugDestinationArrivalHandler.accept(destinationArrivalView(arrival), null);
-            } else {
-                debugDestinationArrivalHandler.reject(destinationArrivalView(arrival), null);
-            }
+    private void debugAcceptArrival(EgressStopArrivalState<T> arrival) {
+        if (isDebugArrival(arrival.stop())) {
+            debugDestinationArrivalHandler.accept(destinationArrivalView(arrival), null);
         }
     }
 
-    private void debugPath(Path<T> path, boolean added) {
-        if (added) {
-            debugPathHandler.accept(path, paths);
-        } else {
-            debugPathHandler.reject(path, paths);
+    private void debugRejectArrival(EgressStopArrivalState<T> arrival) {
+        if (isDebugArrival(arrival.stop())) {
+            debugDestinationArrivalHandler.reject(destinationArrivalView(arrival), null);
         }
+    }
+
+    private boolean isDebugArrival(int stop) {
+        return debugDestinationArrivalHandler != null && debugDestinationArrivalHandler.isDebug(stop);
     }
 }

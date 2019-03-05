@@ -24,12 +24,12 @@ public interface ParetoSetEventListener<T> {
     /**
      * This is the callback called when an element is dropped.
      */
-    void notifyElementAccepted(T newElement, Collection<? extends T> resultSet);
+    default void notifyElementAccepted(T newElement, Collection<? extends T> resultSet) {}
 
     /**
      * This is the callback called when an element is dropped.
      */
-    void notifyElementDropped(T element, T droppedByElement);
+    default void notifyElementDropped(T element, T droppedByElement) {}
 
     /**
      * This is the callback called when an element is dropped.
@@ -38,5 +38,5 @@ public interface ParetoSetEventListener<T> {
      * @param existingSet The existing elements in the set, in witch ataleast one element dominates
      *                    the new rejected element.
      */
-    void notifyElementRejected(T element, Collection<? extends T> existingSet);
+    default void notifyElementRejected(T element, Collection<? extends T> existingSet) {}
 }

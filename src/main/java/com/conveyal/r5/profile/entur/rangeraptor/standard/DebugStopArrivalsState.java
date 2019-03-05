@@ -30,14 +30,14 @@ public final class DebugStopArrivalsState<T extends TripScheduleInfo> implements
             StopsCursor<T> stopsCursor,
             StopArrivalsState<T> delegate
     ) {
-        this.debug = new StateDebugger<>(stopsCursor, roundProvider, dFactory.debugStopArrival());
+        this.debug = new StateDebugger<>(stopsCursor, roundProvider, dFactory);
         this.delegate = delegate;
     }
 
     @Override
     public final void setInitialTime(final int stop, final int arrivalTime, int durationInSeconds) {
         delegate.setInitialTime(stop, arrivalTime, durationInSeconds);
-        debug.accept(stop);
+        debug.acceptAccess(stop);
     }
 
     @Override
@@ -60,9 +60,7 @@ public final class DebugStopArrivalsState<T extends TripScheduleInfo> implements
 
     @Override
     public void rejectNewBestTransitTime(int stop, int alightTime, T trip, int boardStop, int boardTime) {
-        if (debug.isDebug(stop)) {
-            debug.rejectTransit(stop, alightTime, trip, boardStop, boardTime);
-        }
+        debug.rejectTransit(stop, alightTime, trip, boardStop, boardTime);
         delegate.rejectNewBestTransitTime(stop, alightTime, trip, boardStop, boardTime);
     }
 
@@ -76,9 +74,7 @@ public final class DebugStopArrivalsState<T extends TripScheduleInfo> implements
 
     @Override
     public void rejectNewBestTransferTime(int fromStop, int arrivalTime, TransferLeg transferLeg) {
-        if (debug.isDebug(transferLeg.stop())) {
-            debug.rejectTransfer(fromStop, transferLeg, transferLeg.stop(), arrivalTime);
-        }
+        debug.rejectTransfer(fromStop, transferLeg, transferLeg.stop(), arrivalTime);
         delegate.rejectNewBestTransferTime(fromStop, arrivalTime, transferLeg);
     }
 }

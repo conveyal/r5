@@ -40,7 +40,7 @@ public final class StdStopArrivalsState<T extends TripScheduleInfo> implements S
                 c.lifeCycle()
         );
 
-        if (c.debugRequest().isDebug()) {
+        if (c.debugFactory().isDebugStopArrival()) {
             return new DebugStopArrivalsState<>(
                     c.roundProvider(),
                     c.debugFactory(),

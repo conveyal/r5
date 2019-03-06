@@ -7,10 +7,12 @@ import com.conveyal.r5.profile.entur.api.request.TuningParameters;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
 import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
+import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
+import com.conveyal.r5.profile.entur.rangeraptor.workerlifecycle.LifeCycleBuilder;
+import com.conveyal.r5.profile.entur.rangeraptor.workerlifecycle.LifeCycleEventPublisher;
 
 import java.util.Collection;
 
@@ -32,7 +34,7 @@ public class SearchContext<T extends TripScheduleInfo> {
     private final boolean searchForward;
     private final DebugRequest<T> debugRequest;
     private final DebugHandlerFactory<T> debugFactory;
-    private final RangeRaptorLifeCyclePublisher lifeCyclePublisher = new RangeRaptorLifeCyclePublisher();
+    private LifeCycleBuilder lifeCycleBuilder = new LifeCycleBuilder();
 
     public SearchContext(
             RangeRaptorRequest<T> request,
@@ -130,7 +132,16 @@ public class SearchContext<T extends TripScheduleInfo> {
         return roundTracker;
     }
 
-    public LifeCyclePublisher lifeCycle() {
-        return lifeCyclePublisher;
+    public WorkerLifeCycle lifeCycle() {
+        return lifeCycleBuilder;
     }
+
+    public LifeCycleEventPublisher createLifeCyclePublisher() {
+        LifeCycleEventPublisher publisher = new LifeCycleEventPublisher(lifeCycleBuilder);
+        // We want the code to fail (NPE) if someone try to attach to the worker workerlifecycle
+        // after it is iniziated; Hence set the builder to null:
+        lifeCycleBuilder = null;
+        return publisher;
+    }
+
 }

@@ -1,8 +1,8 @@
 package com.conveyal.r5.profile.entur.rangeraptor.transit;
 
 
-import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
 import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
+import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 
 /**
  * Round tracker to keep track of round index and when to stop exploring new rounds.
@@ -33,7 +33,7 @@ public class RoundTracker implements RoundProvider {
     private int roundMaxLimit;
 
 
-    RoundTracker(int nRounds, int numberOfAdditionalTransfers, LifeCyclePublisher lifeCycle) {
+    RoundTracker(int nRounds, int numberOfAdditionalTransfers, WorkerLifeCycle lifeCycle) {
         // The 'roundMaxLimit' is inclusive, while the 'nRounds' is exclusive; Hence subtract 1.
         this.roundMaxLimit = nRounds - 1;
         this.numberOfAdditionalTransfers = numberOfAdditionalTransfers;

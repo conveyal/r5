@@ -2,7 +2,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.debug;
 
 import com.conveyal.r5.profile.entur.api.request.DebugRequest;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
+import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 
 /**
@@ -13,7 +13,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 final class DebugHandlerDestinationArrivalAdapter<T extends TripScheduleInfo>
         extends AbstractDebugHandlerAdapter<DestinationArrivalView<T>> {
 
-    DebugHandlerDestinationArrivalAdapter(DebugRequest<T> debug, LifeCyclePublisher lifeCycle) {
+    DebugHandlerDestinationArrivalAdapter(DebugRequest<T> debug, WorkerLifeCycle lifeCycle) {
         super(debug, debug.destinationArrivalListener(), lifeCycle);
     }
 

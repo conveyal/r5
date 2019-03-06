@@ -7,12 +7,12 @@ import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
-import com.conveyal.r5.profile.entur.rangeraptor.transit.RangeRaptorLifeCyclePublisher;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.RoundTracker;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleBoardSearch;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleSearch;
+import com.conveyal.r5.profile.entur.rangeraptor.workerlifecycle.LifeCycleEventPublisher;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
 
 import java.util.Collection;
@@ -79,7 +79,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
      * The life cycle is used to publish life cycle events to everyone who
      * listen.
      */
-    private final RangeRaptorLifeCyclePublisher lifeCycle;
+    private final LifeCycleEventPublisher lifeCycle;
 
 
     public AbstractRangeRaptorWorker(
@@ -94,7 +94,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
         // We do a cast here to avoid exposing the round tracker  and the life cycle publisher to "everyone"
         // by providing access to it in the context.
         this.roundTracker = (RoundTracker) context.roundProvider();
-        this.lifeCycle = (RangeRaptorLifeCyclePublisher) context.lifeCycle();
+        this.lifeCycle = context.createLifeCyclePublisher();
     }
 
     /**
@@ -224,7 +224,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
 
             performTransitForRoundAndEachStopInPattern(pattern);
         }
-        state.transitsForRoundComplete();
+        lifeCycle.transitsForRoundComplete();
     }
 
 
@@ -237,7 +237,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
             // loop transfers are already included by virtue of those stops having been reached
             state.transferToStops(fromStop, transit.getTransfers(fromStop));
         }
-        state.transfersForRoundComplete();
+        lifeCycle.transfersForRoundComplete();
     }
 
     // Track time spent, measure performance

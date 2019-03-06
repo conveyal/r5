@@ -2,7 +2,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
+import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.path.PathMapper;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
@@ -82,7 +82,7 @@ class DestinationArrivals<T extends TripScheduleInfo> {
             TransitCalculator calculator,
             StopsCursor<T> stopsCursor,
             DebugHandlerFactory<T> debugFactory,
-            LifeCyclePublisher lifeCycle
+            WorkerLifeCycle lifeCycle
     ) {
         this.stopsCursor = stopsCursor;
         this.calculator = calculator;
@@ -93,6 +93,8 @@ class DestinationArrivals<T extends TripScheduleInfo> {
 
         this.pathMapper = calculator.createPathMapper();
         this.paths = new ParetoSet<>(pathComparator(), debugFactory.paretoSetDebugPathListener());
+
+        // Attatch to Worker life cycle
         lifeCycle.onIterationComplete(this::addPathsForCurrentIteration);
     }
 

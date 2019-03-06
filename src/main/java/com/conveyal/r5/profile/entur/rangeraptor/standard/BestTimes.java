@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
-import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
+import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
@@ -49,7 +49,7 @@ public final class BestTimes {
         this(c.nStops(), c.calculator(), c.lifeCycle());
     }
 
-    private BestTimes(int nStops, TransitCalculator calculator, LifeCyclePublisher lifeCycle) {
+    private BestTimes(int nStops, TransitCalculator calculator, WorkerLifeCycle lifeCycle) {
         this.calculator = calculator;
         this.times = intArray(nStops, calculator.unreachedTime());
         this.reachedCurrentRound = new BitSet(nStops);
@@ -58,7 +58,9 @@ public final class BestTimes {
         this.transitTimes = intArray(nStops, calculator.unreachedTime());
         this.transitReachedCurrentRound = new BitSet(nStops);
 
-        glueToLifeCycle(lifeCycle);
+        // Attach to Worker life cycle
+        lifeCycle.onSetupIteration((ignore) -> setupIteration());
+        lifeCycle.onPrepareForNextRound(this::prepareForNextRound);
     }
 
     public int time(int stop) {
@@ -182,10 +184,5 @@ public final class BestTimes {
         BitSet tmp = reachedLastRound;
         reachedLastRound = reachedCurrentRound;
         reachedCurrentRound = tmp;
-    }
-
-    private void glueToLifeCycle(LifeCyclePublisher lifeCycle) {
-        lifeCycle.onSetupIteration((dt) -> setupIteration());
-        lifeCycle.onPrepareForNextRound(this::prepareForNextRound);
     }
 }

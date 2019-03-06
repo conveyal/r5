@@ -4,8 +4,8 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
 import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
+import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
@@ -59,7 +59,7 @@ public final class StdStopArrivalsState<T extends TripScheduleInfo> implements S
             TransitCalculator calculator,
             DebugHandlerFactory<T> dFactory,
             Collection<TransferLeg> egressLegs,
-            LifeCyclePublisher lifeCycle
+            WorkerLifeCycle lifeCycle
     ) {
         this.stops = new Stops<>(nRounds, nStops, egressLegs, roundProvider, this::handleEgressStopArrival);
         this.results = new DestinationArrivals<>(nRounds, calculator, cursor(calculator), dFactory, lifeCycle);

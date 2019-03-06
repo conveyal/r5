@@ -3,7 +3,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.debug;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.request.DebugRequest;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
+import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 
 import java.util.List;
 
@@ -14,7 +14,7 @@ import java.util.List;
  */
 final class DebugHandlerPathAdapter <T extends TripScheduleInfo> extends AbstractDebugHandlerAdapter<Path<T>> {
 
-    DebugHandlerPathAdapter(DebugRequest<T> debug, LifeCyclePublisher lifeCycle) {
+    DebugHandlerPathAdapter(DebugRequest<T> debug, WorkerLifeCycle lifeCycle) {
         super(debug, debug.pathFilteringListener(), lifeCycle);
     }
 

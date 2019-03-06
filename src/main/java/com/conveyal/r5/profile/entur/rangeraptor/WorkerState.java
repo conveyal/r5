@@ -22,11 +22,7 @@ public interface WorkerState<T extends TripScheduleInfo> {
 
     IntIterator stopsTouchedByTransitCurrentRound();
 
-    default void transitsForRoundComplete() {}
-
     void transferToStops(int fromStop, Iterator<? extends TransferLeg> transfers);
-
-    default void transfersForRoundComplete() {}
 
     /**
      * Extract paths after the search is complete. This method is optional,

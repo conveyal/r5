@@ -278,7 +278,7 @@ public abstract class AvgTimer {
 
         @Override
         String toSec(long time) {
-            return String.format("%6.2f", time / 1000d);
+            return String.format("%.2f", time / 1000d);
         }
     }
 
@@ -299,7 +299,7 @@ public abstract class AvgTimer {
 
         @Override
         String toSec(long time) {
-            return String.format("%6.2f", time / 1_000_000d);
+            return String.format("%.2f", time / 1_000_000d);
         }
     }
 

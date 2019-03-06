@@ -104,12 +104,12 @@ public class SpeedTest {
 
         for (int i = 0; i < samples; ++i) {
             profile = strategies[i % strategies.length];
-            runSingleTest(opts);
+            runSingleTest(opts, i+1, samples);
         }
         printProfileStatistics();
     }
 
-    private void runSingleTest(SpeedTestCmdLineOpts opts) throws Exception {
+    private void runSingleTest(SpeedTestCmdLineOpts opts, int sample, int nSamples) throws Exception {
         CsvFileIO tcIO = new CsvFileIO(opts.rootDir(), TRAVEL_SEARCH_FILENAME);
         List<TestCase> testCases = tcIO.readTestCasesFromFile();
         List<TripPlan> tripPlans = new ArrayList<>();
@@ -145,10 +145,11 @@ public class SpeedTest {
                 "\n- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - [ SUMMARY " + profile + " ]" +
                 "\n" + String.join("\n", AvgTimer.listResults()) +
                 "\n" +
-                "\nPaths found: " + numOfPathsFound.stream().mapToInt((it) -> it).sum() + " " + numOfPathsFound +
-                "\nSuccessful searches: " + nSuccess + " / " + tcSize +
-                "\nTotal time: " + TOT_TIMER.totalTimeInSeconds() + " seconds" +
-                (nSuccess == tcSize ? "" : "\n!!! UNEXPECTED RESULTS: " + (tcSize - nSuccess) + " OF " + tcSize + " FAILED. SEE LOG ABOVE FOR ERRORS !!!")
+                logLine("Paths found", "%d %s", numOfPathsFound.stream().mapToInt((it) -> it).sum(), numOfPathsFound) +
+                logLine("Successful searches", "%d / %d", nSuccess, tcSize) +
+                logLine(nSamples > 1, "Sample", "%d / %d",  sample ,nSamples) +
+                logLine("Time total", "%s seconds",  TOT_TIMER.totalTimeInSeconds()) +
+                logLine(nSuccess != tcSize, "!!! UNEXPECTED RESULTS", "%d OF %d FAILED. SEE LOG ABOVE FOR ERRORS !!!", tcSize - nSuccess, tcSize)
         );
         workerResults.get(profile).add((int)TIMER_WORKER.avgTime());
         totalResults.get(profile).add((int) TOT_TIMER.avgTime());
@@ -166,6 +167,13 @@ public class SpeedTest {
             workerResults.put(key, new ArrayList<>());
             totalResults.put(key, new ArrayList<>());
         }
+    }
+
+    private String logLine(String label, String formatValue, Object ... args) {
+        return logLine(true, label, formatValue, args);
+    }
+    private String logLine(boolean enable, String label, String formatValues, Object ... args) {
+        return enable ? (String.format("%n%-20s: ", label) + String.format(formatValues, args)) : "";
     }
 
     private boolean runSingleTestCase(List<TripPlan> tripPlans, TestCase testCase, SpeedTestCmdLineOpts opts, boolean ignoreResults) {

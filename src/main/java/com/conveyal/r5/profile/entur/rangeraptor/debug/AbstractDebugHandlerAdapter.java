@@ -2,7 +2,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.debug;
 
 import com.conveyal.r5.profile.entur.api.debug.DebugEvent;
 import com.conveyal.r5.profile.entur.api.request.DebugRequest;
-import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
+import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
 
 import java.util.Collection;
@@ -27,7 +27,7 @@ abstract class AbstractDebugHandlerAdapter<T> implements DebugHandler<T> {
     AbstractDebugHandlerAdapter(
             DebugRequest<?> debugRequest,
             Consumer<DebugEvent<T>> eventListener,
-            LifeCyclePublisher lifeCycle
+            WorkerLifeCycle lifeCycle
     ) {
         this.stops = debugRequest.stops();
         this.path = debugRequest.path();

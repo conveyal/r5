@@ -4,7 +4,7 @@ import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.LifeCyclePublisher;
+import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
@@ -51,7 +51,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
             CostCalculator costCalculator,
             TransitCalculator transitCalculator,
             DebugHandlerFactory<T> debugHandlerFactory,
-            LifeCyclePublisher lifeCycle
+            WorkerLifeCycle lifeCycle
 
     ) {
         this.stops = new Stops<>(
@@ -67,9 +67,25 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         this.costCalculator = costCalculator;
         this.transitCalculator = transitCalculator;
 
-        // Attach this to the RR life cycle
+        // Attach to the RR life cycle
         lifeCycle.onSetupIteration(this::setupIteration);
         lifeCycle.onPrepareForNextRound(this::prepareForNextRound);
+        lifeCycle.onTransitsForRoundComplete(this::transitsForRoundComplete);
+        lifeCycle.onTransfersForRoundComplete(this::transfersForRoundComplete);
+    }
+
+    /*
+     The below methods are ordered after the sequence they naturally appear in the algorithm, also
+     private life-cycle callbacks are listed here (not in the private method section).
+    */
+
+    // This method is private, but is part of Worker life cycle
+    private void setupIteration(int ignoredIterationDepartureTime) {
+        arrivalsCache.clear();
+        // clear all touched stops to avoid constant rexploration
+        touchedStops.clear();
+        stops.markAllStops();
+        updatesExist = false;
     }
 
     @Override
@@ -83,6 +99,11 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     @Override
     public boolean isNewRoundAvailable() {
         return updatesExist;
+    }
+
+    // This method is private, but is part of Worker life cycle
+    private void prepareForNextRound() {
+        stops.clearReachedCurrentRoundFlag();
     }
 
     @Override
@@ -123,16 +144,16 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
         }
     }
 
-    @Override
-    public void transitsForRoundComplete() {
+    // This method is private, but is part of Worker life cycle
+    private void transitsForRoundComplete() {
         updatesExist = !arrivalsCache.isEmpty();
         stops.markAllStops();
         touchedStops.clear();
         commitCachedArrivals();
     }
 
-    @Override
-    public void transfersForRoundComplete() {
+    // This method is private, but is part of Worker life cycle
+    private void transfersForRoundComplete() {
         commitCachedArrivals();
     }
 
@@ -148,18 +169,6 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
 
 
     /* private methods */
-
-    private void setupIteration(int ignoredIterationDepartureTime) {
-        arrivalsCache.clear();
-        // clear all touched stops to avoid constant rexploration
-        touchedStops.clear();
-        stops.markAllStops();
-        updatesExist = false;
-    }
-
-    private void prepareForNextRound() {
-        stops.clearReachedCurrentRoundFlag();
-    }
 
 
     private void transferToStop(Iterable<? extends AbstractStopArrival<T>> fromArrivals, TransferLeg transfer) {
@@ -189,10 +198,9 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     }
 
     private int travelDuration(AbstractStopArrival<T> prev, int boardTime, int alightTime) {
-        if(prev.arrivedByAccessLeg()) {
+        if (prev.arrivedByAccessLeg()) {
             return transitCalculator.addBoardSlack(prev.travelDuration()) + alightTime - boardTime;
-        }
-        else {
+        } else {
             return prev.travelDuration() + alightTime - prev.arrivalTime();
         }
     }

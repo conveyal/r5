@@ -1,7 +1,6 @@
-package com.conveyal.r5.profile.entur.rangeraptor.standard;
+package com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes;
 
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
-import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
@@ -45,11 +44,7 @@ public final class BestTimes {
     private final TransitCalculator calculator;
 
 
-    public BestTimes(SearchContext<?> c) {
-        this(c.nStops(), c.calculator(), c.lifeCycle());
-    }
-
-    private BestTimes(int nStops, TransitCalculator calculator, WorkerLifeCycle lifeCycle) {
+    public BestTimes(int nStops, TransitCalculator calculator, WorkerLifeCycle lifeCycle) {
         this.calculator = calculator;
         this.times = intArray(nStops, calculator.unreachedTime());
         this.reachedCurrentRound = new BitSet(nStops);
@@ -86,7 +81,7 @@ public final class BestTimes {
     /**
      * @return true if at least one stop arrival was reached last round (best overall).
      */
-    final boolean isCurrentRoundUpdated() {
+    public final boolean isCurrentRoundUpdated() {
         return !reachedCurrentRound.isEmpty();
     }
 
@@ -102,14 +97,14 @@ public final class BestTimes {
     /**
      * @return an iterator for all stops reached (overall best) in the last round.
      */
-    final BitSetIterator stopsReachedLastRound() {
+    public final BitSetIterator stopsReachedLastRound() {
         return new BitSetIterator(reachedLastRound);
     }
 
     /**
      * @return an iterator of all stops reached by transit in the current round.
      */
-    final BitSetIterator transitStopsReachedCurrentRound() {
+    public final BitSetIterator transitStopsReachedCurrentRound() {
         return new BitSetIterator(transitReachedCurrentRound);
     }
 
@@ -123,7 +118,7 @@ public final class BestTimes {
     /**
      * @return true if the given stop was reached in the previous/last round.
      */
-    final boolean isStopReachedLastRound(int stop) {
+    public final boolean isStopReachedLastRound(int stop) {
         return reachedLastRound.get(stop);
     }
 
@@ -133,14 +128,14 @@ public final class BestTimes {
      * <p/>
      * This is equivalent to calling {@link #updateNewBestTime(int, int)}
      */
-    final void setAccessStopTime(final int stop, final int time) {
+    public final void setAccessStopTime(final int stop, final int time) {
         updateNewBestTime(stop, time);
     }
 
     /**
      * @return true iff new best time is updated
      */
-    final boolean transitUpdateNewBestTime(final int stop, int time) {
+    public final boolean transitUpdateNewBestTime(final int stop, int time) {
         if(isBestTransitTime(stop, time)) {
             setTransitTime(stop, time);
             return true;
@@ -151,7 +146,7 @@ public final class BestTimes {
     /**
      * @return true iff new best time is updated
      */
-    final boolean updateNewBestTime(final int stop, int time) {
+    public final boolean updateNewBestTime(final int stop, int time) {
         if(isBestTime(stop, time)) {
             setTime(stop, time);
             return true;

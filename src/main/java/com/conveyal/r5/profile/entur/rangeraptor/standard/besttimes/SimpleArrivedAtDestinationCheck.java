@@ -1,6 +1,8 @@
-package com.conveyal.r5.profile.entur.rangeraptor.standard;
+package com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes;
 
-class SimpleArrivedAtDestinationCheck implements ArrivedAtDestinationCheck {
+import com.conveyal.r5.profile.entur.rangeraptor.standard.ArrivedAtDestinationCheck;
+
+public class SimpleArrivedAtDestinationCheck implements ArrivedAtDestinationCheck {
 
     /**
      * The list of egress stops, can be used to terminate the search when the stops are reached.
@@ -9,7 +11,7 @@ class SimpleArrivedAtDestinationCheck implements ArrivedAtDestinationCheck {
     private final BestTimes stopVisited;
 
 
-    SimpleArrivedAtDestinationCheck(int[] egressStops, BestTimes stopVisited) {
+    public SimpleArrivedAtDestinationCheck(int[] egressStops, BestTimes stopVisited) {
         this.egressStops = egressStops;
         this.stopVisited = stopVisited;
     }

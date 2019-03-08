@@ -6,7 +6,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard;
  * destination is reached in the current Raptor round.
  */
 @FunctionalInterface
-interface ArrivedAtDestinationCheck {
+public interface ArrivedAtDestinationCheck {
 
 
     /**

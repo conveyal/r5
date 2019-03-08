@@ -1,10 +1,12 @@
-package com.conveyal.r5.profile.entur.rangeraptor.standard;
+package com.conveyal.r5.profile.entur.rangeraptor.standard.std;
 
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.path.PathMapper;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.ArrivedAtDestinationCheck;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.std.view.StopsCursor;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
@@ -18,6 +20,9 @@ import java.util.Map;
 
 
 /**
+ * TODO TGR - This class can probebly be merged with the class in the multicriteria package.
+ * TODO TGR - Debuggins should be extracted out of this class.
+ *
  * The responsibility of this class is to collect all result paths for a given destination.
  * <p/>
  * Range Raptor requires paths to be collected at the end of each iteration. Following
@@ -40,7 +45,7 @@ import java.util.Map;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-class DestinationArrivals<T extends TripScheduleInfo> {
+public class DestinationArrivals<T extends TripScheduleInfo> implements ArrivedAtDestinationCheck {
     private static <T extends TripScheduleInfo> ParetoComparator<Path<T>> pathComparator() {
         return (l, r) ->
                 l.endTime() < r.endTime() ||
@@ -76,8 +81,10 @@ class DestinationArrivals<T extends TripScheduleInfo> {
 
     private final DebugHandler<DestinationArrivalView<T>> debugDestinationArrivalHandler;
 
+    private boolean arrivedAtDestinationInLastRound = false;
 
-    DestinationArrivals(
+
+    public DestinationArrivals(
             int nRounds,
             TransitCalculator calculator,
             StopsCursor<T> stopsCursor,
@@ -96,14 +103,16 @@ class DestinationArrivals<T extends TripScheduleInfo> {
 
         // Attatch to Worker life cycle
         lifeCycle.onIterationComplete(this::addPathsForCurrentIteration);
+        lifeCycle.onPrepareForNextRound(this::prepareForNextRound);
     }
 
-    void add(EgressStopArrivalState<T> arrival) {
+    public void add(EgressStopArrivalState<T> arrival) {
         if (newStateHaveTheBestDestinationArrivalTimeForGivenTheRound(arrival)) {
             debugDropDestinationArrival(arrival);
             int round = arrival.round();
             egressArrivalsByRound.put(round, arrival);
             bestArrivalTimesAtDestination[round] = destinationArrivalTime(arrival);
+            arrivedAtDestinationInLastRound = true;
             debugAcceptArrival(arrival);
         } else {
             debugRejectArrival(arrival);
@@ -114,8 +123,17 @@ class DestinationArrivals<T extends TripScheduleInfo> {
         return paths;
     }
 
+    @Override
+    public boolean arrivedAtDestinationCurrentRound() {
+        return arrivedAtDestinationInLastRound;
+    }
+
 
     /* Private methods */
+
+    private void prepareForNextRound() {
+        arrivedAtDestinationInLastRound = false;
+    }
 
     /**
      * Create paths at the end of each iteration. This is necessary to avoid stop arrivals
@@ -129,9 +147,6 @@ class DestinationArrivals<T extends TripScheduleInfo> {
         egressArrivalsByRound.clear();
     }
 
-    private int destinationDepartureTime(EgressStopArrivalState<T> arrival) {
-        return arrival.transitTime();
-    }
 
     private int destinationArrivalTime(EgressStopArrivalState<T> arrival) {
         return calculator.add(arrival.transitTime(), arrival.egressLeg().durationInSeconds());
@@ -143,12 +158,7 @@ class DestinationArrivals<T extends TripScheduleInfo> {
 
     private DestinationArrivalView<T> destinationArrivalView(EgressStopArrivalState<T> arrival) {
         // Initialize the cursor to point to the current arrival
-
-        return new StopArrivalViewAdapter.DestinationArrivalViewAdapter<T>(
-                destinationDepartureTime(arrival),
-                destinationArrivalTime(arrival),
-                stopsCursor.transit(arrival.round(), arrival.stop())
-        );
+        return stopsCursor.destinationArrival(arrival);
     }
 
     private boolean newStateHaveTheBestDestinationArrivalTimeForGivenTheRound(EgressStopArrivalState<T> newState) {

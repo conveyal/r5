@@ -9,18 +9,10 @@ import com.conveyal.r5.profile.entur.rangeraptor.Worker;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic.CalculateHeuristicWorkerState;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic.NoWaitRangeRaptorWorker;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.BestTimes;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.BestTimesOnlyStopArrivalsState;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.StdRangeRaptorWorker;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.StdRangeRaptorWorkerState;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.StdWorkerState;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalsState;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.create.StdRangeRaptorFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 
 import java.util.Collection;
-
-import static com.conveyal.r5.profile.entur.rangeraptor.standard.StdStopArrivalsState.createStdWorkerState;
 
 /**
  * A service for performing Range Raptor routing request. 
@@ -91,17 +83,16 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
 
     private Worker<T> createMcRRHeuristicWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
         SearchContext<T> heurCtx = context(transitData, asOnePass(request), ServiceType.Heur);
+        StdRangeRaptorFactory<T> stdFactory = new StdRangeRaptorFactory<>(heurCtx);
 
-        BestTimes bt2 = new BestTimes(heurCtx);
-        CalculateHeuristicWorkerState<T> heuristic = new CalculateHeuristicWorkerState<>(heurCtx, bt2);
-        StdWorkerState<T> state = new StdRangeRaptorWorkerState<>(heurCtx, bt2, heuristic);
-        Worker<T> heurWorker = new StdRangeRaptorWorker<>(context(transitData, request, ServiceType.Heur), state);
+        Worker<T> heurWorker = stdFactory.createStdHeuristicsSearch();
+        CalculateHeuristicWorkerState<T> heurProvider = stdFactory.getHeuristicWorkerState();
 
         SearchContext<T> ctx = context(transitData, request, ServiceType.multiCriteria);
 
         return () -> {
             heurWorker.route();
-            return new McRangeRaptorWorker<>(ctx, heuristic.heuristic()).route();
+            return new McRangeRaptorWorker<>(ctx, heurProvider.heuristic()).route();
         };
     }
 
@@ -115,31 +106,17 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
             return new McRangeRaptorWorker<>(context, null);
         }
 
-        StdWorkerState<T> state = createState(context, type);
+        StdRangeRaptorFactory<T> stdFactory = new StdRangeRaptorFactory<>(context);
 
-        if(type == ServiceType.Heur) {
-            return new NoWaitRangeRaptorWorker<>(context, state);
-        }
-
-        return new StdRangeRaptorWorker<>(context, state);
-    }
-
-    private StdWorkerState<T> createState(SearchContext<T> context, ServiceType type) {
         switch (type) {
             case stdRR:
             case stdRRRev:
-                BestTimes bt0 = new BestTimes(context);
-                StopArrivalsState<T> s0 = createStdWorkerState(context);
-                return new StdRangeRaptorWorkerState<>(context, bt0, s0);
+                return stdFactory.createStandardSearch();
             case BT:
             case BTRev:
-                BestTimes bt1 = new BestTimes(context);
-                StopArrivalsState<T> s1 = new BestTimesOnlyStopArrivalsState<>(bt1);
-                return new StdRangeRaptorWorkerState<>(context, bt1, s1);
+                return stdFactory.createBestTimeSearch();
             case Heur:
-                BestTimes bt2 = new BestTimes(context);
-                StopArrivalsState<T> s2 = new CalculateHeuristicWorkerState<>(context, bt2);
-                return new StdRangeRaptorWorkerState<>(context, bt2, s2);
+                return stdFactory.createNoWaitHeuristicsSearch();
             default:
                 throw new IllegalStateException();
         }

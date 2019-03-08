@@ -24,7 +24,6 @@ class CommandLineOpts {
     /* Speed test options - defined here to keep all option together */
     static final String VERBOSE_OPT = "v";
     static final String NUM_OF_ITINERARIES_OPT = "i";
-    static final String SEARCH_WINDOW_IN_MINUTES_OPT = "m";
     static final String SAMPLE_TEST_N_TIMES_OPT = "n";
     static final String PROFILES_OPT = "p";
     static final String TEST_CASES_OPT = "c";

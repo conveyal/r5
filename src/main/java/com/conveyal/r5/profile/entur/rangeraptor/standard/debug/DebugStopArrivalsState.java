@@ -1,4 +1,4 @@
-package com.conveyal.r5.profile.entur.rangeraptor.standard;
+package com.conveyal.r5.profile.entur.rangeraptor.standard.debug;
 
 
 import com.conveyal.r5.profile.entur.api.path.Path;
@@ -6,6 +6,8 @@ import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalsState;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.std.view.StopsCursor;
 
 import java.util.Collection;
 
@@ -24,7 +26,7 @@ public final class DebugStopArrivalsState<T extends TripScheduleInfo> implements
     /**
      * Create a Standard range raptor state for the given context
      */
-    DebugStopArrivalsState(
+    public DebugStopArrivalsState(
             RoundProvider roundProvider,
             DebugHandlerFactory<T> dFactory,
             StopsCursor<T> stopsCursor,

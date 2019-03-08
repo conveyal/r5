@@ -5,7 +5,7 @@ import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.BestTimes;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
@@ -58,11 +58,15 @@ public final class StdRangeRaptorWorkerState<T
     /**
      * create a BestTimes Range Raptor State for given context.
      */
-    public StdRangeRaptorWorkerState(SearchContext<T> ctx, BestTimes bestTimes, StopArrivalsState<T> stopArrivalsState) {
-        this.calculator = ctx.calculator();
+    public StdRangeRaptorWorkerState(
+            TransitCalculator calculator,
+            BestTimes bestTimes, StopArrivalsState<T> stopArrivalsState,
+            ArrivedAtDestinationCheck arrivedAtDestinationCheck
+    ) {
+        this.calculator = calculator;
         this.bestTimes = bestTimes;
         this.stopArrivalsState = stopArrivalsState;
-        this.arrivedAtDestinationCheck = new SimpleArrivedAtDestinationCheck(ctx.egressStops(), bestTimes);
+        this.arrivedAtDestinationCheck = arrivedAtDestinationCheck;
     }
 
     @Override

@@ -1,4 +1,4 @@
-package com.conveyal.r5.profile.entur.rangeraptor.standard;
+package com.conveyal.r5.profile.entur.rangeraptor.standard.std;
 
 
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
@@ -11,22 +11,40 @@ import java.util.function.Consumer;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-final class Stops<T extends TripScheduleInfo> {
+public final class Stops<T extends TripScheduleInfo> {
 
     private final StopArrivalState<T>[][] stops;
     private final RoundProvider roundProvider;
 
-    Stops(
+    public Stops(
             int nRounds,
             int nStops,
-            Iterable<TransferLeg> egressLegs,
-            RoundProvider roundProvider,
-            Consumer<EgressStopArrivalState<T>> egressArrivalCallback
+            RoundProvider roundProvider
     ) {
         //noinspection unchecked
         this.stops = (StopArrivalState<T>[][]) new StopArrivalState[nRounds][nStops];
         this.roundProvider = roundProvider;
-        createAndInsertEgressStopStates(nRounds, egressLegs, egressArrivalCallback);
+    }
+
+    /**
+     * Setup egress arrivals with a callback witch is notified when a new arrival state is reached.
+     */
+    public void setupEgressStopStates(Iterable<TransferLeg> egressLegs, Consumer<EgressStopArrivalState<T>> egressArrivalCallback) {
+        for (int round = 1; round < stops.length; round++) {
+            for (TransferLeg leg : egressLegs) {
+                EgressStopArrivalState<T> state = new EgressStopArrivalState<>(round, leg, egressArrivalCallback);
+                stops[round][leg.stop()] = state;
+            }
+        }
+    }
+
+    public boolean exist(int round, int stop) {
+        StopArrivalState<T> s = get(round, stop);
+        return s != null && s.reached();
+    }
+
+    public StopArrivalState<T> get(int round, int stop) {
+        return stops[round][stop];
     }
 
     void setInitialTime(int stop, int time, int duration) {
@@ -57,26 +75,8 @@ final class Stops<T extends TripScheduleInfo> {
         return get(round() - 1, stop).time();
     }
 
-    boolean exist(int round, int stop) {
-        StopArrivalState<T> s = get(round, stop);
-        return s != null && s.reached();
-    }
-
-    StopArrivalState<T> get(int round, int stop) {
-        return stops[round][stop];
-    }
-
 
     /* private methods */
-
-    private void createAndInsertEgressStopStates(int nRounds, Iterable<TransferLeg> egressLegs, Consumer<EgressStopArrivalState<T>> egressArrivalCallback) {
-        for (int round = 1; round < nRounds; round++) {
-            for (TransferLeg leg : egressLegs) {
-                EgressStopArrivalState<T> state = new EgressStopArrivalState<>(round, leg, egressArrivalCallback);
-                stops[round][leg.stop()] = state;
-            }
-        }
-    }
 
     private StopArrivalState<T> findOrCreateStopIndex(final int round, final int stop) {
         if (stops[round][stop] == null) {

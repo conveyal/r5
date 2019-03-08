@@ -1,4 +1,4 @@
-package com.conveyal.r5.profile.entur.rangeraptor.standard;
+package com.conveyal.r5.profile.entur.rangeraptor.standard.std;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.util.IntUtils;
@@ -20,7 +20,7 @@ import com.conveyal.r5.profile.entur.util.TimeUtils;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-class StopArrivalState<T extends TripScheduleInfo> {
+public class StopArrivalState<T extends TripScheduleInfo> {
 
     /**
      * Used to initialize all none time based attributes.
@@ -41,35 +41,35 @@ class StopArrivalState<T extends TripScheduleInfo> {
     private int transferFromStop = NOT_SET;
     private int accessOrTransferDuration = NOT_SET;
 
-    final int time() {
+    public final int time() {
         return bestArrivalTime;
     }
 
-    final int accessDuration() {
+    public final int accessDuration() {
         return accessOrTransferDuration;
     }
 
-    final int transitTime() {
+    public final int transitTime() {
         return transitArrivalTime;
     }
 
-    final T trip() {
+    public final T trip() {
         return trip;
     }
 
-    final int boardTime() {
+    public final int boardTime() {
         return boardTime;
     }
 
-    final int boardStop() {
+    public final int boardStop() {
         return boardStop;
     }
 
-    final int transferFromStop() {
+    public final int transferFromStop() {
         return transferFromStop;
     }
 
-    final int transferDuration() {
+    public final int transferDuration() {
         return accessOrTransferDuration;
     }
 
@@ -77,11 +77,11 @@ class StopArrivalState<T extends TripScheduleInfo> {
         return !arrivedByTransfer() && accessOrTransferDuration != NOT_SET;
     }
 
-    final boolean arrivedByTransit() {
+    public final boolean arrivedByTransit() {
         return transitArrivalTime != NOT_SET;
     }
 
-    final boolean arrivedByTransfer() {
+    public final boolean arrivedByTransfer() {
         return transferFromStop != NOT_SET;
     }
 
@@ -94,7 +94,7 @@ class StopArrivalState<T extends TripScheduleInfo> {
         return bestArrivalTime != NOT_SET;
     }
 
-    void arriveByTransit(int time, int boardStop, int boardTime, T trip) {
+    public void arriveByTransit(int time, int boardStop, int boardTime, T trip) {
         this.transitArrivalTime = time;
         this.trip = trip;
         this.boardTime = boardTime;
@@ -110,7 +110,7 @@ class StopArrivalState<T extends TripScheduleInfo> {
     /**
      * Set the time at a transit index iff it is optimal. This sets both the best time and the transfer time
      */
-    final void transferToStop(int fromStop, int arrivalTime, int transferTime) {
+    public final void transferToStop(int fromStop, int arrivalTime, int transferTime) {
         this.bestArrivalTime = arrivalTime;
         this.transferFromStop = fromStop;
         this.accessOrTransferDuration = transferTime;

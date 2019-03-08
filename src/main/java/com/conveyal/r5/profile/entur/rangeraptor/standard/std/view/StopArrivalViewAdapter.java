@@ -1,12 +1,13 @@
-package com.conveyal.r5.profile.entur.rangeraptor.standard;
+package com.conveyal.r5.profile.entur.rangeraptor.standard.std.view;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.std.StopArrivalState;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 
 
 /**
- * TODO TGR -
+ * Implement the {@link StopArrivalView}.
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */

@@ -1,9 +1,10 @@
-package com.conveyal.r5.profile.entur.rangeraptor.standard;
+package com.conveyal.r5.profile.entur.rangeraptor.standard.debug;
 
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.std.view.StopsCursor;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 
@@ -45,17 +46,13 @@ class StateDebugger<T extends TripScheduleInfo> {
 
     void rejectTransit(int alightStop, int alightTime, T trip, int boardStop, int boardTime) {
         if (isDebug(alightStop)) {
-            StopArrivalState<T> arrival = new StopArrivalState<>();
-            arrival.arriveByTransit(alightTime, boardStop, boardTime, trip);
-            reject(new StopArrivalViewAdapter.Transit<>(round(), alightStop, arrival, cursor));
+            reject(cursor.rejectedTransit(round(), alightStop, alightTime, trip, boardStop, boardTime));
         }
     }
 
     void rejectTransfer(int fromStop, TransferLeg transferLeg, int toStop, int arrivalTime) {
         if (isDebug(transferLeg.stop())) {
-            StopArrivalState<T> arrival = new StopArrivalState<>();
-            arrival.transferToStop(fromStop, arrivalTime, transferLeg.durationInSeconds());
-            reject(new StopArrivalViewAdapter.Transfer<>(round(), toStop, arrival, cursor));
+            reject(cursor.rejectedTransfer(round(), fromStop, transferLeg, toStop, arrivalTime));
         }
     }
 

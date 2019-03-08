@@ -1,9 +1,10 @@
-package com.conveyal.r5.profile.entur.rangeraptor.standard;
+package com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes;
 
 
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalsState;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -18,9 +19,9 @@ import java.util.Collections;
  *
  * TODO TGR - Turn this into a class to calculate best times and optimistic number of hops.
  * TODO TGR - Investigate if it is possible to include transfers results in the forward search,
- * TODO TGR - but not in the reverse search. This feature is usfull when combining a FORWARD
+ * TODO TGR - but not in the reverse search. This feature is usful when combining a FORWARD
  * TODO TGR - and REVERSE search to compute a pruning stop bit set. This is most likely not
- * TODO TGR - feasable for the overall bet times, but ok for the calculation of hops/transfers.
+ * TODO TGR - feasable for the overall best times, but ok for the calculation of hops/transfers.
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */

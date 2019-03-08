@@ -7,8 +7,8 @@ import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.DestinationHeuristic;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.BestTimes;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalsState;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.BestTimes;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.CostCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 
@@ -41,7 +41,7 @@ public class CalculateHeuristicWorkerState<T extends TripScheduleInfo> implement
         );
     }
 
-    private CalculateHeuristicWorkerState(
+    public CalculateHeuristicWorkerState(
             int nStops,
             RoundProvider roundProvider,
             BestTimes bestTimes,

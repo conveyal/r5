@@ -5,7 +5,6 @@ import com.conveyal.r5.profile.entur.api.request.DebugRequest;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
 
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.Consumer;
@@ -44,30 +43,26 @@ abstract class AbstractDebugHandlerAdapter<T> implements DebugHandler<T> {
     }
 
     @Override
-    public void accept(T element, Collection<? extends T> result) {
-        if (isDebug(element)) {
-            eventListener.accept(DebugEvent.accept(iterationDepartureTime, element, result));
+    public void accept(T element) {
+        // The "if" is needed because this is the first time we are able to check trip paths
+        if (isDebugStopOrTripPath(element)) {
+            eventListener.accept(DebugEvent.accept(iterationDepartureTime, element));
         }
     }
 
     @Override
-    public void reject(T element, Collection<? extends T> result) {
-        if (isDebug(element)) {
-            eventListener.accept(DebugEvent.reject(iterationDepartureTime, element, result));
+    public void reject(T element, T rejectedByElement, String reason) {
+        // The "if" is needed because this is the first time we are able to check trip paths
+        if (isDebugStopOrTripPath(element)) {
+            eventListener.accept(DebugEvent.reject(iterationDepartureTime, element, rejectedByElement, reason));
         }
     }
 
     @Override
-    public void rejectByOptimization(T element) {
-        if (isDebug(element)) {
-            eventListener.accept(DebugEvent.rejectByOptimization(iterationDepartureTime, element));
-        }
-    }
-
-    @Override
-    public void drop(T element, T droppedByElement) {
-        if (isDebug(element)) {
-            eventListener.accept(DebugEvent.drop(iterationDepartureTime, element, droppedByElement));
+    public void drop(T element, T droppedByElement, String reason) {
+        // The "if" is needed because this is the first time we are able to check trip paths
+        if (isDebugStopOrTripPath(element)) {
+            eventListener.accept(DebugEvent.drop(iterationDepartureTime, element, droppedByElement, reason));
         }
     }
 
@@ -82,11 +77,18 @@ abstract class AbstractDebugHandlerAdapter<T> implements DebugHandler<T> {
         this.iterationDepartureTime = iterationDepartureTime;
     }
 
-    private boolean isDebug(T arrival) {
-        return stops.contains(stop(arrival)) || isDebugTrip(arrival);
+    /**
+     * Check if a stop exist among the trip path stops witch should be debugged.
+     */
+    private boolean isDebugTrip(int stop) {
+        return pathStartAtStopIndex <= path.indexOf(stop);
     }
 
-    private boolean isDebugTrip(T arrival) {
+    private boolean isDebugStopOrTripPath(T arrival) {
+        return stops.contains(stop(arrival)) || isDebugTripPath(arrival);
+    }
+
+    private boolean isDebugTripPath(T arrival) {
         if (!isDebugTrip(stop(arrival))) {
             return false;
         }
@@ -106,9 +108,5 @@ abstract class AbstractDebugHandlerAdapter<T> implements DebugHandler<T> {
             }
         }
         return true;
-    }
-
-    private boolean isDebugTrip(int stop) {
-        return pathStartAtStopIndex <= path.indexOf(stop);
     }
 }

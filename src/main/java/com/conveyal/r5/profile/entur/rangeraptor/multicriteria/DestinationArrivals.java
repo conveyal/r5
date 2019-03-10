@@ -45,7 +45,7 @@ class DestinationArrivals<T extends TripScheduleInfo> {
         DestinationArrival<T> newValue = new DestinationArrival<>(lastTransitArrival, egressLeg, cost);
 
         if(calculator.exceedsTimeLimit(newValue.arrivalTime())) {
-            rejectByOptimization(newValue);
+            debugRejectByTimeLimitOptimization(newValue);
         }
         else {
             boolean added = add(newValue);
@@ -84,6 +84,11 @@ class DestinationArrivals<T extends TripScheduleInfo> {
         return arrivals.stream().map(mapper).collect(Collectors.toList());
     }
 
+    @Override
+    public String toString() {
+        return "DestinationArrivals: " + arrivals;
+    }
+
 
     /* private methods */
 
@@ -91,9 +96,9 @@ class DestinationArrivals<T extends TripScheduleInfo> {
         return arrivals.add(arrival);
     }
 
-    private void rejectByOptimization(DestinationArrival<T> newValue) {
+    private void debugRejectByTimeLimitOptimization(DestinationArrival<T> newValue) {
         if(debugHandler != null) {
-            debugHandler.rejectByOptimization(newValue);
+            debugHandler.reject(newValue, null, calculator.exceedsTimeLimitReason());
         }
     }
 
@@ -101,10 +106,9 @@ class DestinationArrivals<T extends TripScheduleInfo> {
         // The `travelDuration` is added as a criteria to the pareto comparator in addition to the parameters
         // used for each stop arrivals. The `travelDuration` is only needed at the destination because Range Raptor
         // works in iterations backwards in time.
-        return (l, r) ->
-                l.arrivalTime() < r.arrivalTime() ||
-                l.numberOfTransfers() < r.numberOfTransfers() ||
-                l.travelDuration() < r.travelDuration() ||
-                l.cost() < Math.round(r.cost() * relaxCostAtDestinationArrival);
+        return (l, r) -> l.arrivalTime() < r.arrivalTime() ||
+        l.numberOfTransfers() < r.numberOfTransfers() ||
+        l.travelDurationTime() < r.travelDurationTime() ||
+        l.cost() < Math.round(r.cost() * relaxCostAtDestinationArrival);
     }
 }

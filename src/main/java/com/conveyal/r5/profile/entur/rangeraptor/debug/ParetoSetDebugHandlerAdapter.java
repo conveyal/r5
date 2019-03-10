@@ -3,8 +3,6 @@ package com.conveyal.r5.profile.entur.rangeraptor.debug;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSetEventListener;
 
-import java.util.Collection;
-
 
 /**
  * Use this class to attach a debugHandler to a pareto set. The handler will
@@ -21,17 +19,17 @@ final class ParetoSetDebugHandlerAdapter<T> implements ParetoSetEventListener<T>
     }
 
     @Override
-    public void notifyElementAccepted(T newElement, Collection<? extends T> resultSet) {
-        debugHandler.accept(newElement, resultSet);
+    public void notifyElementAccepted(T newElement) {
+        debugHandler.accept(newElement);
     }
 
     @Override
     public void notifyElementDropped(T element, T droppedByElement) {
-        debugHandler.drop(element, droppedByElement);
+        debugHandler.drop(element, droppedByElement, null);
     }
 
     @Override
-    public void notifyElementRejected(T element, Collection<? extends T> existingSet) {
-        debugHandler.reject(element, existingSet);
+    public void notifyElementRejected(T element, T droppedByElement) {
+        debugHandler.reject(element, droppedByElement, null);
     }
 }

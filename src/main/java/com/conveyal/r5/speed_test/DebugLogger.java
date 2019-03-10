@@ -30,10 +30,10 @@ class DebugLogger {
 
         printIterationHeader(e.iterationStartTime());
         printRoundHeader(e.element().round());
-        print(e.element(), e.action().toString());
+        print(e.element(), e.action().toString(), e.reason());
 
-        if (e.action() == DebugEvent.Action.DROP && e.droppedByElement() != null) {
-            print(e.droppedByElement(), "->by");
+        if (e.action() == DebugEvent.Action.DROP && e.rejectedDroppedByElement() != null) {
+            print(e.rejectedDroppedByElement(), "->by", "");
         }
     }
 
@@ -45,7 +45,6 @@ class DebugLogger {
 
         printIterationHeader(e.iterationStartTime());
         printRoundHeader(round);
-
         print(
                 e.action().toString(),
                 round,
@@ -54,27 +53,29 @@ class DebugLogger {
                 path.endTime(),
                 cost,
                 "",
-                path.toString()
+                concat(e.reason(), "Path: " + path.toString())
         );
     }
 
     void pathFilteringListener(DebugEvent<Path<TripSchedule>> e) {
         if (pathHeader) {
             System.err.println();
-            System.err.println("PATH   | TR | FROM  | TO    | START    | END      | DURATION");
+            System.err.println("* PATH *  | TR | FROM  | TO    | START    | END      | DURATION |   COST   | DETAILS");
             pathHeader = false;
         }
 
         Path<TripSchedule> p = e.element();
         System.err.printf(
-                "%6s | %2d | %5d | %5d | %8s | %8s | %8s %n",
-                center(e.action().toString(), 6),
+                "%9s | %2d | %5d | %5d | %8s | %8s | %8s | %8s %n",
+                center(e.action().toString(), 9),
                 p.numberOfTransfers(),
                 p.accessLeg().toStop(),
                 p.egressLeg().fromStop(),
                 TimeUtils.timeToStrLong(p.accessLeg().fromTime()),
                 TimeUtils.timeToStrLong(p.egressLeg().toTime()),
-                timeToStrCompact(p.totalTravelDurationInSeconds())
+                timeToStrCompact(p.totalTravelDurationInSeconds()),
+                p.cost(),
+                concat(e.reason(), e.toString())
         );
     }
 
@@ -88,16 +89,16 @@ class DebugLogger {
         System.err.println("\n**  RUN RAPTOR FOR MINUTE: " + timeToStrCompact(iterationTime) + "  **");
     }
 
-    private void print(StopArrivalView<?> a, String action) {
+    private void print(StopArrivalView<?> a, String action, String optReason) {
         String trip = a.arrivedByTransit() ? a.trip().debugInfo() : "";
-        print(action, a.round(), a.legType(), a.stop(), a.arrivalTime(), a.cost(), trip, path(a));
+        print(action, a.round(), a.legType(), a.stop(), a.arrivalTime(), a.cost(), trip, concat(optReason, path(a)));
     }
 
-    private String path(StopArrivalView<?> a) {
+    private static String path(StopArrivalView<?> a) {
         return path(a, new PathStringBuilder()).toString();
     }
 
-    private PathStringBuilder path(StopArrivalView<?> a, PathStringBuilder buf) {
+    private static PathStringBuilder path(StopArrivalView<?> a, PathStringBuilder buf) {
         if (a.arrivedByAccessLeg()) {
             return buf.walk(legDuration(a)).sep().stop(a.stop());
         }
@@ -117,7 +118,7 @@ class DebugLogger {
     /**
      * The absolute time duration in seconds of a trip.
      */
-    private int legDuration(StopArrivalView<?> a) {
+    private static int legDuration(StopArrivalView<?> a) {
         // Depending on the search direction this may or may not be negative, if we
         // search backwards in time then we arrive before we depart ;-) Hence
         // we need to use the absolute value.
@@ -130,8 +131,8 @@ class DebugLogger {
 
         System.err.println();
         System.err.printf(
-                "%-6s | %-8s | %3s | %-5s | %-8s | %4s | %-20s | %s %n",
-                "ACTION",
+                "%-9s | %-8s | %3s | %-5s | %-8s | %8s | %-20s | %s %n",
+                "ARRIVAL",
                 center("LEG", 8),
                 "RND",
                 "STOP",
@@ -144,8 +145,8 @@ class DebugLogger {
 
     private void print(String action, int round, String leg, int toStop, int toTime, int cost, String trip, String details) {
         System.err.printf(
-                "%-6s | %-8s | %2d  | %5s | %8s | %4d | %-20s | %s %n",
-                center(action, 6),
+                "%-9s | %-8s | %2d  | %5s | %8s | %8d | %-20s | %s %n",
+                center(action, 9),
                 center(leg, 8),
                 round,
                 IntUtils.intToString(toStop, NOT_SET),
@@ -156,7 +157,14 @@ class DebugLogger {
         );
     }
 
-    private String center(String text, int columnWidth) {
+    private static String center(String text, int columnWidth) {
         return StringUtils.center(text, columnWidth);
+    }
+
+    private static String concat(String s, String t) {
+        if(s == null || s.isEmpty()) {
+            return t == null ? "" : t;
+        }
+        return s + " " + (t == null ? "" : t);
     }
 }

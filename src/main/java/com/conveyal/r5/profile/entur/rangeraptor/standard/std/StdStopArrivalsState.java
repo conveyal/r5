@@ -4,6 +4,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard.std;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.path.DestinationArrivalPaths;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalsState;
 
 import java.util.Collection;
@@ -19,14 +20,14 @@ import java.util.Collection;
 public final class StdStopArrivalsState<T extends TripScheduleInfo> implements StopArrivalsState<T> {
 
     private final Stops<T> stops;
-    private final DestinationArrivals<T> results;
+    private final DestinationArrivalPaths<T> results;
 
     /**
      * Create a Standard Range Raptor state for the given stops and destination arrivals.
      */
-    public StdStopArrivalsState(Stops<T> stops, DestinationArrivals<T> destinationArrivals) {
+    public StdStopArrivalsState(Stops<T> stops, DestinationArrivalPaths<T> paths) {
         this.stops = stops;
-        this.results = destinationArrivals;
+        this.results = paths;
     }
 
     @Override
@@ -36,7 +37,7 @@ public final class StdStopArrivalsState<T extends TripScheduleInfo> implements S
 
     @Override
     public final Collection<Path<T>> extractPaths() {
-        return results.paths();
+        return results.listPaths();
     }
 
     @Override

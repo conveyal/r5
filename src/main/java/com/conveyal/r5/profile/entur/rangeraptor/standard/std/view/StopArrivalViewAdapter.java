@@ -154,11 +154,13 @@ abstract class StopArrivalViewAdapter<T extends TripScheduleInfo> implements Sto
     static final class DestinationArrivalViewAdapter<T extends TripScheduleInfo> implements DestinationArrivalView<T> {
         private final int departureTime;
         private final int arrivalTime;
+        private final int numberOfTransfers;
         private final Transit<T> previous;
 
-        DestinationArrivalViewAdapter(int departureTime, int arrivalTime, Transit<T> previous) {
-            this.arrivalTime = arrivalTime;
+        public DestinationArrivalViewAdapter(int departureTime, int arrivalTime, int numberOfTransfers, Transit<T> previous) {
             this.departureTime = departureTime;
+            this.arrivalTime = arrivalTime;
+            this.numberOfTransfers = numberOfTransfers;
             this.previous = previous;
         }
 
@@ -170,6 +172,18 @@ abstract class StopArrivalViewAdapter<T extends TripScheduleInfo> implements Sto
         @Override
         public int arrivalTime() {
             return arrivalTime;
+        }
+
+        @Override
+        public int numberOfTransfers() {
+            return numberOfTransfers;
+        }
+
+        @Override
+        @Deprecated
+        public int travelDurationTime() {
+            // Travel duration should not be used for anything, the hole class is due for deletion
+            return -9999;
         }
 
         @Override

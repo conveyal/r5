@@ -26,9 +26,9 @@ public class ParetoSetEventListenerComposite<T> implements ParetoSetEventListene
     }
 
     @Override
-    public void notifyElementAccepted(T newElement, Collection<? extends T> resultSet) {
+    public void notifyElementAccepted(T newElement) {
         for (ParetoSetEventListener<T> it : listeners) {
-            it.notifyElementAccepted(newElement, resultSet);
+            it.notifyElementAccepted(newElement);
         }
     }
 
@@ -40,9 +40,9 @@ public class ParetoSetEventListenerComposite<T> implements ParetoSetEventListene
     }
 
     @Override
-    public void notifyElementRejected(T element, Collection<? extends T> existingSet) {
+    public void notifyElementRejected(T element, T rejectedByElement) {
         for (ParetoSetEventListener<T> it : listeners) {
-            it.notifyElementRejected(element, existingSet);
+            it.notifyElementRejected(element, rejectedByElement);
         }
     }
 }

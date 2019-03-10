@@ -62,10 +62,10 @@ public class StopsCursor<T extends TripScheduleInfo> {
         return new StopArrivalViewAdapter.DestinationArrivalViewAdapter<T>(
                 arrival.transitTime(),
                 transitCalculator.add(arrival.transitTime(), arrival.egressLeg().durationInSeconds()),
+                arrival.round() - 1,
                 transit(arrival.round(), arrival.stop())
         );
     }
-
 
     /**
      * A access stop arrival, time-shifted according to the first transit boarding/departure time

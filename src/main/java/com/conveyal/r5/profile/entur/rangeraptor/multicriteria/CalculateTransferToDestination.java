@@ -7,8 +7,6 @@ import com.conveyal.r5.profile.entur.rangeraptor.transit.CostCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSetEventListener;
 
-import java.util.Collection;
-
 /**
  * This class listen to egress stop arrivals and on accepted arrivals
  * make the transfer to the destination.
@@ -36,7 +34,7 @@ public class CalculateTransferToDestination<T extends TripScheduleInfo>
      * @param newElement the new transit arrival
      */
     @Override
-    public void notifyElementAccepted(StopArrivalView<T> newElement, Collection<? extends StopArrivalView<T>> ignore) {
+    public void notifyElementAccepted(StopArrivalView<T> newElement) {
         if(newElement instanceof TransitStopArrival) {
             TransitStopArrival<T> transitStopArrival = (TransitStopArrival<T>) newElement;
             destinationArrivals.transferToDestination(

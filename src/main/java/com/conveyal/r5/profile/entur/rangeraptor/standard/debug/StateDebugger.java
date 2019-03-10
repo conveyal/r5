@@ -64,17 +64,17 @@ class StateDebugger<T extends TripScheduleInfo> {
     }
 
     private void accept(int stop) {
-        debugHandlerStopArrivals.accept(cursor.stop(round(), stop), null);
+        debugHandlerStopArrivals.accept(cursor.stop(round(), stop));
     }
 
     private void drop(int stop) {
         if(cursor.exist(round(), stop)) {
-            debugHandlerStopArrivals.drop(cursor.stop(round(), stop), null);
+            debugHandlerStopArrivals.drop(cursor.stop(round(), stop), null, null);
         }
     }
 
     private void reject(StopArrivalView<T> arrival) {
-        debugHandlerStopArrivals.reject(arrival, null);
+        debugHandlerStopArrivals.reject(arrival, null, null);
     }
 
     private int round() {

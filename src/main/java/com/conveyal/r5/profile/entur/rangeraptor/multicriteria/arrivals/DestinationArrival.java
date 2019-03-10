@@ -73,11 +73,13 @@ public class DestinationArrival<T extends TripScheduleInfo> implements Destinati
         return arrivalTime;
     }
 
+    @Override
     public int numberOfTransfers() {
         return numberOfTransfers;
     }
 
-    public int travelDuration() {
+    @Override
+    public int travelDurationTime() {
         return travelDuration;
     }
 

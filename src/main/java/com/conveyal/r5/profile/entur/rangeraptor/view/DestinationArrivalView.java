@@ -14,6 +14,10 @@ public interface DestinationArrivalView<T extends TripScheduleInfo> {
 
     int arrivalTime();
 
+    int numberOfTransfers();
+
+    int travelDurationTime();
+
     StopArrivalView<T> previous();
 
     default int cost() {

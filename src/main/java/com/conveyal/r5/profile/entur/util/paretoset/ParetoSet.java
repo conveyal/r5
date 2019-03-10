@@ -95,7 +95,7 @@ public class ParetoSet<T> extends AbstractCollection<T> {
                 return true;
             }
             else if (rightDominance) {
-                notifyElementRejected(newValue);
+                notifyElementRejected(newValue, it);
                 return false;
             }
             else {
@@ -110,7 +110,7 @@ public class ParetoSet<T> extends AbstractCollection<T> {
         }
 
         // No dominance found, newValue is equivalent with all values in the set
-        notifyElementRejected(newValue);
+        notifyElementRejected(newValue, elements[0]);
         return false;
     }
 
@@ -244,7 +244,7 @@ public class ParetoSet<T> extends AbstractCollection<T> {
 
     private void notifyElementAccepted(T newElement) {
         if(eventListener != null) {
-            eventListener.notifyElementAccepted(newElement, this);
+            eventListener.notifyElementAccepted(newElement);
         }
     }
 
@@ -254,9 +254,9 @@ public class ParetoSet<T> extends AbstractCollection<T> {
         }
     }
 
-    private void notifyElementRejected(T element) {
+    private void notifyElementRejected(T element, T rejectByElement) {
         if(eventListener != null) {
-            eventListener.notifyElementRejected(element, this);
+            eventListener.notifyElementRejected(element, rejectByElement);
         }
     }
 }

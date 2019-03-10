@@ -71,14 +71,9 @@ public interface TransitCalculator {
     boolean exceedsTimeLimit(int time);
 
     /**
-     * Use the {@link #exceedsTimeLimit(int)} to check for searching beyond the time limit,
-     * only use this if you need to fill an array, which serve as an upper bound for arrival time.
-     * <p/>
-     * {@link #unreachedTime()} is returned if not provided in the request.
-     *
-     * @return the latest acceptable arrival time.
+     * Return a reason why a arrival time do not pass the {@link #exceedsTimeLimit(int)}
      */
-    int latestAcceptableArrivalTime();
+    String exceedsTimeLimitReason();
 
     /**
      * Return true is the first argument (subject) is the best time, and false if not. If both

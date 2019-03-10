@@ -81,7 +81,7 @@ public class DestinationArrivalTest {
 
     @Test
     public void travelDuration() {
-        assertEquals(EXPECTED_TOTAL_DURATION, subject.travelDuration());
+        assertEquals(EXPECTED_TOTAL_DURATION, subject.travelDurationTime());
     }
 
     @Test

@@ -9,7 +9,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.Worker;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic.CalculateHeuristicWorkerState;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.create.StdRangeRaptorFactory;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.configure.StdRangeRaptorConfig;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 
 import java.util.Collection;
@@ -83,7 +83,7 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
 
     private Worker<T> createMcRRHeuristicWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
         SearchContext<T> heurCtx = context(transitData, asOnePass(request), ServiceType.Heur);
-        StdRangeRaptorFactory<T> stdFactory = new StdRangeRaptorFactory<>(heurCtx);
+        StdRangeRaptorConfig<T> stdFactory = new StdRangeRaptorConfig<>(heurCtx);
 
         Worker<T> heurWorker = stdFactory.createStdHeuristicsSearch();
         CalculateHeuristicWorkerState<T> heurProvider = stdFactory.getHeuristicWorkerState();
@@ -106,7 +106,7 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
             return new McRangeRaptorWorker<>(context, null);
         }
 
-        StdRangeRaptorFactory<T> stdFactory = new StdRangeRaptorFactory<>(context);
+        StdRangeRaptorConfig<T> stdFactory = new StdRangeRaptorConfig<>(context);
 
         switch (type) {
             case stdRR:

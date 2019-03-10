@@ -4,7 +4,6 @@ import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -24,11 +23,11 @@ public class ParetoSetTest {
     private List<Vector> dropped = new ArrayList<>();
 
     private ParetoSetEventListener<Vector> listener = new ParetoSetEventListener<Vector>() {
-        @Override public void notifyElementAccepted(Vector newElement, Collection resultSet) { /* NOOP */ }
+        @Override public void notifyElementAccepted(Vector newElement) { /* NOOP */ }
         @Override public void notifyElementDropped(Vector element, Vector droppedByElement) {
             dropped.add(element);
         }
-        @Override public void notifyElementRejected(Vector element, Collection existingSet) { /* NOOP */ }
+        @Override public void notifyElementRejected(Vector element, Vector rejectedByElement) { /* NOOP */ }
     };
 
 

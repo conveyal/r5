@@ -21,18 +21,25 @@ public final class Stops<T extends TripScheduleInfo> {
             int nStops,
             RoundProvider roundProvider
     ) {
+        this.roundProvider = roundProvider;
         //noinspection unchecked
         this.stops = (StopArrivalState<T>[][]) new StopArrivalState[nRounds][nStops];
-        this.roundProvider = roundProvider;
     }
 
     /**
-     * Setup egress arrivals with a callback witch is notified when a new arrival state is reached.
+     * Setup egress arrivals with a callback witch is notified when a new transit egress arrival happens.
      */
-    public void setupEgressStopStates(Iterable<TransferLeg> egressLegs, Consumer<EgressStopArrivalState<T>> egressArrivalCallback) {
+    public void setupEgressStopStates(
+            Iterable<TransferLeg> egressLegs,
+            Consumer<EgressStopArrivalState<T>> transitArrivalCallback
+    ) {
         for (int round = 1; round < stops.length; round++) {
             for (TransferLeg leg : egressLegs) {
-                EgressStopArrivalState<T> state = new EgressStopArrivalState<>(round, leg, egressArrivalCallback);
+                EgressStopArrivalState<T> state = new EgressStopArrivalState<>(
+                        round,
+                        leg,
+                        transitArrivalCallback
+                );
                 stops[round][leg.stop()] = state;
             }
         }

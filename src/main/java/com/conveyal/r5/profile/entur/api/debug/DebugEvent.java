@@ -1,9 +1,7 @@
 package com.conveyal.r5.profile.entur.api.debug;
 
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
+import javax.annotation.Nullable;
 
 
 /**
@@ -16,8 +14,8 @@ public class DebugEvent<E> {
     private final Action action;
     private final int iterationStartTime;
     private final E element;
-    private final E droppedByElement;
-    private final Collection<E> result;
+    private final E rejectedDroppedByElement;
+    private final String reason;
 
 
     /**
@@ -27,41 +25,38 @@ public class DebugEvent<E> {
             Action action,
             int iterationStartTime,
             E element,
-            E droppedByElement,
-            Collection<? extends E> result
+            E rejectedDroppedByElement,
+            String reason
     ) {
         this.action = action;
         this.iterationStartTime = iterationStartTime;
         this.element = element;
-        this.droppedByElement = droppedByElement;
-        this.result = result == null ? Collections.emptyList() : new ArrayList<>(result);
+        this.rejectedDroppedByElement = rejectedDroppedByElement;
+        this.reason = reason;
     }
 
-    public static <E> DebugEvent<E> accept(int iterationStartTime, E element, Collection<? extends E> result) {
-        return new DebugEvent<>(Action.ACCEPT, iterationStartTime, element, null, result);
+    public static <E> DebugEvent<E> accept(int iterationStartTime, E element) {
+        return new DebugEvent<>(Action.ACCEPT, iterationStartTime, element, null, null);
     }
 
-    public static <E> DebugEvent<E> reject(int iterationStartTime, E element, Collection<? extends E> result) {
-        return new DebugEvent<>(Action.REJECT, iterationStartTime, element, null, result);
+    public static <E> DebugEvent<E> reject(int iterationStartTime, E element, E rejectedByElement, String reason) {
+        return new DebugEvent<>(Action.REJECT, iterationStartTime, element, rejectedByElement, reason);
     }
 
-    public static <E> DebugEvent<E> rejectByOptimization(int iterationStartTime, E element) {
-        return new DebugEvent<>(Action.REJECT_OPTIMIZED, iterationStartTime, element, null, null);
-    }
-
-    public static <E> DebugEvent<E> drop(int iterationStartTime, E element, E droppedByElement) {
-        return new DebugEvent<>(Action.DROP, iterationStartTime, element, droppedByElement, null);
+    public static <E> DebugEvent<E> drop(int iterationStartTime, E element, E droppedByElement, String reason) {
+        return new DebugEvent<>(Action.DROP, iterationStartTime, element, droppedByElement, reason);
     }
 
     /**
      * The acton taken:
      * <ul>
      *     <li>ACCEPT - The element is accepted as one of the best alternatives.
-     *     <li>REJECT - The element is rejected, there is a better alternative {@link #result()}.
-     *     <li>DROP   - The element is dropped from the list of alternatives, see {@link #droppedByElement()}. Be aware
-     *     that that this does not necessarily mean that the path is not part of the final result. If an element is
-     *     dropped in a later round or iteration the original element path might already be added to the final result;
-     *     hence the drop event have no effect on the result.
+     *     <li>REJECT - The element is rejected, there is a better alternative.
+     *     <li>DROP   - The element is dropped from the list of alternatives. Be
+     *     aware that that this does not necessarily mean that the path is not part
+     *     of the final result. If an element is dropped in a later round or iteration
+     *     the original element path might already be added to the final result;
+     *     hence dropping the element have no effect on the result.
      * </ul>
      */
     public Action action() {
@@ -83,21 +78,25 @@ public class DebugEvent<E> {
     }
 
     /**
-     * The element was removed/dropped/dominated by the {@code  droppedByElement}. This may or may not affect
-     * the final result depending on the round/iteration the original element was accepted and this event.
+     * The element was dominated  by the this element. This may or may not affect the final result
+     * depending on the round/iteration the original element was accepted.
+     * <p/>
+     * The rejectedDroppedByElement is optional. It can be {@code null}.
      */
-    public E droppedByElement() {
-        return droppedByElement;
+    public @Nullable E rejectedDroppedByElement() {
+        return rejectedDroppedByElement;
     }
 
     /**
-     * The state AFTER event happens, only available for ACCEPT and REJECT actions.
-     * This is optional.
+     * An element might get rejected or dropped as part of an optimization. The reason should
+     * explain why an element is rejected.
+     * <P/>
+     * The reason is optional, especially if the {@link #rejectedDroppedByElement} is specified.
      *
-     * @return The new state as a list of elements or {@code null} if not available.
+     * @return If no reason exist an empty string is returned.
      */
-    public Collection<E> result() {
-        return result;
+    public String reason() {
+        return reason == null ? "" : reason;
     }
 
     /** The event action type */

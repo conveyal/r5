@@ -8,6 +8,7 @@ import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.path.ForwardPathMapper;
 import com.conveyal.r5.profile.entur.rangeraptor.path.PathMapper;
 import com.conveyal.r5.profile.entur.util.IntIterators;
+import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 import java.util.function.Function;
 
@@ -80,8 +81,9 @@ final class ForwardSearchTransitCalculator implements TransitCalculator {
     }
 
     @Override
-    public int latestAcceptableArrivalTime() {
-        return latestAcceptableArrivalTime;
+    public String exceedsTimeLimitReason() {
+        return "The arrival time exceeds the time limit, arrive to late: " +
+                TimeUtils.timeToStrLong(latestAcceptableArrivalTime) + ".";
     }
 
     @Override

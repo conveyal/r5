@@ -223,6 +223,17 @@ public class StopArrivalsTestData {
         }
         @Override public int departureTime() { return departureTime; }
         @Override public int arrivalTime() { return arrivalTime; }
+
+        @Override
+        public int numberOfTransfers() {
+            return previous.round() - 1;
+        }
+
+        @Override
+        public int travelDurationTime() {
+            return 0;
+        }
+
         @Override public StopArrivalView<TestTripSchedule> previous() { return previous; }
     }
 }

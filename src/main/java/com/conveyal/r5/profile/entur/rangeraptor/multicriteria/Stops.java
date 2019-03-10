@@ -86,7 +86,7 @@ final class Stops<T extends TripScheduleInfo> {
     }
 
     boolean addStopArrival(AbstractStopArrival<T> arrival) {
-        if(vetoHeuristicDestinationArrival(arrival)) {
+        if(rejectDestinationArrivalBasedOnHeuristic(arrival)) {
             rejectByOptimization(arrival);
             return false;
         }
@@ -140,7 +140,7 @@ final class Stops<T extends TripScheduleInfo> {
         );
     }
 
-    private boolean vetoHeuristicDestinationArrival(AbstractStopArrival<T> arrival) {
+    private boolean rejectDestinationArrivalBasedOnHeuristic(AbstractStopArrival<T> arrival) {
         if(heuristics == null || destinationArrivals.isEmpty()) {
             return false;
         }
@@ -154,7 +154,20 @@ final class Stops<T extends TripScheduleInfo> {
 
     private void rejectByOptimization(AbstractStopArrival<T> arrival) {
         if (debugHandlerFactory.isDebugStopArrival(arrival.stop())) {
-            debugHandlerFactory.debugStopArrival().rejectByOptimization(arrival);
+            String details = heuristics[arrival.stop()] == null
+                    ? "The stop was not reached in the heuristic calculation."
+                    : heuristics[arrival.stop()].toString();
+
+            if(!destinationArrivals.isEmpty()) {
+                details += " " + destinationArrivals;
+            }
+
+            debugHandlerFactory.debugStopArrival().reject(
+                    arrival,
+                    null,
+                    "The element is rejected because the destination is not reachable within the limit " +
+                            "based on heuristic. Details: " + details
+            );
         }
     }
 

@@ -1,8 +1,6 @@
 package com.conveyal.r5.profile.entur.util.paretoset;
 
 
-import java.util.Collection;
-
 /**
  * You may subscribe/listen to the {@link ParetoSet} for events by implementing this
  * interface and register it with the ParetoSet.
@@ -24,19 +22,18 @@ public interface ParetoSetEventListener<T> {
     /**
      * This is the callback called when an element is dropped.
      */
-    default void notifyElementAccepted(T newElement, Collection<? extends T> resultSet) {}
+    default void notifyElementAccepted(T newElement) { }
 
     /**
      * This is the callback called when an element is dropped.
      */
-    default void notifyElementDropped(T element, T droppedByElement) {}
+    default void notifyElementDropped(T element, T droppedByElement) { }
 
     /**
      * This is the callback called when an element is dropped.
      *
-     * @param element     The new element that is rejected.
-     * @param existingSet The existing elements in the set, in witch ataleast one element dominates
-     *                    the new rejected element.
+     * @param element           The new element that is rejected.
+     * @param rejectedByElement One of the existing elements in the set witch dominates the new rejected element.
      */
-    default void notifyElementRejected(T element, Collection<? extends T> existingSet) {}
+    default void notifyElementRejected(T element, T rejectedByElement) { }
 }

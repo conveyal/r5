@@ -4,7 +4,6 @@ import org.junit.Before;
 import org.junit.Test;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -88,7 +87,7 @@ public class ParetoSetEventListenerTest {
     private ParetoSetEventListener<Vector> eventListener() {
         return new ParetoSetEventListener<Vector>() {
             @Override
-            public void notifyElementAccepted(Vector newElement, Collection<? extends Vector> resultSet) {
+            public void notifyElementAccepted(Vector newElement) {
                 accepted.add(newElement);
             }
 
@@ -98,7 +97,7 @@ public class ParetoSetEventListenerTest {
             }
 
             @Override
-            public void notifyElementRejected(Vector element, Collection<? extends Vector> existingSet) {
+            public void notifyElementRejected(Vector element, Vector rejectedByElement) {
                 rejected.add(element);
             }
         };

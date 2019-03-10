@@ -21,6 +21,26 @@ public final class Path<T extends TripScheduleInfo> {
     private final AccessPathLeg<T> accessLeg;
     private EgressPathLeg<T> egressPathLeg = null;
 
+
+    /**
+     * Create a "dummy" path without legs. Can be used to test if a path is pareto optimal without
+     * creating the hole path.
+     */
+    public static <T extends TripScheduleInfo> Path<T> dummyPath(
+            int startTime, int endTime, int numberOfTransfers, int cost
+    ) {
+        return new Path<>(startTime, endTime, numberOfTransfers, cost);
+    }
+
+    /** @see #dummyPath(int, int, int, int) */
+    private Path(int startTime, int endTime, int numberOfTransfers, int cost) {
+        this.startTime = startTime;
+        this.endTime = endTime;
+        this.numberOfTransfers = numberOfTransfers;
+        this.cost = cost;
+        this.accessLeg = null;
+    }
+
     public Path(AccessPathLeg<T> accessLeg, int endTime, int numberOfTransfers, int cost) {
         this.accessLeg = accessLeg;
         this.startTime = accessLeg.fromTime();

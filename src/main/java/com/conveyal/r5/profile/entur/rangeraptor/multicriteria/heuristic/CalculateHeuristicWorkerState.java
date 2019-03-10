@@ -169,5 +169,14 @@ public class CalculateHeuristicWorkerState<T extends TripScheduleInfo> implement
         public int getMinCost() {
             return minCost;
         }
+
+        @Override
+        public String toString() {
+            return "Heuristic{" +
+                    "minTravelTime=" + minTravelTime +
+                    ", minNumTransfers=" + minNumTransfers +
+                    ", minCost=" + minCost +
+                    '}';
+        }
     }
 }

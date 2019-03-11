@@ -1,8 +1,8 @@
-package com.conveyal.r5.profile.entur.rangeraptor.standard.std.view;
+package com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.view;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.view.ArrivalView;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.std.StopArrivalState;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.StopArrivalState;
 
 
 /**

@@ -12,10 +12,10 @@ import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.BestTimes;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.BestTimesOnlyStopArrivalsState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.SimpleArrivedAtDestinationCheck;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.debug.DebugStopArrivalsState;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.std.StdStopArrivalsState;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.std.Stops;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.std.path.EgressArrivalToPathAdapter;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.std.view.StopsCursor;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.StdStopArrivalsState;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.Stops;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.path.EgressArrivalToPathAdapter;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.view.StopsCursor;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 
 

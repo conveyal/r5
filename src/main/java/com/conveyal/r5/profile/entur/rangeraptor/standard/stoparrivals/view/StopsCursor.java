@@ -1,13 +1,13 @@
-package com.conveyal.r5.profile.entur.rangeraptor.standard.std.view;
+package com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.view;
 
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.view.ArrivalView;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.std.StopArrivalState;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.std.Stops;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.std.view.StopArrivalViewAdapter.Access;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.std.view.StopArrivalViewAdapter.Transfer;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.std.view.StopArrivalViewAdapter.Transit;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.StopArrivalState;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.Stops;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.view.StopArrivalViewAdapter.Access;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.view.StopArrivalViewAdapter.Transfer;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.view.StopArrivalViewAdapter.Transit;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 
 

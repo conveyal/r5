@@ -5,7 +5,7 @@ import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.view.ArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.std.view.StopsCursor;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.view.StopsCursor;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
 
 /**

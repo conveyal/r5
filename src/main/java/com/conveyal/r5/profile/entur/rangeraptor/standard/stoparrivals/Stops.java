@@ -1,4 +1,4 @@
-package com.conveyal.r5.profile.entur.rangeraptor.standard.std;
+package com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals;
 
 
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;

@@ -1,12 +1,13 @@
 package com.conveyal.r5.profile.entur.rangeraptor.path;
 
 import com.conveyal.r5.profile.entur.api.path.Path;
+import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.view.ArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
-import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
 
@@ -30,7 +31,7 @@ public class DestinationArrivalPaths<T extends TripScheduleInfo> {
     private final ParetoSet<Path<T>> paths;
     private final TransitCalculator calculator;
     private final PathMapper<T> pathMapper;
-    private final DebugHandler<DestinationArrivalView<T>> debugHandler;
+    private final DebugHandler<ArrivalView<T>> debugHandler;
     private boolean reachedCurrentRound = false;
 
     public DestinationArrivalPaths(
@@ -40,17 +41,20 @@ public class DestinationArrivalPaths<T extends TripScheduleInfo> {
             WorkerLifeCycle lifeCycle
     ) {
         this.paths = new ParetoSet<>(paretoComparator, debugHandlerFactory.paretoSetDebugPathListener());
-        this.debugHandler = debugHandlerFactory.debugDestinationArrival();
+        this.debugHandler = debugHandlerFactory.debugStopArrival();
         this.calculator = calculator;
         this.pathMapper = calculator.createPathMapper();
         lifeCycle.onPrepareForNextRound(this::clearReachedCurrentRoundFlag);
     }
 
-    public void add(DestinationArrivalView<T> destinationArrival) {
-        if (calculator.exceedsTimeLimit(destinationArrival.arrivalTime())) {
-            debugRejectByTimeLimitOptimization(destinationArrival);
+    public void add(ArrivalView<T> egressStopArrival, TransferLeg egressLeg, int additionalCost) {
+        int arrivalTime = calculator.add(egressStopArrival.arrivalTime(), egressLeg.durationInSeconds());
+        DestinationArrival<T> destArrival = new DestinationArrival<>(egressStopArrival, arrivalTime, additionalCost);
+
+        if (calculator.exceedsTimeLimit(arrivalTime)) {
+            debugRejectByTimeLimitOptimization(destArrival);
         } else {
-            Path<T> path = pathMapper.mapToPath(destinationArrival);
+            Path<T> path = pathMapper.mapToPath(destArrival);
             boolean added = paths.add(path);
             if (added) {
                 reachedCurrentRound = true;
@@ -60,9 +64,6 @@ public class DestinationArrivalPaths<T extends TripScheduleInfo> {
 
     /**
      * Check if destination was reached in the current round.
-     * <p/>
-     * NOTE! Remember to clear flag before or after each round:
-     * {@link #clearReachedCurrentRoundFlag()}.
      */
     public boolean isReachedCurrentRound() {
         return reachedCurrentRound;
@@ -85,15 +86,16 @@ public class DestinationArrivalPaths<T extends TripScheduleInfo> {
         return "DestinationArrivalPaths: " + paths;
     }
 
+
     /* private methods */
 
     private void clearReachedCurrentRoundFlag() {
         reachedCurrentRound = false;
     }
 
-    private void debugRejectByTimeLimitOptimization(DestinationArrivalView<T> newValue) {
+    private void debugRejectByTimeLimitOptimization(DestinationArrival<T> destArrival) {
         if (debugHandler != null) {
-            debugHandler.reject(newValue, null, calculator.exceedsTimeLimitReason());
+            debugHandler.reject(destArrival.previous(), null, calculator.exceedsTimeLimitReason());
         }
     }
 

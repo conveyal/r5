@@ -15,10 +15,9 @@ public class AccessStopArrivalTest {
     private static final int DEPATURE_TIME = 8 * 60 * 60;
     private static final int LEG_DURATION = 10 * 60;
     private static final int ALIGHT_TIME = DEPATURE_TIME + LEG_DURATION;
-    private static final int BOARD_TIME = DEPATURE_TIME + 30 * 60;
     private static final int COST = 500;
 
-    private static final TransitCalculator TRANSIT_CALCULATOR = TransitCalculator.testDummyCalculator(BOARD_SLACK);
+    private static final TransitCalculator TRANSIT_CALCULATOR = TransitCalculator.testDummyCalculator(BOARD_SLACK, true);
     private AccessStopArrival<TripScheduleInfo> subject = new AccessStopArrival<>(ALIGHT_STOP, DEPATURE_TIME, LEG_DURATION, COST, TRANSIT_CALCULATOR);
 
 
@@ -38,13 +37,11 @@ public class AccessStopArrivalTest {
     @Test
     public void arrivalTime() {
         assertEquals(ALIGHT_TIME, subject.arrivalTime());
-        assertEquals(BOARD_TIME - BOARD_SLACK, subject.arrivalTimeAccess(BOARD_TIME));
     }
 
     @Test
     public void departureTime() {
         assertEquals(DEPATURE_TIME, subject.departureTime());
-        assertEquals(BOARD_TIME - BOARD_SLACK - LEG_DURATION, subject.departureTimeAccess(BOARD_TIME));
     }
 
     @Test
@@ -55,11 +52,6 @@ public class AccessStopArrivalTest {
     @Test
     public void round() {
         assertEquals(0, subject.round());
-    }
-
-    @Test
-    public void listStops() {
-        assertEquals("[100]", subject.listStopsForDebugging().toString());
     }
 
     @Test
@@ -86,5 +78,4 @@ public class AccessStopArrivalTest {
                 subject.toString()
         );
     }
-
 }

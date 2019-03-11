@@ -29,14 +29,4 @@ public final class AccessStopArrival<T extends TripScheduleInfo> extends Abstrac
     public boolean arrivedByAccessLeg() {
         return true;
     }
-
-    @Override
-    public int departureTimeAccess(int transitBoardTime) {
-        return calculator.originDepartureTime(transitBoardTime, accessDurationInSeconds);
-    }
-
-    @Override
-    public int arrivalTimeAccess(int transitBoardTime) {
-        return calculator.add(departureTimeAccess(transitBoardTime), accessDurationInSeconds);
-    }
 }

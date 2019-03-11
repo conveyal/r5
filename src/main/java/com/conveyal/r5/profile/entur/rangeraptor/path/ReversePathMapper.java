@@ -7,8 +7,8 @@ import com.conveyal.r5.profile.entur.api.path.PathLeg;
 import com.conveyal.r5.profile.entur.api.path.TransferPathLeg;
 import com.conveyal.r5.profile.entur.api.path.TransitPathLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
-import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
+import com.conveyal.r5.profile.entur.api.view.ArrivalView;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 
 
 /**
@@ -25,18 +25,18 @@ import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
  */
 public final class ReversePathMapper<T extends TripScheduleInfo> implements PathMapper<T> {
 
-    private final int boardSlackInSeconds;
+    private final TransitCalculator calculator;
 
-    public ReversePathMapper(int boardSlackInSeconds) {
-        this.boardSlackInSeconds = boardSlackInSeconds;
+    public ReversePathMapper(TransitCalculator calculator) {
+        this.calculator = calculator;
     }
 
     @Override
-    public Path<T> mapToPath(final DestinationArrivalView<T> to) {
-        StopArrivalView<T> from;
+    public Path<T> mapToPath(final DestinationArrival<T> to) {
+        ArrivalView<T> from;
         AccessPathLeg<T> accessLeg;
 
-        // The path is in reverse - .
+        // The path is in reverse
         from = to.previous();
 
         accessLeg = new AccessPathLeg<>(
@@ -46,23 +46,27 @@ public final class ReversePathMapper<T extends TripScheduleInfo> implements Path
                 mapToTransit(from)   // Recursive
         );
 
-        int numberOfTransits = 0;
+        int destinationArrivalTime = egressLeg(accessLeg).toTime();
+        int numberOfTransfers = to.numberOfTransfers();
 
-        PathLeg<T> leg = accessLeg;
-
-        while (!leg.isEgressLeg()) {
-            numberOfTransits += leg.isTransitLeg() ? 1 : 0;
-            leg = leg.nextLeg();
-        }
         return new Path<>(
                 accessLeg,
-                leg.toTime(),
-                numberOfTransits - 1,
+                destinationArrivalTime,
+                numberOfTransfers,
                 to.cost()
         );
     }
 
-    private PathLeg<T> mapToPathLeg(StopArrivalView<T> to, int transitBoardTime) {
+    private PathLeg<T> egressLeg(AccessPathLeg<T> accessLeg) {
+        PathLeg<T> leg = accessLeg;
+
+        while (!leg.isEgressLeg()) {
+            leg = leg.nextLeg();
+        }
+        return leg;
+    }
+
+    private PathLeg<T> mapToPathLeg(ArrivalView<T> to, int transitBoardTime) {
         if (to.arrivedByTransfer()) {
             return mapToTransfer(to);
         }
@@ -74,8 +78,8 @@ public final class ReversePathMapper<T extends TripScheduleInfo> implements Path
         }
     }
 
-    private TransitPathLeg<T> mapToTransit(StopArrivalView<T> to) {
-        StopArrivalView<T> from = to.previous();
+    private TransitPathLeg<T> mapToTransit(ArrivalView<T> to) {
+        ArrivalView<T> from = to.previous();
 
         return new TransitPathLeg<>(
                 to.stop(),
@@ -88,11 +92,11 @@ public final class ReversePathMapper<T extends TripScheduleInfo> implements Path
     }
 
     private int removeBoardSlack(int arrivalTime) {
-        return arrivalTime + boardSlackInSeconds;
+        return calculator.removeBoardSlack(arrivalTime);
     }
 
-    private TransferPathLeg<T> mapToTransfer(StopArrivalView<T> to) {
-        StopArrivalView<T> from = to.previous();
+    private TransferPathLeg<T> mapToTransfer(ArrivalView<T> to) {
+        ArrivalView<T> from = to.previous();
 
         return new TransferPathLeg<T>(
                 to.stop(),
@@ -103,11 +107,9 @@ public final class ReversePathMapper<T extends TripScheduleInfo> implements Path
         );
     }
 
-    private EgressPathLeg<T> mapToEgressLeg(StopArrivalView<T> to, int transitBoardTime) {
-        return new EgressPathLeg<>(
-                to.stop(),
-                to.arrivalTimeAccess(transitBoardTime),
-                to.departureTimeAccess(transitBoardTime)
-        );
+    private EgressPathLeg<T> mapToEgressLeg(ArrivalView<T> to, int transitBoardTime) {
+        int accessDurationInSeconds =  to.departureTime() - to.arrivalTime();
+        int egressArrivalTime = calculator.originDepartureTime(transitBoardTime, accessDurationInSeconds);
+        return new EgressPathLeg<>(to.stop(), transitBoardTime, egressArrivalTime);
     }
 }

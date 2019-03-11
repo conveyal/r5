@@ -60,14 +60,19 @@ final class ForwardSearchTransitCalculator implements TransitCalculator {
     }
 
     @Override
-    public int earliestBoardTime(int time) {
+    public final int earliestBoardTime(int time) {
         // When searching forward we must add the board slack before we board.
+        return addBoardSlack(time);
+    }
+
+    @Override
+    public final int addBoardSlack(int time) {
         return time + boardSlackInSeconds;
     }
 
     @Override
-    public int addBoardSlack(int time) {
-        return earliestBoardTime(time);
+    public final int removeBoardSlack(int time) {
+        return time - boardSlackInSeconds;
     }
 
     @Override
@@ -76,7 +81,7 @@ final class ForwardSearchTransitCalculator implements TransitCalculator {
     }
 
     @Override
-    public boolean exceedsTimeLimit(int time) {
+    public final boolean exceedsTimeLimit(int time) {
         return isBest(latestAcceptableArrivalTime, time);
     }
 
@@ -92,7 +97,7 @@ final class ForwardSearchTransitCalculator implements TransitCalculator {
     }
 
     @Override
-    public int originDepartureTime(int firstTransitBoardTime, int accessLegDuration) {
+    public final int originDepartureTime(int firstTransitBoardTime, int accessLegDuration) {
         return firstTransitBoardTime - (boardSlackInSeconds + accessLegDuration);
     }
 
@@ -111,18 +116,18 @@ final class ForwardSearchTransitCalculator implements TransitCalculator {
     }
 
     @Override
-    public IntIterator patternStopIterator(int nStopsInPattern) {
+    public final IntIterator patternStopIterator(int nStopsInPattern) {
         return IntIterators.intIncIterator(0, nStopsInPattern);
     }
 
     @Override
-    public IntIterator patternStopIterator(int onTripStopPos, int nStopsInPattern) {
+    public final IntIterator patternStopIterator(int onTripStopPos, int nStopsInPattern) {
         // We need to add one, because the input trip is the boarded stop position
         return IntIterators.intIncIterator(onTripStopPos + 1, nStopsInPattern);
     }
 
     @Override
-    public <T extends TripScheduleInfo> TripScheduleSearch<T> createTripSearch(
+    public final <T extends TripScheduleInfo> TripScheduleSearch<T> createTripSearch(
             TripPatternInfo<T> pattern,
             Function<T, Boolean> skipTripScheduleCallback
     ) {
@@ -130,7 +135,7 @@ final class ForwardSearchTransitCalculator implements TransitCalculator {
     }
 
     @Override
-    public <T extends TripScheduleInfo> PathMapper<T> createPathMapper() {
-        return new ForwardPathMapper<>();
+    public final <T extends TripScheduleInfo> PathMapper<T> createPathMapper() {
+        return new ForwardPathMapper<>(this);
     }
 }

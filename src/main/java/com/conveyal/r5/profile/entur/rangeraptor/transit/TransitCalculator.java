@@ -22,15 +22,15 @@ public interface TransitCalculator {
 
     /**
      * Add to time a value(delta) and return the result. In the case of a normal
-     * forward search this will be a pluss '+' operation, while in a backwards
-     * search (moveing back in time) this will be a minus '-' operation.
+     * forward search this will be a pluss '+' operation, while in a reverse
+     * search (moving back in time) this will be a minus '-' operation.
      */
     int add(int time, int delta);
 
     /**
      * Subtract from time a value(delta) and return the result. In the case of a normal
-     * forward search this will be a minus '-' operation, while in a backwards
-     * search (moveing back in time) this will be a pluss '+' operation.
+     * forward search this will be a minus '-' operation, while in a reverse
+     * search (moving back in time) this will be a pluss '+' operation.
      */
     int sub(int time, int delta);
 
@@ -44,12 +44,20 @@ public interface TransitCalculator {
     int earliestBoardTime(int time);
 
     /**
-     * Add boardSlack to time, this is in effect the same as {@link #exceedsTimeLimit(int)}.
+     * Add boardSlack to time.
      *
      * @param time - any time
      * @return the time plus boardSlack
      */
     int addBoardSlack(int time);
+
+    /**
+     * Remove boardSlack from time.
+     *
+     * @param time - any time
+     * @return the time minus boardSlack
+     */
+    int removeBoardSlack(int time);
 
     /**
      * For a normal search return the trip arrival time at stop position.
@@ -128,7 +136,7 @@ public interface TransitCalculator {
 
     /**
      * Create a trip search, to use to find the correct trip to board/alight for
-     * a given pattern. This is used to to inject a forward or backward
+     * a given pattern. This is used to to inject a forward or reverse
      * search into the worker (strategy design pattern).
      *
      * @param pattern the pattern to search
@@ -156,15 +164,27 @@ public interface TransitCalculator {
      *     <li>'latestArrivalTime',  = 10:00:00
      *     <li>'iterationStep' = 60 seconds
      * </ul>
+     * @param forward if true create a calculator for forward search, if false search
      */
-    static TransitCalculator testDummyCalculator(int boardSlackInSeconds) {
-        return new ForwardSearchTransitCalculator(
-                10,
-                boardSlackInSeconds,
-                hm2time(8,0),
-                2 * 60 * 60, // 2 hours
-                -1,
-                60
-        );
+    static TransitCalculator testDummyCalculator(int boardSlackInSeconds, boolean forward) {
+
+
+        return forward
+                ? new ForwardSearchTransitCalculator(
+                        10,
+                        boardSlackInSeconds,
+                        hm2time(8,0),
+                        2 * 60 * 60, // 2 hours
+                        -1,
+                        60
+                )
+                : new ReverseSearchTransitCalculator(
+                        10,
+                        boardSlackInSeconds,
+                        hm2time(8,0),
+                        2 * 60 * 60, // 2 hours
+                        -1,
+                        60
+                );
     }
 }

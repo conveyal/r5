@@ -4,8 +4,7 @@ import com.conveyal.r5.profile.entur.api.debug.DebugEvent;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
-import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
+import com.conveyal.r5.profile.entur.api.view.ArrivalView;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -47,8 +46,7 @@ public class RequestBuilder<T extends TripScheduleInfo> {
     private final List<Integer> debugStops = new ArrayList<>();
     private final List<Integer> debugPath = new ArrayList<>();
     private int debugPathStartAtStopIndex;
-    private Consumer<DebugEvent<StopArrivalView<T>>> stopArrivalListener;
-    private Consumer<DebugEvent<DestinationArrivalView<T>>> destinationArrivalListener;
+    private Consumer<DebugEvent<ArrivalView<T>>> stopArrivalListener;
     private Consumer<DebugEvent<Path<T>>> pathFilteringListener;
 
 
@@ -79,7 +77,6 @@ public class RequestBuilder<T extends TripScheduleInfo> {
         this.debugPath.addAll(debug.path());
         this.debugPathStartAtStopIndex = debug.pathStartAtStopIndex();
         this.stopArrivalListener = debug.stopArrivalListener();
-        this.destinationArrivalListener = debug.destinationArrivalListener();
         this.pathFilteringListener = debug.pathFilteringListener();
     }
 
@@ -234,21 +231,12 @@ public class RequestBuilder<T extends TripScheduleInfo> {
         return this;
     }
 
-    public Consumer<DebugEvent<StopArrivalView<T>>> stopArrivalListener() {
+    public Consumer<DebugEvent<ArrivalView<T>>> stopArrivalListener() {
         return stopArrivalListener;
     }
 
-    public RequestBuilder<T> stopArrivalListener(Consumer<DebugEvent<StopArrivalView<T>>> stopArrivalListener) {
+    public RequestBuilder<T> stopArrivalListener(Consumer<DebugEvent<ArrivalView<T>>> stopArrivalListener) {
         this.stopArrivalListener = stopArrivalListener;
-        return this;
-    }
-
-    public Consumer<DebugEvent<DestinationArrivalView<T>>> destinationArrivalListener() {
-        return destinationArrivalListener;
-    }
-
-    public RequestBuilder<T> destinationArrivalListener(Consumer<DebugEvent<DestinationArrivalView<T>>> destinationArrivalListener) {
-        this.destinationArrivalListener = destinationArrivalListener;
         return this;
     }
 

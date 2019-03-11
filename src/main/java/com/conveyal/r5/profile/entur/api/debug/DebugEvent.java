@@ -105,8 +105,6 @@ public class DebugEvent<E> {
         ACCEPT("Accept"),
         /** Element is rejected */
         REJECT("Reject"),
-        /** Element is rejected as part of an optimization. */
-        REJECT_OPTIMIZED("Optimized"),
         /**
          * Element is dropped from the algorithm state. Since Range Raptor works in rounds and iterations, an element
          * dropped in a later round/iteration might still make it to the optimal solution. This only means that the

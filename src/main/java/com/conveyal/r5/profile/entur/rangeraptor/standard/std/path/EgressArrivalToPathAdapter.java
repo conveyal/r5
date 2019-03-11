@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard.std.path;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.view.ArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.path.DestinationArrivalPaths;
@@ -9,7 +10,6 @@ import com.conveyal.r5.profile.entur.rangeraptor.standard.std.EgressStopArrivalS
 import com.conveyal.r5.profile.entur.rangeraptor.standard.std.view.StopsCursor;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
-import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 
@@ -29,7 +29,7 @@ public class EgressArrivalToPathAdapter<T extends TripScheduleInfo> implements A
     private final DestinationArrivalPaths<T> paths;
     private final TransitCalculator calculator;
     private final StopsCursor<T> cursor;
-    private final DebugHandler<StopArrivalView<T>> debugHandler;
+    private final DebugHandler<ArrivalView<T>> debugHandler;
 
     private boolean newElementSet;
     private EgressStopArrivalState<T> bestEgressStopArrival = null;
@@ -58,9 +58,8 @@ public class EgressArrivalToPathAdapter<T extends TripScheduleInfo> implements A
             newElementSet = true;
             bestDestinationTime = time;
             bestEgressStopArrival = egressStopArrival;
-        }
-        else {
-            if(debugHandler != null) {
+        } else {
+            if (debugHandler != null) {
                 debugHandler.reject(
                         cursor.stop(egressStopArrival.round(), egressStopArrival.stop()),
                         cursor.stop(bestEgressStopArrival.round(), bestEgressStopArrival.stop()),
@@ -79,7 +78,7 @@ public class EgressArrivalToPathAdapter<T extends TripScheduleInfo> implements A
 
     private void roundComplete() {
         if (newElementSet) {
-            paths.add(cursor.destinationArrival(bestEgressStopArrival));
+            addToPath(bestEgressStopArrival);
             newElementSet = false;
         }
     }
@@ -91,5 +90,9 @@ public class EgressArrivalToPathAdapter<T extends TripScheduleInfo> implements A
     @Override
     public boolean arrivedAtDestinationCurrentRound() {
         return paths.isReachedCurrentRound();
+    }
+
+    private void addToPath(final EgressStopArrivalState<T> it) {
+        paths.add(cursor.transit(it.round(), it.stop()), it.egressLeg(), 0);
     }
 }

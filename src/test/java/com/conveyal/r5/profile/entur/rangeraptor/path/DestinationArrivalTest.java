@@ -1,7 +1,8 @@
-package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
+package com.conveyal.r5.profile.entur.rangeraptor.path;
 
-import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import org.junit.Test;
 
@@ -25,17 +26,10 @@ public class DestinationArrivalTest {
     private static final int DESTINATION_DURATION_TIME = 50;
     private static final int DESTINATION_COST = 500;
 
-    private static final TransferLeg EGRESS_LEG = new TransferLeg() {
-        @Override public int stop() { return TRANSIT_STOP; }
-        @Override public int durationInSeconds() { return DESTINATION_DURATION_TIME; }
-    };
-
     private static final int EXPECTED_ARRIVAL_TIME = TRANSIT_ALIGHT_TIME + DESTINATION_DURATION_TIME;
     private static final int EXPECTED_TOTAL_COST = ACCESS_COST + TRANSIT_COST + DESTINATION_COST;
-    private static final int EXPECTED_TOTAL_DURATION = ACCESS_DURATION_TIME + BOARD_SLACK
-            + (TRANSIT_ALIGHT_TIME - TRANSIT_BOARD_TIME) + DESTINATION_DURATION_TIME;
 
-    private static final TransitCalculator TRANSIT_CALCULATOR = TransitCalculator.testDummyCalculator(BOARD_SLACK);
+    private static final TransitCalculator TRANSIT_CALCULATOR = TransitCalculator.testDummyCalculator(BOARD_SLACK, true);
 
     /**
      * Setup a simple journey with an access leg, one transit and a egress leg.
@@ -60,7 +54,7 @@ public class DestinationArrivalTest {
 
     private DestinationArrival<TripScheduleInfo> subject = new DestinationArrival<>(
             TRANSIT_ARRIVAL,
-            EGRESS_LEG,
+            TRANSIT_ALIGHT_TIME + DESTINATION_DURATION_TIME,
             DESTINATION_COST
     );
 
@@ -75,18 +69,13 @@ public class DestinationArrivalTest {
     }
 
     @Test
-    public void numberOfTransfers() {
-        assertEquals(0, subject.numberOfTransfers());
-    }
-
-    @Test
-    public void travelDuration() {
-        assertEquals(EXPECTED_TOTAL_DURATION, subject.travelDurationTime());
-    }
-
-    @Test
     public void cost() {
         assertEquals(EXPECTED_TOTAL_COST, subject.cost());
+    }
+
+    @Test
+    public void numberOfTransfers() {
+        assertEquals(0, subject.numberOfTransfers());
     }
 
     @Test
@@ -96,6 +85,6 @@ public class DestinationArrivalTest {
 
     @Test
     public void testToString() {
-        assertEquals("DestinationArrival { Time: 8:14:50 (8:14:00), Cost: 1120 }", subject.toString());
+        assertEquals("DestinationArrival { From stop: 101, Time: 8:14:50 (8:14:00), Cost: 1120 }", subject.toString());
     }
 }

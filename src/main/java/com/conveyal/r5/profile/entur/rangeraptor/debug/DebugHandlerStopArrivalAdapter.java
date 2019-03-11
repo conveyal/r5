@@ -2,8 +2,10 @@ package com.conveyal.r5.profile.entur.rangeraptor.debug;
 
 import com.conveyal.r5.profile.entur.api.request.DebugRequest;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.view.ArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
-import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
+
+import java.util.LinkedList;
 
 /**
  * StopArrival adapter.
@@ -11,19 +13,35 @@ import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 final class DebugHandlerStopArrivalAdapter<T extends TripScheduleInfo>
-        extends AbstractDebugHandlerAdapter<StopArrivalView<T>> {
+        extends AbstractDebugHandlerAdapter<ArrivalView<T>> {
 
     DebugHandlerStopArrivalAdapter(DebugRequest<T> debug, WorkerLifeCycle lifeCycle) {
         super(debug, debug.stopArrivalListener(), lifeCycle);
     }
 
     @Override
-    protected int stop(StopArrivalView<T> arrival) {
+    protected int stop(ArrivalView<T> arrival) {
         return arrival.stop();
     }
 
     @Override
-    protected Iterable<Integer> stopsVisited(StopArrivalView<T> arrival) {
-        return arrival.listStopsForDebugging();
+    protected Iterable<Integer> stopsVisited(ArrivalView<T> arrival) {
+        return listStopsForDebugging(arrival);
+    }
+
+    /**
+     * List all stops used to arrive at current stop arrival. This method can be SLOW,
+     * should only be used in code that does not need to be fast, like debugging.
+     */
+    private Iterable<Integer> listStopsForDebugging(ArrivalView<T> it) {
+        LinkedList<Integer> stops = new LinkedList<>();
+
+        while (!it.arrivedByAccessLeg()) {
+            stops.addFirst(it.stop());
+            it = it.previous();
+        }
+        stops.addFirst(it.stop());
+
+        return stops;
     }
 }

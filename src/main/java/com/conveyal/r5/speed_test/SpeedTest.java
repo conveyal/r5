@@ -12,8 +12,6 @@ import com.conveyal.r5.profile.entur.api.request.RaptorProfile;
 import com.conveyal.r5.profile.entur.api.request.RequestBuilder;
 import com.conveyal.r5.profile.entur.api.request.TuningParameters;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
-import com.conveyal.r5.profile.entur.rangeraptor.path.ForwardPathMapper;
-import com.conveyal.r5.profile.entur.rangeraptor.path.ReversePathMapper;
 import com.conveyal.r5.profile.entur.transitadapter.TransitLayerRRDataProvider;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
@@ -364,15 +362,9 @@ public class SpeedTest {
             return;
         }
 
-        DebugLogger logger = new DebugLogger(
-                builder.profile() == RAPTOR_REVERSE
-                        ? new ReversePathMapper<>(builder.boardSlackInSeconds())
-                        : new ForwardPathMapper<>()
-
-        );
+        DebugLogger logger = new DebugLogger();
         builder
                 .stopArrivalListener(logger::stopArrivalLister)
-                .destinationArrivalListener(logger::destinationArrivalListener)
                 .pathFilteringListener(logger::pathFilteringListener)
                 .debugPath(trip)
                 .debugPathStartAtStopIndex(opts.debugTripAtStopIndex());

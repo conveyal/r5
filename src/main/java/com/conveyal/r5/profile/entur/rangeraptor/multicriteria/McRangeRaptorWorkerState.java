@@ -4,6 +4,7 @@ import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
@@ -12,6 +13,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.Transfer
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.CostCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
+import com.conveyal.r5.profile.entur.rangeraptor.view.Heuristics;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
 import java.util.ArrayList;
@@ -47,7 +49,8 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
             int nStops,
             double relaxCostAtDestinationArrival,
             Collection<TransferLeg> egressLegs,
-            DestinationHeuristic[] heuristics,
+            Heuristics heuristics,
+            RoundProvider roundProvider,
             CostCalculator costCalculator,
             TransitCalculator transitCalculator,
             DebugHandlerFactory<T> debugHandlerFactory,
@@ -58,6 +61,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
                 nStops,
                 egressLegs,
                 relaxCostAtDestinationArrival,
+                roundProvider,
                 heuristics,
                 costCalculator,
                 transitCalculator,

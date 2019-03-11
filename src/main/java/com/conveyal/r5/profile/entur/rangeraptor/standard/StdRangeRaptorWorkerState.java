@@ -75,7 +75,7 @@ public final class StdRangeRaptorWorkerState<T
         int stop = accessEgressLeg.stop();
         // The time of arrival at the given stop for the current iteration
         // (or departure time at the last stop if we search backwards).
-        int arrivalTime = calculator.add(iterationDepartureTime, durationInSeconds);
+        int arrivalTime = calculator.plusDuration(iterationDepartureTime, durationInSeconds);
 
         bestTimes.setAccessStopTime(stop, arrivalTime);
         stopArrivalsState.setInitialTime(stop, arrivalTime, durationInSeconds);
@@ -160,7 +160,7 @@ public final class StdRangeRaptorWorkerState<T
     private void transferToStop(int arrivalTimeTransit, int fromStop, TransferLeg transferLeg) {
         // Use the calculator to make sure the calculation is done correct for a normal
         // forward search and a reverse search.
-        final int arrivalTime = calculator.add(arrivalTimeTransit, transferLeg.durationInSeconds());
+        final int arrivalTime = calculator.plusDuration(arrivalTimeTransit, transferLeg.durationInSeconds());
 
         if (exceedsTimeLimit(arrivalTime)) {
             return;

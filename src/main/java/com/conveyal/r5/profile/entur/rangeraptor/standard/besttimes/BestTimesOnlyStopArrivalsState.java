@@ -5,6 +5,7 @@ import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalsState;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.transfers.BestNumberOfTransfers;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -16,25 +17,27 @@ import java.util.Collections;
  * The {@link #bestTimePreviousRound(int)} return an estimate of the best time for the
  * previous round by using the overall best time (any round including the current round).
  * <p/>
- *
- * TODO TGR - Turn this into a class to calculate best times and optimistic number of hops.
- * TODO TGR - Investigate if it is possible to include transfers results in the forward search,
- * TODO TGR - but not in the reverse search. This feature is usful when combining a FORWARD
- * TODO TGR - and REVERSE search to compute a pruning stop bit set. This is most likely not
- * TODO TGR - feasable for the overall best times, but ok for the calculation of hops/transfers.
+ * This class is used to calculate heuristic information like the best possible arrival times
+ * and the minimum number for transfers. The results are an optimistic "guess", since we uses
+ * the overall best time instead of best time previous round we might skip hops.
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class BestTimesOnlyStopArrivalsState<T extends TripScheduleInfo> implements StopArrivalsState<T> {
 
     private final BestTimes bestTimes;
+    private final BestNumberOfTransfers bestNumberOfTransfers;
 
-    public BestTimesOnlyStopArrivalsState(BestTimes bestTimes) {
+
+    public BestTimesOnlyStopArrivalsState(BestTimes bestTimes, BestNumberOfTransfers bestNumberOfTransfers) {
         this.bestTimes = bestTimes;
+        this.bestNumberOfTransfers = bestNumberOfTransfers;
     }
 
     @Override
-    public void setInitialTime(int stop, int arrivalTime, int durationInSeconds) { }
+    public void setInitialTime(int stop, int arrivalTime, int durationInSeconds) {
+        bestNumberOfTransfers.visited(stop);
+    }
 
     @Override
     public Collection<Path<T>> extractPaths() { return Collections.emptyList(); }
@@ -57,13 +60,17 @@ public class BestTimesOnlyStopArrivalsState<T extends TripScheduleInfo> implemen
     public int bestTimePreviousRound(int stop) { return bestTimes.time(stop); }
 
     @Override
-    public void setNewBestTransitTime(int stop, int alightTime, T trip, int boardStop, int boardTime, boolean newBestOverall) { }
+    public void setNewBestTransitTime(int stop, int alightTime, T trip, int boardStop, int boardTime, boolean newBestOverall) {
+        bestNumberOfTransfers.visited(stop);
+    }
 
     @Override
     public void rejectNewBestTransitTime(int stop, int alightTime, T trip, int boardStop, int boardTime) { }
 
     @Override
-    public void setNewBestTransferTime(int fromStop, int arrivalTime, TransferLeg transferLeg) { }
+    public void setNewBestTransferTime(int fromStop, int arrivalTime, TransferLeg transferLeg) {
+        bestNumberOfTransfers.visited(transferLeg.stop());
+    }
 
     @Override
     public void rejectNewBestTransferTime(int fromStop, int arrivalTime, TransferLeg transferLeg) { }

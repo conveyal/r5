@@ -84,7 +84,7 @@ public class EgressArrivalToPathAdapter<T extends TripScheduleInfo> implements A
     }
 
     private int destinationArrivalTime(EgressStopArrivalState<T> arrival) {
-        return calculator.add(arrival.transitTime(), arrival.egressLeg().durationInSeconds());
+        return calculator.plusDuration(arrival.transitTime(), arrival.egressLeg().durationInSeconds());
     }
 
     @Override

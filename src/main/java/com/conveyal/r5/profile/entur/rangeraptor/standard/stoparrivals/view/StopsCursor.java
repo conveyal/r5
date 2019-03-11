@@ -86,7 +86,7 @@ public class StopsCursor<T extends TripScheduleInfo> {
      */
     private ArrivalView<T> newAccessView(int stop) {
         StopArrivalState<T> arrival = stops.get(0, stop);
-        int departureTime = transitCalculator.sub(arrival.time(), arrival.accessDuration());
+        int departureTime = transitCalculator.minusDuration(arrival.time(), arrival.accessDuration());
         return new Access<>(stop, departureTime, arrival.time());
     }
 
@@ -96,7 +96,7 @@ public class StopsCursor<T extends TripScheduleInfo> {
     private ArrivalView<T> newAccessView(int stop, int transitDepartureTime) {
         StopArrivalState<T> state = stops.get(0, stop);
         int departureTime = transitCalculator.originDepartureTime(transitDepartureTime, state.accessDuration());
-        int arrivalTime = transitCalculator.add(departureTime, state.accessDuration());
+        int arrivalTime = transitCalculator.plusDuration(departureTime, state.accessDuration());
         return new Access<>(stop, departureTime, arrivalTime);
     }
 
@@ -109,6 +109,6 @@ public class StopsCursor<T extends TripScheduleInfo> {
     }
 
     int departureTime(int arrivalTime, int legDuration) {
-        return transitCalculator.sub(arrivalTime, legDuration);
+        return transitCalculator.minusDuration(arrivalTime, legDuration);
     }
 }

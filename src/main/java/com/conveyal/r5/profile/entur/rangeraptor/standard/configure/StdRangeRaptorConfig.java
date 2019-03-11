@@ -1,10 +1,9 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard.configure;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic.CalculateHeuristicWorkerState;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic.NoWaitRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.path.DestinationArrivalPaths;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.ArrivedAtDestinationCheck;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.NoWaitRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StdRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StdRangeRaptorWorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalsState;
@@ -12,11 +11,14 @@ import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.BestTimes;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.BestTimesOnlyStopArrivalsState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.SimpleArrivedAtDestinationCheck;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.debug.DebugStopArrivalsState;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.heuristics.HeuristicsAdapter;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.StdStopArrivalsState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.Stops;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.path.EgressArrivalToPathAdapter;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.view.StopsCursor;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.transfers.BestNumberOfTransfers;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
+import com.conveyal.r5.profile.entur.rangeraptor.view.Heuristics;
 
 
 /**
@@ -29,10 +31,12 @@ import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
     private final SearchContext<T> ctx;
 
+    private boolean workerCreated = false;
     private BestTimes bestTimes = null;
     private Stops<T> stops = null;
     private ArrivedAtDestinationCheck destinationCheck = null;
-    private CalculateHeuristicWorkerState<T> heuristicWorkerState = null;
+    private BestNumberOfTransfers bestNumberOfTransfers = null;
+    private Heuristics heuristics = null;
 
 
     public StdRangeRaptorConfig(SearchContext<T> context) {
@@ -40,58 +44,44 @@ public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
     }
 
     public StdRangeRaptorWorker<T> createStandardSearch() {
-        StdRangeRaptorWorker<T> worker = createWorker(stdStopArrivalsState());
-        clear();
-        return worker;
+        return createWorker(stdStopArrivalsState());
     }
 
     public StdRangeRaptorWorker<T> createBestTimeSearch() {
-        StdRangeRaptorWorker<T> worker = createWorker(bestTimeStopArrivalsState());
-        clear();
-        return worker;
-    }
-
-    public StdRangeRaptorWorker<T> createStdHeuristicsSearch() {
-        StdRangeRaptorWorker<T> worker = createWorker(heuristicArrivalsState());
-        clear();
-        return worker;
+        return createWorker(bestTimeStopArrivalsState());
     }
 
     public NoWaitRangeRaptorWorker<T> createNoWaitHeuristicsSearch() {
-        NoWaitRangeRaptorWorker<T> worker = createNoWaitWorker(heuristicArrivalsState());
-        clear();
-        return worker;
+        return createNoWaitWorker(bestTimeStopArrivalsState());
     }
 
     /**
-     * @return state or null if not created
-     * @deprecated TODO TGR - make the heuristic a consept, do not pass the entier state out to the ouside world
+     * Return the best results as heuristics. Make sure to retrieve this before you create the worker,
+     * if not the heuristic can not be added to the worker lifecycle and fails.
      */
-    @Deprecated
-    public CalculateHeuristicWorkerState<T> getHeuristicWorkerState() {
-        return heuristicWorkerState;
+    public Heuristics heuristics() {
+        if(heuristics == null) {
+            heuristics = new HeuristicsAdapter(bestTimes(), bestNumberOfTransfers(), ctx.calculator(), ctx.lifeCycle());
+        }
+        return heuristics;
     }
 
 
     /* private factory methods */
 
-    /**
-     * When creating a worker make sure not to reuse the temporary state. To make sure
-     * this does not happen, just clear the state, before returning the worker.
-     */
-    private void clear() {
-        bestTimes = null;
-        destinationCheck = null;
-        stops = null;
-        heuristicWorkerState = null;
-    }
-
-
     private StdRangeRaptorWorker<T> createWorker(StopArrivalsState<T> stopArrivalsState) {
         return new StdRangeRaptorWorker<>(ctx, workerState(stopArrivalsState));
     }
 
+
     private NoWaitRangeRaptorWorker<T> createNoWaitWorker(StopArrivalsState<T> stopArrivalsState) {
+        if(workerCreated) {
+            throw new IllegalStateException(
+                     "Create a new config for each worker. Do not reuse the config instance, " +
+                             "this may lead to unpredictable behavior."
+            );
+        }
+        workerCreated = true;
         return new NoWaitRangeRaptorWorker<>(ctx, workerState(stopArrivalsState));
     }
 
@@ -100,7 +90,15 @@ public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
     }
 
     private BestTimesOnlyStopArrivalsState<T> bestTimeStopArrivalsState() {
-        return new BestTimesOnlyStopArrivalsState<>(bestTimes());
+        return new BestTimesOnlyStopArrivalsState<>(bestTimes(), bestNumberOfTransfers());
+    }
+
+    /** Return instance if created by heuristics or null if not needed.  */
+    private BestNumberOfTransfers bestNumberOfTransfers() {
+        if(bestNumberOfTransfers == null) {
+            this.bestNumberOfTransfers = new BestNumberOfTransfers(ctx.nStops(), ctx.roundProvider());
+        }
+        return bestNumberOfTransfers;
     }
 
     /**
@@ -118,13 +116,6 @@ public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
         } else {
             return state;
         }
-    }
-
-    private CalculateHeuristicWorkerState<T> heuristicArrivalsState() {
-        if (heuristicWorkerState == null) {
-            heuristicWorkerState = new CalculateHeuristicWorkerState<>(ctx.nStops(), ctx.roundProvider(), bestTimes(), ctx.costCalculator(), ctx.lifeCycle());
-        }
-        return heuristicWorkerState;
     }
 
     private Stops<T> stops() {

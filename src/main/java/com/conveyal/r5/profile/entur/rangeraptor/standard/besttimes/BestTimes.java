@@ -122,6 +122,14 @@ public final class BestTimes {
         return reachedLastRound.get(stop);
     }
 
+
+    /**
+     * @return return true if stop is reached.
+     */
+    public boolean isStopReached(int stop) {
+        return time(stop) != calculator.unreachedTime();
+    }
+
     /**
      * Set the initial access time at the given stop, but only if the new access
      * is better than a stop arrival from previous rounds.
@@ -152,6 +160,10 @@ public final class BestTimes {
             return true;
         }
         return false;
+    }
+
+    public int size() {
+        return times.length;
     }
 
 

@@ -21,18 +21,25 @@ import static com.conveyal.r5.profile.entur.util.TimeUtils.hm2time;
 public interface TransitCalculator {
 
     /**
-     * Add to time a value(delta) and return the result. In the case of a normal
-     * forward search this will be a pluss '+' operation, while in a reverse
-     * search (moving back in time) this will be a minus '-' operation.
+     * Add duration to time and return the result. In the case of a normal
+     * forward search this will be a plus '+' operation, while in a reverse
+     * search (moving back in time) this will be a minus '-' operation: 'time - duration'.
      */
-    int add(int time, int delta);
+    int plusDuration(int time, int duration);
 
     /**
-     * Subtract from time a value(delta) and return the result. In the case of a normal
-     * forward search this will be a minus '-' operation, while in a reverse
-     * search (moving back in time) this will be a pluss '+' operation.
+     * Subtract a positive duration from given time and return the result. In the
+     * case of a normal forward search this will be a minus '-' operation, while in
+     * a reverse search (moving back in time) this will be a plus '+' operation.
      */
-    int sub(int time, int delta);
+    int minusDuration(int time, int duration);
+
+    /**
+     * Subtract a time (B) from time (A) and return the result. In the case of
+     * a normal forward search this will be: 'B - A' operation, while in
+     * a reverse search (moving back in time) this will 'A - B'.
+     */
+    int duration(int timeA, int timeB);
 
     /**
      * Calculate the earlies possible board time, adding board slack in the case

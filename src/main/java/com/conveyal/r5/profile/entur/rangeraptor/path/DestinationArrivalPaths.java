@@ -48,7 +48,7 @@ public class DestinationArrivalPaths<T extends TripScheduleInfo> {
     }
 
     public void add(ArrivalView<T> egressStopArrival, TransferLeg egressLeg, int additionalCost) {
-        int arrivalTime = calculator.add(egressStopArrival.arrivalTime(), egressLeg.durationInSeconds());
+        int arrivalTime = calculator.plusDuration(egressStopArrival.arrivalTime(), egressLeg.durationInSeconds());
         DestinationArrival<T> destArrival = new DestinationArrival<>(egressStopArrival, arrivalTime, additionalCost);
 
         if (calculator.exceedsTimeLimit(arrivalTime)) {

@@ -28,9 +28,10 @@ import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
  */
 public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
     private final SearchContext<T> ctx;
+
     private BestTimes bestTimes = null;
-    private ArrivedAtDestinationCheck destinationCheck = null;
     private Stops<T> stops = null;
+    private ArrivedAtDestinationCheck destinationCheck = null;
     private CalculateHeuristicWorkerState<T> heuristicWorkerState = null;
 
 

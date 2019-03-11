@@ -7,8 +7,6 @@ import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.path.PathLeg;
 import com.conveyal.r5.profile.entur.api.path.TransferPathLeg;
 import com.conveyal.r5.profile.entur.api.path.TransitPathLeg;
-import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
-import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 
 import java.util.Arrays;
 import java.util.List;
@@ -79,8 +77,8 @@ public class StopArrivalsTestData {
      * </ol>
      */
     public static Egress basicTripByForwardSearch() {
-        AbstractArrival arrival;
-        arrival = new Access(STOP_1, T0945, T0950, BOARD_SLACK);
+        AbstractStopArrival arrival;
+        arrival = new Access(STOP_1, T0945, T0950);
         arrival = new Bus(1, STOP_2, T1000, T1035, TRIP_1, arrival);
         arrival = new Walk(1, STOP_3, T1035, T1038, arrival);
         arrival = new Bus(2, STOP_4, T1100, T1123, TRIP_2, arrival);
@@ -112,10 +110,10 @@ public class StopArrivalsTestData {
      * Tip! Think of this journey as traveling back in time and from destination to origin (search above).
      */
     public static Egress basicTripByReverseSearch() {
-        AbstractArrival arrival;
+        AbstractStopArrival arrival;
         // The Access will be time-shifted to match the transit boarding;
         // hence the actual departure and arrival time will be 12:00 and 11:53
-        arrival = new Access(STOP_5, T1210, T1203, 0);
+        arrival = new Access(STOP_5, T1210, T1203);
         // Board slack is subtracted from the arrival time to get the latest possible
         arrival = new Bus(1, STOP_4, T1153, T1140 - BOARD_SLACK, TRIP_3, arrival);
         arrival = new Bus(2, STOP_3, T1123, T1100 - BOARD_SLACK, TRIP_2, arrival);
@@ -143,98 +141,5 @@ public class StopArrivalsTestData {
         return Arrays.asList(STOP_1, STOP_2, STOP_3, STOP_4, STOP_5);
     }
 
-    private static abstract class AbstractArrival implements StopArrivalView<TestTripSchedule> {
-        private final int round;
-        private final int stop;
-        private final int departureTime;
-        private final int arrivalTime;
-        private final StopArrivalView<TestTripSchedule> previous;
-
-        private AbstractArrival(
-                int round, int stop, int departureTime, int arrivalTime, StopArrivalView<TestTripSchedule> previous
-        ) {
-            this.round = round;
-            this.stop = stop;
-            this.departureTime = departureTime;
-            this.arrivalTime = arrivalTime;
-            this.previous = previous;
-        }
-
-        @Override public int stop() { return stop; }
-        @Override public int round() { return round; }
-        @Override public int departureTime() { return departureTime; }
-        @Override public int arrivalTime() { return arrivalTime; }
-        @Override public int cost() { return 100; }
-        @Override public StopArrivalView<TestTripSchedule> previous() { return previous; }
-        @Override public String toString() { return asString(); }
-    }
-
-    private static class Access extends AbstractArrival {
-        private int boardSlack;
-        private Access(int stop, int departureTime, int arrivalTime, int boardSlack) {
-            super(0, stop, departureTime, arrivalTime, null);
-            this.boardSlack = boardSlack;
-        }
-        @Override public int departureTimeAccess(int transitBoardTime) { return arrivalTimeAccess(transitBoardTime) - (arrivalTime() - departureTime()); }
-        @Override public int arrivalTimeAccess(int transitBoardTime) {
-            return transitBoardTime - boardSlack;
-        }
-        @Override public boolean arrivedByAccessLeg() { return true; }
-    }
-
-    private static class Bus extends AbstractArrival {
-        private final TestTripSchedule trip;
-
-        private Bus(
-                int round, int stop, int departureTime, int arrivalTime, TestTripSchedule trip,
-                StopArrivalView<TestTripSchedule> previous
-        ) {
-            super(round, stop, departureTime, arrivalTime, previous);
-            this.trip = trip;
-        }
-        @Override public int boardStop() { return previous().stop(); }
-        @Override public TestTripSchedule trip() { return trip; }
-        @Override public boolean arrivedByTransit() { return true; }
-    }
-
-    private static class Walk extends AbstractArrival {
-        private Walk(
-                int round, int stop, int departureTime, int arrivalTime, StopArrivalView<TestTripSchedule> previous
-        ) {
-            super(round, stop, departureTime, arrivalTime, previous);
-        }
-        @Override public boolean arrivedByTransfer() {
-            return true;
-        }
-        @Override public int transferFromStop() {
-            return previous().stop();
-        }
-    }
-
-    private static class Egress implements DestinationArrivalView<TestTripSchedule> {
-        private final int departureTime;
-        private final int arrivalTime;
-        private final StopArrivalView<TestTripSchedule> previous;
-
-        private Egress(int departureTime, int arrivalTime, StopArrivalView<TestTripSchedule> previous) {
-            this.departureTime = departureTime;
-            this.arrivalTime = arrivalTime;
-            this.previous = previous;
-        }
-        @Override public int departureTime() { return departureTime; }
-        @Override public int arrivalTime() { return arrivalTime; }
-
-        @Override
-        public int numberOfTransfers() {
-            return previous.round() - 1;
-        }
-
-        @Override
-        public int travelDurationTime() {
-            return 0;
-        }
-
-        @Override public StopArrivalView<TestTripSchedule> previous() { return previous; }
-    }
 }
 

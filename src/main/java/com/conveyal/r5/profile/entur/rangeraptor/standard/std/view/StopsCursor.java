@@ -2,15 +2,13 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard.std.view;
 
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.std.EgressStopArrivalState;
+import com.conveyal.r5.profile.entur.api.view.ArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.std.StopArrivalState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.std.Stops;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.std.view.StopArrivalViewAdapter.Access;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.std.view.StopArrivalViewAdapter.Transfer;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.std.view.StopArrivalViewAdapter.Transit;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
-import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
-import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 
 
 
@@ -58,19 +56,10 @@ public class StopsCursor<T extends TripScheduleInfo> {
             return new StopArrivalViewAdapter.Transfer<>(round, toStop, arrival, this);
     }
 
-    public DestinationArrivalView<T> destinationArrival(EgressStopArrivalState<T> arrival) {
-        return new StopArrivalViewAdapter.DestinationArrivalViewAdapter<T>(
-                arrival.transitTime(),
-                transitCalculator.add(arrival.transitTime(), arrival.egressLeg().durationInSeconds()),
-                arrival.round() - 1,
-                transit(arrival.round(), arrival.stop())
-        );
-    }
-
     /**
      * A access stop arrival, time-shifted according to the first transit boarding/departure time
      */
-    StopArrivalView<T> access(int stop, int transitDepartureTime) {
+    ArrivalView<T> access(int stop, int transitDepartureTime) {
         return newAccessView(stop, transitDepartureTime);
     }
 
@@ -83,19 +72,19 @@ public class StopsCursor<T extends TripScheduleInfo> {
      * @param stop the stop index to use.
      * @return the current transit state, if found
      */
-    Transit<T> transit(int round, int stop) {
+    public Transit<T> transit(int round, int stop) {
         StopArrivalState<T> state = stops.get(round, stop);
         return new Transit<>(round, stop, state, this);
     }
 
-    public StopArrivalView<T> stop(int round, int stop) {
+    public ArrivalView<T> stop(int round, int stop) {
         return round == 0 ? newAccessView(stop) : newTransitOrTransferView(round, stop);
     }
 
     /**
      * Access without known transit, uses the iteration departure time without time shift
      */
-    private StopArrivalView<T> newAccessView(int stop) {
+    private ArrivalView<T> newAccessView(int stop) {
         StopArrivalState<T> arrival = stops.get(0, stop);
         int departureTime = transitCalculator.sub(arrival.time(), arrival.accessDuration());
         return new Access<>(stop, departureTime, arrival.time());
@@ -104,14 +93,14 @@ public class StopsCursor<T extends TripScheduleInfo> {
     /**
      * A access stop arrival, time-shifted according to the first transit boarding/departure time
      */
-    private StopArrivalView<T> newAccessView(int stop, int transitDepartureTime) {
+    private ArrivalView<T> newAccessView(int stop, int transitDepartureTime) {
         StopArrivalState<T> state = stops.get(0, stop);
         int departureTime = transitCalculator.originDepartureTime(transitDepartureTime, state.accessDuration());
         int arrivalTime = transitCalculator.add(departureTime, state.accessDuration());
         return new Access<>(stop, departureTime, arrivalTime);
     }
 
-    private StopArrivalView<T> newTransitOrTransferView(int round, int stop) {
+    private ArrivalView<T> newTransitOrTransferView(int round, int stop) {
         StopArrivalState<T> state = stops.get(round, stop);
 
         return state.arrivedByTransfer()

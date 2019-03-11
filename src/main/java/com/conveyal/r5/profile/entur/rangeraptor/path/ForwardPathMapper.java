@@ -7,8 +7,8 @@ import com.conveyal.r5.profile.entur.api.path.PathLeg;
 import com.conveyal.r5.profile.entur.api.path.TransferPathLeg;
 import com.conveyal.r5.profile.entur.api.path.TransitPathLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
-import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
+import com.conveyal.r5.profile.entur.api.view.ArrivalView;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 
 
 /**
@@ -16,11 +16,16 @@ import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
  * to the domain of result paths. All values not needed for routing is computed as part of this mapping.
  */
 public final class ForwardPathMapper<T extends TripScheduleInfo> implements PathMapper<T> {
+    private final TransitCalculator calculator;
+
+    public ForwardPathMapper(TransitCalculator calculator) {
+        this.calculator = calculator;
+    }
 
     @Override
-    public Path<T> mapToPath(final DestinationArrivalView<T> destinationArrival) {
-        StopArrivalView<T> from;
-        StopArrivalView<T> to;
+    public Path<T> mapToPath(final DestinationArrival<T> destinationArrival) {
+        ArrivalView<T> from;
+        ArrivalView<T> to;
         PathLeg<T> lastLeg;
         TransitPathLeg<T> transitLeg;
         int numberOfTransits = 0;
@@ -63,14 +68,7 @@ public final class ForwardPathMapper<T extends TripScheduleInfo> implements Path
         }
         while (from.arrivedByTransit());
 
-        int boardTimeTransit = transitLeg.fromTime();
-
-        AccessPathLeg<T> accessLeg = new AccessPathLeg<T>(
-                from.departureTimeAccess(boardTimeTransit),
-                from.stop(),
-                from.arrivalTimeAccess(boardTimeTransit),
-                transitLeg
-        );
+        AccessPathLeg<T> accessLeg = createAccessPathLeg(from, transitLeg);
 
         return new Path<>(
                 accessLeg,
@@ -78,5 +76,14 @@ public final class ForwardPathMapper<T extends TripScheduleInfo> implements Path
                 numberOfTransits - 1,
                 destinationArrival.cost()
         );
+    }
+
+    private AccessPathLeg<T> createAccessPathLeg(ArrivalView<T> from, TransitPathLeg<T> transitLeg) {
+        int boardTimeTransit = transitLeg.fromTime();
+        int accessDurationInSeconds = from.arrivalTime() - from.departureTime();
+        int originDepartureTime = calculator.originDepartureTime(boardTimeTransit, accessDurationInSeconds);
+        int accessArrivalTime = originDepartureTime + accessDurationInSeconds;
+
+        return new AccessPathLeg<>(originDepartureTime, from.stop(), accessArrivalTime, transitLeg);
     }
 }

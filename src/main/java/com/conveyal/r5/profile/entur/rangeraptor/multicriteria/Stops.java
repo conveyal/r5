@@ -4,11 +4,11 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AccessStopArrival;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.DestinationArrival;
-import com.conveyal.r5.profile.entur.rangeraptor.path.PathMapper;
+import com.conveyal.r5.profile.entur.rangeraptor.path.DestinationArrivalPaths;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.CostCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.util.Debug;
@@ -27,9 +27,8 @@ import static java.util.Collections.emptyList;
 final class Stops<T extends TripScheduleInfo> {
     private final StopArrivalParetoSet<T>[] stops;
     private final DestinationHeuristic[] heuristics;
-    private final DestinationArrivals<T> destinationArrivals;
+    private final DestinationArrivalPaths<T> paths;
     private final DebugHandlerFactory<T> debugHandlerFactory;
-    private final PathMapper<T> pathMapper;
     private final TransitCalculator calculator;
 
     /**
@@ -42,18 +41,19 @@ final class Stops<T extends TripScheduleInfo> {
             DestinationHeuristic[] heuristics,
             CostCalculator costCalculator,
             TransitCalculator transitCalculator,
-            DebugHandlerFactory<T> debugHandlerFactory
+            DebugHandlerFactory<T> debugHandlerFactory,
+            WorkerLifeCycle lifeCycle
     ) {
         //noinspection unchecked
         this.stops = (StopArrivalParetoSet<T>[]) new StopArrivalParetoSet[nStops];
         this.heuristics = heuristics;
         this.calculator = transitCalculator;
-        this.pathMapper = calculator.createPathMapper();
         this.debugHandlerFactory = debugHandlerFactory;
-        this.destinationArrivals = new DestinationArrivals<>(
-                relaxCostAtDestinationArrival,
+        this.paths = new DestinationArrivalPaths<>(
+                DestinationArrivalPaths.paretoComparatorWithCost(relaxCostAtDestinationArrival),
                 calculator,
-                debugHandlerFactory
+                debugHandlerFactory,
+                lifeCycle
         );
         for (TransferLeg it : egressLegs) {
             glueTogetherEgressStopWithDestinationArrivals(it, costCalculator);
@@ -72,17 +72,10 @@ final class Stops<T extends TripScheduleInfo> {
     }
 
     /**
-     * Delegates to {@link DestinationArrivals#reachedCurrentRound()}
+     * Delegates to {@link DestinationArrivalPaths#isReachedCurrentRound()}
      */
     boolean isDestinationReachedInCurrentRound() {
-        return destinationArrivals.reachedCurrentRound();
-    }
-
-    /**
-     * Delegates to {@link DestinationArrivals#clearReachedCurrentRoundFlag()}
-     */
-    void clearReachedCurrentRoundFlag() {
-        destinationArrivals.clearReachedCurrentRoundFlag();
+        return paths.isReachedCurrentRound();
     }
 
     boolean addStopArrival(AbstractStopArrival<T> arrival) {
@@ -95,7 +88,7 @@ final class Stops<T extends TripScheduleInfo> {
 
     Collection<Path<T>> extractPaths() {
         debugStateInfo();
-        return destinationArrivals.mapToList(pathMapper::mapToPath);
+        return paths.listPaths();
     }
 
     /** List all transits arrived this round. */
@@ -135,13 +128,13 @@ final class Stops<T extends TripScheduleInfo> {
         this.stops[stop] = StopArrivalParetoSet.createEgressStopArrivalSet(
                 egressLeg,
                 costCalculator,
-                destinationArrivals,
+                paths,
                 debugHandlerFactory
         );
     }
 
     private boolean rejectDestinationArrivalBasedOnHeuristic(AbstractStopArrival<T> arrival) {
-        if(heuristics == null || destinationArrivals.isEmpty()) {
+        if(heuristics == null || paths.isEmpty()) {
             return false;
         }
         DestinationHeuristic heuristic = heuristics[arrival.stop()];
@@ -149,7 +142,21 @@ final class Stops<T extends TripScheduleInfo> {
         if(heuristic == null) {
             return true;
         }
-        return !destinationArrivals.qualify(new DestinationArrival<>(arrival, heuristic));
+
+
+        return !qualify(arrival, heuristic);
+    }
+
+    /**
+     * This is used to make an optimistic guess for the best possible arrival at the destination,
+     * using the given arrival and a pre-calculated heuristics.
+     */
+    private boolean qualify(AbstractStopArrival<T> a, DestinationHeuristic h) {
+        int arrivalTime = a.arrivalTime() + h.getMinTravelTime();
+        int numberOfTransfers = a.round() - 1 + h.getMinNumTransfers();
+        int travelDuration = a.travelDuration() + h.getMinTravelTime();
+        int cost = a.cost() + h.getMinCost();
+        return paths.qualify(arrivalTime - travelDuration, arrivalTime, numberOfTransfers, cost);
     }
 
     private void rejectByOptimization(AbstractStopArrival<T> arrival) {
@@ -158,8 +165,8 @@ final class Stops<T extends TripScheduleInfo> {
                     ? "The stop was not reached in the heuristic calculation."
                     : heuristics[arrival.stop()].toString();
 
-            if(!destinationArrivals.isEmpty()) {
-                details += " " + destinationArrivals;
+            if(!paths.isEmpty()) {
+                details += " " + paths;
             }
 
             debugHandlerFactory.debugStopArrival().reject(

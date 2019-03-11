@@ -61,15 +61,15 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
                 heuristics,
                 costCalculator,
                 transitCalculator,
-                debugHandlerFactory
+                debugHandlerFactory,
+                lifeCycle
         );
         this.touchedStops = new BitSet(nStops);
         this.costCalculator = costCalculator;
         this.transitCalculator = transitCalculator;
 
         // Attach to the RR life cycle
-        lifeCycle.onSetupIteration(this::setupIteration);
-        lifeCycle.onPrepareForNextRound(this::prepareForNextRound);
+        lifeCycle.onSetupIteration((ignore) -> setupIteration());
         lifeCycle.onTransitsForRoundComplete(this::transitsForRoundComplete);
         lifeCycle.onTransfersForRoundComplete(this::transfersForRoundComplete);
     }
@@ -80,7 +80,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     */
 
     // This method is private, but is part of Worker life cycle
-    private void setupIteration(int ignoredIterationDepartureTime) {
+    private void setupIteration() {
         arrivalsCache.clear();
         // clear all touched stops to avoid constant rexploration
         touchedStops.clear();
@@ -99,11 +99,6 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     @Override
     public boolean isNewRoundAvailable() {
         return updatesExist;
-    }
-
-    // This method is private, but is part of Worker life cycle
-    private void prepareForNextRound() {
-        stops.clearReachedCurrentRoundFlag();
     }
 
     @Override

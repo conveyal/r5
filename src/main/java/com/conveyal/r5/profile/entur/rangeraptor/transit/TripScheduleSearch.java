@@ -15,7 +15,7 @@ import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
  * say more than 300 trip schedules.
  * <p/>
  * The implementation of this interface is also responsible for adding board slack, and
- * take care the search direction (normal/reverse). For a reverse search (searching
+ * take care the search direction (forward/reverse). For a reverse search (searching
  * backward in time) the trip found departure/arrival times are swapped. This is one of
  * the things that allows for the algorithm to be generic, used in both cases.
  *
@@ -35,7 +35,7 @@ public interface TripScheduleSearch<T extends TripScheduleInfo> {
      *
      * @param tripIndexLimit        Lower bound for trip index to search for. Inclusive. Use {@code 0}
      *                              for an unbounded search.
-     * @param arrivalDepartureTime  The time of arrival(departure for backward search) at the given stop.
+     * @param arrivalDepartureTime  The time of arrival(departure for reverse search) at the given stop.
      * @param stopPositionInPattern The stop to board
      */
     boolean search(int arrivalDepartureTime, int stopPositionInPattern, int tripIndexLimit);

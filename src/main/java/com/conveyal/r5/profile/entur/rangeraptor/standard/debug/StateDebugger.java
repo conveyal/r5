@@ -2,11 +2,11 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard.debug;
 
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.view.ArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.std.view.StopsCursor;
 import com.conveyal.r5.profile.entur.rangeraptor.view.DebugHandler;
-import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 
 /**
  * Send debug events to the {@link DebugHandler} using the {@link StopsCursor}.
@@ -16,7 +16,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 class StateDebugger<T extends TripScheduleInfo> {
     private final StopsCursor<T> cursor;
     private final RoundProvider roundProvider;
-    private final DebugHandler<StopArrivalView<T>> debugHandlerStopArrivals;
+    private final DebugHandler<ArrivalView<T>> debugHandlerStopArrivals;
 
     StateDebugger(
             StopsCursor<T> cursor,
@@ -73,7 +73,7 @@ class StateDebugger<T extends TripScheduleInfo> {
         }
     }
 
-    private void reject(StopArrivalView<T> arrival) {
+    private void reject(ArrivalView<T> arrival) {
         debugHandlerStopArrivals.reject(arrival, null, null);
     }
 

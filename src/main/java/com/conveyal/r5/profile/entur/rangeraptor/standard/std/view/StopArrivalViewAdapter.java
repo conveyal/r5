@@ -1,17 +1,16 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard.std.view;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.view.ArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.std.StopArrivalState;
-import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
-import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 
 
 /**
- * Implement the {@link StopArrivalView}.
+ * Implement the {@link ArrivalView}.
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-abstract class StopArrivalViewAdapter<T extends TripScheduleInfo> implements StopArrivalView<T> {
+abstract class StopArrivalViewAdapter<T extends TripScheduleInfo> implements ArrivalView<T> {
     private final int round;
     private final int stop;
 
@@ -52,22 +51,12 @@ abstract class StopArrivalViewAdapter<T extends TripScheduleInfo> implements Sto
         }
 
         @Override
-        public int departureTimeAccess(int transitBoardTime) {
-            return departureTime;
-        }
-
-        @Override
-        public int arrivalTimeAccess(int transitBoardTime) {
-            return arrivalTime;
-        }
-
-        @Override
         public boolean arrivedByAccessLeg() {
             return true;
         }
 
         @Override
-        public StopArrivalView<T> previous() {
+        public ArrivalView<T> previous() {
             throw new UnsupportedOperationException("Access arrival is the first leg.");
         }
     }
@@ -108,7 +97,7 @@ abstract class StopArrivalViewAdapter<T extends TripScheduleInfo> implements Sto
         }
 
         @Override
-        public StopArrivalView<T> previous() {
+        public ArrivalView<T> previous() {
             return round() == 1
                     ? cursor.access(boardStop(), departureTime())
                     : cursor.stop(round()-1, boardStop());
@@ -146,49 +135,8 @@ abstract class StopArrivalViewAdapter<T extends TripScheduleInfo> implements Sto
         }
 
         @Override
-        public StopArrivalView<T> previous() {
+        public ArrivalView<T> previous() {
             return cursor.transit(round(), transferFromStop());
-        }
-    }
-
-    static final class DestinationArrivalViewAdapter<T extends TripScheduleInfo> implements DestinationArrivalView<T> {
-        private final int departureTime;
-        private final int arrivalTime;
-        private final int numberOfTransfers;
-        private final Transit<T> previous;
-
-        public DestinationArrivalViewAdapter(int departureTime, int arrivalTime, int numberOfTransfers, Transit<T> previous) {
-            this.departureTime = departureTime;
-            this.arrivalTime = arrivalTime;
-            this.numberOfTransfers = numberOfTransfers;
-            this.previous = previous;
-        }
-
-        @Override
-        public int departureTime() {
-            return departureTime;
-        }
-
-        @Override
-        public int arrivalTime() {
-            return arrivalTime;
-        }
-
-        @Override
-        public int numberOfTransfers() {
-            return numberOfTransfers;
-        }
-
-        @Override
-        @Deprecated
-        public int travelDurationTime() {
-            // Travel duration should not be used for anything, the hole class is due for deletion
-            return -9999;
-        }
-
-        @Override
-        public Transit<T> previous() {
-            return previous;
         }
     }
 }

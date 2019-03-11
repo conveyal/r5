@@ -2,10 +2,11 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.view.ArrivalView;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
+import com.conveyal.r5.profile.entur.rangeraptor.path.DestinationArrivalPaths;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.CostCalculator;
-import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSetEventListener;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSetEventListenerComposite;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSetWithMarker;
@@ -20,7 +21,7 @@ class StopArrivalParetoSet<T extends TripScheduleInfo> extends ParetoSetWithMark
     /**
      * Use the factory methods in this class to create a new instance.
      */
-    StopArrivalParetoSet(ParetoSetEventListener<StopArrivalView<T>> listener) {
+    StopArrivalParetoSet(ParetoSetEventListener<ArrivalView<T>> listener) {
         super(AbstractStopArrival.compareArrivalTimeRoundAndCost(), listener);
     }
 
@@ -29,7 +30,7 @@ class StopArrivalParetoSet<T extends TripScheduleInfo> extends ParetoSetWithMark
      */
     static <T extends TripScheduleInfo> StopArrivalParetoSet<T> createStopArrivalSet(
             int stop,
-            DebugHandlerFactory<T>debugHandlerFactory
+            DebugHandlerFactory<T> debugHandlerFactory
     ) {
         return new StopArrivalParetoSet<>(debugHandlerFactory.paretoSetStopArrivalListener(stop));
     }
@@ -42,11 +43,11 @@ class StopArrivalParetoSet<T extends TripScheduleInfo> extends ParetoSetWithMark
     static <T extends TripScheduleInfo> StopArrivalParetoSet<T> createEgressStopArrivalSet(
             TransferLeg egressLeg,
             CostCalculator costCalculator,
-            DestinationArrivals<T> destinationArrivals,
-            DebugHandlerFactory<T>debugHandlerFactory
+            DestinationArrivalPaths<T> destinationArrivals,
+            DebugHandlerFactory<T> debugHandlerFactory
     ) {
-        ParetoSetEventListener<StopArrivalView<T>> listener;
-        ParetoSetEventListener<StopArrivalView<T>> debugListener;
+        ParetoSetEventListener<ArrivalView<T>> listener;
+        ParetoSetEventListener<ArrivalView<T>> debugListener;
 
         listener = new CalculateTransferToDestination<>(egressLeg, destinationArrivals, costCalculator);
         debugListener = debugHandlerFactory.paretoSetStopArrivalListener(egressLeg.stop());

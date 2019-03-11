@@ -35,7 +35,7 @@ public class TransferStopArrivalTest {
     private static final int TRANSFER_COST = 400;
 
 
-    private static final TransitCalculator TRANSIT_CALCULATOR = TransitCalculator.testDummyCalculator(BOARD_SLACK);
+    private static final TransitCalculator TRANSIT_CALCULATOR = TransitCalculator.testDummyCalculator(BOARD_SLACK, true);
     private static final AccessStopArrival<TripScheduleInfo> ACCESS_ARRIVAL = new AccessStopArrival<>(
             ACCESS_TO_STOP,
             ACCESS_DEPARTURE_TIME,
@@ -111,11 +111,6 @@ public class TransferStopArrivalTest {
     @Test
     public void previous() {
         assertSame(TRANSIT_ARRIVAL, subject.previous());
-    }
-
-    @Test
-    public void listStops() {
-        assertEquals("[100, 101, 102]", subject.listStopsForDebugging().toString());
     }
 
     @Test

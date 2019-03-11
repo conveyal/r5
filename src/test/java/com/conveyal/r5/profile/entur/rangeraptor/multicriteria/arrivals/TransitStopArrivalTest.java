@@ -30,7 +30,7 @@ public class TransitStopArrivalTest {
     private static final TripScheduleInfo TRANSIT_TRIP = TestTripSchedule.createTripScheduleUseingArrivalTimes(TRANSIT_ALIGHT_TIME);
     private static final int ROUND = 1;
 
-    private static final TransitCalculator TRANSIT_CALCULATOR = testDummyCalculator(BOARD_SLACK);
+    private static final TransitCalculator TRANSIT_CALCULATOR = testDummyCalculator(BOARD_SLACK, true);
 
     private static final AccessStopArrival<TripScheduleInfo> ACCESS_ARRIVAL = new AccessStopArrival<>(
             ACCESS_TO_STOP,
@@ -104,11 +104,6 @@ public class TransitStopArrivalTest {
     @Test
     public void previous() {
         assertSame(ACCESS_ARRIVAL, subject.previous());
-    }
-
-    @Test
-    public void listStops() {
-        assertEquals("[100, 101]", subject.listStopsForDebugging().toString());
     }
 
     @Test

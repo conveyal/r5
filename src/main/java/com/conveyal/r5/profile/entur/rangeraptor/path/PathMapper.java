@@ -2,7 +2,6 @@ package com.conveyal.r5.profile.entur.rangeraptor.path;
 
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
 
 /**
  * Responsible for mapping between the domain of routing to the domain of result paths.
@@ -18,5 +17,5 @@ public interface PathMapper<T extends TripScheduleInfo> {
      * Build a path from a destination arrival - this maps between the domain of routing
      * to the domain of result paths. All values not needed for routing is computed as part of this mapping.
      */
-     Path<T> mapToPath(final DestinationArrivalView<T> destinationArrival);
+     Path<T> mapToPath(final DestinationArrival<T> destinationArrival);
 }

@@ -1,10 +1,8 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
+import com.conveyal.r5.profile.entur.api.view.ArrivalView;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
-
-import java.util.LinkedList;
 
 
 /**
@@ -12,7 +10,7 @@ import java.util.LinkedList;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements StopArrivalView<T> {
+public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements ArrivalView<T> {
 
     public static <T extends TripScheduleInfo> ParetoComparator<AbstractStopArrival<T>> compareArrivalTimeRoundAndCost() {
         // This is important with respect to performance. Using logical OR(||) is faster than boolean OR(|)
@@ -120,15 +118,6 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
     @Override
     public String toString() {
         return asString();
-    }
-
-    @Override
-    public Iterable<Integer> listStopsForDebugging() {
-        LinkedList<Integer> stops = new LinkedList<>();
-        for(AbstractStopArrival<?> it = this; it != null; it = it.previous) {
-            stops.addFirst(it.stop);
-        }
-        return stops;
     }
 
     @Override

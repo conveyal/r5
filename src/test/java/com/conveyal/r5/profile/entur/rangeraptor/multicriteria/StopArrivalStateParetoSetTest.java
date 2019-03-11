@@ -22,7 +22,7 @@ public class StopArrivalStateParetoSetTest {
     private static final int ROUND_2 = 2;
     private static final int ROUND_3 = 3;
     private static final TripScheduleInfo ANY_TRIP = null;
-    private static final TransitCalculator CALCULATOR = testDummyCalculator(60);
+    private static final TransitCalculator CALCULATOR = testDummyCalculator(60, true);
 
     // In this test each stop is used to identify the pareto vector - it is just one
     // ParetoSet "subject" with multiple "stops" in it. The stop have no effect on

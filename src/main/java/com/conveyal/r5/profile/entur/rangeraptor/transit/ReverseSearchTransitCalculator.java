@@ -37,7 +37,7 @@ final class ReverseSearchTransitCalculator implements TransitCalculator {
         );
     }
 
-    private ReverseSearchTransitCalculator(
+    ReverseSearchTransitCalculator(
             int binaryTripSearchThreshold,
             int boardSlackInSeconds,
             int latestArrivalTime,
@@ -72,28 +72,33 @@ final class ReverseSearchTransitCalculator implements TransitCalculator {
     }
 
     @Override
-    public int earliestBoardTime(int time) {
-        // The boardSlack is NOT added here - as in the normal forward search
+    public final int earliestBoardTime(int time) {
+        // The boardSlack is NOT added here (as in a forward search) - it is added to the arrival time instead
         return time;
     }
 
     @Override
-    public int addBoardSlack(int time) {
-        return earliestBoardTime(time);
+    public final int addBoardSlack(int time) {
+        return add(time, boardSlackInSeconds);
     }
 
     @Override
-    public <T extends TripScheduleInfo> int latestArrivalTime(T onTrip, int stopPositionInPattern) {
+    public final int removeBoardSlack(int time) {
+        return sub(time, boardSlackInSeconds);
+    }
+
+    @Override
+    public final <T extends TripScheduleInfo> int latestArrivalTime(T onTrip, int stopPositionInPattern) {
         return add(onTrip.departure(stopPositionInPattern), boardSlackInSeconds);
     }
 
     @Override
-    public boolean exceedsTimeLimit(int time) {
+    public final boolean exceedsTimeLimit(int time) {
         return isBest(earliestAcceptableDepartureTime, time);
     }
 
     @Override
-    public String exceedsTimeLimitReason() {
+    public final String exceedsTimeLimitReason() {
         return "The departure time exceeds the time limit, depart to early: " +
                 TimeUtils.timeToStrLong(earliestAcceptableDepartureTime) + ".";
     }
@@ -105,7 +110,7 @@ final class ReverseSearchTransitCalculator implements TransitCalculator {
     }
 
     @Override
-    public int originDepartureTime(int firstTransitBoardTime, int accessLegDuration) {
+    public final int originDepartureTime(int firstTransitBoardTime, int accessLegDuration) {
         return firstTransitBoardTime + accessLegDuration;
     }
 
@@ -124,17 +129,17 @@ final class ReverseSearchTransitCalculator implements TransitCalculator {
     }
 
     @Override
-    public IntIterator patternStopIterator(int nStopsInPattern) {
+    public final IntIterator patternStopIterator(int nStopsInPattern) {
         return IntIterators.intDecIterator(nStopsInPattern, 0);
     }
 
     @Override
-    public IntIterator patternStopIterator(int onTripStopPos, int nStopsInPattern) {
+    public final IntIterator patternStopIterator(int onTripStopPos, int nStopsInPattern) {
         return IntIterators.intDecIterator(onTripStopPos, 0);
     }
 
     @Override
-    public <T extends TripScheduleInfo> TripScheduleSearch<T> createTripSearch(
+    public final <T extends TripScheduleInfo> TripScheduleSearch<T> createTripSearch(
             TripPatternInfo<T> pattern,
             Function<T, Boolean> skipTripScheduleCallback
     ) {
@@ -142,7 +147,7 @@ final class ReverseSearchTransitCalculator implements TransitCalculator {
     }
 
     @Override
-    public <T extends TripScheduleInfo> PathMapper<T> createPathMapper() {
-        return new ReversePathMapper<>(this.boardSlackInSeconds);
+    public final <T extends TripScheduleInfo> PathMapper<T> createPathMapper() {
+        return new ReversePathMapper<>(this);
     }
 }

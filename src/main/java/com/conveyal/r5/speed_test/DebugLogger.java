@@ -3,9 +3,7 @@ package com.conveyal.r5.speed_test;
 
 import com.conveyal.r5.profile.entur.api.debug.DebugEvent;
 import com.conveyal.r5.profile.entur.api.path.Path;
-import com.conveyal.r5.profile.entur.rangeraptor.path.PathMapper;
-import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
-import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
+import com.conveyal.r5.profile.entur.api.view.ArrivalView;
 import com.conveyal.r5.profile.entur.util.IntUtils;
 import com.conveyal.r5.profile.entur.util.PathStringBuilder;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
@@ -20,41 +18,17 @@ class DebugLogger {
     private int lastRound = NOT_SET;
 
     private boolean pathHeader = true;
-    private final PathMapper<TripSchedule> pathMapper;
 
-    DebugLogger(PathMapper<TripSchedule>pathMapper) {
-        this.pathMapper = pathMapper;
-    }
-
-    void stopArrivalLister(DebugEvent<StopArrivalView<TripSchedule>> e) {
+    void stopArrivalLister(DebugEvent<ArrivalView<TripSchedule>> e) {
 
         printIterationHeader(e.iterationStartTime());
         printRoundHeader(e.element().round());
         print(e.element(), e.action().toString(), e.reason());
 
-        if (e.action() == DebugEvent.Action.DROP && e.rejectedDroppedByElement() != null) {
-            print(e.rejectedDroppedByElement(), "->by", "");
+        ArrivalView<TripSchedule> byElement = e.rejectedDroppedByElement();
+        if (e.action() == DebugEvent.Action.DROP && byElement != null) {
+            print(byElement, "->by", "");
         }
-    }
-
-    void destinationArrivalListener(DebugEvent<DestinationArrivalView<TripSchedule>> e) {
-        DestinationArrivalView<TripSchedule> d = e.element();
-        int round = d.previous().round();
-        int cost = d.cost();
-        Path<TripSchedule> path = pathMapper.mapToPath(d);
-
-        printIterationHeader(e.iterationStartTime());
-        printRoundHeader(round);
-        print(
-                e.action().toString(),
-                round,
-                "Egress",
-                path.egressLeg().fromStop(),
-                path.endTime(),
-                cost,
-                "",
-                concat(e.reason(), "Path: " + path.toString())
-        );
     }
 
     void pathFilteringListener(DebugEvent<Path<TripSchedule>> e) {
@@ -66,7 +40,7 @@ class DebugLogger {
 
         Path<TripSchedule> p = e.element();
         System.err.printf(
-                "%9s | %2d | %5d | %5d | %8s | %8s | %8s | %8s %n",
+                "%9s | %2d | %5d | %5d | %8s | %8s | %8s | %8s | %s%n",
                 center(e.action().toString(), 9),
                 p.numberOfTransfers(),
                 p.accessLeg().toStop(),
@@ -89,16 +63,16 @@ class DebugLogger {
         System.err.println("\n**  RUN RAPTOR FOR MINUTE: " + timeToStrCompact(iterationTime) + "  **");
     }
 
-    private void print(StopArrivalView<?> a, String action, String optReason) {
+    private void print(ArrivalView<?> a, String action, String optReason) {
         String trip = a.arrivedByTransit() ? a.trip().debugInfo() : "";
         print(action, a.round(), a.legType(), a.stop(), a.arrivalTime(), a.cost(), trip, concat(optReason, path(a)));
     }
 
-    private static String path(StopArrivalView<?> a) {
+    private static String path(ArrivalView<?> a) {
         return path(a, new PathStringBuilder()).toString();
     }
 
-    private static PathStringBuilder path(StopArrivalView<?> a, PathStringBuilder buf) {
+    private static PathStringBuilder path(ArrivalView<?> a, PathStringBuilder buf) {
         if (a.arrivedByAccessLeg()) {
             return buf.walk(legDuration(a)).sep().stop(a.stop());
         }
@@ -118,7 +92,7 @@ class DebugLogger {
     /**
      * The absolute time duration in seconds of a trip.
      */
-    private static int legDuration(StopArrivalView<?> a) {
+    private static int legDuration(ArrivalView<?> a) {
         // Depending on the search direction this may or may not be negative, if we
         // search backwards in time then we arrive before we depart ;-) Hence
         // we need to use the absolute value.

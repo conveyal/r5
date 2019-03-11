@@ -3,8 +3,7 @@ package com.conveyal.r5.profile.entur.api.request;
 import com.conveyal.r5.profile.entur.api.debug.DebugEvent;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.view.DestinationArrivalView;
-import com.conveyal.r5.profile.entur.rangeraptor.view.StopArrivalView;
+import com.conveyal.r5.profile.entur.api.view.ArrivalView;
 
 import java.util.Collections;
 import java.util.List;
@@ -55,8 +54,7 @@ public class DebugRequest<T extends TripScheduleInfo> {
     private final List<Integer> stops;
     private final List<Integer> path;
     private final int pathStartAtStopIndex;
-    private final Consumer<DebugEvent<StopArrivalView<T>>> stopArrivalListener;
-    private final Consumer<DebugEvent<DestinationArrivalView<T>>> destinationArrivalListener;
+    private final Consumer<DebugEvent<ArrivalView<T>>> stopArrivalListener;
     private final Consumer<DebugEvent<Path<T>>> pathFilteringListener;
 
     private DebugRequest() {
@@ -64,7 +62,6 @@ public class DebugRequest<T extends TripScheduleInfo> {
         path = Collections.emptyList();
         pathStartAtStopIndex = 0;
         stopArrivalListener = null;
-        destinationArrivalListener = null;
         pathFilteringListener = null;
     }
 
@@ -73,7 +70,6 @@ public class DebugRequest<T extends TripScheduleInfo> {
         this.path = Collections.unmodifiableList(builder.debugPath());
         this.pathStartAtStopIndex = builder.debugPathStartAtStopIndex();
         this.stopArrivalListener = builder.stopArrivalListener();
-        this.destinationArrivalListener = builder.destinationArrivalListener();
         this.pathFilteringListener = builder.pathFilteringListener();
     }
 
@@ -104,15 +100,8 @@ public class DebugRequest<T extends TripScheduleInfo> {
     /**
      * Stop arrival debug event listener
      */
-    public Consumer<DebugEvent<StopArrivalView<T>>> stopArrivalListener() {
+    public Consumer<DebugEvent<ArrivalView<T>>> stopArrivalListener() {
         return stopArrivalListener;
-    }
-
-    /**
-     * Destination arrival debug event listener
-     */
-    public Consumer<DebugEvent<DestinationArrivalView<T>>> destinationArrivalListener() {
-        return destinationArrivalListener;
     }
 
     /**
@@ -136,7 +125,6 @@ public class DebugRequest<T extends TripScheduleInfo> {
                 ", path=" + path +
                 ", pathStartAtStopIndex=" + pathStartAtStopIndex +
                 ", stopArrivalListener=" + enabled(stopArrivalListener) +
-                ", destinationArrivalListener=" + enabled(destinationArrivalListener) +
                 ", pathFilteringListener=" + enabled(pathFilteringListener) +
                 '}';
     }

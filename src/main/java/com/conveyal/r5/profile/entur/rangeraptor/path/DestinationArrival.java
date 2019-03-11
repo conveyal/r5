@@ -2,8 +2,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.path;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.view.ArrivalView;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.DestinationHeuristic;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
+
 
 /**
  * The purpose of this class is hold information about a destination arrival and
@@ -26,8 +25,6 @@ import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.Abstract
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 class DestinationArrival<T extends TripScheduleInfo> implements ArrivalView<T> {
-    /** Constant used to return an unknown value in cases where we do not care what is returned. */
-    private static final int UNKNOWN_VALUE = -1;
 
     private final ArrivalView<T> previous;
     private final int departureTime;
@@ -42,18 +39,6 @@ class DestinationArrival<T extends TripScheduleInfo> implements ArrivalView<T> {
         this.arrivalTime = arrivalTime;
         this.numberOfTransfers = previous.round() - 1;
         this.cost = previous.cost() + additionalCost;
-    }
-
-    /**
-     * This is used to make an optimistic guess for the best possible arrival at the destination,
-     * using the given arrival and a pre-calculated heuristics.
-     */
-    public DestinationArrival(AbstractStopArrival<T> a, DestinationHeuristic h) {
-        this.previous = null;
-        this.departureTime = UNKNOWN_VALUE;
-        this.arrivalTime = a.arrivalTime() + h.getMinTravelTime();
-        this.numberOfTransfers = (a.round() - 1) + h.getMinNumTransfers();
-        this.cost = a.cost() + h.getMinCost();
     }
 
     int numberOfTransfers() {

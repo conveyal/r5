@@ -8,9 +8,9 @@ import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.Worker;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McRangeRaptorWorker;
-import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic.CalculateHeuristicWorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.configure.StdRangeRaptorConfig;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
+import com.conveyal.r5.profile.entur.rangeraptor.view.Heuristics;
 
 import java.util.Collection;
 
@@ -85,14 +85,14 @@ public class RangeRaptorService<T extends TripScheduleInfo> {
         SearchContext<T> heurCtx = context(transitData, asOnePass(request), ServiceType.Heur);
         StdRangeRaptorConfig<T> stdFactory = new StdRangeRaptorConfig<>(heurCtx);
 
-        Worker<T> heurWorker = stdFactory.createStdHeuristicsSearch();
-        CalculateHeuristicWorkerState<T> heurProvider = stdFactory.getHeuristicWorkerState();
+        Heuristics heuristics = stdFactory.heuristics();
+        Worker<T> heurWorker = stdFactory.createNoWaitHeuristicsSearch();
 
         SearchContext<T> ctx = context(transitData, request, ServiceType.multiCriteria);
 
         return () -> {
             heurWorker.route();
-            return new McRangeRaptorWorker<>(ctx, heurProvider.heuristic()).route();
+            return new McRangeRaptorWorker<>(ctx, heuristics).route();
         };
     }
 

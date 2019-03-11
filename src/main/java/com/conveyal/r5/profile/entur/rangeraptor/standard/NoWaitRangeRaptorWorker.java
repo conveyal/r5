@@ -1,9 +1,8 @@
-package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic;
+package com.conveyal.r5.profile.entur.rangeraptor.standard;
 
 import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.StdWorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleSearch;
 
@@ -43,6 +42,7 @@ public final class NoWaitRangeRaptorWorker<T extends TripScheduleInfo> extends A
         this.onTripIndex = NOT_SET;
         this.onTripBoardTime = 0;
         this.onTripBoardStop = -1;
+        this.onTripTimeShift = 0;
         this.onTrip = null;
     }
 

@@ -7,6 +7,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleSearch;
+import com.conveyal.r5.profile.entur.rangeraptor.view.Heuristics;
 
 
 /**
@@ -20,7 +21,7 @@ public final class McRangeRaptorWorker<T extends TripScheduleInfo> extends Abstr
     private TripPatternInfo<T> pattern;
     private TripScheduleSearch<T> tripSearch;
 
-    public McRangeRaptorWorker(SearchContext<T> context, DestinationHeuristic[] heuristics) {
+    public McRangeRaptorWorker(SearchContext<T> context, Heuristics heuristics) {
         super(
                 context,
                 new McRangeRaptorWorkerState<>(
@@ -28,6 +29,7 @@ public final class McRangeRaptorWorker<T extends TripScheduleInfo> extends Abstr
                         context.tuningParameters().relaxCostAtDestinationArrival(),
                         context.egressLegs(),
                         heuristics,
+                        context.roundProvider(),
                         context.costCalculator(),
                         context.calculator(),
                         context.debugFactory(),

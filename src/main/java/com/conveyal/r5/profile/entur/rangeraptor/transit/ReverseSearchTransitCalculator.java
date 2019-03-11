@@ -56,19 +56,27 @@ final class ReverseSearchTransitCalculator implements TransitCalculator {
     }
 
     @Override
-    public final int add(final int time, final int delta) {
+    public final int plusDuration(final int time, final int duration) {
         // It might seems strange to use minus int the add method, but
         // the "positive" direction in this class is backwards in time;
         // hence we need to subtract the board slack.
-        return time - delta;
+        return time - duration;
     }
 
     @Override
-    public final int sub(final int time, final int delta) {
+    public final int minusDuration(final int time, final int duration) {
         // It might seems strange to use plus int the subtract method, but
         // the "positive" direction in this class is backwards in time;
         // hence we need to add the board slack.
-        return time + delta;
+        return time + duration;
+    }
+
+    @Override
+    public final int duration(final int timeA, final int timeB) {
+        // When searching in reverse time A is > time B, so to
+        // calculate the duration we need to swap A and B
+        // compared with the normal forward search
+        return timeA - timeB;
     }
 
     @Override
@@ -79,17 +87,17 @@ final class ReverseSearchTransitCalculator implements TransitCalculator {
 
     @Override
     public final int addBoardSlack(int time) {
-        return add(time, boardSlackInSeconds);
+        return plusDuration(time, boardSlackInSeconds);
     }
 
     @Override
     public final int removeBoardSlack(int time) {
-        return sub(time, boardSlackInSeconds);
+        return minusDuration(time, boardSlackInSeconds);
     }
 
     @Override
     public final <T extends TripScheduleInfo> int latestArrivalTime(T onTrip, int stopPositionInPattern) {
-        return add(onTrip.departure(stopPositionInPattern), boardSlackInSeconds);
+        return plusDuration(onTrip.departure(stopPositionInPattern), boardSlackInSeconds);
     }
 
     @Override

@@ -50,13 +50,18 @@ final class ForwardSearchTransitCalculator implements TransitCalculator {
     }
 
     @Override
-    public final int add(final int time, final int delta) {
+    public final int plusDuration(final int time, final int delta) {
         return time + delta;
     }
 
     @Override
-    public final int sub(final int time, final int delta) {
+    public final int minusDuration(final int time, final int delta) {
         return time - delta;
+    }
+
+    @Override
+    public final int duration(final int timeA, final int timeB) {
+        return timeB - timeA;
     }
 
     @Override

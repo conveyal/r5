@@ -29,6 +29,14 @@ public enum RaptorProfile {
     MULTI_CRITERIA_RANGE_RAPTOR_WITH_HEURISTICS,
 
     /**
+     * Multi criteria pareto state with McRangeRaptor optimized by using a standard
+     * reverse and a forward range raptor search to calculate heuristic data.
+     * <p/>
+     * Both destination pareto-set pruning and a stops filer is used to optimize the search.
+     */
+    MULTI_CRITERIA_RANGE_RAPTOR_PRUNE_STOPS,
+
+    /**
      * Perform a raptor search traversing the transit graph in reverse. Only one iteration is performed.
      * Search from destination to origin traversing the transit graph backwards in time.
      */

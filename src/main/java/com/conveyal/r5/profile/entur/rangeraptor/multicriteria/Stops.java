@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 
+import com.conveyal.r5.profile.entur.api.debug.DebugLogger;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
@@ -14,11 +15,11 @@ import com.conveyal.r5.profile.entur.rangeraptor.path.DestinationArrivalPaths;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.CostCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.view.Heuristics;
-import com.conveyal.r5.profile.entur.util.Debug;
 
 import java.util.Collection;
 import java.util.stream.Collectors;
 
+import static com.conveyal.r5.profile.entur.api.debug.DebugTopic.SEARCH_STATS;
 import static java.util.Collections.emptyList;
 
 
@@ -33,6 +34,7 @@ final class Stops<T extends TripScheduleInfo> {
     private final DestinationArrivalPaths<T> paths;
     private final DebugHandlerFactory<T> debugHandlerFactory;
     private final TransitCalculator calculator;
+    private final DebugLogger debugLogger;
 
     /**
      * Set the time at a transit index iff it is optimal. This sets both the best time and the transfer time
@@ -46,12 +48,14 @@ final class Stops<T extends TripScheduleInfo> {
             CostCalculator costCalculator,
             TransitCalculator transitCalculator,
             DebugHandlerFactory<T> debugHandlerFactory,
+            DebugLogger debugLogger,
             WorkerLifeCycle lifeCycle
     ) {
         //noinspection unchecked
         this.stops = (StopArrivalParetoSet<T>[]) new StopArrivalParetoSet[nStops];
         this.calculator = transitCalculator;
         this.debugHandlerFactory = debugHandlerFactory;
+        this.debugLogger = debugLogger;
         this.paths = new DestinationArrivalPaths<>(
                 DestinationArrivalPaths.paretoComparatorWithCost(relaxCostAtDestinationArrival),
                 calculator,
@@ -147,10 +151,8 @@ final class Stops<T extends TripScheduleInfo> {
 
     private void rejectByOptimization(AbstractStopArrival<T> arrival) {
         if (debugHandlerFactory.isDebugStopArrival(arrival.stop())) {
-            String details = heuristics.rejectErrorMessage(arrival.stop());
-            if(!paths.isEmpty()) {
-                details += ", Path: " + paths;
-            }
+            String details = heuristics.rejectErrorMessage(arrival.stop()) +
+                    ", Existing paths: " + paths;
 
             debugHandlerFactory.debugStopArrival().reject(
                     arrival,
@@ -162,7 +164,7 @@ final class Stops<T extends TripScheduleInfo> {
     }
 
     private void debugStateInfo() {
-        if(!Debug.isDebug()) return;
+        if(!debugLogger.isEnabled(SEARCH_STATS)) return;
 
         long total = 0;
         long arrayLen = 0;
@@ -180,7 +182,8 @@ final class Stops<T extends TripScheduleInfo> {
         double avg = ((double)total) / numOfStops;
         double arrayLenAvg = ((double)arrayLen) / numOfStops;
 
-        System.err.printf(
+        debugLogger.debug(
+                SEARCH_STATS,
                 " => STOP ARRIVALS  %.1f / %d / %d'  Array Length: %.1f / %d'  Stops: %d' / %d'%n",
                 avg, max, total/1000, arrayLenAvg, arrayLen/1000, numOfStops/1000, stops.length/1000
         );

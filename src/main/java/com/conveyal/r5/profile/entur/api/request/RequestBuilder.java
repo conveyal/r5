@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile.entur.api.request;
 
 import com.conveyal.r5.profile.entur.api.debug.DebugEvent;
+import com.conveyal.r5.profile.entur.api.debug.DebugLogger;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
@@ -48,6 +49,7 @@ public class RequestBuilder<T extends TripScheduleInfo> {
     private int debugPathStartAtStopIndex;
     private Consumer<DebugEvent<ArrivalView<T>>> stopArrivalListener;
     private Consumer<DebugEvent<Path<T>>> pathFilteringListener;
+    private DebugLogger debugLogger;
 
 
 
@@ -78,6 +80,7 @@ public class RequestBuilder<T extends TripScheduleInfo> {
         this.debugPathStartAtStopIndex = debug.pathStartAtStopIndex();
         this.stopArrivalListener = debug.stopArrivalListener();
         this.pathFilteringListener = debug.pathFilteringListener();
+        this.debugLogger = debug.logger();
     }
 
     public RaptorProfile profile() {
@@ -246,6 +249,15 @@ public class RequestBuilder<T extends TripScheduleInfo> {
 
     public RequestBuilder<T> pathFilteringListener(Consumer<DebugEvent<Path<T>>> pathFilteringListener) {
         this.pathFilteringListener = pathFilteringListener;
+        return this;
+    }
+
+    public DebugLogger debugLogger() {
+        return debugLogger;
+    }
+
+    public RequestBuilder<T> debugLogger(DebugLogger logger) {
+        this.debugLogger = logger;
         return this;
     }
 

@@ -6,6 +6,7 @@ package com.conveyal.r5.profile.entur.util;
 public class PathStringBuilder {
     private StringBuilder buf = new StringBuilder();
 
+    // TODO TGR - Replace '>' with '-' better readability
     public PathStringBuilder sep() {
         return append(" > ");
     }
@@ -33,6 +34,7 @@ public class PathStringBuilder {
         return append(TimeUtils.timeToStrCompact(duration));
     }
 
+    // TODO TGR - Replace '-' with ' ' better readability
     private PathStringBuilder time(int from, int to) {
         return append(TimeUtils.timeToStrShort(from)).append("-").append(TimeUtils.timeToStrShort(to));
     }

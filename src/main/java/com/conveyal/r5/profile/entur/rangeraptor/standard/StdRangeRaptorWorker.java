@@ -31,7 +31,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleSearch;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-public final class StdRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRangeRaptorWorker<T, StdWorkerState<T>> {
+public class StdRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRangeRaptorWorker<T, StdWorkerState<T>> {
 
     private static final int NOT_SET = -1;
 
@@ -47,6 +47,14 @@ public final class StdRangeRaptorWorker<T extends TripScheduleInfo> extends Abst
         super(context, state);
     }
 
+    TripScheduleSearch<T> tripSearch() {
+        return tripSearch;
+    }
+
+    T onTrip() {
+        return onTrip;
+    }
+
     @Override
     protected final void prepareTransitForRoundAndPattern(TripPatternInfo<T> pattern, TripScheduleSearch<T> tripSearch) {
         this.pattern = pattern;
@@ -55,7 +63,10 @@ public final class StdRangeRaptorWorker<T extends TripScheduleInfo> extends Abst
         this.onTripBoardTime = 0;
         this.onTripBoardStop = -1;
         this.onTrip = null;
+        prepareTransitForRoundAndPattern();
     }
+
+    protected void prepareTransitForRoundAndPattern() { }
 
     @Override
     protected final void performTransitForRoundAndPatternAtStop(int stopPositionInPattern) {
@@ -66,12 +77,10 @@ public final class StdRangeRaptorWorker<T extends TripScheduleInfo> extends Abst
         if (onTripIndex != -1) {
             state.transitToStop(
                     stop,
-                    // In the normal case the arrivalTime is used,
-                    // but in reverse search the board slack is added; hence the calculator delegation
-                    calculator().latestArrivalTime(onTrip, stopPositionInPattern),
-                    onTrip,
+                    alightTime(stopPositionInPattern),
                     onTripBoardStop,
-                    onTripBoardTime
+                    onTripBoardTime,
+                    onTrip
             );
         }
 
@@ -86,9 +95,20 @@ public final class StdRangeRaptorWorker<T extends TripScheduleInfo> extends Abst
             if (found) {
                 onTripIndex = tripSearch.getCandidateTripIndex();
                 onTrip = tripSearch.getCandidateTrip();
-                onTripBoardTime = tripSearch.getCandidateTripTime();
+                onTripBoardTime = boardTime(earliestBoardTime);
                 onTripBoardStop = stop;
             }
         }
+    }
+
+    protected int boardTime(final int earliestBoardTime) {
+        return tripSearch.getCandidateTripTime();
+    }
+
+
+    protected int alightTime(final int stopPositionInPattern) {
+        // In the normal case the arrivalTime is used,
+        // but in reverse search the board slack is added; hence the calculator delegation
+        return calculator().latestArrivalTime(onTrip, stopPositionInPattern);
     }
 }

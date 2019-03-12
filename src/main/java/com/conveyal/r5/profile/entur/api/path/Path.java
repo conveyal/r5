@@ -2,6 +2,7 @@ package com.conveyal.r5.profile.entur.api.path;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.util.PathStringBuilder;
+import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -143,7 +144,9 @@ public final class Path<T extends TripScheduleInfo> {
         }
         buf.sep().stop(leg.asEgressLeg().fromStop()).sep().walk(leg.duration());
 
-        return buf.toString();
+        return buf.toString() +
+                " (tot: " + TimeUtils.timeToStrCompact(endTime-startTime) +
+                (cost <= 0 ? "" : ", cost: " + cost) + ")";
     }
 
     @Override

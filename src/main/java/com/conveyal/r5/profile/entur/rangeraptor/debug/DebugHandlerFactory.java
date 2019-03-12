@@ -21,11 +21,11 @@ public class DebugHandlerFactory<T extends TripScheduleInfo> {
     private DebugHandler<Path<T>> pathHandler;
 
     public DebugHandlerFactory(DebugRequest<T> request, WorkerLifeCycle lifeCycle) {
-        this.stopHandler = isDebug(request, request.stopArrivalListener())
+        this.stopHandler = isDebug(request.stopArrivalListener())
                 ? new DebugHandlerStopArrivalAdapter<>(request, lifeCycle)
                 : null;
 
-        this.pathHandler = isDebug(request, request.pathFilteringListener())
+        this.pathHandler = isDebug(request.pathFilteringListener())
                 ? new DebugHandlerPathAdapter<>(request, lifeCycle)
                 : null;
     }
@@ -62,7 +62,7 @@ public class DebugHandlerFactory<T extends TripScheduleInfo> {
 
     /* private methods */
 
-    private boolean isDebug(DebugRequest<T> request, Object handler) {
-        return request.isDebug() && handler != null;
+    private boolean isDebug(Object handler) {
+        return handler != null;
     }
 }

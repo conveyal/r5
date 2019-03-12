@@ -93,14 +93,20 @@ public class SpeedTest {
         }
     }
 
+    private int numOfExtraTransfers = 5;
+
     private void runTest() throws Exception {
         final SpeedTestCmdLineOpts opts = (SpeedTestCmdLineOpts) this.opts;
         final SpeedTestProfiles[] strategies = opts.profiles();
         final int samples = opts.numberOfTestsSamplesToRun();
+        numOfExtraTransfers = opts.numOfExtraTransfers();
 
         initProfileStatistics();
 
         for (int i = 0; i < samples; ++i) {
+            //numOfExtraTransfers = 1 + (samples - i - 1) / strategies.length;
+            //System.err.println("\n>>> Run test with " + numOfExtraTransfers + " number of extra transfers.\n");
+
             profile = strategies[i % strategies.length];
             runSingleTest(opts, i+1, samples);
         }
@@ -280,7 +286,9 @@ public class SpeedTest {
 
             ItinerarySet itineraries = new ItinerarySet();
 
-            RangeRaptorRequest<TripSchedule> req = createRequest(request, latestArrivalTime, streetRouter);
+            RangeRaptorRequest<TripSchedule> req = createRequest(
+                    request, latestArrivalTime, numOfExtraTransfers, streetRouter
+            );
 
             TuningParameters tuningParameters = new TuningParameters() {
                 @Override public int maxNumberOfTransfers() { return request.maxRides; }
@@ -336,12 +344,19 @@ public class SpeedTest {
     private RangeRaptorRequest<TripSchedule> createRequest(
             ProfileRequest request,
             int latestArrivalTime,
+            int numOfExtraTransfers,
             EgressAccessRouter streetRouter
     ) {
+        int expandSearchWindowHours = 0;
+        // Add half of the extra time to departure and half to the arrival
+        int expandDeltaSeconds = expandSearchWindowHours * 3600/2;
+
+
         RequestBuilder<TripSchedule> builder = new RequestBuilder<TripSchedule>()
-                .earliestDepartureTime(request.fromTime)
-                .latestArrivalTime(latestArrivalTime)
-                .searchWindowInSeconds(request.toTime - request.fromTime)
+                .earliestDepartureTime(request.fromTime - expandDeltaSeconds)
+                .latestArrivalTime(latestArrivalTime + expandDeltaSeconds)
+                .searchWindowInSeconds(request.toTime - request.fromTime + 2 * expandDeltaSeconds)
+                .numberOfAdditionalTransfers(numOfExtraTransfers)
                 ;
 
         builder.profile(mapAlgorithm(profile));
@@ -361,11 +376,12 @@ public class SpeedTest {
         if(!opts.debug() && stops.isEmpty() && trip.isEmpty()) {
             return;
         }
+        DebugLogger logger = new DebugLogger(opts.debug());
 
-        DebugLogger logger = new DebugLogger();
         builder
                 .stopArrivalListener(logger::stopArrivalLister)
                 .pathFilteringListener(logger::pathFilteringListener)
+                .debugLogger(logger)
                 .debugPath(trip)
                 .debugPathStartAtStopIndex(opts.debugTripAtStopIndex());
         stops.forEach(builder::debugStop);
@@ -471,6 +487,7 @@ public class SpeedTest {
         switch (profile) {
             case mc_range_raptor: return RaptorProfile.MULTI_CRITERIA_RANGE_RAPTOR;
             case mc_rr_heuristic: return RaptorProfile.MULTI_CRITERIA_RANGE_RAPTOR_WITH_HEURISTICS;
+            case mc_range_raptor_prune_stops: return RaptorProfile.MULTI_CRITERIA_RANGE_RAPTOR_PRUNE_STOPS;
             case range_raptor: return RaptorProfile.RANGE_RAPTOR;
             case best_time: return RaptorProfile.RANGE_RAPTOR_BEST_TIME;
             case raptor_reverse: return RAPTOR_REVERSE;

@@ -2,6 +2,7 @@ package com.conveyal.r5.speed_test;
 
 
 import com.conveyal.r5.profile.entur.api.debug.DebugEvent;
+import com.conveyal.r5.profile.entur.api.debug.DebugTopic;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.view.ArrivalView;
 import com.conveyal.r5.profile.entur.util.IntUtils;
@@ -12,12 +13,19 @@ import org.apache.commons.lang.StringUtils;
 
 import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrCompact;
 
-class DebugLogger {
-    private int NOT_SET = Integer.MIN_VALUE;
+class DebugLogger implements com.conveyal.r5.profile.entur.api.debug.DebugLogger {
+
+    private static int NOT_SET = Integer.MIN_VALUE;
+
+    private final boolean enableDebugLogging;
+
     private int lastIterationTime = NOT_SET;
     private int lastRound = NOT_SET;
-
     private boolean pathHeader = true;
+
+    DebugLogger(boolean enableDebugLogging) {
+        this.enableDebugLogging = enableDebugLogging;
+    }
 
     void stopArrivalLister(DebugEvent<ArrivalView<TripSchedule>> e) {
 
@@ -49,7 +57,7 @@ class DebugLogger {
                 TimeUtils.timeToStrLong(p.egressLeg().toTime()),
                 timeToStrCompact(p.totalTravelDurationInSeconds()),
                 p.cost(),
-                concat(e.reason(), e.toString())
+                details(e.action().toString(), e.reason(), e.toString())
         );
     }
 
@@ -65,11 +73,24 @@ class DebugLogger {
 
     private void print(ArrivalView<?> a, String action, String optReason) {
         String trip = a.arrivedByTransit() ? a.trip().debugInfo() : "";
-        print(action, a.round(), a.legType(), a.stop(), a.arrivalTime(), a.cost(), trip, concat(optReason, path(a)));
+        print(
+                action,
+                a.round(),
+                a.legType(),
+                a.stop(),
+                a.arrivalTime(),
+                a.cost(),
+                trip,
+                details(action, optReason, path(a))
+        );
+    }
+
+    private static String details(String action, String optReason, String element) {
+        return concat(optReason,  action + "ed element: " + element);
     }
 
     private static String path(ArrivalView<?> a) {
-        return path(a, new PathStringBuilder()).toString();
+        return path(a, new PathStringBuilder()).toString()  + " (cost: " + a.cost() + ")";
     }
 
     private static PathStringBuilder path(ArrivalView<?> a, PathStringBuilder buf) {
@@ -139,6 +160,18 @@ class DebugLogger {
         if(s == null || s.isEmpty()) {
             return t == null ? "" : t;
         }
-        return s + " " + (t == null ? "" : t);
+        return s + ", " + (t == null ? "" : t);
+    }
+
+    @Override
+    public boolean isEnabled(DebugTopic topic) {
+        return enableDebugLogging;
+    }
+
+    @Override
+    public void debug(DebugTopic topic, String message) {
+        if(enableDebugLogging) {
+            System.err.printf("%-16s | %s%n", topic, message);
+        }
     }
 }

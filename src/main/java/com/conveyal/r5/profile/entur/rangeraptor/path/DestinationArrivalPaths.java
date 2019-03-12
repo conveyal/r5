@@ -83,7 +83,7 @@ public class DestinationArrivalPaths<T extends TripScheduleInfo> {
 
     @Override
     public String toString() {
-        return "DestinationArrivalPaths: " + paths;
+        return paths.toString();
     }
 
 

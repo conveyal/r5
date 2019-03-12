@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.transit;
 
+import com.conveyal.r5.profile.entur.api.debug.DebugLogger;
 import com.conveyal.r5.profile.entur.api.request.DebugRequest;
 import com.conveyal.r5.profile.entur.api.request.MultiCriteriaCostFactors;
 import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
@@ -14,9 +15,11 @@ import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
 import com.conveyal.r5.profile.entur.rangeraptor.workerlifecycle.LifeCycleBuilder;
 import com.conveyal.r5.profile.entur.rangeraptor.workerlifecycle.LifeCycleEventPublisher;
 
+import java.util.BitSet;
 import java.util.Collection;
 
 public class SearchContext<T extends TripScheduleInfo> {
+    private static final DebugLogger NOOP_DEBUG_LOGGER = (topic, message) -> { };
     /**
      * The request input used to customize the worker to the clients needs.
      */
@@ -34,7 +37,9 @@ public class SearchContext<T extends TripScheduleInfo> {
     private final boolean searchForward;
     private final DebugRequest<T> debugRequest;
     private final DebugHandlerFactory<T> debugFactory;
+
     private LifeCycleBuilder lifeCycleBuilder = new LifeCycleBuilder();
+    private BitSet stopsFilter;
 
     public SearchContext(
             RangeRaptorRequest<T> request,
@@ -101,6 +106,11 @@ public class SearchContext<T extends TripScheduleInfo> {
         return debugFactory;
     }
 
+    public DebugLogger debugLogger() {
+        DebugLogger logger = request.debug().logger();
+        return logger != null ? logger : NOOP_DEBUG_LOGGER;
+    }
+
     /** Number of stops in transit graph. */
     public int nStops() {
         return transit.numberOfStops();
@@ -109,6 +119,14 @@ public class SearchContext<T extends TripScheduleInfo> {
     /** Calculate the maximum number of rounds to perform. */
     public int nRounds() {
         return tuningParameters.maxNumberOfTransfers() + 1;
+    }
+
+    public void setStopFilter(BitSet stopsFilter) {
+        this.stopsFilter = stopsFilter;
+    }
+
+    public BitSet stopsFilter() {
+        return stopsFilter;
     }
 
     /**
@@ -143,5 +161,4 @@ public class SearchContext<T extends TripScheduleInfo> {
         lifeCycleBuilder = null;
         return publisher;
     }
-
 }

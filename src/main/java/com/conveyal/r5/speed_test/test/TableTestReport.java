@@ -1,6 +1,5 @@
 package com.conveyal.r5.speed_test.test;
 
-import com.conveyal.r5.profile.entur.util.Debug;
 import com.conveyal.r5.profile.entur.util.TimeUtils;
 
 import java.util.Arrays;
@@ -45,15 +44,17 @@ public class TableTestReport {
     }
 
     private static void addTo(OutputTable table, Result result) {
+        boolean longFormat = true;
+
         table.addRow(
                 result.status.label,
                 result.transfers,
                 TimeUtils.timeToStrCompact(result.duration),
                 result.cost,
                 // Strip of seconds for faster reading - most service schedules are by the minute not seconds
-                Debug.isDebug() ? result.startTime : result.startTime.substring(0, 5),
+                longFormat ? result.startTime : result.startTime.substring(0, 5),
                 // Strip of seconds for faster reading - most service schedules are by the minute not seconds
-                Debug.isDebug() ? result.endTime : result.endTime.substring(0, 5),
+                longFormat ? result.endTime : result.endTime.substring(0, 5),
                 toStr(result.modes),
                 toStr(result.agencies),
                 toStr(result.routes),

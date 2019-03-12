@@ -28,5 +28,5 @@ public interface StdWorkerState<T extends TripScheduleInfo> extends WorkerState<
     /**
      * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the transitTime
      */
-    void transitToStop(int stop, int alightTime, T trip, int boardStop, int boardTime);
+    void transitToStop(int alightStop, int alightTime, int boardStop, int boardTime, T trip);
 }

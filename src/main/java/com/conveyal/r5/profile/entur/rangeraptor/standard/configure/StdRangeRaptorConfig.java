@@ -11,6 +11,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.BestTimes;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.BestTimesOnlyStopArrivalsState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.SimpleArrivedAtDestinationCheck;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.debug.DebugStopArrivalsState;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.heuristics.HeuristicSearch;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.heuristics.HeuristicsAdapter;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.StdStopArrivalsState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.Stops;
@@ -55,13 +56,25 @@ public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
         return createNoWaitWorker(bestTimeStopArrivalsState());
     }
 
+
+    public HeuristicSearch<T> createHeuristicSearch(SearchContext<T> ctx) {
+        StdRangeRaptorConfig<T> stdFactory = new StdRangeRaptorConfig<>(ctx);
+        return new HeuristicSearch<>(stdFactory.heuristics(), stdFactory.createNoWaitHeuristicsSearch());
+    }
+
     /**
      * Return the best results as heuristics. Make sure to retrieve this before you create the worker,
      * if not the heuristic can not be added to the worker lifecycle and fails.
      */
     public Heuristics heuristics() {
         if(heuristics == null) {
-            heuristics = new HeuristicsAdapter(bestTimes(), bestNumberOfTransfers(), ctx.calculator(), ctx.lifeCycle());
+            heuristics = new HeuristicsAdapter(
+                    bestTimes(),
+                    bestNumberOfTransfers(),
+                    ctx.egressLegs(),
+                    ctx.calculator(),
+                    ctx.lifeCycle()
+            );
         }
         return heuristics;
     }

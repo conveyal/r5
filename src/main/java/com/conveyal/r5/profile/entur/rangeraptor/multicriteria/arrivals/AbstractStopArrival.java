@@ -130,17 +130,6 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
         throw new IllegalStateException("Avoid using hashCode() and equals() for this class.");
     }
 
-    /**
-     * This method is used to find the first transit arrival in a journey.
-     * The first leg after the access leg must be a transit leg, so
-     * the second leg is always the first transit leg/arrival.
-     */
-    boolean firstArrivedByTransit() {
-        // We can use the paretoRound for this, because the two first leags are always
-        // an access lag followed by a transit leg.
-        return paretoRound == 1;
-    }
-
     private boolean isTransitFollowedByTransit() {
         return arrivedByTransit() && previous.arrivedByTransit();
     }

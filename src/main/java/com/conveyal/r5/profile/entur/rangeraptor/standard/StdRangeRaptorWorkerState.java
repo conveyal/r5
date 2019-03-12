@@ -127,7 +127,7 @@ public final class StdRangeRaptorWorkerState<T
      * Set the time at a transit stop iff it is optimal. This sets both the bestTime and the transitTime.
      */
     @Override
-    public final void transitToStop(int stop, int alightTime, T trip, int boardStop, int boardTime) {
+    public final void transitToStop(int stop, int alightTime, int boardStop, int boardTime, T trip) {
         if (exceedsTimeLimit(alightTime)) {
             return;
         }

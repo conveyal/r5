@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
+import com.conveyal.r5.profile.entur.api.debug.DebugLogger;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
@@ -53,6 +54,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
             RoundProvider roundProvider,
             CostCalculator costCalculator,
             TransitCalculator transitCalculator,
+            DebugLogger debugLogger,
             DebugHandlerFactory<T> debugHandlerFactory,
             WorkerLifeCycle lifeCycle
 
@@ -66,6 +68,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
                 costCalculator,
                 transitCalculator,
                 debugHandlerFactory,
+                debugLogger,
                 lifeCycle
         );
         this.touchedStops = new BitSet(nStops);

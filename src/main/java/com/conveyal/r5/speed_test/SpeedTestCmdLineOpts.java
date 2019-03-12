@@ -20,6 +20,7 @@ public class SpeedTestCmdLineOpts extends CommandLineOpts {
         options.addOption(SAMPLE_TEST_N_TIMES_OPT, "sampleTestNTimes", true, "Repeat the test N times. Profiles are altered in a round robin fashion.");
         options.addOption(PROFILES_OPT, "profiles", true, "A coma separated list of configuration profiles:\n" + String.join("\n", SpeedTestProfiles.options()));
         options.addOption(TEST_CASES_OPT, "testCases", true, "A coma separated list of test case numbers to run.");
+        options.addOption(NUM_OF_ADD_TRANSFERS, "nExtraTransfers", true, "The maximum number of extra transfers allowed relative to the path with the fewest transfers.");
         return options;
     }
 
@@ -33,6 +34,10 @@ public class SpeedTestCmdLineOpts extends CommandLineOpts {
 
     int numberOfTestsSamplesToRun() {
         return Integer.valueOf(cmd.getOptionValue(SAMPLE_TEST_N_TIMES_OPT, Integer.toString(profiles().length)));
+    }
+
+    int numOfExtraTransfers() {
+        return Integer.valueOf(cmd.getOptionValue(NUM_OF_ADD_TRANSFERS, "5"));
     }
 
     SpeedTestProfiles[] profiles() {

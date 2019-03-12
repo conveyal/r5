@@ -50,7 +50,7 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
         accessLegs = Collections.emptyList();
         egressLegs = Collections.emptyList();
         boardSlackInSeconds = 60;
-        numberOfAdditionalTransfers = 12;
+        numberOfAdditionalTransfers = 5;
         multiCriteriaCostFactors = MultiCriteriaCostFactors.DEFAULTS;
         debug = DebugRequest.defaults();
     }

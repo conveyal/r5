@@ -1,6 +1,9 @@
 package com.conveyal.r5.profile.entur.util;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
 
 /**
  * A utility class for integer functions.
@@ -20,11 +23,21 @@ public final class IntUtils {
 
 
     /**
-     * Create a new int array an initialize it with the given {@code initialValue}.
+     * Create a new int array and initialize all values with the given {@code initialValue}.
      */
     public static int[] intArray(int size, int initialValue) {
         int [] array = new int[size];
         Arrays.fill(array, initialValue);
         return array;
     }
+
+    /**
+     * Concatenate list a and b and convert them to int arrays.
+     */
+    public static int[] concat(Collection<Integer> a, Collection<Integer> b) {
+        List<Integer> all = new ArrayList<>(a);
+        all.addAll(b);
+        return all.stream().mapToInt(it -> it).toArray();
+    }
+
 }

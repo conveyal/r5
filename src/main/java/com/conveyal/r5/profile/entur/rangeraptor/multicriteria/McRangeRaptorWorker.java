@@ -32,6 +32,7 @@ public final class McRangeRaptorWorker<T extends TripScheduleInfo> extends Abstr
                         context.roundProvider(),
                         context.costCalculator(),
                         context.calculator(),
+                        context.debugLogger(),
                         context.debugFactory(),
                         context.lifeCycle()
                 )
@@ -63,13 +64,17 @@ public final class McRangeRaptorWorker<T extends TripScheduleInfo> extends Abstr
 
                 while (patternStops.hasNext()) {
                     int alightStopPos = patternStops.next();
-                    state.transitToStop(
-                            boardStop,
-                            pattern.stopIndex(alightStopPos),
-                            trip.arrival(alightStopPos),
-                            trip.departure(boardStopPos),
-                            trip
-                    );
+                    int alightStopIndex = pattern.stopIndex(alightStopPos);
+
+                    if(allowStopVisit(alightStopIndex)) {
+                        state.transitToStop(
+                                boardStop,
+                                alightStopIndex,
+                                trip.arrival(alightStopPos),
+                                trip.departure(boardStopPos),
+                                trip
+                        );
+                    }
                 }
             }
         }

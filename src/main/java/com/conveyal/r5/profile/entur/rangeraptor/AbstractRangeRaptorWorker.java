@@ -15,6 +15,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleSearch;
 import com.conveyal.r5.profile.entur.rangeraptor.workerlifecycle.LifeCycleEventPublisher;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
 
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.Iterator;
 
@@ -75,6 +76,8 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
 
     private final Collection<TransferLeg> accessLegs;
 
+    private final BitSet stopsFilter;
+
     /**
      * The life cycle is used to publish life cycle events to everyone who
      * listen.
@@ -94,6 +97,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
         // We do a cast here to avoid exposing the round tracker  and the life cycle publisher to "everyone"
         // by providing access to it in the context.
         this.roundTracker = (RoundTracker) context.roundProvider();
+        this.stopsFilter =  context.stopsFilter();
         this.lifeCycle = context.createLifeCyclePublisher();
     }
 
@@ -132,6 +136,10 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
     protected abstract void prepareTransitForRoundAndPattern(TripPatternInfo<T> pattern, TripScheduleSearch<T> tripSearch);
 
     protected abstract void performTransitForRoundAndPatternAtStop(int stopPositionInPattern);
+
+    protected boolean allowStopVisit(int stop) {
+        return stopsFilter == null || stopsFilter.get(stop);
+    }
 
     /**
      * Iterate over given pattern and calculate transit for each stop.

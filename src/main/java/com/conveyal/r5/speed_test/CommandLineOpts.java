@@ -27,8 +27,9 @@ class CommandLineOpts {
     static final String SAMPLE_TEST_N_TIMES_OPT = "n";
     static final String PROFILES_OPT = "p";
     static final String TEST_CASES_OPT = "c";
-    static final String DEBUG_STOPS = "s";
-    static final String DEBUG_TRIP = "t";
+    static final String NUM_OF_ADD_TRANSFERS = "t";
+    static final String DEBUG_STOPS = "S";
+    static final String DEBUG_TRIP = "T";
     static final String DEBUG = "D";
 
 

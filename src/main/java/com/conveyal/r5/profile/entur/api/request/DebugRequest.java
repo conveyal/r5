@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile.entur.api.request;
 
 import com.conveyal.r5.profile.entur.api.debug.DebugEvent;
+import com.conveyal.r5.profile.entur.api.debug.DebugLogger;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.view.ArrivalView;
@@ -56,6 +57,7 @@ public class DebugRequest<T extends TripScheduleInfo> {
     private final int pathStartAtStopIndex;
     private final Consumer<DebugEvent<ArrivalView<T>>> stopArrivalListener;
     private final Consumer<DebugEvent<Path<T>>> pathFilteringListener;
+    private final DebugLogger debugLogger;
 
     private DebugRequest() {
         stops = Collections.emptyList();
@@ -63,6 +65,7 @@ public class DebugRequest<T extends TripScheduleInfo> {
         pathStartAtStopIndex = 0;
         stopArrivalListener = null;
         pathFilteringListener = null;
+        debugLogger = null;
     }
 
     DebugRequest(RequestBuilder<T> builder) {
@@ -71,6 +74,7 @@ public class DebugRequest<T extends TripScheduleInfo> {
         this.pathStartAtStopIndex = builder.debugPathStartAtStopIndex();
         this.stopArrivalListener = builder.stopArrivalListener();
         this.pathFilteringListener = builder.pathFilteringListener();
+        this.debugLogger = builder.debugLogger();
     }
 
 
@@ -112,10 +116,10 @@ public class DebugRequest<T extends TripScheduleInfo> {
     }
 
     /**
-     * Is any debugging enabled. Either stops or path exist.
+     * Path debug event listener
      */
-    public boolean isDebug() {
-        return !stops.isEmpty() || !path.isEmpty();
+    public DebugLogger logger() {
+        return debugLogger;
     }
 
     @Override
@@ -126,6 +130,7 @@ public class DebugRequest<T extends TripScheduleInfo> {
                 ", pathStartAtStopIndex=" + pathStartAtStopIndex +
                 ", stopArrivalListener=" + enabled(stopArrivalListener) +
                 ", pathFilteringListener=" + enabled(pathFilteringListener) +
+                ", logger=" + enabled(debugLogger) +
                 '}';
     }
 

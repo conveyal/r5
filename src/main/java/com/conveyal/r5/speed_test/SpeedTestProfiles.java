@@ -11,6 +11,7 @@ enum SpeedTestProfiles {
     raptor_reverse("rv", "Reverse Raptor"),
     mc_range_raptor("mc", "Multi-Criteria pareto optimal Range Raptor [ transfers, arrival time, travel time, cost ]."),
     mc_rr_heuristic("mh", "Multi-Criteria pareto optimal Range Raptor with heuristics [ transfers, arrival time, travel time, cost ]."),
+    mc_range_raptor_prune_stops("ms", "Multi-Criteria pareto optimal Range Raptor with stop filter heuristics [ transfers, arrival time, travel time, cost ]."),
     ;
 
     final String shortName;

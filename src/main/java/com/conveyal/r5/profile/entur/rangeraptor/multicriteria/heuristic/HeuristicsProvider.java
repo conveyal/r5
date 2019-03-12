@@ -38,9 +38,7 @@ public final class HeuristicsProvider<T extends TripScheduleInfo> {
             return false;
         }
         int minArrivalTime = arrivalTime + h.getMinTravelDuration();
-        // The min number of transfers is a's numberOfTransfers + h's numberOfTransfers + 1
-        // a's numberOfTransfers + 1 = a1s round.
-        int minNumberOfTransfers = roundProvider.round() + h.getMinNumTransfers();
+        int minNumberOfTransfers = roundProvider.round() - 1 + h.getMinNumTransfers();
         int minTravelDuration = travelDuration + h.getMinTravelDuration();
         int minCost = cost + h.getMinCost();
         int departureTime = minArrivalTime - minTravelDuration;

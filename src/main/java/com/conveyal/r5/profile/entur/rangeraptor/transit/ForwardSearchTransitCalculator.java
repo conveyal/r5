@@ -113,11 +113,18 @@ final class ForwardSearchTransitCalculator implements TransitCalculator {
 
     @Override
     public final IntIterator rangeRaptorMinutes() {
-        return IntIterators.intDecIterator(
-                earliestDepartureTime + searchWindowSizeInSeconds,
-                earliestDepartureTime,
-                iterationStep
-        );
+        return oneIterationOnly()
+                ? IntIterators.singleValueIterator(earliestDepartureTime)
+                : IntIterators.intDecIterator(
+                        earliestDepartureTime + searchWindowSizeInSeconds,
+                        earliestDepartureTime,
+                        iterationStep
+                );
+    }
+
+    @Override
+    public boolean oneIterationOnly() {
+        return searchWindowSizeInSeconds <= iterationStep;
     }
 
     @Override

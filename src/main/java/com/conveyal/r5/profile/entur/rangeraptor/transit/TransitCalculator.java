@@ -123,6 +123,13 @@ public interface TransitCalculator {
     IntIterator rangeRaptorMinutes();
 
     /**
+     * Return TRUE if the Range Raptor should perform only ONE iteration.
+     * This is defined happens if the search window is less than or equals
+     * to the iteration step duration.
+     */
+    boolean oneIterationOnly();
+
+    /**
      * Return an iterator, iterating over the stop positions in a pattern.
      * Iterate from '0' to 'nStopsInPattern - 1' in a forward search and from
      * 'nStopsInPattern - 1' to '0' in a reverse search.
@@ -174,8 +181,6 @@ public interface TransitCalculator {
      * @param forward if true create a calculator for forward search, if false search
      */
     static TransitCalculator testDummyCalculator(int boardSlackInSeconds, boolean forward) {
-
-
         return forward
                 ? new ForwardSearchTransitCalculator(
                         10,

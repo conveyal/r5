@@ -129,11 +129,18 @@ final class ReverseSearchTransitCalculator implements TransitCalculator {
 
     @Override
     public final IntIterator rangeRaptorMinutes() {
-        return IntIterators.intIncIterator(
-                latestArrivalTime - searchWindowInSeconds,
-                latestArrivalTime,
-                iterationStep
-        );
+        return oneIterationOnly()
+                ? IntIterators.singleValueIterator(latestArrivalTime)
+                : IntIterators.intIncIterator(
+                        latestArrivalTime - searchWindowInSeconds,
+                        latestArrivalTime,
+                        iterationStep
+                );
+    }
+
+    @Override
+    public boolean oneIterationOnly() {
+        return searchWindowInSeconds <= iterationStep;
     }
 
     @Override

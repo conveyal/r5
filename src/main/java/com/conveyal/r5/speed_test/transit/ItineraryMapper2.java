@@ -1,4 +1,4 @@
-package com.conveyal.r5.speed_test;
+package com.conveyal.r5.speed_test.transit;
 
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.r5.profile.ProfileRequest;
@@ -24,19 +24,41 @@ import com.vividsolutions.jts.geom.Coordinate;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.TimeZone;
 import java.util.stream.Collectors;
 
-class ItineraryMapper2 {
+public class ItineraryMapper2 {
     private TransportNetwork transportNetwork;
+    private ProfileRequest request;
 
-    ItineraryMapper2(TransportNetwork transportNetwork) {
+    private ItineraryMapper2(ProfileRequest request, TransportNetwork transportNetwork) {
+        this.request = request;
         this.transportNetwork = transportNetwork;
     }
 
-    SpeedTestItinerary createItinerary(ProfileRequest request, Path<TripSchedule> path, StreetPath accessPath, StreetPath egressPath) {
+    public static ItinerarySet mapItineraries(
+            ProfileRequest request,
+            Collection<Path<TripSchedule>> paths,
+            EgressAccessRouter streetRouter,
+            TransportNetwork transportNetwork
+    ) {
+        ItineraryMapper2 mapper = new ItineraryMapper2(request, transportNetwork);
+        ItinerarySet itineraries = new ItinerarySet();
+
+        for (Path<TripSchedule> p : paths) {
+            StreetPath accessPath = streetRouter.accessPath(p.accessLeg().toStop());
+            StreetPath egressPath = streetRouter.egressPath(p.egressLeg().fromStop());
+            SpeedTestItinerary itinerary = mapper.createItinerary(p, accessPath, egressPath);
+            itineraries.add(itinerary);
+        }
+        return itineraries;
+    }
+
+
+    private SpeedTestItinerary createItinerary(Path<TripSchedule> path, StreetPath accessPath, StreetPath egressPath) {
         SpeedTestItinerary itinerary = new SpeedTestItinerary();
         if (path == null) {
             return null;

@@ -1,4 +1,4 @@
-package com.conveyal.r5.speed_test;
+package com.conveyal.r5.speed_test.transit;
 
 import com.conveyal.r5.profile.entur.util.TimeUtils;
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;

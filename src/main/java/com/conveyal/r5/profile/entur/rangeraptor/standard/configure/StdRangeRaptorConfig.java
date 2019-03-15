@@ -3,6 +3,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard.configure;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.path.DestinationArrivalPaths;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.ArrivedAtDestinationCheck;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.BestNumberOfTransfers;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.NoWaitRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StdRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StdRangeRaptorWorkerState;
@@ -10,6 +11,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalsState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.BestTimes;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.BestTimesOnlyStopArrivalsState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.SimpleArrivedAtDestinationCheck;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.SimpleBestNumberOfTransfers;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.debug.DebugStopArrivalsState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.heuristics.HeuristicSearch;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.heuristics.HeuristicsAdapter;
@@ -17,7 +19,6 @@ import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.StdStopAr
 import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.Stops;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.path.EgressArrivalToPathAdapter;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.view.StopsCursor;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.transfers.BestNumberOfTransfers;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.view.Heuristics;
 
@@ -40,62 +41,70 @@ public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
     private Heuristics heuristics = null;
 
 
-    public StdRangeRaptorConfig(SearchContext<T> context) {
+    private StdRangeRaptorConfig(SearchContext<T> context) {
         this.ctx = context;
     }
 
-    public StdRangeRaptorWorker<T> createStandardSearch() {
-        return createWorker(stdStopArrivalsState());
+    public static <T extends TripScheduleInfo> StdRangeRaptorWorker<T> createSearch(SearchContext<T> context) {
+        return new StdRangeRaptorConfig<>(context).createSearch(false);
     }
 
-    public StdRangeRaptorWorker<T> createBestTimeSearch() {
-        return createWorker(bestTimeStopArrivalsState());
-    }
-
-    public NoWaitRangeRaptorWorker<T> createNoWaitHeuristicsSearch() {
-        return createNoWaitWorker(bestTimeStopArrivalsState());
-    }
-
-
-    public HeuristicSearch<T> createHeuristicSearch(SearchContext<T> ctx) {
-        StdRangeRaptorConfig<T> stdFactory = new StdRangeRaptorConfig<>(ctx);
-        return new HeuristicSearch<>(stdFactory.heuristics(), stdFactory.createNoWaitHeuristicsSearch());
-    }
-
-    /**
-     * Return the best results as heuristics. Make sure to retrieve this before you create the worker,
-     * if not the heuristic can not be added to the worker lifecycle and fails.
-     */
-    public Heuristics heuristics() {
-        if(heuristics == null) {
-            heuristics = new HeuristicsAdapter(
-                    bestTimes(),
-                    bestNumberOfTransfers(),
-                    ctx.egressLegs(),
-                    ctx.calculator(),
-                    ctx.lifeCycle()
-            );
-        }
-        return heuristics;
+    public static <T extends TripScheduleInfo> HeuristicSearch<T> createHeuristicSearch(SearchContext<T> ctx) {
+        return new StdRangeRaptorConfig<>(ctx).createHeuristicSearch();
     }
 
 
     /* private factory methods */
 
-    private StdRangeRaptorWorker<T> createWorker(StopArrivalsState<T> stopArrivalsState) {
-        return new StdRangeRaptorWorker<>(ctx, workerState(stopArrivalsState));
+    private StdRangeRaptorWorker<T> createSearch(boolean includeHeuristics) {
+        new VerifyRequestIsValid(ctx).verify();
+
+        switch (ctx.request().profile()) {
+            case STANDARD:
+                return createWorker(includeHeuristics, stdStopArrivalsState());
+            case BEST_TIME:
+                return createWorker(includeHeuristics, bestTimeStopArrivalsState());
+            case NO_WAIT_STD:
+                return createNoWaitWorker(includeHeuristics, stdStopArrivalsState());
+            case NO_WAIT_BEST_TIME:
+                return createNoWaitWorker(includeHeuristics, bestTimeStopArrivalsState());
+        }
+        throw new IllegalArgumentException(ctx.request().profile().toString());
     }
 
+    private HeuristicSearch<T> createHeuristicSearch() {
+        return new HeuristicSearch<>(createSearch(true), heuristics);
+    }
 
-    private NoWaitRangeRaptorWorker<T> createNoWaitWorker(StopArrivalsState<T> stopArrivalsState) {
-        if(workerCreated) {
-            throw new IllegalStateException(
-                     "Create a new config for each worker. Do not reuse the config instance, " +
-                             "this may lead to unpredictable behavior."
-            );
-        }
-        workerCreated = true;
+    private StdRangeRaptorWorker<T> createWorker(boolean includeHeuristics, StopArrivalsState<T> stopArrivalsState) {
+        assertOnlyOneWorkerIsCreated();
+        StdRangeRaptorWorkerState<T> workerState = workerState(stopArrivalsState);
+        createHeuristics(includeHeuristics);
+        return new StdRangeRaptorWorker<>(ctx, workerState);
+    }
+
+    private NoWaitRangeRaptorWorker<T> createNoWaitWorker(boolean includeHeuristics, StopArrivalsState<T> stopArrivalsState) {
+        assertOnlyOneWorkerIsCreated();
+        createHeuristics(includeHeuristics);
         return new NoWaitRangeRaptorWorker<>(ctx, workerState(stopArrivalsState));
+    }
+
+    /**
+     * The heuristics MUST be created before the worker, if not the heuristic
+     * can not be added to the worker lifecycle and fails.
+     */
+    private void createHeuristics(boolean includeHeuristics) {
+        if(!includeHeuristics) {
+            return;
+        }
+        assertNotNull(bestNumberOfTransfers);
+        heuristics = new HeuristicsAdapter(
+                bestTimes(),
+                this.bestNumberOfTransfers,
+                ctx.egressLegs(),
+                ctx.calculator(),
+                ctx.lifeCycle()
+        );
     }
 
     private StdRangeRaptorWorkerState<T> workerState(StopArrivalsState<T> stopArrivalsState) {
@@ -103,15 +112,19 @@ public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
     }
 
     private BestTimesOnlyStopArrivalsState<T> bestTimeStopArrivalsState() {
-        return new BestTimesOnlyStopArrivalsState<>(bestTimes(), bestNumberOfTransfers());
+        return new BestTimesOnlyStopArrivalsState<>(bestTimes(), simpleBestNumberOfTransfers());
     }
 
-    /** Return instance if created by heuristics or null if not needed.  */
-    private BestNumberOfTransfers bestNumberOfTransfers() {
-        if(bestNumberOfTransfers == null) {
-            this.bestNumberOfTransfers = new BestNumberOfTransfers(ctx.nStops(), ctx.roundProvider());
-        }
-        return bestNumberOfTransfers;
+    /**
+     * Return instance if created by heuristics or null if not needed.
+     */
+    private SimpleBestNumberOfTransfers simpleBestNumberOfTransfers() {
+        SimpleBestNumberOfTransfers value = new SimpleBestNumberOfTransfers(
+                ctx.nStops(),
+                ctx.roundProvider()
+        );
+        setBestNumberOfTransfers(value);
+        return value;
     }
 
     /**
@@ -138,8 +151,14 @@ public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
                     ctx.nStops(),
                     ctx.roundProvider()
             );
+            setBestNumberOfTransfers(stops);
         }
         return stops;
+    }
+
+    private void setBestNumberOfTransfers(BestNumberOfTransfers bestNumberOfTransfers) {
+        assertSetValueIsNull("bestNumberOfTransfers", this.bestNumberOfTransfers, bestNumberOfTransfers);
+        this.bestNumberOfTransfers = bestNumberOfTransfers;
     }
 
     private StopsCursor<T> stopsCursor() {
@@ -201,5 +220,34 @@ public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
 
     private SimpleArrivedAtDestinationCheck simpleDestinationCheck() {
         return new SimpleArrivedAtDestinationCheck(ctx.egressStops(), bestTimes());
+    }
+
+    /**
+     * This assert should only be called when creating a worker is the next step
+     */
+    private void assertOnlyOneWorkerIsCreated() {
+        if (workerCreated) {
+            throw new IllegalStateException(
+                    "Create a new config for each worker. Do not reuse the config instance, " +
+                            "this may lead to unpredictable behavior."
+            );
+        }
+        workerCreated = true;
+    }
+
+    private void assertSetValueIsNull(String name, Object setValue, Object newValue) {
+        if (setValue != null) {
+            throw new IllegalStateException(
+                    "There is more than one instance of " + name + ": " +
+                            newValue.getClass().getSimpleName() + ", " +
+                            setValue.getClass().getSimpleName()
+            );
+        }
+    }
+
+    private void assertNotNull(Object value) {
+        if(value == null) {
+            throw new NullPointerException();
+        }
     }
 }

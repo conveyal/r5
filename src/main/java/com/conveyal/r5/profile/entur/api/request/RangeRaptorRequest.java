@@ -8,7 +8,9 @@ import com.conveyal.r5.profile.entur.util.TimeUtils;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Objects;
+import java.util.Set;
 
 
 /**
@@ -23,12 +25,13 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
     private static final int DEFAULT_SEARCH_WINDOW_1_HOUR_IN_SECONDS = 60 * 60;
 
 
-    private final RaptorProfile profile;
+    private final RangeRaptorProfile profile;
     private final int earliestDepartureTime;
     private final int latestArrivalTime;
     private final int searchWindowInSeconds;
     private final boolean arrivedBy;
-
+    private final boolean searchForward;
+    private final Set<Optimization> optimizations;
     private final Collection<TransferLeg> accessLegs;
     private final Collection<TransferLeg> egressLegs;
     private final int boardSlackInSeconds;
@@ -42,11 +45,13 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
     }
 
     private RangeRaptorRequest() {
-        profile = RaptorProfile.MULTI_CRITERIA_RANGE_RAPTOR;
+        profile = RangeRaptorProfile.MULTI_CRITERIA;
         earliestDepartureTime = NOT_SET;
         latestArrivalTime = NOT_SET;
         searchWindowInSeconds = DEFAULT_SEARCH_WINDOW_1_HOUR_IN_SECONDS;
         arrivedBy = false;
+        searchForward = true;
+        optimizations = Collections.emptySet();
         accessLegs = Collections.emptyList();
         egressLegs = Collections.emptyList();
         boardSlackInSeconds = 60;
@@ -61,12 +66,16 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
         this.latestArrivalTime = builder.latestArrivalTime();
         this.searchWindowInSeconds = builder.searchWindowInSeconds();
         this.arrivedBy = builder.arrivedBy();
-        this.accessLegs = new ArrayList<>(builder.accessLegs());
-        this.egressLegs = new ArrayList<>(builder.egressLegs());
+        this.searchForward = builder.searchForward();
+        // TODO JAVA_9 - Cleanup next 3 lines: Set.of(...) and List.of(...)
+        this.optimizations = Collections.unmodifiableSet(EnumSet.copyOf(builder.optimizations()));
+        this.accessLegs = Collections.unmodifiableList(new  ArrayList<>(builder.accessLegs()));
+        this.egressLegs = Collections.unmodifiableList(new ArrayList<>(builder.egressLegs()));
         this.boardSlackInSeconds = builder.boardSlackInSeconds();
         this.numberOfAdditionalTransfers = builder.numberOfAdditionalTransfers();
         this.multiCriteriaCostFactors = builder.buildMcCostFactors();
         this.debug = builder.debug();
+        verify();
     }
 
     public RequestBuilder<T> mutate() {
@@ -76,9 +85,9 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
     /**
      * The profile/algorithm to use for this request.
      * <p/>
-     * The default value is {@link RaptorProfile#MULTI_CRITERIA_RANGE_RAPTOR}
+     * The default value is {@link RangeRaptorProfile#MULTI_CRITERIA}
      */
-    public RaptorProfile profile() {
+    public RangeRaptorProfile profile() {
         return profile;
     }
 
@@ -119,7 +128,9 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
      * by search* this is used to calculate the 'earliestArrivalTime'. The algorithm will find
      * all optimal travels within the given time window.
      * <p/>
-     * Required. Must be a positive integer.
+     * Set the search window to 0 (zero) to run 1 iteration.
+     * <p/>
+     * Required. Must be a positive integer or 0(zero).
      */
     public int searchWindowInSeconds() {
         return searchWindowInSeconds;
@@ -129,12 +140,51 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
     /**
      * This parameter decide if a search is a 'depart after' or 'arrive by' search.
      * <p/>
-     * Required. Initial value is 'false'.
+     * Optional. Default value is 'false'.
      *
      * @return true is the search is a 'arrive by' search.
      */
     public boolean arrivedBy() {
         return arrivedBy;
+    }
+
+    /**
+     * Set search direction to REVERSE to performed a search  from the destination
+     * to the origin. Thie traverse the transit graph backwards in time.
+     * This parameter is used internally to produce heuristics, and is normally not
+     * something you would like to do unless you are testing or analyzing.
+     * <p/>
+     *
+     * @return  NOT {@link #searchForward()}
+     */
+    public boolean searchInReverse() {
+        return !searchForward;
+    }
+
+    /**
+     * When TRUE the search is performed from the origin to the destination in a
+     * normal way.
+     * <p/>
+     * Optional. Default value is 'true'.
+     *
+     * @return true is search is forward.
+     */
+    public boolean searchForward() {
+        return searchForward;
+    }
+
+    /**
+     * Return list of enabled optimizations.
+     */
+    public Collection<Optimization> optimizations() {
+        return optimizations;
+    }
+
+    /**
+     * TRUE if the given optimization is enabled.
+     */
+    public boolean optimizationEnabled(Optimization optimization) {
+        return optimization.isOneOf(optimizations);
     }
 
     /**
@@ -237,5 +287,19 @@ public class RangeRaptorRequest<T extends TripScheduleInfo> {
                 profile, earliestDepartureTime, latestArrivalTime, searchWindowInSeconds, arrivedBy, accessLegs,
                 egressLegs, boardSlackInSeconds, numberOfAdditionalTransfers, multiCriteriaCostFactors, debug
         );
+    }
+
+
+    /* private methods */
+
+    private void verify() {
+        assertProperty(!accessLegs.isEmpty(), "At least one 'accessLegs' is required.");
+        assertProperty(!egressLegs.isEmpty(), "At least one 'egressLegs' is required.");
+    }
+
+    private void assertProperty(boolean predicate, String errorMessage) {
+        if(!predicate) {
+            throw new IllegalArgumentException(RangeRaptorRequest.class.getSimpleName()  + " error: " + errorMessage);
+        }
     }
 }

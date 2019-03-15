@@ -1,4 +1,4 @@
-package com.conveyal.r5.speed_test;
+package com.conveyal.r5.speed_test.transit;
 
 import com.conveyal.r5.profile.entur.util.paretoset.ParetoSet;
 
@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import static com.conveyal.r5.speed_test.SpeedTestItinerary.paretoDominanceFunctions;
+import static com.conveyal.r5.speed_test.transit.SpeedTestItinerary.paretoDominanceFunctions;
 
 /**
  * This code is experimental, and just implemented to test if we can get some
@@ -18,7 +18,7 @@ public class ItinerarySet implements Iterable<SpeedTestItinerary> {
     private boolean filtered = false;
 
 
-    void add(SpeedTestItinerary it) {
+    public void add(SpeedTestItinerary it) {
         itineraries.add(it);
     }
 

@@ -9,7 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static com.conveyal.r5.speed_test.SpeedTestItinerary.legsAsCompactString;
+import static com.conveyal.r5.speed_test.transit.SpeedTestItinerary.legsAsCompactString;
 
 /**
  * Map an Itinerary to a result instance. We do this to normalize the Itinerary

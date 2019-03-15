@@ -5,7 +5,6 @@ import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalsState;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.transfers.BestNumberOfTransfers;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -26,17 +25,17 @@ import java.util.Collections;
 public class BestTimesOnlyStopArrivalsState<T extends TripScheduleInfo> implements StopArrivalsState<T> {
 
     private final BestTimes bestTimes;
-    private final BestNumberOfTransfers bestNumberOfTransfers;
+    private final SimpleBestNumberOfTransfers bestNumberOfTransfers;
 
 
-    public BestTimesOnlyStopArrivalsState(BestTimes bestTimes, BestNumberOfTransfers bestNumberOfTransfers) {
+    public BestTimesOnlyStopArrivalsState(BestTimes bestTimes, SimpleBestNumberOfTransfers bestNumberOfTransfers) {
         this.bestTimes = bestTimes;
         this.bestNumberOfTransfers = bestNumberOfTransfers;
     }
 
     @Override
     public void setInitialTime(int stop, int arrivalTime, int durationInSeconds) {
-        bestNumberOfTransfers.visited(stop);
+        bestNumberOfTransfers.arriveAtStop(stop);
     }
 
     @Override
@@ -61,7 +60,7 @@ public class BestTimesOnlyStopArrivalsState<T extends TripScheduleInfo> implemen
 
     @Override
     public void setNewBestTransitTime(int stop, int alightTime, T trip, int boardStop, int boardTime, boolean newBestOverall) {
-        bestNumberOfTransfers.visited(stop);
+        bestNumberOfTransfers.arriveAtStop(stop);
     }
 
     @Override
@@ -69,7 +68,7 @@ public class BestTimesOnlyStopArrivalsState<T extends TripScheduleInfo> implemen
 
     @Override
     public void setNewBestTransferTime(int fromStop, int arrivalTime, TransferLeg transferLeg) {
-        bestNumberOfTransfers.visited(transferLeg.stop());
+        bestNumberOfTransfers.arriveAtStop(transferLeg.stop());
     }
 
     @Override

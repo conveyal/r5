@@ -7,4 +7,8 @@ public class TestCaseFailedException extends RuntimeException {
     TestCaseFailedException() {
         super("Test assert errors");
     }
+
+    public TestCaseFailedException(String message) {
+        super(message);
+    }
 }

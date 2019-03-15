@@ -1,4 +1,4 @@
-package com.conveyal.r5.speed_test;
+package com.conveyal.r5.speed_test.transit;
 
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.r5.profile.Path;
@@ -25,20 +25,32 @@ import java.util.TimeZone;
 import java.util.stream.Collectors;
 
 
-class ItineraryMapper {
+public class ItineraryMapper {
     private TransportNetwork transportNetwork;
 
-    ItineraryMapper(TransportNetwork transportNetwork) {
+    private ItineraryMapper(TransportNetwork transportNetwork) {
         this.transportNetwork = transportNetwork;
     }
 
-    SpeedTestItinerary createItinerary(ProfileRequest request, Path path, StreetPath accessPath, StreetPath egressPath) {
+
+    public static SpeedTestItinerary createItinerary(
+            TransportNetwork transportNetwork,
+            ProfileRequest request,
+            EgressAccessRouter streetRouter,
+            com.conveyal.r5.profile.Path path
+    ) {
+        StreetPath accessPath = streetRouter.accessPath(path.boardStops[0]);
+        StreetPath egressPath = streetRouter.egressPath(path.alightStops[path.alightStops.length - 1]);
+        return new ItineraryMapper(transportNetwork).createItinerary(request, path, accessPath, egressPath);
+    }
+
+
+    private SpeedTestItinerary createItinerary(ProfileRequest request, Path path, StreetPath accessPath, StreetPath egressPath) {
         SpeedTestItinerary itinerary = new SpeedTestItinerary();
         if (path == null) {
             return null;
         }
 
-        // TODO TGR - Use request param here
         int MINIMUM_BOARD_WAIT_SEC = 60;
 
         itinerary.walkDistance = 0.0;

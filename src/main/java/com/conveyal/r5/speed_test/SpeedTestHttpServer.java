@@ -1,6 +1,7 @@
 package com.conveyal.r5.speed_test;
 
 import com.conveyal.r5.speed_test.api.SpeedTestApplication;
+import com.conveyal.r5.speed_test.cli.CommandLineOpts;
 import org.glassfish.grizzly.http.CompressionConfig;
 import org.glassfish.grizzly.http.server.CLStaticHttpHandler;
 import org.glassfish.grizzly.http.server.HttpHandler;

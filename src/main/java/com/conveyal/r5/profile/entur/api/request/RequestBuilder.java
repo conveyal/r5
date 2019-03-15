@@ -10,9 +10,10 @@ import com.conveyal.r5.profile.entur.api.view.ArrivalView;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 /**
  * This is a Request builder to help construct valid requests. Se the
@@ -32,13 +33,15 @@ public class RequestBuilder<T extends TripScheduleInfo> {
     private int latestArrivalTime;
     private int searchWindowInSeconds;
     private boolean arrivedBy;
+    private boolean searchForward;
+    private final Set<Optimization> optimizations = EnumSet.noneOf(Optimization.class);
     private final Collection<TransferLeg> accessLegs = new ArrayList<>();
     private final Collection<TransferLeg> egressLegs = new ArrayList<>();
     private int boardSlackInSeconds;
     private int numberOfAdditionalTransfers;
 
     // Algorithm
-    private RaptorProfile profile;
+    private RangeRaptorProfile profile;
     private int multiCriteriaBoardCost;
     private double multiCriteriaWalkReluctanceFactor;
     private double multiCriteriaWaitReluctanceFactor;
@@ -61,6 +64,9 @@ public class RequestBuilder<T extends TripScheduleInfo> {
         this.earliestDepartureTime = defaults.earliestDepartureTime();
         this.latestArrivalTime = defaults.latestArrivalTime();
         this.searchWindowInSeconds = defaults.searchWindowInSeconds();
+        this.arrivedBy = defaults.arrivedBy();
+        this.searchForward = defaults.searchForward();
+        this.optimizations.addAll(defaults.optimizations());
         this.accessLegs.addAll(defaults.accessLegs());
         this.egressLegs.addAll(defaults.egressLegs());
         this.boardSlackInSeconds = defaults.boardSlackInSeconds();
@@ -83,11 +89,11 @@ public class RequestBuilder<T extends TripScheduleInfo> {
         this.debugLogger = debug.logger();
     }
 
-    public RaptorProfile profile() {
+    public RangeRaptorProfile profile() {
         return profile;
     }
 
-    public RequestBuilder<T> profile(RaptorProfile profile) {
+    public RequestBuilder<T> profile(RangeRaptorProfile profile) {
         this.profile = profile;
         return this;
     }
@@ -159,6 +165,30 @@ public class RequestBuilder<T extends TripScheduleInfo> {
         this.arrivedBy = arrivedBy;
         return this;
     }
+
+    public boolean searchForward() {
+        return searchForward;
+    }
+
+    public RequestBuilder<T> searchDirection(boolean searchForward) {
+        this.searchForward = searchForward;
+        return this;
+    }
+
+    public Collection<Optimization> optimizations() {
+        return optimizations;
+    }
+
+    public RequestBuilder<T> enableOptimization(Optimization optimization) {
+        this.optimizations.add(optimization);
+        return this;
+    }
+
+    public RequestBuilder<T> disableOptimization(Optimization optimization) {
+        this.optimizations.remove(optimization);
+        return this;
+    }
+
 
     public int boardSlackInSeconds() {
         return boardSlackInSeconds;
@@ -266,8 +296,6 @@ public class RequestBuilder<T extends TripScheduleInfo> {
     }
 
     public RangeRaptorRequest<T> build() {
-        assertProperty(!accessLegs.isEmpty(), () ->"At least one 'accessLegs' is required.");
-        assertProperty(!egressLegs.isEmpty(), () ->"At least one 'egressLegs' is required.");
         return new RangeRaptorRequest<>(this);
     }
 
@@ -278,11 +306,5 @@ public class RequestBuilder<T extends TripScheduleInfo> {
     public RequestBuilder<T> reverseDebugRequest() {
         Collections.reverse(this.debugPath);
         return this;
-    }
-
-    private void assertProperty(boolean predicate, Supplier<String> errorMessageProvider) {
-        if(!predicate) {
-            throw new IllegalArgumentException(RangeRaptorRequest.class.getSimpleName()  + " error: " + errorMessageProvider.get());
-        }
     }
 }

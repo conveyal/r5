@@ -10,7 +10,8 @@ import java.util.Iterator;
  * the iterator and all instances of the TransferLeg. The TransferLeg is
  * only valid for the duration of one step.
  * <p/>
- * NOT THREAD SAFE!
+ * Used {@link #clone()} to get a new iterator to iterate over the same Transfers.
+ * This enables the iterator to be reused, and is THREAD SAFE.
  */
 class LightweightTransferIterator implements Iterator<TransferLeg>, TransferLeg {
     private final int[] durationToStops;
@@ -18,7 +19,7 @@ class LightweightTransferIterator implements Iterator<TransferLeg>, TransferLeg 
 
     LightweightTransferIterator(int[] durationToStops) {
         this.durationToStops = durationToStops;
-        reset();
+        this.index = this.durationToStops.length == 0 ? 0 : -2;
     }
 
 
@@ -56,5 +57,13 @@ class LightweightTransferIterator implements Iterator<TransferLeg>, TransferLeg 
      */
     void reset() {
         this.index = this.durationToStops.length == 0 ? 0 : -2;
+    }
+
+    /**
+     * Used to make a copy of the iterator.
+     */
+    @Override
+    public LightweightTransferIterator clone() {
+        return new LightweightTransferIterator(durationToStops);
     }
 }

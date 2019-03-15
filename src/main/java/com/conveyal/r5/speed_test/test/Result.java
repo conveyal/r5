@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 /**
@@ -15,6 +17,7 @@ import java.util.TreeSet;
  * itinerary. The result can be expected or actual, both represented by this class.
  */
 class Result implements Comparable<Result> {
+    private static final Pattern STOPS_PATTERN = Pattern.compile(" - (\\d+) - ");
     /**
      * The status is not final; This allows to update the status when matching expected and actual results.
      */
@@ -41,6 +44,7 @@ class Result implements Comparable<Result> {
         this.startTime = startTime;
         this.endTime = endTime;
         this.details = details;
+        this.stops.addAll(parseStops(details));
     }
 
     void setStatus(TestStatus status) {
@@ -103,5 +107,16 @@ class Result implements Comparable<Result> {
                 endTime,
                 details
         );
+    }
+
+    private List<Integer> parseStops(String details) {
+        List<Integer> stops = new ArrayList<>();
+        // WALK 0:44 - 87540 - BUS NX1 06:25 08:50 - 87244 - WALK 0:20
+        Matcher m = STOPS_PATTERN.matcher(details);
+
+        while (m.find()) {
+            stops.add(Integer.parseInt(m.group(1)));
+        }
+        return stops;
     }
 }

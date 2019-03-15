@@ -64,4 +64,17 @@ public interface TuningParameters {
     default double relaxCostAtDestinationArrival() {
         return 1.0;
     }
+
+
+    /**
+     * Split a travel search in smaller jobs and run them in parallel to improve performance. Use this
+     * parameter to set the total number of executable threads available across all searches.
+     * <p/>
+     * Multiple searches can run in parallel - this parameter have no effect with regard to that.
+     * <p/>
+     * The default value is 0 - zero. If 0, no extra threads are stated and the search is done in one thread.
+     */
+    default int searchThreadPoolSize() {
+        return 0;
+    }
 }

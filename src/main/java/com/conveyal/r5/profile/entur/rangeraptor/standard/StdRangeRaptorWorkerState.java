@@ -60,7 +60,8 @@ public final class StdRangeRaptorWorkerState<T
      */
     public StdRangeRaptorWorkerState(
             TransitCalculator calculator,
-            BestTimes bestTimes, StopArrivalsState<T> stopArrivalsState,
+            BestTimes bestTimes,
+            StopArrivalsState<T> stopArrivalsState,
             ArrivedAtDestinationCheck arrivedAtDestinationCheck
     ) {
         this.calculator = calculator;

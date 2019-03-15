@@ -43,8 +43,8 @@ public class LightweightTransferIteratorTest {
         // No more elements expected
         assertFalse(subject.hasNext());
 
-        // Reset and assert thet we can start over
-        ((LightweightTransferIterator) subject).reset();
+        // Clone and assert that we can start over
+        subject = ((LightweightTransferIterator) subject).clone();
 
         assertTrue(subject.hasNext());
         d = subject.next();

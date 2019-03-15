@@ -1,11 +1,12 @@
-package com.conveyal.r5.speed_test;
+package com.conveyal.r5.speed_test.transit;
 
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
+import com.conveyal.r5.profile.entur.util.TimeUtils;
 
-class AccessEgressLeg implements TransferLeg {
+public class AccessEgressLeg implements TransferLeg {
     private final int stop, durationInSeconds;
 
-    AccessEgressLeg(int stop, int durationInSeconds) {
+    public AccessEgressLeg(int stop, int durationInSeconds) {
         this.stop = stop;
         this.durationInSeconds = durationInSeconds;
     }
@@ -20,4 +21,9 @@ class AccessEgressLeg implements TransferLeg {
         return durationInSeconds;
     }
 
+
+    @Override
+    public String toString() {
+        return TimeUtils.timeToStrCompact(durationInSeconds) + " " + stop;
+    }
 }

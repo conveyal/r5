@@ -18,6 +18,12 @@ import com.conveyal.r5.profile.entur.rangeraptor.workerlifecycle.LifeCycleEventP
 import java.util.BitSet;
 import java.util.Collection;
 
+/**
+ * The seach context is used to hold search scoped instances and to pass these
+ * to who ever need them.
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
+ */
 public class SearchContext<T extends TripScheduleInfo> {
     private static final DebugLogger NOOP_DEBUG_LOGGER = (topic, message) -> { };
     /**
@@ -34,7 +40,6 @@ public class SearchContext<T extends TripScheduleInfo> {
     private final TuningParameters tuningParameters;
     private final RoundTracker roundTracker;
     private final WorkerPerformanceTimers timers;
-    private final boolean searchForward;
     private final DebugRequest<T> debugRequest;
     private final DebugHandlerFactory<T> debugFactory;
 
@@ -45,27 +50,29 @@ public class SearchContext<T extends TripScheduleInfo> {
             RangeRaptorRequest<T> request,
             TuningParameters tuningParameters,
             TransitDataProvider<T> transit,
-            WorkerPerformanceTimers timers,
-            boolean forward
+            WorkerPerformanceTimers timers
     ) {
         this.request = request;
         this.tuningParameters = tuningParameters;
         this.transit = transit;
-        this.searchForward = forward;
         // Note that it is the "new" request that is passed in.
-        this.calculator = createCalculator(this.request, tuningParameters, forward);
+        this.calculator = createCalculator(this.request, tuningParameters);
         this.roundTracker = new RoundTracker(nRounds(), request.numberOfAdditionalTransfers(), lifeCycle());
         this.timers = timers;
-        this.debugRequest = debugRequest(request, forward);
+        this.debugRequest = debugRequest(request);
         this.debugFactory = new DebugHandlerFactory<>(this.debugRequest, lifeCycle());
     }
 
+    public RangeRaptorRequest<T> request() {
+        return request;
+    }
+
     public Collection<TransferLeg> accessLegs() {
-        return searchForward ? request.accessLegs() : request.egressLegs();
+        return request.searchForward() ? request.accessLegs() : request.egressLegs();
     }
 
     public Collection<TransferLeg> egressLegs() {
-        return searchForward ? request.egressLegs() : request.accessLegs();
+        return request.searchForward() ? request.egressLegs() : request.accessLegs();
     }
 
     public int[] egressStops() {
@@ -132,14 +139,12 @@ public class SearchContext<T extends TripScheduleInfo> {
     /**
      * Create a new calculator depending on the desired search direction.
      */
-    private static TransitCalculator createCalculator(RangeRaptorRequest<?> r, TuningParameters t, boolean forward) {
-        return forward
-                ? new ForwardSearchTransitCalculator(r, t)
-                : new ReverseSearchTransitCalculator(r, t);
+    private static TransitCalculator createCalculator(RangeRaptorRequest<?> r, TuningParameters t) {
+        return r.searchForward() ? new ForwardSearchTransitCalculator(r, t) : new ReverseSearchTransitCalculator(r, t);
     }
 
-    private DebugRequest<T> debugRequest(RangeRaptorRequest<T> request, boolean forward) {
-        return forward ? request.debug() : request.mutate().reverseDebugRequest().debug();
+    private DebugRequest<T> debugRequest(RangeRaptorRequest<T> request) {
+        return request.searchForward() ? request.debug() : request.mutate().reverseDebugRequest().debug();
     }
 
     public int numberOfAdditionalTransfers() {

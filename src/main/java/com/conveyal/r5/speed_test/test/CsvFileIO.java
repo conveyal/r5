@@ -132,16 +132,21 @@ public class CsvFileIO {
     }
 
     private Result readExpectedResult(CsvReader csvReader) throws IOException {
-        return new Result(
-                csvReader.get("tcId"),
-                Integer.parseInt(csvReader.get("transfers")),
-                Integer.parseInt(csvReader.get("duration")),
-                Integer.parseInt(csvReader.get("cost")),
-                Integer.parseInt(csvReader.get("walkDistance")),
-                csvReader.get("startTime"),
-                csvReader.get("endTime"),
-                csvReader.get("details")
-        );
+        try {
+            return new Result(
+                    csvReader.get("tcId"),
+                    Integer.parseInt(csvReader.get("transfers")),
+                    Integer.parseInt(csvReader.get("duration")),
+                    Integer.parseInt(csvReader.get("cost")),
+                    Integer.parseInt(csvReader.get("walkDistance")),
+                    csvReader.get("startTime"),
+                    csvReader.get("endTime"),
+                    csvReader.get("details")
+            );
+        }
+        catch (RuntimeException e) {
+            throw new java.lang.IllegalStateException(e.getMessage() + ". Line: " + csvReader.getRawRecord(), e);
+        }
     }
 
     private boolean isCommentOrEmpty(String line) {

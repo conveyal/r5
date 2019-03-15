@@ -4,6 +4,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.BestNumberOfTransfers;
 
 import java.util.function.Consumer;
 
@@ -11,7 +12,7 @@ import java.util.function.Consumer;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-public final class Stops<T extends TripScheduleInfo> {
+public final class Stops<T extends TripScheduleInfo> implements BestNumberOfTransfers {
 
     private final StopArrivalState<T>[][] stops;
     private final RoundProvider roundProvider;
@@ -52,6 +53,16 @@ public final class Stops<T extends TripScheduleInfo> {
 
     public StopArrivalState<T> get(int round, int stop) {
         return stops[round][stop];
+    }
+
+    @Override
+    public int calculateMinNumberOfTransfers(int stop) {
+        for (int i = 0; i < stops.length; i++) {
+            if(stops[i][stop] != null) {
+                return i;
+            }
+        }
+        return unreachedMinNumberOfTransfers();
     }
 
     void setInitialTime(int stop, int time, int duration) {

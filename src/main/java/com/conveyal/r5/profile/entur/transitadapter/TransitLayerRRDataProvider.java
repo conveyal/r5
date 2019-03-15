@@ -78,9 +78,7 @@ public class TransitLayerRRDataProvider implements TransitDataProvider<TripSched
 
         if(it == null) return EMPTY_TRANSFER_ITERATOR;
 
-        it.reset();
-
-        return it;
+        return it.clone();
     }
 
     private static LightweightTransferIterator transfersAt(TIntList m, int walkSpeedMillimetersPerSecond) {

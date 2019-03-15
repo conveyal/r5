@@ -79,7 +79,9 @@ public class TestCase {
     }
 
     public void printResults() {
-        System.err.println(results.toString());
+        if(!results.actualResults().isEmpty()) {
+            System.err.println(results.toString());
+        }
     }
 
     /**

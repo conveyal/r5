@@ -1,4 +1,4 @@
-package com.conveyal.r5.speed_test;
+package com.conveyal.r5.speed_test.transit;
 
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetPath;
@@ -16,15 +16,15 @@ public class EgressAccessRouter {
     StreetRouter egressRouter;
     StreetRouter accessRouter;
 
-    TIntIntMap egressTimesToStopsInSeconds;
-    TIntIntMap accessTimesToStopsInSeconds;
+    public TIntIntMap egressTimesToStopsInSeconds;
+    public TIntIntMap accessTimesToStopsInSeconds;
 
-    EgressAccessRouter(TransportNetwork transportNetwork, ProfileRequest request) {
+    public EgressAccessRouter(TransportNetwork transportNetwork, ProfileRequest request) {
         this.transportNetwork = transportNetwork;
         this.request = request;
     }
 
-    void route() {
+    public void route() {
         TIMER.time(() -> {
             egressRouter = streetRoute(request, true);
             accessRouter = streetRoute(request, false);
@@ -34,14 +34,14 @@ public class EgressAccessRouter {
         });
     }
 
-    StreetPath accessPath(int boardStopIndex) {
+    public StreetPath accessPath(int boardStopIndex) {
         StreetRouter.State accessState = accessRouter.getStateAtVertex(
                 transportNetwork.transitLayer.streetVertexForStop.get(boardStopIndex)
         );
         return new StreetPath(accessState, transportNetwork, false);
     }
 
-    StreetPath egressPath(int alightStopIndex) {
+    public StreetPath egressPath(int alightStopIndex) {
         StreetRouter.State egressState = egressRouter.getStateAtVertex(
                 transportNetwork.transitLayer.streetVertexForStop.get(alightStopIndex)
         );

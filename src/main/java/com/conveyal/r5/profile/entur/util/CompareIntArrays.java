@@ -1,5 +1,6 @@
 package com.conveyal.r5.profile.entur.util;
 
+import java.util.Comparator;
 import java.util.function.IntFunction;
 
 
@@ -9,23 +10,67 @@ import java.util.function.IntFunction;
  * <p/>
  * The result is returned as a multi-line string.
  * <p/>
- * If the header line exceeds 2000 characters the comparison is aborted.
+ * If the header line exceeds 2000 characters and you compare all elements the comparison is aborted.
  * <p/>
  * Both regular numbers and time is supported. The time uses the {@link TimeUtils#timeToStrCompact(int)}
  * to print all times.
  */
 public class CompareIntArrays {
+    private final String label;
+    private final String aName;
+    private final String bName;
+    private final int unreached;
+    private final IntFunction<String> mapValue;
+    private final Comparator<Integer> comparator;
+
+    private String hh = "";
+    private String aValues = "";
+    private String bValues = "";
+    private int aLess = 0;
+    private int bLess = 0;
+    private int aNotReached = 0;
+    private int bNotReached = 0;
+
+    private CompareIntArrays(
+            String label,
+            String aName,
+            String bName,
+            int unreached,
+            IntFunction<String> mapValue,
+            Comparator<Integer> comparator
+    ) {
+        this.label = label;
+        this.aName = aName;
+        this.bName = bName;
+        this.unreached = unreached;
+        this.mapValue = mapValue;
+        this.comparator = comparator;
+    }
 
     public static String compareTime(
-            String label, String aName, int[] a, String bName, int[] b, int unreached, int[] stops
+            String label,
+            String aName,
+            int[] a,
+            String bName,
+            int[] b,
+            int unreached,
+            int[] stops,
+            Comparator<Integer> comparator
     ) {
-        return compare(label, aName, a, bName, b, TimeUtils::timeToStrCompact, unreached, stops);
+        return compare(label, aName, a, bName, b, TimeUtils::timeToStrCompact, comparator, unreached, stops);
     }
 
     public static String compare(
-            String label, String aName, int[] a, String bName, int[] b, int unreached, int[] stops
+            String label,
+            String aName,
+            int[] a,
+            String bName,
+            int[] b,
+            int unreached,
+            int[] stops,
+            Comparator<Integer> comparator
     ) {
-        return compare(label,aName, a, bName, b, Integer::toString, unreached, stops);
+        return compare(label,aName, a, bName, b, Integer::toString, comparator, unreached, stops);
     }
 
     private static String compare(
@@ -35,74 +80,89 @@ public class CompareIntArrays {
             String bName,
             int[] b,
             IntFunction<String> mapValue,
+            Comparator<Integer> comparator,
             int unreached,
             int[] stops
     ) {
-        State s = new State(label, aName, bName, unreached, mapValue);
+        CompareIntArrays s = new CompareIntArrays(label, aName, bName, unreached, mapValue, comparator);
+        int size;
 
-        if(stops != null) {
+        if(stops != null && stops.length > 0) {
+            size = stops.length;
             s.compare(a, b, stops);
         }
         else {
+            size = a.length;
             s.compareAll(a, b);
         }
-        return s.result();
+        return s.result(size);
     }
 
-    static class State {
-        private final String label;
-        private final String aName;
-        private final String bName;
-        private final int unreached;
-        private final IntFunction<String> mapValue;
-
-        private String hh = "";
-        private String r1 = "";
-        private String r2 = "";
-
-        State(String label, String aName, String bName, int unreached, IntFunction<String> mapValue) {
-            this.label = label;
-            this.aName = aName;
-            this.bName = bName;
-            this.unreached = unreached;
-            this.mapValue = mapValue;
+    private void compare(int[] a, int[] b, int[] index) {
+        for (int i : index) {
+            addResult(i, a[i], b[i]);
+            countDiff(a[i], b[i]);
         }
+    }
 
-        void compare(int[] a, int[] b, int[] index) {
-            for (int i : index) {
-                compare(i, a[i], b[i]);
-            }
-        }
+    private void compareAll(int[] a, int[] b) {
+        for (int i = 0; i < a.length; ++i) {
+            int u = a[i];
+            int v = b[i];
 
-        void compareAll(int[] a, int[] b) {
-            for (int i = 0; i < a.length; ++i) {
-                compare(i, a[i], b[i]);
-            }
-        }
-
-        void compare(int i, int v, int u) {
             if(u != v) {
-                if(hh.length() > 2000) {
-                    return;
+                if(hh.length() < 2000) {
+                    addResult(i, u, v);
                 }
-                hh += String.format("%8d ", i);
-                r1 += String.format("%8s ", toStr(u));
-                r2 += String.format("%8s ", toStr(v));
+                countDiff(a[i], b[i]);
             }
         }
-
-        String toStr(int v) {
-            return v == unreached ? "" : mapValue.apply(v);
+        if(hh.length() == 0) {
+            hh      += "ALL STOPS";
+            aValues += "  ARE";
+            bValues += " EQUAL";
         }
 
-        String result() {
-            int w = Math.max(4, Math.max(aName.length(), bName.length()));
-            String f = "%-" + w + "s  %s%n";
-            String result = label + '\n';
-            result += String.format(f, "Stop", hh);
-            result += String.format(f, aName, r1);
-            result += String.format(f, bName, r2);
-            return result;
+    }
+
+    private void countDiff(int a, int b) {
+        if(a == unreached) aNotReached++;
+        else if(b == unreached) bNotReached++;
+        else {
+            int c = comparator.compare(a, b);
+            if(c < 0) aLess++;
+            else if(c > 0) bLess++;
         }
+    }
+
+
+    private void addResult(int i, int u, int v) {
+        hh += String.format("%8d ", i);
+        aValues += String.format("%8s ", toStr(u));
+        bValues += String.format("%8s ", toStr(v));
+    }
+
+    private String toStr(int v) {
+        return v == unreached ? "" : mapValue.apply(v);
+    }
+
+    private String result(int size) {
+        int w = Math.max(4, Math.max(aName.length(), bName.length()));
+        String f = "%-" + w + "s  %s%n";
+        String result = label + '\n';
+        result += String.format(f, "Stop", hh);
+        result += String.format(f, aName, aValues);
+        result += String.format(f, bName, bValues);
+        if(diffTot() != 0) {
+            result += String.format(
+                    "Number of diffs: %d of %d, %s better: %d and not reached: %d, %s better: %d and not reached: %d.%n",
+                    diffTot(), size, aName, aLess, aNotReached, bName, bLess, bNotReached
+            );
+        }
+        return result;
+    }
+
+    private int diffTot() {
+        return aNotReached + aLess + bNotReached + bLess;
     }
 }

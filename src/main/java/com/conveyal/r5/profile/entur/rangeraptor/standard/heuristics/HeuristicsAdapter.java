@@ -2,8 +2,8 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard.heuristics;
 
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.BestNumberOfTransfers;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.BestTimes;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.transfers.BestNumberOfTransfers;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.view.Heuristics;
 import com.conveyal.r5.profile.entur.util.IntUtils;
@@ -21,8 +21,8 @@ public class HeuristicsAdapter implements Heuristics {
     private static final int NOT_SET = Integer.MAX_VALUE;
 
     private int originDepartureTime = -1;
-    private final BestTimes bestTimes;
-    private final BestNumberOfTransfers bestNumberOfTransfers;
+    private final BestTimes times;
+    private final BestNumberOfTransfers transfers;
     private final Collection<TransferLeg> transferLegs;
     private final TransitCalculator calculator;
 
@@ -30,14 +30,14 @@ public class HeuristicsAdapter implements Heuristics {
     private int minJourneyNumOfTransfers = NOT_SET;
 
     public HeuristicsAdapter(
-            BestTimes bestTimes,
-            BestNumberOfTransfers bestNumberOfTransfers,
+            BestTimes times,
+            BestNumberOfTransfers transfers,
             Collection<TransferLeg> transferLegs,
             TransitCalculator calculator,
             WorkerLifeCycle lifeCycle
     ) {
-        this.bestTimes = bestTimes;
-        this.bestNumberOfTransfers = bestNumberOfTransfers;
+        this.times = times;
+        this.transfers = transfers;
         this.transferLegs = transferLegs;
         this.calculator = calculator;
         lifeCycle.onSetupIteration(this::setUpIteration);
@@ -55,32 +55,32 @@ public class HeuristicsAdapter implements Heuristics {
 
     @Override
     public boolean reached(int stop) {
-        return bestTimes.isStopReached(stop);
+        return times.isStopReached(stop);
     }
 
     @Override
     public int bestTravelDuration(int stop) {
-        return calculator.duration(originDepartureTime, bestTimes.time(stop));
+        return calculator.duration(originDepartureTime, times.time(stop));
     }
 
     @Override
     public int[] bestTravelDurationToIntArray(int unreached) {
-        return toIntArray(unreached, size(), this::bestTravelDuration);
+        return toIntArray(size(), unreached, this::bestTravelDuration);
     }
 
     @Override
     public int bestNumOfTransfers(int stop) {
-        return bestNumberOfTransfers.minNumberOfTransfers(stop);
+        return transfers.calculateMinNumberOfTransfers(stop);
     }
 
     @Override
     public int[] bestNumOfTransfersToIntArray(int unreached) {
-        return toIntArray(unreached, size(), this::bestNumOfTransfers);
+        return toIntArray(size(), unreached, this::bestNumOfTransfers);
     }
 
     @Override
     public int size() {
-        return bestTimes.size();
+        return times.size();
     }
 
     @Override
@@ -108,7 +108,7 @@ public class HeuristicsAdapter implements Heuristics {
     /**
      * Convert one of heuristics to an int array.
      */
-    private int[] toIntArray(int unreached, int size, IntUnaryOperator supplier) {
+    private int[] toIntArray(int size, int unreached, IntUnaryOperator supplier) {
         int[] a = IntUtils.intArray(size, unreached);
         for (int i = 0; i < a.length; i++) {
             if(reached(i)) {

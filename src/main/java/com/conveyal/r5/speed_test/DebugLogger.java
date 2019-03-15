@@ -14,7 +14,6 @@ import org.apache.commons.lang.StringUtils;
 import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrCompact;
 
 class DebugLogger implements com.conveyal.r5.profile.entur.api.debug.DebugLogger {
-
     private static int NOT_SET = Integer.MIN_VALUE;
 
     private final boolean enableDebugLogging;
@@ -126,7 +125,7 @@ class DebugLogger implements com.conveyal.r5.profile.entur.api.debug.DebugLogger
 
         System.err.println();
         System.err.printf(
-                "%-9s | %-8s | %3s | %-5s | %-8s | %8s | %-20s | %s %n",
+                "%-9s | %-8s | %3s | %-5s | %-8s | %8s | %-24s | %s %n",
                 "ARRIVAL",
                 center("LEG", 8),
                 "RND",
@@ -140,7 +139,7 @@ class DebugLogger implements com.conveyal.r5.profile.entur.api.debug.DebugLogger
 
     private void print(String action, int round, String leg, int toStop, int toTime, int cost, String trip, String details) {
         System.err.printf(
-                "%-9s | %-8s | %2d  | %5s | %8s | %8d | %-20s | %s %n",
+                "%-9s | %-8s | %2d  | %5s | %8s | %8d | %-24s | %s %n",
                 center(action, 9),
                 center(leg, 8),
                 round,
@@ -171,7 +170,13 @@ class DebugLogger implements com.conveyal.r5.profile.entur.api.debug.DebugLogger
     @Override
     public void debug(DebugTopic topic, String message) {
         if(enableDebugLogging) {
-            System.err.printf("%-16s | %s%n", topic, message);
+            // We log to info - since debugging is controlled by the application
+            if(message.contains("\n")) {
+                System.err.printf("%16s\n%s", topic, message);
+            }
+            else {
+                System.err.printf("%-16s | %s%n", topic, message);
+            }
         }
     }
 }

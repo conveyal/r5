@@ -74,7 +74,7 @@ public class StdRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRa
 
         // attempt to alight if we're on board, done above the board search so that we don't check for alighting
         // when boarding
-        if (onTripIndex != -1) {
+        if (onTripIndex != NOT_SET) {
             state.transitToStop(
                     stop,
                     alightTime(stopPositionInPattern),

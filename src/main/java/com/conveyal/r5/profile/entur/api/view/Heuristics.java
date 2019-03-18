@@ -1,4 +1,4 @@
-package com.conveyal.r5.profile.entur.rangeraptor.view;
+package com.conveyal.r5.profile.entur.api.view;
 
 
 /**

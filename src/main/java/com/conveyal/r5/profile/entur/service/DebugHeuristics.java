@@ -1,9 +1,9 @@
 package com.conveyal.r5.profile.entur.service;
 
 import com.conveyal.r5.profile.entur.api.debug.DebugLogger;
-import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
-import com.conveyal.r5.profile.entur.rangeraptor.view.Heuristics;
+import com.conveyal.r5.profile.entur.api.request.DebugRequest;
+import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
+import com.conveyal.r5.profile.entur.api.view.Heuristics;
 import com.conveyal.r5.profile.entur.util.CompareIntArrays;
 import com.conveyal.r5.profile.entur.util.IntUtils;
 
@@ -20,23 +20,25 @@ public class DebugHeuristics {
     private final String aName;
     private final String bName;
     private final DebugLogger logger;
+    private final int[] stops;
 
-    private DebugHeuristics(String aName, String bName, DebugLogger logger) {
+    private DebugHeuristics(String aName, String bName, DebugRequest<?> debugRequest) {
         this.aName = aName;
         this.bName = bName;
-        this.logger = logger;
+        this.logger = debugRequest.logger();
+        this.stops = IntUtils.concat(debugRequest.stops(), debugRequest.path());
     }
 
-    public static <T extends TripScheduleInfo> void debug(
+    public static void debug(
             String aName,
             Heuristics h1,
             String bName,
             Heuristics h2,
-            SearchContext<T> ctx
+            RangeRaptorRequest<?> request
     ) {
-        if (ctx.debugLogger().isEnabled(HEURISTICS)) {
-            int[] stops = IntUtils.concat(ctx.debugRequest().stops(), ctx.debugRequest().path());
-            new DebugHeuristics(aName, bName, ctx.debugLogger()).debug(h1, h2, stops, ctx.request().searchForward());
+        DebugRequest<?> debug = request.debug();
+        if (debug.logger().isEnabled(HEURISTICS)) {
+            new DebugHeuristics(aName, bName, debug).debug(h1, h2, request.searchForward());
         }
     }
 
@@ -44,7 +46,7 @@ public class DebugHeuristics {
         logger.debug(HEURISTICS, message);
     }
 
-    private void debug(Heuristics fwdHeur, Heuristics revHeur, int[] stops, boolean forward) {
+    private void debug(Heuristics fwdHeur, Heuristics revHeur, boolean forward) {
         log(CompareIntArrays.compare(
                 "NUMBER OF TRANSFERS",
                 aName, fwdHeur.bestNumOfTransfersToIntArray(UNREACHED),

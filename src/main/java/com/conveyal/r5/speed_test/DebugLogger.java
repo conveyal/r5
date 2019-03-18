@@ -172,7 +172,7 @@ class DebugLogger implements com.conveyal.r5.profile.entur.api.debug.DebugLogger
         if(enableDebugLogging) {
             // We log to info - since debugging is controlled by the application
             if(message.contains("\n")) {
-                System.err.printf("%16s\n%s", topic, message);
+                System.err.printf("%s\n%s", topic, message);
             }
             else {
                 System.err.printf("%-16s | %s%n", topic, message);

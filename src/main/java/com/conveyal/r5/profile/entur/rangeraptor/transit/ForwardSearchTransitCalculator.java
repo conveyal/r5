@@ -1,6 +1,6 @@
 package com.conveyal.r5.profile.entur.rangeraptor.transit;
 
-import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
+import com.conveyal.r5.profile.entur.api.request.SearchParams;
 import com.conveyal.r5.profile.entur.api.request.TuningParameters;
 import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
@@ -20,13 +20,13 @@ final class ForwardSearchTransitCalculator implements TransitCalculator {
     private final int latestAcceptableArrivalTime;
     private final int iterationStep;
 
-    ForwardSearchTransitCalculator(RangeRaptorRequest<?> r, TuningParameters t) {
+    ForwardSearchTransitCalculator(SearchParams s, TuningParameters t) {
         this(
                 t.scheduledTripBinarySearchThreshold(),
-                r.boardSlackInSeconds(),
-                r.earliestDepartureTime(),
-                r.searchWindowInSeconds(),
-                r.latestArrivalTime(),
+                s.boardSlackInSeconds(),
+                s.earliestDepartureTime(),
+                s.searchWindowInSeconds(),
+                s.latestArrivalTime(),
                 t.iterationDepartureStepInSeconds()
         );
     }

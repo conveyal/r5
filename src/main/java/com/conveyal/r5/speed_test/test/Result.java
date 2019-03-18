@@ -109,7 +109,7 @@ class Result implements Comparable<Result> {
         );
     }
 
-    private List<Integer> parseStops(String details) {
+    private static List<Integer> parseStops(String details) {
         List<Integer> stops = new ArrayList<>();
         // WALK 0:44 - 87540 - BUS NX1 06:25 08:50 - 87244 - WALK 0:20
         Matcher m = STOPS_PATTERN.matcher(details);

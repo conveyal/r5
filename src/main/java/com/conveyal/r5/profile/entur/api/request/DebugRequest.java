@@ -54,27 +54,27 @@ public class DebugRequest<T extends TripScheduleInfo> {
 
     private final List<Integer> stops;
     private final List<Integer> path;
-    private final int pathStartAtStopIndex;
+    private final int debugPathFromStopIndex;
     private final Consumer<DebugEvent<ArrivalView<T>>> stopArrivalListener;
     private final Consumer<DebugEvent<Path<T>>> pathFilteringListener;
-    private final DebugLogger debugLogger;
+    private final DebugLogger logger;
 
     private DebugRequest() {
         stops = Collections.emptyList();
         path = Collections.emptyList();
-        pathStartAtStopIndex = 0;
+        debugPathFromStopIndex = 0;
         stopArrivalListener = null;
         pathFilteringListener = null;
-        debugLogger = null;
+        logger = (topic, message) -> {};
     }
 
-    DebugRequest(RequestBuilder<T> builder) {
-        this.stops = Collections.unmodifiableList(builder.debugStops());
-        this.path = Collections.unmodifiableList(builder.debugPath());
-        this.pathStartAtStopIndex = builder.debugPathStartAtStopIndex();
+    DebugRequest(DebugRequestBuilder<T> builder) {
+        this.stops = Collections.unmodifiableList(builder.stops());
+        this.path = Collections.unmodifiableList(builder.path());
+        this.debugPathFromStopIndex = builder.debugPathFromStopIndex();
         this.stopArrivalListener = builder.stopArrivalListener();
         this.pathFilteringListener = builder.pathFilteringListener();
-        this.debugLogger = builder.debugLogger();
+        this.logger = builder.logger();
     }
 
 
@@ -94,11 +94,11 @@ public class DebugRequest<T extends TripScheduleInfo> {
 
     /**
      * The first stop to start recording debug information in the path specified in this request.
-     * This will filter away all events in the beginning of the path reducing the number of events significantly;
-     * hence make it easier to inspect events towards the end of the trip.
+     * This will filter away all events in the beginning of the path reducing the number of events
+     * significantly; Hence make it easier to inspect events towards the end of the trip.
      */
-    public int pathStartAtStopIndex() {
-        return pathStartAtStopIndex;
+    public int debugPathFromStopIndex() {
+        return debugPathFromStopIndex;
     }
 
     /**
@@ -119,7 +119,7 @@ public class DebugRequest<T extends TripScheduleInfo> {
      * Path debug event listener
      */
     public DebugLogger logger() {
-        return debugLogger;
+        return logger;
     }
 
     @Override
@@ -127,10 +127,10 @@ public class DebugRequest<T extends TripScheduleInfo> {
         return "DebugRequest{" +
                 "stops=" + stops +
                 ", path=" + path +
-                ", pathStartAtStopIndex=" + pathStartAtStopIndex +
+                ", startAtStopIndex=" + debugPathFromStopIndex +
                 ", stopArrivalListener=" + enabled(stopArrivalListener) +
                 ", pathFilteringListener=" + enabled(pathFilteringListener) +
-                ", logger=" + enabled(debugLogger) +
+                ", logger=" + enabled(logger) +
                 '}';
     }
 
@@ -143,13 +143,15 @@ public class DebugRequest<T extends TripScheduleInfo> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         DebugRequest<?> that = (DebugRequest<?>) o;
-        return pathStartAtStopIndex == that.pathStartAtStopIndex &&
+        return debugPathFromStopIndex == that.debugPathFromStopIndex &&
                 Objects.equals(stops, that.stops) &&
                 Objects.equals(path, that.path);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(stops, path, pathStartAtStopIndex);
+        return Objects.hash(stops, path, debugPathFromStopIndex);
     }
+
+
 }

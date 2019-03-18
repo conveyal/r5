@@ -2,8 +2,9 @@ package com.conveyal.r5.profile.entur.rangeraptor.transit;
 
 import com.conveyal.r5.profile.entur.api.debug.DebugLogger;
 import com.conveyal.r5.profile.entur.api.request.DebugRequest;
-import com.conveyal.r5.profile.entur.api.request.MultiCriteriaCostFactors;
+import com.conveyal.r5.profile.entur.api.request.McCostParams;
 import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
+import com.conveyal.r5.profile.entur.api.request.SearchParams;
 import com.conveyal.r5.profile.entur.api.request.TuningParameters;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
@@ -57,7 +58,7 @@ public class SearchContext<T extends TripScheduleInfo> {
         this.transit = transit;
         // Note that it is the "new" request that is passed in.
         this.calculator = createCalculator(this.request, tuningParameters);
-        this.roundTracker = new RoundTracker(nRounds(), request.numberOfAdditionalTransfers(), lifeCycle());
+        this.roundTracker = new RoundTracker(nRounds(), request.searchParams().numberOfAdditionalTransfers(), lifeCycle());
         this.timers = timers;
         this.debugRequest = debugRequest(request);
         this.debugFactory = new DebugHandlerFactory<>(this.debugRequest, lifeCycle());
@@ -68,11 +69,11 @@ public class SearchContext<T extends TripScheduleInfo> {
     }
 
     public Collection<TransferLeg> accessLegs() {
-        return request.searchForward() ? request.accessLegs() : request.egressLegs();
+        return request.searchForward() ? request.searchParams().accessLegs() : request.searchParams().egressLegs();
     }
 
     public Collection<TransferLeg> egressLegs() {
-        return request.searchForward() ? request.egressLegs() : request.accessLegs();
+        return request.searchForward() ? request.searchParams().egressLegs() : request.searchParams().accessLegs();
     }
 
     public int[] egressStops() {
@@ -96,10 +97,10 @@ public class SearchContext<T extends TripScheduleInfo> {
     }
 
     public CostCalculator costCalculator() {
-        MultiCriteriaCostFactors f = request.multiCriteriaCostFactors();
+        McCostParams f = request.multiCriteriaCostFactors();
         return new CostCalculator(
                 f.boardCost(),
-                request.boardSlackInSeconds(),
+                request.searchParams().boardSlackInSeconds(),
                 f.walkReluctanceFactor(),
                 f.waitReluctanceFactor()
         );
@@ -128,27 +129,16 @@ public class SearchContext<T extends TripScheduleInfo> {
         return tuningParameters.maxNumberOfTransfers() + 1;
     }
 
-    public void setStopFilter(BitSet stopsFilter) {
-        this.stopsFilter = stopsFilter;
-    }
-
-    public BitSet stopsFilter() {
-        return stopsFilter;
-    }
-
     /**
      * Create a new calculator depending on the desired search direction.
      */
     private static TransitCalculator createCalculator(RangeRaptorRequest<?> r, TuningParameters t) {
-        return r.searchForward() ? new ForwardSearchTransitCalculator(r, t) : new ReverseSearchTransitCalculator(r, t);
+        SearchParams s = r.searchParams();
+        return r.searchForward() ? new ForwardSearchTransitCalculator(s, t) : new ReverseSearchTransitCalculator(s, t);
     }
 
     private DebugRequest<T> debugRequest(RangeRaptorRequest<T> request) {
-        return request.searchForward() ? request.debug() : request.mutate().reverseDebugRequest().debug();
-    }
-
-    public int numberOfAdditionalTransfers() {
-        return request.numberOfAdditionalTransfers();
+        return request.searchForward() ? request.debug() : request.mutate().debug().reverseDebugRequest().build();
     }
 
     public RoundProvider roundProvider() {

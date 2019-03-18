@@ -1,11 +1,11 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard.heuristics;
 
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
+import com.conveyal.r5.profile.entur.api.view.Heuristics;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.BestNumberOfTransfers;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.BestTimes;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
-import com.conveyal.r5.profile.entur.rangeraptor.view.Heuristics;
 import com.conveyal.r5.profile.entur.util.IntUtils;
 
 import java.util.Collection;

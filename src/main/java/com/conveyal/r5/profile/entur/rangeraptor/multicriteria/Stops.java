@@ -5,6 +5,7 @@ import com.conveyal.r5.profile.entur.api.debug.DebugLogger;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.view.Heuristics;
 import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.DebugHandlerFactory;
@@ -14,7 +15,6 @@ import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic.Heurist
 import com.conveyal.r5.profile.entur.rangeraptor.path.DestinationArrivalPaths;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.CostCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
-import com.conveyal.r5.profile.entur.rangeraptor.view.Heuristics;
 
 import java.util.Collection;
 import java.util.stream.Collectors;

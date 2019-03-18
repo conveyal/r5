@@ -32,7 +32,7 @@ public class CommandLineOpts {
     static final String DEBUG = "D";
     static final String DEBUG_REQUEST = "R";
     static final String DEBUG_STOPS = "S";
-    static final String DEBUG_TRIP = "T";
+    static final String DEBUG_PATH = "P";
 
     public CommandLineOpts(String[] args) {
         Options options = speedTestOptions();
@@ -64,7 +64,7 @@ public class CommandLineOpts {
         options.addOption(ROOT_DIR, "dir", true, "The directory where network and input files are located. (Optional)");
         options.addOption(HELP, "help", false, "Print all command line options, then exit. (Optional)");
         options.addOption(DEBUG_STOPS, "debugStops", true, "A coma separated list of stops to debug.");
-        options.addOption(DEBUG_TRIP, "debugTrip", true, "A coma separated list of stops representing a trip/path to debug. " +
+        options.addOption(DEBUG_PATH, "debugPath", true, "A coma separated list of stops representing a trip/path to debug. " +
                 "Use a '*' to indicate where to start debugging. For example '1,*2,3' will print event at stop 2 and 3, " +
                 "but not stop 1 for all trips starting with the given stop sequence.");
         options.addOption(DEBUG_REQUEST, "debugRequest", false, "Debug request.");
@@ -92,15 +92,15 @@ public class CommandLineOpts {
         return parseCSVToInt(DEBUG_STOPS);
     }
 
-    public List<Integer> debugTrip() {
-        return parseCSVList(DEBUG_TRIP).stream()
+    public List<Integer> debugPath() {
+        return parseCSVList(DEBUG_PATH).stream()
                 .map(it -> it.startsWith("*") ? it.substring(1) : it)
                 .map(Integer::valueOf)
                 .collect(Collectors.toList());
     }
 
-    public int debugTripAtStopIndex() {
-        List<String> stops = parseCSVList(DEBUG_TRIP);
+    public int debugPathFromStopIndex() {
+        List<String> stops = parseCSVList(DEBUG_PATH);
         for (int i = 0; i < stops.size(); ++i) {
             if (stops.get(i).startsWith("*")) return i;
         }

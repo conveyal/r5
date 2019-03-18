@@ -37,7 +37,7 @@ class RequestSupport {
 
     private RequestSupport() { }
 
-    static ProfileRequest buildDefaultRequest(TestCase testCase, SpeedTestCmdLineOpts opts) {
+    static ProfileRequest buildProfileRequest(TestCase testCase, SpeedTestCmdLineOpts opts) {
         ProfileRequest request = new ProfileRequest();
 
         request.accessModes = request.egressModes = request.directModes = EnumSet.of(LegMode.WALK);
@@ -64,61 +64,80 @@ class RequestSupport {
             SpeedTestProfile profile,
             int latestArrivalTime,
             int numOfExtraTransfers,
+            boolean oneIterationOnly,
             EgressAccessRouter streetRouter
     ) {
         // Add half of the extra time to departure and half to the arrival
         int expandDeltaSeconds = EXPAND_SEARCH_WINDOW_HOURS * 3600/2;
 
 
-        RequestBuilder<TripSchedule> builder = new RequestBuilder<TripSchedule>()
+        RequestBuilder<TripSchedule> builder = new RequestBuilder<TripSchedule>();
+        builder.searchParams()
                 .earliestDepartureTime(request.fromTime - expandDeltaSeconds)
                 .latestArrivalTime(latestArrivalTime + expandDeltaSeconds)
                 .searchWindowInSeconds(request.toTime - request.fromTime + 2 * expandDeltaSeconds)
-                .numberOfAdditionalTransfers(numOfExtraTransfers)
-                .enableOptimization(Optimization.PARALLEL)
-                ;
+                .numberOfAdditionalTransfers(numOfExtraTransfers);
+
+        if(oneIterationOnly) {
+            builder.searchParams().searchOneIterationOnly();
+        }
+
+        builder.enableOptimization(Optimization.PARALLEL);
 
         builder.profile(profile.raptorProfile);
         for (Optimization it : profile.optimizations) {
             builder.enableOptimization(it);
         }
         if(profile.raptorProfile.isOneOf(RangeRaptorProfile.NO_WAIT_STD, RangeRaptorProfile.NO_WAIT_BEST_TIME)) {
-            builder.searchWindowInSeconds(0);
+            builder.searchParams().searchOneIterationOnly();
         }
 
         builder.searchDirection(profile.forward);
 
-        addStopTimes(streetRouter.accessTimesToStopsInSeconds, builder::addAccessStop);
-        addStopTimes(streetRouter.egressTimesToStopsInSeconds, builder::addEgressStop);
+        addAccessEgressStopArrivals(streetRouter.accessTimesToStopsInSeconds, builder.searchParams()::addAccessStop);
+        addAccessEgressStopArrivals(streetRouter.egressTimesToStopsInSeconds, builder.searchParams()::addEgressStop);
 
         addDebugOptions(builder, opts);
 
-        return builder.build();
+        RangeRaptorRequest<TripSchedule> req = builder.build();
+
+        if (opts.debugRequest()) {
+            System.err.println("-> Request: " + req);
+        }
+
+        return req;
     }
 
 
-    private static void addStopTimes(TIntIntMap timesToStopsInSeconds, Consumer<AccessEgressLeg> addStop) {
+    private static void addAccessEgressStopArrivals(TIntIntMap timesToStopsInSeconds, Consumer<AccessEgressLeg> addStop) {
         for(TIntIntIterator it = timesToStopsInSeconds.iterator(); it.hasNext(); ) {
             it.advance();
             addStop.accept(new AccessEgressLeg(it.key(), it.value()));
         }
     }
 
-    private static void addDebugOptions(com.conveyal.r5.profile.entur.api.request.RequestBuilder<TripSchedule> builder, CommandLineOpts opts) {
+    private static void addDebugOptions(RequestBuilder<TripSchedule> builder, CommandLineOpts opts) {
         List<Integer> stops = opts.debugStops();
-        List<Integer> trip = opts.debugTrip();
+        List<Integer> path = opts.debugPath();
 
-        if(!opts.debug() && stops.isEmpty() && trip.isEmpty()) {
+        boolean debugLoggerEnabled = opts.debugRequest();
+
+        if(opts instanceof SpeedTestCmdLineOpts) {
+            debugLoggerEnabled = debugLoggerEnabled || ((SpeedTestCmdLineOpts)opts).compareHeuristics();
+        }
+
+        if(!debugLoggerEnabled && stops.isEmpty() && path.isEmpty()) {
             return;
         }
-        DebugLogger logger = new DebugLogger(opts.debug());
 
-        builder
+        DebugLogger logger = new DebugLogger(debugLoggerEnabled);
+
+        builder.debug()
                 .stopArrivalListener(logger::stopArrivalLister)
                 .pathFilteringListener(logger::pathFilteringListener)
-                .debugLogger(logger)
-                .debugPath(trip)
-                .debugPathStartAtStopIndex(opts.debugTripAtStopIndex());
-        stops.forEach(builder::debugStop);
+                .logger(logger)
+                .debugPathFromStopIndex(opts.debugPathFromStopIndex());
+        builder.debug().path().addAll(path);
+        builder.debug().stops().addAll(stops);
     }
 }

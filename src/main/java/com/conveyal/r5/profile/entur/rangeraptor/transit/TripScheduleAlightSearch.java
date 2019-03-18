@@ -134,7 +134,7 @@ public class TripScheduleAlightSearch<T extends TripScheduleInfo> implements Tri
 
             final int arrival = trip.arrival(stopPositionInPattern);
 
-            if (arrival < latestAlightTime) {
+            if (arrival <= latestAlightTime) {
                 candidateTrip = trip;
                 candidateTripIndex = i;
             } else {
@@ -163,7 +163,7 @@ public class TripScheduleAlightSearch<T extends TripScheduleInfo> implements Tri
 
             final int arrival = trip.arrival(stopPositionInPattern);
 
-            if (arrival < latestAlightTime) {
+            if (arrival <= latestAlightTime) {
                 candidateTrip = trip;
                 candidateTripIndex = i;
                 return true;
@@ -193,7 +193,7 @@ public class TripScheduleAlightSearch<T extends TripScheduleInfo> implements Tri
 
             int arrival = trip.arrival(stopPositionInPattern);
 
-            if (arrival < latestAlightTime) {
+            if (arrival <= latestAlightTime) {
                 lower = m;
             }
             else {

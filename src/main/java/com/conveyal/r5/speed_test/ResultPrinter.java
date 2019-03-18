@@ -45,7 +45,8 @@ class ResultPrinter {
 
     public static void logSingleTestResult(
             SpeedTestProfile profile,
-            List<Integer> numOfPathsFound, int sample,
+            List<Integer> numOfPathsFound,
+            int sample,
             int nSamples,
             int nSuccess,
             int tcSize,

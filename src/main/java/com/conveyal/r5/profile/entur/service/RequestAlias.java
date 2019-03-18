@@ -7,7 +7,8 @@ import static com.conveyal.r5.profile.entur.api.request.Optimization.PARETO_CHEC
 import static com.conveyal.r5.profile.entur.api.request.Optimization.TRANSFERS_STOP_FILTER;
 
 public class RequestAlias {
-    public static String alias(RangeRaptorRequest<?> request, boolean multithreaded) {
+    public static String alias(RangeRaptorRequest<?> request, boolean serviceMultithreaded) {
+        boolean multithreaded = serviceMultithreaded && request.optimizationEnabled(PARALLEL);
         String alias = request.profile().abbreviation();
 
         if (request.searchInReverse()) {

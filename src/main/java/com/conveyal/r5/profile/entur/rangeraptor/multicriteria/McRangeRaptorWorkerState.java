@@ -5,6 +5,7 @@ import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.view.Heuristics;
 import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerLifeCycle;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
@@ -14,7 +15,6 @@ import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.Transfer
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.CostCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
-import com.conveyal.r5.profile.entur.rangeraptor.view.Heuristics;
 import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
 import java.util.ArrayList;
@@ -34,7 +34,7 @@ import java.util.List;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements WorkerState<T> {
+final public class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements WorkerState<T> {
 
     private final Stops<T> stops;
     private final List<AbstractStopArrival<T>> arrivalsCache = new ArrayList<>();
@@ -46,7 +46,7 @@ final class McRangeRaptorWorkerState<T extends TripScheduleInfo> implements Work
     /**
      * create a RaptorState for a network with a particular number of stops, and a given maximum duration
      */
-    McRangeRaptorWorkerState(
+    public McRangeRaptorWorkerState(
             int nStops,
             double relaxCostAtDestinationArrival,
             Collection<TransferLeg> egressLegs,

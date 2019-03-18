@@ -54,10 +54,8 @@ class ItineraryResultMapper {
                 TimeUtils.timeToStrLong(itinerary.endTime),
                 legsAsCompactString(itinerary)
         );
-        int lastStop=-1;
-        for (Leg it : itinerary.legs) {
-            lastStop = addStops(result, it.from.stopIndex, it.to.stopIndex, lastStop);
 
+        for (Leg it : itinerary.legs) {
             if (it.isTransitLeg()) {
                 result.agencies.add(AGENCY_NAMES_SHORT.getOrDefault(it.agencyName, it.agencyName));
                 result.modes.add(it.mode);
@@ -65,16 +63,5 @@ class ItineraryResultMapper {
             }
         }
         return result;
-    }
-
-    private static int addStops(Result result, Integer fromStop, Integer toStop, int lastStop) {
-        if(fromStop != null && fromStop >=0 && fromStop != lastStop) {
-            result.stops.add(fromStop);
-        }
-        if(toStop != null && toStop >=0) {
-            result.stops.add(toStop);
-            return toStop;
-        }
-        return -1;
     }
 }

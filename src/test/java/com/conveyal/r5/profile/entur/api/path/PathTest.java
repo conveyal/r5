@@ -46,8 +46,13 @@ public class PathTest {
     }
 
     @Test
+    public void cost() {
+        Assert.assertEquals(600, subject.cost());
+    }
+
+    @Test
     public void testToString() {
-        Assert.assertEquals("Walk 5:00 > 1 > Transit 10:00-10:35 > 2 > Walk 3:00 > 3 > Transit 11:00-11:23 > 4 > Transit 11:40-11:53 > 5 > Walk 7:00", subject.toString());
+        Assert.assertEquals("Walk 5:00 > 1 > Transit 10:00-10:35 > 2 > Walk 3:00 > 3 > Transit 11:00-11:23 > 4 > Transit 11:40-11:53 > 5 > Walk 7:00 (tot: 2:07:00, cost: 600)", subject.toString());
     }
 
     @Test

@@ -6,6 +6,7 @@ import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.view.Worker;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.RoundTracker;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
@@ -67,7 +68,6 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
      */
     private final RoundTracker roundTracker;
 
-
     private final TransitDataProvider<T> transit;
 
     private final TransitCalculator calculator;
@@ -97,7 +97,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
         // We do a cast here to avoid exposing the round tracker  and the life cycle publisher to "everyone"
         // by providing access to it in the context.
         this.roundTracker = (RoundTracker) context.roundProvider();
-        this.stopsFilter =  context.stopsFilter();
+        this.stopsFilter =  context.request().searchParams().stopFilter();
         this.lifeCycle = context.createLifeCyclePublisher();
     }
 
@@ -184,7 +184,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
 
             // NB since we have transfer limiting not bothering to cut off search when there are no more transfers
             // as that will be rare and complicates the code
-            timerByMinuteScheduleSearch().time(this::calculateTransitForRound);
+            timerByMinuteScheduleSearch().time(this::findAllTransitForRound);
 
             timerByMinuteTransfers().time(this::transfersForRound);
 
@@ -220,7 +220,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
     /**
      * Perform a scheduled search
      */
-    private void calculateTransitForRound() {
+    private void findAllTransitForRound() {
         IntIterator stops = state.stopsTouchedPreviousRound();
         Iterator<? extends TripPatternInfo<T>> patternIterator = transit.patternIterator(stops);
 

@@ -1,10 +1,10 @@
 package com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.view.Heuristics;
 import com.conveyal.r5.profile.entur.rangeraptor.RoundProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.path.DestinationArrivalPaths;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.CostCalculator;
-import com.conveyal.r5.profile.entur.rangeraptor.view.Heuristics;
 
 /**
  * A wrapper around {@link Heuristics} to cash elements to avoid recalculation

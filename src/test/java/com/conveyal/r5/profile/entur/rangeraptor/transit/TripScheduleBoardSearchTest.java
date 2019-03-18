@@ -31,7 +31,7 @@ public class TripScheduleBoardSearchTest {
      * The TripScheduleBoardSearch should handle the above trip variations. The point here
      * is that trip B, S and T is in order at stop 1, but not at stop 2.
      */
-    private static final int BOARD_SLACK = 10;
+
 
     /**
      * We use a relatively small prime number as the binary search threshold. This make it simpler to
@@ -79,15 +79,14 @@ public class TripScheduleBoardSearchTest {
 
     @Test
     public void noTripFoundAfterLastTripInServiceDeparture() {
-        // Given:
-        //   Trip B is the last trip in service, T depart from stop 1 after B and S depart from stop 2 after B,
-        //   but S and T is NOT in service.
         // When:
-        //   We search the latest possible arrival time that is not boarding trip B
+        //   Searching for a trip that board after the last trip i service (Trip B)
         // Then:
         //   No trips are expected as a result
+        // Stop 1: (Trip T depart after B, but is not in service)
         searchForTrip(latestTimeNotBoardingAt(TIME_B0), STOP_1)
                 .assertNoTripFound();
+        // Stop 1: (Trip S depart after B, but is not in service)
         searchForTrip(latestTimeNotBoardingAt(TIME_B1), STOP_2)
                 .assertNoTripFound();
     }
@@ -163,7 +162,7 @@ public class TripScheduleBoardSearchTest {
     }
 
     @Test
-    public void findTripWithGivenTripIndexUpperBoundButNotSkipedTrips() {
+    public void findTripWithGivenTripIndexUpperBoundButNotSkippedTrips() {
         // Given the default pattern with the following trips: A, S, B, T
 
         // STOP 1
@@ -174,18 +173,18 @@ public class TripScheduleBoardSearchTest {
                 .withIndex(TRIP_B_INDEX);
 
         // But NOT when `tripIndexUpperBound` equals trip B´s index
-        searchForTrip(TIME_A0, STOP_1, TRIP_B_INDEX)
+        searchForTrip(latestTimeNotBoardingAt(TIME_A0), STOP_1, TRIP_B_INDEX)
                 .assertNoTripFound();
 
         // STOP 2
         // Then we expect to find trip B when `tripIndexUpperBound` is larger than B´s index
-        searchForTrip(TIME_A1, STOP_2, TRIP_B_INDEX + 1)
+        searchForTrip(latestTimeNotBoardingAt(TIME_A1), STOP_2, TRIP_B_INDEX + 1)
                 .assertTripFound()
                 .withBoardTime(TIME_B1)
                 .withIndex(TRIP_B_INDEX);
 
         // But NOT when `tripIndexUpperBound` equals trip B´s index
-        searchForTrip(TIME_A1, STOP_2, TRIP_B_INDEX)
+        searchForTrip(latestTimeNotBoardingAt(TIME_A1), STOP_2, TRIP_B_INDEX)
                 .assertNoTripFound();
     }
 
@@ -290,13 +289,14 @@ public class TripScheduleBoardSearchTest {
         );
     }
 
-    private int latestTimeNotBoardingAt(int boardTime) {
+    private int latestTimeToBoardAt(int boardTime) {
         return boardTime;
     }
 
-    private int latestTimeToBoardAt(int boardTime) {
-        return latestTimeNotBoardingAt(boardTime) - 1;
+    private int latestTimeNotBoardingAt(int boardTime) {
+        return boardTime + 1;
     }
+
 
     private static void addNTimes(List<TestTripSchedule> trips, TestTripSchedule tripS, int n) {
         for (int i = 0; i < n; i++) {

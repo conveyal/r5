@@ -80,14 +80,14 @@ public class TripScheduleAlightSearchTest {
     @Test
     public void noTripFoundBeforeFirstTripInServiceArrival() {
         // When:
-        //   Searching for a trip that alight before A (first trip i service)
+        //   Searching for a trip that alight before the first trip i service (Trip A)
         // Then:
         //   No trips are expected as a result
-        // Stop 1:
-        searchForTrip(TIME_A0, STOP_1)
+        // Stop 1: (Trip S alight before A, but is not in service)
+        searchForTrip(earliestTimeNotAlightingAt(TIME_A0), STOP_1)
                 .assertNoTripFound();
-        // Stop 2:
-        searchForTrip(TIME_A1, STOP_2)
+        // Stop 2: (Trip T alight before A, but is not in service)
+        searchForTrip(earliestTimeNotAlightingAt(TIME_A1), STOP_2)
                 .assertNoTripFound();
     }
 
@@ -106,12 +106,12 @@ public class TripScheduleAlightSearchTest {
 
     @Test
     public void findLastTripWithTheMinimumPossibleSlack() {
-        searchForTrip(TIME_B0 + 1, STOP_1)
+        searchForTrip(earliestTimeAlightingAt(TIME_B0), STOP_1)
                 .assertTripFound()
                 .withIndex(TRIP_B_INDEX)
                 .withAlightTime(TIME_B0);
 
-        searchForTrip(TIME_B1 + 1, STOP_2)
+        searchForTrip(earliestTimeAlightingAt(TIME_B1), STOP_2)
                 .assertTripFound()
                 .withIndex(TRIP_B_INDEX)
                 .withAlightTime(TIME_B1);
@@ -121,14 +121,14 @@ public class TripScheduleAlightSearchTest {
     public void findLastAvailableTripButNotSkippedTrips() {
         // At stop 1
         // Search for the last trip before trip B; expect Trip A
-        searchForTrip(TIME_B0, STOP_1)
+        searchForTrip(earliestTimeNotAlightingAt(TIME_B0), STOP_1)
                 .assertTripFound()
                 .withIndex(TRIP_A_INDEX)
                 .withAlightTime(TIME_A0);
 
         // At stop 2
         // Search for the last trip before trip B; expect Trip A
-        searchForTrip(TIME_B1, STOP_2)
+        searchForTrip(earliestTimeNotAlightingAt(TIME_B1), STOP_2)
                 .assertTripFound()
                 .withIndex(TRIP_A_INDEX)
                 .withAlightTime(TIME_A1);
@@ -162,29 +162,29 @@ public class TripScheduleAlightSearchTest {
     }
 
     @Test
-    public void findTripWithGivenTripIndexLowerBoundButNotSkipedTrips() {
+    public void findTripWithGivenTripIndexLowerBoundButNotSkippedTrips() {
         // Given the default pattern with the following trips: S, A, T, B
 
         // STOP 1
         // Then we expect to find trip A when `tripIndexLowerBound` is smaller than A´s index
-        searchForTrip(TIME_B0, STOP_1, TRIP_A_INDEX - 1)
+        searchForTrip(earliestTimeNotAlightingAt(TIME_B0), STOP_1, TRIP_A_INDEX - 1)
                 .assertTripFound()
                 .withAlightTime(TIME_A0)
                 .withIndex(TRIP_A_INDEX);
 
         // But NOT when `tripIndexLowerBound` equals trip A´s index
-        searchForTrip(TIME_B0, STOP_1, TRIP_A_INDEX)
+        searchForTrip(earliestTimeNotAlightingAt(TIME_B0), STOP_1, TRIP_A_INDEX)
                 .assertNoTripFound();
 
         // STOP 2
         // Then we expect to find trip A when `tripIndexLowerBound` is smaller than A´s index
-        searchForTrip(TIME_B1, STOP_2, TRIP_A_INDEX - 1)
+        searchForTrip(earliestTimeNotAlightingAt(TIME_B1), STOP_2, TRIP_A_INDEX - 1)
                 .assertTripFound()
                 .withAlightTime(TIME_A1)
                 .withIndex(TRIP_A_INDEX);
 
         // But NOT when `tripIndexLowerBound` equals trip A´s index
-        searchForTrip(TIME_B1, STOP_2, TRIP_A_INDEX)
+        searchForTrip(earliestTimeNotAlightingAt(TIME_B1), STOP_2, TRIP_A_INDEX)
                 .assertNoTripFound();
     }
 
@@ -208,12 +208,12 @@ public class TripScheduleAlightSearchTest {
 
 
         // Search for a trip that alight before the first trip, expect no trip in return
-        searchForTrip(firstArrivalTime, STOP_1)
+        searchForTrip(earliestTimeNotAlightingAt(firstArrivalTime), STOP_1)
                 .assertNoTripFound();
 
         for (int i = 0; i < N; ++i) {
             int tripAlightTime = dT * (i + 1);
-            int okSearchTime = tripAlightTime + 1;
+            int okSearchTime = earliestTimeAlightingAt(tripAlightTime);
 
             // Search and find trip 'i'
             searchForTrip(okSearchTime, STOP_1)
@@ -255,13 +255,13 @@ public class TripScheduleAlightSearchTest {
 
         // Then we expect to find A for both stop 1 and 2
         // Stop 1
-        searchForTrip(TIME_A0 + 1, STOP_1)
+        searchForTrip(earliestTimeAlightingAt(TIME_A0), STOP_1)
                 .assertTripFound()
                 .withIndex(indexA)
                 .withAlightTime(TIME_A0);
 
         // Stop 2
-        searchForTrip(TIME_A1 + 1, STOP_2)
+        searchForTrip(earliestTimeAlightingAt(TIME_A1), STOP_2)
                 .assertTripFound()
                 .withIndex(indexA)
                 .withAlightTime(TIME_A1);
@@ -286,6 +286,14 @@ public class TripScheduleAlightSearchTest {
                 this.pattern,
                 this::skip
         );
+    }
+
+    private int earliestTimeAlightingAt(int alightTime) {
+        return alightTime;
+    }
+
+    private int earliestTimeNotAlightingAt(int alightTime) {
+        return alightTime - 1;
     }
 
     private static void addNTimes(List<TestTripSchedule> trips, TestTripSchedule tripS, int n) {

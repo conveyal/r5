@@ -1,6 +1,7 @@
 package com.conveyal.r5.profile.entur.rangeraptor.standard.configure;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.entur.api.view.Heuristics;
 import com.conveyal.r5.profile.entur.rangeraptor.path.DestinationArrivalPaths;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.ArrivedAtDestinationCheck;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.BestNumberOfTransfers;
@@ -20,7 +21,6 @@ import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.Stops;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.path.EgressArrivalToPathAdapter;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.view.StopsCursor;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
-import com.conveyal.r5.profile.entur.rangeraptor.view.Heuristics;
 
 
 /**

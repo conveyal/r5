@@ -20,8 +20,6 @@ import com.conveyal.r5.speed_test.transit.ItinerarySet;
 import com.conveyal.r5.speed_test.transit.TripPlanSupport;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripSchedule;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.lang.ref.WeakReference;
@@ -37,9 +35,7 @@ import java.util.stream.Collectors;
  * Also demonstrates how to run basic searches without using the graphQL profile routing API.
  */
 public class SpeedTest {
-    private static final Logger LOG = LoggerFactory.getLogger(SpeedTest.class);
-
-    private static final boolean TEST_NUM_OF_ADDITIONAL_TRANSFERS = true;
+    private static final boolean TEST_NUM_OF_ADDITIONAL_TRANSFERS = false;
     private static final String TRAVEL_SEARCH_FILENAME = "travelSearch";
     private static final String NETWORK_DATA_FILE = "network.dat";
 
@@ -106,15 +102,15 @@ public class SpeedTest {
         final int nSamples = opts.numberOfTestsSamplesToRun();
         nAdditionalTransfers = opts.numOfExtraTransfers();
         service = new RangeRaptorService<>(TUNING_PARAMETERS);
-        boolean skipFirstProfile = false;
+        boolean skipFirstProfile;
 
         initProfileStatistics();
 
         skipFirstProfile = opts.compareHeuristics();
 
-        for (int i = 1; i <= nSamples; ++i) {
-            setupSingleTest(speedTestProfiles, nSamples, i, skipFirstProfile);
-            runSingleTest(opts, i, nSamples);
+        for (int i = 0; i < nSamples; ++i) {
+            setupSingleTest(speedTestProfiles, i, nSamples, skipFirstProfile);
+            runSingleTest(opts, i+1, nSamples);
         }
         printProfileStatistics();
 
@@ -176,11 +172,11 @@ public class SpeedTest {
 
     private boolean runSingleTestCase(List<TripPlan> tripPlans, TestCase testCase, SpeedTestCmdLineOpts opts, boolean ignoreResults) {
         try {
-            final ProfileRequest request = RequestSupport.buildDefaultRequest(testCase, opts);
+            final ProfileRequest request = RequestSupport.buildProfileRequest(testCase, opts);
 
             if (opts.compareHeuristics()) {
                 TOT_TIMER.start();
-                ProfileRequest heurReq = RequestSupport.buildDefaultRequest(testCase, opts);
+                ProfileRequest heurReq = RequestSupport.buildProfileRequest(testCase, opts);
                 compareHeuristics(heurReq, request, testCase.arrivalTime);
                 TOT_TIMER.stop();
             } else {
@@ -258,15 +254,15 @@ public class SpeedTest {
         EgressAccessRouter streetRouter = new EgressAccessRouter(transportNetwork, heurReq);
         streetRouter.route();
         TransitDataProvider<TripSchedule> transitData = transitData(heurReq);
-        RangeRaptorRequest<TripSchedule> req1 = rangeRaptorRequest(heuristicProfile, heurReq, latestArrivalTime, streetRouter);
-        RangeRaptorRequest<TripSchedule> req2 = rangeRaptorRequest(routeProfile, routeReq, latestArrivalTime, streetRouter);
+        RangeRaptorRequest<TripSchedule> req1 = heuristicRequest(heuristicProfile, heurReq, latestArrivalTime, streetRouter);
+        RangeRaptorRequest<TripSchedule> req2 = heuristicRequest(routeProfile, routeReq, latestArrivalTime, streetRouter);
 
         TIMER_WORKER.start();
         service.compareHeuristics(req1, req2, transitData);
         TIMER_WORKER.stop();
     }
 
-    private void setupSingleTest(SpeedTestProfile[] profilesToRun, int nSamples, int sample, boolean skipFirstProfile) {
+    private void setupSingleTest(SpeedTestProfile[] profilesToRun, int sample, int nSamples, boolean skipFirstProfile) {
         if (skipFirstProfile) {
             heuristicProfile = profilesToRun[0];
             routeProfile = profilesToRun[1 + sample % (profilesToRun.length - 1)];
@@ -276,21 +272,33 @@ public class SpeedTest {
         // Enable flag to test the effect of counting down the number of additional transfers limit
         if (TEST_NUM_OF_ADDITIONAL_TRANSFERS) {
             // sample start at 1 .. nSamples(inclusive)
-            nAdditionalTransfers = 1 + (nSamples - sample) / profilesToRun.length;
+            nAdditionalTransfers = 1 + ((nSamples-1) - sample) / profilesToRun.length;
             System.err.println("\n>>> Run test with " + nAdditionalTransfers + " number of additional transfers.\n");
         }
     }
 
-    private RangeRaptorRequest<TripSchedule> rangeRaptorRequest(
-            SpeedTestProfile profile, ProfileRequest request, int latestArrivalTime, EgressAccessRouter streetRouter
+    private RangeRaptorRequest<TripSchedule> heuristicRequest(
+            SpeedTestProfile profile,
+            ProfileRequest request,
+            int latestArrivalTime,
+            EgressAccessRouter streetRouter
     ) {
         RangeRaptorRequest<TripSchedule> req = RequestSupport.createRangeRaptorRequest(
-                opts, request, profile, latestArrivalTime, nAdditionalTransfers, streetRouter
+                opts, request, profile, latestArrivalTime, nAdditionalTransfers, true, streetRouter
         );
-        if (opts.debugRequest()) {
-            System.err.println("-> Request: " + req);
-        }
         return req;
+    }
+
+
+    private RangeRaptorRequest<TripSchedule> rangeRaptorRequest(
+            SpeedTestProfile profile,
+            ProfileRequest request,
+            int latestArrivalTime,
+            EgressAccessRouter streetRouter
+    ) {
+        return RequestSupport.createRangeRaptorRequest(
+                opts, request, profile, latestArrivalTime, nAdditionalTransfers, false, streetRouter
+        );
     }
 
     private static TripPlan mapToTripPlan(ProfileRequest request, Collection<Path<TripSchedule>> paths, EgressAccessRouter streetRouter) {

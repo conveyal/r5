@@ -30,7 +30,7 @@ abstract class AbstractDebugHandlerAdapter<T> implements DebugHandler<T> {
     ) {
         this.stops = debugRequest.stops();
         this.path = debugRequest.path();
-        this.pathStartAtStopIndex = debugRequest.pathStartAtStopIndex();
+        this.pathStartAtStopIndex = debugRequest.debugPathFromStopIndex();
         this.eventListener = eventListener;
 
         // Attach debugger to RR life cycle to receive iteration setup events

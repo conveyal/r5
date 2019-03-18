@@ -6,8 +6,8 @@ import java.util.Objects;
 /**
  * This class define how to calculate the cost when cost is part of the multi-criteria pareto function.
  */
-public class MultiCriteriaCostFactors {
-    public static final MultiCriteriaCostFactors DEFAULTS = new MultiCriteriaCostFactors();
+public class McCostParams {
+    static final McCostParams DEFAULTS = new McCostParams();
 
     private final int boardCost;
     private final double walkReluctanceFactor;
@@ -16,16 +16,16 @@ public class MultiCriteriaCostFactors {
     /**
      * Default constructor defines default values.
      */
-    private MultiCriteriaCostFactors() {
+    private McCostParams() {
         this.boardCost = 300;
         this.walkReluctanceFactor = 4.0;
         this.waitReluctanceFactor = 1.0;
     }
 
-    MultiCriteriaCostFactors(RequestBuilder<?> builder) {
-        this.boardCost = builder.multiCriteriaBoardCost();
-        this.walkReluctanceFactor = builder.multiCriteriaWalkReluctanceFactor();
-        this.waitReluctanceFactor = builder.multiCriteriaWaitReluctanceFactor();
+    McCostParams(McCostParamsBuilder builder) {
+        this.boardCost = builder.boardCost();
+        this.walkReluctanceFactor = builder.walkReluctanceFactor();
+        this.waitReluctanceFactor = builder.waitReluctanceFactor();
     }
 
     public int boardCost() {
@@ -46,7 +46,7 @@ public class MultiCriteriaCostFactors {
 
     @Override
     public String toString() {
-        return "MultiCriteriaCostFactors{" +
+        return "McCostParams{" +
                 "boardCost=" + boardCost +
                 ", walkReluctanceFactor=" + walkReluctanceFactor +
                 ", waitReluctanceFactor=" + waitReluctanceFactor +
@@ -57,7 +57,7 @@ public class MultiCriteriaCostFactors {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        MultiCriteriaCostFactors that = (MultiCriteriaCostFactors) o;
+        McCostParams that = (McCostParams) o;
         return boardCost == that.boardCost &&
                 Double.compare(that.walkReluctanceFactor, walkReluctanceFactor) == 0 &&
                 Double.compare(that.waitReluctanceFactor, waitReluctanceFactor) == 0;

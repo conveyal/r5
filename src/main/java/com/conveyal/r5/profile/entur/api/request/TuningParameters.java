@@ -51,8 +51,8 @@ public interface TuningParameters {
      * This accept none optimal trips if they are close enough - if and only if they represent an optimal path
      * for their given iteration. I other words this slack only relax the pareto comparison at the destination.
      * <p/>
-     * Let {@code c} be the existing minimum pareto optimal cost to to beat. Then a trip with cost {@code c'} is accepted if the
-     * following is true:
+     * Let {@code c} be the existing minimum pareto optimal cost to to beat. Then a trip with cost {@code c'}
+     * is accepted if the following is true:
      * <pre>
      * c' <= Math.round(c * relaxCostAtDestinationArrival)
      * </pre>

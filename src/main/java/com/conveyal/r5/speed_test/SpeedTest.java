@@ -4,7 +4,6 @@ import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.entur.RangeRaptorService;
 import com.conveyal.r5.profile.entur.api.path.Path;
 import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
-import com.conveyal.r5.profile.entur.api.request.TuningParameters;
 import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.transitadapter.TransitLayerRRDataProvider;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
@@ -39,23 +38,6 @@ public class SpeedTest {
     private static final String TRAVEL_SEARCH_FILENAME = "travelSearch";
     private static final String NETWORK_DATA_FILE = "network.dat";
 
-    private static final TuningParameters TUNING_PARAMETERS = new TuningParameters() {
-        @Override
-        public int maxNumberOfTransfers() {
-            return 12;
-        }
-
-        // We don´t want to relax the results in the test, because it make it much harder to verify the result
-        @Override
-        public double relaxCostAtDestinationArrival() {
-            return 1.0;
-        }
-
-        @Override
-        public int searchThreadPoolSize() {
-            return 0;
-        }
-    };
 
     private static TransportNetwork transportNetwork;
 
@@ -101,7 +83,7 @@ public class SpeedTest {
         final SpeedTestProfile[] speedTestProfiles = opts.profiles();
         final int nSamples = opts.numberOfTestsSamplesToRun();
         nAdditionalTransfers = opts.numOfExtraTransfers();
-        service = new RangeRaptorService<>(TUNING_PARAMETERS);
+        service = new RangeRaptorService<>(RequestSupport.TUNING_PARAMETERS);
         boolean skipFirstProfile;
 
         initProfileStatistics();
@@ -283,10 +265,9 @@ public class SpeedTest {
             int latestArrivalTime,
             EgressAccessRouter streetRouter
     ) {
-        RangeRaptorRequest<TripSchedule> req = RequestSupport.createRangeRaptorRequest(
+        return RequestSupport.createRangeRaptorRequest(
                 opts, request, profile, latestArrivalTime, nAdditionalTransfers, true, streetRouter
         );
-        return req;
     }
 
 

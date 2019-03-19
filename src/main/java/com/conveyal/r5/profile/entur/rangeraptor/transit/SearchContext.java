@@ -3,6 +3,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.transit;
 import com.conveyal.r5.profile.entur.api.debug.DebugLogger;
 import com.conveyal.r5.profile.entur.api.request.DebugRequest;
 import com.conveyal.r5.profile.entur.api.request.McCostParams;
+import com.conveyal.r5.profile.entur.api.request.RangeRaptorProfile;
 import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.request.SearchParams;
 import com.conveyal.r5.profile.entur.api.request.TuningParameters;
@@ -16,7 +17,6 @@ import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
 import com.conveyal.r5.profile.entur.rangeraptor.workerlifecycle.LifeCycleBuilder;
 import com.conveyal.r5.profile.entur.rangeraptor.workerlifecycle.LifeCycleEventPublisher;
 
-import java.util.BitSet;
 import java.util.Collection;
 
 /**
@@ -45,7 +45,6 @@ public class SearchContext<T extends TripScheduleInfo> {
     private final DebugHandlerFactory<T> debugFactory;
 
     private LifeCycleBuilder lifeCycleBuilder = new LifeCycleBuilder();
-    private BitSet stopsFilter;
 
     public SearchContext(
             RangeRaptorRequest<T> request,
@@ -64,10 +63,6 @@ public class SearchContext<T extends TripScheduleInfo> {
         this.debugFactory = new DebugHandlerFactory<>(this.debugRequest, lifeCycle());
     }
 
-    public RangeRaptorRequest<T> request() {
-        return request;
-    }
-
     public Collection<TransferLeg> accessLegs() {
         return request.searchForward() ? request.searchParams().accessLegs() : request.searchParams().egressLegs();
     }
@@ -80,8 +75,12 @@ public class SearchContext<T extends TripScheduleInfo> {
         return egressLegs().stream().mapToInt(TransferLeg::stop).toArray();
     }
 
-    public DebugRequest<T> debugRequest() {
-        return debugRequest;
+    public SearchParams searchParams() {
+        return request.searchParams();
+    }
+
+    public RangeRaptorProfile profile() {
+        return request.profile();
     }
 
     public TuningParameters tuningParameters() {

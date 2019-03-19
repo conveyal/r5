@@ -59,7 +59,7 @@ public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
     private StdRangeRaptorWorker<T> createSearch(boolean includeHeuristics) {
         new VerifyRequestIsValid(ctx).verify();
 
-        switch (ctx.request().profile()) {
+        switch (ctx.profile()) {
             case STANDARD:
                 return createWorker(includeHeuristics, stdStopArrivalsState());
             case BEST_TIME:
@@ -69,7 +69,7 @@ public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
             case NO_WAIT_BEST_TIME:
                 return createNoWaitWorker(includeHeuristics, bestTimeStopArrivalsState());
         }
-        throw new IllegalArgumentException(ctx.request().profile().toString());
+        throw new IllegalArgumentException(ctx.profile().toString());
     }
 
     private HeuristicSearch<T> createHeuristicSearch() {

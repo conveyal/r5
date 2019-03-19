@@ -89,7 +89,7 @@ public class EgressArrivalToPathAdapter<T extends TripScheduleInfo> implements A
 
     @Override
     public boolean arrivedAtDestinationCurrentRound() {
-        return paths.isReachedCurrentRound();
+        return newElementSet;
     }
 
     private void addToPath(final EgressStopArrivalState<T> it) {

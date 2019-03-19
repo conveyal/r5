@@ -147,6 +147,18 @@ final class ForwardSearchTransitCalculator implements TransitCalculator {
     }
 
     @Override
+    public final <T extends TripScheduleInfo> TripScheduleSearch<T> createExactTripSearch(
+            TripPatternInfo<T> pattern,
+            Function<T, Boolean> skipTripScheduleCallback
+    ) {
+        return new TripScheduleExactMatchSearch<>(
+                createTripSearch(pattern, skipTripScheduleCallback),
+                this,
+                iterationStep
+        );
+    }
+
+    @Override
     public final <T extends TripScheduleInfo> PathMapper<T> createPathMapper() {
         return new ForwardPathMapper<>(this);
     }

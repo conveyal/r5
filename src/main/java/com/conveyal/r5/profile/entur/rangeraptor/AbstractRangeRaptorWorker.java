@@ -78,6 +78,8 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
 
     private final BitSet stopsFilter;
 
+    private boolean matchBoardingAlightExactInFirstRound;
+
     /**
      * The life cycle is used to publish life cycle events to everyone who
      * listen.
@@ -97,8 +99,9 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
         // We do a cast here to avoid exposing the round tracker  and the life cycle publisher to "everyone"
         // by providing access to it in the context.
         this.roundTracker = (RoundTracker) context.roundProvider();
-        this.stopsFilter =  context.request().searchParams().stopFilter();
+        this.stopsFilter =  context.searchParams().stopFilter();
         this.lifeCycle = context.createLifeCyclePublisher();
+        this.matchBoardingAlightExactInFirstRound = !context.searchParams().waitAtBeginningEnabled();
     }
 
     /**
@@ -159,7 +162,12 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
      * This is protected to allow reverse search to override and create a alight search instead.
      */
     private TripScheduleSearch<T> createTripSearch(TripPatternInfo<T> pattern) {
-        return calculator.createTripSearch(pattern, this::skipTripSchedule);
+        if(matchBoardingAlightExactInFirstRound && roundTracker.round() == 1) {
+            return calculator.createExactTripSearch(pattern, this::skipTripSchedule);
+        }
+        else {
+            return calculator.createTripSearch(pattern, this::skipTripSchedule);
+        }
     }
 
     /**

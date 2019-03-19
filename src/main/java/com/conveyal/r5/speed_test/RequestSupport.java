@@ -7,6 +7,7 @@ import com.conveyal.r5.profile.entur.api.request.Optimization;
 import com.conveyal.r5.profile.entur.api.request.RangeRaptorProfile;
 import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
 import com.conveyal.r5.profile.entur.api.request.RequestBuilder;
+import com.conveyal.r5.profile.entur.api.request.TuningParameters;
 import com.conveyal.r5.speed_test.cli.CommandLineOpts;
 import com.conveyal.r5.speed_test.cli.SpeedTestCmdLineOpts;
 import com.conveyal.r5.speed_test.test.TestCase;
@@ -34,6 +35,23 @@ class RequestSupport {
      */
     private static final int EXPAND_SEARCH_WINDOW_HOURS = 0;
 
+    static final TuningParameters TUNING_PARAMETERS = new TuningParameters() {
+        @Override
+        public int maxNumberOfTransfers() {
+            return 12;
+        }
+
+        // We don´t want to relax the results in the test, because it make it much harder to verify the result
+        @Override
+        public double relaxCostAtDestinationArrival() {
+            return 1.0;
+        }
+
+        @Override
+        public int searchThreadPoolSize() {
+            return 0;
+        }
+    };
 
     private RequestSupport() { }
 
@@ -73,6 +91,7 @@ class RequestSupport {
 
         RequestBuilder<TripSchedule> builder = new RequestBuilder<TripSchedule>();
         builder.searchParams()
+                .boardSlackInSeconds(120)
                 .earliestDepartureTime(request.fromTime - expandDeltaSeconds)
                 .latestArrivalTime(latestArrivalTime + expandDeltaSeconds)
                 .searchWindowInSeconds(request.toTime - request.fromTime + 2 * expandDeltaSeconds)

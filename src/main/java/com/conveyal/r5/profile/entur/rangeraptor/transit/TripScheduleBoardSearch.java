@@ -20,6 +20,8 @@ import java.util.function.Function;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class TripScheduleBoardSearch<T extends TripScheduleInfo> implements TripScheduleSearch<T> {
+    private static final int NOT_SET = -1;
+
     private final int nTripsBinarySearchThreshold;
     private final TripPatternInfo<T> pattern;
     private final int nTrips;
@@ -27,9 +29,8 @@ public class TripScheduleBoardSearch<T extends TripScheduleInfo> implements Trip
 
     private int earliestBoardTime;
     private int stopPositionInPattern;
-
     private T candidateTrip;
-    private int candidateTripIndex;
+    private int candidateTripIndex = NOT_SET;
 
     TripScheduleBoardSearch(
             int scheduledTripBinarySearchThreshold,
@@ -81,7 +82,7 @@ public class TripScheduleBoardSearch<T extends TripScheduleInfo> implements Trip
         this.earliestBoardTime = earliestBoardTime;
         this.stopPositionInPattern = stopPositionInPattern;
         this.candidateTrip = null;
-        this.candidateTripIndex = -1;
+        this.candidateTripIndex = NOT_SET;
 
         // No previous trip is found
         if (tripIndexUpperBound < 0) {

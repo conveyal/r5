@@ -33,7 +33,7 @@ public class TripScheduleAlightSearch<T extends TripScheduleInfo> implements Tri
     private T candidateTrip;
     private int candidateTripIndex;
 
-    public TripScheduleAlightSearch(
+    TripScheduleAlightSearch(
             int scheduledTripBinarySearchThreshold,
             TripPatternInfo<T> pattern,
             Function<T, Boolean> skipTripScheduleCallback

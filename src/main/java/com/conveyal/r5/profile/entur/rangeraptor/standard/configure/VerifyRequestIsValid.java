@@ -36,11 +36,11 @@ class VerifyRequestIsValid  {
     }
 
     private RangeRaptorProfile profile() {
-        return context.request().profile();
+        return context.profile();
     }
 
     private boolean noWaitWorker() {
-        return context.request().profile().isOneOf(NO_WAIT_STD, NO_WAIT_BEST_TIME);
+        return profile().isOneOf(NO_WAIT_STD, NO_WAIT_BEST_TIME);
     }
 
     private boolean oneIteration() {

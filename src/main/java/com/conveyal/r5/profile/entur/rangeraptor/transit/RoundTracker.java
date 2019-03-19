@@ -35,10 +35,9 @@ public class RoundTracker implements RoundProvider {
 
     RoundTracker(int nRounds, int numberOfAdditionalTransfers, WorkerLifeCycle lifeCycle) {
         // The 'roundMaxLimit' is inclusive, while the 'nRounds' is exclusive; Hence subtract 1.
-        this.roundMaxLimit = nRounds - 1;
+        this.roundMaxLimit = nRounds;
         this.numberOfAdditionalTransfers = numberOfAdditionalTransfers;
         lifeCycle.onSetupIteration(this::setupIteration);
-        lifeCycle.onPrepareForNextRound(this::prepareForNextRound);
         lifeCycle.onRoundComplete(this::roundComplete);
     }
 
@@ -49,6 +48,9 @@ public class RoundTracker implements RoundProvider {
         round = 0;
     }
 
+    /**
+     * Set the round limit based on the 'numberOfAdditionalTransfers' parameter.
+     */
     private void roundComplete(boolean destinationReached) {
         if(destinationReached) {
             recalculateMaxLimitBasedOnDestinationReachedinCurrentRound();
@@ -59,14 +61,9 @@ public class RoundTracker implements RoundProvider {
      * Is there more rounds to process (or is the upper limit reached).
      */
     public boolean hasMoreRounds() {
-        return round < roundMaxLimit;
-    }
-
-    /**
-     * Prepare for next round by incrementing round index.
-     */
-    private void prepareForNextRound() {
-        ++round;
+        // Round is incremented here; This grantee that the round is correct in
+        // the WorkerLifeCycle, 'prepareForNextRound' and 'roundComplete' phase.
+        return  ++round < roundMaxLimit;
     }
 
     /**
@@ -80,6 +77,7 @@ public class RoundTracker implements RoundProvider {
     /* private methods */
 
     private void recalculateMaxLimitBasedOnDestinationReachedinCurrentRound() {
-        roundMaxLimit = Math.min(roundMaxLimit, round + numberOfAdditionalTransfers);
+        // Rounds start at 0 (access arrivals), and round is not incremented jet
+        roundMaxLimit = Math.min(roundMaxLimit, round + numberOfAdditionalTransfers + 1);
     }
 }

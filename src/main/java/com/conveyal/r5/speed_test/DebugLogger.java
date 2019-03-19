@@ -41,7 +41,7 @@ class DebugLogger implements com.conveyal.r5.profile.entur.api.debug.DebugLogger
     void pathFilteringListener(DebugEvent<Path<TripSchedule>> e) {
         if (pathHeader) {
             System.err.println();
-            System.err.println("* PATH *  | TR | FROM  | TO    | START    | END      | DURATION |   COST   | DETAILS");
+            System.err.println(">>> PATH  | TR | FROM  | TO    | START    | END      | DURATION |   COST   | DETAILS");
             pathHeader = false;
         }
 

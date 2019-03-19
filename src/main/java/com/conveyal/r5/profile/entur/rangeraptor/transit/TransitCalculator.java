@@ -162,6 +162,14 @@ public interface TransitCalculator {
             Function<T, Boolean> skipTripScheduleCallback
     );
 
+    /**
+     * Same as {@link #createTripSearch(TripPatternInfo, Function)}, but create a
+     * trip search that only accept exact trip timeLimit matches.
+     */
+    <T extends TripScheduleInfo> TripScheduleSearch<T> createExactTripSearch(
+            TripPatternInfo<T> pattern,
+            Function<T, Boolean> skipTripScheduleCallback
+    );
 
     /**
      * Create a new path mapper depending on the search direction.

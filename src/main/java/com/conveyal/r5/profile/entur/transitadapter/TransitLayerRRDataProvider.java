@@ -172,10 +172,9 @@ public class TransitLayerRRDataProvider implements TransitDataProvider<TripSched
         return transitLayer.patternsForStop.get(stop);
     }
 
-    class InternalPatternIterator implements TripPatternInfo<TripSchedule>, Iterator<TripPatternInfo<TripSchedule>> {
+    class InternalPatternIterator implements Iterator<TripPatternInfo<TripSchedule>> {
         private int nextPatternIndex;
         private BitSet patternsTouched;
-        private TripPattern pattern;
 
         InternalPatternIterator(BitSet patternsTouched) {
             this.patternsTouched = patternsTouched;
@@ -189,13 +188,18 @@ public class TransitLayerRRDataProvider implements TransitDataProvider<TripSched
         }
 
         @Override public TripPatternInfo<TripSchedule> next() {
-            pattern = runningScheduledPatterns[nextPatternIndex];
+            TPInfo res = new TPInfo(runningScheduledPatterns[nextPatternIndex]);
             nextPatternIndex = patternsTouched.nextSetBit(nextPatternIndex + 1);
-            return this;
+            return res;
         }
+    }
 
+    private static class TPInfo implements TripPatternInfo<TripSchedule> {
+        private final TripPattern pattern;
 
-        /*  Pattern interface implementation */
+        TPInfo(TripPattern pattern) {
+            this.pattern = pattern;
+        }
 
         @Override
         public int stopIndex(int stopPositionInPattern) {

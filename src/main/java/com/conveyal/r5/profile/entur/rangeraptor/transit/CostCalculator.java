@@ -4,6 +4,8 @@ package com.conveyal.r5.profile.entur.rangeraptor.transit;
 /**
  * The responsibility for the cost calculator is to calculate the
  * multi-criteria cost.
+ * <P/>
+ * This class is immutable and thread safe.
  */
 public class CostCalculator {
     private static final int PRECISION = 100;

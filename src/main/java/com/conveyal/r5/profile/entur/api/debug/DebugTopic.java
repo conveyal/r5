@@ -8,7 +8,8 @@ public enum DebugTopic {
     HEURISTICS,
 
     /**
-     * Log search statistics, like number of stops visited and so on.
+     * Log multi criteria stop arrivals statistics. Loggs avarage and total stops arrivals for each
+     * stop and number of stops visited.
      */
-    SEARCH_STATS
+    STOP_ARRIVALS_STATISTICS
 }

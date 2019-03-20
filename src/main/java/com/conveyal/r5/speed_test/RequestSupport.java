@@ -139,7 +139,7 @@ class RequestSupport {
         List<Integer> stops = opts.debugStops();
         List<Integer> path = opts.debugPath();
 
-        boolean debugLoggerEnabled = opts.debugRequest();
+        boolean debugLoggerEnabled = opts.debugRequest() || opts.debug();
 
         if(opts instanceof SpeedTestCmdLineOpts) {
             debugLoggerEnabled = debugLoggerEnabled || ((SpeedTestCmdLineOpts)opts).compareHeuristics();

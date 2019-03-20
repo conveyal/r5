@@ -4,16 +4,32 @@ import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.view.Heuristics;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McRangeRaptorWorkerState;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.Stops;
+import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic.HeuristicsProvider;
+import com.conveyal.r5.profile.entur.rangeraptor.path.DestinationArrivalPaths;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 
+import javax.annotation.Nullable;
+
+
+/**
+ * Configure and create multicriteria worker, state and child classes.
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
+ */
 public class McRangeRaptorConfig<T extends TripScheduleInfo> {
-    private SearchContext<T> context;
+    private final SearchContext<T> context;
+
+    private DestinationArrivalPaths<T> paths;
 
     public McRangeRaptorConfig(SearchContext<T> context) {
         this.context = context;
     }
 
-    public McRangeRaptorWorker<T> createWorker(Heuristics heuristics) {
+    /**
+     * Create new multi-criteria worker with optional heuristics.
+     */
+    public McRangeRaptorWorker<T> createWorker(@Nullable Heuristics heuristics) {
         return new McRangeRaptorWorker<>(context, createState(heuristics));
     }
 
@@ -22,16 +38,51 @@ public class McRangeRaptorConfig<T extends TripScheduleInfo> {
 
     private McRangeRaptorWorkerState<T> createState(Heuristics heuristics) {
         return new McRangeRaptorWorkerState<>(
-                context.nStops(),
-                context.tuningParameters().relaxCostAtDestinationArrival(),
-                context.egressLegs(),
-                heuristics,
-                context.roundProvider(),
+                createStops(),
+                createDestinationArrivalPaths(),
+                createHeuristicsProvider(heuristics),
                 context.costCalculator(),
                 context.calculator(),
-                context.debugLogger(),
-                context.debugFactory(),
                 context.lifeCycle()
         );
+    }
+
+    private Stops<T> createStops() {
+        return new Stops<>(
+                context.nStops(),
+                context.egressLegs(),
+                createDestinationArrivalPaths(),
+                context.costCalculator(),
+                context.debugFactory(),
+                context.debugLogger()
+        );
+    }
+
+    private HeuristicsProvider<T> createHeuristicsProvider(@Nullable Heuristics heuristics) {
+        if (heuristics == null) {
+            return new HeuristicsProvider<>();
+        } else {
+            return new HeuristicsProvider<>(
+                    heuristics,
+                    context.roundProvider(),
+                    createDestinationArrivalPaths(),
+                    context.costCalculator(),
+                    context.debugFactory()
+            );
+        }
+    }
+
+    private DestinationArrivalPaths<T> createDestinationArrivalPaths() {
+        if (paths == null) {
+            paths = new DestinationArrivalPaths<>(
+                    DestinationArrivalPaths.paretoComparatorWithCost(
+                            context.tuningParameters().relaxCostAtDestinationArrival()
+                    ),
+                    context.calculator(),
+                    context.debugFactory(),
+                    context.lifeCycle()
+            );
+        }
+        return paths;
     }
 }

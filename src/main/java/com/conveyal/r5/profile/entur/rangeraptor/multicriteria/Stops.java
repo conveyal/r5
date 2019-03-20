@@ -3,6 +3,7 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 
 import com.conveyal.r5.profile.entur.api.debug.DebugLogger;
 import com.conveyal.r5.profile.entur.api.path.Path;
+import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TransferLeg;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.view.Heuristics;
@@ -15,7 +16,9 @@ import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic.Heurist
 import com.conveyal.r5.profile.entur.rangeraptor.path.DestinationArrivalPaths;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.CostCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
+import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.stream.Collectors;
 
@@ -30,6 +33,7 @@ import static java.util.Collections.emptyList;
  */
 final class Stops<T extends TripScheduleInfo> {
     private final StopArrivalParetoSet<T>[] stops;
+    private final BitSet touchedStops;
     private final HeuristicsProvider<T> heuristics;
     private final DestinationArrivalPaths<T> paths;
     private final DebugHandlerFactory<T> debugHandlerFactory;
@@ -53,6 +57,7 @@ final class Stops<T extends TripScheduleInfo> {
     ) {
         //noinspection unchecked
         this.stops = (StopArrivalParetoSet<T>[]) new StopArrivalParetoSet[nStops];
+        this.touchedStops = new BitSet(nStops);
         this.calculator = transitCalculator;
         this.debugHandlerFactory = debugHandlerFactory;
         this.debugLogger = debugLogger;
@@ -87,12 +92,25 @@ final class Stops<T extends TripScheduleInfo> {
         return paths.isReachedCurrentRound();
     }
 
+    boolean updateExist() {
+        return !touchedStops.isEmpty();
+    }
+
+    IntIterator stopsTouchedIterator() {
+        return new BitSetIterator(touchedStops);
+    }
+
     boolean addStopArrival(AbstractStopArrival<T> arrival) {
         if(rejectDestinationArrivalBasedOnHeuristic(arrival)) {
             rejectByOptimization(arrival);
             return false;
         }
-        return findOrCreateSet(arrival.stop()).add(arrival);
+        boolean added = findOrCreateSet(arrival.stop()).add(arrival);
+
+        if (added) {
+            touchedStops.set(arrival.stop());
+        }
+        return added;
     }
 
     Collection<Path<T>> extractPaths() {
@@ -110,11 +128,11 @@ final class Stops<T extends TripScheduleInfo> {
     }
 
     void markAllStops() {
-        for (StopArrivalParetoSet<T> stop : stops) {
-            if (stop != null) {
-                stop.markAtEndOfSet();
-            }
+        IntIterator it = stopsTouchedIterator();
+        while (it.hasNext()) {
+            stops[it.next()].markAtEndOfSet();
         }
+        touchedStops.clear();
     }
 
     private StopArrivalParetoSet<T> findOrCreateSet(final int stop) {

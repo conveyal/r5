@@ -15,10 +15,8 @@ import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.Transfer
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.TransitStopArrival;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.CostCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
-import com.conveyal.r5.profile.entur.util.BitSetIterator;
 
 import java.util.ArrayList;
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -40,8 +38,6 @@ final public class McRangeRaptorWorkerState<T extends TripScheduleInfo> implemen
     private final List<AbstractStopArrival<T>> arrivalsCache = new ArrayList<>();
     private final CostCalculator costCalculator;
     private final TransitCalculator transitCalculator;
-    private boolean updatesExist = false;
-    private BitSet touchedStops;
 
     /**
      * create a RaptorState for a network with a particular number of stops, and a given maximum duration
@@ -71,7 +67,6 @@ final public class McRangeRaptorWorkerState<T extends TripScheduleInfo> implemen
                 debugLogger,
                 lifeCycle
         );
-        this.touchedStops = new BitSet(nStops);
         this.costCalculator = costCalculator;
         this.transitCalculator = transitCalculator;
 
@@ -90,32 +85,28 @@ final public class McRangeRaptorWorkerState<T extends TripScheduleInfo> implemen
     private void setupIteration() {
         arrivalsCache.clear();
         // clear all touched stops to avoid constant rexploration
-        touchedStops.clear();
         stops.markAllStops();
-        updatesExist = false;
     }
 
     @Override
     public void setInitialTimeForIteration(TransferLeg accessLeg, int iterationDepartureTime) {
         int cost = costCalculator.walkCost(accessLeg.durationInSeconds());
         stops.setInitialTime(iterationDepartureTime, accessLeg, cost);
-        touchedStops.set(accessLeg.stop());
-        updatesExist = true;
     }
 
     @Override
     public boolean isNewRoundAvailable() {
-        return updatesExist;
+        return stops.updateExist();
     }
 
     @Override
     public IntIterator stopsTouchedPreviousRound() {
-        return new BitSetIterator(touchedStops);
+        return stops.stopsTouchedIterator();
     }
 
     @Override
     public IntIterator stopsTouchedByTransitCurrentRound() {
-        return new BitSetIterator(touchedStops);
+        return stops.stopsTouchedIterator();
     }
 
     Iterable<? extends AbstractStopArrival<T>> listStopArrivalsPreviousRound(int stop) {
@@ -148,9 +139,7 @@ final public class McRangeRaptorWorkerState<T extends TripScheduleInfo> implemen
 
     // This method is private, but is part of Worker life cycle
     private void transitsForRoundComplete() {
-        updatesExist = !arrivalsCache.isEmpty();
         stops.markAllStops();
-        touchedStops.clear();
         commitCachedArrivals();
     }
 
@@ -188,9 +177,7 @@ final public class McRangeRaptorWorkerState<T extends TripScheduleInfo> implemen
 
     private void commitCachedArrivals() {
         for (AbstractStopArrival<T> arrival : arrivalsCache) {
-            if (stops.addStopArrival(arrival)) {
-                touchedStops.set(arrival.stop());
-            }
+            stops.addStopArrival(arrival);
         }
         arrivalsCache.clear();
     }

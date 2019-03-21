@@ -8,6 +8,9 @@ import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.view.Heuristics;
 import com.conveyal.r5.profile.entur.api.view.Worker;
+import com.conveyal.r5.profile.entur.rangeraptor.PerformTransitStrategy;
+import com.conveyal.r5.profile.entur.rangeraptor.RangeRaptorWorker;
+import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.configure.McRangeRaptorConfig;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.configure.StdRangeRaptorConfig;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.heuristics.HeuristicSearch;
@@ -44,17 +47,18 @@ public class RangeRaptorConfig<T extends TripScheduleInfo> {
     }
 
     public Worker<T> createStdWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
-        return StdRangeRaptorConfig.createSearch(context(transitData, request));
+        SearchContext<T> context = context(transitData, request);
+        return new StdRangeRaptorConfig<>(context).createSearch((s, w) -> createWorker(context, s, w));
     }
 
     public Worker<T> createMcWorker(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request, Heuristics heuristics) {
         final SearchContext<T> context = context(transitData, request);
-        return new McRangeRaptorConfig<T>(context).createWorker(heuristics);
+        return new McRangeRaptorConfig<>(context).createWorker(heuristics, (s, w) -> createWorker(context, s, w));
     }
 
     public HeuristicSearch<T> createHeuristicSearch(TransitDataProvider<T> transitData, RangeRaptorRequest<T> request) {
         SearchContext<T> context = context(transitData, request);
-        return StdRangeRaptorConfig.createHeuristicSearch(context);
+        return new StdRangeRaptorConfig<>(context).createHeuristicSearch((s, w) -> createWorker(context, s, w));
     }
 
     public HeuristicSearch<T> createHeuristicSearch(
@@ -64,7 +68,7 @@ public class RangeRaptorConfig<T extends TripScheduleInfo> {
             boolean forward
     ) {
         RangeRaptorRequest<T> req = heuristicReq(request, profile, forward);
-        return  createHeuristicSearch(transitData, req);
+        return createHeuristicSearch(transitData, req);
     }
 
     public boolean isMultiThreaded() {
@@ -82,6 +86,24 @@ public class RangeRaptorConfig<T extends TripScheduleInfo> {
     }
 
     /* private factory methods */
+
+    private Worker<T> createWorker(
+            SearchContext<T> ctx,
+            WorkerState<T> workerState,
+            PerformTransitStrategy<T> performTransitStrategy
+    ) {
+        return new RangeRaptorWorker<>(
+                workerState,
+                performTransitStrategy,
+                ctx.transit(),
+                ctx.accessLegs(),
+                ctx.roundProvider(),
+                ctx.calculator(),
+                ctx.createLifeCyclePublisher(),
+                ctx.timers(),
+                ctx.searchParams().waitAtBeginningEnabled()
+        );
+    }
 
     private RangeRaptorRequest<T> heuristicReq(RangeRaptorRequest<T> request, RangeRaptorProfile profile, boolean forward) {
         RequestBuilder<T> copy = request.mutate();

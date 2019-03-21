@@ -9,14 +9,12 @@ import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.view.Worker;
 import com.conveyal.r5.profile.entur.rangeraptor.debug.WorkerPerformanceTimers;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.RoundTracker;
-import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleBoardSearch;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleSearch;
 import com.conveyal.r5.profile.entur.rangeraptor.workerlifecycle.LifeCycleEventPublisher;
 import com.conveyal.r5.profile.entur.util.AvgTimer;
 
-import java.util.BitSet;
 import java.util.Collection;
 import java.util.Iterator;
 
@@ -48,7 +46,10 @@ import java.util.Iterator;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 @SuppressWarnings("Duplicates")
-public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S extends WorkerState<T>> implements Worker<T> {
+public final class RangeRaptorWorker<T extends TripScheduleInfo, S extends WorkerState<T>> implements Worker<T> {
+
+
+    private final PerformTransitStrategy<T> transitWorker;
 
     /**
      * The RangeRaptor state - we delegate keeping track of state to the state object,
@@ -60,7 +61,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
      * current object-oriented approach. There were no performance differences(=> GC is not
      * the bottle neck), so we dropped the integer array implementation.
      */
-    protected final S state;
+    private final S state;
 
     /**
      * The round tracker keep track for the current Raptor round, and abort the search if the
@@ -68,15 +69,13 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
      */
     private final RoundTracker roundTracker;
 
-    private final TransitDataProvider<T> transit;
+    private final TransitDataProvider<T> transitData;
 
     private final TransitCalculator calculator;
 
     private final WorkerPerformanceTimers timers;
 
     private final Collection<TransferLeg> accessLegs;
-
-    private final BitSet stopsFilter;
 
     private boolean matchBoardingAlightExactInFirstRound;
 
@@ -87,21 +86,28 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
     private final LifeCycleEventPublisher lifeCycle;
 
 
-    public AbstractRangeRaptorWorker(
-            SearchContext<T> context,
-            S state
+    public RangeRaptorWorker(
+            S state,
+            PerformTransitStrategy<T> transitWorker,
+            TransitDataProvider<T> transitData,
+            Collection<TransferLeg> accessLegs,
+            RoundProvider roundProvider,
+            TransitCalculator calculator,
+            LifeCycleEventPublisher lifeCyclePublisher,
+            WorkerPerformanceTimers timers,
+            boolean waitAtBeginningEnabled
     ) {
+        this.transitWorker = transitWorker;
         this.state = state;
-        this.transit = context.transit();
-        this.calculator = context.calculator();
-        this.timers = context.timers();
-        this.accessLegs = context.accessLegs();
+        this.transitData = transitData;
+        this.calculator = calculator;
+        this.timers = timers;
+        this.accessLegs = accessLegs;
         // We do a cast here to avoid exposing the round tracker  and the life cycle publisher to "everyone"
         // by providing access to it in the context.
-        this.roundTracker = (RoundTracker) context.roundProvider();
-        this.stopsFilter =  context.searchParams().stopFilter();
-        this.lifeCycle = context.createLifeCyclePublisher();
-        this.matchBoardingAlightExactInFirstRound = !context.searchParams().waitAtBeginningEnabled();
+        this.roundTracker = (RoundTracker) roundProvider;
+        this.lifeCycle = lifeCyclePublisher;
+        this.matchBoardingAlightExactInFirstRound = !waitAtBeginningEnabled;
     }
 
     /**
@@ -117,7 +123,7 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
     @Override
     final public Collection<Path<T>> route() {
         timerRoute().time(() -> {
-            timerSetup(transit::setup);
+            timerSetup(transitData::setup);
 
             // The main outer loop iterates backward over all minutes in the departure times window.
             // Ergo, we re-use the arrival times found in searches that have already occurred that
@@ -130,51 +136,6 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
             }
         });
         return state.extractPaths();
-    }
-
-    protected TransitCalculator calculator() {
-        return calculator;
-    }
-
-    protected abstract void prepareTransitForRoundAndPattern(TripPatternInfo<T> pattern, TripScheduleSearch<T> tripSearch);
-
-    protected abstract void performTransitForRoundAndPatternAtStop(int stopPositionInPattern);
-
-    protected boolean allowStopVisit(int stop) {
-        return stopsFilter == null || stopsFilter.get(stop);
-    }
-
-    /**
-     * Iterate over given pattern and calculate transit for each stop.
-     * <p/>
-     * This is protected to allow reverse search to override and step backwards.
-     */
-    private void performTransitForRoundAndEachStopInPattern(final TripPatternInfo<T> pattern) {
-        IntIterator it = calculator.patternStopIterator(pattern.numberOfStopsInPattern());
-        while (it.hasNext()) {
-            performTransitForRoundAndPatternAtStop(it.next());
-        }
-    }
-
-    /**
-     * Create a trip search using {@link TripScheduleBoardSearch}.
-     * <p/>
-     * This is protected to allow reverse search to override and create a alight search instead.
-     */
-    private TripScheduleSearch<T> createTripSearch(TripPatternInfo<T> pattern) {
-        if(matchBoardingAlightExactInFirstRound && roundTracker.round() == 1) {
-            return calculator.createExactTripSearch(pattern, this::skipTripSchedule);
-        }
-        else {
-            return calculator.createTripSearch(pattern, this::skipTripSchedule);
-        }
-    }
-
-    /**
-     * Skip trips NOT running on the day of the search and skip frequency trips
-     */
-    private boolean skipTripSchedule(T trip) {
-        return !transit.isTripScheduleInService(trip);
     }
 
     /**
@@ -207,13 +168,6 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
 
 
     /**
-     * Check if the RangeRaptor should continue with a new round.
-     */
-    private boolean hasMoreRounds() {
-        return roundTracker.hasMoreRounds() && state.isNewRoundAvailable();
-    }
-
-    /**
      * Set the departure time in the scheduled search to the given departure time,
      * and prepare for the scheduled search at the next-earlier minute.
      * <p/>
@@ -226,23 +180,41 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
     }
 
     /**
+     * Check if the RangeRaptor should continue with a new round.
+     */
+    private boolean hasMoreRounds() {
+        return roundTracker.hasMoreRounds() && state.isNewRoundAvailable();
+    }
+
+    /**
      * Perform a scheduled search
      */
     private void findAllTransitForRound() {
         IntIterator stops = state.stopsTouchedPreviousRound();
-        Iterator<? extends TripPatternInfo<T>> patternIterator = transit.patternIterator(stops);
+        Iterator<? extends TripPatternInfo<T>> patternIterator = transitData.patternIterator(stops);
 
         while (patternIterator.hasNext()) {
             TripPatternInfo<T> pattern = patternIterator.next();
             TripScheduleSearch<T> tripSearch = createTripSearch(pattern);
 
-            prepareTransitForRoundAndPattern(pattern, tripSearch);
+            transitWorker.prepareForTransitWith(pattern, tripSearch);
 
             performTransitForRoundAndEachStopInPattern(pattern);
         }
         lifeCycle.transitsForRoundComplete();
     }
 
+    /**
+     * Iterate over given pattern and calculate transit for each stop.
+     * <p/>
+     * This is protected to allow reverse search to override and step backwards.
+     */
+    private void performTransitForRoundAndEachStopInPattern(final TripPatternInfo<T> pattern) {
+        IntIterator it = calculator.patternStopIterator(pattern.numberOfStopsInPattern());
+        while (it.hasNext()) {
+            transitWorker.routeTransitAtStop(it.next());
+        }
+    }
 
     private void transfersForRound() {
         IntIterator it = state.stopsTouchedByTransitCurrentRound();
@@ -251,9 +223,30 @@ public abstract class AbstractRangeRaptorWorker<T extends TripScheduleInfo, S ex
             final int fromStop = it.next();
             // no need to consider loop transfers, since we don't mark patterns here any more
             // loop transfers are already included by virtue of those stops having been reached
-            state.transferToStops(fromStop, transit.getTransfers(fromStop));
+            state.transferToStops(fromStop, transitData.getTransfers(fromStop));
         }
         lifeCycle.transfersForRoundComplete();
+    }
+
+    /**
+     * Create a trip search using {@link TripScheduleBoardSearch}.
+     * <p/>
+     * This is protected to allow reverse search to override and create a alight search instead.
+     */
+    private TripScheduleSearch<T> createTripSearch(TripPatternInfo<T> pattern) {
+        if(matchBoardingAlightExactInFirstRound && roundTracker.round() == 1) {
+            return calculator.createExactTripSearch(pattern, this::skipTripSchedule);
+        }
+        else {
+            return calculator.createTripSearch(pattern, this::skipTripSchedule);
+        }
+    }
+
+    /**
+     * Skip trips NOT running on the day of the search and skip frequency trips
+     */
+    private boolean skipTripSchedule(T trip) {
+        return !transitData.isTripScheduleInService(trip);
     }
 
     // Track time spent, measure performance

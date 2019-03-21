@@ -5,7 +5,7 @@ import java.util.Iterator;
 
 
 /**
- * This interface defines the data needed for the StdRangeRaptorWorker
+ * This interface defines the data needed for the StdTransitWorker
  * to do transit. {@link com.conveyal.r5.transit.TransitLayer} contains
  * all that data - but not exactly in the flavour needed by the
  * Worker, so creating this interface define that role, and make it

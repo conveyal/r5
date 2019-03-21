@@ -3,55 +3,59 @@ package com.conveyal.r5.profile.entur.rangeraptor.multicriteria;
 import com.conveyal.r5.profile.entur.api.transit.IntIterator;
 import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
+import com.conveyal.r5.profile.entur.rangeraptor.PerformTransitStrategy;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
-import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.StopFilter;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleSearch;
 
 
 /**
- * The purpose of this class is to implement the multi-criteria specific functonallity of
+ * The purpose of this class is to implement the multi-criteria specific functionality of
  * the worker.
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-public final class McRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRangeRaptorWorker<T, McRangeRaptorWorkerState<T>> {
+public final class McTransitWorker<T extends TripScheduleInfo> implements PerformTransitStrategy<T> {
+
+    private final McRangeRaptorWorkerState<T> state;
+    private final TransitCalculator calculator;
+    private final StopFilter stopFilter;
 
     private TripPatternInfo<T> pattern;
     private TripScheduleSearch<T> tripSearch;
 
-    public McRangeRaptorWorker(SearchContext<T> context, McRangeRaptorWorkerState<T> state) {
-        super(context, state);
+    public McTransitWorker(McRangeRaptorWorkerState<T> state, StopFilter stopFilter, TransitCalculator calculator) {
+        this.state = state;
+        this.stopFilter = stopFilter;
+        this.calculator = calculator;
     }
 
     @Override
-    protected final void prepareTransitForRoundAndPattern(TripPatternInfo<T> pattern, TripScheduleSearch<T> tripSearch) {
+    public void prepareForTransitWith(TripPatternInfo<T> pattern, TripScheduleSearch<T> tripSearch) {
         this.pattern = pattern;
         this.tripSearch = tripSearch;
     }
 
-    /**
-     * Perform a scheduled search
-     */
     @Override
-    protected final void performTransitForRoundAndPatternAtStop(int boardStopPos) {
+    public void routeTransitAtStop(int boardStopPos) {
         final int nPatternStops = pattern.numberOfStopsInPattern();
         int boardStopIndex = pattern.stopIndex(boardStopPos);
 
         for (AbstractStopArrival<T> boardStop : state.listStopArrivalsPreviousRound(boardStopIndex)) {
 
-            int earliestBoardTime = calculator().earliestBoardTime(boardStop.arrivalTime());
+            int earliestBoardTime = calculator.earliestBoardTime(boardStop.arrivalTime());
             boolean found = tripSearch.search(earliestBoardTime, boardStopPos);
 
             if (found) {
                 T trip = tripSearch.getCandidateTrip();
-                IntIterator patternStops = calculator().patternStopIterator(boardStopPos, nPatternStops);
+                IntIterator patternStops = calculator.patternStopIterator(boardStopPos, nPatternStops);
 
                 while (patternStops.hasNext()) {
                     int alightStopPos = patternStops.next();
                     int alightStopIndex = pattern.stopIndex(alightStopPos);
 
-                    if(allowStopVisit(alightStopIndex)) {
+                    if(stopFilter.allowStopVisit(alightStopIndex)) {
                         state.transitToStop(
                                 boardStop,
                                 alightStopIndex,

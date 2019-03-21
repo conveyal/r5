@@ -7,6 +7,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.McRangeRaptorWork
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.Stops;
 import com.conveyal.r5.profile.entur.rangeraptor.multicriteria.heuristic.HeuristicsProvider;
 import com.conveyal.r5.profile.entur.rangeraptor.path.DestinationArrivalPaths;
+import com.conveyal.r5.profile.entur.rangeraptor.path.configure.PathConfig;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
 
 import javax.annotation.Nullable;
@@ -19,11 +20,13 @@ import javax.annotation.Nullable;
  */
 public class McRangeRaptorConfig<T extends TripScheduleInfo> {
     private final SearchContext<T> context;
+    private final PathConfig<T> pathConfig;
 
     private DestinationArrivalPaths<T> paths;
 
     public McRangeRaptorConfig(SearchContext<T> context) {
         this.context = context;
+        this.pathConfig = new PathConfig<>(context);
     }
 
     /**
@@ -74,14 +77,7 @@ public class McRangeRaptorConfig<T extends TripScheduleInfo> {
 
     private DestinationArrivalPaths<T> createDestinationArrivalPaths() {
         if (paths == null) {
-            paths = new DestinationArrivalPaths<>(
-                    DestinationArrivalPaths.paretoComparatorWithCost(
-                            context.tuningParameters().relaxCostAtDestinationArrival()
-                    ),
-                    context.calculator(),
-                    context.debugFactory(),
-                    context.lifeCycle()
-            );
+            paths = pathConfig.createDestArrivalPaths(true);
         }
         return paths;
     }

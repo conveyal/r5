@@ -18,7 +18,6 @@ public abstract class AbstractStopArrival<T extends TripScheduleInfo> implements
     }
 
     public static <T extends TripScheduleInfo> ParetoComparator<AbstractStopArrival<T>> compareArrivalTimeAndRound() {
-        // This is important with respect to performance. Using logical OR(||) is faster than boolean OR(|).
         return (l, r) -> l.arrivalTime < r.arrivalTime || l.paretoRound < r.paretoRound;
     }
 

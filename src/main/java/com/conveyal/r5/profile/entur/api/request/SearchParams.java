@@ -25,11 +25,16 @@ public class SearchParams {
     private final boolean arrivedBy;
     private final int boardSlackInSeconds;
     private final int numberOfAdditionalTransfers;
+    private final double relaxCostAtDestination;
+    private final boolean timetableEnabled;
     private final boolean waitAtBeginningEnabled;
     private final BitSet stopFilter;
     private final Collection<TransferLeg> accessLegs;
     private final Collection<TransferLeg> egressLegs;
 
+    /**
+     * Default values is defined in the default constructor.
+     */
     private SearchParams() {
         earliestDepartureTime = NOT_SET;
         latestArrivalTime = NOT_SET;
@@ -37,6 +42,8 @@ public class SearchParams {
         arrivedBy = false;
         boardSlackInSeconds = 60;
         numberOfAdditionalTransfers = 5;
+        relaxCostAtDestination = NOT_SET;
+        timetableEnabled = false;
         waitAtBeginningEnabled = true;
         stopFilter = null;
         accessLegs = Collections.emptyList();
@@ -51,6 +58,8 @@ public class SearchParams {
         // TODO JAVA_9 - Cleanup next 3 lines: Set.of(...) and List.of(...)
         this.boardSlackInSeconds = builder.boardSlackInSeconds();
         this.numberOfAdditionalTransfers = builder.numberOfAdditionalTransfers();
+        this.relaxCostAtDestination = builder.relaxCostAtDestination();
+        this.timetableEnabled = builder.timetableEnabled();
         this.waitAtBeginningEnabled = builder.waitAtBeginningEnabled();
         this.stopFilter = builder.stopFilter();
         this.accessLegs = Collections.unmodifiableList(new ArrayList<>(builder.accessLegs()));
@@ -140,6 +149,43 @@ public class SearchParams {
     }
 
 
+
+    /**
+     * This accept none optimal trips if they are close enough - if and only if they represent an optimal path
+     * for their given iteration. I other words this slack only relax the pareto comparison at the destination.
+     * <p/>
+     * Let {@code c} be the existing minimum pareto optimal cost to to beat. Then a trip with cost {@code c'}
+     * is accepted if the following is true:
+     * <pre>
+     * c' < Math.round(c * relaxCostAtDestination)
+     * </pre>
+     * If the values is less then 0.0 a normal '<' comparison is performed.
+     * <p/>
+     * TODO - When setting this above 1.0, we get some unwanted results. We should have a filter to remove those
+     * TODO - results. See issue https://github.com/entur/r5/issues/28
+     * <p/>
+     * The default value is -1.0 (disabled)
+     */
+    public double relaxCostAtDestination() {
+        return relaxCostAtDestination;
+    }
+
+    /**
+     * Time table allow a Journey to be included in the result if it depart from the origin
+     * AFTER another Journey, even if the first departure have lower cost, number of transfers,
+     * and shorter travel time. For two Journeys that depart at the same time only the best one
+     * will be included (both if they are mutually dominating each other).
+     * <p/>
+     * Setting this parameter to "TRUE" will increase the number of paths returned. The
+     * performance impact is small since the check only affect the pareto check at the
+     * destination.
+     * <p/>
+     * The default value is FALSE.
+     */
+    public boolean timetableEnabled() {
+        return timetableEnabled;
+    }
+
     /**
      * Allow a Journey to depart outside the search window. This parameter allow the first
      * Range Raptor iteration to "wait" at the first stop (access stop) to board the first
@@ -157,8 +203,6 @@ public class SearchParams {
     public boolean waitAtBeginningEnabled() {
         return waitAtBeginningEnabled;
     }
-
-
 
     /**
      * Restrict the search to a limited set of stops. Range Raptor will check the
@@ -194,7 +238,6 @@ public class SearchParams {
     public Collection<TransferLeg> egressLegs() {
         return egressLegs;
     }
-
 
     @Override
     public String toString() {

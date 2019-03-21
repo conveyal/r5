@@ -17,6 +17,8 @@ public class SearchParamsBuilder {
     private boolean arrivedBy;
     private int boardSlackInSeconds;
     private int numberOfAdditionalTransfers;
+    private double relaxCostAtDestination;
+    private boolean timetableEnabled;
     private boolean waitAtBeginningEnabled;
     private BitSet stopFilter;
     private final Collection<TransferLeg> accessLegs = new ArrayList<>();
@@ -35,6 +37,8 @@ public class SearchParamsBuilder {
         this.arrivedBy = defaults.arrivedBy();
         this.boardSlackInSeconds = defaults.boardSlackInSeconds();
         this.numberOfAdditionalTransfers = defaults.numberOfAdditionalTransfers();
+        this.relaxCostAtDestination = defaults.relaxCostAtDestination();
+        this.timetableEnabled = defaults.timetableEnabled();
         this.waitAtBeginningEnabled = defaults.waitAtBeginningEnabled();
         this.stopFilter = defaults.stopFilter();
         this.accessLegs.addAll(defaults.accessLegs());
@@ -101,12 +105,30 @@ public class SearchParamsBuilder {
         return this;
     }
 
+    public double relaxCostAtDestination() {
+        return relaxCostAtDestination;
+    }
+
+    public SearchParamsBuilder relaxCostAtDestination(double relaxCostAtDestination) {
+        this.relaxCostAtDestination = relaxCostAtDestination;
+        return this;
+    }
+
+    public boolean timetableEnabled() {
+        return timetableEnabled;
+    }
+
+    public SearchParamsBuilder timetableEnabled(boolean enable) {
+        this.timetableEnabled = enable;
+        return this;
+    }
+
     public boolean waitAtBeginningEnabled() {
         return waitAtBeginningEnabled;
     }
 
     public SearchParamsBuilder waitAtBeginningEnabled(boolean enable) {
-        waitAtBeginningEnabled = enable;
+        this.waitAtBeginningEnabled = enable;
         return this;
     }
 

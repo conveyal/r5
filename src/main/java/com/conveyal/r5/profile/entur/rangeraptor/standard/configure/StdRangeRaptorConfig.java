@@ -3,9 +3,9 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard.configure;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.view.Heuristics;
 import com.conveyal.r5.profile.entur.rangeraptor.path.DestinationArrivalPaths;
+import com.conveyal.r5.profile.entur.rangeraptor.path.configure.PathConfig;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.ArrivedAtDestinationCheck;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.BestNumberOfTransfers;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.NoWaitRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StdRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StdRangeRaptorWorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalsState;
@@ -31,7 +31,9 @@ import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
+
     private final SearchContext<T> ctx;
+    private final PathConfig<T> pathConfig;
 
     private boolean workerCreated = false;
     private BestTimes bestTimes = null;
@@ -43,6 +45,7 @@ public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
 
     private StdRangeRaptorConfig(SearchContext<T> context) {
         this.ctx = context;
+        this.pathConfig = new PathConfig<>(context);
     }
 
     public static <T extends TripScheduleInfo> StdRangeRaptorWorker<T> createSearch(SearchContext<T> context) {
@@ -80,13 +83,13 @@ public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
         assertOnlyOneWorkerIsCreated();
         StdRangeRaptorWorkerState<T> workerState = workerState(stopArrivalsState);
         createHeuristics(includeHeuristics);
-        return new StdRangeRaptorWorker<>(ctx, workerState);
+        return StdRangeRaptorWorker.createStdWorker(ctx, workerState);
     }
 
-    private NoWaitRangeRaptorWorker<T> createNoWaitWorker(boolean includeHeuristics, StopArrivalsState<T> stopArrivalsState) {
+    private StdRangeRaptorWorker<T> createNoWaitWorker(boolean includeHeuristics, StopArrivalsState<T> stopArrivalsState) {
         assertOnlyOneWorkerIsCreated();
         createHeuristics(includeHeuristics);
-        return new NoWaitRangeRaptorWorker<>(ctx, workerState(stopArrivalsState));
+        return StdRangeRaptorWorker.createNoWaitWorker(ctx, workerState(stopArrivalsState));
     }
 
     /**
@@ -167,12 +170,7 @@ public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
     }
 
     private DestinationArrivalPaths<T> destinationArrivalPaths() {
-        DestinationArrivalPaths<T> destinationArrivalPaths = new DestinationArrivalPaths<>(
-                DestinationArrivalPaths.paretoComparatorWithoutCost(),
-                ctx.calculator(),
-                ctx.debugFactory(),
-                ctx.lifeCycle()
-        );
+        DestinationArrivalPaths<T> destinationArrivalPaths = pathConfig.createDestArrivalPaths(false);
 
         // Add egressArrivals to stops and bind them to the destination arrival paths. The
         // adapter notify the destination on each new egress stop arrival.

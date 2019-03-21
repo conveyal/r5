@@ -3,7 +3,6 @@ package com.conveyal.r5.profile.otp2.api.request;
 import com.conveyal.r5.profile.otp2.api.transit.TransferLeg;
 import com.conveyal.r5.profile.otp2.util.TimeUtils;
 
-import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
@@ -213,7 +212,6 @@ public class SearchParams {
      * </p>
      * The default is {@code null}
      */
-    @Nullable
     public BitSet stopFilter() {
         return stopFilter;
     }

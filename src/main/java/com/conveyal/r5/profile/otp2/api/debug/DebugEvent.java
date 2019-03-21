@@ -1,7 +1,6 @@
 package com.conveyal.r5.profile.otp2.api.debug;
 
 
-import javax.annotation.Nullable;
 
 
 /**
@@ -83,7 +82,7 @@ public class DebugEvent<E> {
      * <p/>
      * The rejectedDroppedByElement is optional. It can be {@code null}.
      */
-    public @Nullable E rejectedDroppedByElement() {
+    public E rejectedDroppedByElement() {
         return rejectedDroppedByElement;
     }
 

@@ -1,14 +1,14 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.r5.api.util.ParkRideParking;
+import com.conveyal.r5.streets.StreetLayer;
+import com.conveyal.r5.streets.StreetRouter;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import gnu.trove.map.hash.TIntObjectHashMap;
-import com.conveyal.r5.streets.StreetLayer;
-import com.conveyal.r5.streets.StreetRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -95,9 +95,20 @@ public class TransferFinder {
         // When applying scenarios we want to find transfers for only the newly added stops.
         // We look at any existing list of transfers and do enough iterations to make it as long as the list of stops.
         int firstStopIndex = transfersForStop.size();
-        LOG.info("Finding transfers through the street network from {} stops...", transitLayer.getStopCount() - transfersForStop.size());
+        int nStops =  transitLayer.getStopCount() - transfersForStop.size();
+        int processedCounter = 0;
+        LOG.info("Finding transfers through the street network from {} stops...", nStops);
+
         // TODO Parallelize with streams. See distance table generation.
         for (int s = firstStopIndex; s < transitLayer.getStopCount(); s++) {
+            // Log progress for every 10 000 stops processed
+            if(processedCounter == 10_000) {
+                LOG.info("Progress: {}% of all stops processed.", 100 * (s - firstStopIndex) / nStops);
+                processedCounter = 0;
+            } else {
+                processedCounter++;
+            }
+
             // From each stop, run a street search looking for other transit stops.
             int originStreetVertex = transitLayer.streetVertexForStop.get(s);
             if (originStreetVertex == -1) {

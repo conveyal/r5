@@ -528,7 +528,7 @@ public class FastRaptorWorker {
                             int travelTime = schedule.arrivals[stopPositionInPattern] - schedule.departures[boardStopPositionInPattern];
                             int alightTime = boardTime + travelTime;
                             int boardStop = pattern.stops[boardStopPositionInPattern];
-                            outputState.setTimeAtStop(stop, alightTime, originalPatternIndex, boardStop, waitTime, travelTime, false);
+                            outputState.setTimeAtStop(stop, alightTime, originalPatternIndex, boardStop, waitTime, travelTime, false, tripScheduleIndex, boardTime, -1);
                         }
 
                         // attempt to board if pick up is allowed

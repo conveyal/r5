@@ -1,5 +1,6 @@
 package com.conveyal.r5.speed_test;
 
+import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.otp2.RangeRaptorService;
 import com.conveyal.r5.profile.otp2.api.path.Path;
@@ -72,7 +73,7 @@ public class SpeedTest {
     private void initTransportNetwork() throws Exception {
         synchronized (NETWORK_DATA_FILE) {
             if (transportNetwork == null) {
-                transportNetwork = TransportNetwork.read(new File(opts.rootDir(), NETWORK_DATA_FILE));
+                transportNetwork = KryoNetworkSerializer.read(new File(opts.rootDir(), NETWORK_DATA_FILE));
                 transportNetwork.rebuildTransientIndexes();
             }
         }

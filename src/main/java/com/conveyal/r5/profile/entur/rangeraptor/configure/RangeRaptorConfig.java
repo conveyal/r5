@@ -24,6 +24,8 @@ import java.util.concurrent.Executors;
  * <p/>
  * This class should have APPLICATION scope. It manage a threadPool,
  * and hold a reference to the application tuning parameters.
+ *
+ * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
 public class RangeRaptorConfig<T extends TripScheduleInfo> {
     private final ExecutorService threadPool;

@@ -41,12 +41,6 @@ class RequestSupport {
             return 12;
         }
 
-        // We don´t want to relax the results in the test, because it make it much harder to verify the result
-        @Override
-        public double relaxCostAtDestinationArrival() {
-            return 1.0;
-        }
-
         @Override
         public int searchThreadPoolSize() {
             return 0;
@@ -92,6 +86,7 @@ class RequestSupport {
         RequestBuilder<TripSchedule> builder = new RequestBuilder<TripSchedule>();
         builder.searchParams()
                 .boardSlackInSeconds(120)
+                .timetableEnabled(false)
                 .earliestDepartureTime(request.fromTime - expandDeltaSeconds)
                 .latestArrivalTime(latestArrivalTime + expandDeltaSeconds)
                 .searchWindowInSeconds(request.toTime - request.fromTime + 2 * expandDeltaSeconds)

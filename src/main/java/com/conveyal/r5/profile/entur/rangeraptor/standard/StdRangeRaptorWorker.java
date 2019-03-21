@@ -4,6 +4,7 @@ import com.conveyal.r5.profile.entur.api.transit.TripPatternInfo;
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.AbstractRangeRaptorWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
+import com.conveyal.r5.profile.entur.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleSearch;
 
 
@@ -31,7 +32,7 @@ import com.conveyal.r5.profile.entur.rangeraptor.transit.TripScheduleSearch;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-public class StdRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRangeRaptorWorker<T, StdWorkerState<T>> {
+public final class StdRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRangeRaptorWorker<T, StdWorkerState<T>> {
 
     private static final int NOT_SET = -1;
 
@@ -41,18 +42,23 @@ public class StdRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRa
     private T onTrip;
     private TripPatternInfo<T> pattern;
     private TripScheduleSearch<T> tripSearch;
+    private final BoardAlightTimeCalculatorStrategy<T> boardAlightTime;
 
-
-    public StdRangeRaptorWorker(SearchContext<T> context, StdWorkerState<T> state) {
+    private StdRangeRaptorWorker(SearchContext<T> context, StdWorkerState<T> state, BoardAlightTimeCalculatorStrategy<T> boardAlightTime) {
         super(context, state);
+        this.boardAlightTime = boardAlightTime;
     }
 
-    TripScheduleSearch<T> tripSearch() {
-        return tripSearch;
+    public static <T extends TripScheduleInfo> StdRangeRaptorWorker<T> createStdWorker(
+            SearchContext<T> context, StdWorkerState<T> state
+    ) {
+        return new StdRangeRaptorWorker<>(context, state, new StandardBoardAlightTimeCalculator<>(context.calculator()));
     }
 
-    T onTrip() {
-        return onTrip;
+    public static <T extends TripScheduleInfo> StdRangeRaptorWorker<T> createNoWaitWorker(
+            SearchContext<T> context, StdWorkerState<T> state
+    ) {
+        return new StdRangeRaptorWorker<>(context, state, new NoWaitBoardAlightTimeCalculator<>(context.calculator()));
     }
 
     @Override
@@ -63,7 +69,7 @@ public class StdRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRa
         this.onTripBoardTime = 0;
         this.onTripBoardStop = -1;
         this.onTrip = null;
-        prepareTransitForRoundAndPattern();
+        this.boardAlightTime.prepareTransitForRoundAndPattern();
     }
 
     protected void prepareTransitForRoundAndPattern() { }
@@ -77,7 +83,7 @@ public class StdRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRa
         if (onTripIndex != NOT_SET) {
             state.transitToStop(
                     stop,
-                    alightTime(stopPositionInPattern),
+                    boardAlightTime.alightTime(onTrip, stopPositionInPattern),
                     onTripBoardStop,
                     onTripBoardTime,
                     onTrip
@@ -95,20 +101,62 @@ public class StdRangeRaptorWorker<T extends TripScheduleInfo> extends AbstractRa
             if (found) {
                 onTripIndex = tripSearch.getCandidateTripIndex();
                 onTrip = tripSearch.getCandidateTrip();
-                onTripBoardTime = boardTime(earliestBoardTime);
+                onTripBoardTime = boardAlightTime.boardTime(earliestBoardTime, tripSearch.getCandidateTripTime());
                 onTripBoardStop = stop;
             }
         }
     }
 
-    protected int boardTime(final int earliestBoardTime) {
-        return tripSearch.getCandidateTripTime();
+
+    /**
+     * There is
+     */
+    private interface BoardAlightTimeCalculatorStrategy<T> {
+        default void prepareTransitForRoundAndPattern() {}
+        int boardTime(final int earliestBoardTime, final int candidateTripTime);
+        int alightTime(final T trip, final int stopPositionInPattern);
     }
 
+    private static class StandardBoardAlightTimeCalculator<T extends TripScheduleInfo>
+            implements  BoardAlightTimeCalculatorStrategy<T> {
+        private final TransitCalculator calculator;
 
-    protected int alightTime(final int stopPositionInPattern) {
-        // In the normal case the arrivalTime is used,
-        // but in reverse search the board slack is added; hence the calculator delegation
-        return calculator().latestArrivalTime(onTrip, stopPositionInPattern);
+        StandardBoardAlightTimeCalculator(TransitCalculator calculator) {
+            this.calculator = calculator;
+        }
+
+        public int boardTime(final int earliestBoardTime, final int candidateTripTime) {
+            return candidateTripTime;
+        }
+
+        public int alightTime(final T trip, final int stopPositionInPattern) {
+            // In the normal case the arrivalTime is used,
+            // but in reverse search the board slack is added; hence the calculator delegation
+            return calculator.latestArrivalTime(trip, stopPositionInPattern);
+        }
+    }
+
+    static class NoWaitBoardAlightTimeCalculator<T extends TripScheduleInfo> implements BoardAlightTimeCalculatorStrategy<T> {
+        private final TransitCalculator calculator;
+        int onTripTimeShift = NOT_SET;
+
+        NoWaitBoardAlightTimeCalculator(TransitCalculator calculator) {
+            this.calculator = calculator;
+        }
+
+        public void prepareTransitForRoundAndPattern() {
+            this.onTripTimeShift = NOT_SET;
+        }
+
+        public int boardTime(final int earliestBoardTime, final int candidateTripTime) {
+            onTripTimeShift = candidateTripTime - earliestBoardTime;
+            return earliestBoardTime;
+        }
+
+        public int alightTime(final T trip, final int stopPositionInPattern) {
+            // In the normal case the arrivalTime is used, but in reverse search
+            // the board slack is added; hence the calculator delegation
+            return calculator.latestArrivalTime(trip, stopPositionInPattern) - onTripTimeShift;
+        }
     }
 }

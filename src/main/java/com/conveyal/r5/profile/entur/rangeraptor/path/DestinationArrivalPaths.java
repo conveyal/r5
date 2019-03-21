@@ -98,26 +98,4 @@ public class DestinationArrivalPaths<T extends TripScheduleInfo> {
             debugHandler.reject(destArrival.previous(), null, calculator.exceedsTimeLimitReason());
         }
     }
-
-    public static <T extends TripScheduleInfo>
-    ParetoComparator<Path<T>> paretoComparatorWithCost(double relaxCostAtDestinationArrival) {
-        // The `travelDuration` is added as a criteria to the pareto comparator in addition to the parameters
-        // used for each stop arrivals. The `travelDuration` is only needed at the destination because Range Raptor
-        // works in iterations backwards in time.
-        return (l, r) ->
-                l.endTime() < r.endTime() ||
-                l.numberOfTransfers() < r.numberOfTransfers() ||
-                l.totalTravelDurationInSeconds() < r.totalTravelDurationInSeconds() ||
-                l.cost() < Math.round(r.cost() * relaxCostAtDestinationArrival);
-    }
-
-    public static <T extends TripScheduleInfo> ParetoComparator<Path<T>> paretoComparatorWithoutCost() {
-        // The `travelDuration` is added as a criteria to the pareto comparator in addition to the parameters
-        // used for each stop arrivals. The `travelDuration` is only needed at the destination because Range Raptor
-        // works in iterations backwards in time.
-        return (l, r) ->
-                l.endTime() < r.endTime() ||
-                l.numberOfTransfers() < r.numberOfTransfers() ||
-                l.totalTravelDurationInSeconds() < r.totalTravelDurationInSeconds();
-    }
 }

@@ -1,6 +1,6 @@
 package com.conveyal.r5.speed_test;
 
-import com.conveyal.r5.profile.entur.util.AvgTimer;
+import com.conveyal.r5.profile.otp2.util.AvgTimer;
 import com.conveyal.r5.speed_test.test.TestCase;
 import com.conveyal.r5.speed_test.test.TestCaseFailedException;
 

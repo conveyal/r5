@@ -2,7 +2,7 @@ package com.conveyal.r5.speed_test;
 
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.profile.entur.util.AvgTimer;
+import com.conveyal.r5.profile.otp2.util.AvgTimer;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.TripPlan;
 import com.conveyal.r5.speed_test.transit.EgressAccessRouter;
@@ -13,7 +13,7 @@ import gnu.trove.iterator.TIntIntIterator;
 
 import java.util.Calendar;
 
-import static com.conveyal.r5.profile.entur.util.TimeUtils.midnightOf;
+import static com.conveyal.r5.profile.otp2.util.TimeUtils.midnightOf;
 
 class RunOriginalWorker {
     /**

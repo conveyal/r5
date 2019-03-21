@@ -2,7 +2,7 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.otp2.api.transit.TripScheduleInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

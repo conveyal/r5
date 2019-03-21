@@ -1,12 +1,12 @@
 package com.conveyal.r5.speed_test;
 
 import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.profile.entur.RangeRaptorService;
-import com.conveyal.r5.profile.entur.api.path.Path;
-import com.conveyal.r5.profile.entur.api.request.RangeRaptorRequest;
-import com.conveyal.r5.profile.entur.api.transit.TransitDataProvider;
-import com.conveyal.r5.profile.entur.transitadapter.TransitLayerRRDataProvider;
-import com.conveyal.r5.profile.entur.util.AvgTimer;
+import com.conveyal.r5.profile.otp2.RangeRaptorService;
+import com.conveyal.r5.profile.otp2.api.path.Path;
+import com.conveyal.r5.profile.otp2.api.request.RangeRaptorRequest;
+import com.conveyal.r5.profile.otp2.api.transit.TransitDataProvider;
+import com.conveyal.r5.profile.otp2.transitadapter.TransitLayerRRDataProvider;
+import com.conveyal.r5.profile.otp2.util.AvgTimer;
 import com.conveyal.r5.speed_test.api.model.TripPlan;
 import com.conveyal.r5.speed_test.cli.CommandLineOpts;
 import com.conveyal.r5.speed_test.cli.SpeedTestCmdLineOpts;

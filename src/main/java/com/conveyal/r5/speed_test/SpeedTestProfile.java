@@ -1,7 +1,7 @@
 package com.conveyal.r5.speed_test;
 
-import com.conveyal.r5.profile.entur.api.request.Optimization;
-import com.conveyal.r5.profile.entur.api.request.RangeRaptorProfile;
+import com.conveyal.r5.profile.otp2.api.request.Optimization;
+import com.conveyal.r5.profile.otp2.api.request.RangeRaptorProfile;
 
 import java.util.Arrays;
 import java.util.List;

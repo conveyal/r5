@@ -1,16 +1,16 @@
 package com.conveyal.r5.speed_test.transit;
 
-import com.conveyal.r5.profile.entur.util.TimeUtils;
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparator;
-import com.conveyal.r5.profile.entur.util.paretoset.ParetoComparatorBuilder;
+import com.conveyal.r5.profile.otp2.util.TimeUtils;
+import com.conveyal.r5.profile.otp2.util.paretoset.ParetoComparator;
+import com.conveyal.r5.profile.otp2.util.paretoset.ParetoComparatorBuilder;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.Leg;
 
 import java.util.HashSet;
 import java.util.Set;
 
-import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrCompact;
-import static com.conveyal.r5.profile.entur.util.TimeUtils.timeToStrShort;
+import static com.conveyal.r5.profile.otp2.util.TimeUtils.timeToStrCompact;
+import static com.conveyal.r5.profile.otp2.util.TimeUtils.timeToStrShort;
 
 public class SpeedTestItinerary extends Itinerary {
 

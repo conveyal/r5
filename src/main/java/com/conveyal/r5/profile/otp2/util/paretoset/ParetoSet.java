@@ -1,6 +1,5 @@
 package com.conveyal.r5.profile.otp2.util.paretoset;
 
-import javax.annotation.Nullable;
 import java.util.AbstractCollection;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -40,7 +39,7 @@ public class ParetoSet<T> extends AbstractCollection<T> {
      * @param comparator The comparator to use with this set
      * @param eventListener At most one listener can be registered to listen for drop events.
      */
-    public ParetoSet(ParetoComparator<T> comparator, @Nullable ParetoSetEventListener<? super T> eventListener) {
+    public ParetoSet(ParetoComparator<T> comparator, ParetoSetEventListener<? super T> eventListener) {
         this.comparator = comparator;
         this.eventListener = eventListener;
     }

@@ -24,7 +24,7 @@ import static com.conveyal.r5.profile.otp2.api.request.Optimization.TRANSFERS_ST
 import static com.conveyal.r5.profile.otp2.api.request.RangeRaptorProfile.NO_WAIT_BEST_TIME;
 
 /**
- * A service for performing Range Raptor routing request. 
+ * A service for performing Range Raptor routing request.
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */

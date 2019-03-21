@@ -13,7 +13,6 @@ import com.conveyal.r5.profile.otp2.rangeraptor.path.DestinationArrivalPaths;
 import com.conveyal.r5.profile.otp2.rangeraptor.path.configure.PathConfig;
 import com.conveyal.r5.profile.otp2.rangeraptor.transit.SearchContext;
 
-import javax.annotation.Nullable;
 import java.util.function.BiFunction;
 
 
@@ -37,7 +36,7 @@ public class McRangeRaptorConfig<T extends TripScheduleInfo> {
      * Create new multi-criteria worker with optional heuristics.
      */
     public Worker<T> createWorker(
-            @Nullable Heuristics heuristics,
+            Heuristics heuristics,
             BiFunction<WorkerState<T>, PerformTransitStrategy<T>, Worker<T>> createWorker
     ) {
         McRangeRaptorWorkerState<T> state = createState(heuristics);
@@ -73,7 +72,7 @@ public class McRangeRaptorConfig<T extends TripScheduleInfo> {
         );
     }
 
-    private HeuristicsProvider<T> createHeuristicsProvider(@Nullable Heuristics heuristics) {
+    private HeuristicsProvider<T> createHeuristicsProvider(Heuristics heuristics) {
         if (heuristics == null) {
             return new HeuristicsProvider<>();
         } else {

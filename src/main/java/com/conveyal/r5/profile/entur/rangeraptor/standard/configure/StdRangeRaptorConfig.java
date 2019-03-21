@@ -2,12 +2,17 @@ package com.conveyal.r5.profile.entur.rangeraptor.standard.configure;
 
 import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.api.view.Heuristics;
+import com.conveyal.r5.profile.entur.api.view.Worker;
+import com.conveyal.r5.profile.entur.rangeraptor.PerformTransitStrategy;
+import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.path.DestinationArrivalPaths;
 import com.conveyal.r5.profile.entur.rangeraptor.path.configure.PathConfig;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.ArrivedAtDestinationCheck;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.BestNumberOfTransfers;
-import com.conveyal.r5.profile.entur.rangeraptor.standard.StdRangeRaptorWorker;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.NoWaitTransitWorker;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StdRangeRaptorWorkerState;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.StdTransitWorker;
+import com.conveyal.r5.profile.entur.rangeraptor.standard.StdWorkerState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.StopArrivalsState;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.BestTimes;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.besttimes.BestTimesOnlyStopArrivalsState;
@@ -21,6 +26,8 @@ import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.Stops;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.path.EgressArrivalToPathAdapter;
 import com.conveyal.r5.profile.entur.rangeraptor.standard.stoparrivals.view.StopsCursor;
 import com.conveyal.r5.profile.entur.rangeraptor.transit.SearchContext;
+
+import java.util.function.BiFunction;
 
 
 /**
@@ -40,68 +47,65 @@ public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
     private Stops<T> stops = null;
     private ArrivedAtDestinationCheck destinationCheck = null;
     private BestNumberOfTransfers bestNumberOfTransfers = null;
-    private Heuristics heuristics = null;
 
 
-    private StdRangeRaptorConfig(SearchContext<T> context) {
+    public StdRangeRaptorConfig(SearchContext<T> context) {
         this.ctx = context;
         this.pathConfig = new PathConfig<>(context);
     }
 
-    public static <T extends TripScheduleInfo> StdRangeRaptorWorker<T> createSearch(SearchContext<T> context) {
-        return new StdRangeRaptorConfig<>(context).createSearch(false);
+    /**
+     * Create a heuristic search using the provided callback to create the worker.
+     * The callback is necessary because the heuristics MUST be created before the
+     * worker, if not the heuristic can not be added to the worker lifecycle and fails.
+     */
+    public HeuristicSearch<T> createHeuristicSearch(
+            BiFunction<WorkerState<T>, PerformTransitStrategy<T>, Worker<T>> createWorker
+    ) {
+        StdRangeRaptorWorkerState<T> state = createState();
+        Heuristics heuristics = createHeuristicsAdapter();
+        return new HeuristicSearch<>(createWorker.apply(state, createWorkerStrategy(state)), heuristics);
     }
 
-    public static <T extends TripScheduleInfo> HeuristicSearch<T> createHeuristicSearch(SearchContext<T> ctx) {
-        return new StdRangeRaptorConfig<>(ctx).createHeuristicSearch();
+    public Worker<T> createSearch(
+            BiFunction<WorkerState<T>, PerformTransitStrategy<T>, Worker<T>> createWorker
+    ) {
+        StdRangeRaptorWorkerState<T> state = createState();
+        return createWorker.apply(state, createWorkerStrategy(state));
     }
 
 
     /* private factory methods */
 
-    private StdRangeRaptorWorker<T> createSearch(boolean includeHeuristics) {
+    private StdRangeRaptorWorkerState<T> createState() {
         new VerifyRequestIsValid(ctx).verify();
-
         switch (ctx.profile()) {
             case STANDARD:
-                return createWorker(includeHeuristics, stdStopArrivalsState());
-            case BEST_TIME:
-                return createWorker(includeHeuristics, bestTimeStopArrivalsState());
             case NO_WAIT_STD:
-                return createNoWaitWorker(includeHeuristics, stdStopArrivalsState());
+                return workerState(stdStopArrivalsState());
+            case BEST_TIME:
             case NO_WAIT_BEST_TIME:
-                return createNoWaitWorker(includeHeuristics, bestTimeStopArrivalsState());
+                return workerState(bestTimeStopArrivalsState());
         }
         throw new IllegalArgumentException(ctx.profile().toString());
     }
 
-    private HeuristicSearch<T> createHeuristicSearch() {
-        return new HeuristicSearch<>(createSearch(true), heuristics);
-    }
+    private PerformTransitStrategy<T> createWorkerStrategy(StdWorkerState<T> state) {
 
-    private StdRangeRaptorWorker<T> createWorker(boolean includeHeuristics, StopArrivalsState<T> stopArrivalsState) {
-        assertOnlyOneWorkerIsCreated();
-        StdRangeRaptorWorkerState<T> workerState = workerState(stopArrivalsState);
-        createHeuristics(includeHeuristics);
-        return StdRangeRaptorWorker.createStdWorker(ctx, workerState);
-    }
-
-    private StdRangeRaptorWorker<T> createNoWaitWorker(boolean includeHeuristics, StopArrivalsState<T> stopArrivalsState) {
-        assertOnlyOneWorkerIsCreated();
-        createHeuristics(includeHeuristics);
-        return StdRangeRaptorWorker.createNoWaitWorker(ctx, workerState(stopArrivalsState));
-    }
-
-    /**
-     * The heuristics MUST be created before the worker, if not the heuristic
-     * can not be added to the worker lifecycle and fails.
-     */
-    private void createHeuristics(boolean includeHeuristics) {
-        if(!includeHeuristics) {
-            return;
+        switch (ctx.profile()) {
+            case STANDARD:
+            case BEST_TIME:
+                return new StdTransitWorker<>(state, ctx.calculator());
+            case NO_WAIT_STD:
+            case NO_WAIT_BEST_TIME:
+                return new NoWaitTransitWorker<>(state, ctx.calculator());
         }
+        throw new IllegalArgumentException(ctx.profile().toString());
+    }
+
+    private Heuristics createHeuristicsAdapter() {
         assertNotNull(bestNumberOfTransfers);
-        heuristics = new HeuristicsAdapter(
+        return new HeuristicsAdapter(
                 bestTimes(),
                 this.bestNumberOfTransfers,
                 ctx.egressLegs(),

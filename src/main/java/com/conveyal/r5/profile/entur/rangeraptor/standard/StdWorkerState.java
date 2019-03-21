@@ -4,7 +4,7 @@ import com.conveyal.r5.profile.entur.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.entur.rangeraptor.WorkerState;
 
 /**
- * This interface define the methods used be the {@link StdRangeRaptorWorker}
+ * This interface define the methods used be the {@link StdTransitWorker}
  * to query and update the state of the algorithm.
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.

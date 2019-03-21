@@ -24,7 +24,7 @@ import java.util.function.Consumer;
 
 
 /**
- * Help SpeedTast with careting {@link ProfileRequest}, old r5 request, and mapping to new {@link RangeRaptorRequest}.
+ * Help SpeedTast with creating {@link ProfileRequest}, old r5 request, and mapping to new {@link RangeRaptorRequest}.
  */
 class RequestSupport {
 

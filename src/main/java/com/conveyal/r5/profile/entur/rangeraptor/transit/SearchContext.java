@@ -43,6 +43,7 @@ public class SearchContext<T extends TripScheduleInfo> {
     private final WorkerPerformanceTimers timers;
     private final DebugRequest<T> debugRequest;
     private final DebugHandlerFactory<T> debugFactory;
+    private final StopFilter stopFilter;
 
     private LifeCycleBuilder lifeCycleBuilder = new LifeCycleBuilder();
 
@@ -61,6 +62,9 @@ public class SearchContext<T extends TripScheduleInfo> {
         this.timers = timers;
         this.debugRequest = debugRequest(request);
         this.debugFactory = new DebugHandlerFactory<>(this.debugRequest, lifeCycle());
+        this.stopFilter = request.searchParams().stopFilter() != null
+                ? new StopFilerBitSet(request.searchParams().stopFilter())
+                : (s -> true);
     }
 
     public Collection<TransferLeg> accessLegs() {
@@ -126,6 +130,10 @@ public class SearchContext<T extends TripScheduleInfo> {
     /** Calculate the maximum number of rounds to perform. */
     public int nRounds() {
         return tuningParameters.maxNumberOfTransfers() + 1;
+    }
+
+    public StopFilter stopFilter() {
+        return stopFilter;
     }
 
     /**

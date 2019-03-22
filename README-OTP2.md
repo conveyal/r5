@@ -14,7 +14,7 @@ You need to have:
 
 The best way to get started is to run with the provided _Norwegian_ test data set.
 
-1. Copy the `[Git repo root]/testdata/norway` directory to you prefered testdata directory, `<test-data-dir>`. Most of the needed files are checked in, but you must download a osm map.
+1. Copy the `[Git repo root]/testdata/norway` directory to you prefered testdata directory, `<test-data-dir>`. Some of the needed files are checked in, but you must download GTFS transit data and a osm map.
 1. We did NOT provide the OSM map for norway so you have to download it. Download `norway-latest.osm.pdf` from   
 [ geofabrik.de](https://download.geofabrik.de/europe/norway.html). Move it to `<test-data-dir>`. 
 1. Take a look at the `<test-data-dir>/travelSearch.csv`, each line is a search and is run as part of the test.

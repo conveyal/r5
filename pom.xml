@@ -8,7 +8,7 @@
 
     <groupId>com.conveyal</groupId>
     <artifactId>r5</artifactId>
-    <version>entur.2.0.0-SNAPSHOT</version>
+    <version>4.5.3-SNAPSHOT</version>
     <packaging>jar</packaging>
     <licenses>
         <license>
@@ -50,33 +50,15 @@
     <properties>
         <geotools.version>14.0</geotools.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-
-        <!-- Docker & Fabric8 Configs -->
-        <docker.from>eu.gcr.io/carbon-1287/java-base-image</docker.from>
-        <docker.image>eu.gcr.io/${fabric8.dockerUser}${project.artifactId}:${project.version}</docker.image>
-        <docker.cleanup>none</docker.cleanup>
-        <docker.port.container.jolokia>8778</docker.port.container.jolokia>
-
-        <fabric8.dockerUser>carbon-1287/</fabric8.dockerUser>
-        <fabric8.service.name>r5</fabric8.service.name>
-        <fabric8.service.port>80</fabric8.service.port>
-        <fabric8.service.containerPort>8080</fabric8.service.containerPort>
-
-        <!-- fabric8.env.AB_JOLOKIA_AUTH_OPENSHIFT>true</fabric8.env.AB_JOLOKIA_AUTH_OPENSHIFT -->
-        <fabric8.label.component>${project.artifactId}</fabric8.label.component>
-        <fabric8.label.container>grizzly</fabric8.label.container>
-        <fabric8.label.group>rutebanken</fabric8.label.group>
-        <fabric8.iconRef>spring-boot</fabric8.iconRef>
-        <docker.maven.plugin.version>0.21.0</docker.maven.plugin.version>
-        <fabric8.version>2.3.6</fabric8.version>
     </properties>
 
     <!-- Define where the artifacts produced by this build will be deployed -->
     <distributionManagement>
+        <!-- We are using Sonatype Nexus Staging instead of Maven Release plugin.
+             Only a snapshot repo should be configured. Releases are done from that snapshot staging repo. -->
         <snapshotRepository>
-            <id>snapshots</id>
-            <name>entur2-snapshots</name>
-            <url>https://entur2.jfrog.io/entur2/libs-snapshot-local</url>
+            <id>ossrh</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
         </snapshotRepository>
     </distributionManagement>
 
@@ -92,15 +74,9 @@
                 <filtering>true</filtering>
                 <includes>
                     <include>**/*.properties</include>
-                    <include>worker.sh</include>
                     <include>debug-plan/**</include>
                     <include>fares/**</include>
                 </includes>
-            </resource>
-            <resource>
-                <directory>src/client</directory>
-                <targetPath>client</targetPath>
-                <filtering>false</filtering>
             </resource>
         </resources>
 
@@ -196,6 +172,20 @@
             </plugin>
 
             <plugin>
+                <!-- Recommended way to deploy to OSSRH -->
+                <groupId>org.sonatype.plugins</groupId>
+                <artifactId>nexus-staging-maven-plugin</artifactId>
+                <version>1.6.7</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <serverId>ossrh</serverId>
+                    <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                    <!-- Release versions will be synced to Maven Central automatically. -->
+                    <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                </configuration>
+            </plugin>
+
+            <plugin>
                 <!-- Allow attaching Javadoc during releases -->
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
@@ -241,22 +231,22 @@
                 </executions>
             </plugin>
 
-            <!--<plugin>-->
-                <!--<groupId>org.apache.maven.plugins</groupId>-->
-                <!--<artifactId>maven-gpg-plugin</artifactId>-->
-                <!--<version>1.5</version>-->
-                <!--<executions>-->
-                    <!--<execution>-->
-                        <!--<id>sign-artifacts</id>-->
-                        <!--&lt;!&ndash; We sign in the verify phase, which means it will happen before install and deploy (the last two phases)-->
-                             <!--but not before earlier phases like test or package. &ndash;&gt;-->
-                        <!--<phase>verify</phase>-->
-                        <!--<goals>-->
-                            <!--<goal>sign</goal>-->
-                        <!--</goals>-->
-                    <!--</execution>-->
-                <!--</executions>-->
-            <!--</plugin>-->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <version>1.5</version>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <!-- We sign in the verify phase, which means it will happen before install and deploy (the last two phases)
+                             but not before earlier phases like test or package. -->
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
@@ -274,6 +264,11 @@
             <id>conveyal</id>
             <name>conveyal</name>
             <url>https://maven.conveyal.com</url>
+        </repository>
+        <repository>
+            <id>conveyal-ossrh</id>
+            <name>releases on sonatype, which may not yet have been synced with central</name>
+            <url>https://oss.sonatype.org/content/repositories/releases/</url>
         </repository>
         <repository>
             <id>osgeo</id>
@@ -296,12 +291,7 @@
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-core</artifactId>
-            <version>2.8.7</version>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.jaxrs</groupId>
-            <artifactId>jackson-jaxrs-json-provider</artifactId>
-            <version>2.8.7</version>
+            <version>2.6.1</version>
         </dependency>
         <!-- JTS does 2D geometry and topology. Recently moved from vividsolutions to locationtech.
           We could update R5 to use the new locationtech class names and its built-in GeoJSON support.
@@ -315,12 +305,6 @@
             <groupId>de.grundid.opendatalab</groupId>
             <artifactId>geojson-jackson</artifactId>
             <version>1.5</version>
-        </dependency>
-        <!-- Trove provides optimized map/set collections for native types (int, long...) -->
-        <dependency>
-            <groupId>net.sf.trove4j</groupId>
-            <artifactId>trove4j</artifactId>
-            <version>3.0.3</version>
         </dependency>
         <dependency>
             <groupId>net.sourceforge.javacsv</groupId>
@@ -443,46 +427,6 @@
             <groupId>com.axiomalaska</groupId>
             <artifactId>polyline-encoder</artifactId>
             <version>0.1</version>
-        </dependency>
-        <!-- Jersey annontation-driven REST web services (JAX-RS implementation) -->
-        <dependency>
-            <groupId>org.glassfish.jersey.core</groupId>
-            <artifactId>jersey-server</artifactId>
-            <version>2.23</version>
-        </dependency>
-        <dependency>
-            <groupId>org.glassfish.jersey.media</groupId>
-            <artifactId>jersey-media-multipart</artifactId>
-            <version>2.23</version>
-        </dependency>
-        <!-- Deploy Jersey apps in stand-alone Grizzly server instead of a servlet container. -->
-        <dependency>
-            <groupId>org.glassfish.jersey.containers</groupId>
-            <artifactId>jersey-container-grizzly2-http</artifactId>
-            <version>2.23</version>
-        </dependency>
-        <dependency>
-            <groupId>javax.servlet</groupId>
-            <artifactId>servlet-api</artifactId>
-            <version>2.5</version>
-            <scope>provided</scope> <!-- this dependency is provided by the servlet container -->
-        </dependency>
-        <dependency>
-            <groupId>javax.annotation</groupId>
-            <artifactId>jsr250-api</artifactId>
-            <version>1.0</version>
-        </dependency>
-        <dependency>
-            <groupId>javax.inject</groupId>
-            <artifactId>javax.inject</artifactId>
-            <version>1</version>
-        </dependency>
-        <!-- Asynchronous Websocket-capable client, for message-driven incremental GTFS-RT -->
-        <!-- AsyncHttpClient Websockets need a newer version of Grizzly than Jersey does. -->
-        <dependency>
-            <groupId>com.ning</groupId>
-            <artifactId>async-http-client</artifactId>
-            <version>1.8.12</version>
         </dependency>
     </dependencies>
 </project>

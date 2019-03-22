@@ -3,13 +3,13 @@ package com.conveyal.r5.streets;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.common.SphericalDistanceLibrary;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
-import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.profile.ProfileRequest;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransitLayer;
+import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.util.TIntObjectHashMultimap;
 import com.conveyal.r5.util.TIntObjectMultimap;
 import gnu.trove.iterator.TIntIterator;
-import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.list.TIntList;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.TIntObjectMap;
@@ -21,8 +21,19 @@ import org.apache.commons.math3.util.FastMath;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.*;
-import java.util.*;
+import java.io.BufferedOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
+import java.io.PrintStream;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.List;
+import java.util.PriorityQueue;
 
 /**
  * This routes over the street layer of a TransitNetwork.
@@ -32,8 +43,6 @@ import java.util.*;
 public class StreetRouter {
 
     private static final Logger LOG = LoggerFactory.getLogger(StreetRouter.class);
-
-    private static boolean SHOW_DISTANCE_LIMIT_WARNING_ONCE = true;
 
     private static final boolean DEBUG_OUTPUT = false;
 
@@ -459,10 +468,7 @@ public class StreetRouter {
             // Distance in State is in millimeters. Distance limit is in meters, requiring a conversion.
             distanceLimitMm = distanceLimitMeters * 1000;
             if (quantityToMinimize != State.RoutingVariable.DISTANCE_MILLIMETERS) {
-                if(SHOW_DISTANCE_LIMIT_WARNING_ONCE) {
-                    LOG.warn("Setting a distance limit when distance is not the dominance function, this is a resource limiting issue and paths may be incorrect.");
-                    SHOW_DISTANCE_LIMIT_WARNING_ONCE = false;
-                }
+                LOG.warn("Setting a distance limit when distance is not the dominance function, this is a resource limiting issue and paths may be incorrect.");
             }
         } else {
             // There is no distance limit. Set it to the largest possible value to allow routing to progress.

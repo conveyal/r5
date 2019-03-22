@@ -1,6 +1,5 @@
 package com.conveyal.r5.profile;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,12 +56,6 @@ public class RaptorState {
      */
     public int[] previousPatterns;
 
-    public int[] previousTrips;
-
-    public int[] boardTimes;
-
-    public int[] transferTimes;
-
     /** The stop the previous pattern was boarded at */
     public int[] previousStop;
 
@@ -93,15 +86,9 @@ public class RaptorState {
         this.previousPatterns = new int[nStops];
         this.previousStop = new int[nStops];
         this.transferStop = new int[nStops];
-        this.previousTrips = new int[nStops];
-        this.boardTimes = new int[nStops];
-        this.transferTimes = new int[nStops];
         Arrays.fill(previousPatterns, -1);
         Arrays.fill(previousStop, -1);
         Arrays.fill(transferStop, -1);
-        Arrays.fill(previousTrips, -1);
-        Arrays.fill(boardTimes, -1);
-        Arrays.fill(transferTimes, -1);
 
         this.nonTransferWaitTime = new int[nStops];
         this.nonTransferInVehicleTravelTime = new int[nStops];
@@ -168,7 +155,7 @@ public class RaptorState {
      * @param transfer if true, this was reached via transfer/initial walk
      * @return if the time was optimal
      */
-    public boolean setTimeAtStop(int stop, int time, int fromPattern, int fromStop, int waitTime, int inVehicleTime, boolean transfer, int tripIndex, int boardTime, int transferTime) {
+    public boolean setTimeAtStop(int stop, int time, int fromPattern, int fromStop, int waitTime, int inVehicleTime, boolean transfer) {
         if (time > departureTime + maxDurationSeconds) return false;
 
         boolean optimal = false;
@@ -176,8 +163,6 @@ public class RaptorState {
             bestNonTransferTimes[stop] = time;
             nonTransferStopsTouched.set(stop);
             previousPatterns[stop] = fromPattern;
-            previousTrips[stop] = tripIndex;
-            boardTimes[stop] = boardTime;
             previousStop[stop] = fromStop;
 
             // wait time is not stored after transfers, so copy from pre-transfer
@@ -219,7 +204,6 @@ public class RaptorState {
             bestStopsTouched.set(stop);
             if (transfer) {
                 transferStop[stop] = fromStop;
-                transferTimes[stop] = transferTime;
             } else {
                 transferStop[stop] = -1;
             }

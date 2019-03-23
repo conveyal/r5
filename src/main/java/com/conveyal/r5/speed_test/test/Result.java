@@ -2,7 +2,6 @@ package com.conveyal.r5.speed_test.test;
 
 import com.conveyal.r5.profile.otp2.util.TimeUtils;
 
-import javax.validation.constraints.NotNull;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -52,7 +51,7 @@ class Result implements Comparable<Result> {
     }
 
     @Override
-    public int compareTo(@NotNull Result o) {
+    public int compareTo(Result o) {
         // Sort first arrival first
         int res = endTime.compareTo(o.endTime);
         if(res == 0) {

@@ -60,7 +60,7 @@ public class SpeedTest {
     private RangeRaptorService<TripSchedule> service;
 
 
-    SpeedTest(CommandLineOpts opts) throws Exception {
+    private SpeedTest(CommandLineOpts opts) throws Exception {
         this.opts = opts;
         initTransportNetwork();
     }
@@ -155,11 +155,11 @@ public class SpeedTest {
 
     private boolean runSingleTestCase(List<TripPlan> tripPlans, TestCase testCase, SpeedTestCmdLineOpts opts, boolean ignoreResults) {
         try {
-            final ProfileRequest request = RequestSupport.buildProfileRequest(testCase, opts);
+            final SpeedTestProfileRequest request = RequestSupport.buildProfileRequest(testCase, opts);
 
             if (opts.compareHeuristics()) {
                 TOT_TIMER.start();
-                ProfileRequest heurReq = RequestSupport.buildProfileRequest(testCase, opts);
+                SpeedTestProfileRequest heurReq = RequestSupport.buildProfileRequest(testCase, opts);
                 compareHeuristics(heurReq, request, testCase.arrivalTime);
                 TOT_TIMER.stop();
             } else {
@@ -186,14 +186,6 @@ public class SpeedTest {
 
 
     public TripPlan route(ProfileRequest request, int latestArrivalTime) {
-        if (routeProfile.isOriginal()) {
-            return RunOriginalWorker.route(request, transportNetwork, TIMER_WORKER);
-        } else {
-            return routeUsingNewRRaptor(request, latestArrivalTime);
-        }
-    }
-
-    private TripPlan routeUsingNewRRaptor(ProfileRequest request, int latestArrivalTime) {
         try {
             Collection<Path<TripSchedule>> paths;
             EgressAccessRouter streetRouter = new EgressAccessRouter(transportNetwork, request);

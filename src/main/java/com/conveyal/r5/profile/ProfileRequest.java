@@ -2,15 +2,13 @@ package com.conveyal.r5.profile;
 
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.analyst.scenario.Scenario;
+
+import java.time.*;
+
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.api.util.SearchType;
 import com.conveyal.r5.api.util.TransitModes;
-import com.conveyal.r5.model.json_serialization.LegModeSetDeserializer;
-import com.conveyal.r5.model.json_serialization.LegModeSetSerializer;
-import com.conveyal.r5.model.json_serialization.TransitModeSetDeserializer;
-import com.conveyal.r5.model.json_serialization.TransitModeSetSerializer;
-import com.conveyal.r5.model.json_serialization.ZoneIdDeserializer;
-import com.conveyal.r5.model.json_serialization.ZoneIdSerializer;
+import com.conveyal.r5.model.json_serialization.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
@@ -18,10 +16,6 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import graphql.schema.DataFetchingEnvironment;
 
 import java.io.Serializable;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Collection;
 import java.util.EnumSet;
@@ -213,18 +207,6 @@ public class ProfileRequest implements Serializable, Cloneable {
      * with exactly this number of departure times is generated.
      */
     public int monteCarloDraws = 220;
-
-
-
-    /* PARAMETERS ADDED AT ENTUR */
-
-    /**
-     * Number of itineraries to search for.
-     */
-    public Integer numberOfItineraries = 1;
-
-    public String description;
-
 
     public ProfileRequest clone () {
         try {
@@ -471,7 +453,6 @@ public class ProfileRequest implements Serializable, Cloneable {
      */
     @JsonIgnore
     public int getMonteCarloDrawsPerMinute() {
-        return 1;
-        //return (int) Math.ceil((double) monteCarloDraws / getTimeWindowLengthMinutes());
+        return (int) Math.ceil((double) monteCarloDraws / getTimeWindowLengthMinutes());
     }
 }

@@ -10,8 +10,6 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 
-import static java.lang.Integer.MAX_VALUE;
-
 /**
  * Class used to represent transit paths in Browsochrones and Modeify.
  */
@@ -25,8 +23,6 @@ public class Path {
     public int[] boardStops;
     public int[] alightStops;
     public int[] alightTimes;
-    public int[] boardTimes;
-    public int[] transferTimes;
     public int[] trips;
     public int[] boardStopPositions;
     public int[] alightStopPositions;
@@ -38,15 +34,11 @@ public class Path {
     public Path(RaptorState state, int stop) {
         // trace the path back from this RaptorState
         int previousPattern;
-        int previousTrip;
         TIntList patterns = new TIntArrayList();
         TIntList boardStops = new TIntArrayList();
         TIntList alightStops = new TIntArrayList();
         TIntList times = new TIntArrayList();
         TIntList alightTimes = new TIntArrayList();
-        TIntList boardTimes = new TIntArrayList();
-        TIntList transferTimes = new TIntArrayList();
-        TIntList trips = new TIntArrayList();
 
         while (state.previous != null) {
             // find the fewest-transfers trip that is still optimal in terms of travel time
@@ -60,14 +52,11 @@ public class Path {
             }
 
             previousPattern = state.previousPatterns[stop];
-            previousTrip = state.previousTrips[stop];
 
             patterns.add(previousPattern);
-            trips.add(previousTrip);
             alightStops.add(stop);
             times.add(state.bestTimes[stop]);
             alightTimes.add(state.bestNonTransferTimes[stop]);
-            boardTimes.add(state.boardTimes[stop]);
             stop = state.previousStop[stop];
             boardStops.add(stop);
 
@@ -76,10 +65,7 @@ public class Path {
 
             // handle transfers
             if (state.transferStop[stop] != -1) {
-                transferTimes.add(state.transferTimes[stop]);
                 stop = state.transferStop[stop];
-            } else {
-                transferTimes.add(-1);
             }
         }
 
@@ -89,22 +75,15 @@ public class Path {
         boardStops.reverse();
         alightStops.reverse();
         alightTimes.reverse();
-        boardTimes.reverse();
-        trips.reverse();
-        transferTimes.reverse();
 
         this.patterns = patterns.toArray();
         this.boardStops = boardStops.toArray();
         this.alightStops = alightStops.toArray();
         this.alightTimes = alightTimes.toArray();
-        this.boardTimes = boardTimes.toArray();
-        this.trips = trips.toArray();
-        this.transferTimes = transferTimes.toArray();
         this.length = this.patterns.length;
 
-        if (length == 0) {
-            throw new IllegalStateException("Transit path computed without a transit segment!");
-        }
+        if (this.patterns.length == 0)
+            LOG.error("Transit path computed without a transit segment!");
     }
 
     /**
@@ -152,38 +131,9 @@ public class Path {
         this.alightStopPositions = alightStopPositions.toArray();
         this.length = this.patterns.length;
 
-        if (this.patterns.length == 0) {
-            throw new IllegalStateException("Transit path computed without a transit segment!");
-        }
+        if (this.patterns.length == 0)
+            LOG.error("Transit path computed without a transit segment!");
     }
-
-    public Path(
-            int[] patterns,
-            int[] boardStops,
-            int[] alightStops,
-            int[] alightTimes,
-            int[] trips,
-            int[] boardStopPositions,
-            int[] alightStopPositions,
-            int[] boardTimes,
-            int[] transferTimes
-    ) {
-        this.patterns = patterns;
-        this.boardStops = boardStops;
-        this.alightStops = alightStops;
-        this.alightTimes = alightTimes;
-        this.trips = trips;
-        this.boardStopPositions = boardStopPositions;
-        this.alightStopPositions = alightStopPositions;
-        this.boardTimes = boardTimes;
-        this.transferTimes = transferTimes;
-        this.length = patterns.length;
-
-        if (patterns.length == 0) {
-            throw new IllegalStateException("Transit path computed without a transit segment!");
-        }
-    }
-
 
     // The semantic HashCode and Equals are used in deduplicating the paths for static site output.
     // They will be calculated millions of times so might be slow with all these multiplications.
@@ -216,48 +166,14 @@ public class Path {
         return result;
     }
 
-    @Override
-    public String toString() {
-        return "Path:\n" +
-                "\tboard stop:    " + toString(boardStops) + "\n" +
-                "\tboard times:   " + toString(boardTimes) + "\n" +
-                "\talight stops:  " + toString(alightStops) + "\n" +
-                "\talight times:  " + toString(alightTimes) + "\n" +
-                "\ttrips:         " + toString(trips) + "\n" +
-                "\tpatterns:      " + toString(patterns) + "\n" +
-                "\ttransferTimes: " + toString(transferTimes) + "\n";
-    }
-
-    private static String toString(int[] array) {
-        if(array.length == 0) return "";
-
-        StringBuilder buf = new StringBuilder();
-        for (int v : array) {
-            buf.append(", ").append(String.format("%5s", intToString(v)));
-        }
-        return buf.substring(2);
-    }
-
     /**
      * Gets tripPattern at provided pathIndex
+     * @param transitLayer
+     * @param pathIndex
+     * @return
      */
     public TripPattern getPattern(TransitLayer transitLayer, int pathIndex) {
         return transitLayer.tripPatterns.get(this.patterns[pathIndex]);
     }
 
-    public int egressStop() {
-        return alightStops[length - 1];
-    }
-
-    public int accessStop() {
-        return boardStops[0];
-    }
-
-    public int travelTime() {
-        return alightTimes[length - 1] - boardTimes[0];
-    }
-
-    private static String intToString(int v) {
-        return v == -1 ? "ø" : (v == MAX_VALUE ? "Ø" : Integer.toString(v));
-    }
 }

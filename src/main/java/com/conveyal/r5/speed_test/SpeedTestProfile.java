@@ -9,7 +9,6 @@ import java.util.stream.Collectors;
 
 
 public enum SpeedTestProfile {
-    original("or", "The original R5 FastRaptorWorker by Conveyal", null, true),
     std_range_raptor(
             "rr",
             "Standard Range Raptor, super fast [ transfers, arrival time, travel time ].",
@@ -108,10 +107,6 @@ public enum SpeedTestProfile {
 
     public static List<String> options() {
         return Arrays.stream(values()).map(SpeedTestProfile::description).collect(Collectors.toList());
-    }
-
-    public boolean isOriginal() {
-        return this == original;
     }
 
     /* private methods */

@@ -49,8 +49,8 @@ class RequestSupport {
 
     private RequestSupport() { }
 
-    static ProfileRequest buildProfileRequest(TestCase testCase, SpeedTestCmdLineOpts opts) {
-        ProfileRequest request = new ProfileRequest();
+    static SpeedTestProfileRequest buildProfileRequest(TestCase testCase, SpeedTestCmdLineOpts opts) {
+        SpeedTestProfileRequest request = new SpeedTestProfileRequest();
 
         request.accessModes = request.egressModes = request.directModes = EnumSet.of(LegMode.WALK);
         request.maxWalkTime = 20;

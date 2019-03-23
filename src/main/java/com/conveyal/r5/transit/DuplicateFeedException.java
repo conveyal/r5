@@ -1,6 +1,5 @@
 package com.conveyal.r5.transit;
 
-
 /**
  * Thrown when a TransportNetwork is build with two feeds with the same feed ID.
  */

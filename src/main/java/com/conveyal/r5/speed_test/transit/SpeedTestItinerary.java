@@ -2,7 +2,6 @@ package com.conveyal.r5.speed_test.transit;
 
 import com.conveyal.r5.profile.otp2.util.TimeUtils;
 import com.conveyal.r5.profile.otp2.util.paretoset.ParetoComparator;
-import com.conveyal.r5.profile.otp2.util.paretoset.ParetoComparatorBuilder;
 import com.conveyal.r5.speed_test.api.model.Itinerary;
 import com.conveyal.r5.speed_test.api.model.Leg;
 
@@ -51,14 +50,13 @@ public class SpeedTestItinerary extends Itinerary {
     }
 
     static ParetoComparator<SpeedTestItinerary> paretoDominanceFunctions() {
-        return new ParetoComparatorBuilder<SpeedTestItinerary>()
-                .lessThen(it -> it.transfers)
-                .lessThen(it -> it.durationSeconds)
-                .lessThen(it -> it.walkDistanceMeters)
-                .lessThen(it -> it.endTimeSeconds)
-                //.different(it -> it.modesHash)
-                .different(it -> it.agenciesHash)
-                .build();
+        return (l, r) ->
+                l.transfers < r.transfers ||
+                l.durationSeconds < r.durationSeconds ||
+                l.walkDistanceMeters < r.walkDistanceMeters ||
+                l.endTimeSeconds < r.endTimeSeconds ||
+                //l.modesHash != r.modesHash ||
+                l.agenciesHash != r.agenciesHash;
     }
 
     @Override

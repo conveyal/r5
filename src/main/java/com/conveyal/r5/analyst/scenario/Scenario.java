@@ -158,6 +158,16 @@ public class Scenario implements Serializable {
     }
 
     /**
+    * @param lat Latitude of origin in floating point (not fixed int) degrees.
+    * @param lon Longitude of origin in floating point (not fixed int) degrees.
+    * @return time (in seconds) to wait at origin before beginning the trip
+    **/
+    public int computeOriginDelay (double lat, double lon) {
+        //TODO iterate through TNCPickupDelay modifications and return delay corresponding to lat/lon
+        return 5 * 60;
+    }
+
+    /**
      * @return true if applying this scenario will cause changes to the StreetLayer of a TransportNetwork.
      * This indicates whether a protective copy must be made of the StreetLayer, whether the resulting
      * modified TransportNetwork must be re-linked to destination pointsets or the original linkage can be re-used,

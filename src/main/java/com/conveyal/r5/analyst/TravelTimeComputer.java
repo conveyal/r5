@@ -84,7 +84,10 @@ public class TravelTimeComputer {
         StreetRouter sr = new StreetRouter(network.streetLayer);
         sr.profileRequest = request;
         sr.streetMode = accessMode;
-        boolean foundOriginPoint = sr.setOrigin(request.fromLat, request.fromLon);
+        int delayAtOrigin = 0;
+        if (request.accessModes.contains(LegMode.CAR)) delayAtOrigin =
+                request.scenario.computeOriginDelay(request.fromLat, request.fromLon);
+        boolean foundOriginPoint = sr.setOrigin(request.fromLat, request.fromLon, delayAtOrigin);
         if (!foundOriginPoint) {
             // Short circuit around routing and propagation. Calling finish() before streaming in any travel times to
             // destinations is designed to produce the right result.

@@ -307,6 +307,12 @@ public class StreetRouter {
             LOG.info("No street was found near the specified origin point of {}, {}.", lat, lon);
             return false;
         }
+
+        if (delay <0 ) {
+            // Modifications like PickupDelay return negative values when service is not provided for a given origin.
+            return false;
+        }
+
         originSplit = split;
         bestStatesAtEdge.clear();
         queue.clear();

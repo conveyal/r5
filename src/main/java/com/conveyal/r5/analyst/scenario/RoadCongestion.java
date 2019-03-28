@@ -98,7 +98,7 @@ public class RoadCongestion extends Modification {
 
     // Internal (private) fields
 
-    private static STRtree polygonSpatialIndex;
+    private STRtree polygonSpatialIndex;
 
     private boolean logUpdatedEdgeCounts = true;
 

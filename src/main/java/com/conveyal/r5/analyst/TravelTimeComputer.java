@@ -14,6 +14,7 @@ import com.conveyal.r5.profile.PerTargetPropagater;
 import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetRouter;
+import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
@@ -173,7 +174,7 @@ public class TravelTimeComputer {
                 // Special handling for walk search, find distance in seconds and divide to match behavior at egress
                 // (in stop trees). For bike/car searches this is immaterial as the access searches are already asymmetric.
                 // TODO clarify - I think this is referring to the fact that the egress trees are pre-calculated for a standard speed and must be adjusted.
-                sr.distanceLimitMeters = 2000; // TODO hardwired same as gridcomputer, at least use a symbolic constant
+                sr.distanceLimitMeters = TransitLayer.DISTANCE_TABLE_SIZE_METERS;
                 sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
                 sr.route();
 

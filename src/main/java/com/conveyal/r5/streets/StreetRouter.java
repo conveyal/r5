@@ -349,6 +349,10 @@ public class StreetRouter {
         return true;
     }
 
+    public boolean setOrigin (double lat, double lon){
+        return setOrigin(lat, lon, 0);
+    }
+
     public void setOrigin (int fromVertex) {
         bestStatesAtEdge.clear();
         queue.clear();

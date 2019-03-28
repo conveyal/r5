@@ -39,6 +39,7 @@ public class ModificationTypeResolver extends TypeIdResolverBase {
             .put("reroute", Reroute.class)
             .put("remove-stops", RemoveStops.class)
             .put("road-congestion", RoadCongestion.class)
+            .put("pickup-delay", PickupDelay.class)
             .put("set-fare-calculator", SetFareCalculator.class)
             .build();
 

@@ -10,11 +10,6 @@ public class SetFareCalculator extends Modification {
     public InRoutingFareCalculator fareCalculator;
 
     @Override
-    public String getType() {
-        return "set-fare-calculator";
-    }
-
-    @Override
     public boolean apply(TransportNetwork network) {
         // NB will break if applied more than once, but don't think that should happen
         network.fareCalculator = this.fareCalculator;

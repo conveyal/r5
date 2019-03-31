@@ -69,11 +69,6 @@ public class AdjustSpeed extends Modification {
     private int nTripsAffected = 0;
 
     @Override
-    public String getType() {
-        return "adjust-speed";
-    }
-
-    @Override
     public boolean resolve(TransportNetwork network) {
         if (scale <= 0) {
             errors.add("Scaling factor must be a positive number.");

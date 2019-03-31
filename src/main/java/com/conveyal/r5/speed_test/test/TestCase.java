@@ -5,7 +5,7 @@ import com.conveyal.r5.speed_test.api.model.Itinerary;
 import java.util.Collection;
 import java.util.List;
 
-import static com.conveyal.r5.profile.otp2.util.TimeUtils.timeToStrShort;
+import static com.conveyal.r5.otp2.util.TimeUtils.timeToStrShort;
 
 
 /**

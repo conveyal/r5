@@ -1,7 +1,7 @@
 package com.conveyal.r5.speed_test.transit;
 
-import com.conveyal.r5.profile.otp2.api.transit.TransferLeg;
-import com.conveyal.r5.profile.otp2.util.TimeUtils;
+import com.conveyal.r5.otp2.api.transit.TransferLeg;
+import com.conveyal.r5.otp2.util.TimeUtils;
 
 public class AccessEgressLeg implements TransferLeg {
     private final int stop, durationInSeconds;

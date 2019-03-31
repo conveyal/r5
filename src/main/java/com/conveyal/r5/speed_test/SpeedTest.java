@@ -2,13 +2,13 @@ package com.conveyal.r5.speed_test;
 
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
 import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.profile.otp2.RangeRaptorService;
-import com.conveyal.r5.profile.otp2.api.path.Path;
-import com.conveyal.r5.profile.otp2.api.request.RangeRaptorRequest;
-import com.conveyal.r5.profile.otp2.api.transit.TransitDataProvider;
-import com.conveyal.r5.profile.otp2.transitadapter.TransitLayerRRDataProvider;
-import com.conveyal.r5.profile.otp2.transitadapter.TripScheduleAdapter;
-import com.conveyal.r5.profile.otp2.util.AvgTimer;
+import com.conveyal.r5.otp2.RangeRaptorService;
+import com.conveyal.r5.otp2.api.path.Path;
+import com.conveyal.r5.otp2.api.request.RangeRaptorRequest;
+import com.conveyal.r5.otp2.api.transit.TransitDataProvider;
+import com.conveyal.r5.otp2.transitadapter.TransitLayerRRDataProvider;
+import com.conveyal.r5.otp2.transitadapter.TripScheduleAdapter;
+import com.conveyal.r5.otp2.util.AvgTimer;
 import com.conveyal.r5.speed_test.api.model.TripPlan;
 import com.conveyal.r5.speed_test.cli.CommandLineOpts;
 import com.conveyal.r5.speed_test.cli.SpeedTestCmdLineOpts;
@@ -20,7 +20,6 @@ import com.conveyal.r5.speed_test.transit.ItineraryMapper2;
 import com.conveyal.r5.speed_test.transit.ItinerarySet;
 import com.conveyal.r5.speed_test.transit.TripPlanSupport;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.conveyal.r5.transit.TripSchedule;
 
 import java.io.File;
 import java.lang.ref.WeakReference;

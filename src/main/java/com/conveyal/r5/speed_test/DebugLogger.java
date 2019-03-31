@@ -1,20 +1,19 @@
 package com.conveyal.r5.speed_test;
 
 
-import com.conveyal.r5.profile.otp2.api.debug.DebugEvent;
-import com.conveyal.r5.profile.otp2.api.debug.DebugTopic;
-import com.conveyal.r5.profile.otp2.api.path.Path;
-import com.conveyal.r5.profile.otp2.api.transit.TripScheduleInfo;
-import com.conveyal.r5.profile.otp2.api.view.ArrivalView;
-import com.conveyal.r5.profile.otp2.util.IntUtils;
-import com.conveyal.r5.profile.otp2.util.PathStringBuilder;
-import com.conveyal.r5.profile.otp2.util.TimeUtils;
-import com.conveyal.r5.transit.TripSchedule;
+import com.conveyal.r5.otp2.api.debug.DebugEvent;
+import com.conveyal.r5.otp2.api.debug.DebugTopic;
+import com.conveyal.r5.otp2.api.path.Path;
+import com.conveyal.r5.otp2.api.transit.TripScheduleInfo;
+import com.conveyal.r5.otp2.api.view.ArrivalView;
+import com.conveyal.r5.otp2.util.IntUtils;
+import com.conveyal.r5.otp2.util.PathStringBuilder;
+import com.conveyal.r5.otp2.util.TimeUtils;
 import org.apache.commons.lang.StringUtils;
 
-import static com.conveyal.r5.profile.otp2.util.TimeUtils.timeToStrCompact;
+import static com.conveyal.r5.otp2.util.TimeUtils.timeToStrCompact;
 
-class DebugLogger<T extends TripScheduleInfo> implements com.conveyal.r5.profile.otp2.api.debug.DebugLogger {
+class DebugLogger<T extends TripScheduleInfo> implements com.conveyal.r5.otp2.api.debug.DebugLogger {
     private static int NOT_SET = Integer.MIN_VALUE;
 
     private final boolean enableDebugLogging;

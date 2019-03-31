@@ -2,7 +2,7 @@ package com.conveyal.r5.speed_test.transit;
 
 import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.profile.StreetPath;
-import com.conveyal.r5.profile.otp2.util.AvgTimer;
+import com.conveyal.r5.otp2.util.AvgTimer;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.map.TIntIntMap;

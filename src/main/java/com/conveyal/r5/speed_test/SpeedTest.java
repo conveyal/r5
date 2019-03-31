@@ -7,6 +7,7 @@ import com.conveyal.r5.profile.otp2.api.path.Path;
 import com.conveyal.r5.profile.otp2.api.request.RangeRaptorRequest;
 import com.conveyal.r5.profile.otp2.api.transit.TransitDataProvider;
 import com.conveyal.r5.profile.otp2.transitadapter.TransitLayerRRDataProvider;
+import com.conveyal.r5.profile.otp2.transitadapter.TripScheduleAdapter;
 import com.conveyal.r5.profile.otp2.util.AvgTimer;
 import com.conveyal.r5.speed_test.api.model.TripPlan;
 import com.conveyal.r5.speed_test.cli.CommandLineOpts;
@@ -57,7 +58,7 @@ public class SpeedTest {
     /**
      * Init profile used by the HttpServer
      */
-    private RangeRaptorService<TripSchedule> service;
+    private RangeRaptorService<TripScheduleAdapter> service;
 
 
     private SpeedTest(CommandLineOpts opts) throws Exception {
@@ -187,17 +188,17 @@ public class SpeedTest {
 
     public TripPlan route(ProfileRequest request, int latestArrivalTime) {
         try {
-            Collection<Path<TripSchedule>> paths;
+            Collection<Path<TripScheduleAdapter>> paths;
             EgressAccessRouter streetRouter = new EgressAccessRouter(transportNetwork, request);
             streetRouter.route();
 
             // -------------------------------------------------------- [ WORKER ROUTE ]
 
-            TransitDataProvider<TripSchedule> transitData = transitData(request);
+            TransitDataProvider<TripScheduleAdapter> transitData = transitData(request);
 
             TIMER_WORKER.start();
 
-            RangeRaptorRequest<TripSchedule> req = rangeRaptorRequest(routeProfile, request, latestArrivalTime, streetRouter);
+            RangeRaptorRequest<TripScheduleAdapter> req = rangeRaptorRequest(routeProfile, request, latestArrivalTime, streetRouter);
 
             paths = service.route(req, transitData);
 
@@ -228,9 +229,13 @@ public class SpeedTest {
     private void compareHeuristics(ProfileRequest heurReq, ProfileRequest routeReq, int latestArrivalTime) {
         EgressAccessRouter streetRouter = new EgressAccessRouter(transportNetwork, heurReq);
         streetRouter.route();
-        TransitDataProvider<TripSchedule> transitData = transitData(heurReq);
-        RangeRaptorRequest<TripSchedule> req1 = heuristicRequest(heuristicProfile, heurReq, latestArrivalTime, streetRouter);
-        RangeRaptorRequest<TripSchedule> req2 = heuristicRequest(routeProfile, routeReq, latestArrivalTime, streetRouter);
+        TransitDataProvider<TripScheduleAdapter> transitData = transitData(heurReq);
+        RangeRaptorRequest<TripScheduleAdapter> req1 = heuristicRequest(
+                heuristicProfile, heurReq, latestArrivalTime, streetRouter
+        );
+        RangeRaptorRequest<TripScheduleAdapter> req2 = heuristicRequest(
+                routeProfile, routeReq, latestArrivalTime, streetRouter
+        );
 
         TIMER_WORKER.start();
         service.compareHeuristics(req1, req2, transitData);
@@ -252,7 +257,7 @@ public class SpeedTest {
         }
     }
 
-    private RangeRaptorRequest<TripSchedule> heuristicRequest(
+    private RangeRaptorRequest<TripScheduleAdapter> heuristicRequest(
             SpeedTestProfile profile,
             ProfileRequest request,
             int latestArrivalTime,
@@ -264,7 +269,7 @@ public class SpeedTest {
     }
 
 
-    private RangeRaptorRequest<TripSchedule> rangeRaptorRequest(
+    private RangeRaptorRequest<TripScheduleAdapter> rangeRaptorRequest(
             SpeedTestProfile profile,
             ProfileRequest request,
             int latestArrivalTime,
@@ -275,7 +280,7 @@ public class SpeedTest {
         );
     }
 
-    private static TripPlan mapToTripPlan(ProfileRequest request, Collection<Path<TripSchedule>> paths, EgressAccessRouter streetRouter) {
+    private static TripPlan mapToTripPlan(ProfileRequest request, Collection<Path<TripScheduleAdapter>> paths, EgressAccessRouter streetRouter) {
         ItinerarySet itineraries = ItineraryMapper2.mapItineraries(request, paths, streetRouter, transportNetwork);
 
         // Filter away similar itineraries for easier reading

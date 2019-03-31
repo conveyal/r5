@@ -2,12 +2,12 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.model.Frequency;
 import com.conveyal.gtfs.model.Trip;
-import com.conveyal.r5.profile.otp2.api.transit.TripScheduleInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.List;
 import java.util.stream.Collectors;
 
 /**
@@ -15,7 +15,7 @@ import java.util.stream.Collectors;
  * If this is a frequency trip, it also records the different headways throughout the day, and when those headways
  * begin and end.
  */
-public class TripSchedule implements Serializable, Comparable<TripSchedule>, Cloneable, TripScheduleInfo {
+public class TripSchedule implements Serializable, Comparable<TripSchedule>, Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(TripSchedule.class);
 
@@ -79,8 +79,6 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
      * TODO phasing now works differently, is this still needed?
      */
     public int[] stopSequences;
-
-    private TripPattern tripPattern;
 
     /** static factory so we can return null */
     public static TripSchedule create (Trip trip, int[] arrivals, int[] departures, Collection<Frequency> frequencies, int[] stopSequences, int serviceCode) {
@@ -259,29 +257,4 @@ public class TripSchedule implements Serializable, Comparable<TripSchedule>, Clo
         return headwaySeconds.length;
     }
 
-    @Override
-    public int arrival(int stopPosInPattern) {
-        return arrivals[stopPosInPattern];
-    }
-
-    @Override
-    public int departure(int stopPosInPattern) {
-        return departures[stopPosInPattern];
-    }
-
-    @Override
-    public String debugInfo() {
-        return tripPattern.routeId;
-    }
-
-    public void setPattern(TripPattern tripPattern) {
-        if(this.tripPattern != null) {
-            throw new IllegalStateException("Trip schedule is added to more tan one pattern!!!!");
-        }
-        this.tripPattern = tripPattern;
-    }
-
-    public TripPattern tripPattern() {
-        return tripPattern;
-    }
 }

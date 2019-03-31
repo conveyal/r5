@@ -1,6 +1,5 @@
 package com.conveyal.r5.transit;
 
-import com.conveyal.gtfs.model.Shape;
 import com.conveyal.gtfs.model.StopTime;
 import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.streets.VertexStore;
@@ -154,12 +153,7 @@ public class TripPattern implements Serializable, Cloneable {
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("TripPattern on route ");
-        sb.append(routeId);
-        sb.append(" with stops ");
-        sb.append(Arrays.toString(stops));
-        return sb.toString();
+        return "TripPattern on route " + routeId + " with stops " + Arrays.toString(stops);
     }
 
     public String toStringDetailed (TransitLayer transitLayer) {

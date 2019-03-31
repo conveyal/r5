@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.jsontype.impl.TypeIdResolverBase;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * This establishes a mapping between type codes embedded in JSON objects and Java Modification types on R5 workers.
@@ -22,6 +24,8 @@ import com.google.common.collect.ImmutableBiMap;
  * Created by abyrd on 2019-03-15
  */
 public class ModificationTypeResolver extends TypeIdResolverBase {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ModificationTypeResolver.class);
 
     /**
      * A mapping between all Modification types known by this worker and their JSON type codes.
@@ -44,9 +48,13 @@ public class ModificationTypeResolver extends TypeIdResolverBase {
     public String idFromValue (Object o) {
         // For custom modifications, see if they have a specific r5 type they want to report to the worker.
         if (o instanceof CustomModificationHolder) {
-            Object r5type = ((CustomModificationHolder)o).getFreeformProperties().get("r5type");
+            Object r5type = ((CustomModificationHolder) o).getFreeformProperties().get("r5type");
             if (r5type instanceof String) {
                 return (String)r5type;
+            } else {
+                LOG.error("The r5type property of a custom modification was not a String. " +
+                        "The R5 worker will not be able to deserialize and use the resulting R5 modification.");
+                return null;
             }
         }
         // For all other modifications, just look up the corresponding type code in the table.

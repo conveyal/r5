@@ -7,8 +7,6 @@ import com.fasterxml.jackson.databind.jsontype.impl.TypeIdResolverBase;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
 
-import java.io.IOException;
-
 /**
  * This establishes a mapping between type codes embedded in JSON objects and Java Modification types on R5 workers.
  * It is used to achieve polymorphism in serialization and deserialization to and from JSON.
@@ -18,8 +16,8 @@ import java.io.IOException;
  * might be completely unknown to the backend.
  *
  * Actually we might be able to perform the bulk of the class/type string mappings using those annotations, and just
- * override the behavior only on the CustomModification (with a TypeIdResolver that only handles the CustomModification
- * case). That could be done in addition to moving the R5 CustomModification to the backend, so it's clearly outside R5.
+ * override the behavior only on the CustomModificationHolder (with a TypeIdResolver that only handles the CustomModificationHolder
+ * case). That could be done in addition to moving the R5 CustomModificationHolder to the backend, so it's clearly outside R5.
  *
  * Created by abyrd on 2019-03-15
  */
@@ -45,8 +43,8 @@ public class ModificationTypeResolver extends TypeIdResolverBase {
     @Override
     public String idFromValue (Object o) {
         // For custom modifications, see if they have a specific r5 type they want to report to the worker.
-        if (o instanceof CustomModification) {
-            Object r5type = ((CustomModification)o).getFreeformProperties().get("r5type");
+        if (o instanceof CustomModificationHolder) {
+            Object r5type = ((CustomModificationHolder)o).getFreeformProperties().get("r5type");
             if (r5type instanceof String) {
                 return (String)r5type;
             }

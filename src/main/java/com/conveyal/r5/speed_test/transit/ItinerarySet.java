@@ -1,6 +1,6 @@
 package com.conveyal.r5.speed_test.transit;
 
-import com.conveyal.r5.profile.otp2.util.paretoset.ParetoSet;
+import com.conveyal.r5.otp2.util.paretoset.ParetoSet;
 
 import java.util.ArrayList;
 import java.util.Iterator;

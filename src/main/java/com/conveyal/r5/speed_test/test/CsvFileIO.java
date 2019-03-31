@@ -1,6 +1,6 @@
 package com.conveyal.r5.speed_test.test;
 
-import com.conveyal.r5.profile.otp2.util.TimeUtils;
+import com.conveyal.r5.otp2.util.TimeUtils;
 import com.csvreader.CsvReader;
 
 import java.io.File;

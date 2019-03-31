@@ -4,6 +4,7 @@ package com.conveyal.r5.speed_test;
 import com.conveyal.r5.profile.otp2.api.debug.DebugEvent;
 import com.conveyal.r5.profile.otp2.api.debug.DebugTopic;
 import com.conveyal.r5.profile.otp2.api.path.Path;
+import com.conveyal.r5.profile.otp2.api.transit.TripScheduleInfo;
 import com.conveyal.r5.profile.otp2.api.view.ArrivalView;
 import com.conveyal.r5.profile.otp2.util.IntUtils;
 import com.conveyal.r5.profile.otp2.util.PathStringBuilder;
@@ -13,7 +14,7 @@ import org.apache.commons.lang.StringUtils;
 
 import static com.conveyal.r5.profile.otp2.util.TimeUtils.timeToStrCompact;
 
-class DebugLogger implements com.conveyal.r5.profile.otp2.api.debug.DebugLogger {
+class DebugLogger<T extends TripScheduleInfo> implements com.conveyal.r5.profile.otp2.api.debug.DebugLogger {
     private static int NOT_SET = Integer.MIN_VALUE;
 
     private final boolean enableDebugLogging;
@@ -26,26 +27,26 @@ class DebugLogger implements com.conveyal.r5.profile.otp2.api.debug.DebugLogger 
         this.enableDebugLogging = enableDebugLogging;
     }
 
-    void stopArrivalLister(DebugEvent<ArrivalView<TripSchedule>> e) {
+    void stopArrivalLister(DebugEvent<ArrivalView<T>> e) {
 
         printIterationHeader(e.iterationStartTime());
         printRoundHeader(e.element().round());
         print(e.element(), e.action().toString(), e.reason());
 
-        ArrivalView<TripSchedule> byElement = e.rejectedDroppedByElement();
+        ArrivalView<?> byElement = e.rejectedDroppedByElement();
         if (e.action() == DebugEvent.Action.DROP && byElement != null) {
             print(byElement, "->by", "");
         }
     }
 
-    void pathFilteringListener(DebugEvent<Path<TripSchedule>> e) {
+    void pathFilteringListener(DebugEvent<Path<T>> e) {
         if (pathHeader) {
             System.err.println();
             System.err.println(">>> PATH  | TR | FROM  | TO    | START    | END      | DURATION |   COST   | DETAILS");
             pathHeader = false;
         }
 
-        Path<TripSchedule> p = e.element();
+        Path<?> p = e.element();
         System.err.printf(
                 "%9s | %2d | %5d | %5d | %8s | %8s | %8s | %8s | %s%n",
                 center(e.action().toString(), 9),

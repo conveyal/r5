@@ -9,7 +9,6 @@ import com.conveyal.r5.profile.otp2.util.AvgTimer;
 import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TripPattern;
-import com.conveyal.r5.transit.TripSchedule;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
@@ -24,7 +23,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.stream.IntStream;
 
-public class TransitLayerRRDataProvider implements TransitDataProvider<TripSchedule> {
+public class TransitLayerRRDataProvider implements TransitDataProvider<TripScheduleAdapter> {
 
     private static AvgTimer TIMER_INIT_STOP_TIMES = AvgTimer.timerMilliSec("TransitLayerRRDataProvider:setup stops");
 
@@ -96,8 +95,8 @@ public class TransitLayerRRDataProvider implements TransitDataProvider<TripSched
     }
 
     @Override
-    public boolean isTripScheduleInService(TripSchedule trip) {
-        return trip.headwaySeconds == null && servicesActive.get(trip.serviceCode);
+    public boolean isTripScheduleInService(TripScheduleAdapter trip) {
+        return trip.isScheduledService() && servicesActive.get(trip.serviceCode());
     }
 
     @Override
@@ -141,7 +140,7 @@ public class TransitLayerRRDataProvider implements TransitDataProvider<TripSched
 
     }
 
-    @Override public Iterator<TripPatternInfo<TripSchedule>> patternIterator(IntIterator stops) {
+    @Override public Iterator<TripPatternInfo<TripScheduleAdapter>> patternIterator(IntIterator stops) {
         return new InternalPatternIterator(getPatternsTouchedForStops(stops));
     }
 
@@ -172,7 +171,7 @@ public class TransitLayerRRDataProvider implements TransitDataProvider<TripSched
         return transitLayer.patternsForStop.get(stop);
     }
 
-    class InternalPatternIterator implements Iterator<TripPatternInfo<TripSchedule>> {
+    class InternalPatternIterator implements Iterator<TripPatternInfo<TripScheduleAdapter>> {
         private int nextPatternIndex;
         private BitSet patternsTouched;
 
@@ -187,14 +186,14 @@ public class TransitLayerRRDataProvider implements TransitDataProvider<TripSched
             return nextPatternIndex >=0;
         }
 
-        @Override public TripPatternInfo<TripSchedule> next() {
+        @Override public TripPatternInfo<TripScheduleAdapter> next() {
             TPInfo res = new TPInfo(runningScheduledPatterns[nextPatternIndex]);
             nextPatternIndex = patternsTouched.nextSetBit(nextPatternIndex + 1);
             return res;
         }
     }
 
-    private static class TPInfo implements TripPatternInfo<TripSchedule> {
+    private static class TPInfo implements TripPatternInfo<TripScheduleAdapter> {
         private final TripPattern pattern;
 
         TPInfo(TripPattern pattern) {
@@ -212,8 +211,8 @@ public class TransitLayerRRDataProvider implements TransitDataProvider<TripSched
         }
 
         @Override
-        public TripSchedule getTripSchedule(int index) {
-            return pattern.tripSchedules.get(index);
+        public TripScheduleAdapter getTripSchedule(int index) {
+            return new TripScheduleAdapter(pattern, pattern.tripSchedules.get(index));
         }
 
         @Override

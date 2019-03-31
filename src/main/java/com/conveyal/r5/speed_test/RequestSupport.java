@@ -8,6 +8,8 @@ import com.conveyal.r5.profile.otp2.api.request.RangeRaptorProfile;
 import com.conveyal.r5.profile.otp2.api.request.RangeRaptorRequest;
 import com.conveyal.r5.profile.otp2.api.request.RequestBuilder;
 import com.conveyal.r5.profile.otp2.api.request.TuningParameters;
+import com.conveyal.r5.profile.otp2.api.transit.TripScheduleInfo;
+import com.conveyal.r5.profile.otp2.transitadapter.TripScheduleAdapter;
 import com.conveyal.r5.speed_test.cli.CommandLineOpts;
 import com.conveyal.r5.speed_test.cli.SpeedTestCmdLineOpts;
 import com.conveyal.r5.speed_test.test.TestCase;
@@ -47,6 +49,7 @@ class RequestSupport {
         }
     };
 
+    /** Private to prevent it from instantiation. This is a utility class with ONLY static methods. */
     private RequestSupport() { }
 
     static SpeedTestProfileRequest buildProfileRequest(TestCase testCase, SpeedTestCmdLineOpts opts) {
@@ -70,7 +73,7 @@ class RequestSupport {
 
 
 
-    static RangeRaptorRequest<TripSchedule> createRangeRaptorRequest(
+    static RangeRaptorRequest<TripScheduleAdapter> createRangeRaptorRequest(
             CommandLineOpts opts,
             ProfileRequest request,
             SpeedTestProfile profile,
@@ -83,7 +86,7 @@ class RequestSupport {
         int expandDeltaSeconds = EXPAND_SEARCH_WINDOW_HOURS * 3600/2;
 
 
-        RequestBuilder<TripSchedule> builder = new RequestBuilder<TripSchedule>();
+        RequestBuilder<TripScheduleAdapter> builder = new RequestBuilder<>();
         builder.searchParams()
                 .boardSlackInSeconds(120)
                 .timetableEnabled(false)
@@ -113,7 +116,7 @@ class RequestSupport {
 
         addDebugOptions(builder, opts);
 
-        RangeRaptorRequest<TripSchedule> req = builder.build();
+        RangeRaptorRequest<TripScheduleAdapter> req = builder.build();
 
         if (opts.debugRequest()) {
             System.err.println("-> Request: " + req);
@@ -130,7 +133,7 @@ class RequestSupport {
         }
     }
 
-    private static void addDebugOptions(RequestBuilder<TripSchedule> builder, CommandLineOpts opts) {
+    private static void addDebugOptions(RequestBuilder<TripScheduleAdapter> builder, CommandLineOpts opts) {
         List<Integer> stops = opts.debugStops();
         List<Integer> path = opts.debugPath();
 
@@ -144,7 +147,7 @@ class RequestSupport {
             return;
         }
 
-        DebugLogger logger = new DebugLogger(debugLoggerEnabled);
+        DebugLogger<TripScheduleAdapter> logger = new DebugLogger<>(debugLoggerEnabled);
 
         builder.debug()
                 .stopArrivalListener(logger::stopArrivalLister)

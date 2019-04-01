@@ -3,7 +3,7 @@ package com.conveyal.r5.otp2.rangeraptor.multicriteria;
 import com.conveyal.r5.otp2.api.transit.IntIterator;
 import com.conveyal.r5.otp2.api.transit.TripPatternInfo;
 import com.conveyal.r5.otp2.api.transit.TripScheduleInfo;
-import com.conveyal.r5.otp2.rangeraptor.PerformTransitStrategy;
+import com.conveyal.r5.otp2.rangeraptor.TransitRoutingStrategy;
 import com.conveyal.r5.otp2.rangeraptor.multicriteria.arrivals.AbstractStopArrival;
 import com.conveyal.r5.otp2.rangeraptor.transit.StopFilter;
 import com.conveyal.r5.otp2.rangeraptor.transit.TransitCalculator;
@@ -16,7 +16,7 @@ import com.conveyal.r5.otp2.rangeraptor.transit.TripScheduleSearch;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-public final class McTransitWorker<T extends TripScheduleInfo> implements PerformTransitStrategy<T> {
+public final class McTransitWorker<T extends TripScheduleInfo> implements TransitRoutingStrategy<T> {
 
     private final McRangeRaptorWorkerState<T> state;
     private final TransitCalculator calculator;

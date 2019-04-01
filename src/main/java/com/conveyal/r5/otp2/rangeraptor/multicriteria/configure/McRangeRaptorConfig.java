@@ -3,7 +3,7 @@ package com.conveyal.r5.otp2.rangeraptor.multicriteria.configure;
 import com.conveyal.r5.otp2.api.transit.TripScheduleInfo;
 import com.conveyal.r5.otp2.api.view.Heuristics;
 import com.conveyal.r5.otp2.api.view.Worker;
-import com.conveyal.r5.otp2.rangeraptor.PerformTransitStrategy;
+import com.conveyal.r5.otp2.rangeraptor.TransitRoutingStrategy;
 import com.conveyal.r5.otp2.rangeraptor.WorkerState;
 import com.conveyal.r5.otp2.rangeraptor.multicriteria.McRangeRaptorWorkerState;
 import com.conveyal.r5.otp2.rangeraptor.multicriteria.McTransitWorker;
@@ -37,7 +37,7 @@ public class McRangeRaptorConfig<T extends TripScheduleInfo> {
      */
     public Worker<T> createWorker(
             Heuristics heuristics,
-            BiFunction<WorkerState<T>, PerformTransitStrategy<T>, Worker<T>> createWorker
+            BiFunction<WorkerState<T>, TransitRoutingStrategy<T>, Worker<T>> createWorker
     ) {
         McRangeRaptorWorkerState<T> state = createState(heuristics);
         return createWorker.apply(state, createTransitWorkerStrategy(state));
@@ -46,7 +46,7 @@ public class McRangeRaptorConfig<T extends TripScheduleInfo> {
 
     /* private factory methods */
 
-    private PerformTransitStrategy<T> createTransitWorkerStrategy(McRangeRaptorWorkerState<T> state) {
+    private TransitRoutingStrategy<T> createTransitWorkerStrategy(McRangeRaptorWorkerState<T> state) {
         return new McTransitWorker<>(state, context.stopFilter(), context.calculator());
     }
 

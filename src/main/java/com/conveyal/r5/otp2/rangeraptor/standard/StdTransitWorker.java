@@ -2,7 +2,7 @@ package com.conveyal.r5.otp2.rangeraptor.standard;
 
 import com.conveyal.r5.otp2.api.transit.TripPatternInfo;
 import com.conveyal.r5.otp2.api.transit.TripScheduleInfo;
-import com.conveyal.r5.otp2.rangeraptor.PerformTransitStrategy;
+import com.conveyal.r5.otp2.rangeraptor.TransitRoutingStrategy;
 import com.conveyal.r5.otp2.rangeraptor.transit.TransitCalculator;
 import com.conveyal.r5.otp2.rangeraptor.transit.TripScheduleSearch;
 
@@ -12,7 +12,7 @@ import com.conveyal.r5.otp2.rangeraptor.transit.TripScheduleSearch;
  *
  * @param <T> The TripSchedule type defined by the user of the range raptor API.
  */
-public final class StdTransitWorker<T extends TripScheduleInfo> implements PerformTransitStrategy<T> {
+public final class StdTransitWorker<T extends TripScheduleInfo> implements TransitRoutingStrategy<T> {
 
     private static final int NOT_SET = -1;
 

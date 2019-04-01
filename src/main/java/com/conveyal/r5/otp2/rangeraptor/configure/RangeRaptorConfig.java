@@ -8,7 +8,7 @@ import com.conveyal.r5.otp2.api.transit.TransitDataProvider;
 import com.conveyal.r5.otp2.api.transit.TripScheduleInfo;
 import com.conveyal.r5.otp2.api.view.Heuristics;
 import com.conveyal.r5.otp2.api.view.Worker;
-import com.conveyal.r5.otp2.rangeraptor.PerformTransitStrategy;
+import com.conveyal.r5.otp2.rangeraptor.TransitRoutingStrategy;
 import com.conveyal.r5.otp2.rangeraptor.RangeRaptorWorker;
 import com.conveyal.r5.otp2.rangeraptor.WorkerState;
 import com.conveyal.r5.otp2.rangeraptor.multicriteria.configure.McRangeRaptorConfig;
@@ -90,11 +90,11 @@ public class RangeRaptorConfig<T extends TripScheduleInfo> {
     private Worker<T> createWorker(
             SearchContext<T> ctx,
             WorkerState<T> workerState,
-            PerformTransitStrategy<T> performTransitStrategy
+            TransitRoutingStrategy<T> transitRoutingStrategy
     ) {
         return new RangeRaptorWorker<>(
                 workerState,
-                performTransitStrategy,
+                transitRoutingStrategy,
                 ctx.transit(),
                 ctx.accessLegs(),
                 ctx.roundProvider(),

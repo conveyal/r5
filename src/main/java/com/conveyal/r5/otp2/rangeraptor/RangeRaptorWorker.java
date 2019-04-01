@@ -49,7 +49,7 @@ import java.util.Iterator;
 public final class RangeRaptorWorker<T extends TripScheduleInfo, S extends WorkerState<T>> implements Worker<T> {
 
 
-    private final PerformTransitStrategy<T> transitWorker;
+    private final TransitRoutingStrategy<T> transitWorker;
 
     /**
      * The RangeRaptor state - we delegate keeping track of state to the state object,
@@ -88,7 +88,7 @@ public final class RangeRaptorWorker<T extends TripScheduleInfo, S extends Worke
 
     public RangeRaptorWorker(
             S state,
-            PerformTransitStrategy<T> transitWorker,
+            TransitRoutingStrategy<T> transitWorker,
             TransitDataProvider<T> transitData,
             Collection<TransferLeg> accessLegs,
             RoundProvider roundProvider,

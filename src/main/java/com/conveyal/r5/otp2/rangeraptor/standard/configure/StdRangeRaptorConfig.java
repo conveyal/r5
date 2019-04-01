@@ -3,7 +3,7 @@ package com.conveyal.r5.otp2.rangeraptor.standard.configure;
 import com.conveyal.r5.otp2.api.transit.TripScheduleInfo;
 import com.conveyal.r5.otp2.api.view.Heuristics;
 import com.conveyal.r5.otp2.api.view.Worker;
-import com.conveyal.r5.otp2.rangeraptor.PerformTransitStrategy;
+import com.conveyal.r5.otp2.rangeraptor.TransitRoutingStrategy;
 import com.conveyal.r5.otp2.rangeraptor.WorkerState;
 import com.conveyal.r5.otp2.rangeraptor.path.DestinationArrivalPaths;
 import com.conveyal.r5.otp2.rangeraptor.path.configure.PathConfig;
@@ -60,7 +60,7 @@ public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
      * worker, if not the heuristic can not be added to the worker lifecycle and fails.
      */
     public HeuristicSearch<T> createHeuristicSearch(
-            BiFunction<WorkerState<T>, PerformTransitStrategy<T>, Worker<T>> createWorker
+            BiFunction<WorkerState<T>, TransitRoutingStrategy<T>, Worker<T>> createWorker
     ) {
         StdRangeRaptorWorkerState<T> state = createState();
         Heuristics heuristics = createHeuristicsAdapter();
@@ -68,7 +68,7 @@ public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
     }
 
     public Worker<T> createSearch(
-            BiFunction<WorkerState<T>, PerformTransitStrategy<T>, Worker<T>> createWorker
+            BiFunction<WorkerState<T>, TransitRoutingStrategy<T>, Worker<T>> createWorker
     ) {
         StdRangeRaptorWorkerState<T> state = createState();
         return createWorker.apply(state, createWorkerStrategy(state));
@@ -90,7 +90,7 @@ public class StdRangeRaptorConfig<T extends TripScheduleInfo> {
         throw new IllegalArgumentException(ctx.profile().toString());
     }
 
-    private PerformTransitStrategy<T> createWorkerStrategy(StdWorkerState<T> state) {
+    private TransitRoutingStrategy<T> createWorkerStrategy(StdWorkerState<T> state) {
 
         switch (ctx.profile()) {
             case STANDARD:

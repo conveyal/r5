@@ -1,6 +1,30 @@
 package com.conveyal.r5;
 
-import com.conveyal.r5.api.util.*;
+import com.conveyal.r5.api.util.AbsoluteDirection;
+import com.conveyal.r5.api.util.Alert;
+import com.conveyal.r5.api.util.BikeRentalStation;
+import com.conveyal.r5.api.util.Elevation;
+import com.conveyal.r5.api.util.Fare;
+import com.conveyal.r5.api.util.Itinerary;
+import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.api.util.NonTransitMode;
+import com.conveyal.r5.api.util.ParkRideParking;
+import com.conveyal.r5.api.util.PointToPointConnection;
+import com.conveyal.r5.api.util.PolylineGeometry;
+import com.conveyal.r5.api.util.ProfileOption;
+import com.conveyal.r5.api.util.RelativeDirection;
+import com.conveyal.r5.api.util.Route;
+import com.conveyal.r5.api.util.SearchType;
+import com.conveyal.r5.api.util.SegmentPattern;
+import com.conveyal.r5.api.util.Stats;
+import com.conveyal.r5.api.util.Stop;
+import com.conveyal.r5.api.util.StopCluster;
+import com.conveyal.r5.api.util.StreetEdgeInfo;
+import com.conveyal.r5.api.util.StreetSegment;
+import com.conveyal.r5.api.util.TransitJourneyID;
+import com.conveyal.r5.api.util.TransitModes;
+import com.conveyal.r5.api.util.TransitSegment;
+import com.conveyal.r5.api.util.Trip;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.model.json_serialization.PolyUtil;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
@@ -10,7 +34,16 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import graphql.GraphQLException;
 import graphql.Scalars;
 import graphql.language.StringValue;
-import graphql.schema.*;
+import graphql.schema.Coercing;
+import graphql.schema.GraphQLArgument;
+import graphql.schema.GraphQLEnumType;
+import graphql.schema.GraphQLFieldDefinition;
+import graphql.schema.GraphQLList;
+import graphql.schema.GraphQLNonNull;
+import graphql.schema.GraphQLObjectType;
+import graphql.schema.GraphQLOutputType;
+import graphql.schema.GraphQLScalarType;
+import graphql.schema.GraphQLTypeReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -122,6 +155,7 @@ public class GraphQLSchema {
     public static GraphQLEnumType transitmodeEnum = GraphQLEnumType.newEnum()
         .name("TransitModes")
         .description("Types of transit mode transport from GTFS")
+        .value("AIR", TransitModes.AIR, "Air")
         .value("TRAM", TransitModes.TRAM,
             " Tram, Streetcar, Light rail. Any light rail or street level system within a metropolitan area.")
         .value("SUBWAY", TransitModes.SUBWAY,

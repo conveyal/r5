@@ -894,8 +894,8 @@ public class EdgeStore implements Serializable {
             pointConsumer.consumePoint(p, vertex.getFixedLat(), vertex.getFixedLon());
         }
 
-        /** @return an envelope around the whole edge geometry. */
-        public Envelope getEnvelope() {
+        /** @return an envelope around the whole edge geometry, in fixed-point WGS84 degrees. */
+        public Envelope getEnvelope () {
             Envelope envelope = new Envelope();
             forEachPoint((p, fixedLat, fixedLon) -> {
                 envelope.expandToInclude(fixedLon, fixedLat);

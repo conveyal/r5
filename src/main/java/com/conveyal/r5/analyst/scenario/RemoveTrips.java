@@ -32,11 +32,6 @@ public class RemoveTrips extends Modification {
     private int nTripsRemoved = 0;
 
     @Override
-    public String getType() {
-        return "remove-trips";
-    }
-
-    @Override
     public boolean resolve (TransportNetwork network) {
         int nDefined = 0;
         checkIds(routes, patterns, trips, true, network);

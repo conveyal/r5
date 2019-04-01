@@ -1,6 +1,7 @@
 package com.conveyal.r5.transit;
 
 import com.conveyal.r5.api.util.ParkRideParking;
+import com.conveyal.r5.util.LambdaCounter;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import gnu.trove.map.TIntIntMap;
@@ -95,9 +96,20 @@ public class TransferFinder {
         // When applying scenarios we want to find transfers for only the newly added stops.
         // We look at any existing list of transfers and do enough iterations to make it as long as the list of stops.
         int firstStopIndex = transfersForStop.size();
-        LOG.info("Finding transfers through the street network from {} stops...", transitLayer.getStopCount() - transfersForStop.size());
+
+        // Iterating over all stops to generate transfers take a long time, so it is nice to have a progress counter.
+        LOG.info("Finding transfers through the street network from stops...");
+        LambdaCounter progressCounter = new LambdaCounter(
+                LOG,
+                transitLayer.getStopCount() - transfersForStop.size(),
+                10_000,
+                "Progress: {} of {} stops processed."
+        );
+
         // TODO Parallelize with streams. See distance table generation.
         for (int s = firstStopIndex; s < transitLayer.getStopCount(); s++) {
+            progressCounter.increment();
+
             // From each stop, run a street search looking for other transit stops.
             int originStreetVertex = transitLayer.streetVertexForStop.get(s);
             if (originStreetVertex == -1) {
@@ -151,6 +163,7 @@ public class TransferFinder {
             }
 
         }
+        progressCounter.done();
         // Store the transfers in the transit layer
         transitLayer.transfersForStop = transfersForStop;
         LOG.info("Done finding transfers. {} stops are unlinked.", unconnectedStops);

@@ -6,10 +6,10 @@ import java.util.BitSet;
 /**
  * A implementation of the StopFilter interface that wraps a BitSet.
  */
-public class StopFilerBitSet implements StopFilter {
+public class StopFilterBitSet implements StopFilter {
     private final BitSet allowVisit;
 
-    StopFilerBitSet(BitSet allowVisit) {
+    StopFilterBitSet (BitSet allowVisit) {
         this.allowVisit = allowVisit;
     }
 

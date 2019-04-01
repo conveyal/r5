@@ -63,7 +63,7 @@ public class SearchContext<T extends TripScheduleInfo> {
         this.debugRequest = debugRequest(request);
         this.debugFactory = new DebugHandlerFactory<>(this.debugRequest, lifeCycle());
         this.stopFilter = request.searchParams().stopFilter() != null
-                ? new StopFilerBitSet(request.searchParams().stopFilter())
+                ? new StopFilterBitSet(request.searchParams().stopFilter())
                 : (s -> true);
     }
 

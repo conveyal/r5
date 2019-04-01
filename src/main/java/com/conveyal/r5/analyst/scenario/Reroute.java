@@ -97,11 +97,6 @@ public class Reroute extends Modification {
     private int nPatternsAffected = 0;
 
     @Override
-    public String getType() {
-        return "reroute";
-    }
-
-    @Override
     public boolean resolve (TransportNetwork network) {
         checkIds(routes, patterns, null, false, network);
         if (fromStop == null && toStop == null) {

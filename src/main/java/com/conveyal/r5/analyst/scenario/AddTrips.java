@@ -56,11 +56,6 @@ public class AddTrips extends Modification {
     private int routeIndex;
 
     @Override
-    public String getType() {
-        return "add-trips";
-    }
-
-    @Override
     public boolean resolve (TransportNetwork network) {
         if (stops == null || stops.size() < 2) {
             errors.add("You must provide at least two stops.");

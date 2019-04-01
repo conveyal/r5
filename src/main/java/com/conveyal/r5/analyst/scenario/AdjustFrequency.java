@@ -66,11 +66,6 @@ public class AdjustFrequency extends Modification {
     private Set<PatternTimetable> entriesMatched = new HashSet<>();
 
     @Override
-    public String getType() {
-        return "adjust-frequency";
-    }
-
-    @Override
     public boolean resolve (TransportNetwork network) {
         if (entries.isEmpty()) {
             errors.add("This modification should include at least one timetable/frequency entry.");

@@ -6,6 +6,7 @@ import com.conveyal.r5.analyst.TravelTimeReducer;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.streets.LinkedPointSet;
+import com.conveyal.r5.streets.StreetRouter;
 import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -221,9 +222,18 @@ public class PerTargetPropagater {
                         // cannot improve on the best known time at this iteration. Also avoids overflow.
                         continue;
                     }
-                    // If recording path details, extract the row of paths to all stops for this iteration.
                     // Propagate from the current stop out to the target.
-                    int timeAtTarget = timeAtStop + distanceMillimeters / speedMillimetersPerSecond;
+                    int secondsFromStopToTarget;
+
+                    if (targets.linkageCostUnit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) {
+                        secondsFromStopToTarget = linkageCost / speedMillimetersPerSecond;
+                    } else if (targets.linkageCostUnit == StreetRouter.State.RoutingVariable.DURATION_SECONDS) {
+                        secondsFromStopToTarget = linkageCost;
+                    } else {
+                        throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
+                    }
+
+                    int timeAtTarget = timeAtStop + secondsFromStopToTarget;
                     if (timeAtTarget < cutoffSeconds &&
                         timeAtTarget < perIterationTravelTimes[iteration]) {
                         // To reach this target, alighting at this stop is faster than any previously checked stop.

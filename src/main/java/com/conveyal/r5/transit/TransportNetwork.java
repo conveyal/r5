@@ -6,28 +6,15 @@ import com.conveyal.r5.analyst.WebMercatorGridPointSet;
 import com.conveyal.r5.analyst.error.TaskError;
 import com.conveyal.r5.analyst.scenario.Scenario;
 import com.conveyal.r5.common.JsonUtilities;
-import com.conveyal.r5.kryo.InstanceCountingClassResolver;
 import com.conveyal.r5.kryo.KryoNetworkSerializer;
-import com.conveyal.r5.kryo.TIntArrayListSerializer;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
-import com.esotericsoftware.kryo.Kryo;
-import com.esotericsoftware.kryo.io.Input;
-import com.esotericsoftware.kryo.io.Output;
-import com.esotericsoftware.kryo.serializers.ExternalizableSerializer;
-import com.esotericsoftware.kryo.serializers.JavaSerializer;
 import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
-import com.conveyal.r5.analyst.fare.GreedyFareCalculator;
+import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.profile.StreetMode;
 import com.google.common.io.Files;
 import com.vividsolutions.jts.geom.Envelope;
-import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetLayer;
-import gnu.trove.impl.hash.TIntHash;
-import gnu.trove.impl.hash.TPrimitiveHash;
-import gnu.trove.list.array.TIntArrayList;
-import org.mapdb.Fun;
-import org.objenesis.strategy.SerializingInstantiatorStrategy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -52,6 +39,11 @@ public class TransportNetwork implements Serializable {
     /**
      * This stores any number of lightweight scenario networks built upon the current base network.
      * FIXME that sounds like a memory leak, should be a WeighingCache or at least size-limited.
+     * A single network cache at the top level could store base networks and scenarios since they all have globally
+     * unique IDs. A hierarchical cache does have the advantage of evicting all the scenarios with the associated
+     * base network, which keeps the references in the scenarios from holding on to the base network. But considering
+     * that we have never started evicting networks (other than for a "cache" of one element) this might be getting
+     * ahead of ourselves.
      */
     public transient Map<String, TransportNetwork> scenarios = new HashMap<>();
 
@@ -59,19 +51,11 @@ public class TransportNetwork implements Serializable {
      * A grid point set that covers the full extent of this transport network. The PointSet itself then caches linkages
      * to street networks (the baseline street network, or ones with various scenarios applied). If they have been
      * created, this point set and its linkage to the street network are serialized along with the network, which makes
-     * startup much faster. Note that there's a linkage cache with references to streetlayers in this GridPointSet,
+     * startup much faster. Note that there's a linkage cache with references to StreetLayers in this GridPointSet,
      * so you should usually only serialize a TransportNetwork right after it's built, when that cache contains only
-     * the baseline linkage.
+     * the baseline linkage. This unlinked GridPointSet is not specific to any mode of travel, it's just a set of points.
      */
     public WebMercatorGridPointSet gridPointSet;
-
-    /**
-     * Linkages are cached within GridPointSets. Guava caches serialize their configuration but not
-     * their contents, which is actually pretty sane behavior for a cache. So if we want a particular linkage to be
-     * available on reload, we have to store it in its own field.
-     * TODO it would be more "normalized" to keep only this field, and access the unlinked gridPointSet via linkedGridPointSet.pointset.
-     */
-    public LinkedPointSet linkedGridPointSet;
 
     /**
      * A string uniquely identifying the contents of this TransportNetwork in the space of TransportNetworks.
@@ -84,7 +68,7 @@ public class TransportNetwork implements Serializable {
 
     public static final String BUILDER_CONFIG_FILENAME = "build-config.json";
 
-    public GreedyFareCalculator fareCalculator;
+    public InRoutingFareCalculator fareCalculator;
 
     /** Non-fatal warnings encountered when applying the scenario, null on a base network */
     public List<TaskError> scenarioApplicationWarnings;
@@ -296,21 +280,21 @@ public class TransportNetwork implements Serializable {
     }
 
     /**
-     * Build an efficient implicit grid PointSet for this TransportNetwork if it doesn't already exist. Then link that
-     * grid pointset to the street layer. This is called when a network is built for analysis purposes, and also after a
-     * scenario is applied to rebuild the grid pointset on the scenario copy of the network.
-     *
-     * This grid PointSet will cover the entire street network layer of this TransportNetwork, which should include
-     * every point we can route from or to. Any other destination grid (for the same mode, walking) can be made as a
-     * subset of this one since it includes every potentially accessible point.
+     * For Analysis purposes, build an efficient implicit grid PointSet for this TransportNetwork. Then, for any modes
+     * supplied, we also build a linkage that is held permanently in the GridPointSet. This method is called when a
+     * network is first built.
+     * The resulting grid PointSet will cover the entire street network layer of this TransportNetwork, which should
+     * include every point we can route from or to. Any other destination grid (for the same mode, walking) can be made
+     * as a subset of this one since it includes every potentially accessible point.
      */
-    public void rebuildLinkedGridPointSet() {
-        if (gridPointSet == null) {
-            gridPointSet = new WebMercatorGridPointSet(this);
+    public void rebuildLinkedGridPointSet(StreetMode... modes) {
+        if (gridPointSet != null) {
+            throw new RuntimeException("Linked grid pointset was built more than once.");
         }
-        // Here we are bypassing the GridPointSet's internal cache of linkages because we want this particular
-        // linkage to be serialized with the network. The internal Guava cache does not serialize its contents (by design).
-        linkedGridPointSet = new LinkedPointSet(gridPointSet, streetLayer, StreetMode.WALK, linkedGridPointSet);
+        gridPointSet = new WebMercatorGridPointSet(this);
+        for (StreetMode mode : modes) {
+            gridPointSet.buildUnevictableLinkage(streetLayer, mode);
+        }
     }
 
     //TODO: add transit stops to envelope
@@ -371,7 +355,6 @@ public class TransportNetwork implements Serializable {
         // It is important to set this before making the clones of the street and transit layers below.
         copy.scenarioId = scenario.id;
         copy.gridPointSet = this.gridPointSet;
-        copy.linkedGridPointSet = this.linkedGridPointSet;
         copy.transitLayer = this.transitLayer.scenarioCopy(copy, scenario.affectsTransitLayer());
         copy.streetLayer = this.streetLayer.scenarioCopy(copy, scenario.affectsStreetLayer());
         copy.fareCalculator = this.fareCalculator;

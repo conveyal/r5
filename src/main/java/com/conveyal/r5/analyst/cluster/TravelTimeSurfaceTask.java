@@ -5,7 +5,6 @@ import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,6 +14,9 @@ import java.util.List;
  * of travel time from the chosen origin to that destination.
  */
 public class TravelTimeSurfaceTask extends AnalysisTask {
+
+    // FIXME red flag - what is this enum enumerating Java types?
+
     @Override
     public Type getType() {
         return Type.TRAVEL_TIME_SURFACE;
@@ -44,23 +46,6 @@ public class TravelTimeSurfaceTask extends AnalysisTask {
 
     public Format getFormat(){
         return format;
-    }
-
-    /**
-     * Travel time results may be combined with many different grids, so we don't want to limit their geographic extent
-     * to that of any one grid. Instead we use the extents supplied in the request.
-     * The UI only sends these if the user has changed them to something other than "full region".
-     * If "full region" is selected, the UI sends nothing and the backend fills in the bounds of the region.
-     *
-     * FIXME: the request bounds indicate either origin bounds or destination bounds depending on the request type.
-     * We need to specify these separately as we merge all the request types.
-     */
-    @Override
-    public List<PointSet> getDestinations(TransportNetwork network, GridCache gridCache) {
-        List pointSets = new ArrayList<>();
-        // Reuse linkages in the base gridPointSet stored in the TransportNetwork as to avoid relinking
-        pointSets.add(gridPointSetCache.get(this.zoom, this.west, this.north, this.width, this.height, network.gridPointSet));
-        return pointSets;
     }
 
 }

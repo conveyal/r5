@@ -49,11 +49,6 @@ public class AdjustDwellTime extends Modification {
     private int nTripsAffected = 0;
 
     @Override
-    public String getType() {
-        return "adjust-dwell-time";
-    }
-
-    @Override
     public boolean resolve (TransportNetwork network) {
         if (stops != null) {
             intStops = new TIntHashSet();

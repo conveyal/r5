@@ -151,8 +151,12 @@ public class TimeGrid {
         }
     }
 
-    /** Write this grid out in GeoTIFF format */
+    /**
+     * Write this grid out in GeoTIFF format.
+     * If an analysis task is supplied, add metadata to the GeoTIFF explaining what scenario it comes from.
+     */
     public void writeGeotiff (OutputStream out, AnalysisTask request) {
+        LOG.info("Writing GeoTIFF file");
         try {
             // Inspired by org.geotools.coverage.grid.GridCoverageFactory
             final WritableRaster raster =
@@ -183,16 +187,16 @@ public class TimeGrid {
 
             GeoTiffWriter writer = new GeoTiffWriter(out);
 
+            // If the request that produced this TimeGrid was supplied, write scenario metadata into the GeoTIFF
             if (request != null) {
                 AnalysisTask clonedRequest = request.clone();
-                // don't make metadata too large.
-                // we're not losing info here, the scenario id used here is qualified with the CRC and is thus immutable
+                // Save the scenario ID rather than the full scenario, to avoid making metadata too large. We're not
+                // losing information here, the scenario id used here is qualified with the CRC and is thus immutable
                 // and available from S3.
                 if (clonedRequest.scenario != null) {
                     clonedRequest.scenarioId = clonedRequest.scenario.id;
                     clonedRequest.scenario = null;
                 }
-
                 // 270: Image Description, 305: Software (https://www.awaresystems.be/imaging/tiff/tifftags/baseline.html)
                 writer.setMetadataValue("270", JsonUtilities.objectMapper.writerWithDefaultPrettyPrinter()
                         .writeValueAsString(clonedRequest));
@@ -204,10 +208,6 @@ public class TimeGrid {
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
-    }
-
-    public void writeGeotiff (OutputStream out) {
-        writeGeotiff(out, null);
     }
 
     /**

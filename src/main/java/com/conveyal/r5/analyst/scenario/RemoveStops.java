@@ -65,11 +65,6 @@ public class RemoveStops extends Modification {
     private int nPatternsAffected = 0;
 
     @Override
-    public String getType() {
-        return "remove-stops";
-    }
-
-    @Override
     public boolean resolve (TransportNetwork network) {
         checkIds(routes, patterns, null, false, network);
         intStops = new TIntHashSet();

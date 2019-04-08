@@ -1,19 +1,16 @@
 package com.conveyal.r5.kryo;
 
-import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.r5.analyst.scenario.FakeGraph;
-import com.conveyal.r5.diff.ObjectDiffer;
+import com.conveyal.object_differ.ObjectDiffer;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.IntHashGrid;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.esotericsoftware.kryo.Kryo;
-import com.google.common.cache.LoadingCache;
 import org.junit.Test;
 
 import java.io.File;
 import java.util.BitSet;
 
 import static com.conveyal.r5.analyst.scenario.FakeGraph.buildNetwork;
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
 /**
@@ -28,9 +25,9 @@ public class KryoNetworkSerializerTest {
     @Test
     public void testRoundTrip () throws Exception {
 
-        // Build a network, including distance tables and a linked grid pointset for Analysis.
+        // Build a network, including distance tables and a linked grid point set for Analysis.
         TransportNetwork originalNetwork = buildNetwork(FakeGraph.TransitNetwork.MULTIPLE_LINES);
-        originalNetwork.rebuildLinkedGridPointSet();
+        originalNetwork.rebuildLinkedGridPointSet(StreetMode.WALK);
 
         // Test that the network is identical to itself. This is a test that the ObjectDiffer works and is configured
         // properly, and enables a special option of that class.
@@ -50,7 +47,6 @@ public class KryoNetworkSerializerTest {
         TransportNetwork copiedNetwork2 = KryoNetworkSerializer.read(tempFile);
         copiedNetwork2.rebuildTransientIndexes();
         assertNoDifferences(copiedNetwork1, copiedNetwork2);
-
     }
 
     /**
@@ -69,8 +65,9 @@ public class KryoNetworkSerializerTest {
         // Skip the somewhat unnecessary spatial index field on PointSets - these contain unordered lists
         // (and should probably be eliminated on gridded point sets).
         objectDiffer.ignoreFields("spatialIndex");
-        // Skip the linkage LoadingCache which has no comparison method defined and can have its values evicted.
-        objectDiffer.ignoreFields("linkageCache");
+        // Skip the linkage LoadingCache which can have its values evicted.
+        // It and the map are keyed on street layers, which have identity equality so don't compare properly here.
+        objectDiffer.ignoreFields("linkageCache", "linkageMap");
         objectDiffer.useEquals(BitSet.class);
         // IntHashGrid contains unordered lists of elements in each bin. Lists are compared as ordered.
         objectDiffer.ignoreClasses(IntHashGrid.class);
@@ -79,7 +76,7 @@ public class KryoNetworkSerializerTest {
             objectDiffer.enableComparingIdenticalObjects();
         }
         objectDiffer.compareTwoObjects(a, b);
-        objectDiffer.printDifferences();
+        objectDiffer.printSummary();
         assertFalse(objectDiffer.hasDifferences());
     }
 

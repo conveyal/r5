@@ -4,6 +4,8 @@ package com.conveyal.r5.api.util;
  * Types of transit mode transport from GTFS
  */
 public enum TransitModes {
+    // Air
+    AIR,
     // Tram, Streetcar, Light rail. Any light rail or street level system within a metropolitan area.
     TRAM,
     //Subway, Metro. Any underground rail system within a metropolitan area.

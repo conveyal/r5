@@ -3,6 +3,7 @@ package com.conveyal.r5.analyst.scenario;
 import com.beust.jcommander.internal.Lists;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
+import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransferFinder;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -110,7 +111,7 @@ public class Scenario implements Serializable {
         // Apply each modification in turn to the same extensible copy of the TransitNetwork.
         LOG.info("Applying modifications to TransportNetwork.");
         for (Modification modification : modifications) {
-            LOG.info("Applying modification of type {}", modification.getType());
+            LOG.info("Applying modification of type {}", modification.getClass().getSimpleName());
             boolean errors = modification.apply(copiedNetwork);
             if (errors) {
                 // Bail out at the first error, because modification application changes the underlying network and
@@ -132,6 +133,7 @@ public class Scenario implements Serializable {
 
         // Rebuild edge lists to account for changes from scenario application
         copiedNetwork.streetLayer.buildEdgeLists();
+        // TODO Elaborate on this
         // Rebuild distance tables affected by street network changes
         Geometry treeRebuildZone =
                 copiedNetwork.streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.DISTANCE_TABLE_SIZE_METERS);
@@ -141,8 +143,10 @@ public class Scenario implements Serializable {
         // TODO also rebuild transfers which are near street network changes but which do not connect to new stops.
         new TransferFinder(copiedNetwork).findTransfers();
 
-        // Update the linkage between the grid and the streets, considering whether the scenario changed any streets.
-        copiedNetwork.rebuildLinkedGridPointSet();
+        // Any linkages to the new scenario street network will be built as needed based on the incoming request.
+        // FIXME New routes drawn outside the original bounds cannot have an effect,
+        // because the (unlinked) grid point set has been copied verbatim to the new network.
+
         if (VERIFY_BASE_NETWORK_UNCHANGED) {
             if (originalNetwork.checksum() != baseNetworkChecksum) {
                 LOG.error("Applying a scenario mutated the base transportation network. THIS IS A BUG.");

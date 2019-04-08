@@ -107,8 +107,8 @@ public class PointToPointRouterServer {
                 TransportNetwork transportNetwork = KryoNetworkSerializer.read(new File(dir, "network.dat"));
                 transportNetwork.readOSM(new File(dir, "osm.mapdb"));
                 transportNetwork.transitLayer.buildDistanceTables(null);
-                transportNetwork.rebuildLinkedGridPointSet();
-                transportNetwork.linkedGridPointSet.pointSet.link(transportNetwork.streetLayer, StreetMode.CAR);
+                // Build WALK and CAR linked pointsets because they are needed for isochrones (which are enabled).
+                transportNetwork.rebuildLinkedGridPointSet(StreetMode.WALK, StreetMode.CAR);
                 run(transportNetwork);
             } catch (Exception e) {
                 LOG.error("An error occurred during the reading or decoding of transit networks", e);

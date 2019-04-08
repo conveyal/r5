@@ -4,8 +4,8 @@ import com.conveyal.r5.transit.TransportNetwork;
 import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.transit.TripSchedule;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
 import gnu.trove.list.TIntList;
 import gnu.trove.list.array.TIntArrayList;
 import org.slf4j.Logger;
@@ -24,31 +24,14 @@ import java.util.Set;
  * That will also allow them to accumulate stats on how many patterns, trips, routes etc. they affected.
  */
 // we use the property "type" to determine what type of modification it is. The string values are defined here.
-// Each class's getType should return the same value.
-@JsonTypeInfo(use=JsonTypeInfo.Id.NAME, include=JsonTypeInfo.As.PROPERTY, property="type")
-@JsonSubTypes({
-        @JsonSubTypes.Type(name = "adjust-speed", value = AdjustSpeed.class),
-        @JsonSubTypes.Type(name = "adjust-frequency", value = AdjustFrequency.class),
-        @JsonSubTypes.Type(name = "adjust-dwell-time", value = AdjustDwellTime.class),
-        @JsonSubTypes.Type(name = "add-trips", value = AddTrips.class),
-        @JsonSubTypes.Type(name = "remove-trips", value = RemoveTrips.class),
-        @JsonSubTypes.Type(name = "reroute", value = Reroute.class),
-        @JsonSubTypes.Type(name = "remove-stops", value = RemoveStops.class),
-        @JsonSubTypes.Type(name = "set-fare-calculator", value = SetFareCalculator.class)
-})
+@JsonTypeInfo(use=JsonTypeInfo.Id.CUSTOM, include=JsonTypeInfo.As.PROPERTY, property="type", visible = true)
+@JsonTypeIdResolver(ModificationTypeResolver.class)
 public abstract class Modification implements Serializable {
 
-    static final long serialVersionUID = 2111604049617395839L;
+    // TODO remove all serialVersionUIDs unless we're actually relying on them
+    // static final long serialVersionUID = 2111604049617395839L;
 
     private static final Logger LOG = LoggerFactory.getLogger(Modification.class);
-
-    /** Distinguish between modification types when a list of Modifications are serialized out as JSON. */
-    public abstract String getType();
-
-    /** This setter only exists to ensure that "type" is perceived as a property by libraries. It has no effect. */
-    public final void setType (String type) {
-        // Do nothing.
-    }
 
     /** Free-text comment describing this modification instance and what it's intended to do or represent. */
     public String comment;
@@ -78,6 +61,7 @@ public abstract class Modification implements Serializable {
      * or other deep objects from the original TransportNetwork. The Modification is responsible for ensuring that
      * no damage is done to the original TransportNetwork by making copies of referenced objects as necessary.
      *
+     * TODO arguably this and resolve() don't need to return booleans - all implementations just check whether the errors list is empty, so we could just supply a method that does that.
      * TODO remove the network field, and use the network against which this Modification was resolved.
      * @return true if any errors happened while applying the modification.
      */
@@ -126,7 +110,8 @@ public abstract class Modification implements Serializable {
      * For each StopSpec in the supplied list, find or create and link a stop in the given TransportNetwork.
      * This method is shared by all modifications that need to find or create stops based on a list of StopSpecs.
      * Any warnings or error messages are stored in the errors list of this Modification.
-     * Any Modification that calls this method can potentially affect both the street and transit layers of the network.
+     * Any Modification that calls this method can potentially affect both the street and transit layers of the network,
+     * so affectsStreetLayer and affectsTransitLayer should both return true on such Modifications.
      * @return the integer stop IDs of all stops that were found or created
      */
     protected TIntList findOrCreateStops(List<StopSpec> stops, TransportNetwork network) {
@@ -139,20 +124,14 @@ public abstract class Modification implements Serializable {
         // Adding the stops changes the street network but does not rebuild the edge lists.
         // We have to rebuild the edge lists after those changes but before we build the stop trees.
         // Alternatively we could actually update the edge lists as edges are added and removed,
-        // and build the stop trees immediately in stopSpec::resolve.
-        // We used to do this after every modification, but now we do it once at the end of the scenario application process
-        /*network.streetLayer.buildEdgeLists();
-        int firstNewStop = network.transitLayer.stopToVertexDistanceTables.size();
-        for (int intStopIndex = firstNewStop; intStopIndex < network.transitLayer.getStopCount(); intStopIndex++) {
-            network.transitLayer.stopToVertexDistanceTables.add(network.transitLayer.buildOneDistanceTable(intStopIndex));
-        }
-        new TransferFinder(network).findTransfers();*/
+        // and build the stop trees immediately in stopSpec::resolve. We used to do this after every modification,
+        // but now we do it once at the end of the scenario application process
         return intStopIds;
     }
 
     /**
-     * This determines the sequence in which modifications will be applied.
-     * It is used in a standard compare function, so lower numbered modifications will be applied before higher ones.
+     * This determines the sequence in which modifications will be applied. It is used in a standard compare function,
+     * so lower numbered modifications will be applied before higher ones. Typical values are 10 through 100.
      */
     @JsonIgnore
     public abstract int getSortOrder();
@@ -163,7 +142,8 @@ public abstract class Modification implements Serializable {
      * The IDs in the list must reference actual trip or route IDs in the target transport network.
      * @param allowTrips whether or not this modification allows specifying trips.
      */
-    public void checkIds (Set<String> routes, Set<String> patterns, Set<String> trips, boolean allowTrips, TransportNetwork network) {
+    public void checkIds (Set<String> routes, Set<String> patterns, Set<String> trips, boolean allowTrips,
+                          TransportNetwork network) {
 
         // We will remove items from these sets as they are encountered when iterating over all trips.
         Set<String> unmatchedRoutes = new HashSet<>();

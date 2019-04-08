@@ -2,6 +2,7 @@ package com.conveyal.r5.transit;
 
 import com.conveyal.gtfs.GTFSFeed;
 import com.conveyal.gtfs.model.*;
+import com.conveyal.gtfs.model.Fare;
 import com.conveyal.gtfs.model.Route;
 import com.conveyal.gtfs.model.Stop;
 import com.conveyal.gtfs.model.Trip;
@@ -80,6 +81,11 @@ public class TransitLayer implements Serializable, Cloneable {
     // It contains information that is temporarily also held in stopForIndex.
     public List<String> stopIdForIndex = new ArrayList<>();
 
+    /** Fare zones for stops */
+    public List<String> fareZoneForStop = new ArrayList<>();
+
+    public List<String> parentStationIdForStop = new ArrayList<>();
+
     // Inverse map of stopIdForIndex, reconstructed from that list (not serialized). No-entry value is -1.
     public transient TObjectIntMap<String> indexForStopId;
 
@@ -128,12 +134,12 @@ public class TransitLayer implements Serializable, Cloneable {
     public boolean hasSchedules = false;
 
     /**
-     * For each transit stop, an int-int map giving the distance of every reachable street vertex from that stop.
+     * For each transit stop, an int-int map giving the walking distance to every reachable street vertex from that stop.
      * This is the result of running a distance-constrained street search outward from every stop in the graph.
      * If these tables are present, we serialize them when persisting a network to disk to avoid recalculating them
-     * upon re-load. However, the tables are not computed when the network is first built, except in certain code
-     * paths used for analysis work. The tables are not necessary for basic routing.
-     * Serializing these tables makes files much bigger and makes our checks to ensure that scenario application
+     * upon re-load. However, these tables are only computed when the network is first built in certain code
+     * paths used for analysis work. The tables are not necessary for basic point-to-point routing.
+     * Serializing this table makes network files much bigger and makes our checks to ensure that scenario application
      * does not damage base graphs slower.
      */
     public List<TIntIntMap> stopToVertexDistanceTables;
@@ -144,6 +150,8 @@ public class TransitLayer implements Serializable, Cloneable {
      * references between the two layers.
      */
     public TransportNetwork parentNetwork = null;
+
+    public Map<String, Fare> fares;
 
     /** Map from feed ID to feed CRC32 to ensure that we can't apply scenarios to the wrong feeds */
     public Map<String, Long> feedChecksums = new HashMap<>();
@@ -184,6 +192,9 @@ public class TransitLayer implements Serializable, Cloneable {
             // This is only used while building the TransitNetwork to look up StopTimes from the same feed.
             indexForUnscopedStopId.put(stop.stop_id, stopIndex);
             stopIdForIndex.add(scopedStopId);
+            // intern zone IDs to save memory
+            fareZoneForStop.add(stop.zone_id);
+            parentStationIdForStop.add(stop.parent_station);
             stopForIndex.add(stop);
             if (stop.wheelchair_boarding != null && stop.wheelchair_boarding.trim().equals("1")) {
                 stopsWheelchair.set(stopIndex);
@@ -433,6 +444,10 @@ public class TransitLayer implements Serializable, Cloneable {
             }
         }
 
+        if (level == LoadLevel.FULL) {
+            this.fares = new HashMap<>(gtfs.fares);
+        }
+
         // Will be useful in naming patterns.
 //        LOG.info("Finding topology of each route/direction...");
 //        Multimap<T2<String, Integer>, TripPattern> patternsForRouteDirection = HashMultimap.create();
@@ -545,7 +560,7 @@ public class TransitLayer implements Serializable, Cloneable {
     }
 
     /**
-     * Perform a single on-street search from the specified transit stop.
+     * Perform a single on-street WALK search from the specified transit stop.
      * Return the distance in millimeters to every reached street vertex.
      * @param stop the internal integer stop ID for which to build a distance table.
      * @return a map from street vertex numbers to distances in millimeters
@@ -662,7 +677,7 @@ public class TransitLayer implements Serializable, Cloneable {
         }else if (routeType >= 1000 && routeType < 1100){ //Water Transport Service
             return TransitModes.FERRY;
         }else if (routeType >= 1100 && routeType < 1200){ //Air Service
-            throw new IllegalArgumentException("Air transport not supported" + routeType);
+            return TransitModes.AIR;
         }else if (routeType >= 1200 && routeType < 1300){ //Ferry Service
             return TransitModes.FERRY;
         }else if (routeType >= 1300 && routeType < 1400){ //Telecabin Service

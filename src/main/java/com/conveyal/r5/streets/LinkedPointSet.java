@@ -20,6 +20,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -33,45 +34,50 @@ public class LinkedPointSet implements Serializable {
     private static final Logger LOG = LoggerFactory.getLogger(LinkedPointSet.class);
 
     /**
-     * LinkedPointSets are long-lived and not extremely numerous, so we keep references to the objects it was built from.
-     * Besides these fields are useful for later processing of LinkedPointSets.
+     * LinkedPointSets are long-lived and not extremely numerous, so we keep references to the objects it was built
+     * from. Besides these fields are useful for later processing of LinkedPointSets.
      */
     public final PointSet pointSet;
 
     /**
-     * We need to retain the street layer so we can look up edge endpoint vertices for the edge IDs.
-     * Besides, this object is inextricably linked to one street network.
+     * We need to retain the street layer so we can look up edge endpoint vertices for the edge IDs. Besides, this
+     * object is inextricably linked to one street network.
      */
     public final StreetLayer streetLayer;
 
     /**
      * The linkage may be different depending on what mode of travel one uses to reach the points from transit stops.
-     * Along with the PointSet and StreetLayer this mode is what determines the contents of a particular LinkedPointSet.
+     * Along with the PointSet and StreetLayer this mode is what determines the contents of a particular
+     * LinkedPointSet.
      */
     public final StreetMode streetMode;
 
     /**
-     * For each point, the closest edge in the street layer.
-     * This is in fact the even (forward) edge ID of the closest edge pairs.
+     * For each point, the closest edge in the street layer. This is in fact the even (forward) edge ID of the closest
+     * edge pairs.
      */
     public int[] edges;
 
-    /** For each point, distance from the beginning vertex of the edge geometry up to the split point (closest
-     * point on the edge to the point to be linked), plus the distance from the linked point to the split point */
+    /**
+     * For each point, distance from the beginning vertex of the edge geometry up to the split point (closest point on
+     * the edge to the point to be linked), plus the distance from the linked point to the split point
+     */
     public int[] distances0_mm;
 
-    /** For each point, distance from the end vertex of the edge geometry up to the split point (closest
-     * point on the edge to the point to be linked), plus the distance from the linked point to the split point */
+    /**
+     * For each point, distance from the end vertex of the edge geometry up to the split point (closest point on the
+     * edge to the point to be linked), plus the distance from the linked point to the split point
+     */
     public int[] distances1_mm;
 
     /** For each transit stop, the distances to nearby PointSet points as packed (point_index, distance) pairs. */
     public List<int[]> stopToPointDistanceTables;
 
     /**
-     * For each pointset point, the stops reachable without using transit, as a map from StopID to distance in millimeters.
-     * Inverted version of stopToPointDistanceTables. This is used in PerTargetPropagator to find all the stops near
-     * a particular point (grid cell) so we can perform propagation to that grid cell only. We only retain a few
-     * percentiles of travel time at each target cell, so doing one cell at a time allows us to keep the output size
+     * For each pointset point, the stops reachable without using transit, as a map from StopID to distance in
+     * millimeters. Inverted version of stopToPointDistanceTables. This is used in PerTargetPropagator to find all the
+     * stops near a particular point (grid cell) so we can perform propagation to that grid cell only. We only retain a
+     * few percentiles of travel time at each target cell, so doing one cell at a time allows us to keep the output size
      * within reason.
      */
     public transient List<TIntIntMap> pointToStopDistanceTables;
@@ -79,11 +85,11 @@ public class LinkedPointSet implements Serializable {
     /**
      * A LinkedPointSet is a PointSet that has been pre-connected to a StreetLayer in a non-destructive, reversible way.
      * These objects are long-lived and not extremely numerous, so we keep references to the objects it was built from.
-     * Besides they are useful for later processing of LinkedPointSets.
-     * However once we start evicting TransportNetworks, we have to make sure we're not holding references to entire
-     * StreetLayers in LinkedPointSets (memory leak).
+     * Besides they are useful for later processing of LinkedPointSets. However once we start evicting
+     * TransportNetworks, we have to make sure we're not holding references to entire StreetLayers in LinkedPointSets
+     * (memory leak).
      */
-    public LinkedPointSet(PointSet pointSet, StreetLayer streetLayer, StreetMode streetMode, LinkedPointSet baseLinkage) {
+    public LinkedPointSet (PointSet pointSet, StreetLayer streetLayer, StreetMode streetMode, LinkedPointSet baseLinkage) {
         LOG.info("Linking pointset to street network...");
         this.pointSet = pointSet;
         this.streetLayer = streetLayer;
@@ -154,10 +160,11 @@ public class LinkedPointSet implements Serializable {
 
     /**
      * Construct a new LinkedPointSet for a grid that falls entirely within an existing grid LinkedPointSet.
+     *
      * @param sourceLinkage a LinkedPointSet whose PointSet must be a WebMercatorGridPointset
-     * @param subGrid the grid for which to create a linkage
+     * @param subGrid       the grid for which to create a linkage
      */
-    public LinkedPointSet(LinkedPointSet sourceLinkage, WebMercatorGridPointSet subGrid) {
+    public LinkedPointSet (LinkedPointSet sourceLinkage, WebMercatorGridPointSet subGrid) {
 
         if (!(sourceLinkage.pointSet instanceof WebMercatorGridPointSet)) {
             throw new IllegalArgumentException("Source linkage must be for a gridded point set.");
@@ -170,7 +177,7 @@ public class LinkedPointSet implements Serializable {
         if (subGrid.west + subGrid.width < superGrid.west //sub-grid is entirely west of super-grid
                 || superGrid.west + superGrid.width < subGrid.west // super-grid is entirely west of sub-grid
                 || subGrid.north + subGrid.height < superGrid.north //sub-grid is entirely north of super-grid (note Web Mercator conventions)
-                || superGrid.north + superGrid.height < subGrid.north ) { //super-grid is entirely north of sub-grid
+                || superGrid.north + superGrid.height < subGrid.north) { //super-grid is entirely north of sub-grid
             LOG.warn("Sub-grid is entirely outside the super-grid.  Points will not be linked to any street edges.");
         }
 
@@ -235,12 +242,12 @@ public class LinkedPointSet implements Serializable {
 
     /**
      * Associate the points in this PointSet with the street vertices at the ends of the closest street edge.
+     *
      * @param all If true, link all points, otherwise link only those that were previously connected to edges that have
-     *            been deleted (i.e. split).
-     *            We will need to change this behavior when we allow creating new edges rather than simply splitting
-     *            existing ones.
+     *            been deleted (i.e. split). We will need to change this behavior when we allow creating new edges
+     *            rather than simply splitting existing ones.
      */
-    private void linkPointsToStreets(boolean all) {
+    private void linkPointsToStreets (boolean all) {
         LambdaCounter counter = new LambdaCounter(LOG, pointSet.featureCount(), 10000,
                 "Linked {} of {} PointSet points to streets.");
         // Perform linkage calculations in parallel, writing results to the shared parallel arrays.
@@ -252,7 +259,7 @@ public class LinkedPointSet implements Serializable {
             // we may be able to use some type of flood-fill algorithm in geographic space, expanding the relink envelope until we
             // hit edges on all sides or reach some predefined maximum.
             if (all || (streetLayer.edgeStore.temporarilyDeletedEdges != null &&
-                        streetLayer.edgeStore.temporarilyDeletedEdges.contains(edges[p]))) {
+                    streetLayer.edgeStore.temporarilyDeletedEdges.contains(edges[p]))) {
                 // Use radius from StreetLayer such that maximum origin and destination walk distances are symmetric.
                 Split split = streetLayer.findSplit(pointSet.getLat(p), pointSet.getLon(p),
                         StreetLayer.LINK_RADIUS_METERS, streetMode);
@@ -277,10 +284,9 @@ public class LinkedPointSet implements Serializable {
     }
 
     /**
-     * A functional interface for fetching the travel time to any street vertex in the transport network.
-     * Note that TIntIntMap::get matches this functional interface.
-     * There may be a generic IntToIntFunction library interface somewhere, but this interface provides type information
-     * about what the function and its parameters mean.
+     * A functional interface for fetching the travel time to any street vertex in the transport network. Note that
+     * TIntIntMap::get matches this functional interface. There may be a generic IntToIntFunction library interface
+     * somewhere, but this interface provides type information about what the function and its parameters mean.
      */
     @FunctionalInterface
     public static interface TravelTimeFunction {
@@ -327,17 +333,18 @@ public class LinkedPointSet implements Serializable {
 
             travelTimes[i] = time0 < time1 ? time0 : time1;
         }
-        return new PointSetTimes (pointSet, travelTimes);
+        return new PointSetTimes(pointSet, travelTimes);
     }
 
     /**
      * Given a table of distances to street vertices from a particular transit stop, create a table of distances to
-     * points in this PointSet from the same transit stop.
-     * All points outside the distanceTableZone are skipped as an optimization.
-     * See JavaDoc on the caller makeStopToPointDistanceTables - this is one of the slowest parts of building a network.
+     * points in this PointSet from the same transit stop. All points outside the distanceTableZone are skipped as an
+     * optimization. See JavaDoc on the caller makeStopToPointDistanceTables - this is one of the slowest parts of
+     * building a network.
+     *
      * @return A packed array of (pointIndex, distanceMillimeters)
      */
-    private int[] extendDistanceTableToPoints(TIntIntMap distanceTableToVertices, Envelope distanceTableZone) {
+    private int[] extendDistanceTableToPoints (TIntIntMap distanceTableToVertices, Envelope distanceTableZone) {
         int nPoints = this.size();
         TIntIntMap distanceToPoint = new TIntIntHashMap(nPoints, 0.5f, Integer.MAX_VALUE, Integer.MAX_VALUE);
         Edge edge = streetLayer.edgeStore.getCursor();
@@ -380,20 +387,18 @@ public class LinkedPointSet implements Serializable {
     /**
      * For each transit stop in the associated TransportNetwork, make a table of distances to nearby points in this
      * PointSet.
-     *
      * At one point we experimented with doing the entire search from the transit stops all the way up to the points
-     * within this method. However, that takes too long when switching PointSets. So we pre-cache distances to all street
-     * vertices in the TransitNetwork, and then just extend those tables to the points in the PointSet.
-     *
+     * within this method. However, that takes too long when switching PointSets. So we pre-cache distances to all
+     * street vertices in the TransitNetwork, and then just extend those tables to the points in the PointSet.
      * This is one of the slowest steps in working with a new scenario. It takes about 50 seconds to link 400000 points.
      * The run time is not shocking when you consider the complexity of the operation: there are nStops * nPoints
-     * iterations, which is 8000 * 400000 in the example case. This means 6 msec per transit stop, or 2e-8 sec per
-     * point iteration, which is not horribly slow. There are just too many iterations.
+     * iterations, which is 8000 * 400000 in the example case. This means 6 msec per transit stop, or 2e-8 sec per point
+     * iteration, which is not horribly slow. There are just too many iterations.
      *
-     * @param treeRebuildZone only build trees for stops inside this geometry in FIXED POINT DEGREES,
-     *                        leaving all the others alone. If null, build trees for all stops.
+     * @param treeRebuildZone only build trees for stops inside this geometry in FIXED POINT DEGREES, leaving all the
+     *                        others alone. If null, build trees for all stops.
      */
-    public void makeStopToPointDistanceTables(Geometry treeRebuildZone) {
+    public void makeStopToPointDistanceTables (Geometry treeRebuildZone) {
         LOG.info("Creating distance tables from each transit stop to PointSet points.");
         // FIXME this is wasting a lot of memory and not needed for gridded pointsets - overload for gridded and freeform PointSets
         pointSet.createSpatialIndexAsNeeded();
@@ -432,6 +437,7 @@ public class LinkedPointSet implements Serializable {
         counter.done();
     }
 
+    // FIXME Method and block inside are both synchronized on "this", is that intentional? See comment in internal block.
     public synchronized void makePointToStopDistanceTablesIfNeeded () {
         if (pointToStopDistanceTables != null) return;
 

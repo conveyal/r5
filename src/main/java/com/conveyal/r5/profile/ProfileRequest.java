@@ -63,7 +63,11 @@ public class ProfileRequest implements Serializable, Cloneable {
     /** maximum level of traffic stress for cycling, 1 - 4 */
     public int bikeTrafficStress = 4;
     
-    /** The speed of driving, in meters per second. Roads from OSM use the speed limit, this is the speed used when propagating from the street network to a pointset. */
+    /** The speed of driving, in meters per second. Roads from OSM use the speed limit; this is the speed used when
+     * linking the street network to a pointset (i.e. it is applied between the true origin and the first street
+     * vertex, and between the last street vertex and the true destination). Note that slow speeds specified here may
+     * result in longer travel times than expected on long, high-speed blocks. But we tolerate some imprecision at
+     * the scale of individual blocks (see conversation at #436)*/
     public float carSpeed = 2.22f; // ~8 km/h
 
     /** Maximum time to reach the destination without using transit in minutes */

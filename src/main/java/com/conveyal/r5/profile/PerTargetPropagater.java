@@ -208,12 +208,12 @@ public class PerTargetPropagater {
      */
     private void propagateTransit (int targetIndex) {
         // Grab the set of nearby stops for this target, with their distances.
-        TIntIntMap pointToStopDistanceTable = targets.pointToStopDistanceTables.get(targetIndex);
+        TIntIntMap pointToStopLinkageCostTable = targets.pointToStopLinkageCostTables.get(targetIndex);
         // Only try to propagate transit travel times if there are transit stops near this target.
         // Even if we don't propagate transit travel times, we still need to pass these non-transit times to
         // the reducer later in the caller, because you can walk even where there is no transit.
-        if (pointToStopDistanceTable != null) {
-            pointToStopDistanceTable.forEachEntry((stop, distanceMillimeters) -> {
+        if (pointToStopLinkageCostTable != null) {
+            pointToStopLinkageCostTable.forEachEntry((stop, linkageCost) -> {
                 for (int iteration = 0; iteration < nIterations; iteration++) {
                     int timeAtStop = travelTimesToStop[stop][iteration];
                     if (timeAtStop > cutoffSeconds || timeAtStop > perIterationTravelTimes[iteration]) {

@@ -70,17 +70,18 @@ public class LinkedPointSet implements Serializable {
      */
     public int[] distances1_mm;
 
-    /** For each transit stop, the distances to nearby PointSet points as packed (point_index, distance) pairs. */
-    public List<int[]> stopToPointDistanceTables;
+    /** For each transit stop, the distances (or times) to nearby PointSet points as packed (point_index, distance)
+     * pairs. */
+    public List<int[]> stopToPointLinkageCostTables;
 
     /**
-     * For each pointset point, the stops reachable without using transit, as a map from StopID to distance in
-     * millimeters. Inverted version of stopToPointDistanceTables. This is used in PerTargetPropagator to find all the
-     * stops near a particular point (grid cell) so we can perform propagation to that grid cell only. We only retain a
-     * few percentiles of travel time at each target cell, so doing one cell at a time allows us to keep the output size
-     * within reason.
+     * For each pointset point, the stops reachable without using transit, as a map from StopID to distance. For walk
+     * and bike, distance is in millimeters; for car, distance is actually time in seconds. Inverted version of
+     * stopToPointLinkageCostTables. This is used in PerTargetPropagator to find all the stops near a particular point
+     * (grid cell) so we can perform propagation to that grid cell only. We only retain a few percentiles of travel
+     * time at each target cell, so doing one cell at a time allows us to keep the output size within reason.
      */
-    public transient List<TIntIntMap> pointToStopDistanceTables;
+    public transient List<TIntIntMap> pointToStopLinkageCostTables;
 
     /**
      * A LinkedPointSet is a PointSet that has been pre-connected to a StreetLayer in a non-destructive, reversible way.
@@ -117,7 +118,7 @@ public class LinkedPointSet implements Serializable {
             edges = new int[nPoints];
             distances0_mm = new int[nPoints];
             distances1_mm = new int[nPoints];
-            stopToPointDistanceTables = new ArrayList<>();
+            stopToPointLinkageCostTables = new ArrayList<>();
         } else {
             // The caller has supplied an existing linkage for a scenario StreetLayer's base StreetLayer.
             // We want to re-use most of that that existing linkage to reduce linking time.
@@ -131,7 +132,7 @@ public class LinkedPointSet implements Serializable {
             edges = Arrays.copyOf(baseLinkage.edges, nPoints);
             distances0_mm = Arrays.copyOf(baseLinkage.distances0_mm, nPoints);
             distances1_mm = Arrays.copyOf(baseLinkage.distances1_mm, nPoints);
-            stopToPointDistanceTables = new ArrayList<>(baseLinkage.stopToPointDistanceTables);
+            stopToPointLinkageCostTables = new ArrayList<>(baseLinkage.stopToPointLinkageCostTables);
             // TODO We need to determine which points to re-link and which stops should have their stop-to-point tables re-built.
             // This should be all the points within the (bird-fly) linking radius of any modified edge.
             // The stop-to-vertex trees should already be rebuilt elsewhere when applying the scenario.
@@ -147,7 +148,7 @@ public class LinkedPointSet implements Serializable {
 
         // If dealing with a scenario, pad out the stop trees list from the base linkage to match the new stop count.
         // If dealing with a base network linkage, fill the stop trees list entirely with nulls.
-        while (stopToPointDistanceTables.size() < nStops) stopToPointDistanceTables.add(null);
+        while (stopToPointLinkageCostTables.size() < nStops) stopToPointLinkageCostTables.add(null);
 
         // First, link the points in this PointSet to specific street vertices.
         // If there is no base linkage, link all streets.
@@ -210,7 +211,7 @@ public class LinkedPointSet implements Serializable {
             }
         }
 
-        stopToPointDistanceTables = sourceLinkage.stopToPointDistanceTables.stream()
+        stopToPointLinkageCostTables = sourceLinkage.stopToPointLinkageCostTables.stream()
                 .map(distanceTable -> {
                     if (distanceTable == null) return null; // if it was previously unlinked, it is still unlinked
 
@@ -411,7 +412,7 @@ public class LinkedPointSet implements Serializable {
                 "Computed distances to PointSet points from {} of {} transit stops.");
         // Create a distance table from each transit stop to the points in this PointSet in parallel.
         // When applying a scenario, keep the existing distance table for those stops that could not be affected.
-        stopToPointDistanceTables = IntStream.range(0, nStops).parallel().mapToObj(stopIndex -> {
+        stopToPointLinkageCostTables = IntStream.range(0, nStops).parallel().mapToObj(stopIndex -> {
             Point stopPoint = transitLayer.getJTSPointForStopFixed(stopIndex);
             // If the stop is not linked to the street network, it should have no distance table.
             if (stopPoint == null) return null;
@@ -419,10 +420,10 @@ public class LinkedPointSet implements Serializable {
                 // This stop is not affected by the scenario. Return the existing distance table.
                 // All new stops created by a scenario should be inside the relink zone, so
                 // all stops outside the relink zone should already have a distance table entry.
-                if (stopIndex >= stopToPointDistanceTables.size()) {
+                if (stopIndex >= stopToPointLinkageCostTables.size()) {
                     throw new AssertionError("A stop created by a scenario is located outside relink zone.");
                 }
-                return stopToPointDistanceTables.get(stopIndex);
+                return stopToPointLinkageCostTables.get(stopIndex);
             }
             // Get the pre-computed distance table from the stop to the street vertices,
             // then extend that table out from the street vertices to the points in this PointSet.
@@ -439,16 +440,16 @@ public class LinkedPointSet implements Serializable {
 
     // FIXME Method and block inside are both synchronized on "this", is that intentional? See comment in internal block.
     public synchronized void makePointToStopDistanceTablesIfNeeded () {
-        if (pointToStopDistanceTables != null) return;
+        if (pointToStopLinkageCostTables != null) return;
 
         synchronized (this) {
             // check again in case they were built while waiting on this synchronized block
-            if (pointToStopDistanceTables != null) return;
-            if (stopToPointDistanceTables == null) makeStopToPointDistanceTables(null);
+            if (pointToStopLinkageCostTables != null) return;
+            if (stopToPointLinkageCostTables == null) makeStopToPointDistanceTables(null);
             TIntIntMap[] result = new TIntIntMap[size()];
 
-            for (int stop = 0; stop < stopToPointDistanceTables.size(); stop++) {
-                int[] stopToPointDistanceTable = stopToPointDistanceTables.get(stop);
+            for (int stop = 0; stop < stopToPointLinkageCostTables.size(); stop++) {
+                int[] stopToPointDistanceTable = stopToPointLinkageCostTables.get(stop);
                 if (stopToPointDistanceTable == null) continue;
 
                 for (int idx = 0; idx < stopToPointDistanceTable.length; idx += 2) {
@@ -458,7 +459,7 @@ public class LinkedPointSet implements Serializable {
                     result[point].put(stop, distance);
                 }
             }
-            pointToStopDistanceTables = Arrays.asList(result);
+            pointToStopLinkageCostTables = Arrays.asList(result);
         }
     }
 

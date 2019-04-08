@@ -20,7 +20,6 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -52,6 +51,14 @@ public class LinkedPointSet implements Serializable {
      */
     public final StreetMode streetMode;
 
+    static final int BICYCLE_DISTANCE_LINKING_LIMIT_METERS = 8000;
+
+    static final int CAR_TIME_LINKING_LIMIT_SECONDS = 60 * 60; // 1 hour
+
+    // Fair to assume that people walk from nearest OSM way to their ultimate destination? Should we just use the
+    // walk speed from the analysis request?
+    static final int OFF_STREET_SPEED_MILLIMETERS_PER_SECOND = (int) 1.3f * 1000;
+
     /**
      * For each point, the closest edge in the street layer. This is in fact the even (forward) edge ID of the closest
      * edge pairs.
@@ -70,6 +77,8 @@ public class LinkedPointSet implements Serializable {
      */
     public int[] distances1_mm;
 
+    // TODO Refactor following three to own class
+
     /** For each transit stop, the distances (or times) to nearby PointSet points as packed (point_index, distance)
      * pairs. */
     public List<int[]> stopToPointLinkageCostTables;
@@ -82,6 +91,8 @@ public class LinkedPointSet implements Serializable {
      * time at each target cell, so doing one cell at a time allows us to keep the output size within reason.
      */
     public transient List<TIntIntMap> pointToStopLinkageCostTables;
+
+    public StreetRouter.State.RoutingVariable linkageCostUnit = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
 
     /**
      * A LinkedPointSet is a PointSet that has been pre-connected to a StreetLayer in a non-destructive, reversible way.
@@ -425,15 +436,58 @@ public class LinkedPointSet implements Serializable {
                 }
                 return stopToPointLinkageCostTables.get(stopIndex);
             }
-            // Get the pre-computed distance table from the stop to the street vertices,
-            // then extend that table out from the street vertices to the points in this PointSet.
-            TIntIntMap distanceTableToVertices = transitLayer.stopToVertexDistanceTables.get(stopIndex);
-            Envelope distanceTableZone = stopPoint.getEnvelopeInternal();
-            GeometryUtils.expandEnvelopeFixed(distanceTableZone, TransitLayer.DISTANCE_TABLE_SIZE_METERS);
-            int[] distancesToPoints = distanceTableToVertices == null ? null :
-                    extendDistanceTableToPoints(distanceTableToVertices, distanceTableZone);
+
+            int[] linkageCostToPoints;
+
+            if (streetMode == StreetMode.WALK) {
+                // Walking distances from stops to street vertices are saved in the transitLayer.
+                // Get the pre-computed distance table from the stop to the street vertices,
+                // then extend that table out from the street vertices to the points in this PointSet.
+                TIntIntMap distanceTableToVertices = transitLayer.stopToVertexDistanceTables.get(stopIndex); // walk!
+                Envelope distanceTableZone = stopPoint.getEnvelopeInternal();
+                GeometryUtils.expandEnvelopeFixed(distanceTableZone, TransitLayer.DISTANCE_TABLE_SIZE_METERS);
+                linkageCostToPoints = distanceTableToVertices == null ? null :
+                        extendDistanceTableToPoints(distanceTableToVertices, distanceTableZone);
+
+            } else if (streetMode == StreetMode.BICYCLE) {
+                // Biking distances from stops to street vertices are not saved in the transitLayer, so additional
+                // steps are needed compared to Walk.
+                StreetRouter sr = new StreetRouter(transitLayer.parentNetwork.streetLayer);
+                sr.streetMode = StreetMode.BICYCLE;
+                sr.distanceLimitMeters = BICYCLE_DISTANCE_LINKING_LIMIT_METERS;
+                sr.quantityToMinimize = linkageCostUnit;
+                sr.setOrigin(stopPoint.getY(), stopPoint.getX());
+                sr.route();
+                Envelope distanceTableZone = stopPoint.getEnvelopeInternal();
+                GeometryUtils.expandEnvelopeFixed(distanceTableZone, BICYCLE_DISTANCE_LINKING_LIMIT_METERS);
+                linkageCostToPoints = extendDistanceTableToPoints(sr.getReachedVertices(), distanceTableZone);
+
+            } else if (streetMode == StreetMode.CAR) {
+                // The speeds for Walk and Bicycle can be specified in an analysis request, so it makes sense above to
+                // store distances and apply the requested speed. In contrast, car speeds vary by link and cannot be
+                // set in analysis requests, so it makes sense to use seconds directly as the linkage cost.
+                linkageCostUnit = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
+                // TODO confirm this works as expected when modifications can affect street layer.
+                StreetRouter sr = new StreetRouter(transitLayer.parentNetwork.streetLayer);
+                sr.streetMode = StreetMode.CAR;
+                sr.timeLimitSeconds = CAR_TIME_LINKING_LIMIT_SECONDS;
+                sr.quantityToMinimize = linkageCostUnit;
+                sr.setOrigin(stopPoint.getY(), stopPoint.getX());
+                sr.route();
+
+                // TODO limit search radius using envelope, as above. This optimization will require care to avoid
+                //  creating a resource-limiting problem.
+                linkageCostToPoints = eval(sr::getTravelTimeToVertex, OFF_STREET_SPEED_MILLIMETERS_PER_SECOND).travelTimes;
+
+            } else {
+
+                throw new UnsupportedOperationException("Tried to link a pointset with an unsupported mode");
+
+            }
+
             counter.increment();
-            return distancesToPoints;
+            return linkageCostToPoints;
+
         }).collect(Collectors.toList());
         counter.done();
     }

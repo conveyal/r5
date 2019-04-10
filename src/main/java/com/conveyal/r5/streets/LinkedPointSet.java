@@ -127,7 +127,7 @@ public class LinkedPointSet implements Serializable {
 //            baseLinkage = null;
 //        }
 
-        if (baseLinkage == null) { // TODO investigate whether we also need to check baseLinkage.streetMode !=  streetMode
+        if (baseLinkage == null || baseLinkage.streetMode !=  streetMode) {
             edges = new int[nPoints];
             distances0_mm = new int[nPoints];
             distances1_mm = new int[nPoints];

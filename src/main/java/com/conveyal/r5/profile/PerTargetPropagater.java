@@ -7,6 +7,7 @@ import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.streets.LinkedPointSet;
+import com.conveyal.r5.streets.StreetRouter;
 import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -218,13 +219,19 @@ public class PerTargetPropagater {
         int egressDistanceLimitMillimeters = egressLegTimeLimitSeconds * speedMillimetersPerSecond;
 
         // Grab the set of nearby stops for this target, with their distances.
-        TIntIntMap pointToStopDistanceTable = targets.pointToStopDistanceTables.get(targetIndex);
+        TIntIntMap pointToStopLinkageCostTable = targets.pointToStopLinkageCostTables.get(targetIndex);
+
+        StreetRouter.State.RoutingVariable unit = targets.linkageCostUnit;
+
+        int egressLimit = unit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS ?
+                egressLegTimeLimitSeconds * speedMillimetersPerSecond : egressLegTimeLimitSeconds;
+
         // Only try to propagate transit travel times if there are transit stops near this target.
         // Even if we don't propagate transit travel times, we still need to pass these non-transit times to
         // the reducer later in the caller, because you can walk even where there is no transit.
-        if (pointToStopDistanceTable != null) {
-            pointToStopDistanceTable.forEachEntry((stop, distanceMillimeters) -> {
-                if (distanceMillimeters <= egressDistanceLimitMillimeters) {
+        if (pointToStopLinkageCostTable != null) {
+            pointToStopLinkageCostTable.forEachEntry((stop, linkageCost) -> {
+                if (linkageCost < egressLimit){
                     for (int iteration = 0; iteration < nIterations; iteration++) {
                         int timeAtStop = travelTimesToStop[stop][iteration];
                         if (timeAtStop > cutoffSeconds || timeAtStop > perIterationTravelTimes[iteration]) {
@@ -232,9 +239,18 @@ public class PerTargetPropagater {
                             // cannot improve on the best known time at this iteration. Also avoids overflow.
                             continue;
                         }
-                        // If recording path details, extract the row of paths to all stops for this iteration.
                         // Propagate from the current stop out to the target.
-                        int timeAtTarget = timeAtStop + distanceMillimeters / speedMillimetersPerSecond;
+                        int secondsFromStopToTarget;
+
+                        if (unit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) {
+                            secondsFromStopToTarget = linkageCost / speedMillimetersPerSecond;
+                        } else if (unit == StreetRouter.State.RoutingVariable.DURATION_SECONDS) {
+                            secondsFromStopToTarget = linkageCost;
+                        } else {
+                            throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
+                        }
+
+                        int timeAtTarget = timeAtStop + secondsFromStopToTarget;
                         if (timeAtTarget < cutoffSeconds &&
                                 timeAtTarget < perIterationTravelTimes[iteration]) {
                             // To reach this target, alighting at this stop is faster than any previously checked stop.

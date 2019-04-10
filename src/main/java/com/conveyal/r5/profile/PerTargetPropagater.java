@@ -112,7 +112,7 @@ public class PerTargetPropagater {
         this.calculateComponents = task.makeStaticSite;
         StreetMode egressMode = LegMode.getDominantStreetMode(task.egressModes);
         speedMillimetersPerSecond = (int) (request.getSpeedForMode(egressMode) * MM_PER_METER);
-        egressLegTimeLimitSeconds = (int) request.getMaxAccessTimeForMode(egressMode) * SECONDS_PER_MINUTE;
+        egressLegTimeLimitSeconds = request.getMaxAccessTimeForMode(egressMode) * SECONDS_PER_MINUTE;
         nIterations = travelTimesToStopsForIteration.length;
         nStops = travelTimesToStopsForIteration[0].length;
         invertTravelTimes();

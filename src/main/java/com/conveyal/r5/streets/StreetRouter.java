@@ -308,7 +308,7 @@ public class StreetRouter {
      * travel on!
      *
      * @param lat Latitude in floating point (not fixed int) degrees.
-     * @param lon Longitude in flating point (not fixed int) degrees.
+     * @param lon Longitude in floating point (not fixed int) degrees.
      * @return true if an edge was found near the specified coordinate
      */
     public boolean setOrigin (double lat, double lon) {

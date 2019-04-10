@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.conveyal.r5.streets.VertexStore.FIXED_FACTOR;
+
 /**
  * A LinkedPointSet is a PointSet that has been connected to a StreetLayer in a non-destructive, reversible way.
  * For each feature in the PointSet, we record the closest edge and the distance to the vertices at the ends of that
@@ -51,9 +53,9 @@ public class LinkedPointSet implements Serializable {
      */
     public final StreetMode streetMode;
 
-    static final int BICYCLE_DISTANCE_LINKING_LIMIT_METERS = 8000;
+    static final int BICYCLE_DISTANCE_LINKING_LIMIT_METERS = 2000;
 
-    static final int CAR_TIME_LINKING_LIMIT_SECONDS = 60 * 60; // 1 hour
+    static final int CAR_TIME_LINKING_LIMIT_SECONDS = 20 * 60;
 
     // Fair to assume that people walk from nearest OSM way to their ultimate destination? Should we just use the
     // walk speed from the analysis request?
@@ -125,7 +127,7 @@ public class LinkedPointSet implements Serializable {
 //            baseLinkage = null;
 //        }
 
-        if (baseLinkage == null) {
+        if (baseLinkage == null) { // TODO investigate whether we also need to check baseLinkage.streetMode !=  streetMode
             edges = new int[nPoints];
             distances0_mm = new int[nPoints];
             distances1_mm = new int[nPoints];
@@ -138,8 +140,8 @@ public class LinkedPointSet implements Serializable {
 
             // Copy the supplied base linkage into this new LinkedPointSet.
             // The new linkage has the same PointSet as the base linkage, so the linkage arrays remain the same length
-            // as in the base linkage. However, if the TransitLayer was also modified by the scneario, the stopToVertexDistanceTables
-            // list might need to grow.
+            // as in the base linkage. However, if the TransitLayer was also modified by the scenario, the
+            // stopToVertexDistanceTables list might need to grow.
             edges = Arrays.copyOf(baseLinkage.edges, nPoints);
             distances0_mm = Arrays.copyOf(baseLinkage.distances0_mm, nPoints);
             distances1_mm = Arrays.copyOf(baseLinkage.distances1_mm, nPoints);
@@ -166,7 +168,7 @@ public class LinkedPointSet implements Serializable {
         this.linkPointsToStreets(baseLinkage == null);
 
         // Second, make a table of distances from each transit stop to the points in this PointSet.
-        this.makeStopToPointDistanceTables(treeRebuildZone);
+        this.makeStopToPointLinkageCostTables(treeRebuildZone);
 
     }
 
@@ -351,7 +353,7 @@ public class LinkedPointSet implements Serializable {
     /**
      * Given a table of distances to street vertices from a particular transit stop, create a table of distances to
      * points in this PointSet from the same transit stop. All points outside the distanceTableZone are skipped as an
-     * optimization. See JavaDoc on the caller makeStopToPointDistanceTables - this is one of the slowest parts of
+     * optimization. See JavaDoc on the caller makeStopToPointLinkageCostTables - this is one of the slowest parts of
      * building a network.
      *
      * @return A packed array of (pointIndex, distanceMillimeters)
@@ -410,8 +412,8 @@ public class LinkedPointSet implements Serializable {
      * @param treeRebuildZone only build trees for stops inside this geometry in FIXED POINT DEGREES, leaving all the
      *                        others alone. If null, build trees for all stops.
      */
-    public void makeStopToPointDistanceTables (Geometry treeRebuildZone) {
-        LOG.info("Creating distance tables from each transit stop to PointSet points.");
+    public void makeStopToPointLinkageCostTables(Geometry treeRebuildZone) {
+        LOG.info("Creating linkage cost tables from each transit stop to PointSet points.");
         // FIXME this is wasting a lot of memory and not needed for gridded pointsets - overload for gridded and freeform PointSets
         pointSet.createSpatialIndexAsNeeded();
         if (treeRebuildZone != null) {
@@ -456,7 +458,7 @@ public class LinkedPointSet implements Serializable {
                 sr.streetMode = StreetMode.BICYCLE;
                 sr.distanceLimitMeters = BICYCLE_DISTANCE_LINKING_LIMIT_METERS;
                 sr.quantityToMinimize = linkageCostUnit;
-                sr.setOrigin(stopPoint.getY(), stopPoint.getX());
+                sr.setOrigin(stopPoint.getY() / FIXED_FACTOR, stopPoint.getX() / FIXED_FACTOR);
                 sr.route();
                 Envelope distanceTableZone = stopPoint.getEnvelopeInternal();
                 GeometryUtils.expandEnvelopeFixed(distanceTableZone, BICYCLE_DISTANCE_LINKING_LIMIT_METERS);
@@ -472,7 +474,7 @@ public class LinkedPointSet implements Serializable {
                 sr.streetMode = StreetMode.CAR;
                 sr.timeLimitSeconds = CAR_TIME_LINKING_LIMIT_SECONDS;
                 sr.quantityToMinimize = linkageCostUnit;
-                sr.setOrigin(stopPoint.getY(), stopPoint.getX());
+                sr.setOrigin(stopPoint.getY() / FIXED_FACTOR, stopPoint.getX() / FIXED_FACTOR);
                 sr.route();
 
                 // TODO limit search radius using envelope, as above. This optimization will require care to avoid
@@ -499,7 +501,7 @@ public class LinkedPointSet implements Serializable {
         synchronized (this) {
             // check again in case they were built while waiting on this synchronized block
             if (pointToStopLinkageCostTables != null) return;
-            if (stopToPointLinkageCostTables == null) makeStopToPointDistanceTables(null);
+            if (stopToPointLinkageCostTables == null) makeStopToPointLinkageCostTables(null);
             TIntIntMap[] result = new TIntIntMap[size()];
 
             for (int stop = 0; stop < stopToPointLinkageCostTables.size(); stop++) {

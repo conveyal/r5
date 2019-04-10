@@ -172,11 +172,10 @@ public class TravelTimeComputer {
                 Arrays.fill(nonTransitTravelTimesToDestinations, FastRaptorWorker.UNREACHED);
             } else if (accessMode == StreetMode.WALK) {
                 // Special handling for walk search: find distance in millimeters and divide by speed to match behavior
-                // at egress (in stop trees). For bike/car searches this is immaterial as the access searches are
-                // already asymmetric.
-                // TODO clarify - I think this is referring to the fact that the egress trees are pre-calculated for a standard speed and must be adjusted.
-                sr.distanceLimitMeters = (int) (request.getSpeedForMode(accessMode) *
-                        request.getMaxAccessTimeForMode(accessMode) * 60);
+                // at egress (in stop to point linkage cost tables). For bike/car searches this is immaterial as the
+                // access searches are already asymmetric (i.e. bike/car linkage distances precomputed for egress
+                // can't be used for access, because there are one-way streets; we ignore the possibility of one-way
+                // pedestrian ways).
                 sr.distanceLimitMeters = (int) (request.walkSpeed * request.maxWalkTime * // in StreetMode.WALK block
                         FastRaptorWorker.SECONDS_PER_MINUTE);
                 sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;

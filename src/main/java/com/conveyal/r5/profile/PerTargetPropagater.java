@@ -38,7 +38,7 @@ public class PerTargetPropagater {
      * The maximum travel time we will record and report. To limit calculation time and avoid overflow places this
      * many seconds from the origin are just considered unreachable.
      */
-    public int cutoffSeconds = 120 * 60;
+    public int cutoffSeconds = 120 * SECONDS_PER_MINUTE;
 
     /** The targets, linked to the street network. */
     public LinkedPointSet targets;
@@ -76,11 +76,12 @@ public class PerTargetPropagater {
      * casts, the operations themselves, or the fact that the operations were being completed with doubles rather than
      * floats.
      */
-    int speedMillimetersPerSecond;
+    private int speedMillimetersPerSecond;
 
     private int egressLegTimeLimitSeconds;
 
     private static final int SECONDS_PER_MINUTE = 60;
+    private static final int MM_PER_METER = 1000;
 
     // STATE FIELDS WHICH ARE RESET WHEN PROCESSING EACH DESTINATION.
     // These track the characteristics of the best paths known to the target currently being processed.
@@ -110,8 +111,8 @@ public class PerTargetPropagater {
         // If we're making a static site we'll break travel times down into components and make paths.
         // This expects the pathsToStopsForIteration and pathWriter fields to be set separately by the caller.
         this.calculateComponents = task.makeStaticSite;
-        speedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
         StreetMode egressMode = LegMode.getDominantStreetMode(task.egressModes);
+        speedMillimetersPerSecond = (int) (request.getSpeedForMode(egressMode) * MM_PER_METER);
         egressLegTimeLimitSeconds = request.getMaxAccessTimeForMode(egressMode) * SECONDS_PER_MINUTE;
         nIterations = travelTimesToStopsForIteration.length;
         nStops = travelTimesToStopsForIteration[0].length;
@@ -164,7 +165,8 @@ public class PerTargetPropagater {
                 // TODO Somehow report these in-vehicle, wait and walk breakdown values alongside the total travel time.
                 // TODO WalkTime should be calculated per-iteration, as it may not hold for some summary statistics that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
                 // NOTE this is currently using only the first of what could be N percentiles.
-                Set<Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, percentilesMinutes[0] * 60);
+                Set<Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, percentilesMinutes[0] *
+                        SECONDS_PER_MINUTE);
                 pathWriter.recordPathsForTarget(selectedPaths);
             }
         }
@@ -214,6 +216,8 @@ public class PerTargetPropagater {
      * They appear to be travel times (are compared against cutoffSeconds which is a trip duration).
      */
     private void propagateTransit (int targetIndex) {
+        int egressDistanceLimitMillimeters = egressLegTimeLimitSeconds * speedMillimetersPerSecond;
+
         // Grab the set of nearby stops for this target, with their distances.
         TIntIntMap pointToStopLinkageCostTable = targets.pointToStopLinkageCostTables.get(targetIndex);
 

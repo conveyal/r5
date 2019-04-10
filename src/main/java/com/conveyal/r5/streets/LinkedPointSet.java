@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static com.conveyal.r5.streets.VertexStore.FIXED_FACTOR;
+
 /**
  * A LinkedPointSet is a PointSet that has been connected to a StreetLayer in a non-destructive, reversible way.
  * For each feature in the PointSet, we record the closest edge and the distance to the vertices at the ends of that
@@ -456,7 +458,7 @@ public class LinkedPointSet implements Serializable {
                 sr.streetMode = StreetMode.BICYCLE;
                 sr.distanceLimitMeters = BICYCLE_DISTANCE_LINKING_LIMIT_METERS;
                 sr.quantityToMinimize = linkageCostUnit;
-                sr.setOrigin(stopPoint.getY(), stopPoint.getX());
+                sr.setOrigin(stopPoint.getY() / FIXED_FACTOR, stopPoint.getX() / FIXED_FACTOR);
                 sr.route();
                 Envelope distanceTableZone = stopPoint.getEnvelopeInternal();
                 GeometryUtils.expandEnvelopeFixed(distanceTableZone, BICYCLE_DISTANCE_LINKING_LIMIT_METERS);
@@ -472,7 +474,7 @@ public class LinkedPointSet implements Serializable {
                 sr.streetMode = StreetMode.CAR;
                 sr.timeLimitSeconds = CAR_TIME_LINKING_LIMIT_SECONDS;
                 sr.quantityToMinimize = linkageCostUnit;
-                sr.setOrigin(stopPoint.getY(), stopPoint.getX());
+                sr.setOrigin(stopPoint.getY() / FIXED_FACTOR, stopPoint.getX() / FIXED_FACTOR);
                 sr.route();
 
                 // TODO limit search radius using envelope, as above. This optimization will require care to avoid

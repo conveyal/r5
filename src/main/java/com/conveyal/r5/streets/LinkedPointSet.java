@@ -51,9 +51,9 @@ public class LinkedPointSet implements Serializable {
      */
     public final StreetMode streetMode;
 
-    static final int BICYCLE_DISTANCE_LINKING_LIMIT_METERS = 8000;
+    static final int BICYCLE_DISTANCE_LINKING_LIMIT_METERS = 2000;
 
-    static final int CAR_TIME_LINKING_LIMIT_SECONDS = 60 * 60; // 1 hour
+    static final int CAR_TIME_LINKING_LIMIT_SECONDS = 20 * 60;
 
     // Fair to assume that people walk from nearest OSM way to their ultimate destination? Should we just use the
     // walk speed from the analysis request?

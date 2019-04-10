@@ -5,6 +5,7 @@ import com.conveyal.r5.analyst.PathScorer;
 import com.conveyal.r5.analyst.TravelTimeReducer;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
+import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.StreetRouter;
 import gnu.trove.map.TIntIntMap;
@@ -77,6 +78,9 @@ public class PerTargetPropagater {
      */
     int speedMillimetersPerSecond;
 
+    private int egressLegTimeLimitSeconds;
+
+    private static final int SECONDS_PER_MINUTE = 60;
 
     // STATE FIELDS WHICH ARE RESET WHEN PROCESSING EACH DESTINATION.
     // These track the characteristics of the best paths known to the target currently being processed.
@@ -107,6 +111,8 @@ public class PerTargetPropagater {
         // This expects the pathsToStopsForIteration and pathWriter fields to be set separately by the caller.
         this.calculateComponents = task.makeStaticSite;
         speedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
+        StreetMode egressMode = LegMode.getDominantStreetMode(task.egressModes);
+        egressLegTimeLimitSeconds = request.getMaxAccessTimeForMode(egressMode) * SECONDS_PER_MINUTE;
         nIterations = travelTimesToStopsForIteration.length;
         nStops = travelTimesToStopsForIteration[0].length;
         invertTravelTimes();
@@ -210,37 +216,45 @@ public class PerTargetPropagater {
     private void propagateTransit (int targetIndex) {
         // Grab the set of nearby stops for this target, with their distances.
         TIntIntMap pointToStopLinkageCostTable = targets.pointToStopLinkageCostTables.get(targetIndex);
+
+        StreetRouter.State.RoutingVariable unit = targets.linkageCostUnit;
+
+        int egressLimit = unit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS ?
+                egressLegTimeLimitSeconds * speedMillimetersPerSecond : egressLegTimeLimitSeconds;
+
         // Only try to propagate transit travel times if there are transit stops near this target.
         // Even if we don't propagate transit travel times, we still need to pass these non-transit times to
         // the reducer later in the caller, because you can walk even where there is no transit.
         if (pointToStopLinkageCostTable != null) {
             pointToStopLinkageCostTable.forEachEntry((stop, linkageCost) -> {
-                for (int iteration = 0; iteration < nIterations; iteration++) {
-                    int timeAtStop = travelTimesToStop[stop][iteration];
-                    if (timeAtStop > cutoffSeconds || timeAtStop > perIterationTravelTimes[iteration]) {
-                        // Skip propagation if all resulting times will be greater than the cutoff and
-                        // cannot improve on the best known time at this iteration. Also avoids overflow.
-                        continue;
-                    }
-                    // Propagate from the current stop out to the target.
-                    int secondsFromStopToTarget;
+                if (linkageCost < egressLimit){
+                    for (int iteration = 0; iteration < nIterations; iteration++) {
+                        int timeAtStop = travelTimesToStop[stop][iteration];
+                        if (timeAtStop > cutoffSeconds || timeAtStop > perIterationTravelTimes[iteration]) {
+                            // Skip propagation if all resulting times will be greater than the cutoff and
+                            // cannot improve on the best known time at this iteration. Also avoids overflow.
+                            continue;
+                        }
+                        // Propagate from the current stop out to the target.
+                        int secondsFromStopToTarget;
 
-                    if (targets.linkageCostUnit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) {
-                        secondsFromStopToTarget = linkageCost / speedMillimetersPerSecond;
-                    } else if (targets.linkageCostUnit == StreetRouter.State.RoutingVariable.DURATION_SECONDS) {
-                        secondsFromStopToTarget = linkageCost;
-                    } else {
-                        throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
-                    }
+                        if (unit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) {
+                            secondsFromStopToTarget = linkageCost / speedMillimetersPerSecond;
+                        } else if (unit == StreetRouter.State.RoutingVariable.DURATION_SECONDS) {
+                            secondsFromStopToTarget = linkageCost;
+                        } else {
+                            throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
+                        }
 
-                    int timeAtTarget = timeAtStop + secondsFromStopToTarget;
-                    if (timeAtTarget < cutoffSeconds &&
-                        timeAtTarget < perIterationTravelTimes[iteration]) {
-                        // To reach this target, alighting at this stop is faster than any previously checked stop.
-                        perIterationTravelTimes[iteration] = timeAtTarget;
-                        if (calculateComponents) {
-                            Path[] pathsToStops = pathsToStopsForIteration.get(iteration);
-                            perIterationPaths[iteration] = pathsToStops[stop];
+                        int timeAtTarget = timeAtStop + secondsFromStopToTarget;
+                        if (timeAtTarget < cutoffSeconds &&
+                                timeAtTarget < perIterationTravelTimes[iteration]) {
+                            // To reach this target, alighting at this stop is faster than any previously checked stop.
+                            perIterationTravelTimes[iteration] = timeAtTarget;
+                            if (calculateComponents) {
+                                Path[] pathsToStops = pathsToStopsForIteration.get(iteration);
+                                perIterationPaths[iteration] = pathsToStops[stop];
+                            }
                         }
                     }
                 }

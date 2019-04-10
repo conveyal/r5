@@ -125,7 +125,7 @@ public class LinkedPointSet implements Serializable {
 //            baseLinkage = null;
 //        }
 
-        if (baseLinkage == null) {
+        if (baseLinkage == null) { // TODO investigate whether we also need to check baseLinkage.streetMode !=  streetMode
             edges = new int[nPoints];
             distances0_mm = new int[nPoints];
             distances1_mm = new int[nPoints];
@@ -138,8 +138,8 @@ public class LinkedPointSet implements Serializable {
 
             // Copy the supplied base linkage into this new LinkedPointSet.
             // The new linkage has the same PointSet as the base linkage, so the linkage arrays remain the same length
-            // as in the base linkage. However, if the TransitLayer was also modified by the scneario, the stopToVertexDistanceTables
-            // list might need to grow.
+            // as in the base linkage. However, if the TransitLayer was also modified by the scenario, the
+            // stopToVertexDistanceTables list might need to grow.
             edges = Arrays.copyOf(baseLinkage.edges, nPoints);
             distances0_mm = Arrays.copyOf(baseLinkage.distances0_mm, nPoints);
             distances1_mm = Arrays.copyOf(baseLinkage.distances1_mm, nPoints);

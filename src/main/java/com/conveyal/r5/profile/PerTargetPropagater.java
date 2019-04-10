@@ -215,6 +215,8 @@ public class PerTargetPropagater {
      * They appear to be travel times (are compared against cutoffSeconds which is a trip duration).
      */
     private void propagateTransit (int targetIndex) {
+        int egressDistanceLimitMillimeters = egressLegTimeLimitSeconds * speedMillimetersPerSecond;
+
         // Grab the set of nearby stops for this target, with their distances.
         TIntIntMap pointToStopDistanceTable = targets.pointToStopDistanceTables.get(targetIndex);
         // Only try to propagate transit travel times if there are transit stops near this target.
@@ -222,7 +224,7 @@ public class PerTargetPropagater {
         // the reducer later in the caller, because you can walk even where there is no transit.
         if (pointToStopDistanceTable != null) {
             pointToStopDistanceTable.forEachEntry((stop, distanceMillimeters) -> {
-                if (distanceMillimeters / speedMillimetersPerSecond <= egressLegTimeLimitSeconds) {
+                if (distanceMillimeters <= egressDistanceLimitMillimeters) {
                     for (int iteration = 0; iteration < nIterations; iteration++) {
                         int timeAtStop = travelTimesToStop[stop][iteration];
                         if (timeAtStop > cutoffSeconds || timeAtStop > perIterationTravelTimes[iteration]) {

@@ -166,7 +166,7 @@ public class LinkedPointSet implements Serializable {
         this.linkPointsToStreets(baseLinkage == null);
 
         // Second, make a table of distances from each transit stop to the points in this PointSet.
-        this.makeStopToPointDistanceTables(treeRebuildZone);
+        this.makeStopToPointLinkageCostTables(treeRebuildZone);
 
     }
 
@@ -351,7 +351,7 @@ public class LinkedPointSet implements Serializable {
     /**
      * Given a table of distances to street vertices from a particular transit stop, create a table of distances to
      * points in this PointSet from the same transit stop. All points outside the distanceTableZone are skipped as an
-     * optimization. See JavaDoc on the caller makeStopToPointDistanceTables - this is one of the slowest parts of
+     * optimization. See JavaDoc on the caller makeStopToPointLinkageCostTables - this is one of the slowest parts of
      * building a network.
      *
      * @return A packed array of (pointIndex, distanceMillimeters)
@@ -410,8 +410,8 @@ public class LinkedPointSet implements Serializable {
      * @param treeRebuildZone only build trees for stops inside this geometry in FIXED POINT DEGREES, leaving all the
      *                        others alone. If null, build trees for all stops.
      */
-    public void makeStopToPointDistanceTables (Geometry treeRebuildZone) {
-        LOG.info("Creating distance tables from each transit stop to PointSet points.");
+    public void makeStopToPointLinkageCostTables(Geometry treeRebuildZone) {
+        LOG.info("Creating linkage cost tables from each transit stop to PointSet points.");
         // FIXME this is wasting a lot of memory and not needed for gridded pointsets - overload for gridded and freeform PointSets
         pointSet.createSpatialIndexAsNeeded();
         if (treeRebuildZone != null) {
@@ -499,7 +499,7 @@ public class LinkedPointSet implements Serializable {
         synchronized (this) {
             // check again in case they were built while waiting on this synchronized block
             if (pointToStopLinkageCostTables != null) return;
-            if (stopToPointLinkageCostTables == null) makeStopToPointDistanceTables(null);
+            if (stopToPointLinkageCostTables == null) makeStopToPointLinkageCostTables(null);
             TIntIntMap[] result = new TIntIntMap[size()];
 
             for (int stop = 0; stop < stopToPointLinkageCostTables.size(); stop++) {

@@ -101,7 +101,7 @@ public class TravelTimeComputer {
             // searches which use distance as the quantity to minimize (because they are precalculated and stored as distance,
             // and then converted to times by dividing by speed without regard to weights/penalties for things like stairs).
             // This does mean that walk-only results will not match the walking portion of walk+transit results.
-            sr.timeLimitSeconds = request.maxTripDurationMinutes * 60;
+            sr.timeLimitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
             sr.streetMode = directMode;
             sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             sr.route();
@@ -145,6 +145,10 @@ public class TravelTimeComputer {
             // The request has the speed in float meters per second, internally we use integer millimeters per second.
             int offstreetTravelSpeedMillimetersPerSecond = (int) (request.getSpeedForMode(accessMode) * 1000);
 
+            if (offstreetTravelSpeedMillimetersPerSecond <= 0){
+                throw new IllegalArgumentException("Speed of access/direct modes must be greater than 0.");
+            }
+
             if (request.accessModes.contains(LegMode.CAR_PARK)) {
                 // Currently first search from origin to P+R is hardcoded as time dominance variable for Max car time seconds
                 // Second search from P+R to stops is not actually a search we just return list of all reached stops for each found P+R.
@@ -167,10 +171,13 @@ public class TravelTimeComputer {
                 nonTransitTravelTimesToDestinations = new int[accessModeLinkedDestinations.size()];
                 Arrays.fill(nonTransitTravelTimesToDestinations, FastRaptorWorker.UNREACHED);
             } else if (accessMode == StreetMode.WALK) {
-                // Special handling for walk search, find distance in seconds and divide to match behavior at egress
-                // (in stop trees). For bike/car searches this is immaterial as the access searches are already asymmetric.
-                // TODO clarify - I think this is referring to the fact that the egress trees are pre-calculated for a standard speed and must be adjusted.
-                sr.distanceLimitMeters = 2000; // TODO hardwired same as gridcomputer, at least use a symbolic constant
+                // Special handling for walk search: find distance in millimeters and divide by speed to match behavior
+                // at egress (in stop to point linkage cost tables). For bike/car searches this is immaterial as the
+                // access searches are already asymmetric (i.e. bike/car linkage distances precomputed for egress
+                // can't be used for access, because there are one-way streets; we ignore the possibility of one-way
+                // pedestrian ways).
+                sr.distanceLimitMeters = (int) (request.walkSpeed * request.maxWalkTime * // in StreetMode.WALK block
+                        FastRaptorWorker.SECONDS_PER_MINUTE);
                 sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
                 sr.route();
 
@@ -196,7 +203,7 @@ public class TravelTimeComputer {
             } else {
                 // Other modes are already asymmetric with the egress/stop trees, so just do a time-based on street
                 // search and don't worry about distance limiting.
-                sr.timeLimitSeconds = request.getMaxAccessTimeForMode(accessMode) * 60;
+                sr.timeLimitSeconds = request.getMaxAccessTimeForMode(accessMode) * FastRaptorWorker.SECONDS_PER_MINUTE;
                 sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
                 sr.route();
                 accessTimes = sr.getReachedStops(); // already in seconds
@@ -237,7 +244,7 @@ public class TravelTimeComputer {
                         (departureTime) -> new FareDominatingList(
                                 request.inRoutingFareCalculator,
                                 request.maxFare,
-                                departureTime + request.maxTripDurationMinutes * 60);
+                                departureTime + request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE);
                 McRaptorSuboptimalPathProfileRouter mcRaptorWorker = new McRaptorSuboptimalPathProfileRouter(network,
                         request, null, null, listSupplier, InRoutingFareCalculator.getCollator(request));
                 mcRaptorWorker.route();

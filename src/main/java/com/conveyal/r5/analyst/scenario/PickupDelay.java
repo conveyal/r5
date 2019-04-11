@@ -50,7 +50,7 @@ public class PickupDelay extends Modification {
      * The name of the attribute (floating-point) within the polygon layer that contains the pick-up wait time
      * (in minutes). Negative waiting times mean the area is not served at all.
      */
-    public String waitTimeAttribute = "scale";
+    public String waitTimeAttribute = "wait";
 
     /** The name of the attribute (numeric) within the polygon layer that contains the polygon priority. */
     public String priorityAttribute = "priority";

@@ -61,7 +61,7 @@ public class IndexedPolygonCollection {
     // Internal (private) fields.
     // These are set by the feature loading and indexing process, and have getters to ensure that they are immutable.
 
-    private static STRtree polygonSpatialIndex = new STRtree();
+    private STRtree polygonSpatialIndex = new STRtree();
 
     private int featureCount = 0;
 

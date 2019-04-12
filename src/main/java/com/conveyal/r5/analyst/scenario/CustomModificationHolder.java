@@ -2,7 +2,6 @@ package com.conveyal.r5.analyst.scenario;
 
 import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.annotation.JsonAnyGetter;
-import com.fasterxml.jackson.annotation.JsonAnySetter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,7 +21,7 @@ import java.util.Map;
  *
  * Note that this modification type, although it is defined in R5, should never be applied to a transit network and
  * should never be deserialized by a worker or the backend. It only exists as a conversion target for the backend
- * class CustomModification.toR5(), and to specify the special behavior where the type code "custom" is overwritten
+ * class CustomModificationHolder.toR5(), and to specify the special behavior where the type code "custom" is overwritten
  * with a type code that some custom version of an R5 worker will understand. This is why it lacks any way to set the
  * properties, and lacks a no-arg constructor, both of which would be needed for deserialization. Their absence prevents
  * accidental misuse.
@@ -30,13 +29,13 @@ import java.util.Map;
  * This class could in fact be defined in analysis-backend instead of R5 to avoid confusion. It needs to be a subtype
  * of the R5 scenario modification base class, but nothing blocks us from defining such a subtype in analysis-backend.
  *
- * TODO R5 modifications are stored in MongoDB in regional analyses. CustomModifications and default de/serialization target classes may clash with that, please verify.
+ * TODO R5 modifications are stored in MongoDB in regional analyses. CustomModificationHolders and default de/serialization target classes may clash with that, please verify.
  *
  * Created by abyrd on 2019-03-15
  */
-public class CustomModification extends Modification {
+public class CustomModificationHolder extends Modification {
 
-    private static final Logger LOG = LoggerFactory.getLogger(CustomModification.class);
+    private static final Logger LOG = LoggerFactory.getLogger(CustomModificationHolder.class);
 
     /**
      * In this Modification type, we want to store properties in a freeform Map instead of typed fields.
@@ -75,7 +74,7 @@ public class CustomModification extends Modification {
      * Constructor used to copy all arbitrary properties from the Analysis UI/Backend modification model object into
      * this R5 worker Modification object. It also serves to copy the name/comment field from the Modification base class.
      */
-    public CustomModification (Map<String, Object> freeformProperties, String comment) {
+    public CustomModificationHolder (Map<String, Object> freeformProperties, String comment) {
         this.freeformProperties = new HashMap<>(freeformProperties);
         this.comment = comment;
     }

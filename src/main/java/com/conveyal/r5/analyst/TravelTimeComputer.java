@@ -185,21 +185,8 @@ public class TravelTimeComputer {
                 nonTransitTravelTimesToDestinations = new int[accessModeLinkedDestinations.size()];
                 Arrays.fill(nonTransitTravelTimesToDestinations, FastRaptorWorker.UNREACHED);
             } else if (accessMode == StreetMode.WALK) {
-                // Special handling for walk search, find distance in seconds and divide to match behavior at egress
-                // (in stop trees). For bike/car searches this is immaterial as the access searches are already asymmetric.
-                // TODO clarify - I think this is referring to the fact that the egress trees are pre-calculated for a standard speed and must be adjusted.
-                sr.distanceLimitMeters = TransitLayer.DISTANCE_TABLE_SIZE_METERS;
-                sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
-                sr.route();
 
-                // Get the travel times to all stops reached in the initial on-street search. Convert distances to speeds.
-                // getReachedStops returns distances in this case since dominance variable is millimeters,
-                // so convert to times in the loop below.
-                accessTimes = sr.getReachedStops();
-                for (TIntIntIterator it = accessTimes.iterator(); it.hasNext(); ) {
-                    it.advance();
-                    it.setValue(it.value() / offstreetTravelSpeedMillimetersPerSecond);
-                }
+                accessTimes = calculateWalkAccessTimes(sr, offstreetTravelSpeedMillimetersPerSecond);
 
                 // again, use distance / speed rather than time for symmetry with other searches
                 final StreetRouter effectivelyFinalSr = sr;
@@ -211,6 +198,7 @@ public class TravelTimeComputer {
                                     else return state.distance / offstreetTravelSpeedMillimetersPerSecond;
                                 },
                                 offstreetTravelSpeedMillimetersPerSecond).travelTimes;
+
             } else {
                 // Other modes are already asymmetric with the egress/stop trees, so just do a time-based on street
                 // search and don't worry about distance limiting.
@@ -276,4 +264,26 @@ public class TravelTimeComputer {
             return perTargetPropagater.propagate();
         }
     }
+
+    TIntIntMap calculateWalkAccessTimes(StreetRouter sr, int offstreetTravelSpeedMillimetersPerSecond) {
+        // Special handling for walk search, find distance in seconds and divide to match behavior at egress
+        // (in stop trees). For bike/car searches this is immaterial as the access searches are already asymmetric.
+        // TODO clarify - I think this is referring to the fact that the egress trees are pre-calculated for a standard speed and must be adjusted.
+        sr.distanceLimitMeters = TransitLayer.DISTANCE_TABLE_SIZE_METERS;
+        sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+        sr.route();
+
+        // Get the travel times to all stops reached in the initial on-street search. Convert distances to speeds.
+        // getReachedStops returns distances in this case since dominance variable is millimeters,
+        // so convert to times in the loop below.
+        TIntIntMap accessTimes = sr.getReachedStops();
+        for (TIntIntIterator it = accessTimes.iterator(); it.hasNext(); ) {
+            it.advance();
+            it.setValue(it.value() / offstreetTravelSpeedMillimetersPerSecond);
+        }
+
+        return accessTimes;
+
+    }
+
 }

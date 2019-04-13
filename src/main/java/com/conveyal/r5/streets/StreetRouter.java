@@ -309,18 +309,12 @@ public class StreetRouter {
      *
      * @param lat Latitude in floating point (not fixed int) degrees.
      * @param lon Longitude in floating point (not fixed int) degrees.
-     * @param delay additional time spent at origin before traversing street network (e.g. TNC pickup delay)
      * @return true if an edge was found near the specified coordinate
      */
-    public boolean setOrigin (double lat, double lon, int delay) {
+    public boolean setOrigin (double lat, double lon) {
         Split split = streetLayer.findSplit(lat, lon, StreetLayer.LINK_RADIUS_METERS, streetMode);
         if (split == null) {
             LOG.info("No street was found near the specified origin point of {}, {}.", lat, lon);
-            return false;
-        }
-
-        if (delay <0 ) {
-            // Modifications like PickupDelay return negative values when service is not provided for a given origin.
             return false;
         }
 
@@ -335,13 +329,13 @@ public class StreetRouter {
         // Uses weight based on distance from end vertices, and speed on edge which depends on transport mode
         float speedMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
         startState1.weight = (int) ((split.distance1_mm / 1000) / speedMetersPerSecond);
-        startState1.durationSeconds = startState1.weight + delay;
+        startState1.durationSeconds = startState1.weight;
         startState1.distance = split.distance1_mm;
         edge.advance();
         // Speed can be different on opposite sides of the same street
         speedMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
         startState0.weight = (int) ((split.distance0_mm / 1000) / speedMetersPerSecond);
-        startState0.durationSeconds = startState0.weight + delay;
+        startState0.durationSeconds = startState0.weight;
         startState0.distance = split.distance0_mm;
 
         // FIXME Below is reversing the vertices, but then aren't the weights, times, distances wrong? Why are we even doing this?
@@ -364,10 +358,6 @@ public class StreetRouter {
 
         maxAbsOriginLat = originSplit.fixedLat;
         return true;
-    }
-
-    public boolean setOrigin (double lat, double lon){
-        return setOrigin(lat, lon, 0);
     }
 
     public void setOrigin (int fromVertex) {

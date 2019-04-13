@@ -85,16 +85,18 @@ public class TravelTimeComputer {
         StreetRouter sr = new StreetRouter(network.streetLayer);
         sr.profileRequest = request;
         sr.streetMode = accessMode;
-        int delayAtOrigin = 0;
-        if (request.accessModes.contains(LegMode.CAR)) {
-            delayAtOrigin = network.streetLayer.getWaitTime(request.fromLat, request.fromLon);
-        }
-        boolean foundOriginPoint = sr.setOrigin(request.fromLat, request.fromLon, delayAtOrigin);
+        boolean foundOriginPoint = sr.setOrigin(request.fromLat, request.fromLon);
         if (!foundOriginPoint) {
             // Short circuit around routing and propagation. Calling finish() before streaming in any travel times to
             // destinations is designed to produce the right result.
             LOG.info("Origin point was outside the transport network. Skipping routing and propagation, and returning default result.");
             return travelTimeReducer.finish();
+        }
+
+        // Delay specified by a modification. For PickupDelay modifications, negative values imply no car service.
+        int delaySeconds = 0;
+        if (request.accessModes.contains(LegMode.CAR)) {
+            delaySeconds = network.streetLayer.getWaitTime(request.fromLat, request.fromLon);
         }
 
         // First we will find travel times to all destinations reachable without using transit.
@@ -106,6 +108,12 @@ public class TravelTimeComputer {
             // searches which use distance as the quantity to minimize (because they are precalculated and stored as distance,
             // and then converted to times by dividing by speed without regard to weights/penalties for things like stairs).
             // This does mean that walk-only results will not match the walking portion of walk+transit results.
+
+            // If there's no pickup service, give up (don't even try walking)
+            if (delaySeconds < 0) {
+                return travelTimeReducer.finish();
+            }
+
             sr.timeLimitSeconds = request.maxTripDurationMinutes * 60;
             sr.streetMode = directMode;
             sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
@@ -119,10 +127,15 @@ public class TravelTimeComputer {
 
             // Iterate over all destinations ("targets") and at each destination, save the same travel time for all percentiles.
             for (int d = 0; d < travelTimesToTargets.length; d++) {
-                final int travelTimeSeconds = travelTimesToTargets[d];
+                final int travelTimeSeconds = travelTimesToTargets[d] + delaySeconds;
                 travelTimeReducer.recordTravelTimesForTarget(d, new int[] { travelTimeSeconds });
             }
+
+            // TODO if we allow multiple directModes, check the next fastest mode. Walking or biking might be faster,
+            //  especially if there are congestion or pickup delay modifications.
+
             return travelTimeReducer.finish();
+
         } else {
             // This search will include transit.
             //

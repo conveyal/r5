@@ -156,7 +156,7 @@ public class LinkedPointSet implements Serializable {
             // transit stops, we still need to re-link points and rebuild stop trees (both the trees to the vertices
             // and the trees to the points, because some existing stop-to-vertex trees might not include new splitter
             // vertices).
-            treeRebuildZone = streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.DISTANCE_TABLE_SIZE_METERS);
+            treeRebuildZone = streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.WALK_DISTANCE_LIMIT_METERS);
         }
 
         // If dealing with a scenario, pad out the stop trees list from the base linkage to match the new stop count.
@@ -447,7 +447,7 @@ public class LinkedPointSet implements Serializable {
                 // then extend that table out from the street vertices to the points in this PointSet.
                 TIntIntMap distanceTableToVertices = transitLayer.stopToVertexDistanceTables.get(stopIndex); // walk!
                 Envelope distanceTableZone = stopPoint.getEnvelopeInternal();
-                GeometryUtils.expandEnvelopeFixed(distanceTableZone, TransitLayer.DISTANCE_TABLE_SIZE_METERS);
+                GeometryUtils.expandEnvelopeFixed(distanceTableZone, TransitLayer.WALK_DISTANCE_LIMIT_METERS);
                 linkageCostToPoints = distanceTableToVertices == null ? null :
                         extendDistanceTableToPoints(distanceTableToVertices, distanceTableZone);
 

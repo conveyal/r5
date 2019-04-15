@@ -122,18 +122,15 @@ public class LinkedPointSet implements Serializable {
         // Null means relink and rebuild everything, but this will be constrained below if a base linkage was supplied.
         Geometry treeRebuildZone = null;
 
-// This has been commented out because this was evaluating to true frequently on car searches
-// Perhaps the effect of identity equality comparisons and the fact that both base layer and new linkage are coming from a cache?
-//        if (baseLinkage != null && (
-//                baseLinkage.pointSet != pointSet ||
-//                baseLinkage.streetLayer != streetLayer.baseStreetLayer ||
-//                baseLinkage.streetMode != streetMode)) {
-//            LOG.error("Cannot reuse linkage with mismatched characteristics. THIS IS A BUG.");
-//            // Relink everything as if no base linkage was supplied.
-//            baseLinkage = null;
-//        }
+        if (baseLinkage != null && (
+                baseLinkage.pointSet != pointSet ||
+                baseLinkage.streetLayer != streetLayer ||
+                baseLinkage.streetMode != streetMode)) {
+            LOG.error("Cannot reuse linkage with mismatched characteristics. THIS IS A BUG.");
+            // Relink everything as if no base linkage was supplied.
+            baseLinkage = null;
+        }
 
-        if (baseLinkage == null || baseLinkage.streetMode !=  streetMode) {
         if (baseLinkage == null) {
             edges = new int[nPoints];
             distances0_mm = new int[nPoints];

@@ -458,7 +458,7 @@ public class LinkedPointSet implements Serializable {
                 sr.streetMode = StreetMode.BICYCLE;
                 sr.distanceLimitMeters = BICYCLE_DISTANCE_LINKING_LIMIT_METERS;
                 sr.quantityToMinimize = linkageCostUnit;
-                sr.setOrigin(stopPoint.getY() / FIXED_FACTOR, stopPoint.getX() / FIXED_FACTOR);
+                sr.setOrigin(transitLayer.streetVertexForStop.get(stopIndex));
                 sr.route();
                 Envelope distanceTableZone = stopPoint.getEnvelopeInternal();
                 GeometryUtils.expandEnvelopeFixed(distanceTableZone, BICYCLE_DISTANCE_LINKING_LIMIT_METERS);

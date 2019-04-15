@@ -124,7 +124,7 @@ public class LinkedPointSet implements Serializable {
 
         if (baseLinkage != null && (
                 baseLinkage.pointSet != pointSet ||
-                baseLinkage.streetLayer != streetLayer ||
+                baseLinkage.streetLayer != streetLayer.baseStreetLayer ||
                 baseLinkage.streetMode != streetMode)) {
             LOG.error("Cannot reuse linkage with mismatched characteristics. THIS IS A BUG.");
             // Relink everything as if no base linkage was supplied.

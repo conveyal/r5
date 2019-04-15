@@ -102,6 +102,12 @@ public class LinkedPointSet implements Serializable {
      * Besides they are useful for later processing of LinkedPointSets. However once we start evicting
      * TransportNetworks, we have to make sure we're not holding references to entire StreetLayers in LinkedPointSets
      * (memory leak).
+     * @param pointSet Points to be linked (e.g. web mercator grid, or eventually centroids)
+     * @param streetLayer Streets to which the points should be linked
+     * @param streetMode Mode by which to connect with and traverse the street network (e.g. from points to stops)
+     * @param baseLinkage Linkage from which linkage costs will be copied, for points not affected by scenarios. If
+     *                    not null, it should have the same pointSet, streetLayer, and streetMode as the preceding
+     *                    arguments.
      */
     public LinkedPointSet (PointSet pointSet, StreetLayer streetLayer, StreetMode streetMode, LinkedPointSet baseLinkage) {
         LOG.info("Linking pointset to street network...");
@@ -128,6 +134,7 @@ public class LinkedPointSet implements Serializable {
 //        }
 
         if (baseLinkage == null || baseLinkage.streetMode !=  streetMode) {
+        if (baseLinkage == null) {
             edges = new int[nPoints];
             distances0_mm = new int[nPoints];
             distances1_mm = new int[nPoints];
@@ -164,10 +171,11 @@ public class LinkedPointSet implements Serializable {
         while (stopToPointLinkageCostTables.size() < nStops) stopToPointLinkageCostTables.add(null);
 
         // First, link the points in this PointSet to specific street vertices.
-        // If there is no base linkage, link all streets.
+        // If there is no base linkage, link all points.
         this.linkPointsToStreets(baseLinkage == null);
 
-        // Second, make a table of distances from each transit stop to the points in this PointSet.
+        // Second, make a table of linkage costs (distance or time) from each transit stop to the points in this
+        // PointSet.
         this.makeStopToPointLinkageCostTables(treeRebuildZone);
 
     }

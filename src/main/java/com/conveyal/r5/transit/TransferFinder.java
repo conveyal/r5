@@ -56,7 +56,7 @@ public class TransferFinder {
             }
 
             StreetRouter streetRouter = new StreetRouter(streetLayer);
-            streetRouter.distanceLimitMeters = TransitLayer.PARKRIDE_DISTANCE_LIMIT;
+            streetRouter.distanceLimitMeters = TransitLayer.PARKRIDE_DISTANCE_LIMIT_METERS;
             streetRouter.setOrigin(originStreetVertex);
             streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
 
@@ -86,7 +86,7 @@ public class TransferFinder {
                 parkRidesWithoutStops++;
             }
         }
-        LOG.info("Found {} unconnected P+Rs and {} P+Rs without closest stop in {} m", unconnectedParkRides, parkRidesWithoutStops, TransitLayer.PARKRIDE_DISTANCE_LIMIT);
+        LOG.info("Found {} unconnected P+Rs and {} P+Rs without closest stop in {} m", unconnectedParkRides, parkRidesWithoutStops, TransitLayer.PARKRIDE_DISTANCE_LIMIT_METERS);
     }
 
     public void findTransfers () {
@@ -120,7 +120,7 @@ public class TransferFinder {
             }
 
             StreetRouter streetRouter = new StreetRouter(streetLayer);
-            streetRouter.distanceLimitMeters = TransitLayer.TRANSFER_DISTANCE_LIMIT;
+            streetRouter.distanceLimitMeters = TransitLayer.TRANSFER_DISTANCE_LIMIT_METERS;
 
             streetRouter.setOrigin(originStreetVertex);
             streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;

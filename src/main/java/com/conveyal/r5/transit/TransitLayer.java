@@ -54,7 +54,7 @@ public class TransitLayer implements Serializable, Cloneable {
      * Maximum distance to record in distance tables, in meters.
      * Set to 3.5 km to match OTP GraphIndex.MAX_WALK_METERS but TODO should probably be reduced after Kansas City project.
      */
-    public static final int DISTANCE_TABLE_SIZE_METERS = 2000;
+    public static final int WALK_DISTANCE_LIMIT_METERS = 2000;
 
     public static final boolean SAVE_SHAPES = false;
 
@@ -62,12 +62,12 @@ public class TransitLayer implements Serializable, Cloneable {
      * Distance limit for transfers, meters. Set to 1km which is slightly above OTP's 600m (which was specified as
      * 1 m/s with 600s max time, which is actually somewhat less than 600m due to extra costs due to steps etc.
      */
-    public static final int TRANSFER_DISTANCE_LIMIT = 1000;
+    public static final int TRANSFER_DISTANCE_LIMIT_METERS = 1000;
 
     /**
      * Distance limit from P+R to transit in meters
      */
-    public static final int PARKRIDE_DISTANCE_LIMIT = 500;
+    public static final int PARKRIDE_DISTANCE_LIMIT_METERS = 500;
 
     private static final Logger LOG = LoggerFactory.getLogger(TransitLayer.class);
 
@@ -573,7 +573,7 @@ public class TransitLayer implements Serializable, Cloneable {
             return null;
         }
         StreetRouter router = new StreetRouter(parentNetwork.streetLayer);
-        router.distanceLimitMeters = DISTANCE_TABLE_SIZE_METERS;
+        router.distanceLimitMeters = WALK_DISTANCE_LIMIT_METERS;
 
         // Dominate based on distance in millimeters, since (a) we're using a hard distance limit, and (b) we divide
         // by a speed to get time when we use these tables.

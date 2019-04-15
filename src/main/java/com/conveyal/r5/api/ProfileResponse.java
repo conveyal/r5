@@ -187,7 +187,7 @@ public class ProfileResponse {
             streetRouter.streetMode = StreetMode.WALK;
             streetRouter.profileRequest = request;
             //TODO: make configurable distanceLimitMeters in middle
-            streetRouter.distanceLimitMeters = TransitLayer.TRANSFER_DISTANCE_LIMIT;
+            streetRouter.distanceLimitMeters = TransitLayer.TRANSFER_DISTANCE_LIMIT_METERS;
             int stopIndex = transportNetwork.transitLayer.streetVertexForStop.get(entry.getKey());
             streetRouter.setOrigin(stopIndex);
             streetRouter.route();

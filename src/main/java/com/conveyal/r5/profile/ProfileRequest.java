@@ -77,7 +77,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      * Maximum walk time before and after using transit, in minutes
      *
      * NB the time to reach the destination after leaving transit is considered separately from the time to reach
-     * transit at the start of the search; e.g. if you set maxWalkTime to 600 (ten minutes), you could potentially walk
+     * transit at the start of the search; e.g. if you set maxWalkTime to 10, you could potentially walk
      * up to ten minutes to reach transit, and up to _another_ ten minutes to reach the destination after leaving transit.
      *
      * This is required because hard resource limiting on non-objective variables is algorithmically invalid. Consider

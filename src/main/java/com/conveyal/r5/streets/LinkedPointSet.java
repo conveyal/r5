@@ -16,6 +16,7 @@ import gnu.trove.set.TIntSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import static com.conveyal.r5.streets.StreetRouter.State.RoutingVariable;
+import static com.conveyal.r5.transit.TransitLayer.WALK_DISTANCE_LIMIT_METERS;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -57,6 +58,12 @@ public class LinkedPointSet implements Serializable {
     static final int BICYCLE_DISTANCE_LINKING_LIMIT_METERS = 2000;
 
     static final int CAR_TIME_LINKING_LIMIT_SECONDS = 20 * 60;
+    /**
+     * Limit to use when building linkageCostTables, re-calculated for different streetModes as needed, using the
+     * constants specified above. The value should be larger than any per-leg street mode limits that can be requested
+     * in the UI.
+     */
+    int linkingDistanceLimitMeters = WALK_DISTANCE_LIMIT_METERS;
 
     // Fair to assume that people walk from nearest OSM way to their ultimate destination? Should we just use the
     // walk speed from the analysis request?
@@ -121,7 +128,7 @@ public class LinkedPointSet implements Serializable {
 
         // The regions within which we want to link points to edges, then connect transit stops to points.
         // Null means relink and rebuild everything, but this will be constrained below if a base linkage was supplied.
-        Geometry treeRebuildZone = null;
+        Geometry linkageCostRebuildZone = null;
 
         if (baseLinkage != null && (
                 baseLinkage.pointSet != pointSet ||
@@ -161,7 +168,18 @@ public class LinkedPointSet implements Serializable {
             // transit stops, we still need to re-link points and rebuild stop trees (both the trees to the vertices
             // and the trees to the points, because some existing stop-to-vertex trees might not include new splitter
             // vertices).
-            treeRebuildZone = streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.WALK_DISTANCE_LIMIT_METERS);
+
+            if (streetMode != StreetMode.WALK) {
+                // limit already set for WALK.
+            } else if (streetMode == StreetMode.BICYCLE) {
+                linkingDistanceLimitMeters = BICYCLE_DISTANCE_LINKING_LIMIT_METERS;
+            } else if (streetMode == StreetMode.CAR) {
+                linkingDistanceLimitMeters = CAR_TIME_LINKING_LIMIT_SECONDS * MAX_CAR_SPEED_METERS_PER_SECOND;
+            } else {
+                throw new UnsupportedOperationException("Unrecognized streetMode");
+            }
+
+            linkageCostRebuildZone = streetLayer.scenarioEdgesBoundingGeometry(linkingDistanceLimitMeters);
         }
 
         // If dealing with a scenario, pad out the stop trees list from the base linkage to match the new stop count.
@@ -174,7 +192,7 @@ public class LinkedPointSet implements Serializable {
 
         // Second, make a table of linkage costs (distance or time) from each transit stop to the points in this
         // PointSet.
-        this.makeStopToPointLinkageCostTables(treeRebuildZone);
+        this.makeStopToPointLinkageCostTables(linkageCostRebuildZone);
 
     }
 

@@ -15,6 +15,10 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
+import static com.conveyal.r5.streets.StreetRouter.State.RoutingVariable;
+import static com.conveyal.r5.transit.TransitLayer.PARKRIDE_DISTANCE_LIMIT_METERS;
+import static com.conveyal.r5.transit.TransitLayer.TRANSFER_DISTANCE_LIMIT_METERS;
+
 /**
  * TODO optimization: combine TransferFinder with stop-to-vertex distance table builder.
  */
@@ -56,9 +60,9 @@ public class TransferFinder {
             }
 
             StreetRouter streetRouter = new StreetRouter(streetLayer);
-            streetRouter.distanceLimitMeters = TransitLayer.PARKRIDE_DISTANCE_LIMIT_METERS;
+            streetRouter.distanceLimitMeters = PARKRIDE_DISTANCE_LIMIT_METERS;
             streetRouter.setOrigin(originStreetVertex);
-            streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+            streetRouter.quantityToMinimize = RoutingVariable.DISTANCE_MILLIMETERS;
 
             streetRouter.transitStopSearch = true;
             streetRouter.route();
@@ -86,7 +90,7 @@ public class TransferFinder {
                 parkRidesWithoutStops++;
             }
         }
-        LOG.info("Found {} unconnected P+Rs and {} P+Rs without closest stop in {} m", unconnectedParkRides, parkRidesWithoutStops, TransitLayer.PARKRIDE_DISTANCE_LIMIT_METERS);
+        LOG.info("Found {} unconnected P+Rs and {} P+Rs without closest stop in {} m", unconnectedParkRides, parkRidesWithoutStops, PARKRIDE_DISTANCE_LIMIT_METERS);
     }
 
     public void findTransfers () {
@@ -120,10 +124,10 @@ public class TransferFinder {
             }
 
             StreetRouter streetRouter = new StreetRouter(streetLayer);
-            streetRouter.distanceLimitMeters = TransitLayer.TRANSFER_DISTANCE_LIMIT_METERS;
+            streetRouter.distanceLimitMeters = TRANSFER_DISTANCE_LIMIT_METERS;
 
             streetRouter.setOrigin(originStreetVertex);
-            streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+            streetRouter.quantityToMinimize = RoutingVariable.DISTANCE_MILLIMETERS;
 
             streetRouter.route();
             TIntIntMap distancesToReachedStops = streetRouter.getReachedStops();

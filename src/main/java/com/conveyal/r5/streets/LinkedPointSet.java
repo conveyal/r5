@@ -65,9 +65,7 @@ public class LinkedPointSet implements Serializable {
      */
     int linkingDistanceLimitMeters = WALK_DISTANCE_LIMIT_METERS;
 
-    // Fair to assume that people walk from nearest OSM way to their ultimate destination? Should we just use the
-    // walk speed from the analysis request?
-    static final int OFF_STREET_SPEED_MILLIMETERS_PER_SECOND = (int) 1.3f * 1000;
+    static final int OFF_STREET_SPEED_MILLIMETERS_PER_SECOND = (int) (1.3f * 1000);
 
     /**
      * For each point, the closest edge in the street layer. This is in fact the even (forward) edge ID of the closest
@@ -340,10 +338,20 @@ public class LinkedPointSet implements Serializable {
     public PointSetTimes eval (TravelTimeFunction travelTimeForVertex) {
         // R5 used to not differentiate between seconds and meters, preserve that behavior in this deprecated function
         // by using 1 m / s
-        return eval(travelTimeForVertex, 1000);
+        return eval(travelTimeForVertex, 1000, 1000);
     }
 
-    public PointSetTimes eval (TravelTimeFunction travelTimeForVertex, int offstreetTravelSpeedMillimetersPerSecond) {
+    /**
+     *
+     * @param travelTimeForVertex returning the time required to reach a vertex, in seconds
+     * @param onStreetSpeed speed at which the first/last edge is traversed, in millimeters per second. If null, look
+     *                     up CAR speed on the edge.
+     * @param offStreetSpeed travel speed between the first/last edge and the pointset point, in millimeters per
+     *                       second. Generally walking (we don't account for off-street parking not specified in OSM)
+     * @return wrapped int[] of travel times (in seconds) to reach the pointset points
+     */
+
+    public PointSetTimes eval (TravelTimeFunction travelTimeForVertex, Integer onStreetSpeed, int offStreetSpeed) {
         int[] travelTimes = new int[edges.length];
         // Iterate over all locations in this temporary vertex list.
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
@@ -356,17 +364,27 @@ public class LinkedPointSet implements Serializable {
             int time0 = travelTimeForVertex.getTravelTime(edge.getFromVertex());
             int time1 = travelTimeForVertex.getTravelTime(edge.getToVertex());
 
-            // An "off-roading" penalty is applied to limit extending isochrones into water bodies, etc.
-            // We may want to keep the MAX_OFFSTREET_WALK_METERS relatively high to avoid holes in the isochrones,
-            // but make it costly to walk long distances where there aren't streets.  The approach below
-            // accomplishes that, applying a penalty to off-street distances greater than the typical grid cell size.
-            // We could use a distance threshold more closely tied to pointset resolution/coverage
+            int edgeLength = edge.getLengthMm();
+
+            // If the linked street edge for point D has vertices A and B, distance0 and distance1 both include the
+            // distance from split point C to D, double-counting the off-street distance.  So in the equation below,
+            // divide by 2.
+            //
+            // A----C--B
+            //      |
+            //      D
+            int offstreetTime = (distances0_mm[i] + distances1_mm[i] - edgeLength) / 2 / offStreetSpeed;
+
+            // If a null onStreetSpeed is supplied, look up the speed for cars
+            if (onStreetSpeed == null) {
+                onStreetSpeed = (int) (edge.getCarSpeedMetersPerSecond() * 1000);
+            }
 
             if (time0 != Integer.MAX_VALUE) {
-                time0 += (distances0_mm[i]) / offstreetTravelSpeedMillimetersPerSecond;
+                time0 += (edgeLength - distances0_mm[i]) / onStreetSpeed +  offstreetTime;
             }
             if (time1 != Integer.MAX_VALUE) {
-                time1 += (distances1_mm[i]) / offstreetTravelSpeedMillimetersPerSecond;
+                time1 += (edgeLength - distances1_mm[i]) / onStreetSpeed + offstreetTime;
             }
 
             travelTimes[i] = time0 < time1 ? time0 : time1;

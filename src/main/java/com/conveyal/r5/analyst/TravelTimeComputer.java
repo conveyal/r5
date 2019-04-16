@@ -176,8 +176,8 @@ public class TravelTimeComputer {
                 // access searches are already asymmetric (i.e. bike/car linkage distances precomputed for egress
                 // can't be used for access, because there are one-way streets; we ignore the possibility of one-way
                 // pedestrian ways).
-                sr.distanceLimitMeters = (int) (request.walkSpeed * request.maxWalkTime * // in StreetMode.WALK block
-                        FastRaptorWorker.SECONDS_PER_MINUTE);
+                sr.distanceLimitMeters =
+                        (int) (request.walkSpeed * request.maxWalkTime * FastRaptorWorker.SECONDS_PER_MINUTE);
                 sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
                 sr.route();
 

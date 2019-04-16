@@ -15,6 +15,7 @@ import com.conveyal.r5.streets.EdgeStore.Edge;
 import gnu.trove.set.TIntSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import static com.conveyal.r5.streets.StreetRouter.State.RoutingVariable;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -94,7 +95,7 @@ public class LinkedPointSet implements Serializable {
      */
     public transient List<TIntIntMap> pointToStopLinkageCostTables;
 
-    public StreetRouter.State.RoutingVariable linkageCostUnit = StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS;
+    public RoutingVariable linkageCostUnit = RoutingVariable.DISTANCE_MILLIMETERS;
 
     /**
      * A LinkedPointSet is a PointSet that has been pre-connected to a StreetLayer in a non-destructive, reversible way.

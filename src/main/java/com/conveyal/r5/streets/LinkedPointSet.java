@@ -135,12 +135,11 @@ public class LinkedPointSet implements Serializable {
         Geometry linkageCostRebuildZone = null;
 
         if (baseLinkage != null && (
-                baseLinkage.pointSet != pointSet ||
+                !(baseLinkage.pointSet == ((WebMercatorGridPointSet) pointSet).base ||
+                 baseLinkage.pointSet == pointSet) ||
                 baseLinkage.streetLayer != streetLayer.baseStreetLayer ||
                 baseLinkage.streetMode != streetMode)) {
-            LOG.error("Cannot reuse linkage with mismatched characteristics. THIS IS A BUG.");
-            // Relink everything as if no base linkage was supplied.
-            baseLinkage = null;
+            throw new UnsupportedOperationException("Requested characteristics do not match baseLinkage");
         }
 
         if (baseLinkage == null) {

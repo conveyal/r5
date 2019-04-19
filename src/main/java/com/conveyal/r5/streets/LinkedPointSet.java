@@ -53,9 +53,12 @@ public class LinkedPointSet implements Serializable {
      */
     public final StreetMode streetMode;
 
-    static final int BICYCLE_DISTANCE_LINKING_LIMIT_METERS = 2000;
+    static final int BICYCLE_DISTANCE_LINKING_LIMIT_METERS = 5000;
 
-    static final int CAR_TIME_LINKING_LIMIT_SECONDS = 20 * 60;
+    static final int CAR_TIME_LINKING_LIMIT_SECONDS = 30 * 60;
+
+    static final int MAX_CAR_SPEED_METERS_PER_SECOND = 44; // ~160 kilometers per hour
+
     /**
      * Limit to use when building linkageCostTables, re-calculated for different streetModes as needed, using the
      * constants specified above. The value should be larger than any per-leg street mode limits that can be requested

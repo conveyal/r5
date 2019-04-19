@@ -172,7 +172,7 @@ public class LinkedPointSet implements Serializable {
             // and the trees to the points, because some existing stop-to-vertex trees might not include new splitter
             // vertices).
 
-            if (streetMode != StreetMode.WALK) {
+            if (streetMode == StreetMode.WALK) {
                 // limit already set for WALK.
             } else if (streetMode == StreetMode.BICYCLE) {
                 linkingDistanceLimitMeters = BICYCLE_DISTANCE_LINKING_LIMIT_METERS;
@@ -368,6 +368,11 @@ public class LinkedPointSet implements Serializable {
             edge.seek(edges[i]);
             int time0 = travelTimeForVertex.getTravelTime(edge.getFromVertex());
             int time1 = travelTimeForVertex.getTravelTime(edge.getToVertex());
+
+            if (time0 == Integer.MAX_VALUE && time1 == Integer.MAX_VALUE) {
+                travelTimes[i] = Integer.MAX_VALUE;
+                continue;
+            }
 
             int edgeLength = edge.getLengthMm();
 

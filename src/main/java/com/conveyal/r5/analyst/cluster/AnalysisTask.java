@@ -81,6 +81,8 @@ public abstract class AnalysisTask extends ProfileRequest {
      */
     public int nPathsPerTarget = 3;
 
+    public boolean logRequest = false;
+
     /**
      * Is this a task that should return a binary travel time surface or compute accessibility and return it via SQS
      * to be saved in a regional analysis grid file?

@@ -111,7 +111,7 @@ public class Scenario implements Serializable {
         // Apply each modification in turn to the same extensible copy of the TransitNetwork.
         LOG.info("Applying modifications to TransportNetwork.");
         for (Modification modification : modifications) {
-            LOG.info("Applying modification of type {}", modification.getType());
+            LOG.info("Applying modification of type {}", modification.getClass().getSimpleName());
             boolean errors = modification.apply(copiedNetwork);
             if (errors) {
                 // Bail out at the first error, because modification application changes the underlying network and

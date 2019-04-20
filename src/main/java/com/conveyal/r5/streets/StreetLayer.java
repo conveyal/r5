@@ -106,6 +106,8 @@ public class StreetLayer implements Serializable, Cloneable {
     // Edge lists should be constructed after the fact from edges. This minimizes serialized size too.
     public transient List<TIntList> outgoingEdges;
     public transient List<TIntList> incomingEdges;
+
+    /** A spatial index of all street network edges, using fixed-point WGS84 coordinates. */
     public transient IntHashGrid spatialIndex = new IntHashGrid();
 
     /**

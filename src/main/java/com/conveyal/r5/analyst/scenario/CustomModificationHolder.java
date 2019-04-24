@@ -22,9 +22,9 @@ import java.util.Map;
  * Note that this modification type, although it is defined in R5, should never be applied to a transit network and
  * should never be deserialized by a worker or the backend. It only exists as a conversion target for the backend
  * class CustomModificationHolder.toR5(), and to specify the special behavior where the type code "custom" is overwritten
- * with a type code that some custom version of an R5 worker will understand. This is why it lacks any way to set the
- * properties, and lacks a no-arg constructor, both of which would be needed for deserialization. Their absence prevents
- * accidental misuse.
+ * with a type code that some custom version of an R5 worker will understand (which is actually handled in
+ * ModificationTypeResolver). This is why it lacks any way to set the properties, and lacks a no-arg constructor, both
+ * of which would be needed for deserialization. Their absence prevents accidental misuse.
  *
  * This class could in fact be defined in analysis-backend instead of R5 to avoid confusion. It needs to be a subtype
  * of the R5 scenario modification base class, but nothing blocks us from defining such a subtype in analysis-backend.

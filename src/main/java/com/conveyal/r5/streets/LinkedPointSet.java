@@ -135,9 +135,9 @@ public class LinkedPointSet implements Serializable {
 
         // TODO general purpose method to check compatability
         if (baseLinkage != null && (
-                baseLinkage.pointSet != pointSet) ||
+                baseLinkage.pointSet != pointSet ||
                 baseLinkage.streetLayer != streetLayer.baseStreetLayer ||
-                baseLinkage.streetMode != streetMode) {
+                baseLinkage.streetMode != streetMode)) {
             throw new UnsupportedOperationException("Requested characteristics do not match baseLinkage");
         }
 

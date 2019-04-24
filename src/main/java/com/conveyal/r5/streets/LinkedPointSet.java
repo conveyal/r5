@@ -189,7 +189,7 @@ public class LinkedPointSet implements Serializable {
         while (stopToPointLinkageCostTables.size() < nStops) stopToPointLinkageCostTables.add(null);
 
         // First, link the points in this PointSet to specific street vertices.
-        // If there is no base linkage, link all points.
+        // If no base linkage was supplied, parameter will evaluate to true and all points will be linked from scratch.
         this.linkPointsToStreets(baseLinkage == null);
 
         // Second, make a table of linkage costs (distance or time) from each transit stop to the points in this

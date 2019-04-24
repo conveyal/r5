@@ -216,15 +216,20 @@ public class PerTargetPropagater {
      * They appear to be travel times (are compared against cutoffSeconds which is a trip duration).
      */
     private void propagateTransit (int targetIndex) {
-        int egressDistanceLimitMillimeters = egressLegTimeLimitSeconds * speedMillimetersPerSecond;
 
         // Grab the set of nearby stops for this target, with their distances.
         TIntIntMap pointToStopLinkageCostTable = targets.pointToStopLinkageCostTables.get(targetIndex);
 
         StreetRouter.State.RoutingVariable unit = targets.linkageCostUnit;
 
-        int egressLimit = unit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS ?
-                egressLegTimeLimitSeconds * speedMillimetersPerSecond : egressLegTimeLimitSeconds;
+        int egressLimit;
+        if (unit == StreetRouter.State.RoutingVariable.DURATION_SECONDS) {
+            egressLimit = egressLegTimeLimitSeconds;
+        } else if (unit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) {
+            egressLimit = egressLegTimeLimitSeconds * speedMillimetersPerSecond;
+        } else {
+            throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
+        }
 
         // Only try to propagate transit travel times if there are transit stops near this target.
         // Even if we don't propagate transit travel times, we still need to pass these non-transit times to

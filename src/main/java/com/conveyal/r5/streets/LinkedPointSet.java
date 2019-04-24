@@ -117,9 +117,8 @@ public class LinkedPointSet implements Serializable {
      * @param pointSet Points to be linked (e.g. web mercator grid, or eventually centroids)
      * @param streetLayer Streets to which the points should be linked
      * @param streetMode Mode by which to connect with and traverse the street network (e.g. from points to stops)
-     * @param baseLinkage Linkage from which linkage costs will be copied, for points not affected by scenarios. If
-     *                    not null, it should have the same pointSet, streetLayer, and streetMode as the preceding
-     *                    arguments.
+     * @param baseLinkage Linkage for the base StreetLayer of the supplied streetLayer. If not null, it should have
+     *                    the same pointSet and streetMode as the preceding arguments.
      */
     public LinkedPointSet (PointSet pointSet, StreetLayer streetLayer, StreetMode streetMode, LinkedPointSet baseLinkage) {
         LOG.info("Linking pointset to street network...");
@@ -134,11 +133,11 @@ public class LinkedPointSet implements Serializable {
         // Null means relink and rebuild everything, but this will be constrained below if a base linkage was supplied.
         Geometry linkageCostRebuildZone = null;
 
+        // TODO general purpose method to check compatability
         if (baseLinkage != null && (
-                !(baseLinkage.pointSet == ((WebMercatorGridPointSet) pointSet).base ||
-                 baseLinkage.pointSet == pointSet) ||
+                baseLinkage.pointSet != pointSet) ||
                 baseLinkage.streetLayer != streetLayer.baseStreetLayer ||
-                baseLinkage.streetMode != streetMode)) {
+                baseLinkage.streetMode != streetMode) {
             throw new UnsupportedOperationException("Requested characteristics do not match baseLinkage");
         }
 

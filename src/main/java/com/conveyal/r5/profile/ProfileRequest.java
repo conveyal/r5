@@ -63,7 +63,11 @@ public class ProfileRequest implements Serializable, Cloneable {
     /** maximum level of traffic stress for cycling, 1 - 4 */
     public int bikeTrafficStress = 4;
     
-    /** The speed of driving, in meters per second. Roads from OSM use the speed limit, this is the speed used when propagating from the street network to a pointset. */
+    /** The speed of driving, in meters per second. Roads from OSM use the speed limit; this is the speed used when
+     * linking the street network to a pointset (i.e. it is applied between the true origin and the first street
+     * vertex, and between the last street vertex and the true destination). Note that slow speeds specified here may
+     * result in longer travel times than expected on long, high-speed blocks. But we tolerate some imprecision at
+     * the scale of individual blocks (see conversation at #436)*/
     public float carSpeed = 2.22f; // ~8 km/h
 
     /** Maximum time to reach the destination without using transit in minutes */
@@ -73,7 +77,7 @@ public class ProfileRequest implements Serializable, Cloneable {
      * Maximum walk time before and after using transit, in minutes
      *
      * NB the time to reach the destination after leaving transit is considered separately from the time to reach
-     * transit at the start of the search; e.g. if you set maxWalkTime to 600 (ten minutes), you could potentially walk
+     * transit at the start of the search; e.g. if you set maxWalkTime to 10, you could potentially walk
      * up to ten minutes to reach transit, and up to _another_ ten minutes to reach the destination after leaving transit.
      *
      * This is required because hard resource limiting on non-objective variables is algorithmically invalid. Consider
@@ -136,10 +140,9 @@ public class ProfileRequest implements Serializable, Cloneable {
     public int suboptimalMinutes = 5;
 
     /**
-     * The maximum duration of any transit trip found by this search. Results used to be very sensitive to this
-     * when we were using mean travel times, now we use medians so we could set this to 2 hours.
+     * The maximum duration of any transit trip found by this search.
      */
-    public int maxTripDurationMinutes = 4 * 60;
+    public int maxTripDurationMinutes = 2 * 60;
 
     /**
      * The maximum number of rides, e.g. taking the L2 to the Red line to the Green line would be three rides.

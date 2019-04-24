@@ -3,7 +3,6 @@ package com.conveyal.r5.analyst.scenario;
 import com.beust.jcommander.internal.Lists;
 import com.conveyal.r5.analyst.error.ScenarioApplicationException;
 import com.conveyal.r5.analyst.error.TaskError;
-import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.transit.TransferFinder;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
@@ -136,7 +135,7 @@ public class Scenario implements Serializable {
         // TODO Elaborate on this
         // Rebuild distance tables affected by street network changes
         Geometry treeRebuildZone =
-                copiedNetwork.streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.DISTANCE_TABLE_SIZE_METERS);
+                copiedNetwork.streetLayer.scenarioEdgesBoundingGeometry(TransitLayer.WALK_DISTANCE_LIMIT_METERS);
         copiedNetwork.transitLayer.buildDistanceTables(treeRebuildZone);
         
         // Find the transfers originating at or terminating at new stops.

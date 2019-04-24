@@ -5,7 +5,9 @@ import com.conveyal.r5.analyst.PathScorer;
 import com.conveyal.r5.analyst.TravelTimeReducer;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
+import com.conveyal.r5.api.util.LegMode;
 import com.conveyal.r5.streets.LinkedPointSet;
+import com.conveyal.r5.streets.StreetRouter;
 import gnu.trove.map.TIntIntMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +38,7 @@ public class PerTargetPropagater {
      * The maximum travel time we will record and report. To limit calculation time and avoid overflow places this
      * many seconds from the origin are just considered unreachable.
      */
-    public int cutoffSeconds = 120 * 60;
+    public int cutoffSeconds = 120 * SECONDS_PER_MINUTE;
 
     /** The targets, linked to the street network. */
     public LinkedPointSet targets;
@@ -74,8 +76,12 @@ public class PerTargetPropagater {
      * casts, the operations themselves, or the fact that the operations were being completed with doubles rather than
      * floats.
      */
-    int speedMillimetersPerSecond;
+    private int speedMillimetersPerSecond;
 
+    private int egressLegTimeLimitSeconds;
+
+    private static final int SECONDS_PER_MINUTE = 60;
+    private static final int MM_PER_METER = 1000;
 
     // STATE FIELDS WHICH ARE RESET WHEN PROCESSING EACH DESTINATION.
     // These track the characteristics of the best paths known to the target currently being processed.
@@ -105,7 +111,9 @@ public class PerTargetPropagater {
         // If we're making a static site we'll break travel times down into components and make paths.
         // This expects the pathsToStopsForIteration and pathWriter fields to be set separately by the caller.
         this.calculateComponents = task.makeStaticSite;
-        speedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
+        StreetMode egressMode = LegMode.getDominantStreetMode(task.egressModes);
+        speedMillimetersPerSecond = (int) (request.getSpeedForMode(egressMode) * MM_PER_METER);
+        egressLegTimeLimitSeconds = request.getMaxAccessTimeForMode(egressMode) * SECONDS_PER_MINUTE;
         nIterations = travelTimesToStopsForIteration.length;
         nStops = travelTimesToStopsForIteration[0].length;
         invertTravelTimes();
@@ -157,7 +165,8 @@ public class PerTargetPropagater {
                 // TODO Somehow report these in-vehicle, wait and walk breakdown values alongside the total travel time.
                 // TODO WalkTime should be calculated per-iteration, as it may not hold for some summary statistics that stat(total) = stat(in-vehicle) + stat(wait) + stat(walk).
                 // NOTE this is currently using only the first of what could be N percentiles.
-                Set<Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, percentilesMinutes[0] * 60);
+                Set<Path> selectedPaths = pathScorer.getTopPaths(pathWriter.nPathsPerTarget, percentilesMinutes[0] *
+                        SECONDS_PER_MINUTE);
                 pathWriter.recordPathsForTarget(selectedPaths);
             }
         }
@@ -207,30 +216,54 @@ public class PerTargetPropagater {
      * They appear to be travel times (are compared against cutoffSeconds which is a trip duration).
      */
     private void propagateTransit (int targetIndex) {
+
         // Grab the set of nearby stops for this target, with their distances.
-        TIntIntMap pointToStopDistanceTable = targets.pointToStopDistanceTables.get(targetIndex);
+        TIntIntMap pointToStopLinkageCostTable = targets.pointToStopLinkageCostTables.get(targetIndex);
+
+        StreetRouter.State.RoutingVariable unit = targets.linkageCostUnit;
+
+        int egressLimit;
+        if (unit == StreetRouter.State.RoutingVariable.DURATION_SECONDS) {
+            egressLimit = egressLegTimeLimitSeconds;
+        } else if (unit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) {
+            egressLimit = egressLegTimeLimitSeconds * speedMillimetersPerSecond;
+        } else {
+            throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
+        }
+
         // Only try to propagate transit travel times if there are transit stops near this target.
         // Even if we don't propagate transit travel times, we still need to pass these non-transit times to
         // the reducer later in the caller, because you can walk even where there is no transit.
-        if (pointToStopDistanceTable != null) {
-            pointToStopDistanceTable.forEachEntry((stop, distanceMillimeters) -> {
-                for (int iteration = 0; iteration < nIterations; iteration++) {
-                    int timeAtStop = travelTimesToStop[stop][iteration];
-                    if (timeAtStop > cutoffSeconds || timeAtStop > perIterationTravelTimes[iteration]) {
-                        // Skip propagation if all resulting times will be greater than the cutoff and
-                        // cannot improve on the best known time at this iteration. Also avoids overflow.
-                        continue;
-                    }
-                    // If recording path details, extract the row of paths to all stops for this iteration.
-                    // Propagate from the current stop out to the target.
-                    int timeAtTarget = timeAtStop + distanceMillimeters / speedMillimetersPerSecond;
-                    if (timeAtTarget < cutoffSeconds &&
-                        timeAtTarget < perIterationTravelTimes[iteration]) {
-                        // To reach this target, alighting at this stop is faster than any previously checked stop.
-                        perIterationTravelTimes[iteration] = timeAtTarget;
-                        if (calculateComponents) {
-                            Path[] pathsToStops = pathsToStopsForIteration.get(iteration);
-                            perIterationPaths[iteration] = pathsToStops[stop];
+        if (pointToStopLinkageCostTable != null) {
+            pointToStopLinkageCostTable.forEachEntry((stop, linkageCost) -> {
+                if (linkageCost < egressLimit){
+                    for (int iteration = 0; iteration < nIterations; iteration++) {
+                        int timeAtStop = travelTimesToStop[stop][iteration];
+                        if (timeAtStop > cutoffSeconds || timeAtStop > perIterationTravelTimes[iteration]) {
+                            // Skip propagation if all resulting times will be greater than the cutoff and
+                            // cannot improve on the best known time at this iteration. Also avoids overflow.
+                            continue;
+                        }
+                        // Propagate from the current stop out to the target.
+                        int secondsFromStopToTarget;
+
+                        if (unit == StreetRouter.State.RoutingVariable.DISTANCE_MILLIMETERS) {
+                            secondsFromStopToTarget = linkageCost / speedMillimetersPerSecond;
+                        } else if (unit == StreetRouter.State.RoutingVariable.DURATION_SECONDS) {
+                            secondsFromStopToTarget = linkageCost;
+                        } else {
+                            throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
+                        }
+
+                        int timeAtTarget = timeAtStop + secondsFromStopToTarget;
+                        if (timeAtTarget < cutoffSeconds &&
+                                timeAtTarget < perIterationTravelTimes[iteration]) {
+                            // To reach this target, alighting at this stop is faster than any previously checked stop.
+                            perIterationTravelTimes[iteration] = timeAtTarget;
+                            if (calculateComponents) {
+                                Path[] pathsToStops = pathsToStopsForIteration.get(iteration);
+                                perIterationPaths[iteration] = pathsToStops[stop];
+                            }
                         }
                     }
                 }

@@ -4,7 +4,6 @@ import com.conveyal.r5.api.util.*;
 import com.conveyal.r5.profile.*;
 import com.conveyal.r5.streets.StreetRouter;
 import com.conveyal.r5.transit.fare.DCFareCalculator;
-import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.Multimap;
@@ -14,6 +13,8 @@ import org.slf4j.LoggerFactory;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static com.conveyal.r5.transit.TransitLayer.TRANSFER_DISTANCE_LIMIT_METERS;
 
 /**
  * Created by mabu on 30.10.2015.
@@ -187,7 +188,7 @@ public class ProfileResponse {
             streetRouter.streetMode = StreetMode.WALK;
             streetRouter.profileRequest = request;
             //TODO: make configurable distanceLimitMeters in middle
-            streetRouter.distanceLimitMeters = TransitLayer.TRANSFER_DISTANCE_LIMIT;
+            streetRouter.distanceLimitMeters = TRANSFER_DISTANCE_LIMIT_METERS;
             int stopIndex = transportNetwork.transitLayer.streetVertexForStop.get(entry.getKey());
             streetRouter.setOrigin(stopIndex);
             streetRouter.route();

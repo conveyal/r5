@@ -134,11 +134,19 @@ public class LinkedPointSet implements Serializable {
         Geometry linkageCostRebuildZone = null;
 
         // TODO general purpose method to check compatability
-        if (baseLinkage != null && (
-                baseLinkage.pointSet != pointSet ||
-                baseLinkage.streetLayer != streetLayer.baseStreetLayer ||
-                baseLinkage.streetMode != streetMode)) {
-            throw new UnsupportedOperationException("Requested characteristics do not match baseLinkage");
+        // The supplied baseLinkage must be for exactly the same pointSet as the linkage we're creating.
+        // This constructor expects them to have the same number of entries for the exact same geographic points.
+        // The supplied base linkage should be for the same mode, and for the base street network of this street network.
+        if (baseLinkage != null) {
+            if (baseLinkage.pointSet != pointSet) {
+                throw new AssertionError("baseLinkage must be for the same pointSet as the linkage being created.");
+            }
+            if (baseLinkage.streetMode != streetMode) {
+                throw new AssertionError("baseLinkage must be for the same mode as the linkage being created.");
+            }
+            if (baseLinkage.streetLayer != streetLayer.baseStreetLayer) {
+                throw new AssertionError("baseLinkage must be for the baseStreetLayer of the streetLayer of the linkage being created.");
+            }
         }
 
         if (baseLinkage == null) {
@@ -156,6 +164,7 @@ public class LinkedPointSet implements Serializable {
             // The new linkage has the same PointSet as the base linkage, so the linkage arrays remain the same length
             // as in the base linkage. However, if the TransitLayer was also modified by the scenario, the
             // stopToVertexDistanceTables list might need to grow.
+            // TODO add assertion that arrays may grow but will never shrink. Check expected array lengths.
             edges = Arrays.copyOf(baseLinkage.edges, nPoints);
             distances0_mm = Arrays.copyOf(baseLinkage.distances0_mm, nPoints);
             distances1_mm = Arrays.copyOf(baseLinkage.distances1_mm, nPoints);

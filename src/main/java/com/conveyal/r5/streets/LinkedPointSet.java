@@ -230,8 +230,9 @@ public class LinkedPointSet implements Serializable {
             LOG.warn("Sub-grid is entirely outside the super-grid.  Points will not be linked to any street edges.");
         }
 
-        // Initialize the fields of the new LinkedPointSet instance
-        pointSet = sourceLinkage.pointSet;
+        // Initialize the fields of the new LinkedPointSet instance.
+        // Most characteristics are the same, but the new linkage is for the subset of points in the subGrid.
+        pointSet = subGrid;
         streetLayer = sourceLinkage.streetLayer;
         streetMode = sourceLinkage.streetMode;
 

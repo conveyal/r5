@@ -508,10 +508,9 @@ public class LinkedPointSet implements Serializable {
                 return stopToPointLinkageCostTables.get(stopIndex);
             }
 
+            counter.increment();
             Envelope distanceTableZone = stopPoint.getEnvelopeInternal();
             GeometryUtils.expandEnvelopeFixed(distanceTableZone, linkingDistanceLimitMeters);
-
-            int[] linkageCostToPoints;
 
             if (streetMode == StreetMode.WALK) {
                 // Walking distances from stops to street vertices are saved in the transitLayer.
@@ -519,7 +518,7 @@ public class LinkedPointSet implements Serializable {
                 // then extend that table out from the street vertices to the points in this PointSet.
                 // TODO reuse the code that computes the walk tables at com.conveyal.r5.transit.TransitLayer.buildOneDistanceTable() rather than duplicating it below for other modes.
                 TIntIntMap distanceTableToVertices = transitLayer.stopToVertexDistanceTables.get(stopIndex);
-                linkageCostToPoints = distanceTableToVertices == null ? null :
+                return distanceTableToVertices == null ? null :
                         extendDistanceTableToPoints(distanceTableToVertices, distanceTableZone);
             } else {
 
@@ -542,7 +541,7 @@ public class LinkedPointSet implements Serializable {
                     sr.distanceLimitMeters = linkingDistanceLimitMeters;
                     sr.quantityToMinimize = linkageCostUnit;
                     sr.route();
-                    linkageCostToPoints = extendDistanceTableToPoints(sr.getReachedVertices(), distanceTableZone);
+                    return extendDistanceTableToPoints(sr.getReachedVertices(), distanceTableZone);
 
                 } else if (streetMode == StreetMode.CAR) {
                     // The speeds for Walk and Bicycle can be specified in an analysis request, so it makes sense above to
@@ -574,10 +573,6 @@ public class LinkedPointSet implements Serializable {
                     throw new UnsupportedOperationException("Tried to link a pointset with an unsupported street mode");
                 }
             }
-
-            counter.increment();
-            return linkageCostToPoints;
-
         }).collect(Collectors.toList());
         counter.done();
     }

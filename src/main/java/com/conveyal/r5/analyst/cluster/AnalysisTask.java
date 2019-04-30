@@ -82,6 +82,13 @@ public abstract class AnalysisTask extends ProfileRequest {
     public int nPathsPerTarget = 3;
 
     /**
+     * Whether the R5 worker should log an analysis request it receives from the broker. analysis-backend translates
+     * front-end requests to the format expected by R5. To debug this translation process, set logRequest = true in
+     * the front-end profile request, then look for the full request received by the worker in its Cloudwatch log.
+     */
+    public boolean logRequest = false;
+
+    /**
      * Is this a task that should return a binary travel time surface or compute accessibility and return it via SQS
      * to be saved in a regional analysis grid file?
      */

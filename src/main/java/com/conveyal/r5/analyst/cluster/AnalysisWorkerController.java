@@ -40,6 +40,11 @@ public class AnalysisWorkerController {
         TravelTimeSurfaceTask task = JsonUtilities.objectFromRequestBody(request, TravelTimeSurfaceTask.class);
         // TODO do not return raw binary data from method, return better typed response.
         // TODO possibly move data preloading to this point, to allow returning different HTTP status codes.
+
+        if (task.logRequest){
+            LOG.info(request.body());
+        }
+
         try {
             try {
                 byte[] binaryResult = analystWorker.handleOneSinglePointTask(task);

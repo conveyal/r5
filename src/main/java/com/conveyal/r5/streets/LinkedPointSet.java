@@ -417,12 +417,14 @@ public class LinkedPointSet implements Serializable {
      * optimization. See JavaDoc on the caller makeStopToPointLinkageCostTables - this is one of the slowest parts of
      * building a network.
      *
-     * @return A packed array of (pointIndex, distanceMillimeters)
+     * @return A packed array of (pointIndex, distanceMillimeters), or null if there are no reachable points.
      */
     private int[] extendDistanceTableToPoints (TIntIntMap distanceTableToVertices, Envelope distanceTableZone) {
         int nPoints = this.size();
         TIntIntMap distanceToPoint = new TIntIntHashMap(nPoints, 0.5f, Integer.MAX_VALUE, Integer.MAX_VALUE);
         Edge edge = streetLayer.edgeStore.getCursor();
+        // TODO we don't really need a spatial index on a gridded point set.
+        // We may not even need a distance table zone: we could just skip all points whose vertices are not in the router result.
         TIntSet relevantPoints = pointSet.spatialIndex.query(distanceTableZone);
         relevantPoints.forEach(p -> {
             // An edge index of -1 for a particular point indicates that this point is unlinked
@@ -485,6 +487,7 @@ public class LinkedPointSet implements Serializable {
         LambdaCounter counter = new LambdaCounter(LOG, nStops, 1000,
                 "Computed distances to PointSet points from {} of {} transit stops.");
         // Create a distance table from each transit stop to the points in this PointSet in parallel.
+        // Each table is a flattened 2D array. Two values for each point reachable from this stop: (pointIndex, cost)
         // When applying a scenario, keep the existing distance table for those stops that could not be affected.
         stopToPointLinkageCostTables = IntStream.range(0, nStops).parallel().mapToObj(stopIndex -> {
             Point stopPoint = transitLayer.getJTSPointForStopFixed(stopIndex);
@@ -509,10 +512,10 @@ public class LinkedPointSet implements Serializable {
                 // Walking distances from stops to street vertices are saved in the transitLayer.
                 // Get the pre-computed distance table from the stop to the street vertices,
                 // then extend that table out from the street vertices to the points in this PointSet.
+                // TODO reuse the code that computes the walk tables at com.conveyal.r5.transit.TransitLayer.buildOneDistanceTable() rather than duplicating it below for other modes.
                 TIntIntMap distanceTableToVertices = transitLayer.stopToVertexDistanceTables.get(stopIndex);
                 linkageCostToPoints = distanceTableToVertices == null ? null :
                         extendDistanceTableToPoints(distanceTableToVertices, distanceTableZone);
-
             } else {
 
                 StreetRouter sr = new StreetRouter(transitLayer.parentNetwork.streetLayer);

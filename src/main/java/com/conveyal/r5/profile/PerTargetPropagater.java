@@ -256,8 +256,7 @@ public class PerTargetPropagater {
                         }
 
                         int timeAtTarget = timeAtStop + secondsFromStopToTarget;
-                        if (timeAtTarget < cutoffSeconds &&
-                                timeAtTarget < perIterationTravelTimes[iteration]) {
+                        if (timeAtTarget < cutoffSeconds && timeAtTarget < perIterationTravelTimes[iteration]) {
                             // To reach this target, alighting at this stop is faster than any previously checked stop.
                             perIterationTravelTimes[iteration] = timeAtTarget;
                             if (calculateComponents) {

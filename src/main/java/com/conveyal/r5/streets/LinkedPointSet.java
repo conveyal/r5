@@ -105,7 +105,6 @@ public class LinkedPointSet implements Serializable {
      * By default, linkage costs are distances (between stops and pointset points). For modes where speeds vary
      * by link, it doesn't make sense to store distances, so we store times.
      */
-
     public RoutingVariable linkageCostUnit = RoutingVariable.DISTANCE_MILLIMETERS;
 
     /**
@@ -179,7 +178,6 @@ public class LinkedPointSet implements Serializable {
             // transit stops, we still need to re-link points and rebuild stop trees (both the trees to the vertices
             // and the trees to the points, because some existing stop-to-vertex trees might not include new splitter
             // vertices).
-
             if (streetMode == StreetMode.WALK) {
                 // limit already set for WALK.
             } else if (streetMode == StreetMode.BICYCLE) {

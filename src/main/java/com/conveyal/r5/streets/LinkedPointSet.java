@@ -168,6 +168,7 @@ public class LinkedPointSet implements Serializable {
             distances0_mm = Arrays.copyOf(baseLinkage.distances0_mm, nPoints);
             distances1_mm = Arrays.copyOf(baseLinkage.distances1_mm, nPoints);
             stopToPointLinkageCostTables = new ArrayList<>(baseLinkage.stopToPointLinkageCostTables);
+            linkageCostUnit = baseLinkage.linkageCostUnit;
             // TODO We need to determine which points to re-link and which stops should have their stop-to-point tables re-built.
             // This should be all the points within the (bird-fly) linking radius of any modified edge.
             // The stop-to-vertex trees should already be rebuilt elsewhere when applying the scenario.

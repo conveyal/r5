@@ -517,7 +517,17 @@ public class LinkedPointSet implements Serializable {
 
                 StreetRouter sr = new StreetRouter(transitLayer.parentNetwork.streetLayer);
                 sr.streetMode = streetMode;
-                sr.setOrigin(transitLayer.streetVertexForStop.get(stopIndex));
+                int vertexId = transitLayer.streetVertexForStop.get(stopIndex);
+                if (vertexId < 0) {
+                    LOG.warn("Stop unlinked, cannot build distance table: {}", stopIndex);
+                    return null;
+                }
+                // TODO setting the origin point of the router to the stop vertex does not work.
+                // This is probably because link edges do not allow car traversal. We could traverse them.
+                // As a stopgap we perform car linking at the geographic coordinate of the stop.
+                // sr.setOrigin(vertexId);
+                VertexStore.Vertex vertex = streetLayer.vertexStore.getCursor(vertexId);
+                sr.setOrigin(vertex.getLat(), vertex.getLon());
 
                 if (streetMode == StreetMode.BICYCLE) {
 

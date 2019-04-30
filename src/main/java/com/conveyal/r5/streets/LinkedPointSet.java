@@ -484,7 +484,12 @@ public class LinkedPointSet implements Serializable {
         }
         TransitLayer transitLayer = streetLayer.parentNetwork.transitLayer;
         int nStops = transitLayer.getStopCount();
-        LambdaCounter counter = new LambdaCounter(LOG, nStops, 1000,
+        int logFrequency = 1000;
+        if (streetMode == StreetMode.CAR) {
+            // Log more often because car searches are very slow.
+            logFrequency = 100;
+        }
+        LambdaCounter counter = new LambdaCounter(LOG, nStops, logFrequency,
                 "Computed distances to PointSet points from {} of {} transit stops.");
         // Create a distance table from each transit stop to the points in this PointSet in parallel.
         // Each table is a flattened 2D array. Two values for each point reachable from this stop: (pointIndex, cost)

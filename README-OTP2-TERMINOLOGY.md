@@ -1,5 +1,5 @@
 # Terminology
-The Raptor algorithm is described in a paper by Microsoft from 2012. We plan to use the Range Raptor with Multi-criteria pareto-optimal search.
+The Raptor algorithm is described in [a paper by Microsoft from 2012](https://www.microsoft.com/en-us/research/publication/round-based-public-transit-routing/). We plan to use the Range Raptor with Multi-criteria pareto-optimal search.
 
 This section describe the terminology used within the context of the Otp2 Raptor implementation. The section should list 
 most of the terms used and define them. Note that a term my mean something else in another context. Please use the terms

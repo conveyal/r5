@@ -545,8 +545,23 @@ public class LinkedPointSet implements Serializable {
                     linkageCostUnit = RoutingVariable.DURATION_SECONDS;
                     sr.quantityToMinimize = linkageCostUnit;
                     sr.route();
-                    linkageCostToPoints =
-                            eval(sr::getTravelTimeToVertex, null, OFF_STREET_SPEED_MILLIMETERS_PER_SECOND).travelTimes;
+                    // TODO optimization: We probably shouldn't evaluate at every point in this LinkedPointSet in case it's much bigger than the driving radius.
+                    PointSetTimes driveTimesToAllPoints = eval(sr::getTravelTimeToVertex, null,
+                            OFF_STREET_SPEED_MILLIMETERS_PER_SECOND);
+                    // TODO optimization: should we make spatial index visit() method public to avoid copying results?
+                    TIntList packedDriveTimes = new TIntArrayList();
+                    for (int p = 0; p < driveTimesToAllPoints.size(); p++) {
+                        int driveTimeToPoint = driveTimesToAllPoints.getTravelTimeToPoint(p);
+                        if (driveTimeToPoint != Integer.MAX_VALUE) {
+                            packedDriveTimes.add(p);
+                            packedDriveTimes.add(driveTimeToPoint);
+                        }
+                    }
+                    if (packedDriveTimes.isEmpty()) {
+                        return null;
+                    } else {
+                        return packedDriveTimes.toArray();
+                    }
                 } else {
                     throw new UnsupportedOperationException("Tried to link a pointset with an unsupported street mode");
                 }

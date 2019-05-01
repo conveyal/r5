@@ -33,6 +33,8 @@ public class ProfileRequest implements Serializable, Cloneable {
 
     private static final Logger LOG = LoggerFactory.getLogger(ProfileRequest.class);
 
+    private static final int SECONDS_PER_MINUTE = 60;
+
     //From and to zonedDateTime filled in GraphQL request
     //Based on those two variables and timezone from/totime and date is filled
     //Since from/to time and date is assumed to be in local timezone AKA same timezone as TransportNetwork
@@ -274,17 +276,17 @@ public class ProfileRequest implements Serializable, Cloneable {
     }
 
     /**
-     * @return the maximum pre-transit travel time for the given mode in integer minutes.
+     * @return the maximum travel time on a single leg for the given mode in integer seconds.
      */
     @JsonIgnore
-    public int getMaxTimeMinutes(StreetMode mode) {
+    public int getMaxTimeSeconds(StreetMode mode) {
         switch (mode) {
             case CAR:
-                return maxCarTime;
+                return maxCarTime * SECONDS_PER_MINUTE;
             case BICYCLE:
-                return maxBikeTime;
+                return maxBikeTime * SECONDS_PER_MINUTE;
             case WALK:
-                return maxWalkTime;
+                return maxWalkTime * SECONDS_PER_MINUTE;
             default:
                 throw new IllegalArgumentException("Invalid mode " + mode.toString());
         }

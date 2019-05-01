@@ -262,16 +262,15 @@ public class ProfileRequest implements Serializable, Cloneable {
     @JsonIgnore
     public float getSpeedForMode (StreetMode streetMode) {
         switch (streetMode) {
-        case WALK:
-            return walkSpeed;
-        case BICYCLE:
-            return bikeSpeed;
-        case CAR:
-            return carSpeed;
-        default:
-            break;
+            case WALK:
+                return walkSpeed;
+            case BICYCLE:
+                return bikeSpeed;
+            case CAR:
+                return carSpeed;
+            default:
+                throw new IllegalArgumentException("getSpeedForMode(): Invalid mode " + streetMode);
         }
-        throw new IllegalArgumentException("getSpeedForMode(): Invalid mode " + streetMode);
     }
 
     /**
@@ -413,15 +412,15 @@ public class ProfileRequest implements Serializable, Cloneable {
     @JsonIgnore
     public int getMaxTimeSeconds(LegMode mode) {
         switch (mode) {
-        case CAR:
-            return maxCarTime * 60;
-        case BICYCLE:
-            return maxBikeTime * 60;
-        case WALK:
-            return maxWalkTime * 60;
-        default:
-            LOG.error("Unknown mode: {}", mode);
-            return streetTime * 60;
+            case CAR:
+                return maxCarTime * 60;
+            case BICYCLE:
+                return maxBikeTime * 60;
+            case WALK:
+                return maxWalkTime * 60;
+            default:
+                LOG.error("Unknown mode: {}", mode);
+                return streetTime * 60;
         }
     }
 
@@ -432,12 +431,12 @@ public class ProfileRequest implements Serializable, Cloneable {
     @JsonIgnore
     public int getMinTimeSeconds(StreetMode mode) {
         switch (mode) {
-        case CAR:
-            return minCarTime * 60;
-        case BICYCLE:
-            return minBikeTime * 60;
-        default:
-            return 0;
+            case CAR:
+                return minCarTime * 60;
+            case BICYCLE:
+                return minBikeTime * 60;
+            default:
+                return 0;
         }
     }
 

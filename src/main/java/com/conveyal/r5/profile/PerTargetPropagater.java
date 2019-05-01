@@ -147,6 +147,7 @@ public class PerTargetPropagater {
 
             // Improve upon these non-transit travel times based on transit travel times to nearby stops.
             // This fills in perIterationTravelTimes and perIterationPaths for one particular target.
+            // TODO call this multiple times in a loop over egress modes, accumulating best results into perIterationTravelTimes
             propagateTransit(targetIdx);
 
             // Construct the PathScorer before extracting percentiles because the scorer needs to make a copy of

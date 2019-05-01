@@ -20,4 +20,19 @@ public enum  LegMode {
         else if (modes.contains(LegMode.BICYCLE)) return StreetMode.BICYCLE;
         else return StreetMode.WALK;
     }
+
+    /** Convert between these two enum types */
+    public static StreetMode toStreetMode (LegMode legMode) {
+        if (legMode == LegMode.WALK) {
+            return StreetMode.WALK;
+        }
+        if (legMode == LegMode.BICYCLE) {
+            return StreetMode.BICYCLE;
+        }
+        if (legMode == LegMode.CAR) {
+            return StreetMode.CAR;
+        }
+        throw new RuntimeException("Unrecognized mode.");
+    }
+
 }

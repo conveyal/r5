@@ -22,6 +22,14 @@ public class PointSetTimes {
         this.travelTimes = travelTimes;
     }
 
+    /**
+     * Construct a PointSetTimes with no times. This is only useful as a target for repeated merging operations.
+     */
+    public PointSetTimes(PointSet pointSet) {
+        this.pointSet = pointSet;
+        this.travelTimes = null;
+    }
+
     public int size()  {
         return travelTimes.length;
     }
@@ -29,4 +37,30 @@ public class PointSetTimes {
     public int getTravelTimeToPoint (int p) {
         return travelTimes[p];
     }
+
+    /**
+     * Merge the two PointSetTimes, returning a new PointSetTimes containing the minimum value at each point.
+     * The first operand may be null, which allows iteratively accumulating into an uninitialized PointSet variable.
+     */
+    public static PointSetTimes minMerge (PointSetTimes a, PointSetTimes b) {
+        if (b == null) {
+            throw new UnsupportedOperationException("Second operand may not be null.");
+        }
+        if (a == null) {
+            return b;
+        }
+        if (a.pointSet != b.pointSet) {
+            throw new UnsupportedOperationException("Both PointSetTimes must be for the same PointSet.");
+        }
+        if (a.travelTimes.length != b.travelTimes.length) {
+            throw new UnsupportedOperationException("Both PointSetTimes must have the same number of times.");
+        }
+        int[] travelTimes = new int[b.travelTimes.length];
+        for (int i = 0; i < travelTimes.length; i++) {
+            travelTimes[i] = Math.min(a.travelTimes[i], b.travelTimes[i]);
+        }
+        return new PointSetTimes(b.pointSet, travelTimes);
+    }
+
+
 }

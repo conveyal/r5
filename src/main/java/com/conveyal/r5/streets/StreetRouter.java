@@ -515,9 +515,9 @@ public class StreetRouter {
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
 
         if (transitStopSearch) {
-            routingVisitor = new StopVisitor(streetLayer, quantityToMinimize, transitStopSearchQuantity, profileRequest.getMinTimeLimit(streetMode));
+            routingVisitor = new StopVisitor(streetLayer, quantityToMinimize, transitStopSearchQuantity, profileRequest.getMinTimeSeconds(streetMode));
         } else if (flagSearch != null) {
-            routingVisitor = new VertexFlagVisitor(streetLayer, quantityToMinimize, flagSearch, flagSearchQuantity, profileRequest.getMinTimeLimit(streetMode));
+            routingVisitor = new VertexFlagVisitor(streetLayer, quantityToMinimize, flagSearch, flagSearchQuantity, profileRequest.getMinTimeSeconds(streetMode));
         }
         while (!queue.isEmpty()) {
             State s0 = queue.poll();

@@ -14,6 +14,8 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import graphql.schema.DataFetchingEnvironment;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.time.temporal.ChronoUnit;
@@ -28,6 +30,8 @@ public class ProfileRequest implements Serializable, Cloneable {
     // Analyst used to serialize the request along with regional analysis results into MapDB.
     // In Analysis, the request is still saved but as JSON in MongoDB.
     private static final long serialVersionUID = -6501962907644662303L;
+
+    private static final Logger LOG = LoggerFactory.getLogger(ProfileRequest.class);
 
     //From and to zonedDateTime filled in GraphQL request
     //Based on those two variables and timezone from/totime and date is filled
@@ -271,10 +275,10 @@ public class ProfileRequest implements Serializable, Cloneable {
     }
 
     /**
-     * @return the maximum pre-transit travel time for the given mode in minutes
+     * @return the maximum pre-transit travel time for the given mode in integer minutes.
      */
     @JsonIgnore
-    public int getMaxAccessTimeForMode (StreetMode mode) {
+    public int getMaxTimeMinutes(StreetMode mode) {
         switch (mode) {
             case CAR:
                 return maxCarTime;
@@ -283,7 +287,7 @@ public class ProfileRequest implements Serializable, Cloneable {
             case WALK:
                 return maxWalkTime;
             default:
-                throw new IllegalArgumentException("Invalid mode");
+                throw new IllegalArgumentException("Invalid mode " + mode.toString());
         }
     }
 
@@ -404,13 +408,10 @@ public class ProfileRequest implements Serializable, Cloneable {
     }
 
     /**
-     * Returns maxCar/Bike/Walk based on LegMode
-     *
-     * @param mode
-     * @return
+     * @return maximum time in integer seconds that may be spent on a leg using the given mode
      */
     @JsonIgnore
-    public int getTimeLimit(LegMode mode) {
+    public int getMaxTimeSeconds(LegMode mode) {
         switch (mode) {
         case CAR:
             return maxCarTime * 60;
@@ -419,21 +420,17 @@ public class ProfileRequest implements Serializable, Cloneable {
         case WALK:
             return maxWalkTime * 60;
         default:
-            System.err.println("Unknown mode in getTimeLimit:"+mode.toString());
+            LOG.error("Unknown mode: {}", mode);
             return streetTime * 60;
         }
     }
 
     /**
-     * Returns minCar/BikeTime based on StreetMode
-     *
-     * default is 0
-     *
-     * @param mode
-     * @return min number of seconds that this mode should be used to get to stop/Park ride/bike share etc.
+     * @return min number of seconds that the specified mode should be used to get to stop/Park ride/bike share etc.
+     *         defaults to zero for modes other than CAR or BICYCLE.
      */
     @JsonIgnore
-    public int getMinTimeLimit(StreetMode mode) {
+    public int getMinTimeSeconds(StreetMode mode) {
         switch (mode) {
         case CAR:
             return minCarTime * 60;
@@ -444,7 +441,7 @@ public class ProfileRequest implements Serializable, Cloneable {
         }
     }
 
-    /** Return the length of the time window in minutes */
+    /** Return the length of the time window in truncated integer minutes */
     @JsonIgnore
     public int getTimeWindowLengthMinutes() {
         return (toTime - fromTime) / 60;

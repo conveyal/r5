@@ -5,7 +5,7 @@ import com.conveyal.r5.profile.StreetMode;
 import java.util.Set;
 
 /**
- * Modes of transport on ingress egress legs
+ * Modes of transport on access or egress legs
  */
 public enum  LegMode {
     WALK, BICYCLE, CAR,

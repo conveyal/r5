@@ -22,8 +22,7 @@ import gnu.trove.map.hash.TIntIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Arrays;
-import java.util.Set;
+import java.util.*;
 import java.util.function.IntFunction;
 import java.util.stream.Collectors;
 
@@ -70,10 +69,11 @@ public class TravelTimeComputer {
 
     /**
      * The TravelTimeComputer can make travel time grids, accessibility indicators, or (eventually) both
-     * depending on what's in the task it's given.
+     * depending on what's in the task it's given. TODO factor out each major step of this process into private methods.
      */
     public OneOriginResult computeTravelTimes() {
 
+        // 0. Preliminary range checking and setup =====================================================================
         if (!request.directModes.equals(request.accessModes)) {
             throw new IllegalArgumentException("Direct mode may not be different than access mode in Analysis.");
         }
@@ -99,20 +99,22 @@ public class TravelTimeComputer {
         WebMercatorExtents destinationGridExtents = NetworkPreloader.Key.forTask(request).webMercatorExtents;
         PointSet destinations = AnalysisTask.gridPointSetCache.get(destinationGridExtents, network.gridPointSet);
 
-        // First, handle the special case where the search will not use transit at all.
-        // NOTE: Currently this is the only case where we use directMode.
+        // I. Direct no-transit routing ================================================================================
+        // Handle the special case where the search will not use transit at all.
+        // NOTE: Currently this is the only case where we use directModes, which is required to be the same as accessModes.
         if (request.transitModes.isEmpty()) {
             // TODO handle direct modes in the same loop that handles access, maybe by factoring it out into a method.
             StreetMode directMode = LegMode.getDominantStreetMode(request.directModes);
             // When doing a non-transit walk search, we're not trying to match the behavior of egress and transfer
-            // searches which use distance as the quantity to minimize (because they are precalculated and stored as distance,
-            // and then converted to times by dividing by speed without regard to weights/penalties for things like stairs).
-            // This does mean that walk-only results will not match the walking portion of walk+transit results.
+            // searches which use distance as the quantity to minimize (because they are precalculated and stored as
+            // distance, and then converted to times by dividing by speed without regard to weights/penalties for things
+            // like stairs). This does mean that walk-only results will not match the walking portion of walk+transit results.
             StreetRouter sr = new StreetRouter(network.streetLayer);
             sr.profileRequest = request;
             sr.timeLimitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
             sr.streetMode = directMode;
-            sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS; // NOTE direct mode is limited only by the full travel duration, rather than the individual per-mode limits
+            // NOTE direct mode is limited only by the full travel duration, rather than the individual per-mode limits
+            sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             sr.route();
 
             int speedMillimetersPerSecond = (int) (request.getSpeedForMode(directMode) * 1000);
@@ -129,7 +131,8 @@ public class TravelTimeComputer {
             return travelTimeReducer.finish();
         }
 
-        // If we fall through to here, transit modes are specified.
+        // II. Access to transit =======================================================================================
+        // If we fall through to here, transit modes were specified in the request.
         // We want to use one or more modes to access transit stops, retaining the reached transit stops as well as the
         // travel times to the destination points using those access modes.
 
@@ -182,6 +185,12 @@ public class TravelTimeComputer {
             sr.timeLimitSeconds = request.getMaxTimeSeconds(accessMode);
             sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             sr.route();
+            // Change to walking in order to reach transit stops in pedestrian-only areas like train stations.
+            // This implies you are dropped off or have a very easy parking spot for your vehicle.
+            // This kind of multi-stage search should probably also be used when building egress distance cost tables.
+            if (accessMode != StreetMode.WALK) {
+                sr.keepRoutingOnFoot();
+            }
             minMergeMap(accessTimes, sr.getReachedStops());
 
             LinkedPointSet linkedDestinations = destinations.getLinkage(network.streetLayer, accessMode);
@@ -237,12 +246,9 @@ public class TravelTimeComputer {
             return travelTimeReducer.finish();
         }
 
-        // TODO handle propagation via multiple egress modes.
-        StreetMode egressMode = LegMode.getDominantStreetMode(request.egressModes);
-        LinkedPointSet egressModeLinkedDestinations = destinations.getLinkage(network.streetLayer, egressMode);
-
-        // Perform the transit routing from the stops that were reached.
-        // The result is a travel time in seconds for each iteration (departure time x monte carlo draw), for each transit stop.
+        // III. Transit Routing ========================================================================================
+        // Transit stops were reached. Perform transit routing from those stops to all other reachable stops. The result
+        // is a travel time in seconds for each iteration (departure time x monte carlo draw), for each transit stop.
         int[][] transitTravelTimesToStops;
         FastRaptorWorker worker = null;
         if (request.inRoutingFareCalculator == null) {
@@ -269,10 +275,20 @@ public class TravelTimeComputer {
             transitTravelTimesToStops = mcRaptorWorker.getBestTimes();
         }
 
-        // Propagate these travel times for many iterations and stops out to the destination points, via street egress.
-        // TODO pass in multiple egress mode linked destinations, for multiple egress modes
+        // IV. Egress Propagation ======================================================================================
+        // Propagate these travel times for every iteration at every stop out to the destination points, via streets.
+
+        // Prepare a set of modes, all of which will simultaneously be used for on-street egress.
+        Set<StreetMode> egressStreetModes = new HashSet<>();
+        for (LegMode legMode : request.egressModes) {
+            egressStreetModes.add(LegMode.toStreetMode(legMode));
+        }
+
+        // This propagator will link the destinations to the street layer for all modes as needed.
         PerTargetPropagater perTargetPropagater = new PerTargetPropagater(
-                egressModeLinkedDestinations,
+                destinations,
+                network.streetLayer,
+                egressStreetModes,
                 request,
                 transitTravelTimesToStops,
                 nonTransitTravelTimesToDestinations.travelTimes);
@@ -281,11 +297,13 @@ public class TravelTimeComputer {
         // because in the non-transit case we call the reducer directly (see above).
         perTargetPropagater.travelTimeReducer = travelTimeReducer;
 
+        // When building a static site, perform some additional initialization causing the propagator to do extra work.
         if (request.returnPaths || request.travelTimeBreakdown) {
             perTargetPropagater.pathsToStopsForIteration = worker.pathsPerIteration;
             perTargetPropagater.pathWriter = new PathWriter(request);
         }
 
         return perTargetPropagater.propagate();
+
     }
 }

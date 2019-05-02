@@ -1195,5 +1195,19 @@ public class StreetRouter {
         }
     }
 
+    /**
+     * Continue a search by walking (presumably after a car or bicycle search is complete).
+     * This allows accessing transit stops that are linked to edges that are only walkable, but not drivable or bikeable.
+     * This maintains the total travel time limit and other parameters.
+     * NOTE: this conflicts with the rule that a router should not be reused.
+     * This is a good example of why we may want to change that rule. Alternatively this could construct a new StreetRouter.
+     * Just allowing more than one mode doesn't give the desired effect - we really want a sequence of separate modes.
+     */
+    public void keepRoutingOnFoot() {
+        queue.clear();
+        bestStatesAtEdge.forEachEntry((edgeId, states) -> queue.addAll(states));
+        streetMode = StreetMode.WALK;
+        route();
+    }
 
 }

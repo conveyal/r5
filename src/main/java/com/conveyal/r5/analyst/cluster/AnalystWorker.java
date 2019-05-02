@@ -170,6 +170,13 @@ public class AnalystWorker implements Runnable {
     ThroughputTracker throughputTracker = new ThroughputTracker();
 
     /**
+     * This worker will only listen for inccoming single point requests if this field is true when run() is invoked.
+     * Setting this to false before running creates a regional-only cluster worker. This is useful in testing when
+     * running many workers on the same machine.
+     */
+    protected boolean listenForSinglePointRequests;
+
+    /**
      * This has been pulled out into a method so the broker can also make a similar http client.
      */
     public static HttpClient makeHttpClient () {
@@ -222,6 +229,7 @@ public class AnalystWorker implements Runnable {
         return new AnalystWorker(config, cache);
     }
 
+    // TODO merge this constructor with the forConfig factory method, so we don't have different logic for local and cluster workers
     public AnalystWorker(Properties config, TransportNetworkCache transportNetworkCache) {
         // print out date on startup so that CloudWatch logs has a unique fingerprint
         LOG.info("Analyst worker {} starting at {}", machineId,
@@ -255,6 +263,7 @@ public class AnalystWorker implements Runnable {
         this.gridCache = new GridCache(config.getProperty("aws-region"), config.getProperty("pointsets-bucket"));
         this.networkPreloader = new NetworkPreloader(transportNetworkCache);
         this.autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown", "false"));
+        this.listenForSinglePointRequests = Boolean.parseBoolean(config.getProperty("listen-for-single-point", "true"));
 
         // Keep the worker alive for an initial window to prepare for analysis
         inPreloading = true;
@@ -319,13 +328,13 @@ public class AnalystWorker implements Runnable {
         // Before we go into an endless loop polling for regional tasks that can be computed asynchronously, start a
         // single-endpoint web server on this worker to receive single-point requests that must be handled immediately.
         // This is listening on a different port than the backend API so that a worker can be running on the backend.
-        // Trying out the new Spark syntax for non-static configuration.
-        // When testing task redelivery, many  workers run on the same machine. In that case, do not start this HTTP
-        // server to avoid port conflicts.
-        if (!testTaskRedelivery) {
+        // When testing cluster functionality, e.g. task redelivery, many  workers run on the same machine. In that
+        // case, this HTTP server is distabled on all workers but one to avoid port conflicts.
+        if (listenForSinglePointRequests) {
+            // Trying out the new Spark syntax for non-static configuration.
             sparkHttpService = spark.Service.ignite()
-                .port(WORKER_LISTEN_PORT)
-                .threadPool(WORKER_SINGLE_POINT_THREADS);
+                    .port(WORKER_LISTEN_PORT)
+                    .threadPool(WORKER_SINGLE_POINT_THREADS);
             sparkHttpService.post("/single", new AnalysisWorkerController(this)::handleSinglePoint);
         }
 

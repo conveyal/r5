@@ -261,8 +261,9 @@ public class PerTargetPropagater {
         int egressLegTimeLimitSeconds = request.getMaxTimeSeconds(linkedTargets.streetMode);
 
         // FIXME: MASSIVE HACK THAT ONLY WORKS ON ONE STUDY IN SWITZERLAND
-        final int waitingTimeSeconds =  (linkedTargets.streetMode == StreetMode.CAR
-                && linkedTargets.streetLayer.waitTimePolygons != null) ? 60 * 10 : 0;
+        final int waitingTimeSeconds =
+                (linkedTargets.streetMode == StreetMode.CAR && linkedTargets.streetLayer.waitTimePolygons != null) ?
+                (int)(linkedTargets.streetLayer.waitTimePolygons.defaultData * SECONDS_PER_MINUTE) : 0;
 
         // Determine an egress limit in the same units as the egress cost tables in the linked point set.
         int egressLimit;

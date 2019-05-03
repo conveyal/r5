@@ -7,7 +7,6 @@ import com.conveyal.osmlib.OSMEntity;
 import com.conveyal.osmlib.Relation;
 import com.conveyal.osmlib.Way;
 import com.conveyal.r5.analyst.scenario.IndexedPolygonCollection;
-import com.conveyal.r5.analyst.scenario.Modification;
 import com.conveyal.r5.analyst.scenario.ModificationPolygon;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.ParkRideParking;
@@ -1553,6 +1552,15 @@ public class StreetLayer implements Serializable, Cloneable {
             // Convert minutes to seconds
             return (int)(polygon.data * 60);
         }
+    }
+
+    @Override
+    public String toString() {
+        String detail = "(base)";
+        if (baseStreetLayer != null) {
+            detail = "(scenario " + parentNetwork.scenarioId + ")";
+        }
+        return "StreetLayer" + detail;
     }
 
 }

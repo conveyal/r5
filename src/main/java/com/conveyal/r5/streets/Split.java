@@ -28,22 +28,27 @@ public class Split {
     public int edge = -1; // TODO clarify is this the even edge number of a pair?
     public int seg = 0; // the segment within the edge that is closest to the search point
     public double frac = 0; // the fraction along that segment where a link should occur
-    public int fixedLon; // the x coordinate of the link point along the edge
-    public int fixedLat; // the y coordinate of the link point along the edge
+    public int fixedLon; // the x coordinate of the split point along the edge
+    public int fixedLat; // the y coordinate of the split point along the edge
     // We must use a long because squaring a typical search radius in fixed-point _does_ cause signed int32 overflow.
     public long distSquared = Long.MAX_VALUE; // squared distance from given point to the split, in degrees
 
     // The following fields require more calculations and are only set once a best edge is found.
 
     /**
+     * Distance between a requested nearby point and the edge
+     */
+        public int distanceToEdge_mm = 0;
+
+    /**
      * Accumulated distance from the beginning vertex of the edge geometry up to the split point (point on the edge
-     * closest to the point to be linked), plus the distance from the linked point to the split point
+     * closest to the point to be linked)
      */
     public int distance0_mm = 0;
 
     /**
      * Accumulated distance from the end vertex of the edge geometry up to the split point (point on the edge
-     * closest to the point to be linked), plus the distance from the linked point to the split point
+     * closest to the point to be linked)
      */
     public int distance1_mm = 0;
 
@@ -69,8 +74,8 @@ public class Split {
      * Find a location on an existing street near the given point, without actually creating any vertices or edges.
      * @return a new Split object, or null if no edge was found in range.
      */
-    public static Split find (double lat, double lon, double searchRadiusMeters,
-                              StreetLayer streetLayer, StreetMode streetMode) {
+    public static Split find (double lat, double lon, double searchRadiusMeters, StreetLayer streetLayer,
+                              StreetMode streetMode) {
 
         // After this conversion, the entire geometric calculation is happening in fixed precision int degrees.
         int fixedLat = VertexStore.floatingDegreesToFixed(lat);
@@ -206,8 +211,8 @@ public class Split {
         // We now want to calculate the distance in millimeters, for routing.  To do so, we take the square root of
         // distSquared, convert to floating point degrees latitude then multiply by the metersPerDegreeLat factor above
         // and 1000 to convert to millimeters.  This is accurate enough for our purposes.
-        best.distance0_mm += VertexStore.fixedDegreesToFloating(FastMath.sqrt(best.distSquared)) * metersPerDegreeLat * 1000;
-        best.distance1_mm += VertexStore.fixedDegreesToFloating(FastMath.sqrt(best.distSquared)) * metersPerDegreeLat * 1000;
+        best.distanceToEdge_mm =
+                (int) (VertexStore.fixedDegreesToFloating(FastMath.sqrt(best.distSquared)) * metersPerDegreeLat * 1000);
 
         return best;
     }

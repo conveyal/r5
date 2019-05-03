@@ -115,7 +115,6 @@ public class PerTargetPropagater {
         // If we're making a static site we'll break travel times down into components and make paths.
         // This expects the pathsToStopsForIteration and pathWriter fields to be set separately by the caller.
         this.calculateComponents = task.makeStaticSite;
-        StreetMode egressMode = LegMode.getDominantStreetMode(task.egressModes);
         nIterations = travelTimesToStopsForIteration.length;
         nStops = travelTimesToStopsForIteration[0].length;
         invertTravelTimes();
@@ -261,6 +260,10 @@ public class PerTargetPropagater {
         int speedMillimetersPerSecond = (int) (request.getSpeedForMode(linkedTargets.streetMode) * MM_PER_METER);
         int egressLegTimeLimitSeconds = request.getMaxTimeSeconds(linkedTargets.streetMode);
 
+        // FIXME: MASSIVE HACK THAT ONLY WORKS ON ONE STUDY IN SWITZERLAND
+        final int waitingTimeSeconds =  (linkedTargets.streetMode == StreetMode.CAR
+                && linkedTargets.streetLayer.waitTimePolygons != null) ? 60 * 10 : 0;
+
         // Determine an egress limit in the same units as the egress cost tables in the linked point set.
         int egressLimit;
         if (unit == StreetRouter.State.RoutingVariable.DURATION_SECONDS) {
@@ -294,6 +297,9 @@ public class PerTargetPropagater {
                         } else {
                             throw new UnsupportedOperationException("Linkage costs have an unknown unit.");
                         }
+
+                        // Account for any additional delay waiting for taxi or autonomous vehicle.
+                        secondsFromStopToTarget += waitingTimeSeconds;
 
                         int timeAtTarget = timeAtStop + secondsFromStopToTarget;
                         if (timeAtTarget < cutoffSeconds && timeAtTarget < perIterationTravelTimes[iteration]) {

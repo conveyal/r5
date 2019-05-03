@@ -86,6 +86,7 @@ public class IndexedPolygonCollection {
         this.nameAttribute = nameAttribute;
         this.priorityAttribute = priorityAttribute;
         this.defaultData = defaultData;
+        this.defaultPolygon = new ModificationPolygon(null, "DEFAULT", defaultData, -1);
     }
 
     public void loadFromS3GeoJson() throws Exception {
@@ -166,7 +167,9 @@ public class IndexedPolygonCollection {
     }
 
     /**
-     * @param geometry the Geometry for which we want to find a polygon, in floating point WGS84 coordinates
+     * @param geometry the Geometry for which we want to find a polygon, in floating point WGS84 coordinates.
+     * @return the polygon that best matches. Note that this ModificationPolygon might have a null geometry if it's
+     *         the default value.
      */
     public ModificationPolygon getWinningPolygon (Geometry geometry) {
         Envelope envelope = geometry.getEnvelopeInternal();

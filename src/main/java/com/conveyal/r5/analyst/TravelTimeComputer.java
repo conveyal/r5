@@ -95,10 +95,8 @@ public class TravelTimeComputer {
         // Determine car pick-up delay time for the access leg, which is generally specified in a scenario modification.
         // Negative values mean no car service is available.
         // Only find this time when cars are in use, as it requires potentially slow geometry operations.
-        int carPickupDelaySeconds = 0;
-        if (request.accessModes.contains(LegMode.CAR)) {
-            carPickupDelaySeconds = network.streetLayer.getWaitTime(request.fromLat, request.fromLon);
-        }
+        final int carPickupDelaySeconds = (request.accessModes.contains(LegMode.CAR)) ?
+            network.streetLayer.getWaitTime(request.fromLat, request.fromLon) : 0;
 
         // Find the set of destinations for a one-to-many travel time calculation, not yet linked to the street network.
         // By finding the extents and destinations up front, we ensure the exact same grid is used for all steps below.
@@ -166,7 +164,7 @@ public class TravelTimeComputer {
         boolean foundAnyOriginPoint = false;
 
         // Convert from profile routing qualified modes to internal modes
-        Set<StreetMode> accessModes = request.accessModes.stream().map(LegMode::toStreetMode).collect(Collectors.toSet());
+        EnumSet<StreetMode> accessModes = LegMode.toStreetModeSet(request.accessModes);
 
         // TODO make iteration over access modes conditional on use of transit? Include direct modes?
         for (StreetMode accessMode : accessModes) {
@@ -176,6 +174,10 @@ public class TravelTimeComputer {
             if (streetSpeedMillimetersPerSecond <= 0){
                 throw new IllegalArgumentException("Speed of access mode must be greater than 0.");
             }
+            if (accessMode == StreetMode.CAR && carPickupDelaySeconds < 0) {
+                LOG.info("Car pick-up service is not available at this location, continuing to next access mode (if any).");
+                continue;
+            }
 
             // Attempt to set the origin point before progressing any further.
             // This allows us to skip routing calculations if the network is entirely inaccessible. In the CAR_PARK
@@ -184,13 +186,12 @@ public class TravelTimeComputer {
             StreetRouter sr = new StreetRouter(network.streetLayer);
             sr.profileRequest = request;
             sr.streetMode = accessMode;
-            boolean foundOriginPoint = sr.setOrigin(request.fromLat, request.fromLon);
-            foundAnyOriginPoint |= foundOriginPoint;
-            if (!foundOriginPoint) {
+            if ( ! sr.setOrigin(request.fromLat, request.fromLon)) {
                 // Short circuit around routing and propagation if the origin point was not attached to the street network.
                 LOG.info("Origin point could not be linked to the street network for mode {}.", accessMode);
                 continue;
             }
+            foundAnyOriginPoint = true;
 
             // The code blocks below essentially serve to identify transit stations reachable from the origin and
             // produce a grid of non-transit travel times that will later be merged with the transit travel times.
@@ -208,12 +209,19 @@ public class TravelTimeComputer {
             if (accessMode != StreetMode.WALK) {
                 sr.keepRoutingOnFoot();
             }
-            minMergeMap(accessTimes, sr.getReachedStops());
+            TIntIntMap travelTimesToStopsSeconds = sr.getReachedStops();
 
             LinkedPointSet linkedDestinations = destinations.getLinkage(network.streetLayer, accessMode);
             // FIXME this is iterating over every cell in the (possibly huge) destination grid just to get the access times around the origin.
             PointSetTimes pointSetTimes = linkedDestinations.eval(sr::getTravelTimeToVertex,
                     streetSpeedMillimetersPerSecond, walkSpeedMillimetersPerSecond);
+
+            if (accessMode == StreetMode.CAR && carPickupDelaySeconds > 0) {
+                LOG.info("Delaying access times by {} seconds (for car pick-up wait).", carPickupDelaySeconds);
+                travelTimesToStopsSeconds.transformValues(i -> i + carPickupDelaySeconds);
+                pointSetTimes.incrementAllReachable(carPickupDelaySeconds);
+            }
+            minMergeMap(accessTimes, travelTimesToStopsSeconds);
             nonTransitTravelTimesToDestinations = PointSetTimes.minMerge(nonTransitTravelTimesToDestinations, pointSetTimes);
         }
 
@@ -296,10 +304,7 @@ public class TravelTimeComputer {
         // Propagate these travel times for every iteration at every stop out to the destination points, via streets.
 
         // Prepare a set of modes, all of which will simultaneously be used for on-street egress.
-        Set<StreetMode> egressStreetModes = new HashSet<>();
-        for (LegMode legMode : request.egressModes) {
-            egressStreetModes.add(LegMode.toStreetMode(legMode));
-        }
+        EnumSet<StreetMode> egressStreetModes = LegMode.toStreetModeSet(request.egressModes);
 
         // This propagator will link the destinations to the street layer for all modes as needed.
         PerTargetPropagater perTargetPropagater = new PerTargetPropagater(

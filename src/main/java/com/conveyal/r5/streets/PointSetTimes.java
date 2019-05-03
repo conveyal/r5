@@ -38,6 +38,18 @@ public class PointSetTimes {
         return travelTimes[p];
     }
 
+
+    /**
+     * Increment all reachable points by the given number of seconds.
+     */
+    public void incrementAllReachable(int seconds) {
+        for (int i = 0; i < travelTimes.length; i++) {
+            if (travelTimes[i] != Integer.MAX_VALUE) {
+                travelTimes[i] += seconds;
+            }
+        }
+    }
+
     /**
      * Merge the two PointSetTimes, returning a new PointSetTimes containing the minimum value at each point.
      * The first operand may be null, which allows iteratively accumulating into an uninitialized PointSet variable.

@@ -1,7 +1,9 @@
 package com.conveyal.r5.api.util;
 
 import com.conveyal.r5.profile.StreetMode;
+import org.hsqldb.lib.Collection;
 
+import java.util.EnumSet;
 import java.util.Set;
 
 /**
@@ -33,6 +35,16 @@ public enum  LegMode {
             return StreetMode.CAR;
         }
         throw new RuntimeException("Unrecognized mode.");
+    }
+
+    public static EnumSet<StreetMode> toStreetModeSet (EnumSet<LegMode>... legModeSets) {
+        EnumSet<StreetMode> streetModes = EnumSet.noneOf(StreetMode.class);
+        for (EnumSet<LegMode> legModeSet : legModeSets) {
+            for (LegMode legMode : legModeSet) {
+                streetModes.add(LegMode.toStreetMode(legMode));
+            }
+        }
+        return streetModes;
     }
 
 }

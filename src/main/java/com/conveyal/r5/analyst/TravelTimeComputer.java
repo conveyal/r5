@@ -15,6 +15,7 @@ import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.StreetRouter;
+import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
@@ -91,6 +92,14 @@ public class TravelTimeComputer {
         // TODO Create and encapsulate this within the propagator.
         TravelTimeReducer travelTimeReducer = new TravelTimeReducer(request);
 
+        // Determine car pick-up delay time for the access leg, which is generally specified in a scenario modification.
+        // Negative values mean no car service is available.
+        // Only find this time when cars are in use, as it requires potentially slow geometry operations.
+        int carPickupDelaySeconds = 0;
+        if (request.accessModes.contains(LegMode.CAR)) {
+            carPickupDelaySeconds = network.streetLayer.getWaitTime(request.fromLat, request.fromLon);
+        }
+
         // Find the set of destinations for a one-to-many travel time calculation, not yet linked to the street network.
         // By finding the extents and destinations up front, we ensure the exact same grid is used for all steps below.
         // This reuses the logic for finding the appropriate grid size and linking, which is now in the NetworkPreloader.
@@ -102,9 +111,14 @@ public class TravelTimeComputer {
         // I. Direct no-transit routing ================================================================================
         // Handle the special case where the search will not use transit at all.
         // NOTE: Currently this is the only case where we use directModes, which is required to be the same as accessModes.
+
         if (request.transitModes.isEmpty()) {
             // TODO handle direct modes in the same loop that handles access, maybe by factoring it out into a method.
             StreetMode directMode = LegMode.getDominantStreetMode(request.directModes);
+            // If there is no car pickup service, skip routing (don't even try walking).
+            if (directMode == StreetMode.CAR && carPickupDelaySeconds < 0) {
+                return travelTimeReducer.finish();
+            }
             // When doing a non-transit walk search, we're not trying to match the behavior of egress and transfer
             // searches which use distance as the quantity to minimize (because they are precalculated and stored as
             // distance, and then converted to times by dividing by speed without regard to weights/penalties for things
@@ -125,9 +139,13 @@ public class TravelTimeComputer {
 
             // Iterate over all destinations ("targets") and at each destination, save the same travel time for all percentiles.
             for (int d = 0; d < travelTimesToTargets.length; d++) {
-                final int travelTimeSeconds = travelTimesToTargets[d];
+                final int travelTimeSeconds = travelTimesToTargets[d] + carPickupDelaySeconds;
                 travelTimeReducer.recordTravelTimesForTarget(d, new int[]{travelTimeSeconds});
             }
+
+            // TODO if we allow multiple directModes, check the next fastest mode. Walking or biking might be faster,
+            //  especially if there are congestion or pickup delay modifications.
+
             return travelTimeReducer.finish();
         }
 
@@ -178,7 +196,6 @@ public class TravelTimeComputer {
             // produce a grid of non-transit travel times that will later be merged with the transit travel times.
             // Note: this is essentially the same thing that is happening when creating linkage cost tables for the
             // egress end of the trip. We could probably reuse a method for both (getTravelTimesFromPoint).
-
 
             // Note: Access searches (minimizing time) are asymmetric with the egress cost tables (often minimizing
             // distance to allow reuse at different speeds).
@@ -306,4 +323,5 @@ public class TravelTimeComputer {
         return perTargetPropagater.propagate();
 
     }
+
 }

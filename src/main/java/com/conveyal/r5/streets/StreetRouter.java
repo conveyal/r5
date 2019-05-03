@@ -317,6 +317,7 @@ public class StreetRouter {
             LOG.info("No street was found near the specified origin point of {}, {}.", lat, lon);
             return false;
         }
+
         originSplit = split;
         bestStatesAtEdge.clear();
         queue.clear();

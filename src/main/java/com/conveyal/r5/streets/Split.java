@@ -4,13 +4,9 @@ import com.conveyal.r5.common.GeometryUtils;
 import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.geom.Envelope;
 import gnu.trove.TIntCollection;
-import gnu.trove.list.TIntList;
-import gnu.trove.list.array.TIntArrayList;
 import org.apache.commons.math3.util.FastMath;
-import org.geotools.referencing.CRS;
 import org.geotools.referencing.GeodeticCalculator;
 import org.geotools.referencing.crs.DefaultGeographicCRS;
-import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,22 +24,27 @@ public class Split {
     public int edge = -1; // TODO clarify is this the even edge number of a pair?
     public int seg = 0; // the segment within the edge that is closest to the search point
     public double frac = 0; // the fraction along that segment where a link should occur
-    public int fixedLon; // the x coordinate of the link point along the edge
-    public int fixedLat; // the y coordinate of the link point along the edge
+    public int fixedLon; // the x coordinate of the split point along the edge
+    public int fixedLat; // the y coordinate of the split point along the edge
     // We must use a long because squaring a typical search radius in fixed-point _does_ cause signed int32 overflow.
-    public long distSquared = Long.MAX_VALUE; // squared distance from given point to the split, in degrees
+    public long distanceToEdge_squaredFixedDegrees = Long.MAX_VALUE; // squared distance from given point to the split, in degrees
 
     // The following fields require more calculations and are only set once a best edge is found.
 
     /**
+     * Distance between a requested nearby point and the edge
+     */
+    public int distanceToEdge_mm = 0;
+
+    /**
      * Accumulated distance from the beginning vertex of the edge geometry up to the split point (point on the edge
-     * closest to the point to be linked), plus the distance from the linked point to the split point
+     * closest to the point to be linked)
      */
     public int distance0_mm = 0;
 
     /**
      * Accumulated distance from the end vertex of the edge geometry up to the split point (point on the edge
-     * closest to the point to be linked), plus the distance from the linked point to the split point
+     * closest to the point to be linked)
      */
     public int distance1_mm = 0;
 
@@ -53,6 +54,7 @@ public class Split {
     /**
      * Copy all the fields in another Split into this one.
      * This avoids creating large amounts of tiny short-lived objects.
+     * Does not copy distanceToEdge_mm, because this is only set at the very end of the operation, on the winning Split.
      */
     public void setFrom (Split other) {
         edge = other.edge;
@@ -60,7 +62,7 @@ public class Split {
         frac = other.frac;
         fixedLon = other.fixedLon;
         fixedLat = other.fixedLat;
-        distSquared = other.distSquared;
+        distanceToEdge_squaredFixedDegrees = other.distanceToEdge_squaredFixedDegrees;
     }
 
     private static GeodeticCalculator distanceCalculator = new GeodeticCalculator(DefaultGeographicCRS.WGS84);
@@ -69,8 +71,8 @@ public class Split {
      * Find a location on an existing street near the given point, without actually creating any vertices or edges.
      * @return a new Split object, or null if no edge was found in range.
      */
-    public static Split find (double lat, double lon, double searchRadiusMeters,
-                              StreetLayer streetLayer, StreetMode streetMode) {
+    public static Split find (double lat, double lon, double searchRadiusMeters, StreetLayer streetLayer,
+                              StreetMode streetMode) {
 
         // After this conversion, the entire geometric calculation is happening in fixed precision int degrees.
         int fixedLat = VertexStore.floatingDegreesToFixed(lat);
@@ -117,15 +119,6 @@ public class Split {
             }
             edge.retreat();
 
-            /*
-            if (!edge.allowsStreetMode(streetMode)) {
-                // The edge does not allow forward traversal with the specified mode, try the backward edge.
-                edge.advance();
-                // If backward traversal is also not allowed, skip this edge and try the next one.
-                if (!edge.allowsStreetMode(streetMode)) return true;
-            }
-            */
-
             // The distance to this edge is the distance to the closest segment of its geometry.
             edge.forEachSegment((seg, fixedLat0, fixedLon0, fixedLat1, fixedLon1) -> {
                 // Find the fraction along the current segment
@@ -138,13 +131,14 @@ public class Split {
                 // Find squared distance to edge (avoid taking square root, which is slow)
                 long dx = (long)((curr.fixedLon - fixedLon) * cosLat);
                 long dy = (long) (curr.fixedLat - fixedLat);
-                curr.distSquared = dx * dx + dy * dy;
+                curr.distanceToEdge_squaredFixedDegrees = dx * dx + dy * dy;
                 // Ignore segments that are too far away (filter false positives).
-                if (curr.distSquared < squaredRadiusFixedLat) {
-                    if (curr.distSquared < best.distSquared) {
+                if (curr.distanceToEdge_squaredFixedDegrees < squaredRadiusFixedLat) {
+                    if (curr.distanceToEdge_squaredFixedDegrees < best.distanceToEdge_squaredFixedDegrees) {
                         // Update the best segment if we've found something closer.
                         best.setFrom(curr);
-                    } else if (curr.distSquared == best.distSquared && curr.edge < best.edge) {
+                    } else if (curr.distanceToEdge_squaredFixedDegrees == best.distanceToEdge_squaredFixedDegrees
+                            && curr.edge < best.edge) {
                         // Break distance ties by favoring lower edge IDs. This makes destination linking
                         // deterministic where centroids are equidistant to edges (see issue #159).
                         best.setFrom(curr);
@@ -202,13 +196,14 @@ public class Split {
         }
         best.distance1_mm = edge.getLengthMm() - best.distance0_mm;
 
-        // To speed up computation above, square roots were avoided and distSquared was calculated using fixed degrees.
-        // We now want to calculate the distance in millimeters, for routing.  To do so, we take the square root of
-        // distSquared, convert to floating point degrees latitude then multiply by the metersPerDegreeLat factor above
-        // and 1000 to convert to millimeters.  This is accurate enough for our purposes.
-        best.distance0_mm += VertexStore.fixedDegreesToFloating(FastMath.sqrt(best.distSquared)) * metersPerDegreeLat * 1000;
-        best.distance1_mm += VertexStore.fixedDegreesToFloating(FastMath.sqrt(best.distSquared)) * metersPerDegreeLat * 1000;
-
+        // To speed up computation above, square roots were avoided and distanceToEdge_squaredFixedDegrees was
+        // calculated using fixed point degrees. We now want to calculate the distance in millimeters, for routing.
+        // To do so, we take the square root of distanceToEdge_squaredFixedDegrees, convert to floating point degrees
+        // latitude then multiply by the metersPerDegreeLat factor above and 1000 to convert to millimeters.
+        // This is accurate enough for our purposes.
+        double distanceToEdge_fixedDegrees = FastMath.sqrt(best.distanceToEdge_squaredFixedDegrees);
+        double distanceToEdge_floatingDegrees = VertexStore.fixedDegreesToFloating(distanceToEdge_fixedDegrees);
+        best.distanceToEdge_mm = (int) (distanceToEdge_floatingDegrees * metersPerDegreeLat * 1000);
         return best;
     }
 
@@ -255,9 +250,9 @@ public class Split {
 
             lengthBefore_fixedDeg[0] += length;
 
-            curr.distSquared = (long)(dx * dx + dy * dy);
+            curr.distanceToEdge_squaredFixedDegrees = (long)(dx * dx + dy * dy);
             // Replace the best segment if we've found something closer.
-            if (curr.distSquared < best.distSquared) {
+            if (curr.distanceToEdge_squaredFixedDegrees < best.distanceToEdge_squaredFixedDegrees) {
                 best.setFrom(curr);
             }
         }); // end loop over segments

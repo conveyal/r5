@@ -34,6 +34,18 @@ public class LinkedPointSet implements Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(LinkedPointSet.class);
 
+    /* Constants */
+
+    public static final int OFF_STREET_SPEED_MILLIMETERS_PER_SECOND = (int) (1.3f * 1000);
+
+    public static final int BICYCLE_DISTANCE_LINKING_LIMIT_METERS = 5000;
+
+    public static final int CAR_TIME_LINKING_LIMIT_SECONDS = 30 * 60;
+
+    public static final int MAX_CAR_SPEED_METERS_PER_SECOND = 44; // ~160 kilometers per hour
+
+    /* Fields */
+
     /**
      * LinkedPointSets are long-lived and not extremely numerous, so we keep references to the objects it was built
      * from. Besides these fields are useful for later processing of LinkedPointSets.
@@ -53,20 +65,14 @@ public class LinkedPointSet implements Serializable {
      */
     public final StreetMode streetMode;
 
-    static final int BICYCLE_DISTANCE_LINKING_LIMIT_METERS = 5000;
-
-    static final int CAR_TIME_LINKING_LIMIT_SECONDS = 30 * 60;
-
-    static final int MAX_CAR_SPEED_METERS_PER_SECOND = 44; // ~160 kilometers per hour
-
     /**
      * Limit to use when building linkageCostTables, re-calculated for different streetModes as needed, using the
      * constants specified above. The value should be larger than any per-leg street mode limits that can be requested
      * in the UI.
+     * TODO perhaps we should leave this uninitialized, only initializing once the linkage mode is known around L187.
+     * We would then fail fast on any programming errors that don't set or copy the limit.
      */
     int linkingDistanceLimitMeters = WALK_DISTANCE_LIMIT_METERS;
-
-    static final int OFF_STREET_SPEED_MILLIMETERS_PER_SECOND = (int) (1.3f * 1000);
 
     /**
      * For each point, the closest edge in the street layer. This is in fact the even (forward) edge ID of the closest
@@ -75,18 +81,23 @@ public class LinkedPointSet implements Serializable {
     public int[] edges;
 
     /**
+     * For each point, distance from the point to the split point (closest point on the edge to the point to be linked)
+     */
+    public int[] distancesToEdge_mm;
+
+    /**
      * For each point, distance from the beginning vertex of the edge geometry up to the split point (closest point on
-     * the edge to the point to be linked), plus the distance from the linked point to the split point
+     * the edge to the point to be linked)
      */
     public int[] distances0_mm;
 
     /**
      * For each point, distance from the end vertex of the edge geometry up to the split point (closest point on the
-     * edge to the point to be linked), plus the distance from the linked point to the split point
+     * edge to the point to be linked)
      */
     public int[] distances1_mm;
 
-    // TODO Refactor following three to own class
+    // TODO Refactor the following three fields out into their own classes
 
     /** For each transit stop, the distances (or times) to nearby PointSet points as packed (point_index, distance)
      * pairs. */
@@ -104,8 +115,9 @@ public class LinkedPointSet implements Serializable {
     /**
      * By default, linkage costs are distances (between stops and pointset points). For modes where speeds vary
      * by link, it doesn't make sense to store distances, so we store times.
+     * TODO perhaps we should leave this uninitialized, only initializing once the linkage mode is known around L510-540.
+     * We would then fail fast on any programming errors that don't set or copy the cost unit.
      */
-
     public RoutingVariable linkageCostUnit = RoutingVariable.DISTANCE_MILLIMETERS;
 
     /**
@@ -143,6 +155,7 @@ public class LinkedPointSet implements Serializable {
 
         if (baseLinkage == null) {
             edges = new int[nPoints];
+            distancesToEdge_mm = new int[nPoints];
             distances0_mm = new int[nPoints];
             distances1_mm = new int[nPoints];
             stopToPointLinkageCostTables = new ArrayList<>();
@@ -157,6 +170,7 @@ public class LinkedPointSet implements Serializable {
             // as in the base linkage. However, if the TransitLayer was also modified by the scenario, the
             // stopToVertexDistanceTables list might need to grow.
             edges = Arrays.copyOf(baseLinkage.edges, nPoints);
+            distancesToEdge_mm = Arrays.copyOf(baseLinkage.distancesToEdge_mm, nPoints);
             distances0_mm = Arrays.copyOf(baseLinkage.distances0_mm, nPoints);
             distances1_mm = Arrays.copyOf(baseLinkage.distances1_mm, nPoints);
             stopToPointLinkageCostTables = new ArrayList<>(baseLinkage.stopToPointLinkageCostTables);
@@ -228,6 +242,7 @@ public class LinkedPointSet implements Serializable {
 
         int nCells = subGrid.width * subGrid.height;
         edges = new int[nCells];
+        distancesToEdge_mm = new int[nCells];
         distances0_mm = new int[nCells];
         distances1_mm = new int[nCells];
 
@@ -244,6 +259,7 @@ public class LinkedPointSet implements Serializable {
                 } else { //point is inside super-grid
                     int sourcePixel = sourceRow * superGrid.width + sourceColumn;
                     edges[pixel] = sourceLinkage.edges[sourcePixel];
+                    distancesToEdge_mm[pixel] = sourceLinkage.distancesToEdge_mm[sourcePixel];
                     distances0_mm[pixel] = sourceLinkage.distances0_mm[sourcePixel];
                     distances1_mm[pixel] = sourceLinkage.distances1_mm[sourcePixel];
                 }
@@ -307,6 +323,7 @@ public class LinkedPointSet implements Serializable {
                     edges[p] = -1;
                 } else {
                     edges[p] = split.edge;
+                    distancesToEdge_mm[p] = split.distanceToEdge_mm;
                     distances0_mm[p] = split.distance0_mm;
                     distances1_mm[p] = split.distance1_mm;
                 }
@@ -373,28 +390,20 @@ public class LinkedPointSet implements Serializable {
                 continue;
             }
 
-            int edgeLength = edge.getLengthMm();
+            // Portion of point-to-vertex time spent on component perpendicular to edge
+            int offstreetTime = distancesToEdge_mm[i] / offStreetSpeed;
 
-            // If the linked street edge for point D has vertices A and B, distance0 and distance1 both include the
-            // distance from split point C to D, double-counting the off-street distance.  So in the equation below,
-            // divide by 2.  An alternative approach would add an additional array to this class to store the
-            // off-street component.  Testing would help gauge that speed/memory tradeoff.
-            //
-            // A----C--B
-            //      |
-            //      D
-            int offstreetTime = (distances0_mm[i] + distances1_mm[i] - edgeLength) / 2 / offStreetSpeed;
-
+            // Portion of point-to-vertex time spent along edge, between split point and vertex
             // If a null onStreetSpeed is supplied, look up the speed for cars
             if (onStreetSpeed == null) {
                 onStreetSpeed = (int) (edge.getCarSpeedMetersPerSecond() * 1000);
             }
 
             if (time0 != Integer.MAX_VALUE) {
-                time0 += (edgeLength - distances0_mm[i]) / onStreetSpeed + offstreetTime;
+                time0 += distances0_mm[i] / onStreetSpeed + offstreetTime;
             }
             if (time1 != Integer.MAX_VALUE) {
-                time1 += (edgeLength - distances1_mm[i]) / onStreetSpeed + offstreetTime;
+                time1 += distances1_mm[i] / onStreetSpeed + offstreetTime;
             }
 
             travelTimes[i] = time0 < time1 ? time0 : time1;
@@ -423,10 +432,10 @@ public class LinkedPointSet implements Serializable {
             // TODO this is not strictly correct when there are turn restrictions onto the edge this is linked to
 
             if (distanceTableToVertices.containsKey(edge.getFromVertex())) {
-                t1 = distanceTableToVertices.get(edge.getFromVertex()) + distances0_mm[p];
+                t1 = distanceTableToVertices.get(edge.getFromVertex()) + distances0_mm[p] + distancesToEdge_mm[p];
             }
             if (distanceTableToVertices.containsKey(edge.getToVertex())) {
-                t2 = distanceTableToVertices.get(edge.getToVertex()) + distances1_mm[p];
+                t2 = distanceTableToVertices.get(edge.getToVertex()) + distances1_mm[p] + distancesToEdge_mm[p];
             }
             int t = Math.min(t1, t2);
             if (t != Integer.MAX_VALUE) {

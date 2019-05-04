@@ -35,6 +35,8 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.PriorityQueue;
 
+import static com.conveyal.r5.streets.LinkedPointSet.OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
+
 /**
  * This routes over the street layer of a TransitNetwork.
  * It is a throw-away calculator object that retains routing state after the search is finished.
@@ -325,17 +327,20 @@ public class StreetRouter {
         State startState0 = new State(split.vertex0, split.edge + 1, streetMode);
         State startState1 = new State(split.vertex1, split.edge, streetMode);
         EdgeStore.Edge  edge = streetLayer.edgeStore.getCursor(split.edge);
+        int offStreetTime = split.distanceToEdge_mm / OFF_STREET_SPEED_MILLIMETERS_PER_SECOND;
+
         // Uses weight based on distance from end vertices, and speed on edge which depends on transport mode
         float speedMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
-        startState1.weight = (int) ((split.distance1_mm / 1000) / speedMetersPerSecond);
+        startState1.weight = (int) ((split.distance1_mm / 1000) / speedMetersPerSecond) + offStreetTime;
         startState1.durationSeconds = startState1.weight;
-        startState1.distance = split.distance1_mm;
+        startState1.distance = split.distance1_mm + split.distanceToEdge_mm;
         edge.advance();
+
         // Speed can be different on opposite sides of the same street
         speedMetersPerSecond = edge.calculateSpeed(profileRequest, streetMode);
-        startState0.weight = (int) ((split.distance0_mm / 1000) / speedMetersPerSecond);
+        startState0.weight = (int) ((split.distance0_mm / 1000) / speedMetersPerSecond) + offStreetTime;
         startState0.durationSeconds = startState0.weight;
-        startState0.distance = split.distance0_mm;
+        startState0.distance = split.distance0_mm + split.distanceToEdge_mm;
 
         // FIXME Below is reversing the vertices, but then aren't the weights, times, distances wrong? Why are we even doing this?
         if (profileRequest.reverseSearch) {
@@ -748,7 +753,6 @@ public class StreetRouter {
         } else {
             edgeList = streetLayer.incomingEdges.get(split.vertex0);
         }
-
         for (TIntIterator it = edgeList.iterator(); it.hasNext();) {
             Collection<State> states = bestStatesAtEdge.get(it.next());
             // NB this needs a state to copy turn restrictions into. We then don't use that state, which is fine because

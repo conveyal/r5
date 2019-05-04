@@ -34,6 +34,18 @@ public class LinkedPointSet implements Serializable {
 
     private static final Logger LOG = LoggerFactory.getLogger(LinkedPointSet.class);
 
+    /* Constants */
+
+    public static final int OFF_STREET_SPEED_MILLIMETERS_PER_SECOND = (int) (1.3f * 1000);
+
+    public static final int BICYCLE_DISTANCE_LINKING_LIMIT_METERS = 5000;
+
+    public static final int CAR_TIME_LINKING_LIMIT_SECONDS = 30 * 60;
+
+    public static final int MAX_CAR_SPEED_METERS_PER_SECOND = 44; // ~160 kilometers per hour
+
+    /* Fields */
+
     /**
      * LinkedPointSets are long-lived and not extremely numerous, so we keep references to the objects it was built
      * from. Besides these fields are useful for later processing of LinkedPointSets.
@@ -53,20 +65,14 @@ public class LinkedPointSet implements Serializable {
      */
     public final StreetMode streetMode;
 
-    static final int BICYCLE_DISTANCE_LINKING_LIMIT_METERS = 5000;
-
-    static final int CAR_TIME_LINKING_LIMIT_SECONDS = 30 * 60;
-
-    static final int MAX_CAR_SPEED_METERS_PER_SECOND = 44; // ~160 kilometers per hour
-
     /**
      * Limit to use when building linkageCostTables, re-calculated for different streetModes as needed, using the
      * constants specified above. The value should be larger than any per-leg street mode limits that can be requested
      * in the UI.
+     * TODO perhaps we should leave this uninitialized, only initializing once the linkage mode is known around L187.
+     * We would then fail fast on any programming errors that don't set or copy the limit.
      */
     int linkingDistanceLimitMeters = WALK_DISTANCE_LIMIT_METERS;
-
-    public static final int OFF_STREET_SPEED_MILLIMETERS_PER_SECOND = (int) (1.3f * 1000);
 
     /**
      * For each point, the closest edge in the street layer. This is in fact the even (forward) edge ID of the closest
@@ -91,7 +97,7 @@ public class LinkedPointSet implements Serializable {
      */
     public int[] distances1_mm;
 
-    // TODO Refactor following three to own class
+    // TODO Refactor the following three fields out into their own classes
 
     /** For each transit stop, the distances (or times) to nearby PointSet points as packed (point_index, distance)
      * pairs. */
@@ -109,8 +115,9 @@ public class LinkedPointSet implements Serializable {
     /**
      * By default, linkage costs are distances (between stops and pointset points). For modes where speeds vary
      * by link, it doesn't make sense to store distances, so we store times.
+     * TODO perhaps we should leave this uninitialized, only initializing once the linkage mode is known around L510-540.
+     * We would then fail fast on any programming errors that don't set or copy the cost unit.
      */
-
     public RoutingVariable linkageCostUnit = RoutingVariable.DISTANCE_MILLIMETERS;
 
     /**
@@ -382,8 +389,6 @@ public class LinkedPointSet implements Serializable {
                 travelTimes[i] = Integer.MAX_VALUE;
                 continue;
             }
-
-            int edgeLength = edge.getLengthMm();
 
             // Portion of point-to-vertex time spent on component perpendicular to edge
             int offstreetTime = distancesToEdge_mm[i] / offStreetSpeed;

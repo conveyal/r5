@@ -449,7 +449,7 @@ public class TransportNetworkCache {
                 }
             }
             LOG.info("Loading scenario from disk file {}", scenarioFile);
-            scenario = JsonUtilities.objectMapper.readValue(scenarioFile, Scenario.class);
+            scenario = JsonUtilities.lenientObjectMapper.readValue(scenarioFile, Scenario.class);
         } catch (Exception e) {
             LOG.error("Could not fetch scenario {} or read it from from disk: {}", scenarioId, e.toString());
             throw new RuntimeException("Scenario could not be loaded.", e);

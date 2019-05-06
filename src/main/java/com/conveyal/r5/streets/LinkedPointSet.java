@@ -2,9 +2,12 @@ package com.conveyal.r5.streets;
 
 import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSet;
+import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.common.GeometryUtils;
+import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.profile.StreetMode;
+import com.conveyal.r5.transit.TripPattern;
 import com.conveyal.r5.util.LambdaCounter;
 import com.vividsolutions.jts.geom.*;
 import gnu.trove.list.TIntList;
@@ -508,6 +511,26 @@ public class LinkedPointSet implements Serializable {
             Point stopPoint = transitLayer.getJTSPointForStopFixed(stopIndex);
             // If the stop is not linked to the street network, it should have no distance table.
             if (stopPoint == null) return null;
+
+            // HACK FOR Autonomous Vehicle egress: Only build CAR cost tables at rail stations.
+            if (streetMode == StreetMode.CAR) {
+                try {
+                    String stopId = transitLayer.stopIdForIndex.get(stopIndex);
+                    // if (stopId.startsWith("SBB_F103:")) return null;
+                    int firstPatternIndex = transitLayer.patternsForStop.get(stopIndex).get(0);
+                    TripPattern pattern = transitLayer.tripPatterns.get(firstPatternIndex);
+                    RouteInfo routeInfo = transitLayer.routes.get(pattern.routeIndex);
+                    TransitModes mode = TransitLayer.getTransitModes(routeInfo.route_type);
+                    if (mode != TransitModes.RAIL) {
+                        return null;
+                    }
+                    LOG.info("Detected mode of stop {} as {}, building cost table.", stopId, mode);
+                } catch (Exception ex) {
+                    LOG.error("Failed to detect mode of a transit stop.");
+                    return null;
+                }
+            }
+
             if (treeRebuildZone != null && !treeRebuildZone.contains(stopPoint)) {
                 // This stop is not affected by the scenario. Return the existing distance table.
                 // All new stops created by a scenario should be inside the relink zone, so

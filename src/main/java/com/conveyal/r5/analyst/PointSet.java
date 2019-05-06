@@ -88,7 +88,7 @@ public abstract class PointSet {
             // PointSet.this accesses the instance of the outer class.
             LinkedPointSet baseLinkage = null;
             if (key.a.isScenarioCopy()) {
-                LOG.info("Basing linkage for ({}, {}) on the linkage for {}, {}).", key.a, key.b, key.a.baseStreetLayer, key.b);
+                LOG.info("Basing linkage for ({}, {}) on the linkage for ({}, {}).", key.a, key.b, key.a.baseStreetLayer, key.b);
                 baseLinkage = PointSet.this.getLinkage(key.a.baseStreetLayer, key.b);
             }
             // Build a new linkage from this PointSet to the supplied StreetNetwork,

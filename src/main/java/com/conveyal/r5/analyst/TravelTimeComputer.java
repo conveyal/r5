@@ -5,6 +5,7 @@ import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.api.util.LegMode;
+import com.conveyal.r5.api.util.TransitModes;
 import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.profile.DominatingList;
 import com.conveyal.r5.profile.FareDominatingList;
@@ -15,8 +16,10 @@ import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.StreetRouter;
+import com.conveyal.r5.transit.RouteInfo;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
+import com.conveyal.r5.transit.TripPattern;
 import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
@@ -166,6 +169,8 @@ public class TravelTimeComputer {
         // Convert from profile routing qualified modes to internal modes
         EnumSet<StreetMode> accessModes = LegMode.toStreetModeSet(request.accessModes);
 
+        // TODO collect all access/direct modes into a Map<StreetMode, PointSetTimes> and pre-run searches.
+        // This would efficiently allow different access and direct modes.
         // TODO make iteration over access modes conditional on use of transit? Include direct modes?
         for (StreetMode accessMode : accessModes) {
             LOG.info("Performing street search for mode: {}", accessMode);
@@ -211,15 +216,36 @@ public class TravelTimeComputer {
             }
             TIntIntMap travelTimesToStopsSeconds = sr.getReachedStops();
 
+            // AD HOC CHANGE FOR AV ACCESS: cars can only be used to access rail stations
+            if (accessMode == StreetMode.CAR) {
+                travelTimesToStopsSeconds.retainEntries((stopIndex, timeSeconds) -> {
+                    String stopId = "UNKNOWN";
+                    try {
+                        TransitLayer transitLayer = network.transitLayer;
+                        stopId = transitLayer.stopIdForIndex.get(stopIndex);
+                        int firstPatternIndex = transitLayer.patternsForStop.get(stopIndex).get(0);
+                        TripPattern pattern = transitLayer.tripPatterns.get(firstPatternIndex);
+                        RouteInfo routeInfo = transitLayer.routes.get(pattern.routeIndex);
+                        TransitModes mode = TransitLayer.getTransitModes(routeInfo.route_type);
+                        return mode == TransitModes.RAIL;
+                    } catch (Exception ex) {
+                        LOG.warn("Failed to determine mode of stop {}, dropping it.", stopId);
+                        return false;
+                    }
+                });
+            }
+
             LinkedPointSet linkedDestinations = destinations.getLinkage(network.streetLayer, accessMode);
             // FIXME this is iterating over every cell in the (possibly huge) destination grid just to get the access times around the origin.
             PointSetTimes pointSetTimes = linkedDestinations.eval(sr::getTravelTimeToVertex,
                     streetSpeedMillimetersPerSecond, walkSpeedMillimetersPerSecond);
 
-            if (accessMode == StreetMode.CAR && carPickupDelaySeconds > 0) {
+            if (accessMode == StreetMode.CAR && carPickupDelaySeconds >= 0) {
                 LOG.info("Delaying access times by {} seconds (for car pick-up wait).", carPickupDelaySeconds);
                 travelTimesToStopsSeconds.transformValues(i -> i + carPickupDelaySeconds);
-                pointSetTimes.incrementAllReachable(carPickupDelaySeconds);
+                // AD HOC CHANGE for AV ACCESS: destinations can't be reached by car. Only transit stops.
+                Arrays.fill(pointSetTimes.travelTimes, Integer.MAX_VALUE);
+                // pointSetTimes.incrementAllReachable(carPickupDelaySeconds);
             }
             minMergeMap(accessTimes, travelTimesToStopsSeconds);
             nonTransitTravelTimesToDestinations = PointSetTimes.minMerge(nonTransitTravelTimesToDestinations, pointSetTimes);
@@ -254,7 +280,7 @@ public class TravelTimeComputer {
         if (!foundAnyOriginPoint) {
             // The origin point was not even linked to the street network.
             // Calling finish() before streaming in any travel times to destinations is designed to produce the right result.
-            LOG.info("Origin point was outside the street network. Skipping routing and propagation, and returning default result.");
+            LOG.info("No travel was possible from the origin point. Skipping routing and propagation, and returning default result.");
             return travelTimeReducer.finish();
         }
 

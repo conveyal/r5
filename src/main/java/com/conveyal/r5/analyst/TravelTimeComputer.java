@@ -240,12 +240,10 @@ public class TravelTimeComputer {
             PointSetTimes pointSetTimes = linkedDestinations.eval(sr::getTravelTimeToVertex,
                     streetSpeedMillimetersPerSecond, walkSpeedMillimetersPerSecond);
 
-            if (accessMode == StreetMode.CAR && carPickupDelaySeconds >= 0) {
+            if (accessMode == StreetMode.CAR && carPickupDelaySeconds > 0) {
                 LOG.info("Delaying access times by {} seconds (for car pick-up wait).", carPickupDelaySeconds);
                 travelTimesToStopsSeconds.transformValues(i -> i + carPickupDelaySeconds);
-                // AD HOC CHANGE for AV ACCESS: destinations can't be reached by car. Only transit stops.
-                Arrays.fill(pointSetTimes.travelTimes, Integer.MAX_VALUE);
-                // pointSetTimes.incrementAllReachable(carPickupDelaySeconds);
+                pointSetTimes.incrementAllReachable(carPickupDelaySeconds);
             }
             minMergeMap(accessTimes, travelTimesToStopsSeconds);
             nonTransitTravelTimesToDestinations = PointSetTimes.minMerge(nonTransitTravelTimesToDestinations, pointSetTimes);

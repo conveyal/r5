@@ -151,10 +151,10 @@ public class AnalystWorker implements Runnable {
 
     /**
      * This timeout should be longer than the longest expected worker calculation for a single-point request.
-     * Of course when linking a large grid, a worker could take much longer. We're just going to have to accept
-     * timeouts in those situations until we implement fail-fast 202 responses from workers for long lived operations.
+     * Preparing networks or linking grids will take longer, but those cases are now handled with
+     * WorkerNotReadyException.
      */
-    private static final int HTTP_CLIENT_TIMEOUT_SEC = 30;
+    private static final int HTTP_CLIENT_TIMEOUT_SEC = 45;
 
     /**
      * The results of finished work accumulate here, and will be sent in batches back to the broker.

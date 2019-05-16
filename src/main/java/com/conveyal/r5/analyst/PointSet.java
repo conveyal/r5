@@ -130,6 +130,9 @@ public abstract class PointSet {
             if (value == null) {
                 value = linkageCache.get(new Tuple2<>(streetLayer, streetMode));
             }
+            if (value != null && value.pointSet != this) {
+                throw new AssertionError("A PointSet should only hold linkages for itself, not for other PointSets.");
+            }
             return value;
         } catch (ExecutionException e) {
             throw new RuntimeException("Failed to link PointSet to StreetLayer.", e);

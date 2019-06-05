@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -728,6 +729,32 @@ public class EdgeStore implements Serializable {
             return true;
         }
 
+        /**
+         * Cut the packed list of intermediate coordinates in two after specified segment
+         * @return List with first element int[] of coordinates before end of specified segment, and second element
+         * int[] of coordinates after end of specified segment.
+         */
+        public ArrayList<int[]> splitGeometryAfter(int segment) {
+            // Original packed coordinates of edge
+            int[] original = geometries.get(pairIndex);
+            ArrayList<int[]> geoms = new ArrayList<>();
+            geoms.add(Arrays.copyOfRange(original, 0, segment * 2)); // Multiply by 2 because packed array
+            geoms.add(Arrays.copyOfRange(original, segment * 2, original.length + 1));
+            return geoms;
+        }
+
+        /**
+         * Set intermediate coordinates directly with packed array
+         * @param coordinates Packed lists of lat, lon, lat, lon... as fixed-point integers
+         */
+        public void setGeometry (int[] coordinates) {
+            geometries.set(pairIndex, coordinates);
+            calculateAngles();
+        }
+
+        /**
+         * Set intermediate coordinates from OSM nodes
+         */
         public void setGeometry (List<Node> nodes) {
             // The same empty int array represents all straight-line edges.
             if (nodes.size() <= 2) {

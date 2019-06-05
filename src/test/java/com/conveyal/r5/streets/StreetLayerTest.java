@@ -122,6 +122,9 @@ public class StreetLayerTest extends TestCase {
         //assertEquals(backwardEdgeName, newBackwardEdge.getName());
 
         //streetLayer.edgeStore.dump();
+
+        // TODO: check lengths and geometries of curvilinear edges after repeated splitting
+
     }
 
     /** Test that simple turn restrictions (no via ways) are read properly, using http://www.openstreetmap.org/relation/5696764 */

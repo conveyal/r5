@@ -1170,6 +1170,7 @@ public class StreetLayer implements Serializable, Cloneable {
         // The split is somewhere along a street away from an existing intersection vertex. Make a new splitter vertex.
         int newVertexIndex = vertexStore.addVertexFixed((int) split.fixedLat, (int) split.fixedLon);
         int oldToVertex = edge.getToVertex(); // Hold a copy of the to vertex index, because it may be modified below.
+        ArrayList<int[]> geoms = new ArrayList<>();
         if (edge.isMutable()) {
             // The edge we are going to split is mutable.
             // We're either building a baseline graph, or modifying an edge created within the same scenario.
@@ -1177,9 +1178,8 @@ public class StreetLayer implements Serializable, Cloneable {
             // Its spatial index entry is still valid, since the edge's envelope will only shrink.
             edge.setLengthMm(split.distance0_mm);
             edge.setToVertex(newVertexIndex);
-            // Turn the edge into a straight line.
-            // FIXME split edges and new edges should have geometries!
-            edge.setGeometry(Collections.EMPTY_LIST);
+            geoms = edge.splitGeometryAfter(split.seg);
+            edge.setGeometry(geoms.get(0));
         } else {
             // The edge we are going to split is immutable, and should be left as-is.
             // We must be applying a scenario, and this edge is part of the baseline graph shared between threads.
@@ -1207,6 +1207,9 @@ public class StreetLayer implements Serializable, Cloneable {
         EdgeStore.Edge newEdge1 = edgeStore.addStreetPair(newVertexIndex, oldToVertex, split.distance1_mm, edge.getOSMID());
         // Copy the flags and speeds for both directions, making newEdge1 like the existing edge.
         newEdge1.copyPairFlagsAndSpeeds(edge);
+
+        if (geoms.size() > 1) newEdge1.setGeometry(geoms.get(1));
+
         // Insert the new edge into the spatial index
         if (!edgeStore.isExtendOnlyCopy()) {
             spatialIndex.insert(newEdge1.getEnvelope(), newEdge1.edgeIndex);

@@ -157,15 +157,18 @@ public class TravelTimeReducer {
     }
 
     /**
-     * Divide by 60 and return if the value is less than the maxTripDurationMinutes; otherwise return UNREACHED.
+     * Convert the given timeSeconds to minutes. If that time equals or exceeds the maxTripDurationMinutes, instead
+     * return a value indicating that the location is unreachable. The minutes to seconds conversion uses integer
+     * division, which truncates toward zero. This approach is correct for use in accessibility analysis, where we
+     * are always testing whether a travel time is less than a certain threshold value. For example, all travel times
+     * between 59 and 60 minutes will truncate to 59, and will correctly return true for the expression (t < 60
+     * minutes). We are converting seconds to minutes before we export a binary format mainly to narrow the times so
+     * they fit into single bytes (though this also reduces entropy and makes compression more effective). Arguably
+     * this is coupling the backend too closely to the frontend (which makes use of UInt8 typed arrays); the front
+     * end could in principle receive a more general purpose format using wider or variable width integers.
      */
     private int convertToMinutes (int timeSeconds) {
         if (timeSeconds == FastRaptorWorker.UNREACHED) return FastRaptorWorker.UNREACHED;
-
-        // Int divide will floor; this is correct because value 0 has travel times of up to one minute, etc.
-        // This means that anything less than a cutoff of (say) 60 minutes (in seconds) will have value 59,
-        // which is what we want. But maybe converting to minutes before we actually export a binary format is tying
-        // the backend and frontend (which makes use of UInt8 typed arrays) too closely.
         int timeMinutes = timeSeconds / FastRaptorWorker.SECONDS_PER_MINUTE;
         if (timeMinutes < maxTripDurationMinutes) {
             return timeMinutes;

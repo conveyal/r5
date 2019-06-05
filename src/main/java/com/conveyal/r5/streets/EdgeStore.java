@@ -8,6 +8,7 @@ import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.trove.AugmentedList;
 import com.conveyal.r5.trove.TIntAugmentedList;
 import com.conveyal.r5.trove.TLongAugmentedList;
+import com.conveyal.r5.util.P2;
 import com.conveyal.r5.util.TIntIntHashMultimap;
 import com.conveyal.r5.util.TIntIntMultimap;
 import com.vividsolutions.jts.geom.Coordinate;
@@ -730,17 +731,32 @@ public class EdgeStore implements Serializable {
         }
 
         /**
-         * Cut the packed list of intermediate coordinates in two after specified segment
-         * @return List with first element int[] of coordinates before end of specified segment, and second element
-         * int[] of coordinates after end of specified segment.
+         * Cut the packed array of intermediate coordinates in two at the specified segment index, non-destructively
+         * (i.e. returning copies). The original array of the edge's intermediate coordinates does not include the first
+         * and last points of the edge (which are supplied by vertices), so the segment at index N ends at
+         * intermediate point N, which occupies array indexes N2 and N2+1 in the packed array. Intermediate points
+         * before the split point (which is on the specified segment), ending with the beginning of the split
+         * segment, should be in the first return array. Intermediate points after the split point, starting with the
+         * end of the split segment, should be in the second return array. The first or second return array can be
+         * empty if we are splitting at the first or last segment respectively, or if there are no intermediate
+         * coordinates.
+         * @return Pair with element a being int[] of intermediate coordinates before split, and element b being
+         * int[] of intermediate coordinates after split.
          */
-        public ArrayList<int[]> splitGeometryAfter(int segment) {
-            // Original packed coordinates of edge
+        public P2<int[]> splitGeometryAfter(int segment) {
+            int[] preSplit = EMPTY_INT_ARRAY;
+            int[] postSplit = EMPTY_INT_ARRAY;
+            // Original packed array of edge's intermediate coordinates
             int[] original = geometries.get(pairIndex);
-            ArrayList<int[]> geoms = new ArrayList<>();
-            geoms.add(Arrays.copyOfRange(original, 0, segment * 2)); // Multiply by 2 because packed array
-            geoms.add(Arrays.copyOfRange(original, segment * 2, original.length + 1));
-            return geoms;
+            if (original.length > 0) {
+                if (segment > 0) {
+                    preSplit = Arrays.copyOfRange(original, 0, segment * 2);
+                }
+                if (segment < original.length + 1) {
+                    postSplit = Arrays.copyOfRange(original, segment * 2, original.length + 1);
+                }
+            }
+            return new P2<>(preSplit, postSplit);
         }
 
         /**

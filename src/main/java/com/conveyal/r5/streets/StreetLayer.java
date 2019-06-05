@@ -19,7 +19,13 @@ import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.streets.EdgeStore.Edge;
 import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
-import com.vividsolutions.jts.geom.*;
+import com.conveyal.r5.util.P2;
+import com.vividsolutions.jts.geom.Envelope;
+import com.vividsolutions.jts.geom.LineString;
+import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.Polygon;
+import com.vividsolutions.jts.geom.Point;
 import com.conveyal.r5.profile.StreetMode;
 import com.vividsolutions.jts.operation.union.UnaryUnionOp;
 import gnu.trove.list.TIntList;
@@ -1170,7 +1176,7 @@ public class StreetLayer implements Serializable, Cloneable {
         // The split is somewhere along a street away from an existing intersection vertex. Make a new splitter vertex.
         int newVertexIndex = vertexStore.addVertexFixed((int) split.fixedLat, (int) split.fixedLon);
         int oldToVertex = edge.getToVertex(); // Hold a copy of the to vertex index, because it may be modified below.
-        ArrayList<int[]> geoms = new ArrayList<>();
+        P2<int[]> geoms = edge.splitGeometryAfter(split.seg);
         if (edge.isMutable()) {
             // The edge we are going to split is mutable.
             // We're either building a baseline graph, or modifying an edge created within the same scenario.
@@ -1178,8 +1184,7 @@ public class StreetLayer implements Serializable, Cloneable {
             // Its spatial index entry is still valid, since the edge's envelope will only shrink.
             edge.setLengthMm(split.distance0_mm);
             edge.setToVertex(newVertexIndex);
-            geoms = edge.splitGeometryAfter(split.seg);
-            edge.setGeometry(geoms.get(0));
+            edge.setGeometry(geoms.a);
         } else {
             // The edge we are going to split is immutable, and should be left as-is.
             // We must be applying a scenario, and this edge is part of the baseline graph shared between threads.
@@ -1190,7 +1195,7 @@ public class StreetLayer implements Serializable, Cloneable {
             EdgeStore.Edge newEdge0 = edgeStore.addStreetPair(edge.getFromVertex(), newVertexIndex, split.distance0_mm, edge.getOSMID());
             // Copy the flags and speeds for both directions, making the new edge like the existing one.
             newEdge0.copyPairFlagsAndSpeeds(edge);
-
+            newEdge0.setGeometry(geoms.a);
             // Add the new edges to a temporary spatial index that is associated with only this scenario.
             // we need to build this on the fly so that it is possible to split a street multiple times; otherwise,
             // once a street had been split once, the original edge would be removed from consideration
@@ -1207,8 +1212,7 @@ public class StreetLayer implements Serializable, Cloneable {
         EdgeStore.Edge newEdge1 = edgeStore.addStreetPair(newVertexIndex, oldToVertex, split.distance1_mm, edge.getOSMID());
         // Copy the flags and speeds for both directions, making newEdge1 like the existing edge.
         newEdge1.copyPairFlagsAndSpeeds(edge);
-
-        if (geoms.size() > 1) newEdge1.setGeometry(geoms.get(1));
+        newEdge1.setGeometry(geoms.b);
 
         // Insert the new edge into the spatial index
         if (!edgeStore.isExtendOnlyCopy()) {

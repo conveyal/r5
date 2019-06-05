@@ -22,7 +22,10 @@ public class TravelTimeReducer {
 
     private static final Logger LOG = LoggerFactory.getLogger(TravelTimeReducer.class);
 
-    /** The task used to create travel times being reduced herein. */
+    /** Maximum total travel time, above which a destination should be considered unreachable. Note the logic in
+     * analysis-backend AnalysisRequest, which sets this to the requested value for regional analyses, but keeps
+     * it at the default value from R5 ProfileRequest for single-point requests (which allow adjusting the cutoff
+     * after results have been calculated) */
     private int maxTripDurationMinutes;
 
     /** Travel time results for a whole grid of destinations. May be null if we're only recording accessibility. */
@@ -121,9 +124,7 @@ public class TravelTimeReducer {
             // Handle results with no variation, e.g. from walking, biking, or driving.
             // TODO instead of conditionals maybe overload this function to have one version that takes a single int time and wraps this array function.
             int travelTimeSeconds = timesSeconds[0];
-            int travelTimeMinutes = (travelTimeSeconds == FastRaptorWorker.UNREACHED) ?
-                    FastRaptorWorker.UNREACHED : travelTimeSeconds / 60;
-            Arrays.fill(percentileTravelTimesMinutes, travelTimeMinutes);
+            Arrays.fill(percentileTravelTimesMinutes, convertToMinutes(travelTimeSeconds));
         } else if (timesSeconds.length == timesPerDestination) {
             // Instead of general purpose sort this could be done by performing a counting sort on the times,
             // converting them to minutes in the process and reusing the small histogram array (120 elements) which
@@ -131,16 +132,7 @@ public class TravelTimeReducer {
             Arrays.sort(timesSeconds);
             for (int p = 0; p < nPercentiles; p++) {
                 int timeSeconds = timesSeconds[percentileIndexes[p]];
-                if (timeSeconds == FastRaptorWorker.UNREACHED) {
-                    percentileTravelTimesMinutes[p] = FastRaptorWorker.UNREACHED;
-                } else {
-                    // Int divide will floor; this is correct because value 0 has travel times of up to one minute, etc.
-                    // This means that anything less than a cutoff of (say) 60 minutes (in seconds) will have value 59,
-                    // which is what we want. But maybe converting to minutes before we actually export a binary format is tying
-                    // the backend and frontend (which makes use of UInt8 typed arrays) too closely.
-                    int timeMinutes = timeSeconds / 60;
-                    percentileTravelTimesMinutes[p] = timeMinutes;
-                }
+                percentileTravelTimesMinutes[p] = convertToMinutes(timeSeconds);
             }
         } else {
             throw new ParameterException("You must supply the expected number of travel time values (or only one value).");
@@ -163,6 +155,25 @@ public class TravelTimeReducer {
         }
         return percentileTravelTimesMinutes;
     }
+
+    /**
+     * Divide by 60 and return if the value is less than the maxTripDurationMinutes; otherwise return UNREACHED.
+     */
+    private int convertToMinutes (int timeSeconds) {
+        if (timeSeconds == FastRaptorWorker.UNREACHED) return FastRaptorWorker.UNREACHED;
+
+        // Int divide will floor; this is correct because value 0 has travel times of up to one minute, etc.
+        // This means that anything less than a cutoff of (say) 60 minutes (in seconds) will have value 59,
+        // which is what we want. But maybe converting to minutes before we actually export a binary format is tying
+        // the backend and frontend (which makes use of UInt8 typed arrays) too closely.
+        int timeMinutes = timeSeconds / FastRaptorWorker.SECONDS_PER_MINUTE;
+        if (timeMinutes < maxTripDurationMinutes) {
+            return timeMinutes;
+        } else {
+            return FastRaptorWorker.UNREACHED;
+        }
+    }
+
 
     /**
      * If no travel times to destinations have been streamed in by calling recordTravelTimesForTarget, the

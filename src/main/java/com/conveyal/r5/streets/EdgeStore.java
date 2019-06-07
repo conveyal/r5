@@ -752,8 +752,8 @@ public class EdgeStore implements Serializable {
                 if (segment > 0) {
                     preSplit = Arrays.copyOfRange(original, 0, segment * 2);
                 }
-                if (segment < original.length + 1) {
-                    postSplit = Arrays.copyOfRange(original, segment * 2, original.length + 1);
+                if (segment * 2 < original.length) {
+                    postSplit = Arrays.copyOfRange(original, segment * 2, original.length);
                 }
             }
             return new P2<>(preSplit, postSplit);
@@ -942,7 +942,7 @@ public class EdgeStore implements Serializable {
             Envelope envelope = new Envelope();
             forEachPoint((p, fixedLat, fixedLon) -> {
                 envelope.expandToInclude(fixedLon, fixedLat);
-            });
+            forEachPoint((p, fixedLat, fixedLon) -> envelope.expandToInclude(fixedLon, fixedLat));
             return envelope;
         }
 

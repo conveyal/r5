@@ -940,8 +940,6 @@ public class EdgeStore implements Serializable {
         /** @return an envelope around the whole edge geometry, in fixed-point WGS84 degrees. */
         public Envelope getEnvelope () {
             Envelope envelope = new Envelope();
-            forEachPoint((p, fixedLat, fixedLon) -> {
-                envelope.expandToInclude(fixedLon, fixedLat);
             forEachPoint((p, fixedLat, fixedLon) -> envelope.expandToInclude(fixedLon, fixedLat));
             return envelope;
         }

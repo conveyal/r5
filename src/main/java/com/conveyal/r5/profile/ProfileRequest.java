@@ -140,7 +140,7 @@ public class ProfileRequest implements Serializable, Cloneable {
     public int suboptimalMinutes = 5;
 
     /**
-     * The maximum duration of any transit trip found by this search.
+     * The maximum duration of any trip found by this search.
      */
     public int maxTripDurationMinutes = 2 * 60;
 

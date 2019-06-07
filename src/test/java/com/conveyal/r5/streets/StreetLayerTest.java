@@ -122,10 +122,27 @@ public class StreetLayerTest extends TestCase {
         //assertEquals(backwardEdgeName, newBackwardEdge.getName());
 
         //streetLayer.edgeStore.dump();
-
-        // TODO: check lengths and geometries of curvilinear edges after repeated splitting
-
     }
+
+    /**
+     * Test if edge length and geometry are properly preserved in splitting
+     */
+     @Test
+    public void testSplitsForStops () {
+         OSM osm = new OSM(null);
+         osm.intersectionDetection = true;
+         osm.readFromUrl(StreetLayerTest.class.getResource("snake-rd.pbf").toString());
+
+         StreetLayer streetLayer = new StreetLayer(TNBuilderConfig.defaultConfig());
+         streetLayer.loadFromOsm(osm, false, true);
+         osm.close();
+
+         //This is needed for inserting new vertices around coordinates
+         streetLayer.indexStreets();
+
+         // TODO: check lengths and geometries of curvilinear edges after repeated splitting
+
+     }
 
     /** Test that simple turn restrictions (no via ways) are read properly, using http://www.openstreetmap.org/relation/5696764 */
     @Test

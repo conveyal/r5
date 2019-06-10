@@ -144,6 +144,10 @@ public class Grid {
         this.grid = new double[width][height];
     }
 
+    Grid (int zoom, Envelope envelope) {
+        this(zoom, envelope.getMaxY(), envelope.getMaxX(), envelope.getMinY(), envelope.getMinX());
+    }
+
     public static class PixelWeight {
         public final int x;
         public final int y;
@@ -555,13 +559,10 @@ public class Grid {
                 .collect(
                         Collectors.toMap(
                                 c -> c,
-                                c -> new Grid(
-                                        zoom,
-                                        envelope.getMaxY(),
-                                        envelope.getMaxX(),
-                                        envelope.getMinY(),
-                                        envelope.getMinX()
-                                )));
+                                c -> new Grid(zoom,envelope)
+                        ));
+
+        Grid countGrid = new Grid(zoom, envelope);
 
         // read it again, Sam - reread the CSV to get the actual values and populate the grids
         reader = new CsvReader(new BufferedInputStream(new FileInputStream(csvFile)), Charset.forName("UTF-8"));
@@ -590,10 +591,13 @@ public class Grid {
                 }
 
                 grids.get(field).incrementPoint(lat, lon, val);
+                countGrid.incrementPoint(lat, lon, 1);
             }
         }
 
         reader.close();
+
+        grids.put("Count", countGrid);
 
         return grids;
     }

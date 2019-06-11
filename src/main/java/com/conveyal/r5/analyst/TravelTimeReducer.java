@@ -109,6 +109,18 @@ public class TravelTimeReducer {
     }
 
     /**
+     * Given a single travel time, replicate it to match the expected number of percentiles.
+     *
+     * @param timeSeconds Single travel time, for results with no variation, e.g. from walking, biking, or driving.
+     * @return the extracted travel times, in minutes. This is a hack to enable scoring paths in the caller.
+     */
+    public int[] recordTravelTimesForTarget (int target, int timeSeconds){
+        int[] percentileTravelTimesMinutes = new int[nPercentiles];
+        Arrays.fill(new int[nPercentiles], convertToMinutes(timeSeconds));
+        return recordTravelTimesForTarget(target, percentileTravelTimesMinutes);
+    }
+
+    /**
      * Given a list of travel times of the expected length, extract the requested percentiles. Either the extracted
      * percentiles or the resulting accessibility values (or both) are then stored.
      * WARNING: this method destructively sorts the supplied times in place.
@@ -120,12 +132,7 @@ public class TravelTimeReducer {
         // TODO factor out getPercentiles method for clarity
         // Sort the times at each target and read off percentiles at the pre-calculated indexes.
         int[] percentileTravelTimesMinutes = new int[nPercentiles];
-        if (timesSeconds.length == 1) {
-            // Handle results with no variation, e.g. from walking, biking, or driving.
-            // TODO instead of conditionals maybe overload this function to have one version that takes a single int time and wraps this array function.
-            int travelTimeSeconds = timesSeconds[0];
-            Arrays.fill(percentileTravelTimesMinutes, convertToMinutes(travelTimeSeconds));
-        } else if (timesSeconds.length == timesPerDestination) {
+        if (timesSeconds.length == timesPerDestination) {
             // Instead of general purpose sort this could be done by performing a counting sort on the times,
             // converting them to minutes in the process and reusing the small histogram array (120 elements) which
             // should remain largely in processor cache. That's a lot of division though. Would need to be profiled.
@@ -135,7 +142,7 @@ public class TravelTimeReducer {
                 percentileTravelTimesMinutes[p] = convertToMinutes(timeSeconds);
             }
         } else {
-            throw new ParameterException("You must supply the expected number of travel time values (or only one value).");
+            throw new ParameterException("You must supply the expected number of travel time values");
         }
         if (retainTravelTimes) {
             timeGrid.setTarget(target, percentileTravelTimesMinutes);

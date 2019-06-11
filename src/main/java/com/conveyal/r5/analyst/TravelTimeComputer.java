@@ -120,7 +120,7 @@ public class TravelTimeComputer {
             // Iterate over all destinations ("targets") and at each destination, save the same travel time for all percentiles.
             for (int d = 0; d < travelTimesToTargets.length; d++) {
                 final int travelTimeSeconds = travelTimesToTargets[d];
-                travelTimeReducer.recordTravelTimesForTarget(d, new int[] { travelTimeSeconds });
+                travelTimeReducer.recordTravelTimesForTarget(d, travelTimeSeconds);
             }
             return travelTimeReducer.finish();
         } else {
@@ -222,7 +222,7 @@ public class TravelTimeComputer {
                 for (int target = 0; target < nonTransitTravelTimesToDestinations.length; target++) {
                     // TODO abstraction for travel time grid, with method to write it directly to reducer
                     final int travelTimeSeconds = nonTransitTravelTimesToDestinations[target];
-                    travelTimeReducer.recordTravelTimesForTarget(target, new int[] { travelTimeSeconds });
+                    travelTimeReducer.recordTravelTimesForTarget(target, travelTimeSeconds);
                 }
                 return travelTimeReducer.finish();
             }

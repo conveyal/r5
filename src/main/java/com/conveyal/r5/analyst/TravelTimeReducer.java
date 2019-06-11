@@ -72,7 +72,7 @@ public class TravelTimeReducer {
         // Decide whether we want to retain travel times to all destinations for this origin.
         retainTravelTimes = task instanceof TravelTimeSurfaceTask || task.makeStaticSite;
         if (retainTravelTimes) {
-            timeGrid = new TimeGrid(task.zoom, task.west, task.north, task.width, task.height, task.percentiles.length);
+            timeGrid = new TimeGrid(task);
         }
 
         // Decide whether we want to calculate cumulative opportunities accessibility indicators for this origin.

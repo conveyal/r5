@@ -33,6 +33,10 @@ public class WebMercatorExtents {
         return new WebMercatorExtents(grid.west, grid.north, grid.width, grid.height, grid.zoom);
     }
 
+    public int getArea() {
+        return width * height;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

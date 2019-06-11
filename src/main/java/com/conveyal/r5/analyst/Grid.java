@@ -144,6 +144,10 @@ public class Grid {
         this.grid = new double[width][height];
     }
 
+    public Grid (WebMercatorExtents extents) {
+        this(extents.zoom, extents.width, extents.height, extents.north, extents.west);
+    }
+
     Grid (int zoom, Envelope envelope) {
         this(zoom, envelope.getMaxY(), envelope.getMaxX(), envelope.getMinY(), envelope.getMinX());
     }

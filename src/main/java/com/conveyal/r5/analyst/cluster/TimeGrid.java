@@ -2,6 +2,7 @@ package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.Grid;
 import com.conveyal.r5.analyst.PersistenceBuffer;
+import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import com.google.common.io.LittleEndianDataOutputStream;
@@ -55,13 +56,14 @@ public class TimeGrid {
 
     private static final int version = 0;
 
-    // TODO a WEBMERCATOREXTENTS class
+    private final WebMercatorExtents extents;
+
     // used to be stored as longs, but can probably still use with impunity without fear of overflow
-    private final int zoom, west, north, width, height, nValuesPerPixel;
+    private final int nValuesPerPixel;
 
     // Flattened 1-d array of pixel values
     // FIXME its weird that we're storing this as a flattened array using a completely different order than we're writing out to the file.
-    // Should this really be flattenend until it's written out?
+    // Should this really be flattened until it's written out?
     private int[] values;
 
     public final int nValues;
@@ -69,14 +71,10 @@ public class TimeGrid {
     /**
      * Create a new in-memory access grid writer for a width x height x nValuesPerPixel 3D array.
      */
-    public TimeGrid(int zoom, int west, int north, int width, int height, int nValuesPerPixel) {
-        this.zoom = zoom;
-        this.west = west;
-        this.north = north;
-        this.width = width;
-        this.height = height;
-        this.nValuesPerPixel = nValuesPerPixel;
-        this.nValues = width * height * nValuesPerPixel;
+    public TimeGrid(AnalysisTask task) {
+        this.extents = WebMercatorExtents.forTask(task);
+        this.nValuesPerPixel = task.percentiles.length;
+        this.nValues = extents.getArea() * nValuesPerPixel;
 
         long nBytes = ((long)nValues) * Integer.BYTES + HEADER_SIZE;
         if (nBytes > Integer.MAX_VALUE) {
@@ -128,16 +126,16 @@ public class TimeGrid {
             // Write header
             dataOutput.write(gridType.getBytes());
             dataOutput.writeInt(version);
-            dataOutput.writeInt(zoom);
-            dataOutput.writeInt(west);
-            dataOutput.writeInt(north);
-            dataOutput.writeInt(width);
-            dataOutput.writeInt(height);
+            dataOutput.writeInt(extents.zoom);
+            dataOutput.writeInt(extents.west);
+            dataOutput.writeInt(extents.north);
+            dataOutput.writeInt(extents.width);
+            dataOutput.writeInt(extents.height);
             dataOutput.writeInt(nValuesPerPixel);
             // Write values, delta coded
             for (int i = 0; i < nValuesPerPixel; i++) {
                 int prev = 0; // delta code within each percentile grid
-                for (int j = 0; j < width * height; j++) {
+                for (int j = 0; j < extents.getArea(); j++) {
                     // FIXME this is doing extra math to rearrange the ordering of the flattened array it's reading.
                     int curr = values[j * nValuesPerPixel + i];
                     // TODO try not delta-coding the "unreachable" value, and retaining the prev value across unreachable areas.
@@ -160,20 +158,21 @@ public class TimeGrid {
         try {
             // Inspired by org.geotools.coverage.grid.GridCoverageFactory
             final WritableRaster raster =
-                    RasterFactory.createBandedRaster(DataBuffer.TYPE_INT, width, height, nValuesPerPixel, null);
+                    RasterFactory.createBandedRaster(DataBuffer.TYPE_INT, extents.width, extents.height,
+                            nValuesPerPixel, null);
 
             int val;
 
-            for (int y = 0; y < height; y ++) {
-                for (int x = 0; x < width; x ++) {
+            for (int y = 0; y < extents.height; y ++) {
+                for (int x = 0; x < extents.width; x ++) {
                     for (int n = 0; n < nValuesPerPixel; n ++) {
-                        val = values[(y * width + x) * nValuesPerPixel + n];
+                        val = values[(y * extents.width + x) * nValuesPerPixel + n];
                         if (val < FastRaptorWorker.UNREACHED) raster.setSample(x, y, n, val);
                     }
                 }
             }
 
-            Grid grid = new Grid(zoom, width, height, north, west);
+            Grid grid = new Grid(extents);
             ReferencedEnvelope env = grid.getMercatorEnvelopeMeters();
 
             GridCoverageFactory gcf = new GridCoverageFactory();

@@ -1,8 +1,5 @@
 package com.conveyal.r5.analyst;
 
-import com.conveyal.r5.analyst.cluster.Origin;
-import com.conveyal.r5.analyst.cluster.RegionalTask;
-
 /**
  * This holds and accumulates multiple accessibility values as they are computed.
  * Created by abyrd on 2018-01-11

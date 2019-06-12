@@ -95,7 +95,7 @@ public class TravelTimeComputer {
         // Determine car pick-up delay time for the access leg, which is generally specified in a scenario modification.
         // Negative values mean no car service is available.
         // Only find this time when cars are in use, as it requires potentially slow geometry operations.
-        final int carPickupDelaySeconds = (request.accessModes.contains(LegMode.CAR)) ?
+        final int pickupDelaySeconds = (request.accessModes.contains(LegMode.BICYCLE_RENT)) ?
             network.streetLayer.getWaitTime(request.fromLat, request.fromLon) : 0;
 
         // Find the set of destinations for a one-to-many travel time calculation, not yet linked to the street network.
@@ -113,10 +113,17 @@ public class TravelTimeComputer {
         if (request.transitModes.isEmpty()) {
             // TODO handle direct modes in the same loop that handles access, maybe by factoring it out into a method.
             StreetMode directMode = LegMode.getDominantStreetMode(request.directModes);
-            // If there is no car pickup service, skip routing (don't even try walking).
-            if (directMode == StreetMode.CAR && carPickupDelaySeconds < 0) {
-                return travelTimeReducer.finish();
+            // If there is no bikeshare/micromobility service, skip routing (don't even try walking).
+
+            if (request.directModes.contains(LegMode.BICYCLE_RENT)) {
+                if (pickupDelaySeconds < 0) {
+                    // No bikes available in area; walk instead
+                    directMode = StreetMode.WALK;
+                } else {
+                    directMode = StreetMode.BICYCLE;
+                }
             }
+
             // When doing a non-transit walk search, we're not trying to match the behavior of egress and transfer
             // searches which use distance as the quantity to minimize (because they are precalculated and stored as
             // distance, and then converted to times by dividing by speed without regard to weights/penalties for things
@@ -137,7 +144,7 @@ public class TravelTimeComputer {
 
             // Iterate over all destinations ("targets") and at each destination, save the same travel time for all percentiles.
             for (int d = 0; d < travelTimesToTargets.length; d++) {
-                final int travelTimeSeconds = travelTimesToTargets[d] + carPickupDelaySeconds;
+                final int travelTimeSeconds = travelTimesToTargets[d] + pickupDelaySeconds;
                 travelTimeReducer.recordTravelTimesForTarget(d, new int[]{travelTimeSeconds});
             }
 
@@ -163,18 +170,16 @@ public class TravelTimeComputer {
         // This tracks whether any of those searches could even be linked to the street network.
         boolean foundAnyOriginPoint = false;
 
-        // Convert from profile routing qualified modes to internal modes
-        EnumSet<StreetMode> accessModes = LegMode.toStreetModeSet(request.accessModes);
-
         // TODO make iteration over access modes conditional on use of transit? Include direct modes?
-        for (StreetMode accessMode : accessModes) {
+        for (LegMode mode : request.accessModes) {
+            StreetMode accessMode = LegMode.toStreetMode(mode);
             LOG.info("Performing street search for mode: {}", accessMode);
             // TODO rename to modeSpeedMillimetersPerSecond
             int streetSpeedMillimetersPerSecond =  (int) (request.getSpeedForMode(accessMode) * 1000);
             if (streetSpeedMillimetersPerSecond <= 0){
                 throw new IllegalArgumentException("Speed of access mode must be greater than 0.");
             }
-            if (accessMode == StreetMode.CAR && carPickupDelaySeconds < 0) {
+            if (mode == LegMode.BICYCLE_RENT && pickupDelaySeconds < 0) {
                 LOG.info("Car pick-up service is not available at this location, continuing to next access mode (if any).");
                 continue;
             }
@@ -216,10 +221,10 @@ public class TravelTimeComputer {
             PointSetTimes pointSetTimes = linkedDestinations.eval(sr::getTravelTimeToVertex,
                     streetSpeedMillimetersPerSecond, walkSpeedMillimetersPerSecond);
 
-            if (accessMode == StreetMode.CAR && carPickupDelaySeconds > 0) {
-                LOG.info("Delaying access times by {} seconds (for car pick-up wait).", carPickupDelaySeconds);
-                travelTimesToStopsSeconds.transformValues(i -> i + carPickupDelaySeconds);
-                pointSetTimes.incrementAllReachable(carPickupDelaySeconds);
+            if (mode == LegMode.BICYCLE_RENT && pickupDelaySeconds > 0) {
+                LOG.info("Delaying access times by {} seconds (for pick-up wait).", pickupDelaySeconds);
+                travelTimesToStopsSeconds.transformValues(i -> i + pickupDelaySeconds);
+                pointSetTimes.incrementAllReachable(pickupDelaySeconds);
             }
             minMergeMap(accessTimes, travelTimesToStopsSeconds);
             nonTransitTravelTimesToDestinations = PointSetTimes.minMerge(nonTransitTravelTimesToDestinations, pointSetTimes);

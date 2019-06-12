@@ -28,7 +28,7 @@ public enum  LegMode {
         if (legMode == LegMode.WALK) {
             return StreetMode.WALK;
         }
-        if (legMode == LegMode.BICYCLE) {
+        if (legMode == LegMode.BICYCLE || legMode == LegMode.BICYCLE_RENT) {
             return StreetMode.BICYCLE;
         }
         if (legMode == LegMode.CAR) {

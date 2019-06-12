@@ -65,7 +65,7 @@ public class PickupDelay extends Modification {
      * The default waiting time (floating point, in minutes) when no polygon is found. Negative numbers mean the area
      * is not served at all.
      */
-    public double defaultWait = 0;
+    public double defaultWait = 5;
 
     // Internal (private) fields
 

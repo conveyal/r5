@@ -260,9 +260,10 @@ public class PerTargetPropagater {
         int speedMillimetersPerSecond = (int) (request.getSpeedForMode(linkedTargets.streetMode) * MM_PER_METER);
         int egressLegTimeLimitSeconds = request.getMaxTimeSeconds(linkedTargets.streetMode);
 
-        // FIXME: MASSIVE HACK THAT ONLY WORKS ON ONE STUDY IN SWITZERLAND
+        // FIXME: MASSIVE HACK that assumes StreetMode.BICYCLE is only available from LegMode.BICYCLE_RENT, and that
+        //  wait is constant default throughout region
         final int waitingTimeSeconds =
-                (linkedTargets.streetMode == StreetMode.CAR && linkedTargets.streetLayer.waitTimePolygons != null) ?
+                (linkedTargets.streetMode == StreetMode.BICYCLE && linkedTargets.streetLayer.waitTimePolygons != null) ?
                 (int)(linkedTargets.streetLayer.waitTimePolygons.defaultData * SECONDS_PER_MINUTE) : 0;
 
         // Determine an egress limit in the same units as the egress cost tables in the linked point set.

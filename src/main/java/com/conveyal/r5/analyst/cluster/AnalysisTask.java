@@ -59,17 +59,10 @@ public abstract class AnalysisTask extends ProfileRequest {
      * If true, travel time surfaces will be saved to S3
      * Currently this only works on regional requests, and causes them to produce travel time surfaces instead of
      * accessibility indicator values.
-     * FIXME in practice this always implies travelTimeBreakdown and returnPaths, so we've got redundant and potentially incoherent information in the request.
      * The intent is in the future to make all these options separate - we can make either travel time surfaces or
      * accessibility indicators or both, and they may or may not be saved to S3.
      */
-    public boolean makeStaticSite = false;
-
-    /** Whether to break travel time down into in-vehicle, wait, and access/egress time. */
-    public boolean travelTimeBreakdown = false;
-
-    /** Whether to include paths in results. This allows rendering transitive-style schematic maps. */
-    public boolean returnPaths = false;
+    public boolean makeTauiSite = false;
 
     /** Which percentiles of travel time to calculate. */
     public double[] percentiles = new double[] { 50 };

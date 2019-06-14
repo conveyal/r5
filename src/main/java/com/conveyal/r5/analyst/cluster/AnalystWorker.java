@@ -462,7 +462,7 @@ public class AnalystWorker implements Runnable {
             // Fetching data grids should be relatively fast so we can do it synchronously.
             // Perhaps this can be done higher up in the call stack where we know whether or not it's a regional task.
             // TODO move this after the asynchronous loading of the rest of the necessary data?
-            if (!task.makeStaticSite) {
+            if (!task.makeTauiSite) {
                 task.gridData = gridCache.get(task.grid);
             }
 
@@ -479,7 +479,7 @@ public class AnalystWorker implements Runnable {
 
             // If we are generating a static site, there must be a single metadata file for an entire batch of results.
             // Arbitrarily we create this metadata as part of the first task in the job.
-            if (task.makeStaticSite && task.taskId == 0) {
+            if (task.makeTauiSite && task.taskId == 0) {
                 LOG.info("This is the first task in a job that will produce a static site. Writing shared metadata.");
                 saveStaticSiteMetadata(task, transportNetwork);
             }
@@ -491,7 +491,7 @@ public class AnalystWorker implements Runnable {
             TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork, gridCache);
             OneOriginResult oneOriginResult = computer.computeTravelTimes();
 
-            if (task.makeStaticSite) {
+            if (task.makeTauiSite) {
                 // Unlike a normal regional task, this will write a time grid rather than an accessibility indicator
                 // value because we're generating a set of time grids for a static site. We only save a file if it has
                 // non-default contents, as a way to save storage and bandwidth.

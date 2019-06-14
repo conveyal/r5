@@ -110,7 +110,7 @@ public class PerTargetPropagater {
         this.nonTransitTravelTimesToTargets = nonTransitTravelTimesToTargets;
         // If we're making a static site we'll break travel times down into components and make paths.
         // This expects the pathsToStopsForIteration and pathWriter fields to be set separately by the caller.
-        this.calculateComponents = task.makeStaticSite;
+        this.calculateComponents = task.makeTauiSite;
         StreetMode egressMode = LegMode.getDominantStreetMode(task.egressModes);
         speedMillimetersPerSecond = (int) (request.getSpeedForMode(egressMode) * MM_PER_METER);
         egressLegTimeLimitSeconds = request.getMaxAccessTimeForMode(egressMode) * SECONDS_PER_MINUTE;

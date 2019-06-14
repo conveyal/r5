@@ -146,7 +146,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
                     LegMode.getDominantStreetMode(task.accessModes),
                     LegMode.getDominantStreetMode(task.egressModes));
 
-            if (task.isHighPriority() || task.makeStaticSite) {
+            if (task.isHighPriority() || task.makeTauiSite) {
                 // TODO replace isHighPriority with polymorphism - method to return destination extents from any AnalysisTask.
                 // And generally remove the term "high priority" from the whole system.
                 // High Priority is an obsolete term for "single point task".

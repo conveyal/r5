@@ -56,10 +56,10 @@ public abstract class AnalysisTask extends ProfileRequest {
     /**
      * Whether to save results on S3.
      * If false, the results will only be sent back to the broker or UI.
-     * If true, travel time surfaces will be saved to S3
+     * If true, travel time surfaces and paths will be saved to S3
      * Currently this only works on regional requests, and causes them to produce travel time surfaces instead of
      * accessibility indicator values.
-     * The intent is in the future to make all these options separate - we can make either travel time surfaces or
+     * The intent is in the future to make separate options - we can make either travel time surfaces or
      * accessibility indicators or both, and they may or may not be saved to S3.
      */
     public boolean makeTauiSite = false;

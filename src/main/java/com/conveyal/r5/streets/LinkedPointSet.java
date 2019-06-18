@@ -367,7 +367,7 @@ public class LinkedPointSet implements Serializable {
 
 
     @Deprecated
-    public TravelTimeResult eval (TravelTimeFunction travelTimeForVertex) {
+    public PointSetTimes eval (TravelTimeFunction travelTimeForVertex) {
         // R5 used to not differentiate between seconds and meters, preserve that behavior in this deprecated function
         // by using 1 m / s
         return eval(travelTimeForVertex, 1000, 1000);
@@ -383,7 +383,7 @@ public class LinkedPointSet implements Serializable {
      * @return wrapped int[] of travel times (in seconds) to reach the pointset points
      */
 
-    public TravelTimeResult eval (TravelTimeFunction travelTimeForVertex, Integer onStreetSpeed, int offStreetSpeed) {
+    public PointSetTimes eval (TravelTimeFunction travelTimeForVertex, Integer onStreetSpeed, int offStreetSpeed) {
         int[] travelTimes = new int[edges.length];
         // Iterate over all locations in this temporary vertex list.
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
@@ -419,7 +419,7 @@ public class LinkedPointSet implements Serializable {
 
             travelTimes[i] = time0 < time1 ? time0 : time1;
         }
-        return new TravelTimeResult(pointSet, travelTimes);
+        return new PointSetTimes(pointSet, travelTimes);
     }
 
     /**
@@ -564,12 +564,12 @@ public class LinkedPointSet implements Serializable {
                     sr.quantityToMinimize = linkageCostUnit;
                     sr.route();
                     // TODO optimization: We probably shouldn't evaluate at every point in this LinkedPointSet in case it's much bigger than the driving radius.
-                    TravelTimeResult driveTimesToAllPoints = eval(sr::getTravelTimeToVertex, null,
+                    PointSetTimes driveTimesToAllPoints = eval(sr::getTravelTimeToVertex, null,
                             OFF_STREET_SPEED_MILLIMETERS_PER_SECOND);
                     // TODO optimization: should we make spatial index visit() method public to avoid copying results?
                     TIntList packedDriveTimes = new TIntArrayList();
-                    for (int p = 0; p < driveTimesToAllPoints.calculateNPoints(); p++) {
-                        int driveTimeToPoint = driveTimesToAllPoints.getTravelTimeToPoint(0, p);
+                    for (int p = 0; p < driveTimesToAllPoints.size(); p++) {
+                        int driveTimeToPoint = driveTimesToAllPoints.getTravelTimeToPoint(p);
                         if (driveTimeToPoint != Integer.MAX_VALUE) {
                             packedDriveTimes.add(p);
                             packedDriveTimes.add(driveTimeToPoint);

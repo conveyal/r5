@@ -115,7 +115,7 @@ public class TravelTimeComputer {
 
             LinkedPointSet directModeLinkedDestinations = destinations.getLinkage(network.streetLayer, directMode);
             int[] travelTimesToTargets = directModeLinkedDestinations
-                    .eval(sr::getTravelTimeToVertex, speedMillimetersPerSecond, walkSpeedMillimetersPerSecond).travelTimes;
+                    .eval(sr::getTravelTimeToVertex, speedMillimetersPerSecond, walkSpeedMillimetersPerSecond).getTravelTimesForSample(0);
 
             // Iterate over all destinations ("targets") and at each destination, save the same travel time for all percentiles.
             for (int d = 0; d < travelTimesToTargets.length; d++) {
@@ -202,7 +202,7 @@ public class TravelTimeComputer {
                                     else return state.distance / streetSpeedMillimetersPerSecond;
                                 },
                                 walkSpeedMillimetersPerSecond,
-                                walkSpeedMillimetersPerSecond).travelTimes;
+                                walkSpeedMillimetersPerSecond).getTravelTimesForSample(0);
             } else {
                 // Other modes are already asymmetric with the egress/stop trees, so just do a time-based on street
                 // search and don't worry about distance limiting.
@@ -212,7 +212,7 @@ public class TravelTimeComputer {
                 accessTimes = sr.getReachedStops(); // already in seconds
                 nonTransitTravelTimesToDestinations =
                         accessModeLinkedDestinations.eval(sr::getTravelTimeToVertex, streetSpeedMillimetersPerSecond,
-                                walkSpeedMillimetersPerSecond).travelTimes;
+                                walkSpeedMillimetersPerSecond).getTravelTimesForSample(0);
             }
 
             // Short circuit unnecessary transit routing: If the origin was linked to a road, but no transit stations

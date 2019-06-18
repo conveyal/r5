@@ -3,9 +3,9 @@ package com.conveyal.r5.analyst;
 import com.beust.jcommander.ParameterException;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
-import com.conveyal.r5.analyst.cluster.Origin;
 import com.conveyal.r5.analyst.cluster.RegionalTask;
 import com.conveyal.r5.analyst.cluster.TimeGrid;
+import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 import com.conveyal.r5.analyst.cluster.TravelTimeSurfaceTask;
 import com.conveyal.r5.profile.FastRaptorWorker;
 import org.slf4j.Logger;
@@ -28,8 +28,8 @@ public class TravelTimeReducer {
      * after results have been calculated) */
     private int maxTripDurationMinutes;
 
-    /** Travel time results for a whole grid of destinations. May be null if we're only recording accessibility. */
-    private TimeGrid timeGrid = null;
+    /** Reduced travel time results. May be null if we're only recording accessibility. */
+    private TravelTimeResult travelTimes = null;
 
     private AccessibilityResult accessibilityResult = null;
 
@@ -72,7 +72,7 @@ public class TravelTimeReducer {
         // Decide whether we want to retain travel times to all destinations for this origin.
         retainTravelTimes = task instanceof TravelTimeSurfaceTask || task.makeStaticSite;
         if (retainTravelTimes) {
-            timeGrid = new TimeGrid(task);
+            travelTimes = new TimeGrid(task);
         }
 
         // Decide whether we want to calculate cumulative opportunities accessibility indicators for this origin.
@@ -145,7 +145,7 @@ public class TravelTimeReducer {
             throw new ParameterException("You must supply the expected number of travel time values");
         }
         if (retainTravelTimes) {
-            timeGrid.setTarget(target, percentileTravelTimesMinutes);
+            travelTimes.setTarget(target, percentileTravelTimesMinutes);
         }
         if (calculateAccessibility) {
             // This x/y addressing can only work with one grid at a time,
@@ -191,7 +191,7 @@ public class TravelTimeReducer {
      * routing and propagation when the origin point is not connected to the street network.
      */
     public OneOriginResult finish () {
-        return new OneOriginResult(timeGrid, accessibilityResult);
+        return new OneOriginResult(travelTimes, accessibilityResult);
     }
 
 }

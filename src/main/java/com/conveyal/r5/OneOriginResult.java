@@ -4,6 +4,7 @@ import com.conveyal.r5.analyst.AccessibilityResult;
 import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.RegionalWorkResult;
 import com.conveyal.r5.analyst.cluster.TimeGrid;
+import com.conveyal.r5.analyst.cluster.TravelTimeResult;
 
 /**
  * This provides a single return type for all the kinds of results we can get from a travel time computer and reducer
@@ -13,12 +14,12 @@ import com.conveyal.r5.analyst.cluster.TimeGrid;
 ] */
 public class OneOriginResult {
 
-    public final TimeGrid timeGrid;
+    public final TravelTimeResult travelTimes;
 
     public final AccessibilityResult accessibility;
 
-    public OneOriginResult(TimeGrid timeGrid, AccessibilityResult accessibility) {
-        this.timeGrid = timeGrid;
+    public OneOriginResult(TravelTimeResult travelTimes, AccessibilityResult accessibility) {
+        this.travelTimes = travelTimes;
         this.accessibility = accessibility;
     }
 

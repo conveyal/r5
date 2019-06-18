@@ -1,11 +1,9 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.Grid;
-import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.WebMercatorExtents;
 import com.conveyal.r5.common.JsonUtilities;
 import com.conveyal.r5.profile.FastRaptorWorker;
-import com.google.common.io.LittleEndianDataOutputStream;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
@@ -24,7 +22,6 @@ import java.awt.image.WritableRaster;
 import java.io.DataOutput;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Arrays;
 
 /**
  * Grid for recording travel times, which can be written to flat binary output
@@ -44,7 +41,7 @@ import java.util.Arrays;
  * (4 byte int) number of values per pixel
  * (repeated 4-byte int) values of each pixel in row major order. Values are not delta coded here.
  */
-public class TimeGrid {
+public class TimeGrid extends TravelTimeResult{
 
     public static final Logger LOG = LoggerFactory.getLogger(TimeGrid.class);
 
@@ -58,69 +55,26 @@ public class TimeGrid {
 
     private final WebMercatorExtents extents;
 
-    // used to be stored as longs, but can probably still use with impunity without fear of overflow
-    private final int nValuesPerPixel;
-
-    // Flattened 1-d array of pixel values
-    // FIXME its weird that we're storing this as a flattened array using a completely different order than we're writing out to the file.
-    // Should this really be flattened until it's written out?
-    private int[] values;
-
-    public final int nValues;
-
     /**
      * Create a new in-memory access grid writer for a width x height x nValuesPerPixel 3D array.
      */
     public TimeGrid(AnalysisTask task) {
-        this.extents = WebMercatorExtents.forTask(task);
-        this.nValuesPerPixel = task.percentiles.length;
-        this.nValues = extents.getArea() * nValuesPerPixel;
+        super(task);
+        extents = WebMercatorExtents.forTask(task);
 
-        long nBytes = ((long)nValues) * Integer.BYTES + HEADER_SIZE;
+        long nBytes = ((long) nSamplesPerPoint * nPoints) * Integer.BYTES + HEADER_SIZE;
         if (nBytes > Integer.MAX_VALUE) {
             throw new RuntimeException("Grid size in bytes exceeds 31-bit addressable space.");
         }
-
-        // Initialization: Fill the values array the default unreachable value.
-        // This way the grid is valid even if we don't write anything into it
-        // (rather than saying everything is reachable in zero minutes).
-        values = new int[nValues];
-        for (int i = 0; i < nValues; i ++) {
-            values[i] = FastRaptorWorker.UNREACHED;
-        }
-
-    }
-
-    // At 2 million destinations and 100 int values per destination (every percentile) we still only are at 800MB.
-    // So no real risk of overflowing an int index.
-    public void setTarget(int targetIndex, int[] pixelValues) {
-        if (pixelValues.length != nValuesPerPixel) {
-            throw new IllegalArgumentException("Incorrect number of values per pixel.");
-        }
-        int index1d = targetIndex * nValuesPerPixel;
-        for (int i : pixelValues) {
-            values[index1d] = i;
-            index1d += 1;
-        }
-    }
-
-    /**
-     * Write the grid out to a persistence buffer, an abstraction that will perform compression and allow us to save
-     * it to a local or remote storage location.
-     */
-    public PersistenceBuffer writeToPersistenceBuffer() {
-        PersistenceBuffer persistenceBuffer = new PersistenceBuffer();
-        this.writeGridToDataOutput(persistenceBuffer.getDataOutput());
-        persistenceBuffer.doneWriting();
-        return persistenceBuffer;
     }
 
     /**
      * Write the grid to an object implementing the DataOutput interface.
      * TODO maybe shrink the dimensions of the resulting timeGrid to contain only the reached cells.
      */
-    public void writeGridToDataOutput(DataOutput dataOutput) {
-        int sizeInBytes = nValues * Integer.BYTES + HEADER_SIZE;
+    @Override
+    public void writeToDataOutput(DataOutput dataOutput) {
+        int sizeInBytes = nSamplesPerPoint * nPoints * Integer.BYTES + HEADER_SIZE;
         LOG.info("Writing travel time surface with uncompressed size {} kiB", sizeInBytes / 1024);
         try {
             // Write header
@@ -131,13 +85,12 @@ public class TimeGrid {
             dataOutput.writeInt(extents.north);
             dataOutput.writeInt(extents.width);
             dataOutput.writeInt(extents.height);
-            dataOutput.writeInt(nValuesPerPixel);
+            dataOutput.writeInt(nSamplesPerPoint);
             // Write values, delta coded
-            for (int i = 0; i < nValuesPerPixel; i++) {
+            for (int i = 0; i < nSamplesPerPoint; i++) {
                 int prev = 0; // delta code within each percentile grid
                 for (int j = 0; j < extents.getArea(); j++) {
-                    // FIXME this is doing extra math to rearrange the ordering of the flattened array it's reading.
-                    int curr = values[j * nValuesPerPixel + i];
+                    int curr = values[i][j];
                     // TODO try not delta-coding the "unreachable" value, and retaining the prev value across unreachable areas.
                     int delta = curr - prev;
                     dataOutput.writeInt(delta);
@@ -147,6 +100,11 @@ public class TimeGrid {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public int calculateNPoints() {
+        return extents.getArea() * nSamplesPerPoint;
     }
 
     /**
@@ -159,14 +117,14 @@ public class TimeGrid {
             // Inspired by org.geotools.coverage.grid.GridCoverageFactory
             final WritableRaster raster =
                     RasterFactory.createBandedRaster(DataBuffer.TYPE_INT, extents.width, extents.height,
-                            nValuesPerPixel, null);
+                            nSamplesPerPoint, null);
 
             int val;
 
             for (int y = 0; y < extents.height; y ++) {
                 for (int x = 0; x < extents.width; x ++) {
-                    for (int n = 0; n < nValuesPerPixel; n ++) {
-                        val = values[(y * extents.width + x) * nValuesPerPixel + n];
+                    for (int n = 0; n < nSamplesPerPoint; n ++) {
+                        val = values[n][(y * extents.width + x)];
                         if (val < FastRaptorWorker.UNREACHED) raster.setSample(x, y, n, val);
                     }
                 }
@@ -177,7 +135,6 @@ public class TimeGrid {
 
             GridCoverageFactory gcf = new GridCoverageFactory();
             GridCoverage2D coverage = gcf.create("TIMEGRID", raster, env);
-
             GeoTiffWriteParams wp = new GeoTiffWriteParams();
             wp.setCompressionMode(GeoTiffWriteParams.MODE_EXPLICIT);
             wp.setCompressionType("LZW");
@@ -209,13 +166,5 @@ public class TimeGrid {
         }
     }
 
-    /**
-     * @return true if the search reached any destination cell, false if it did not reach any cells. No cells will be
-     * reached when the origin point is outside the transport network. Some cells will still be reached via the street
-     * network when we are outside the transit network but within the street network.
-     */
-    public boolean anyCellReached() {
-        return Arrays.stream(values).anyMatch(v -> v != FastRaptorWorker.UNREACHED);
-    }
 
 }

@@ -223,7 +223,7 @@ public class PointToPointQuery {
             //TODO: add support for bike sharing
             streetRouter.streetMode = StreetMode.valueOf(mode.toString());
             streetRouter.profileRequest = request;
-            streetRouter.timeLimitSeconds = request.getTimeLimit(mode);
+            streetRouter.timeLimitSeconds = request.getMaxTimeSeconds(mode);
             if(streetRouter.setOrigin(request.toLat, request.toLon)) {
                 streetRouter.route();
                 TIntIntMap stops = streetRouter.getReachedStops();
@@ -331,7 +331,7 @@ public class PointToPointQuery {
                 streetRouter.streetMode = StreetMode.valueOf(mode.toString());
 
                 //Gets correct maxCar/Bike/Walk time in seconds for access leg based on mode since it depends on the mode
-                streetRouter.timeLimitSeconds = request.getTimeLimit(mode);
+                streetRouter.timeLimitSeconds = request.getMaxTimeSeconds(mode);
                 streetRouter.transitStopSearch = true;
                 streetRouter.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
 

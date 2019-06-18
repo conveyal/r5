@@ -141,10 +141,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             this.scenarioId = task.scenarioId != null ? task.scenarioId : task.scenario.id;
             // We need to link for all of access modes, egress modes, and direct modes (depending on whether transit is used).
             // See code in TravelTimeComputer for when each is used.
-            this.modes = EnumSet.of(
-                    LegMode.getDominantStreetMode(task.directModes),
-                    LegMode.getDominantStreetMode(task.accessModes),
-                    LegMode.getDominantStreetMode(task.egressModes));
+            this.modes = LegMode.toStreetModeSet(task.directModes, task.accessModes, task.egressModes);
 
             if (task.isHighPriority() || task.makeStaticSite) {
                 // TODO replace isHighPriority with polymorphism - method to return destination extents from any AnalysisTask.

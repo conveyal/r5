@@ -434,28 +434,25 @@ public class TransportNetworkCache {
         // There is no intermediate cache here for the scenario objects - we read them from disk files.
         // This is not a problem, they're only read once before cacheing the resulting scenario-network.
         File scenarioFile = new File(cacheDir, getScenarioFilename(networkId, scenarioId));
-        if (!scenarioFile.exists()) {
-            LOG.info("Retrieving scenario stored separately on S3 rather than in the ProfileRequest.");
-            try {
-                S3Object obj = s3.getObject(bucket, getScenarioFilename(networkId, scenarioId));
-                InputStream is = obj.getObjectContent();
-                OutputStream os = new BufferedOutputStream(new FileOutputStream(scenarioFile));
-                ByteStreams.copy(is, os);
-                is.close();
-                os.close();
-            } catch (Exception e) {
-                LOG.error("Error retrieving scenario {} from S3: {}", scenarioId, e.toString());
-            }
-        }
         try {
-            LOG.info("Loading scenario from disk file.");
-            scenario = JsonUtilities.objectMapper.readValue(scenarioFile, Scenario.class);
-        } catch (IOException e) {
-            LOG.error("Could not read scenario {} from disk: {}", scenarioId, e.toString());
-        }
-        if (scenario == null) {
-            LOG.warn("No scenario provided or loaded. Replacing with empty scenario.");
-            scenario = new Scenario();
+            if (!scenarioFile.exists()) {
+                LOG.info("Retrieving scenario stored separately on S3 rather than in the ProfileRequest.");
+                try {
+                    S3Object obj = s3.getObject(bucket, getScenarioFilename(networkId, scenarioId));
+                    InputStream is = obj.getObjectContent();
+                    OutputStream os = new BufferedOutputStream(new FileOutputStream(scenarioFile));
+                    ByteStreams.copy(is, os);
+                    is.close();
+                    os.close();
+                } catch (Exception e) {
+                    LOG.error("Error retrieving scenario {} from S3: {}", scenarioId, e.toString());
+                }
+            }
+            LOG.info("Loading scenario from disk file {}", scenarioFile);
+            scenario = JsonUtilities.lenientObjectMapper.readValue(scenarioFile, Scenario.class);
+        } catch (Exception e) {
+            LOG.error("Could not fetch scenario {} or read it from from disk: {}", scenarioId, e.toString());
+            throw new RuntimeException("Scenario could not be loaded.", e);
         }
         return scenario;
     }

@@ -526,7 +526,7 @@ public class LinkedPointSet implements Serializable {
                 // Walking distances from stops to street vertices are saved in the transitLayer.
                 // Get the pre-computed distance table from the stop to the street vertices,
                 // then extend that table out from the street vertices to the points in this PointSet.
-                // TODO reuse the code that computes the walk tables at com.conveyal.r5.transit.TransitLayer.buildOneDistanceTable() rather than duplicating it below for other modes.
+                // TODO reuse the code that computes the walk tables at TransitLayer.buildOneDistanceTable() rather than duplicating it below for other modes.
                 TIntIntMap distanceTableToVertices = transitLayer.stopToVertexDistanceTables.get(stopIndex);
                 return distanceTableToVertices == null ? null :
                         extendDistanceTableToPoints(distanceTableToVertices, distanceTableZone);

@@ -6,6 +6,8 @@ import com.conveyal.osmlib.OSM;
 import com.conveyal.osmlib.OSMEntity;
 import com.conveyal.osmlib.Relation;
 import com.conveyal.osmlib.Way;
+import com.conveyal.r5.analyst.scenario.IndexedPolygonCollection;
+import com.conveyal.r5.analyst.scenario.ModificationPolygon;
 import com.conveyal.r5.api.util.BikeRentalStation;
 import com.conveyal.r5.api.util.ParkRideParking;
 import com.conveyal.r5.common.GeometryUtils;
@@ -177,6 +179,12 @@ public class StreetLayer implements Serializable, Cloneable {
      * Otherwise this field should be null.
      */
     public StreetLayer baseStreetLayer = null;
+
+    /**
+     * This set of polygons specifies a spatially varying wait time to use a ride hailing service. Negative wait times
+     * mean the service is not available at a particular location. If this reference is null, no wait time is applied.
+     */
+    public IndexedPolygonCollection waitTimePolygons;
 
     public static final EnumSet<EdgeStore.EdgeFlag> ALL_PERMISSIONS = EnumSet
         .of(EdgeStore.EdgeFlag.ALLOWS_BIKE, EdgeStore.EdgeFlag.ALLOWS_CAR,
@@ -1534,6 +1542,32 @@ public class StreetLayer implements Serializable, Cloneable {
 
         }
         return bikeRentalStations;
+    }
+
+    /**
+     * @param lat latitude of the starting point in floating point degrees
+     * @param lon longitude the starting point in floating point degrees
+     * @return the waiting time in seconds to begin driving on the street network (waiting to be picked up by a car)
+     */
+    public int getWaitTime (double lat, double lon) {
+        if (waitTimePolygons == null) {
+            return 0;
+        } else {
+            // TODO verify x, y order in coordinate
+            Point point = GeometryUtils.geometryFactory.createPoint(new Coordinate(lon, lat));
+            ModificationPolygon polygon = waitTimePolygons.getWinningPolygon(point);
+            // Convert minutes to seconds
+            return (int)(polygon.data * 60);
+        }
+    }
+
+    @Override
+    public String toString() {
+        String detail = "(base)";
+        if (baseStreetLayer != null) {
+            detail = "(scenario " + parentNetwork.scenarioId + ")";
+        }
+        return "StreetLayer" + detail;
     }
 
 }

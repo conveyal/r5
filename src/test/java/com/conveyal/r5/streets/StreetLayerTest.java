@@ -158,21 +158,21 @@ public class StreetLayerTest extends TestCase {
          EdgeStore.Edge snakeEdge = streetLayer.edgeStore.getCursor(0);
 
          long originalOsmId = snakeEdge.getOSMID();
-        int originalLength = snakeEdge.getLengthMm();
-        Coordinate[] originalGeometry = snakeEdge.getGeometry().getCoordinates();
-        int originalFromVertex = snakeEdge.getFromVertex();
-        int originalToVertex = snakeEdge.getToVertex();
+         int originalLength = snakeEdge.getLengthMm();
+         Coordinate[] originalGeometry = snakeEdge.getGeometry().getCoordinates();
+         int originalFromVertex = snakeEdge.getFromVertex();
+         int originalToVertex = snakeEdge.getToVertex();
 
          TIntList stopVertexIds = new TIntArrayList();
          for (Coordinate stopCoordinate : stopCoordinates) {
-            int stopVertexId = streetLayer.createAndLinkVertex(stopCoordinate.y, stopCoordinate.x);
-            // Vertex IDs 0 and 1 should be taken by the beginning and end points of the single original edge.
-            // Negative vertex ID would indicate a linking problem.
-            assertTrue(stopVertexId > 1);
-            stopVertexIds.add(stopVertexId);
-            // Each added stop should create one new pair of street edges and one new pair of link edges, in addition
-            // to the original pair of edges from the original single street.
-            assertTrue(streetLayer.edgeStore.nEdgePairs() == stopVertexIds.size() * 2 + 1);
+             int stopVertexId = streetLayer.createAndLinkVertex(stopCoordinate.y, stopCoordinate.x);
+             // Vertex IDs 0 and 1 should be taken by the beginning and end points of the single original edge.
+             // Negative vertex ID would indicate a linking problem.
+             assertTrue(stopVertexId > 1);
+             stopVertexIds.add(stopVertexId);
+             // Each added stop should create one new pair of street edges and one new pair of link edges, in addition
+             // to the original pair of edges from the original single street.
+             assertTrue(streetLayer.edgeStore.nEdgePairs() == stopVertexIds.size() * 2 + 1);
          }
 
          // As we iterate over all the newly split edges, we'll add up their lengths.

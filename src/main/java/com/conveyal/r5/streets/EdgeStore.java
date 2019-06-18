@@ -8,6 +8,7 @@ import com.conveyal.r5.profile.ProfileRequest;
 import com.conveyal.r5.trove.AugmentedList;
 import com.conveyal.r5.trove.TIntAugmentedList;
 import com.conveyal.r5.trove.TLongAugmentedList;
+import com.conveyal.r5.util.P2;
 import com.conveyal.r5.util.TIntIntHashMultimap;
 import com.conveyal.r5.util.TIntIntMultimap;
 import com.vividsolutions.jts.geom.Coordinate;
@@ -30,6 +31,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -728,6 +730,47 @@ public class EdgeStore implements Serializable {
             return true;
         }
 
+        /**
+         * Cut the packed array of intermediate coordinates in two at the specified segment index, non-destructively
+         * (i.e. returning copies). The original array of the edge's intermediate coordinates does not include the first
+         * and last points of the edge (which are supplied by vertices), so the segment at index N ends at
+         * intermediate point N, which occupies array indexes N2 and N2+1 in the packed array. Intermediate points
+         * before the split point (which is on the specified segment), ending with the beginning of the split
+         * segment, should be in the first return array. Intermediate points after the split point, starting with the
+         * end of the split segment, should be in the second return array. The first or second return array can be
+         * empty if we are splitting at the first or last segment respectively, or if there are no intermediate
+         * coordinates.
+         * @return Pair with element a being int[] of intermediate coordinates before split, and element b being
+         * int[] of intermediate coordinates after split.
+         */
+        public P2<int[]> splitGeometryAfter(int segment) {
+            int[] preSplit = EMPTY_INT_ARRAY;
+            int[] postSplit = EMPTY_INT_ARRAY;
+            // Original packed array of edge's intermediate coordinates
+            int[] original = geometries.get(pairIndex);
+            if (original.length > 0) {
+                if (segment > 0) {
+                    preSplit = Arrays.copyOfRange(original, 0, segment * 2);
+                }
+                if (segment * 2 < original.length) {
+                    postSplit = Arrays.copyOfRange(original, segment * 2, original.length);
+                }
+            }
+            return new P2<>(preSplit, postSplit);
+        }
+
+        /**
+         * Set intermediate coordinates directly with packed array
+         * @param coordinates Packed lists of lat, lon, lat, lon... as fixed-point integers
+         */
+        public void setGeometry (int[] coordinates) {
+            geometries.set(pairIndex, coordinates);
+            calculateAngles();
+        }
+
+        /**
+         * Set intermediate coordinates from OSM nodes
+         */
         public void setGeometry (List<Node> nodes) {
             // The same empty int array represents all straight-line edges.
             if (nodes.size() <= 2) {
@@ -897,9 +940,7 @@ public class EdgeStore implements Serializable {
         /** @return an envelope around the whole edge geometry, in fixed-point WGS84 degrees. */
         public Envelope getEnvelope () {
             Envelope envelope = new Envelope();
-            forEachPoint((p, fixedLat, fixedLon) -> {
-                envelope.expandToInclude(fixedLon, fixedLat);
-            });
+            forEachPoint((p, fixedLat, fixedLon) -> envelope.expandToInclude(fixedLon, fixedLat));
             return envelope;
         }
 

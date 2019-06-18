@@ -3,6 +3,7 @@ package com.conveyal.r5.streets;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.r5.point_to_point.builder.TNBuilderConfig;
 import com.conveyal.r5.profile.StreetMode;
+import com.vividsolutions.jts.geom.Coordinate;
 import gnu.trove.TIntCollection;
 import gnu.trove.iterator.TIntIterator;
 import junit.framework.TestCase;
@@ -123,6 +124,55 @@ public class StreetLayerTest extends TestCase {
 
         //streetLayer.edgeStore.dump();
     }
+
+    /**
+     * Test if edge length and geometry are properly preserved in splitting
+     */
+     @Test
+    public void testSplitsForStops () {
+         OSM osm = new OSM(null);
+         osm.intersectionDetection = true;
+
+         // One edge from Oakland, CA
+         osm.readFromUrl(StreetLayerTest.class.getResource("snake-rd.pbf").toString());
+         // Two coordinates near the edge
+         Coordinate[] stopCoordinates = new Coordinate[]{
+            new Coordinate(-122.206863, 37.825161),
+            new Coordinate(-122.206751, 37.826258)
+         };
+         StreetLayer streetLayer = new StreetLayer(TNBuilderConfig.defaultConfig());
+         streetLayer.loadFromOsm(osm, false, true);
+         osm.close();
+         //This is needed for inserting new vertices around coordinates
+         streetLayer.indexStreets();
+
+        long osmId = streetLayer.edgeStore.getCursor(0).getOSMID();
+        int originalLength = streetLayer.edgeStore.getCursor(0).getLengthMm();
+        Coordinate[] originalGeometry = streetLayer.edgeStore.getCursor(0).getGeometry().getCoordinates();
+
+         for (Coordinate stop : stopCoordinates) {
+            streetLayer.createAndLinkVertex(stop.y, stop.x);
+         }
+
+         int accumulatedLength = 0;
+         int originalGeometryIndex = 1;
+
+         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
+
+         while(edge.advance()) {
+             if (edge.getOSMID() == osmId && edge.isForward()) {
+                 accumulatedLength += edge.getLengthMm();
+                 Coordinate[] splitCoordinates = edge.getGeometry().getCoordinates();
+                 // Skip first and last coordinates of the linestring that has been newly created by splitting, since
+                 // we don't necessarily expect to see these coordinates in the original geometry.
+                 for (int i = 1; i < splitCoordinates.length - 1; i++){
+                     assert(splitCoordinates[i].equals2D(originalGeometry[originalGeometryIndex]));
+                     originalGeometryIndex++;
+                 }
+             }
+         }
+         assertEquals(originalLength, accumulatedLength);
+     }
 
     /** Test that simple turn restrictions (no via ways) are read properly, using http://www.openstreetmap.org/relation/5696764 */
     @Test

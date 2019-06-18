@@ -1,6 +1,9 @@
 package com.conveyal.r5.streets;
 
 import com.conveyal.r5.analyst.PointSet;
+import com.conveyal.r5.profile.FastRaptorWorker;
+
+import static com.conveyal.r5.profile.FastRaptorWorker.UNREACHED;
 
 /**
  * The travel time to every point in a PointSet.
@@ -44,7 +47,7 @@ public class PointSetTimes {
      */
     public void incrementAllReachable(int seconds) {
         for (int i = 0; i < travelTimes.length; i++) {
-            if (travelTimes[i] != Integer.MAX_VALUE) {
+            if (travelTimes[i] != UNREACHED) {
                 travelTimes[i] += seconds;
             }
         }

@@ -78,8 +78,8 @@ public class PerTargetPropagater {
     /** Whether to break travel times down into walk, wait, and ride time. */
     private boolean calculateComponents;
 
-    private static final int SECONDS_PER_MINUTE = 60;
-    private static final int MM_PER_METER = 1000;
+    public static final int SECONDS_PER_MINUTE = 60;
+    public static final int MM_PER_METER = 1000;
 
     // STATE FIELDS WHICH ARE RESET WHEN PROCESSING EACH DESTINATION.
     // These track the characteristics of the best paths known to the target currently being processed.
@@ -260,7 +260,7 @@ public class PerTargetPropagater {
         int speedMillimetersPerSecond = (int) (request.getSpeedForMode(linkedTargets.streetMode) * MM_PER_METER);
         int egressLegTimeLimitSeconds = request.getMaxTimeSeconds(linkedTargets.streetMode);
 
-        // FIXME: MASSIVE HACK THAT ONLY WORKS ON ONE STUDY IN SWITZERLAND
+        // If handling car egress, and car hailing waiting times are defined, initialize with default hail wait time.
         final int waitingTimeSeconds =
                 (linkedTargets.streetMode == StreetMode.CAR && linkedTargets.streetLayer.waitTimePolygons != null) ?
                 (int)(linkedTargets.streetLayer.waitTimePolygons.defaultData * SECONDS_PER_MINUTE) : 0;

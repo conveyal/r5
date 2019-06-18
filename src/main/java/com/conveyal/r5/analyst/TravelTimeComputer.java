@@ -5,7 +5,6 @@ import com.conveyal.r5.analyst.cluster.AnalysisTask;
 import com.conveyal.r5.analyst.cluster.PathWriter;
 import com.conveyal.r5.analyst.fare.InRoutingFareCalculator;
 import com.conveyal.r5.api.util.LegMode;
-import com.conveyal.r5.point_to_point.builder.PointToPointQuery;
 import com.conveyal.r5.profile.DominatingList;
 import com.conveyal.r5.profile.FareDominatingList;
 import com.conveyal.r5.profile.FastRaptorWorker;
@@ -15,17 +14,16 @@ import com.conveyal.r5.profile.StreetMode;
 import com.conveyal.r5.streets.LinkedPointSet;
 import com.conveyal.r5.streets.PointSetTimes;
 import com.conveyal.r5.streets.StreetRouter;
-import com.conveyal.r5.transit.TransitLayer;
 import com.conveyal.r5.transit.TransportNetwork;
-import gnu.trove.iterator.TIntIntIterator;
 import gnu.trove.map.TIntIntMap;
 import gnu.trove.map.hash.TIntIntHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.*;
+import java.util.EnumSet;
 import java.util.function.IntFunction;
-import java.util.stream.Collectors;
+
+import static com.conveyal.r5.profile.PerTargetPropagater.MM_PER_METER;
 
 /**
  * This computes a surface representing travel time from one origin to all destination cells, and writes out a
@@ -86,7 +84,7 @@ public class TravelTimeComputer {
         }
 
         // Convert from floating point meters per second (in request) to integer millimeters per second (internal).
-        int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * 1000);
+        int walkSpeedMillimetersPerSecond = (int) (request.walkSpeed * MM_PER_METER);
 
         // Create an object that accumulates travel times at each destination, simplifying them into percentiles.
         // TODO Create and encapsulate this within the propagator.

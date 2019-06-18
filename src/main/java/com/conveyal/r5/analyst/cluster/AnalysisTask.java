@@ -111,7 +111,7 @@ public abstract class AnalysisTask extends ProfileRequest {
          */
         /** Binary grid of travel times from a single origin, for multiple percentiles, returned via broker by default */
         TRAVEL_TIME_SURFACE,
-        /** Bootstrapped accessibility results for multiple origins, returned over SQS by default. */
+        /** Cumulative opportunity accessibility values for all cells in a grid, returned to broker for assembly*/
         REGIONAL_ANALYSIS
     }
 

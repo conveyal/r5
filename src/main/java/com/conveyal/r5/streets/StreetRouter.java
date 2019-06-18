@@ -319,6 +319,7 @@ public class StreetRouter {
             LOG.info("No street was found near the specified origin point of {}, {}.", lat, lon);
             return false;
         }
+
         originSplit = split;
         bestStatesAtEdge.clear();
         queue.clear();
@@ -520,9 +521,9 @@ public class StreetRouter {
         EdgeStore.Edge edge = streetLayer.edgeStore.getCursor();
 
         if (transitStopSearch) {
-            routingVisitor = new StopVisitor(streetLayer, quantityToMinimize, transitStopSearchQuantity, profileRequest.getMinTimeLimit(streetMode));
+            routingVisitor = new StopVisitor(streetLayer, quantityToMinimize, transitStopSearchQuantity, profileRequest.getMinTimeSeconds(streetMode));
         } else if (flagSearch != null) {
-            routingVisitor = new VertexFlagVisitor(streetLayer, quantityToMinimize, flagSearch, flagSearchQuantity, profileRequest.getMinTimeLimit(streetMode));
+            routingVisitor = new VertexFlagVisitor(streetLayer, quantityToMinimize, flagSearch, flagSearchQuantity, profileRequest.getMinTimeSeconds(streetMode));
         }
         while (!queue.isEmpty()) {
             State s0 = queue.poll();
@@ -1199,5 +1200,19 @@ public class StreetRouter {
         }
     }
 
+    /**
+     * Continue a search by walking (presumably after a car or bicycle search is complete).
+     * This allows accessing transit stops that are linked to edges that are only walkable, but not drivable or bikeable.
+     * This maintains the total travel time limit and other parameters.
+     * NOTE: this conflicts with the rule that a router should not be reused.
+     * This is a good example of why we may want to change that rule. Alternatively this could construct a new StreetRouter.
+     * Just allowing more than one mode doesn't give the desired effect - we really want a sequence of separate modes.
+     */
+    public void keepRoutingOnFoot() {
+        queue.clear();
+        bestStatesAtEdge.forEachEntry((edgeId, states) -> queue.addAll(states));
+        streetMode = StreetMode.WALK;
+        route();
+    }
 
 }

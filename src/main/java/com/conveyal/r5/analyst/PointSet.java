@@ -36,12 +36,11 @@ public abstract class PointSet {
 
     /**
      * Maximum number of street network linkages to cache per PointSet. This is a crude way of limiting memory
-     * consumption, and should eventually be replaced with a WeighingCache. Since every Scenario has its own StreetLayer
-     * instance now, this means we can hold e.g. walk and bike linkages (with distance tables) for 3 scenarios at once.
-     * Note that the baseline scenario also uses up slots in the cache, but is very quick to re-load because it's an
-     * exact copy of the pre-built base linkage saved with the network.
+     * consumption, and should eventually be replaced with a WeighingCache. Since every Scenario including the baseline
+     * has its own StreetLayer instance now, this means we can hold walk, bike, and car linkages (with distance tables)
+     * for 2 scenarios plus the baseline at once.
      */
-    public static int LINKAGE_CACHE_SIZE = 6;
+    public static int LINKAGE_CACHE_SIZE = 9;
 
     /**
      * When this PointSet is connected to the street network, the resulting data are cached in this Map to speed up
@@ -83,12 +82,13 @@ public abstract class PointSet {
     private class LinkageCacheLoader extends CacheLoader<Tuple2<StreetLayer, StreetMode>, LinkedPointSet> implements Serializable {
         @Override
         public LinkedPointSet load(Tuple2<StreetLayer, StreetMode> key) {
-            LOG.info("Linkage for ({}, {}) was not found in cache, building it now.", key.a, key.b);
+            LOG.info("Building Linkage for ({}, {}) because it was not found in cache.", key.a, key.b);
             // If this StreetLayer is a part of a scenario and is therefore wrapping a base StreetLayer we need
             // to recursively fetch / create a linkage for that base StreetLayer so we don't duplicate work.
             // PointSet.this accesses the instance of the outer class.
             LinkedPointSet baseLinkage = null;
             if (key.a.isScenarioCopy()) {
+                LOG.info("Basing linkage for ({}, {}) on the linkage for ({}, {}).", key.a, key.b, key.a.baseStreetLayer, key.b);
                 baseLinkage = PointSet.this.getLinkage(key.a.baseStreetLayer, key.b);
             }
             // Build a new linkage from this PointSet to the supplied StreetNetwork,
@@ -112,7 +112,7 @@ public abstract class PointSet {
      */
     public PointSet() {
         this.linkageCache = CacheBuilder.newBuilder().maximumSize(LINKAGE_CACHE_SIZE)
-                .removalListener(notification -> LOG.warn("Linkage cache evicted {}, cause: {}",
+                .removalListener(notification -> LOG.warn("LINKAGE CACHE EVICTION. key: {}, cause: {}",
                         notification.getKey(), notification.getCause()))
                 .build(new LinkageCacheLoader());
     }

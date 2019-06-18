@@ -70,7 +70,7 @@ public class TravelTimeReducer {
         }
 
         // Decide whether we want to retain travel times to all destinations for this origin.
-        retainTravelTimes = task instanceof TravelTimeSurfaceTask || task.makeStaticSite;
+        retainTravelTimes = task instanceof TravelTimeSurfaceTask || task.makeTauiSite;
         if (retainTravelTimes) {
             travelTimes = new TimeGrid(task);
         }

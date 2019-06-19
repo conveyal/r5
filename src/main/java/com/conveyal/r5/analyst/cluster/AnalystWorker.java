@@ -4,7 +4,7 @@ import com.amazonaws.regions.Regions;
 import com.conveyal.r5.OneOriginResult;
 import com.conveyal.r5.analyst.NetworkPreloader;
 import com.conveyal.r5.analyst.FilePersistence;
-import com.conveyal.r5.analyst.GridCache;
+import com.conveyal.r5.analyst.PointSetCache;
 import com.conveyal.r5.analyst.PersistenceBuffer;
 import com.conveyal.r5.analyst.S3FilePersistence;
 import com.conveyal.r5.analyst.TravelTimeComputer;
@@ -196,7 +196,7 @@ public class AnalystWorker implements Runnable {
      * A loading cache of opportunity dataset grids (not grid pointsets or linkages).
      * TODO use the WebMercatorGridExtents in these Grids.
      */
-    GridCache gridCache;
+    PointSetCache pointSetCache;
 
     /** The transport network this worker already has loaded, and therefore prefers to work on. */
     String networkId = null;
@@ -260,7 +260,7 @@ public class AnalystWorker implements Runnable {
         // graph this machine was intended to analyze.
         this.networkId = config.getProperty("initial-graph-id");
 
-        this.gridCache = new GridCache(config.getProperty("aws-region"), config.getProperty("pointsets-bucket"));
+        this.pointSetCache = new PointSetCache(config.getProperty("aws-region"), config.getProperty("pointsets-bucket"));
         this.networkPreloader = new NetworkPreloader(transportNetworkCache);
         this.autoShutdown = Boolean.parseBoolean(config.getProperty("auto-shutdown", "false"));
         this.listenForSinglePointRequests = Boolean.parseBoolean(config.getProperty("listen-for-single-point", "true"));
@@ -420,7 +420,7 @@ public class AnalystWorker implements Runnable {
         adjustShutdownClock(SINGLE_KEEPALIVE_MINUTES);
 
         // Perform the core travel time computations.
-        TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork, gridCache);
+        TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork, pointSetCache);
         OneOriginResult oneOriginResult = computer.computeTravelTimes();
 
         // Prepare the travel time grid which will be written back to the client. We gzip the data before sending
@@ -466,13 +466,13 @@ public class AnalystWorker implements Runnable {
 
         try {
             // Having a non-null opportunity density grid in the task triggers the computation of accessibility values.
-            // The gridData should not be set on static site tasks (or single-point tasks which don't even have the field).
+            // The pointSet should not be set on static site tasks (or single-point tasks which don't even have the field).
             // Resolve the grid ID to an actual grid - this is important to determine the grid extents for the key.
             // Fetching data grids should be relatively fast so we can do it synchronously.
             // Perhaps this can be done higher up in the call stack where we know whether or not it's a regional task.
             // TODO move this after the asynchronous loading of the rest of the necessary data?
             if (!task.makeTauiSite) {
-                task.gridData = gridCache.get(task.grid);
+                task.pointSet = pointSetCache.get(task.grid);
             }
 
             // Get the graph object for the ID given in the task, fetching inputs and building as needed.
@@ -497,7 +497,7 @@ public class AnalystWorker implements Runnable {
             adjustShutdownClock(REGIONAL_KEEPALIVE_MINUTES);
 
             // Perform the core travel time and accessibility computations.
-            TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork, gridCache);
+            TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork, pointSetCache);
             OneOriginResult oneOriginResult = computer.computeTravelTimes();
 
             if (task.makeTauiSite) {

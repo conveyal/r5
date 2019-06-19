@@ -76,10 +76,10 @@ public class TravelTimeReducer {
         }
 
         // Decide whether we want to calculate cumulative opportunities accessibility indicators for this origin.
-        calculateAccessibility = task instanceof RegionalTask && ((RegionalTask)task).gridData != null;
+        calculateAccessibility = task instanceof RegionalTask && ((RegionalTask)task).pointSet != null;
         if (calculateAccessibility) {
             accessibilityResult = new AccessibilityResult(
-                new Grid[] {((RegionalTask)task).gridData},
+                new PointSet[] {((RegionalTask)task).pointSet},
                 new int[]{task.maxTripDurationMinutes},
                 task.percentiles
             );
@@ -150,7 +150,7 @@ public class TravelTimeReducer {
         if (calculateAccessibility) {
             // This x/y addressing can only work with one grid at a time,
             // needs to be made absolute to handle multiple different extents.
-            Grid grid = accessibilityResult.grids[0];
+            Grid grid = (Grid) accessibilityResult.pointSets[0]; // TODO handle freeform pointsets
             int x = target % grid.width;
             int y = target / grid.width;
             double amount = grid.grid[x][y];

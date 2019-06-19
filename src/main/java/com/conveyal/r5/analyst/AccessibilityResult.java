@@ -7,17 +7,17 @@ package com.conveyal.r5.analyst;
  */
 public class AccessibilityResult {
 
-    public final Grid[] grids;
+    public final PointSet[] pointSets;
     public final int[] cutoffs;
     public final double[] percentiles;
 
     private double[][][] values;
 
-    public AccessibilityResult (Grid[] grids, int[] cutoffs, double[] percentiles) {
-        this.grids = grids;
+    public AccessibilityResult (PointSet[] pointSets, int[] cutoffs, double[] percentiles) {
+        this.pointSets = pointSets;
         this.cutoffs = cutoffs;
         this.percentiles = percentiles;
-        values = new double[grids.length][cutoffs.length][percentiles.length];
+        values = new double[pointSets.length][cutoffs.length][percentiles.length];
     }
 
     /**

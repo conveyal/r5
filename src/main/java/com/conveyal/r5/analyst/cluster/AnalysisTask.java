@@ -1,16 +1,11 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.analyst.GridCache;
-import com.conveyal.r5.analyst.PointSet;
 import com.conveyal.r5.analyst.WebMercatorGridPointSetCache;
 import com.conveyal.r5.analyst.WorkerCategory;
 import com.conveyal.r5.profile.ProfileRequest;
-import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
-
-import java.util.List;
 
 /**
  * Describes an analysis task to be performed.

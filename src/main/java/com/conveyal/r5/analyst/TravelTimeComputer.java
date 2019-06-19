@@ -39,12 +39,12 @@ public class TravelTimeComputer {
 
     public final AnalysisTask request;
     public final TransportNetwork network;
-    public final GridCache gridCache;
+    public final PointSetCache pointSetCache;
 
-    public TravelTimeComputer(AnalysisTask request, TransportNetwork network, GridCache gridCache) {
+    public TravelTimeComputer(AnalysisTask request, TransportNetwork network, PointSetCache pointSetCache) {
         this.request = request;
         this.network = network;
-        this.gridCache = gridCache;
+        this.pointSetCache = pointSetCache;
     }
 
     /**

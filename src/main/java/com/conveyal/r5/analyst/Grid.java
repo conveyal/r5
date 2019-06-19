@@ -75,7 +75,7 @@ import static org.apache.commons.math3.util.FastMath.tan;
  * This is actually a sub-grid of the full-world web mercator grid, with a specified width and height and offset from
  * the edges of the world.
  */
-public class Grid {
+public class Grid extends PointSet {
 
     public static final Logger LOG = LoggerFactory.getLogger(Grid.class);
 
@@ -450,6 +450,12 @@ public class Grid {
     public boolean hasEqualExtents(Grid comparisonGrid){
         return this.zoom == comparisonGrid.zoom && this.west == comparisonGrid.west && this.north == comparisonGrid.north && this.width == comparisonGrid.width && this.height == comparisonGrid.height;
     }
+
+    public double getLat(int i) { return pixelToCenterLat(i, zoom); }
+
+    public double getLon(int i) { return pixelToCenterLon(i, zoom); }
+
+    public int featureCount() { return width * height; }
 
     /* functions below from http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Mathematics */
 

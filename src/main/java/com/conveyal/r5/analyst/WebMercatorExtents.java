@@ -29,8 +29,14 @@ public class WebMercatorExtents {
         return new WebMercatorExtents(task.west, task.north, task.width, task.height, task.zoom);
     }
 
-    public static WebMercatorExtents forGrid (Grid grid) {
-        return new WebMercatorExtents(grid.west, grid.north, grid.width, grid.height, grid.zoom);
+    public static WebMercatorExtents forGrid (PointSet pointSet) {
+        if (pointSet instanceof Grid) {
+            Grid grid = (Grid) pointSet;
+            return new WebMercatorExtents(grid.west, grid.north, grid.width, grid.height, grid.zoom);
+        } else {
+            return null;
+        }
+
     }
 
     public int getArea() {

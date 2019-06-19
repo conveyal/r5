@@ -23,8 +23,9 @@ import java.util.Objects;
  * 2. Build the network if it's not already built.
  * 3. Apply the scenario to the network, or fetch the resulting network if the scenario is already applied.
  * 3. Pre-compute stop-to-vertex distance tables and linkages (stop-to-point distance tables) for the walking mode.
- * 4. Create or fetch a grid of destinations based on this specific task and the gridCache.
- * 5. Link that grid to the street network with the right mode, basing distances on the stop-to-vertex tables created above.
+ * 4. Create or a destination pointset based on this specific task and the pointSetCache.
+ * 5. Link that pointset to the street network with the right mode, basing distances on the stop-to-vertex tables
+ * created above.
  *
  * The network building is done as part of requesting the network.
  * The distance tables are constructed as part of the scenario application. So the main steps to trigger explicitly are:
@@ -153,7 +154,7 @@ public class NetworkPreloader extends AsyncLoader<NetworkPreloader.Key, Transpor
             } else {
                 // A non-static-site regional task. We expect a valid grid of opportunities to be specified as the
                 // destinations. This is necessary to compute accessibility. So we extract those bounds from the grids.
-                this.webMercatorExtents = WebMercatorExtents.forGrid(((RegionalTask)task).gridData);
+                this.webMercatorExtents = WebMercatorExtents.forGrid(((RegionalTask)task).pointSet);
             }
 
             // Some accumulated comments on destination grid size (current and future):

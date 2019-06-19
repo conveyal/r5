@@ -1,6 +1,8 @@
 package com.conveyal.r5.analyst.cluster;
 
 import com.conveyal.r5.analyst.Grid;
+import com.conveyal.r5.analyst.PointSet;
+
 import java.util.List;
 
 /**
@@ -10,11 +12,10 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
 
     /**
      * Coordinates of origin cell in grid defined in AnalysisTask.
-     *
-     * Note that these do not override fromLat and fromLon; those must still be set separately. This is for future use
-     * to allow use of arbitrary origin points.
      */
     public int x = -1, y = -1;
+
+    public int originIndex;
 
     /**
      * The grid key on S3 to compute access to. If this is not blank, the default TravelTimeSurfaceTask will be
@@ -22,21 +23,28 @@ public class RegionalTask extends AnalysisTask implements Cloneable {
      * will be an accessibility value per origin, rather than a grid of travel times from that origin.
      */
     public String grid;
+    
+    /**
+     * The pointset we are calculating accessibility to. This is not serialized into the request, it's looked up by the
+     * worker.
+     */
+    public transient PointSet pointSet;
 
     /**
-     * An array of grid keys on S3 to compute access to. If this is not blank, the default TravelTimeSurfaceTask will be
-     * overridden; returnInVehicleTimes, returnWaitTimes, and returnPaths will be set to false; and the returned results
-     * will be an accessibility value per origin for each destination grid, rather than a grid of travel times from
-     * that origin.
-     * NOT YET IMPLEMENTED AND TESTED
+     * Key for pointset to use as origins.
      */
-    public List <String> grids;
+    public String originPointSetId;
 
     /**
-     * The grid we are calculating accessibility to. This is not serialized int the request, it's looked up by the worker.
-     * TODO use distinct terms for grid extents and gridded opportunity density data.
+     * Key for pointset to use as destinations.
      */
-    public transient Grid gridData;
+    public String destinationPointSetIds;
+
+    /**
+     * Whether to calculate travel times from each origin to the one destination with matching id. If false, travel
+     * time results will be an array of travel times to all destinations.
+     */
+    public boolean oneToOne;
 
     @Override
     public Type getType() {

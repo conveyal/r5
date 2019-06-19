@@ -1,12 +1,6 @@
 package com.conveyal.r5.analyst.cluster;
 
-import com.conveyal.r5.analyst.GridCache;
-import com.conveyal.r5.analyst.PointSet;
-import com.conveyal.r5.transit.TransportNetwork;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Represents a single point, interactive task coming from the Analysis UI and returning a surface of travel

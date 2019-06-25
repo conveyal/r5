@@ -48,11 +48,12 @@ public class LevelOfTrafficStressLabeler {
         String ltsTagValue = way.getTag("lts");
         if (ltsTagValue != null) {
             try {
-                int lts = Integer.parseInt(ltsTagValue);
+                // Some input Shapefiles have LTS as a floating point number.
+                double lts = Double.parseDouble(ltsTagValue);
                 if (lts < 1 || lts > 4) {
                     LOG.error("LTS value in OSM tag must be between 1 and 4. It is: " + lts);
                 }
-                EdgeStore.EdgeFlag ltsFlag = intToLts(lts);
+                EdgeStore.EdgeFlag ltsFlag = intToLts((int)lts);
                 forwardFlags.add(ltsFlag);
                 forwardFlags.add(BIKE_LTS_EXPLICIT);
                 backFlags.add(ltsFlag);

@@ -420,7 +420,7 @@ public class AnalystWorker implements Runnable {
         adjustShutdownClock(SINGLE_KEEPALIVE_MINUTES);
 
         // Perform the core travel time computations.
-        TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork, gridCache);
+        TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
         OneOriginResult oneOriginResult = computer.computeTravelTimes();
 
         // Prepare the travel time grid which will be written back to the client. We gzip the data before sending
@@ -497,7 +497,7 @@ public class AnalystWorker implements Runnable {
             adjustShutdownClock(REGIONAL_KEEPALIVE_MINUTES);
 
             // Perform the core travel time and accessibility computations.
-            TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork, gridCache);
+            TravelTimeComputer computer = new TravelTimeComputer(task, transportNetwork);
             OneOriginResult oneOriginResult = computer.computeTravelTimes();
 
             if (task.makeStaticSite) {

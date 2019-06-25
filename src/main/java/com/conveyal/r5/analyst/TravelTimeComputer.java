@@ -42,29 +42,13 @@ public class TravelTimeComputer {
 
     private final AnalysisTask request;
     private final TransportNetwork network;
-    private final GridCache gridCache; // Unused?
-
-    public TravelTimeComputer(AnalysisTask request, TransportNetwork network, GridCache gridCache) {
-        this.request = request;
-        this.network = network;
-        this.gridCache = gridCache;
-    }
 
     /**
-     * Utility method. Merges two int-int maps, keeping the minimum value when keys collide.
+     * Constructor.
      */
-    private static void minMergeMap (TIntIntMap target, TIntIntMap source) {
-       source.forEachEntry((key, val) -> {
-            if (target.containsKey(key)) {
-               int existingVal = target.get(key);
-               if (val < existingVal) {
-                   target.put(key, val);
-               }
-            } else {
-               target.put(key, val);
-            }
-            return true;
-       });
+    public TravelTimeComputer (AnalysisTask request, TransportNetwork network) {
+        this.request = request;
+        this.network = network;
     }
 
     /**
@@ -287,6 +271,23 @@ public class TravelTimeComputer {
 
         return perTargetPropagater.propagate();
 
+    }
+
+    /**
+     * Utility method. Merges two Trove int-int maps, keeping the minimum value when keys collide.
+     */
+    private static void minMergeMap (TIntIntMap target, TIntIntMap source) {
+        source.forEachEntry((key, val) -> {
+            if (target.containsKey(key)) {
+                int existingVal = target.get(key);
+                if (val < existingVal) {
+                    target.put(key, val);
+                }
+            } else {
+                target.put(key, val);
+            }
+            return true;
+        });
     }
 
 }

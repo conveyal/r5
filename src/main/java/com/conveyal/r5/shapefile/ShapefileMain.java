@@ -3,7 +3,6 @@ package com.conveyal.r5.shapefile;
 import com.conveyal.osmlib.Node;
 import com.conveyal.osmlib.OSM;
 import com.conveyal.osmlib.Way;
-import com.esotericsoftware.minlog.Log;
 import com.vividsolutions.jts.algorithm.LineIntersector;
 import com.vividsolutions.jts.algorithm.RobustLineIntersector;
 import com.vividsolutions.jts.geom.Coordinate;
@@ -17,8 +16,6 @@ import com.vividsolutions.jts.noding.IntersectionAdder;
 import com.vividsolutions.jts.noding.MCIndexNoder;
 import com.vividsolutions.jts.noding.NodedSegmentString;
 import com.vividsolutions.jts.noding.Noder;
-import com.vividsolutions.jts.noding.SegmentNode;
-import com.vividsolutions.jts.noding.SegmentNodeList;
 import com.vividsolutions.jts.noding.SegmentString;
 import com.vividsolutions.jts.noding.SegmentStringUtil;
 import com.vividsolutions.jts.operation.distance.DistanceOp;
@@ -46,9 +43,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -85,6 +80,8 @@ public class ShapefileMain {
 
         // TODO Pre-initialize nodeDeduplicator with OSM nodes from any OSM inputs.
 
+        // Approach 1: Homemade intersection creation.
+
 //        // Base network. LTS attributes are: LTSV2 LTSDV2 MVILTS MVIVLTS LTS_ACC
 //        loadShapefile("/Users/abyrd/geodata/bogota/ltsnets/Red_LTS_DPr.shp", "LTSV2");
 //
@@ -94,11 +91,16 @@ public class ShapefileMain {
 //        // Cycleways. LTS attributes are LTS LTSD RCiLTS RCiFLTS MVILTS MVINCLTS
 //        loadShapefile("/Users/abyrd/geodata/bogota/ltsnets/Ciclovia_LTS_D.shp", "LTS");
 
+        // Approach 2: Use JTS Noder to merge layers
+
         // Cycleways. LTS attributes are LTS LTSD RCiLTS RCiFLTS MVILTS MVINCLTS
-        loadShapefileIntoSegmentStrings("/Users/abyrd/geodata/bogota/ltsnets/Ciclovia_LTS_D.shp", "LTS");
+        loadShapefileIntoSegmentStrings("/Users/abyrd/geodata/bogota/ltsnets/Ciclovia_LTS_D.shp", "LTSD");
+
         // Base network. LTS attributes are: LTSV2 LTSDV2 MVILTS MVIVLTS LTS_ACC
-        loadShapefileIntoSegmentStrings("/Users/abyrd/geodata/bogota/ltsnets/Red_LTS_DPr.shp", "LTSV2");
-        indexNodingWithPrecision();
+        loadShapefileIntoSegmentStrings("/Users/abyrd/geodata/bogota/ltsnets/Red_LTS_DPr.shp", "LTSDV1");
+
+        // Create nodes where SegmentStrings cross, project into WGS84 and convert to OSM data.
+        performIndexNodingWithPrecision();
 
         osm.writeToFile("output.osm.pbf");
 
@@ -150,7 +152,7 @@ public class ShapefileMain {
                 for (LineString lineString : lineStrings) {
                     TLongList nodesInWay = new TLongArrayList();
                     for (Coordinate sourceCoordinate : lineString.getCoordinates()) {
-                        // Perform rounding in source CRS which is probably in isotropic meters
+                        // Perform rounding in source CRS which should be in isotropic meters
                         long nodeId = getNodeForBin(sourceCoordinate.x, sourceCoordinate.y);
                         nodesInWay.add(nodeId);
                     }
@@ -169,10 +171,10 @@ public class ShapefileMain {
                     if (intersect) {
                         List<WayLineString> oldWayLineStrings = wayIndex.query(lineString.getEnvelopeInternal());
                         for (WayLineString oldWayLineString : oldWayLineStrings) {
-//                            Geometry intersection = wayLineString.lineString.intersection(lineString);
-//                            if (!intersection.isEmpty()) {
-//                                LOG.info("Intersection: {}", intersection);
-//                            }
+                            // Couls also potentially use:
+                            // Geometry intersection = wayLineString.lineString.intersection(lineString);
+                            // DistanceOp is finding only one point of intersection between the two linestrings,
+                            // in some cases there are multiple intersection points.
                             DistanceOp distanceOp = new DistanceOp(lineString, oldWayLineString.lineString, 1);
                             if (distanceOp.distance() < 2) {
                                 GeometryLocation[] geometryLocations = distanceOp.nearestLocations();
@@ -188,7 +190,6 @@ public class ShapefileMain {
         }
         dataStore.dispose();
     }
-
 
     private void insertOsmNode (WayLineString wayLineString, GeometryLocation geometryLocation) {
         Coordinate coordinate = geometryLocation.getCoordinate();
@@ -271,7 +272,7 @@ public class ShapefileMain {
         dataStore.dispose();
     }
 
-    public void indexNodingWithPrecision () throws Throwable {
+    public void performIndexNodingWithPrecision () throws Throwable {
         PrecisionModel fixedPM = new PrecisionModel(1);
         LineIntersector li = new RobustLineIntersector();
         li.setPrecisionModel(fixedPM);
@@ -279,10 +280,11 @@ public class ShapefileMain {
         // This call should modify the segment strings in place, inserting new nodes.
         noder.computeNodes(allSegmentStrings);
         for (NodedSegmentString segmentString : allSegmentStrings) {
-            // SegmentNodeList segmentNodeList = segmentString.getNodeList(); // This gets only the nodes (intersections with other segmentstrings)
+            // The following gets only the nodes (intersections with other SegmentStrings) not the intermediate coords:
+            // SegmentNodeList segmentNodeList = segmentString.getNodeList();
             TLongList nodesInWay = new TLongArrayList();
             for (Coordinate sourceCoordinate : segmentString.getCoordinates()) {
-                // Perform rounding in source CRS which is probably in isotropic meters
+                // Perform rounding in source CRS which is should be in isotropic meters.
                 long osmNodeId = getNodeForBin(sourceCoordinate.x, sourceCoordinate.y);
                 nodesInWay.add(osmNodeId);
             }

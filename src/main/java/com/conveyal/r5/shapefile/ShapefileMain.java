@@ -18,6 +18,7 @@ import gnu.trove.list.TLongList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.TObjectLongMap;
 import gnu.trove.map.hash.TObjectLongHashMap;
+import org.apache.commons.math3.util.FastMath;
 import org.geotools.data.DataStore;
 import org.geotools.data.DataStoreFinder;
 import org.geotools.data.FeatureSource;
@@ -37,6 +38,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -140,8 +143,25 @@ public class ShapefileMain {
         LineIntersector li = new RobustLineIntersector();
         li.setPrecisionModel(fixedPM);
         Noder noder = new MCIndexNoder(new IntersectionAdder(li));
+        // Noder noder = new MCIndexNoder(new IntersectionAdder(new RobustLineIntersector()));
+        // Noder noder = new IteratedNoder(new PrecisionModel());
         // This call should modify the segment strings in place, inserting new nodes.
         noder.computeNodes(allSegmentStrings);
+
+        // Overwrite the existing allSegmentStrings with freshly created SegmentStrings.
+        allSegmentStrings = extendSegmentStrings(noder.getNodedSubstrings());
+
+        // Create a new intersector and noder for good measure, and re-run the operation with extended SegmentStrings.
+        // noder = new MCIndexNoder(new IntersectionAdder(new RobustLineIntersector()));
+        li = new RobustLineIntersector();
+        li.setPrecisionModel(fixedPM);
+        noder = new MCIndexNoder(new IntersectionAdder(li));
+        // noder = new IteratedNoder(new PrecisionModel());
+        noder.computeNodes(allSegmentStrings);
+        // NB: based on experience, you must call getNodedSubstrings to splice the nodes into the coordinate list.
+        // The segments are not modified in place.
+        allSegmentStrings = (List) (noder.getNodedSubstrings());
+
         for (NodedSegmentString segmentString : allSegmentStrings) {
             // The following gets only the nodes (intersections with other SegmentStrings) not the intermediate coords:
             // SegmentNodeList segmentNodeList = segmentString.getNodeList();
@@ -168,9 +188,68 @@ public class ShapefileMain {
      * little bit short of actually touching those neighboring paths. This method finds SegmentStrings that appear to
      * be such dead ends, extends them slightly, and reruns the noding operation to try to create more intersections.
      * This is a heuristic fix, and may create as many problems as it solves in places where there are true dead ends.
+     *
+     * Detection of dead ends via node-coordinate comparison seems to fail, so currently extending all shapes at both ends.
+     * This is overkill but should work. It seems like the endpoints of every SegmentString are considered nodes.
      */
-    private void extendDeadEndSegmentStrings () {
-        throw new UnsupportedOperationException();
+    private static List<NodedSegmentString> extendSegmentStrings (Collection<NodedSegmentString> inputSegmentStrings) {
+        final double DIST_TO_EXTEND = 5; // source CRS units, usually meters.
+        List<NodedSegmentString> outputSegmentStrings = new ArrayList<>();
+        for (NodedSegmentString segmentString : inputSegmentStrings) {
+            Coordinate [] coordinates = segmentString.getCoordinates();
+            // Remove repeated coordinates in the incoming geometries.
+            // Repeated geometries lead to zero lengths, which lead to division by zero, yielding NaN coordinates which
+            // then cascade an obscure error in the spatial index ("comparison violates its general contract").
+            {
+                List<Coordinate> nonDuplicateCoords = new ArrayList<>();
+                Coordinate prevCoord = null;
+                for (Coordinate currCoord : coordinates) {
+                    if (prevCoord == null || !prevCoord.equals2D(currCoord)) {
+                        nonDuplicateCoords.add(currCoord);
+                    }
+                    prevCoord = currCoord;
+                }
+                coordinates = nonDuplicateCoords.toArray(new Coordinate[nonDuplicateCoords.size()]);
+            }
+            // Drop fragments, possibly created by repeated coordinates in input data being split.
+            if (coordinates.length < 2) {
+                continue;
+            }
+
+            // Extend forward from end of linestring
+            Coordinate lastCoord = coordinates[coordinates.length - 1];
+            Coordinate secondToLastCoord = coordinates[coordinates.length - 2];
+            coordinates = Arrays.copyOf(coordinates, coordinates.length + 1);
+            coordinates[coordinates.length - 1] = extendLineSegment(secondToLastCoord, lastCoord, DIST_TO_EXTEND);
+
+            // Extend backward from beginning of linestring
+            Coordinate[] newCoordinates = new Coordinate[coordinates.length +1];
+            System.arraycopy(coordinates, 0, newCoordinates, 1, coordinates.length);
+            newCoordinates[0] = extendLineSegment(coordinates[1], coordinates[0], DIST_TO_EXTEND);
+            coordinates = newCoordinates;
+
+            // Create a new segment string with the processed coordinate and same LTS level as the source.
+            outputSegmentStrings.add(new NodedSegmentString(coordinates, segmentString.getData()));
+        }
+        return outputSegmentStrings;
+    }
+
+    /**
+     * Given two coordinates a and b, extend the line segment from a to b by the given distance, returning the new
+     * end point.
+     */
+    private static Coordinate extendLineSegment (Coordinate a, Coordinate b, double distanceToExtend) {
+        double dx = b.x - a.x;
+        double dy = b.y - a.y;
+        double length = FastMath.sqrt(dx * dx + dy * dy);
+        if (length == 0) {
+            LOG.error("Zero length segment.");
+            return b;
+        }
+        Coordinate result = new Coordinate();
+        result.x = b.x + dx / length * distanceToExtend;
+        result.y = b.y + dy / length * distanceToExtend;
+        return result;
     }
 
     /// CODE FOR DEDUPLICATING (MERGING) OSM NODES

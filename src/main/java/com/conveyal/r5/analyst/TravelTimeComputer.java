@@ -204,9 +204,8 @@ public class TravelTimeComputer {
 
         // Short circuit unnecessary transit routing: If the origin was linked to a road, but no transit stations
         // were reached, return the non-transit grid as the final result.
-        // Should we combine this with the handling of situations where transit is not requested, and direct legs?
         if (request.transitModes.isEmpty() || accessTimes.isEmpty()) {
-            LOG.info("Skipping transit search since no transit stops were reached.");
+            LOG.info("Skipping transit search. No transit stops were reached or no transit modes were selected.");
             for (int target = 0; target < nonTransitTravelTimesToDestinations.size(); target++) {
                 // TODO: pull this loop out into a method: travelTimeReducer.recordPointSetTimes(accessTimes)
                 final int travelTimeSeconds = nonTransitTravelTimesToDestinations.getTravelTimeToPoint(target);

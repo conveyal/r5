@@ -7,19 +7,13 @@ import com.vividsolutions.jts.algorithm.LineIntersector;
 import com.vividsolutions.jts.algorithm.RobustLineIntersector;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.Geometry;
-import com.vividsolutions.jts.geom.LineString;
-import com.vividsolutions.jts.geom.MultiLineString;
 import com.vividsolutions.jts.geom.PrecisionModel;
-import com.vividsolutions.jts.index.SpatialIndex;
-import com.vividsolutions.jts.index.quadtree.Quadtree;
 import com.vividsolutions.jts.noding.IntersectionAdder;
 import com.vividsolutions.jts.noding.MCIndexNoder;
 import com.vividsolutions.jts.noding.NodedSegmentString;
 import com.vividsolutions.jts.noding.Noder;
 import com.vividsolutions.jts.noding.SegmentString;
 import com.vividsolutions.jts.noding.SegmentStringUtil;
-import com.vividsolutions.jts.operation.distance.DistanceOp;
-import com.vividsolutions.jts.operation.distance.GeometryLocation;
 import gnu.trove.list.TLongList;
 import gnu.trove.list.array.TLongArrayList;
 import gnu.trove.map.TObjectLongMap;
@@ -48,55 +42,48 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * This Main class serves as a tool to convert Shapefiles into OSM data, which can then be imported into Analysis.
+ * The initial use case is for performing accessibility analysis on shapefiles representing bicycle networks.
+ * These shapefiles have a property containing the Level of Traffic Stress (LTS) for each road segment.
+ * This property is converted to an OSM tag in the output data. R5 reads and uses this tag to set its LTS values.
+ * Several shapefiles are loaded and "noded", i.e. topological connections are created everywhere lines cross.
+ * The inputs could potentially be any format that amounts to a collection of linestring features (GeoJSON etc.).
+ */
 public class ShapefileMain {
 
     private static final Logger LOG = LoggerFactory.getLogger(ShapefileMain.class);
 
-    // at line crossings within layers, and between layers
-    private boolean intersect = false;
-
+    /**
+     * We use negative OSM way and node IDs, decrementing for each new entity that is created.
+     * This is the convention for entities that don't appear in the shared global OSM database.
+     */
     private long nextTemporaryOsmWayId = -1;
 
+    /** While performing the conversion, OSM output is accumulated here and written out at the end. */
     private OSM osm;
 
-    private SpatialIndex wayIndex = new Quadtree();
+    private List<NodedSegmentString> allSegmentStrings = new ArrayList<>();
 
-    /**
-     * Given N shapefiles and/or OSM files, merge them all, creating new nodes as requested.
-     *
-     * Inputs can really be anything that amounts to a collection of linestring features.
-     *
-     * JTS and Geotools probably have methods for a lot of operations.
-     */
+    /** The transform from the input shapefile coordinate reference system into WGS84 latitude and longitude. */
+    private MathTransform coordinateTransform;
+
     public static void main (String[] args) throws Throwable {
         new ShapefileMain().run();
     }
 
     private void run () throws Throwable {
 
+        // OSM data store using temporary file.
         osm = new OSM(null);
-        // Can pre-load OSM data here:
-        // osm.readFromFile(x);
 
-        // TODO Pre-initialize nodeDeduplicator with OSM nodes from any OSM inputs.
+        // We could pre-load OSM data here: osm.readFromFile(x);
+        // Then we would need to pre-initialize the node deduplicator with OSM nodes from those OSM inputs.
 
-        // Approach 1: Homemade intersection creation.
-
-//        // Base network. LTS attributes are: LTSV2 LTSDV2 MVILTS MVIVLTS LTS_ACC
-//        loadShapefile("/Users/abyrd/geodata/bogota/ltsnets/Red_LTS_DPr.shp", "LTSV2");
-//
-//        // Switch on intersection creation here - within the layer itself and with any pre-existing ways.
-//        intersect = true;
-//
-//        // Cycleways. LTS attributes are LTS LTSD RCiLTS RCiFLTS MVILTS MVINCLTS
-//        loadShapefile("/Users/abyrd/geodata/bogota/ltsnets/Ciclovia_LTS_D.shp", "LTS");
-
-        // Approach 2: Use JTS Noder to merge layers
-
-        // Cycleways. LTS attributes are LTS LTSD RCiLTS RCiFLTS MVILTS MVINCLTS
+        // Load cycleways. LTS attributes are LTS LTSD RCiLTS RCiFLTS MVILTS MVINCLTS
         loadShapefileIntoSegmentStrings("/Users/abyrd/geodata/bogota/ltsnets/Ciclovia_LTS_D.shp", "LTSD");
 
-        // Base network. LTS attributes are: LTSV2 LTSDV2 MVILTS MVIVLTS LTS_ACC
+        // Load base network. LTS attributes are: LTSV2 LTSDV2 MVILTS MVIVLTS LTS_ACC
         loadShapefileIntoSegmentStrings("/Users/abyrd/geodata/bogota/ltsnets/Red_LTS_DPr.shp", "LTSDV1");
 
         // Create nodes where SegmentStrings cross, project into WGS84 and convert to OSM data.
@@ -105,133 +92,6 @@ public class ShapefileMain {
         osm.writeToFile("output.osm.pbf");
 
     }
-
-    private void loadShapefile (String filename, String ltsAttributeName) throws Throwable {
-
-        final File file = new File(filename);
-        LOG.info("Loading Shapefile {}", file);
-
-        // Open shapefile
-        Map<String, Object> map = new HashMap<>();
-        map.put("url", file.toURI().toURL());
-
-        DataStore dataStore = DataStoreFinder.getDataStore(map);
-        String typeName = dataStore.getTypeNames()[0];
-
-        FeatureSource<SimpleFeatureType, SimpleFeature> source = dataStore.getFeatureSource(typeName);
-        Filter filter = Filter.INCLUDE;
-        // ECQL.toFilter("BBOX(THE_GEOM, 10,20,30,40)");
-
-        FeatureCollection<SimpleFeatureType, SimpleFeature> collection = source.getFeatures(filter);
-
-        // Find transform from shapefile coordinate system into WGS84
-        CoordinateReferenceSystem sourceCrs = collection.getSchema().getCoordinateReferenceSystem();
-        transform = CRS.findMathTransform(sourceCrs, DefaultGeographicCRS.WGS84, true);
-
-        try (FeatureIterator<SimpleFeature> features = collection.features()) {
-            int ltsTagCount = 0;
-            while (features.hasNext()) {
-                SimpleFeature feature = features.next();
-                // System.out.print(feature.getID());
-                // System.out.print(": ");
-                // System.out.println(feature.getDefaultGeometryProperty().getValue());
-                Object geometry = feature.getDefaultGeometry();
-                // Unwrap MultiLinestrings into a list of LineStrings
-                List<LineString> lineStrings = new ArrayList<>();
-                if (geometry instanceof LineString) {
-                    lineStrings.add((LineString)geometry);
-                } else if (geometry instanceof MultiLineString) {
-                    int nLineStrings = ((MultiLineString) geometry).getNumGeometries();
-                    for (int i = 0; i < nLineStrings; i++) {
-                        lineStrings.add((LineString)((MultiLineString) geometry).getGeometryN(i));
-                    }
-                } else {
-                    throw new RuntimeException("Unsupported geometry type: " + geometry.getClass());
-                }
-                Object lts = feature.getAttribute(ltsAttributeName);
-                for (LineString lineString : lineStrings) {
-                    TLongList nodesInWay = new TLongArrayList();
-                    for (Coordinate sourceCoordinate : lineString.getCoordinates()) {
-                        // Perform rounding in source CRS which should be in isotropic meters
-                        long nodeId = getNodeForBin(sourceCoordinate.x, sourceCoordinate.y);
-                        nodesInWay.add(nodeId);
-                    }
-                    Way way = new Way();
-                    way.addTag("highway", "tertiary");
-                    if (lts != null) {
-                        way.addTag("lts", lts.toString());
-                        ltsTagCount += 1;
-                    }
-                    LOG.info("tags: {}", way.tags);
-                    way.nodes = nodesInWay.toArray();
-                    long wayId = nextTemporaryOsmWayId;
-                    nextTemporaryOsmWayId -= 1;
-                    osm.ways.put(wayId, way);
-                    WayLineString newWayLineString = new WayLineString(way, wayId, lineString);
-                    if (intersect) {
-                        List<WayLineString> oldWayLineStrings = wayIndex.query(lineString.getEnvelopeInternal());
-                        for (WayLineString oldWayLineString : oldWayLineStrings) {
-                            // Couls also potentially use:
-                            // Geometry intersection = wayLineString.lineString.intersection(lineString);
-                            // DistanceOp is finding only one point of intersection between the two linestrings,
-                            // in some cases there are multiple intersection points.
-                            DistanceOp distanceOp = new DistanceOp(lineString, oldWayLineString.lineString, 1);
-                            if (distanceOp.distance() < 2) {
-                                GeometryLocation[] geometryLocations = distanceOp.nearestLocations();
-                                insertOsmNode(newWayLineString, geometryLocations[0]);
-                                insertOsmNode(oldWayLineString, geometryLocations[1]);
-                            }
-                        }
-                    }
-                    wayIndex.insert(lineString.getEnvelopeInternal(), newWayLineString);
-                }
-            }
-            LOG.info("Total LTS tags added to OSM: {}", ltsTagCount);
-        }
-        dataStore.dispose();
-    }
-
-    private void insertOsmNode (WayLineString wayLineString, GeometryLocation geometryLocation) {
-        Coordinate coordinate = geometryLocation.getCoordinate();
-        long intersectionNodeId = getNodeForBin(coordinate.x, coordinate.y);
-        // Insert node in list of nodes belonging to way
-        int insertionIndex = geometryLocation.getSegmentIndex();
-        int dst = 0;
-        long[] oldNodes = wayLineString.way.nodes;
-        long[] newNodes = new long[oldNodes.length + 1];
-        if (oldNodes[insertionIndex] == intersectionNodeId || oldNodes[insertionIndex + 1] == intersectionNodeId) {
-            // If inserting the new node ID would result in a repeating node, don't take any action.
-            return;
-        }
-        for (int src = 0; src < oldNodes.length; src++, dst++) {
-            newNodes[dst] = oldNodes[src];
-            if (dst == insertionIndex) {
-                dst += 1;
-                newNodes[dst] = intersectionNodeId;
-            }
-        }
-        wayLineString.way.nodes = newNodes;
-        osm.ways.put(wayLineString.wayId, wayLineString.way);
-    }
-
-    /**
-     * Associates an OSM way with its JTS Geometry to allow performing intersections.
-     */
-    private static class WayLineString {
-        Way way;
-        long wayId;
-        LineString lineString;
-
-        public WayLineString (Way way, long wayId, LineString lineString) {
-            this.way = way;
-            this.wayId = wayId;
-            this.lineString = lineString;
-        }
-    }
-
-    private List<NodedSegmentString> allSegmentStrings = new ArrayList<>();
-
-    private MathTransform transform;
 
     private void loadShapefileIntoSegmentStrings (String filename, String ltsAttributeName) throws Throwable {
 
@@ -252,7 +112,7 @@ public class ShapefileMain {
         // Find transform from shapefile coordinate system into WGS84
         // Note that this assumes all input files are in the same CRS
         CoordinateReferenceSystem sourceCrs = collection.getSchema().getCoordinateReferenceSystem();
-        transform = CRS.findMathTransform(sourceCrs, DefaultGeographicCRS.WGS84, true);
+        coordinateTransform = CRS.findMathTransform(sourceCrs, DefaultGeographicCRS.WGS84, true);
 
         try (FeatureIterator<SimpleFeature> features = collection.features()) {
             int ltsTagCount = 0;
@@ -272,7 +132,10 @@ public class ShapefileMain {
         dataStore.dispose();
     }
 
-    public void performIndexNodingWithPrecision () throws Throwable {
+    /**
+     * Use the code provided by JTS for "noding", i.e. creating shared nodes at each place where shapes cross each other.
+     */
+    private void performIndexNodingWithPrecision () {
         PrecisionModel fixedPM = new PrecisionModel(1);
         LineIntersector li = new RobustLineIntersector();
         li.setPrecisionModel(fixedPM);
@@ -285,7 +148,7 @@ public class ShapefileMain {
             TLongList nodesInWay = new TLongArrayList();
             for (Coordinate sourceCoordinate : segmentString.getCoordinates()) {
                 // Perform rounding in source CRS which is should be in isotropic meters.
-                long osmNodeId = getNodeForBin(sourceCoordinate.x, sourceCoordinate.y);
+                long osmNodeId = getNodeForCoordinate(sourceCoordinate.x, sourceCoordinate.y);
                 nodesInWay.add(osmNodeId);
             }
             Way way = new Way();
@@ -300,21 +163,35 @@ public class ShapefileMain {
         }
     }
 
+    /**
+     * The input data contains some paths that are intended to cross or connect to neighboring paths, but stop just a
+     * little bit short of actually touching those neighboring paths. This method finds SegmentStrings that appear to
+     * be such dead ends, extends them slightly, and reruns the noding operation to try to create more intersections.
+     * This is a heuristic fix, and may create as many problems as it solves in places where there are true dead ends.
+     */
+    private void extendDeadEndSegmentStrings () {
+        throw new UnsupportedOperationException();
+    }
 
-    /// DEDUPLICATE OSM NODES
+    /// CODE FOR DEDUPLICATING (MERGING) OSM NODES
 
-    TObjectLongMap<BinKey> osmNodeForBin = new TObjectLongHashMap<>();
-
-    private long nextTempOsmId = -1;
-
-    private static final double roundingMultiplier = 1;
+    /** A map from rounded coordinate bins to the long ID for the merged OSM node that represents each bin. */
+    TObjectLongMap<CoordBinKey> osmNodeForBin = new TObjectLongHashMap<>();
 
     /**
-     * Lazy-create.
-     * Stores any newly created nodes in the OSM MapDB.
+     * We use negative OSM way and node IDs, decrementing for each new entity that is created.
+     * This is the convention for entities that don't appear in the shared global OSM database.
      */
-    private long getNodeForBin (double x, double y) {
-        BinKey binKey = new BinKey(x, y);
+    private long nextTempOsmId = -1;
+
+    private static final double COORD_ROUNDING_MULTIPLIER = 1;
+
+    /**
+     * Lazy-create OSM node objects, storing the newly created nodes in the OSM MapDB.
+     * If a node has already been requested for a location in the same N-meter bin, the pre-existing node is returned.
+     */
+    private long getNodeForCoordinate (double x, double y) {
+        CoordBinKey binKey = new CoordBinKey(x, y);
         long nodeId = osmNodeForBin.get(binKey);
         if (nodeId == 0) {
             nodeId = nextTempOsmId;
@@ -322,7 +199,7 @@ public class ShapefileMain {
             osmNodeForBin.put(binKey, nodeId);
             try {
                 Coordinate wgsCoordinate = new Coordinate();
-                JTS.transform(new Coordinate(x, y), wgsCoordinate, transform);
+                JTS.transform(new Coordinate(x, y), wgsCoordinate, coordinateTransform);
                 osm.nodes.put(nodeId, new Node(wgsCoordinate.y, wgsCoordinate.x));
             } catch (TransformException e) {
                 throw new RuntimeException(e);
@@ -331,21 +208,28 @@ public class ShapefileMain {
         return nodeId;
     }
 
-    private static class BinKey {
+    /**
+     * Objects of this class serve as keys for deduplicated / spatially merged OSM nodes. Floating point coordinates are
+     * truncated to integers after being scaled by a multiplier. This essentially bins the nodes by geographic proximity.
+     * Now that we are using the standard JTS noding utilities, this may not be necessary. JTS is using a similar
+     * coordinate rounding approach to combine nodes, but I'm not sure that the rounded coordinates are being stored
+     * This code was already written and using it reassures me that we are really merging into the same OSM node.
+     */
+    private static class CoordBinKey {
 
         private int xBin;
         private int yBin;
 
-        public BinKey (double x, double y) {
-            this.xBin = (int)(x * roundingMultiplier);
-            this.yBin = (int)(y * roundingMultiplier);
+        public CoordBinKey (double x, double y) {
+            this.xBin = (int)(x * COORD_ROUNDING_MULTIPLIER);
+            this.yBin = (int)(y * COORD_ROUNDING_MULTIPLIER);
         }
 
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
-            BinKey key = (BinKey) o;
+            CoordBinKey key = (CoordBinKey) o;
             return xBin == key.xBin && yBin == key.yBin;
         }
 
@@ -358,6 +242,7 @@ public class ShapefileMain {
         public String toString() {
             return "(" + xBin + "," + yBin + ')';
         }
+
     }
 
 }

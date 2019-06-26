@@ -89,7 +89,8 @@ public class ShapefileMain {
         // Load base network. LTS attributes are: LTSV2 LTSDV2 MVILTS MVIVLTS LTS_ACC
         loadShapefileIntoSegmentStrings("/Users/abyrd/geodata/bogota/ltsnets/Red_LTS_DPr.shp", "LTSDV1");
 
-        // Create nodes where SegmentStrings cross, project into WGS84 and convert to OSM data.
+        extendSegmentStrings();
+
         performIndexNodingWithPrecision();
 
         osm.writeToFile("output.osm.pbf");
@@ -139,32 +140,19 @@ public class ShapefileMain {
      * Use the code provided by JTS for "noding", i.e. creating shared nodes at each place where shapes cross each other.
      */
     private void performIndexNodingWithPrecision () {
+
         PrecisionModel fixedPM = new PrecisionModel(1);
         LineIntersector li = new RobustLineIntersector();
         li.setPrecisionModel(fixedPM);
         Noder noder = new MCIndexNoder(new IntersectionAdder(li));
-        // Noder noder = new MCIndexNoder(new IntersectionAdder(new RobustLineIntersector()));
-        // Noder noder = new IteratedNoder(new PrecisionModel());
-        // This call should modify the segment strings in place, inserting new nodes.
-        noder.computeNodes(allSegmentStrings);
-
-        // Overwrite the existing allSegmentStrings with freshly created SegmentStrings.
-        allSegmentStrings = extendSegmentStrings(noder.getNodedSubstrings());
-
-        // Create a new intersector and noder for good measure, and re-run the operation with extended SegmentStrings.
-        // noder = new MCIndexNoder(new IntersectionAdder(new RobustLineIntersector()));
-        li = new RobustLineIntersector();
-        li.setPrecisionModel(fixedPM);
-        noder = new MCIndexNoder(new IntersectionAdder(li));
         // noder = new IteratedNoder(new PrecisionModel());
         noder.computeNodes(allSegmentStrings);
+
         // NB: based on experience, you must call getNodedSubstrings to splice the nodes into the coordinate list.
-        // The segments are not modified in place.
+        // The input SegmentStrings are not fully modified in place.
         allSegmentStrings = (List) (noder.getNodedSubstrings());
 
         for (NodedSegmentString segmentString : allSegmentStrings) {
-            // The following gets only the nodes (intersections with other SegmentStrings) not the intermediate coords:
-            // SegmentNodeList segmentNodeList = segmentString.getNodeList();
             TLongList nodesInWay = new TLongArrayList();
             for (Coordinate sourceCoordinate : segmentString.getCoordinates()) {
                 // Perform rounding in source CRS which is should be in isotropic meters.
@@ -192,10 +180,10 @@ public class ShapefileMain {
      * Detection of dead ends via node-coordinate comparison seems to fail, so currently extending all shapes at both ends.
      * This is overkill but should work. It seems like the endpoints of every SegmentString are considered nodes.
      */
-    private static List<NodedSegmentString> extendSegmentStrings (Collection<NodedSegmentString> inputSegmentStrings) {
-        final double DIST_TO_EXTEND = 5; // source CRS units, usually meters.
+    private void extendSegmentStrings () {
+        final double DIST_TO_EXTEND = 4; // source CRS units, usually meters.
         List<NodedSegmentString> outputSegmentStrings = new ArrayList<>();
-        for (NodedSegmentString segmentString : inputSegmentStrings) {
+        for (NodedSegmentString segmentString : allSegmentStrings) {
             Coordinate [] coordinates = segmentString.getCoordinates();
             // Remove repeated coordinates in the incoming geometries.
             // Repeated geometries lead to zero lengths, which lead to division by zero, yielding NaN coordinates which
@@ -231,7 +219,8 @@ public class ShapefileMain {
             // Create a new segment string with the processed coordinate and same LTS level as the source.
             outputSegmentStrings.add(new NodedSegmentString(coordinates, segmentString.getData()));
         }
-        return outputSegmentStrings;
+        // Overwrite old segment strings with new extended ones.
+        allSegmentStrings = outputSegmentStrings;
     }
 
     /**

@@ -139,7 +139,12 @@ public class TravelTimeComputer {
             // egress end of the trip. We could probably reuse a method for both (getTravelTimesFromPoint).
             // Note: Access searches (which minimize travel time) are asymmetric with the egress cost tables (which
             // often minimize distance to allow reuse at different speeds).
-            sr.timeLimitSeconds = request.getMaxTimeSeconds(accessMode);
+            // Preserve past behavior: only apply bike or walk time limits when those modes are used to access transit.
+            if (request.hasTransit()) {
+                sr.timeLimitSeconds = request.getMaxTimeSeconds(accessMode);
+            } else {
+                sr.timeLimitSeconds = request.maxTripDurationMinutes * FastRaptorWorker.SECONDS_PER_MINUTE;
+            }
             sr.quantityToMinimize = StreetRouter.State.RoutingVariable.DURATION_SECONDS;
             sr.route();
             // Change to walking in order to reach transit stops in pedestrian-only areas like train stations.

@@ -13,6 +13,7 @@ import com.vividsolutions.jts.geom.Point;
 import com.vividsolutions.jts.geom.Polygon;
 import com.vividsolutions.jts.geom.prep.PreparedGeometry;
 import com.vividsolutions.jts.geom.prep.PreparedGeometryFactory;
+import org.apache.commons.io.input.BOMInputStream;
 import org.apache.commons.math3.util.FastMath;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
@@ -503,9 +504,13 @@ public class Grid {
     }
 
     public static Map<String,Grid> fromCsv(File csvFile, String latField, String lonField, int zoom, BiConsumer<Integer, Integer> statusListener) throws IOException {
-        CsvReader reader = new CsvReader(new BufferedInputStream(new FileInputStream(csvFile)), Charset.forName("UTF-8"));
-        reader.readHeaders();
 
+        // Read through the CSV file once to establish its structure (which fields are numeric).
+        // Although UTF-8 encoded files do not need a byte order mark and it is not recommended, Windows text editors
+        // often add one anyway.
+        InputStream csvInputStream = new BOMInputStream(new BufferedInputStream(new FileInputStream(csvFile)));
+        CsvReader reader = new CsvReader(csvInputStream, Charset.forName("UTF-8"));
+        reader.readHeaders();
         String[] headers = reader.getHeaders();
         if (!Stream.of(headers).anyMatch(h -> h.equals(latField))) {
             LOG.info("Lat field not found!");
@@ -563,8 +568,10 @@ public class Grid {
                                         envelope.getMinX()
                                 )));
 
-        // read it again, Sam - reread the CSV to get the actual values and populate the grids
-        reader = new CsvReader(new BufferedInputStream(new FileInputStream(csvFile)), Charset.forName("UTF-8"));
+        // The first read through the CSV just established its structure (e.g. which fields were numeric).
+        // Now, re-read the CSV from the beginning to load the values and populate the grids.
+        csvInputStream = new BOMInputStream(new BufferedInputStream(new FileInputStream(csvFile)));
+        reader = new CsvReader(csvInputStream, Charset.forName("UTF-8"));
         reader.readHeaders();
 
         int i = 0;

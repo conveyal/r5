@@ -8,7 +8,7 @@
 
     <groupId>com.conveyal</groupId>
     <artifactId>r5</artifactId>
-    <version>4.6.0</version>
+    <version>4.6.1-SNAPSHOT</version>
     <packaging>jar</packaging>
     <licenses>
         <license>

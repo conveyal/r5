@@ -234,6 +234,9 @@ public class EdgeStore implements Serializable {
         // Comments below pasted from that document.
         // FIXME bicycle LTS should not really be flags, the categories are mutually exclusive and can be stored in 2 bits.
 
+        // If this flag is set, then its LTS has been loaded from OSM tags and we will not apply further processing to infer it.
+        BIKE_LTS_EXPLICIT (27),
+
         /**
          * Presenting little traffic stress and demanding little attention from cyclists, and attractive enough for a
          * relaxing bike ride. Suitable for almost all cyclists, including children trained to safely cross intersections.

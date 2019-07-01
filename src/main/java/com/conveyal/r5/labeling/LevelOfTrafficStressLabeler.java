@@ -17,6 +17,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.conveyal.r5.streets.EdgeStore.EdgeFlag.BIKE_LTS_EXPLICIT;
+
 /**
  * Label streets with a best-guess at their Level of Traffic Stress, as defined in
  * http://transweb.sjsu.edu/PDFs/research/1005-low-stress-bicycling-network-connectivity.pdf
@@ -41,6 +43,26 @@ public class LevelOfTrafficStressLabeler {
     /** Set the LTS for this way in the provided flags (not taking into account any intersection LTS at the moment) */
     public void label (Way way, EnumSet<EdgeStore.EdgeFlag> forwardFlags, EnumSet<EdgeStore.EdgeFlag> backFlags) {
         // the general idea behind this function is that we progress from low-stress to higher-stress, bailing out as we go.
+
+        // First, if the input OSM data contains LTS tags, use those rather than estimating LTS from road characteristics.
+        String ltsTagValue = way.getTag("lts");
+        if (ltsTagValue != null) {
+            try {
+                // Some input Shapefiles have LTS as a floating point number.
+                double lts = Double.parseDouble(ltsTagValue);
+                if (lts < 1 || lts > 4) {
+                    LOG.error("LTS value in OSM tag must be between 1 and 4. It is: " + lts);
+                }
+                EdgeStore.EdgeFlag ltsFlag = intToLts((int)lts);
+                forwardFlags.add(ltsFlag);
+                forwardFlags.add(BIKE_LTS_EXPLICIT);
+                backFlags.add(ltsFlag);
+                backFlags.add(BIKE_LTS_EXPLICIT);
+                return;
+            } catch (NumberFormatException nfe){
+                LOG.error("Could not parse LTS from OSM tag: " + ltsTagValue);
+            }
+        }
 
         if (!forwardFlags.contains(EdgeStore.EdgeFlag.ALLOWS_CAR) && !backFlags.contains(EdgeStore.EdgeFlag.ALLOWS_CAR)) {
             // no cars permitted on this way, it is LTS 1
@@ -162,6 +184,7 @@ public class LevelOfTrafficStressLabeler {
      * the highest LTS of any of the streets entering the intersection, unless there is a traffic signal at the intersection.
      */
     public void applyIntersectionCosts(StreetLayer streetLayer) {
+
         VertexStore.Vertex v = streetLayer.vertexStore.getCursor(0);
         EdgeStore.Edge e = streetLayer.edgeStore.getCursor();
 
@@ -202,6 +225,9 @@ public class LevelOfTrafficStressLabeler {
 
             for (TIntIterator eit = streetLayer.incomingEdges.get(v.index).iterator(); eit.hasNext();) {
                 e.seek(eit.next());
+                if (e.getFlag(BIKE_LTS_EXPLICIT)) {
+                    continue;
+                }
 
                 // we do need to check and preserve LTS on this edge, because it can be higher than the intersection
                 // LTS if the other end of it is connected to a higher-stress intersection.
@@ -222,6 +248,9 @@ public class LevelOfTrafficStressLabeler {
             // need to set on both incoming and outgoing b/c it is possible to start or end a search at a high-stress intersection
             for (TIntIterator eit = streetLayer.outgoingEdges.get(v.index).iterator(); eit.hasNext();) {
                 e.seek(eit.next());
+                if (e.getFlag(BIKE_LTS_EXPLICIT)) {
+                    continue;
+                }
 
                 // we do need to check and preserve LTS on this edge, because it can be higher than the intersection
                 // LTS if the other end of it is connected to a higher-stress intersection.
